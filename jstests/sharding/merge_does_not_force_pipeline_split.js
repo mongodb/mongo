@@ -1,4 +1,4 @@
-// Tests that an $out stage does not force a pipeline to split into a "shards part" and a "merging
+// Tests that a $merge stage does not force a pipeline to split into a "shards part" and a "merging
 // part" if no other stage in the pipeline would force such a split.
 (function() {
     "use strict";
@@ -30,32 +30,34 @@
         assert(explain.hasOwnProperty("splitPipeline"), tojson(explain));
         assert(explain.splitPipeline.hasOwnProperty("shardsPart"), tojson(explain));
         assert.eq(
-            explain.splitPipeline.shardsPart.filter(stage => stage.hasOwnProperty("$out")).length,
+            explain.splitPipeline.shardsPart.filter(stage => stage.hasOwnProperty("$merge")).length,
             1,
             tojson(explain));
         assert(explain.splitPipeline.hasOwnProperty("mergerPart"), tojson(explain));
         assert.eq([], explain.splitPipeline.mergerPart, tojson(explain));
     }
 
-    // Test that a simple $out can run in parallel. Note that we still expect a 'splitPipeline' in
+    // Test that a simple $merge can run in parallel. Note that we still expect a 'splitPipeline' in
     // the explain output, but the merging half should be empty to indicate that the entire thing is
     // executing in parallel on the shards.
-    let explain =
-        inColl.explain().aggregate([{$out: {to: outCollById.getName(), mode: "insertDocuments"}}]);
+    let explain = inColl.explain().aggregate(
+        [{$merge: {into: outCollById.getName(), whenMatched: "fail", whenNotMatched: "insert"}}]);
     assertOutRunsOnShards(explain);
     // Actually execute the pipeline and make sure it works as expected.
     assert.eq(outCollById.find().itcount(), 0);
-    inColl.aggregate([{$out: {to: outCollById.getName(), mode: "insertDocuments"}}]);
+    inColl.aggregate(
+        [{$merge: {into: outCollById.getName(), whenMatched: "fail", whenNotMatched: "insert"}}]);
     assert.eq(outCollById.find().itcount(), numDocs);
 
     // Test the same thing but in a pipeline where the output collection's shard key differs from
     // the input collection's.
-    explain =
-        inColl.explain().aggregate([{$out: {to: outCollBySK.getName(), mode: "insertDocuments"}}]);
+    explain = inColl.explain().aggregate(
+        [{$merge: {into: outCollBySK.getName(), whenMatched: "fail", whenNotMatched: "insert"}}]);
     assertOutRunsOnShards(explain);
     // Again, test that execution works as expected.
     assert.eq(outCollBySK.find().itcount(), 0);
-    inColl.aggregate([{$out: {to: outCollBySK.getName(), mode: "insertDocuments"}}]);
+    inColl.aggregate(
+        [{$merge: {into: outCollBySK.getName(), whenMatched: "fail", whenNotMatched: "insert"}}]);
     assert.eq(outCollBySK.find().itcount(), numDocs);
 
     st.stop();

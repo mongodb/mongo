@@ -1,4 +1,4 @@
-// Tests that aggregations with a $out stage respect the options set on the command.
+// Tests that aggregations with a $merge stage respect the options set on the command.
 (function() {
     'use strict';
 
@@ -40,11 +40,17 @@
     });
 
     // Test that the maxTimeMS value is used for both the listIndexes command for uniqueKey
-    // validation as well as the $out aggregation itself.
+    // validation as well as the $merge aggregation itself.
     (function testMaxTimeMS() {
         assert.commandWorked(source.runCommand("aggregate", {
-            pipeline:
-                [{$out: {to: target.getName(), mode: "replaceDocuments", uniqueKey: shardKey}}],
+            pipeline: [{
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: "replaceWithNew",
+                    whenNotMatched: "insert",
+                    on: Object.keys(shardKey)
+                }
+            }],
             cursor: {},
             maxTimeMS: maxTimeMS
         }));
@@ -76,10 +82,16 @@
         assert.commandWorked(primaryDB.getSiblingDB("admin").runCommand(
             {configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}));
 
-        // Test that the $out correctly fails when the maxTimeMS is exceeded.
+        // Test that the $merge correctly fails when the maxTimeMS is exceeded.
         const res = source.runCommand("aggregate", {
-            pipeline:
-                [{$out: {to: target.getName(), mode: "replaceDocuments", uniqueKey: shardKey}}],
+            pipeline: [{
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: "replaceWithNew",
+                    whenNotMatched: "insert",
+                    on: Object.keys(shardKey)
+                }
+            }],
             cursor: {},
             maxTimeMS: maxTimeMS
         });
@@ -112,16 +124,21 @@
             {configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}));
     })();
 
-    // Test that setting a read preference on the $out also applies to the listIndexes
+    // Test that setting a read preference on the $merge also applies to the listIndexes
     // command.
     (function testReadPreference() {
         const secondaryDB = st.rs0.getSecondary().getDB("test");
         assert.commandWorked(secondaryDB.setProfilingLevel(2));
 
-        // TODO SERVER-37250: Ban $readPreference secondary with new $out modes.
         assert.commandWorked(source.runCommand("aggregate", {
-            pipeline:
-                [{$out: {to: target.getName(), mode: "replaceDocuments", uniqueKey: shardKey}}],
+            pipeline: [{
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: "replaceWithNew",
+                    whenNotMatched: "insert",
+                    on: Object.keys(shardKey)
+                }
+            }],
             cursor: {},
             $readPreference: {mode: "secondary"}
         }));
@@ -150,10 +167,10 @@
             numExpectedMatches: 1
         });
 
-        // $out with mode "replaceCollection" cannot be run against a secondary since it writes
-        // directly to a local temp collection.
+        // Test that $out cannot be run against a secondary since it writes directly to a local temp
+        // collection.
         assert.commandFailedWithCode(source.runCommand("aggregate", {
-            pipeline: [{$out: {to: "non_existent", mode: "replaceCollection"}}],
+            pipeline: [{$out: "non_existent"}],
             cursor: {},
             $readPreference: {mode: "secondary"}
         }),

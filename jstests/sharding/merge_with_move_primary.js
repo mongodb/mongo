@@ -1,4 +1,4 @@
-// Tests that the $out aggregation stage is resilient to move primary in both the source and
+// Tests that the $merge aggregation stage is resilient to move primary in both the source and
 // output collection during execution.
 (function() {
     'use strict';
@@ -9,29 +9,32 @@
     const sourceColl = mongosDB["source"];
     const targetColl = mongosDB["target"];
 
-    function setAggHang(mode, outMode) {
-        const failPoint = outMode == "replaceCollection"
-            ? "hangWhileBuildingDocumentSourceOutBatch"
-            : "hangWhileBuildingDocumentSourceMergeBatch";
+    function setAggHang(mode) {
+        assert.commandWorked(st.shard0.adminCommand(
+            {configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}));
+        assert.commandWorked(st.shard1.adminCommand(
+            {configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}));
 
-        assert.commandWorked(st.shard0.adminCommand({configureFailPoint: failPoint, mode: mode}));
-        assert.commandWorked(st.shard1.adminCommand({configureFailPoint: failPoint, mode: mode}));
+        assert.commandWorked(st.shard0.adminCommand(
+            {configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}));
+        assert.commandWorked(st.shard1.adminCommand(
+            {configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}));
     }
 
-    function runOutWithMode(outMode, shardedColl, expectFailCode) {
+    function runPipelineWithStage(stage, shardedColl, expectFailCode) {
         // Set the failpoint to hang in the first call to DocumentSourceCursor's getNext().
-        setAggHang("alwaysOn", outMode);
+        setAggHang("alwaysOn");
 
         // Set the primary shard.
         st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 
-        let comment = outMode + "_" + shardedColl.getName() + "_1";
+        let comment = jsTestName() + "_comment";
         let outFn = `
             const sourceDB = db.getSiblingDB(jsTestName());
             const sourceColl = sourceDB["${sourceColl.getName()}"];
             let cmdRes = sourceDB.runCommand({
                 aggregate: "${sourceColl.getName()}",
-                pipeline: [{$out: {to: "${targetColl.getName()}", mode: "${outMode}"}}],
+                pipeline: [${tojson(stage)}],
                 cursor: {},
                 comment: "${comment}"
             });
@@ -42,7 +45,7 @@
             }
         `;
 
-        // Start the $out aggregation in a parallel shell.
+        // Start the $merge aggregation in a parallel shell.
         let outShell = startParallelShell(outFn, st.s.port);
 
         // Wait for the parallel shell to hit the failpoint.
@@ -60,11 +63,11 @@
         // Migrate the primary shard from shard0 to shard1.
         st.ensurePrimaryShard(mongosDB.getName(), st.shard1.shardName);
 
-        // Unset the failpoint to unblock the $out and join with the parallel shell.
-        setAggHang("off", outMode);
+        // Unset the failpoint to unblock the $merge and join with the parallel shell.
+        setAggHang("off");
         outShell();
 
-        // Verify that the $out succeeded.
+        // Verify that the $merge succeeded.
         if (expectFailCode === undefined) {
             assert.eq(2, targetColl.find().itcount());
         }
@@ -78,9 +81,15 @@
 
     // Note that the actual error is NamespaceNotFound but it is wrapped in a generic error code by
     // mistake.
-    runOutWithMode("replaceCollection", sourceColl, ErrorCodes.CommandFailed);
-    runOutWithMode("replaceDocuments", sourceColl);
-    runOutWithMode("insertDocuments", sourceColl);
+    runPipelineWithStage({$out: targetColl.getName()}, sourceColl, ErrorCodes.CommandFailed);
+    runPipelineWithStage({
+        $merge:
+            {into: targetColl.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}
+    },
+                         sourceColl);
+    runPipelineWithStage(
+        {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
+        sourceColl);
 
     sourceColl.drop();
 
@@ -91,9 +100,15 @@
     assert.commandWorked(sourceColl.insert({shardKey: -1}));
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-    runOutWithMode("replaceCollection", sourceColl, ErrorCodes.CommandFailed);
-    runOutWithMode("replaceDocuments", sourceColl);
-    runOutWithMode("insertDocuments", sourceColl);
+    runPipelineWithStage({$out: targetColl.getName()}, sourceColl, ErrorCodes.CommandFailed);
+    runPipelineWithStage({
+        $merge:
+            {into: targetColl.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}
+    },
+                         sourceColl);
+    runPipelineWithStage(
+        {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
+        sourceColl);
 
     sourceColl.drop();
 
@@ -105,9 +120,15 @@
     assert.commandWorked(sourceColl.insert({shardKey: -1}));
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-    runOutWithMode("replaceCollection", targetColl, ErrorCodes.CommandFailed);
-    runOutWithMode("replaceDocuments", targetColl);
-    runOutWithMode("insertDocuments", targetColl);
+    runPipelineWithStage({$out: targetColl.getName()}, targetColl, ErrorCodes.CommandFailed);
+    runPipelineWithStage({
+        $merge:
+            {into: targetColl.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}
+    },
+                         targetColl);
+    runPipelineWithStage(
+        {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
+        targetColl);
 
     sourceColl.drop();
     targetColl.drop();
@@ -121,10 +142,15 @@
     assert.commandWorked(sourceColl.insert({shardKey: -1}));
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-    // Note that mode "replaceCollection" is not supported with an existing sharded output
-    // collection.
-    runOutWithMode("replaceDocuments", targetColl);
-    runOutWithMode("insertDocuments", targetColl);
+    // Note that the legacy $out is not supported with an existing sharded output collection.
+    runPipelineWithStage({
+        $merge:
+            {into: targetColl.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}
+    },
+                         targetColl);
+    runPipelineWithStage(
+        {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
+        targetColl);
 
     st.stop();
 })();

@@ -1,12 +1,12 @@
-// Tests that $out respects the writeConcern set on the original aggregation command.
+// Tests that $merge respects the writeConcern set on the original aggregation command.
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/out_helpers.js");  // For withEachOutMode() and isSharded().
+    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode.
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 3}, config: 1});
 
-    const mongosDB = st.s0.getDB("out_write_concern");
+    const mongosDB = st.s0.getDB("merge_write_concern");
     const source = mongosDB["source"];
     const target = mongosDB["target"];
     const shard0 = st.rs0;
@@ -21,40 +21,51 @@
         const stoppedSecondary = rs.getSecondary();
         rs.stop(stoppedSecondary);
 
-        // Test that $out correctly returns a WC error.
-        withEachOutMode((mode) => {
-            // Skip mode "replaceCollection" if the target collection is sharded, as it is
-            // unsupported. Also skip mode "replaceCollection" if the test is expecting a timeout
-            // against the non-primary shard, since this mode writes to a temp collection on the
-            // primary only.
-            if (mode == "replaceCollection" && (rs != shard0 || FixtureHelpers.isSharded(target)))
+        // Test that $merge correctly returns a WC error.
+        withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+            // Skip the combination of merge modes which will fail depending on the contents of the
+            // source and target collection, as this will cause the assertion below to trip.
+            if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail")
                 return;
 
             const res = mongosDB.runCommand({
                 aggregate: "source",
-                pipeline: [{$out: {to: "target", mode: mode}}],
+                pipeline: [{
+                    $merge: {
+                        into: "target",
+                        whenMatched: whenMatchedMode,
+                        whenNotMatched: whenNotMatchedMode
+                    }
+                }],
                 writeConcern: {w: 3, wtimeout: 100},
                 cursor: {},
             });
 
-            // $out writeConcern errors are handled differently from normal writeConcern
+            // $merge writeConcern errors are handled differently from normal writeConcern
             // errors. Rather than returing ok:1 and a WriteConcernError, the entire operation
             // fails.
             assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
             assert.commandWorked(target.remove({}));
         });
 
-        // Restart the stopped node and verify that the $out's now pass.
+        // Restart the stopped node and verify that the $merge's now pass.
         rs.restart(rs.getSecondary());
         rs.awaitReplication();
-        withEachOutMode((mode) => {
-            // "replaceCollection" is banned when the target collection is sharded.
-            if (mode == "replaceCollection" && FixtureHelpers.isSharded(target))
+        withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+            // Skip the combination of merge modes which will fail depending on the contents of the
+            // source and target collection, as this will cause the assertion below to trip.
+            if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail")
                 return;
 
             const res = mongosDB.runCommand({
                 aggregate: "source",
-                pipeline: [{$out: {to: "target", mode: mode}}],
+                pipeline: [{
+                    $merge: {
+                        into: "target",
+                        whenMatched: whenMatchedMode,
+                        whenNotMatched: whenNotMatchedMode
+                    }
+                }],
                 writeConcern: {w: 3},
                 cursor: {},
             });
@@ -81,7 +92,7 @@
     assert.eq(FixtureHelpers.isSharded(target), true);
     testWriteConcernError(shard0);
 
-    // Write a few documents to the source collection which will be $out-ed to the second shard.
+    // Write a few documents to the source collection which will be $merge-ed to the second shard.
     assert.commandWorked(source.insert([{_id: 11}, {_id: 12}, {_id: 13}]));
 
     // Verify that either shard can produce a WriteConcernError since writes are going to both.

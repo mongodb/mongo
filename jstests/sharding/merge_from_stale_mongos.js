@@ -1,9 +1,10 @@
-// Tests for $out against a stale mongos with combinations of sharded/unsharded source and target
+// Tests for $merge against a stale mongos with combinations of sharded/unsharded source and target
 // collections.
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode.
+    load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
 
     const st = new ShardingTest({
         shards: 2,
@@ -78,9 +79,9 @@
         }
     }
 
-    // Runs a $out with the given mode against each mongos in 'mongosList'. This method will wrap
+    // Runs a $merge with the given modes against each mongos in 'mongosList'. This method will wrap
     // 'mongosList' into a list if it is not an array.
-    function runOutTest(mode, mongosList) {
+    function runMergeTest(whenMatchedMode, whenNotMatchedMode, mongosList) {
         if (!(mongosList instanceof Array)) {
             mongosList = [mongosList];
         }
@@ -93,14 +94,25 @@
             assert.commandWorked(sourceColl.insert([{_id: -1}, {_id: 0}, {_id: 1}]));
             assert.commandWorked(targetColl.insert([{_id: -2}, {_id: 2}, {_id: 3}]));
 
-            mongos[sourceColl.getName()].aggregate(
-                [{$out: {to: targetColl.getName(), mode: mode}}]);
-            assert.eq(mode == "replaceCollection" ? 3 : 6, targetColl.find().itcount());
+            mongos[sourceColl.getName()].aggregate([{
+                $merge: {
+                    into: targetColl.getName(),
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode
+                }
+            }]);
+
+            // If whenNotMatchedMode is "discard", then the documents in the source collection will
+            // not get written to the target since none of them match.
+            assert.eq(whenNotMatchedMode == "discard" ? 3 : 6, targetColl.find().itcount());
         });
     }
 
-    ["replaceDocuments", "insertDocuments"].forEach(mode => {
-        jsTestLog("Testing mode " + mode);
+    withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+        // Skip the combination of merge modes which will fail depending on the contents of the
+        // source and target collection, as this will cause the assertion below to trip.
+        if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail")
+            return;
 
         // For each mode, test the following scenarios:
         // * Both the source and target collections are sharded.
@@ -108,16 +120,16 @@
         // * Source collection is sharded and the target collection is unsharded.
         // * Source collection is unsharded and the target collection is sharded.
         setupStaleMongos({shardedSource: false, shardedTarget: false});
-        runOutTest(mode, [staleMongosSource, staleMongosTarget]);
+        runMergeTest(whenMatchedMode, whenNotMatchedMode, [staleMongosSource, staleMongosTarget]);
 
         setupStaleMongos({shardedSource: true, shardedTarget: true});
-        runOutTest(mode, [staleMongosSource, staleMongosTarget]);
+        runMergeTest(whenMatchedMode, whenNotMatchedMode, [staleMongosSource, staleMongosTarget]);
 
         setupStaleMongos({shardedSource: true, shardedTarget: false});
-        runOutTest(mode, [staleMongosSource, staleMongosTarget]);
+        runMergeTest(whenMatchedMode, whenNotMatchedMode, [staleMongosSource, staleMongosTarget]);
 
         setupStaleMongos({shardedSource: false, shardedTarget: true});
-        runOutTest(mode, [staleMongosSource, staleMongosTarget]);
+        runMergeTest(whenMatchedMode, whenNotMatchedMode, [staleMongosSource, staleMongosTarget]);
 
         //
         // The remaining tests run against a mongos which is stale with respect to BOTH the source
@@ -141,7 +153,7 @@
         shardCollWithMongos(freshMongos, targetColl);
 
         // Test against the stale mongos, which believes both collections are unsharded.
-        runOutTest(mode, staleMongosBoth);
+        runMergeTest(whenMatchedMode, whenNotMatchedMode, staleMongosBoth);
 
         //
         // 2. Both source and target collections are unsharded.
@@ -151,7 +163,7 @@
 
         // The collections were both dropped through a different mongos, so the stale mongos still
         // believes that they're sharded.
-        runOutTest(mode, staleMongosBoth);
+        runMergeTest(whenMatchedMode, whenNotMatchedMode, staleMongosBoth);
 
         //
         // 3. Source collection is sharded and target collection is unsharded.
@@ -172,7 +184,7 @@
 
         // At this point, the stale mongos believes the source collection is unsharded and the
         // target collection is sharded when in fact the reverse is true.
-        runOutTest(mode, staleMongosBoth);
+        runMergeTest(whenMatchedMode, whenNotMatchedMode, staleMongosBoth);
 
         //
         // 4. Source collection is unsharded and target collection is sharded.
@@ -193,24 +205,43 @@
 
         // At this point, the stale mongos believes the source collection is sharded and the target
         // collection is unsharded when in fact the reverse is true.
-        runOutTest(mode, staleMongosBoth);
+        runMergeTest(whenMatchedMode, whenNotMatchedMode, staleMongosBoth);
     });
 
-    // Mode "replaceCollection" is special because the aggregation will fail if the target
-    // collection is sharded.
+    // Runs a legacy $out against each mongos in 'mongosList'. This method will wrap 'mongosList'
+    // into a list if it is not an array.
+    function runOutTest(mongosList) {
+        if (!(mongosList instanceof Array)) {
+            mongosList = [mongosList];
+        }
+
+        mongosList.forEach(mongos => {
+            targetColl.remove({});
+            sourceColl.remove({});
+            // Insert several documents into the source and target collection without any conflicts.
+            // Note that the chunk split point is at {_id: 0}.
+            assert.commandWorked(sourceColl.insert([{_id: -1}, {_id: 0}, {_id: 1}]));
+            assert.commandWorked(targetColl.insert([{_id: -2}, {_id: 2}, {_id: 3}]));
+
+            mongos[sourceColl.getName()].aggregate([{$out: targetColl.getName()}]);
+            assert.eq(3, targetColl.find().itcount());
+        });
+    }
+
+    // Legacy $out will fail if the target collection is sharded.
     setupStaleMongos({shardedSource: false, shardedTarget: false});
-    runOutTest("replaceCollection", [staleMongosSource, staleMongosTarget]);
+    runOutTest([staleMongosSource, staleMongosTarget]);
 
     setupStaleMongos({shardedSource: true, shardedTarget: true});
-    assert.eq(assert.throws(() => runOutTest("replaceCollection", staleMongosSource)).code, 28769);
-    assert.eq(assert.throws(() => runOutTest("replaceCollection", staleMongosTarget)).code, 17017);
+    assert.eq(assert.throws(() => runOutTest(staleMongosSource)).code, 28769);
+    assert.eq(assert.throws(() => runOutTest(staleMongosTarget)).code, 17017);
 
     setupStaleMongos({shardedSource: true, shardedTarget: false});
-    runOutTest("replaceCollection", [staleMongosSource, staleMongosTarget]);
+    runOutTest([staleMongosSource, staleMongosTarget]);
 
     setupStaleMongos({shardedSource: false, shardedTarget: true});
-    assert.eq(assert.throws(() => runOutTest("replaceCollection", staleMongosSource)).code, 28769);
-    assert.eq(assert.throws(() => runOutTest("replaceCollection", staleMongosTarget)).code, 17017);
+    assert.eq(assert.throws(() => runOutTest(staleMongosSource)).code, 28769);
+    assert.eq(assert.throws(() => runOutTest(staleMongosTarget)).code, 17017);
 
     st.stop();
 }());

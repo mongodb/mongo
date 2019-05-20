@@ -597,7 +597,7 @@
     st.shardColl(mongosDB.from, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
     runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl);
 
-    // Test that a $lookup from an unsharded collection followed by an $out to a sharded collection
+    // Test that a $lookup from an unsharded collection followed by a $merge to a sharded collection
     // is allowed.
     const sourceColl = st.getDB(testName).lookUp;
     assert(sourceColl.drop());
@@ -614,7 +614,7 @@
 
     sourceColl.aggregate([
         {$lookup: {localField: "a", foreignField: "b", from: fromColl.getName(), as: "same"}},
-        {$out: {to: outColl.getName(), mode: "insertDocuments"}}
+        {$merge: {into: outColl.getName()}}
     ]);
 
     assert.eq([{a: 0, same: [{_id: 0, b: 0}]}], outColl.find({}, {_id: 0}).toArray());

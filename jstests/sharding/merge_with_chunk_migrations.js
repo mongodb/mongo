@@ -1,4 +1,4 @@
-// Tests that the $out aggregation stage is resilient to chunk migrations in both the source and
+// Tests that the $merge aggregation stage is resilient to chunk migrations in both the source and
 // output collection during execution.
 (function() {
     'use strict';
@@ -16,23 +16,29 @@
             {configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch", mode: mode}));
     }
 
-    function runOutWithMode(outMode, shardedColl) {
+    function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl) {
         // Set the failpoint to hang in the first call to DocumentSourceCursor's getNext().
         setAggHang("alwaysOn");
 
-        let comment = outMode + "_" + shardedColl.getName() + "_1";
+        let comment = whenMatchedMode + "_" + whenNotMatchedMode + "_" + shardedColl.getName();
         // The $_internalInhibitOptimization stage is added to the pipeline to prevent the pipeline
         // from being optimized away after it's been split. Otherwise, we won't hit the failpoint.
         let outFn = `
             const sourceDB = db.getSiblingDB(jsTestName());
             const sourceColl = sourceDB["${sourceColl.getName()}"];
-            sourceColl.aggregate([{$_internalInhibitOptimization: {}},
-                {$out: {to: "${targetColl.getName()}", mode: "${outMode}"}}],
-                {comment: "${comment}"});
+            sourceColl.aggregate([
+                {$_internalInhibitOptimization: {}},
+                {$merge: {
+                    into: "${targetColl.getName()}", 
+                    whenMatched: "${whenMatchedMode}", 
+                    whenNotMatched: "${whenNotMatchedMode}"
+                }}
+            ],
+            {comment: "${comment}"});
         `;
 
-        // Start the $out aggregation in a parallel shell.
-        let outShell = startParallelShell(outFn, st.s.port);
+        // Start the $merge aggregation in a parallel shell.
+        let mergeShell = startParallelShell(outFn, st.s.port);
 
         // Wait for the parallel shell to hit the failpoint.
         assert.soon(
@@ -44,28 +50,34 @@
         assert.commandWorked(st.s.adminCommand(
             {moveChunk: shardedColl.getFullName(), find: {shardKey: 1}, to: st.shard0.shardName}));
 
-        // Unset the failpoint to unblock the $out and join with the parallel shell.
+        // Unset the failpoint to unblock the $merge and join with the parallel shell.
         setAggHang("off");
-        outShell();
+        mergeShell();
 
-        // Verify that the $out succeeded.
+        // Verify that the $merge succeeded.
         assert.eq(2, targetColl.find().itcount());
 
         // Now both chunks are on shard0. Run a similar test except migrate the chunks back to
         // shard1 in the middle of execution.
         assert.commandWorked(targetColl.remove({}));
         setAggHang("alwaysOn");
-        comment = outMode + "_" + shardedColl.getName() + "_2";
+        comment = comment + "_2";
         // The $_internalInhibitOptimization stage is added to the pipeline to prevent the pipeline
         // from being optimized away after it's been split. Otherwise, we won't hit the failpoint.
         outFn = `
             const sourceDB = db.getSiblingDB(jsTestName());
             const sourceColl = sourceDB["${sourceColl.getName()}"];
-            sourceColl.aggregate([{$_internalInhibitOptimization: {}},
-                {$out: {to: "${targetColl.getName()}", mode: "${outMode}"}}],
-                {comment: "${comment}"});
+            sourceColl.aggregate([
+                {$_internalInhibitOptimization: {}},
+                {$merge: {
+                    into: "${targetColl.getName()}", 
+                    whenMatched: "${whenMatchedMode}", 
+                    whenNotMatched: "${whenNotMatchedMode}"
+                }}
+            ],
+            {comment: "${comment}"});
         `;
-        outShell = startParallelShell(outFn, st.s.port);
+        mergeShell = startParallelShell(outFn, st.s.port);
 
         // Wait for the parallel shell to hit the failpoint.
         assert.soon(
@@ -78,11 +90,11 @@
         assert.commandWorked(st.s.adminCommand(
             {moveChunk: shardedColl.getFullName(), find: {shardKey: 1}, to: st.shard1.shardName}));
 
-        // Unset the failpoint to unblock the $out and join with the parallel shell.
+        // Unset the failpoint to unblock the $merge and join with the parallel shell.
         setAggHang("off");
-        outShell();
+        mergeShell();
 
-        // Verify that the $out succeeded.
+        // Verify that the $merge succeeded.
         assert.eq(2, targetColl.find().itcount());
 
         // Reset the chunk distribution.
@@ -99,9 +111,8 @@
     assert.commandWorked(sourceColl.insert({shardKey: -1}));
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-    runOutWithMode("replaceCollection", sourceColl);
-    runOutWithMode("replaceDocuments", sourceColl);
-    runOutWithMode("insertDocuments", sourceColl);
+    runMergeWithMode("replaceWithNew", "insert", sourceColl);
+    runMergeWithMode("fail", "insert", sourceColl);
 
     // Run a similar test with chunk migrations on the output collection instead.
     sourceColl.drop();
@@ -114,10 +125,8 @@
     assert.commandWorked(sourceColl.insert({shardKey: -1}));
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-    // Note that mode "replaceCollection" is not supported with an existing sharded output
-    // collection.
-    runOutWithMode("replaceDocuments", targetColl);
-    runOutWithMode("insertDocuments", targetColl);
+    runMergeWithMode("replaceWithNew", "insert", targetColl);
+    runMergeWithMode("fail", "insert", targetColl);
 
     st.stop();
 })();

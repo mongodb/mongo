@@ -1,7 +1,9 @@
-// Tests that the $out aggregation stage is resilient to drop shard in both the source and
+// Tests that the $merge aggregation stage is resilient to drop shard in both the source and
 // output collection during execution.
 (function() {
     'use strict';
+
+    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode.
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
@@ -35,8 +37,6 @@
         // Drop the test database on the removed shard so it does not interfere with addShard later.
         assert.commandWorked(shard.getDB(mongosDB.getName()).dropDatabase());
 
-        // SERVER-39665 is the follow up ticket to fully investigate whether the following commands
-        // are needed or not.
         st.configRS.awaitLastOpCommitted();
         assert.commandWorked(st.s.adminCommand({flushRouterConfig: 1}));
         assert.commandWorked(st.stopBalancer());
@@ -48,25 +48,30 @@
         assert.commandWorked(st.s.adminCommand(
             {moveChunk: sourceColl.getFullName(), find: {shardKey: 0}, to: shard}));
     }
-    function runOutWithMode(outMode, shardedColl, dropShard) {
+    function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl, dropShard) {
         // Set the failpoint to hang in the first call to DocumentSourceCursor's getNext().
         setAggHang("alwaysOn");
 
-        let comment = outMode + "_" + shardedColl.getName() + "_1";
+        let comment =
+            whenMatchedMode + "_" + whenNotMatchedMode + "_" + shardedColl.getName() + "_1";
         let outFn = `
             const sourceDB = db.getSiblingDB(jsTestName());
             const sourceColl = sourceDB["${sourceColl.getName()}"];
             let cmdRes = sourceDB.runCommand({
                 aggregate: "${sourceColl.getName()}",
-                pipeline: [{$out: {to: "${targetColl.getName()}", mode: "${outMode}"}}],
+                pipeline: [{$merge: {
+                    into: "${targetColl.getName()}",
+                    whenMatched: ${tojson(whenMatchedMode)},
+                    whenNotMatched: "${whenNotMatchedMode}"
+                }}],
                 cursor: {},
                 comment: "${comment}"
             });
             assert.commandWorked(cmdRes);
         `;
 
-        // Start the $out aggregation in a parallel shell.
-        let outShell = startParallelShell(outFn, st.s.port);
+        // Start the $merge aggregation in a parallel shell.
+        let mergeShell = startParallelShell(outFn, st.s.port);
 
         // Wait for the parallel shell to hit the failpoint.
         assert.soon(
@@ -85,12 +90,13 @@
         } else {
             addShard(st.rs0.getURL());
         }
-        // Unset the failpoint to unblock the $out and join with the parallel shell.
+        // Unset the failpoint to unblock the $merge and join with the parallel shell.
         setAggHang("off");
-        outShell();
+        mergeShell();
 
-        // Verify that the $out succeeded.
-        assert.eq(2, targetColl.find().itcount());
+        // Verify that the $merge succeeded. For whenNotMatched "discard", the two documents will
+        // not get written to the target collection.
+        assert.eq(whenNotMatchedMode == "discard" ? 0 : 2, targetColl.find().itcount());
 
         assert.commandWorked(targetColl.remove({}));
     }
@@ -106,12 +112,15 @@
     assert.commandWorked(sourceColl.insert({shardKey: -1}));
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-    // Note that mode "replaceCollection" is not supported with an existing sharded output
-    // collection.
-    runOutWithMode("insertDocuments", targetColl, true);
-    runOutWithMode("insertDocuments", targetColl, false);
-    runOutWithMode("replaceDocuments", targetColl, true);
-    runOutWithMode("replaceDocuments", targetColl, false);
+    withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+        // Skip the combination of merge modes which will fail depending on the contents of the
+        // source and target collection, as this will cause the assertion below to trip.
+        if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail")
+            return;
+
+        runMergeWithMode(whenMatchedMode, whenNotMatchedMode, targetColl, true);
+        runMergeWithMode(whenMatchedMode, whenNotMatchedMode, targetColl, false);
+    });
 
     st.stop();
 })();
