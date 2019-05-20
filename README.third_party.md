@@ -25,7 +25,7 @@ a notice will be included in
 | Aladdin MD5                | Zlib              |                  | Unknown           |          ✗           |                ✗                |
 | [ASIO]                     | BSL-1.0           | 1.13.0           | b0926b61b0        |                      |                ✗                |
 | [benchmark]                | Apache-2.0        | 1.4.1            | 1.4.1             |                      |                                 |
-| [Boost]                    | BSL-1.0           | 1.70.0           | 1.69.0            |                      |                ✗                |
+| [Boost]                    | BSL-1.0           | 1.70.0           | 1.70.0            |                      |                ✗                |
 | [fmt]                      | BSD-2-Clause      |                  | 018d8b57f6        |                      |                ✗                |
 | [GPerfTools]               | BSD-3-Clause      | 2.7              | 2.7               |                      |                ✗                |
 | [ICU4]                     | ICU               | 64.2             | 57.1              |          ✗           |                ✗                |
