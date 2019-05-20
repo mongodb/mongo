@@ -3450,6 +3450,7 @@ tasks:
           - "./mongobridge*"
           - "./mongoebench*"
           - "./mongoed*"
+          - "./mongotmock*"
           - "./wt*"
           - "buildscripts/**"
           - "*Example"
@@ -7776,6 +7777,24 @@ tasks:
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
+- <<: *task_template
+  name: search_beta
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=search_beta --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
+  name: search_beta_ssl
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=search_beta_ssl --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
 - name: shared_scons_cache_pruning
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on: []
@@ -9863,6 +9882,8 @@ buildvariants:
   - name: .read_only
   - name: .rollbackfuzzer
   - name: sasl
+  - name: search_beta
+  - name: search_beta_ssl
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
@@ -10052,6 +10073,8 @@ buildvariants:
   - name: .read_only
   - name: .rollbackfuzzer
   - name: sasl
+  - name: search_beta
+  - name: search_beta_ssl
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
   # Sharded transactions suites exclude tests that use snapshot read concern, since snapshot read
@@ -10133,6 +10156,8 @@ buildvariants:
   - name: .retry
   - name: .rollbackfuzzer
   - name: sasl
+  - name: search_beta
+  - name: search_beta_ssl
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
@@ -10215,6 +10240,8 @@ buildvariants:
     - name: .rollbackfuzzer
     - name: retryable_writes_jscore_passthrough_gen
     - name: sasl
+    - name: search_beta
+    - name: search_beta_ssl
     - name: secondary_reads_passthrough_gen
     - name: session_jscore_passthrough
     - name: .sharding .jscore !.wo_snapshot
@@ -10270,6 +10297,8 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: .replica_sets .multi_oplog
   - name: sasl
+  - name: search_beta
+  - name: search_beta_ssl
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp

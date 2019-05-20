@@ -1,0 +1,11 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - src/mongo/db/modules/*/jstests/search_beta/*.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands

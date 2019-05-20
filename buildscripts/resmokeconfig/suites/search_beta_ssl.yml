@@ -1,0 +1,16 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - src/mongo/db/modules/*/jstests/search_beta/ssl/*.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands
+      ssl: ''
+      tlsAllowInvalidHostnames: ''
+      tlsAllowInvalidCertificates: ''
+      tlsCAFile: jstests/libs/ca.pem
+      tlsCertificateKeyFile: jstests/libs/client.pem
