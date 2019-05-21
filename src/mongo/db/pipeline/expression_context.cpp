@@ -160,6 +160,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->inMongos = inMongos;
     expCtx->allowDiskUse = allowDiskUse;
     expCtx->bypassDocumentValidation = bypassDocumentValidation;
+    expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
     expCtx->subPipelineDepth = subPipelineDepth;
 
     expCtx->tempDir = tempDir;

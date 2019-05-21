@@ -2325,6 +2325,10 @@ public:
     explicit ExpressionTrunc(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionRangedArity<ExpressionTrunc, 1, 2>(expCtx) {}
 
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement elem,
+        const VariablesParseState& vps);
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
