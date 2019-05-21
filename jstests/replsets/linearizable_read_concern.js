@@ -110,9 +110,9 @@ load('jstests/libs/write_concern_util.js');
         ErrorCodes.LinearizableReadConcernError);
 
     jsTestLog("Test that a linearizable read will timeout when the primary is isolated.");
-    result = primary.getDB("test").runCommand(
+    let findResult = primary.getDB("test").runCommand(
         {"find": "foo", "readConcern": {level: "linearizable"}, "maxTimeMS": 3000});
-    assert.commandFailedWithCode(result, ErrorCodes.MaxTimeMSExpired);
+    assert.commandFailedWithCode(findResult, ErrorCodes.MaxTimeMSExpired);
 
     jsTestLog("Testing to make sure linearizable read command does not block forever.");
 
