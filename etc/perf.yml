@@ -2,6 +2,7 @@ command_type: system
 stepback: false
 
 pre:
+    - command: manifest.load
     - command: shell.exec
       params:
         silent: true
@@ -47,7 +48,9 @@ modules:
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
   branch: master
-
+- name: genny
+  repo: git@github.com:mongodb/genny.git
+  branch: master
 
 functions:
   "download analysis scripts":
@@ -205,6 +208,35 @@ functions:
           REFTAG="3.6.5-Baseline"
           OVERRIDE="../dsi/analysis/${branch_name}/perf_override.json"
           python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.075 --threadThreshold 0.12
+
+  # Params:
+  #   workload: the path relative to genny/src/workloads to run e.g.
+  #             scale/InsertRemove.yml
+  "run genny workload":
+    - command: git.get_project
+      params:
+        directory: src
+        revisions:
+          genny: ${genny_rev}
+    - command: shell.exec
+      params:
+        working_dir: src/genny
+        script: |
+          set -eo pipefail
+
+          export PATH="/opt/mongodbtoolchain/v3/bin:$PATH"
+          python3 -m virtualenv ./venv
+          source ./venv/bin/activate
+          python -m pip install ./src/python
+
+          ./scripts/lamp --linux-distro rhel62
+          ./dist/bin/genny run -w "./dist/etc/genny/workloads/${workload}" -u 'mongodb://admin:password@localhost:27017' --metrics-output-file genny-perf.csv --metrics-format cedar-csv
+          genny-metrics-legacy-report --report-file "${workdir}/src/perf.json" genny-perf.csv
+    - command: "json.send"
+      params:
+        name: "perf"
+        file: "src/perf.json"
+
   "run perf tests":
     - command: shell.exec
       params:
@@ -235,6 +267,17 @@ functions:
         file: "src/perf/perf.json"
 
 tasks:
+
+- name: genny_scale_InsertRemove
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+  - func: "start server"
+  - func: "run genny workload"
+    vars:
+      workload: scale/InsertRemove.yml
+
 - name: compile
   commands:
     - command: git.get_project
@@ -535,6 +578,7 @@ buildvariants:
   batchtime: 90  # 1.5 hours
   modules:
     - enterprise
+    - genny
   expansions:
     # We are explicitly tracking the rhel62 variant compile options from evergreen.yml for
     # microbenchmarks, since they run on the centos6 boxes.  If we can get proper artifacts directly
@@ -562,6 +606,7 @@ buildvariants:
   - name: compile
     distros:
     - rhel62-large
+  - name: genny_scale_InsertRemove
   - name: aggregation
   - name: agg-query-comparison
   - name: query
@@ -579,6 +624,8 @@ buildvariants:
 - name: linux-wt-repl
   display_name: 1-Node ReplSet Linux inMemory
   batchtime: 90  # 1.5 hours
+  modules:
+    - genny
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
@@ -600,6 +647,7 @@ buildvariants:
   run_on:
   - "centos6-perf"
   tasks:
+  - name: genny_scale_InsertRemove
   - name: update
   - name: insert
   - name: misc
