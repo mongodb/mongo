@@ -64,11 +64,6 @@ structs:
                 description: "Specifies the timestamp at which the multi-document transaction should
                               be committed.  Required for prepared transactions, not permitted for
                               unprepared ones."
-            prepared:
-                type: bool
-                optional: true
-                description: "True if the transaction has been prepared. Set to false for a commit
-                              for an unprepared transaction."
             count:
                 type: long
                 optional: true
