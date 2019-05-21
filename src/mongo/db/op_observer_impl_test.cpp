@@ -2014,7 +2014,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
     checkSessionAndTransactionFields(commitOplogObj);
     auto commitEntry = assertGet(OplogEntry::parse(commitOplogObj));
     auto o = commitEntry.getObject();
-    auto oExpected = BSON("commitTransaction" << 1 << "commitTimestamp" << commitTimestamp);
+    auto oExpected = BSON(
+        "commitTransaction" << 1 << "commitTimestamp" << commitTimestamp << "prepared" << true);
     ASSERT_BSONOBJ_EQ(oExpected, o);
     ASSERT_TRUE(commitEntry.getPrevWriteOpTimeInTransaction());
     ASSERT_EQ(*commitEntry.getPrevWriteOpTimeInTransaction(), prepareEntry.getOpTime());
@@ -2316,7 +2317,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedPackingTest) {
     checkSessionAndTransactionFields(commitOplogObj);
     auto commitEntry = assertGet(OplogEntry::parse(commitOplogObj));
     auto o = commitEntry.getObject();
-    auto oExpected = BSON("commitTransaction" << 1 << "commitTimestamp" << commitTimestamp);
+    auto oExpected = BSON(
+        "commitTransaction" << 1 << "commitTimestamp" << commitTimestamp << "prepared" << true);
     ASSERT_BSONOBJ_EQ(oExpected, o);
     ASSERT_TRUE(commitEntry.getPrevWriteOpTimeInTransaction());
     ASSERT_EQ(*commitEntry.getPrevWriteOpTimeInTransaction(), insertEntry.getOpTime());
