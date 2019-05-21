@@ -145,9 +145,6 @@ Status applyCommitTransaction(OperationContext* opCtx,
     IDLParserErrorContext ctx("commitTransaction");
     auto commitOplogEntryOpTime = entry.getOpTime();
     auto commitCommand = CommitTransactionOplogObject::parse(ctx, entry.getObject());
-    const bool prepared = !commitCommand.getPrepared() || *commitCommand.getPrepared();
-    if (!prepared)
-        return Status::OK();
     invariant(commitCommand.getCommitTimestamp());
 
     if (mode == repl::OplogApplication::Mode::kRecovering ||
