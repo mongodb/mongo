@@ -19,7 +19,8 @@ var $config = extendWorkload($config, ($config, $super) => {
         init: {update: 0.9, checkConsistency: 0.1},
         update: {update: 0.8, checkConsistency: 0.1, killSession: 0.1},
         checkConsistency: {update: 0.9, killSession: 0.1},
-        killSession: {update: 0.9, checkConsistency: 0.1}
+        killSession: {update: 0.8, checkConsistency: 0.1, causalRead: 0.1},
+        causalRead: {update: 0.9, killSession: 0.1},
     };
 
     return $config;

@@ -184,8 +184,9 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.transitions = {
         init: {update: 0.9, checkInvariants: 0.1},
-        update: {update: 0.9, checkInvariants: 0.1},
-        checkInvariants: {update: 1.0}
+        update: {update: 0.8, checkInvariants: 0.1, causalRead: 0.1},
+        checkInvariants: {update: 0.9, causalRead: 0.1},
+        causalRead: {update: 1.0}
     };
 
     return $config;

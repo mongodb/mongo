@@ -165,5 +165,5 @@ var {withTxnAndAutoRetry} = (function() {
         } while (hasTransientError);
     }
 
-    return {withTxnAndAutoRetry};
+    return {withTxnAndAutoRetry, isKilledSessionCode};
 })();

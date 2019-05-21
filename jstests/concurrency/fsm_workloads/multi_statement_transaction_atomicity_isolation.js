@@ -46,7 +46,7 @@
 // for Graph
 load('jstests/libs/cycle_detection.js');
 
-// For withTxnAndAutoRetry.
+// For withTxnAndAutoRetry, isKilledSessionCode.
 load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 
 // For arrayEq.
@@ -143,7 +143,7 @@ var $config = (function() {
     // Overridable functions for subclasses to do more complex transactions.
     const getAllCollections = (db, collName) => [db.getCollection(collName)];
 
-    function getAllDocuments(db, collName, numDocs, {useTxn}) {
+    function getAllDocuments(numDocs, {useTxn}) {
         let allDocuments = [];
 
         if (useTxn) {
@@ -261,18 +261,41 @@ var $config = (function() {
             },
 
             checkConsistency: function checkConsistency(db, collName) {
-                const documents = this.getAllDocuments(db, collName, this.numDocs, {useTxn: true});
+                const documents = this.getAllDocuments(this.numDocs, {useTxn: true});
                 checkTransactionCommitOrder(documents);
                 checkNumUpdatedByEachTransaction(documents);
                 checkWritesOfCommittedTxns(this, documents);
+            },
+
+            causalRead: function causalRead(db, collName) {
+                const collection = this.collections[Random.randInt(this.collections.length)];
+                const randomDbName = collection.getDB().getName();
+                const randomCollName = collection.getName();
+
+                // We do a non-transactional read on a causally consistent session so that it uses
+                // 'afterClusterTime' internally and is subject to prepare conflicts (in a sharded
+                // cluster). This is meant to expose deadlocks involving prepare conflicts outside
+                // of transactions.
+                const sessionCollection =
+                    this.session.getDatabase(randomDbName).getCollection(randomCollName);
+
+                try {
+                    const cursor = sessionCollection.find();
+                    assertAlways.eq(cursor.itcount(), this.numDocs);
+                } catch (e) {
+                    if (this.retryOnKilledSession && isKilledSessionCode(e.code)) {
+                        // If the session is expected to be killed, ignore it.
+                        return;
+                    }
+                    throw e;
+                }
             }
         };
     })();
 
     /**
      * This function wraps the state functions and causes each thread to run checkConsistency()
-     * before
-     * teardown.
+     * before teardown.
      */
     function checkConsistencyOnLastIteration(data, func, checkConsistencyFunc) {
         let lastIteration = ++data.totalIteration >= data.iterations;
@@ -295,8 +318,9 @@ var $config = (function() {
 
     const transitions = {
         init: {update: 0.9, checkConsistency: 0.1},
-        update: {update: 0.9, checkConsistency: 0.1},
-        checkConsistency: {update: 1}
+        update: {update: 0.8, checkConsistency: 0.1, causalRead: 0.1},
+        checkConsistency: {update: 1},
+        causalRead: {update: 1},
     };
 
     function setup(db, collName, cluster) {
@@ -322,7 +346,7 @@ var $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
-        const documents = this.getAllDocuments(db, collName, this.numDocs, {useTxn: false});
+        const documents = this.getAllDocuments(this.numDocs, {useTxn: false});
         checkTransactionCommitOrder(documents);
         checkNumUpdatedByEachTransaction(documents);
     }
