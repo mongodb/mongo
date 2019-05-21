@@ -802,9 +802,10 @@ void MongoBase::Functions::_markNodeAsFailed::call(JSContext* cx, JS::CallArgs a
 
 std::unique_ptr<DBClientBase> runEncryptedDBClientCallback(std::unique_ptr<DBClientBase> conn,
                                                            JS::HandleValue arg,
+                                                           JS::HandleObject mongoConnection,
                                                            JSContext* cx) {
     if (encryptedDBClientCallback != nullptr) {
-        return encryptedDBClientCallback(std::move(conn), arg, cx);
+        return encryptedDBClientCallback(std::move(conn), arg, mongoConnection, cx);
     }
     return conn;
 }
@@ -833,11 +834,12 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     }
 
     ScriptEngine::runConnectCallback(*conn);
-    conn = runEncryptedDBClientCallback(std::move(conn), args.get(1), cx);
 
     JS::RootedObject thisv(cx);
     scope->getProto<MongoExternalInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
+
+    conn = runEncryptedDBClientCallback(std::move(conn), args.get(1), thisv, cx);
 
     JS_SetPrivate(thisv, scope->trackedNew<std::shared_ptr<DBClientBase>>(conn.release()));
 

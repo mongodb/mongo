@@ -37,6 +37,7 @@ namespace mozjs {
 
 using EncryptedDBClientCallback = std::unique_ptr<DBClientBase>(std::unique_ptr<DBClientBase>,
                                                                 JS::HandleValue,
+                                                                JS::HandleObject,
                                                                 JSContext*);
 void setEncryptedDBClientCallback(EncryptedDBClientCallback* callback);
 
