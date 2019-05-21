@@ -81,6 +81,13 @@ public:
     };
 
     /**
+     * Set the query predicate to apply to the documents in addition to the "near" predicate.
+     */
+    void setQuery(BSONObj newQuery) {
+        query = newQuery.getOwned();
+    };
+
+    /**
      * The field in which the computed distance will be stored.
      */
     FieldPath getDistanceField() const {
