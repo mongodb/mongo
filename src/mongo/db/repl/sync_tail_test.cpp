@@ -908,8 +908,7 @@ protected:
         _commitPrepareWithPrevOp = makeCommandOplogEntryWithSessionInfoAndStmtId(
             {Timestamp(Seconds(1), 4), 1LL},
             _nss1,
-            BSON("commitTransaction" << 1 << "prepared" << true << "commitTimestamp"
-                                     << Timestamp(Seconds(1), 4)),
+            BSON("commitTransaction" << 1 << "commitTimestamp" << Timestamp(Seconds(1), 4)),
             _lsid,
             _txnNum,
             StmtId(3),
@@ -917,8 +916,7 @@ protected:
         _commitSinglePrepareApplyOp = makeCommandOplogEntryWithSessionInfoAndStmtId(
             {Timestamp(Seconds(1), 4), 1LL},
             _nss1,
-            BSON("commitTransaction" << 1 << "prepared" << true << "commitTimestamp"
-                                     << Timestamp(Seconds(1), 4)),
+            BSON("commitTransaction" << 1 << "commitTimestamp" << Timestamp(Seconds(1), 4)),
             _lsid,
             _txnNum,
             StmtId(1),
