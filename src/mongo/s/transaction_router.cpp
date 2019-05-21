@@ -807,7 +807,11 @@ BSONObj TransactionRouter::_commitTransaction(
         switch (participant.second.readOnly) {
             case Participant::ReadOnly::kUnset:
                 uasserted(ErrorCodes::NoSuchTransaction,
-                          "Can't send commit unless all previous statements were successful");
+                          str::stream() << txnIdToString() << " Failed to commit transaction "
+                                        << "because a previous statement on the transaction "
+                                        << "participant "
+                                        << participant.first
+                                        << " was unsuccessful.");
             case Participant::ReadOnly::kReadOnly:
                 readOnlyShards.push_back(participant.first);
                 break;
