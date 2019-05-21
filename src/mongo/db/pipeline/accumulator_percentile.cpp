@@ -170,9 +170,6 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
                     {"weight", centroid.weight()}
                 });
         };
-        
-        // ToReview: This is the vector created to pass the centroids to MongoS and needs to be counted in memory usage.
-        _memUsageBytes += centroids.size() * sizeof(centroids[0]);
 
         return Value(
             Document{
