@@ -466,31 +466,26 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
-       PersistParticipantListWhenDocumentWithConflictingParticipantListExistsFails) {
+       PersistParticipantListWhenDocumentWithConflictingParticipantListExistsFailsToPersistList) {
+    auto opCtx = operationContext();
     std::vector<ShardId> participants{
         ShardId("shard0001"), ShardId("shard0002"), ShardId("shard0003")};
-    persistParticipantListExpectSuccess(operationContext(), _lsid, _txnNumber, participants);
+    persistParticipantListExpectSuccess(opCtx, _lsid, _txnNumber, participants);
+
+    // We should retry until shutdown. The original participants should be persisted.
 
     std::vector<ShardId> smallerParticipantList{ShardId("shard0001"), ShardId("shard0002")};
-    ASSERT_THROWS_CODE(
-        txn::persistParticipantsList(*_aws, _lsid, _txnNumber, smallerParticipantList).get(),
-        AssertionException,
-        51025);
+    Future<void> future =
+        txn::persistParticipantsList(*_aws, _lsid, _txnNumber, smallerParticipantList);
 
-    std::vector<ShardId> largerParticipantList{
-        ShardId("shard0001"), ShardId("shard0002"), ShardId("shard0003"), ShardId("shard0004")};
+    _aws->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Shutdown for test"});
+    advanceClockAndExecuteScheduledTasks();
     ASSERT_THROWS_CODE(
-        txn::persistParticipantsList(*_aws, _lsid, _txnNumber, largerParticipantList).get(),
-        AssertionException,
-        51025);
+        future.get(), AssertionException, ErrorCodes::TransactionCoordinatorSteppingDown);
 
-    std::vector<ShardId> differentSameSizeParticipantList{
-        ShardId("shard0001"), ShardId("shard0002"), ShardId("shard0004")};
-    ASSERT_THROWS_CODE(
-        txn::persistParticipantsList(*_aws, _lsid, _txnNumber, differentSameSizeParticipantList)
-            .get(),
-        AssertionException,
-        51025);
+    auto allCoordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
+    ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(1));
+    assertDocumentMatches(allCoordinatorDocs[0], _lsid, _txnNumber, participants);
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
@@ -515,15 +510,6 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest, PersistParticipantListForMul
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
-       PersistAbortDecisionWhenNoDocumentForTransactionExistsFails) {
-    ASSERT_THROWS_CODE(
-        txn::persistDecision(*_aws, _lsid, _txnNumber, _participants, boost::none /* abort */)
-            .get(),
-        AssertionException,
-        51026);
-}
-
-TEST_F(TransactionCoordinatorDriverPersistenceTest,
        PersistAbortDecisionWhenDocumentExistsWithoutDecisionSucceeds) {
     persistParticipantListExpectSuccess(operationContext(), _lsid, _txnNumber, _participants);
     persistDecisionExpectSuccess(
@@ -541,12 +527,13 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
-       PersistCommitDecisionWhenNoDocumentForTransactionExistsFails) {
+       PersistCommitDecisionWhenNoDocumentForTransactionExistsCanBeInterruptedAndReturnsError) {
+    Future<void> future = txn::persistDecision(
+        *_aws, _lsid, _txnNumber, _participants, _commitTimestamp /* commit */);
+    _aws->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Shutdown for test"});
+
     ASSERT_THROWS_CODE(
-        txn::persistDecision(*_aws, _lsid, _txnNumber, _participants, _commitTimestamp /* commit */)
-            .get(),
-        AssertionException,
-        51026);
+        future.get(), AssertionException, ErrorCodes::TransactionCoordinatorSteppingDown);
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
@@ -563,47 +550,6 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
         operationContext(), _lsid, _txnNumber, _participants, _commitTimestamp /* commit */);
     persistDecisionExpectSuccess(
         operationContext(), _lsid, _txnNumber, _participants, _commitTimestamp /* commit */);
-}
-
-TEST_F(TransactionCoordinatorDriverPersistenceTest,
-       PersistCommitDecisionWhenDocumentExistsWithDifferentCommitTimestampFails) {
-    persistParticipantListExpectSuccess(operationContext(), _lsid, _txnNumber, _participants);
-    persistDecisionExpectSuccess(
-        operationContext(), _lsid, _txnNumber, _participants, _commitTimestamp /* commit */);
-
-    const Timestamp differentCommitTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 1);
-    ASSERT_THROWS_CODE(
-        txn::persistDecision(
-            *_aws, _lsid, _txnNumber, _participants, differentCommitTimestamp /* commit */)
-            .get(),
-        AssertionException,
-        51026);
-}
-
-TEST_F(TransactionCoordinatorDriverPersistenceTest,
-       PersistAbortDecisionWhenDocumentExistsWithDifferentDecisionFails) {
-    persistParticipantListExpectSuccess(operationContext(), _lsid, _txnNumber, _participants);
-    persistDecisionExpectSuccess(
-        operationContext(), _lsid, _txnNumber, _participants, _commitTimestamp /* commit */);
-
-    ASSERT_THROWS_CODE(
-        txn::persistDecision(*_aws, _lsid, _txnNumber, _participants, boost::none /* abort */)
-            .get(),
-        AssertionException,
-        51026);
-}
-
-TEST_F(TransactionCoordinatorDriverPersistenceTest,
-       PersistCommitDecisionWhenDocumentExistsWithDifferentDecisionFails) {
-    persistParticipantListExpectSuccess(operationContext(), _lsid, _txnNumber, _participants);
-    persistDecisionExpectSuccess(
-        operationContext(), _lsid, _txnNumber, _participants, boost::none /* abort */);
-
-    ASSERT_THROWS_CODE(
-        txn::persistDecision(*_aws, _lsid, _txnNumber, _participants, _commitTimestamp /* abort */)
-            .get(),
-        AssertionException,
-        51026);
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest, DeleteCoordinatorDocWhenNoDocumentExistsFails) {

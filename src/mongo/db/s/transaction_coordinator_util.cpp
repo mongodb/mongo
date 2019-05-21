@@ -92,12 +92,8 @@ std::string buildParticipantListString(const std::vector<ShardId>& participantLi
 }
 
 bool shouldRetryPersistingCoordinatorState(const Status& responseStatus) {
-    // Writes to the local node are expected to succeed if this node is still primary, so *only*
-    // retry if the write was explicitly interrupted (we do not allow a user to stop a commit
-    // coordination by issuing killOp, since that can stall resources across the cluster. However,
-    // the write may also fail if the coordinator document has been manually tampered with; in this
-    // case we do not retry, since the write is unlikely to succeed the second time.
-    return responseStatus == ErrorCodes::Interrupted;
+    return !responseStatus.isOK() &&
+        responseStatus != ErrorCodes::TransactionCoordinatorSteppingDown;
 }
 
 }  // namespace
@@ -517,7 +513,7 @@ Future<void> deleteCoordinatorDoc(txn::AsyncWorkScheduler& scheduler,
                                   TxnNumber txnNumber) {
     return txn::doWhile(scheduler,
                         boost::none /* no need for a backoff */,
-                        [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
+                        [](const Status& s) { return s == ErrorCodes::Interrupted; },
                         [&scheduler, lsid, txnNumber] {
                             return scheduler.scheduleWork(
                                 [lsid, txnNumber](OperationContext* opCtx) {
