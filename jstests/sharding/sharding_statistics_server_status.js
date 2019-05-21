@@ -2,6 +2,7 @@
 // Tests that serverStatus includes sharding statistics by default and the sharding statistics are
 // indeed the correct values. Does not test the catalog cache portion of sharding statistics.
 //
+// @tags: [uses_transactions]
 
 (function() {
     'use strict';
@@ -129,7 +130,7 @@
     // Start a transaction and insert to the migrating chunk to block entering the critical section.
     const session = mongos.startSession();
     session.startTransaction();
-    session.getDatabase(dbName)[collName].insert({_id: 5});
+    assert.commandWorked(session.getDatabase(dbName)[collName].insert({_id: 5}));
 
     // Unpause the migration and it should time out entering the critical section.
     unpauseMoveChunkAtStep(donorConn, moveChunkStepNames.reachedSteadyState);
