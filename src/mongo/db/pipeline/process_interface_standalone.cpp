@@ -379,6 +379,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::makePipelin
 
 unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
+    return attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
+}
+
+unique_ptr<Pipeline, PipelineDeleter>
+MongoInterfaceStandalone::attachCursorSourceToPipelineForLocalRead(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
 

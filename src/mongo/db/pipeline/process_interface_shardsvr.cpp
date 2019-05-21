@@ -197,7 +197,7 @@ unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSou
     // this function, to be sure the collection didn't become sharded between the time we checked
     // whether it's sharded and the time we took the lock.
 
-    return MongoInterfaceStandalone::attachCursorSourceToPipeline(expCtx, pipeline.release());
+    return attachCursorSourceToPipelineForLocalRead(expCtx, pipeline.release());
 }
 
 }  // namespace mongo

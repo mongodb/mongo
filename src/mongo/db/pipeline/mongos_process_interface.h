@@ -168,6 +168,12 @@ public:
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final;
 
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final {
+        // It is not meaningful to perform a "local read" on mongos.
+        MONGO_UNREACHABLE;
+    }
+
     std::string getShardName(OperationContext* opCtx) const final {
         MONGO_UNREACHABLE;
     }

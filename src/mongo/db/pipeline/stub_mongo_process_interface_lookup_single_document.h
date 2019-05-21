@@ -56,6 +56,8 @@ public:
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) final;
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) final;
 
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

@@ -56,13 +56,20 @@ StubMongoProcessInterfaceLookupSingleDocument::makePipeline(
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-StubMongoProcessInterfaceLookupSingleDocument::attachCursorSourceToPipeline(
+StubMongoProcessInterfaceLookupSingleDocument::attachCursorSourceToPipelineForLocalRead(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
     pipeline->addInitialSource(DocumentSourceMock::createForTest(_mockResults));
     return pipeline;
 }
+
+std::unique_ptr<Pipeline, PipelineDeleter>
+StubMongoProcessInterfaceLookupSingleDocument::attachCursorSourceToPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
+    return attachCursorSourceToPipelineForLocalRead(expCtx, ownedPipeline);
+}
+
 
 boost::optional<Document> StubMongoProcessInterfaceLookupSingleDocument::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

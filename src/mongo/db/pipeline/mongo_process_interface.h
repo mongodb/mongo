@@ -243,6 +243,23 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) = 0;
 
     /**
+     * Accepts a pipeline and returns a new one which will draw input from the underlying
+     * collection _locally_. Trying to run this method on mongos is a programming error. Running
+     * this method on a shard server will only return results which match the pipeline on that
+     * shard.
+
+     * Performs no further optimization of the pipeline. NamespaceNotFound will be
+     * thrown if ExpressionContext has a UUID and that UUID doesn't exist anymore. That should be
+     * the only case where NamespaceNotFound is returned.
+     *
+     * This function takes ownership of the 'pipeline' argument as if it were a unique_ptr.
+     * Changing it to a unique_ptr introduces a circular dependency on certain platforms where the
+     * compiler expects to find an implementation of PipelineDeleter.
+     */
+    virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) = 0;
+
+    /**
      * Returns a vector of owned BSONObjs, each of which contains details of an in-progress
      * operation or, optionally, an idle connection. If userMode is kIncludeAllUsers, report
      * operations for all authenticated users; otherwise, report only the current user's operations.

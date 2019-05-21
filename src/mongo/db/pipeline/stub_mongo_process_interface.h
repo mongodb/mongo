@@ -141,6 +141,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) override {
+        MONGO_UNREACHABLE;
+    }
+
     std::vector<BSONObj> getCurrentOps(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        CurrentOpConnectionsMode connMode,
                                        CurrentOpSessionsMode sessionMode,
