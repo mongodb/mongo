@@ -524,7 +524,11 @@ func (opts *ToolOptions) setOptionsFromURI(cs connstring.ConnString) error {
 		}
 		opts.Username = cs.Username
 		opts.Password = cs.Password
-		opts.Source = cs.AuthSource
+		// Only set Source if it's not the Go driver default; that means a user must
+		// have passed an authsource option or provided a database in the URI path.
+		if _, ok := cs.Options["authsource"]; ok || cs.Database != "" {
+			opts.Source = cs.AuthSource
+		}
 		opts.Auth.Mechanism = cs.AuthMechanism
 	}
 	if opts.enabledOptions.Namespace {
