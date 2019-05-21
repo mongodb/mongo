@@ -185,7 +185,6 @@ void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
             namespacesTouchedByTransaction.insert(nss);
         }
 
-
         const auto& opType = stmt.getOpType();
 
         // We pass an empty opTime to observers because retryable write history doesn't care about

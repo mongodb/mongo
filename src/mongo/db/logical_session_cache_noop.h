@@ -44,16 +44,7 @@ class LogicalSessionCacheNoop : public LogicalSessionCache {
 public:
     void joinOnShutDown() override {}
 
-    Status promote(const LogicalSessionId& lsid) override {
-        return Status::OK();
-    }
-
     Status startSession(OperationContext* opCtx, const LogicalSessionRecord& record) override {
-        return Status::OK();
-    }
-
-    Status refreshSessions(OperationContext* opCtx,
-                           const std::vector<LogicalSessionFromClient>& sessions) override {
         return Status::OK();
     }
 

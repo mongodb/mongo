@@ -32,6 +32,7 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/service_liaison.h"
 #include "mongo/db/sessions_collection.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/functional.h"
 
 namespace mongo {
@@ -66,12 +67,7 @@ public:
 
     void joinOnShutDown() override;
 
-    Status promote(const LogicalSessionId& lsid) override;
-
     Status startSession(OperationContext* opCtx, const LogicalSessionRecord& record) override;
-
-    Status refreshSessions(OperationContext* opCtx,
-                           const std::vector<LogicalSessionFromClient>& sessions) override;
 
     Status vivify(OperationContext* opCtx, const LogicalSessionId& lsid) override;
 
@@ -93,10 +89,6 @@ public:
     LogicalSessionCacheStats getStats() override;
 
 private:
-    /**
-     * Internal methods to handle scheduling and perform refreshes for active
-     * session records contained within the cache.
-     */
     void _periodicRefresh(Client* client);
     void _refresh(Client* client);
 
@@ -109,13 +101,13 @@ private:
     bool _isDead(const LogicalSessionRecord& record, Date_t now) const;
 
     /**
-     * Takes the lock and inserts the given record into the cache.
+     *
      */
-    Status _addToCache(LogicalSessionRecord record);
+    Status _addToCache(WithLock, LogicalSessionRecord record);
 
-    std::unique_ptr<ServiceLiaison> _service;
-    std::shared_ptr<SessionsCollection> _sessionsColl;
-    ReapSessionsOlderThanFn _reapSessionsOlderThanFn;
+    const std::unique_ptr<ServiceLiaison> _service;
+    const std::shared_ptr<SessionsCollection> _sessionsColl;
+    const ReapSessionsOlderThanFn _reapSessionsOlderThanFn;
 
     mutable stdx::mutex _mutex;
 

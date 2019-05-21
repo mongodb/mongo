@@ -62,13 +62,6 @@ public:
     virtual void joinOnShutDown() = 0;
 
     /**
-     * If the cache contains a record for this LogicalSessionId, promotes that lsid
-     * to be the most recently used and updates its lastUse date to be the current
-     * time. Returns an error if the session was not found.
-     */
-    virtual Status promote(const LogicalSessionId& lsid) = 0;
-
-    /**
      * Inserts a new authoritative session record into the cache.
      *
      * This method will insert the authoritative record into the sessions collection and should only
@@ -76,12 +69,6 @@ public:
      * sessions.
      */
     virtual Status startSession(OperationContext* opCtx, const LogicalSessionRecord& record) = 0;
-
-    /**
-     * Refresh the given sessions. Updates the timestamps of these records in the local cache.
-     */
-    virtual Status refreshSessions(OperationContext* opCtx,
-                                   const std::vector<LogicalSessionFromClient>& sessions) = 0;
 
     /**
      * Vivifies the session in the cache. I.e. creates it if it isn't there, updates last use if it

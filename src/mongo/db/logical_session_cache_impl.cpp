@@ -85,42 +85,21 @@ void LogicalSessionCacheImpl::joinOnShutDown() {
     _service->join();
 }
 
-Status LogicalSessionCacheImpl::promote(const LogicalSessionId& lsid) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    auto it = _activeSessions.find(lsid);
-    if (it == _activeSessions.end()) {
-        return {ErrorCodes::NoSuchSession, "no matching session record found in the cache"};
-    }
-
-    return Status::OK();
-}
-
 Status LogicalSessionCacheImpl::startSession(OperationContext* opCtx,
                                              const LogicalSessionRecord& record) {
-    return _addToCache(record);
-}
-
-Status LogicalSessionCacheImpl::refreshSessions(
-    OperationContext* opCtx, const std::vector<LogicalSessionFromClient>& sessions) {
-    // Update the timestamps of all these records in our cache
-    for (const auto& lsid : makeLogicalSessionIds(sessions, opCtx)) {
-        if (!promote(lsid).isOK()) {
-            // This is a new record, insert it.
-            auto addToCacheStatus =
-                _addToCache(makeLogicalSessionRecord(opCtx, lsid, _service->now()));
-            if (!addToCacheStatus.isOK()) {
-                return addToCacheStatus;
-            }
-        }
-    }
-
-    return Status::OK();
+    stdx::lock_guard lg(_mutex);
+    return _addToCache(lg, record);
 }
 
 Status LogicalSessionCacheImpl::vivify(OperationContext* opCtx, const LogicalSessionId& lsid) {
-    if (!promote(lsid).isOK()) {
-        return startSession(opCtx, makeLogicalSessionRecord(opCtx, lsid, _service->now()));
-    }
+    stdx::lock_guard lg(_mutex);
+    auto it = _activeSessions.find(lsid);
+    if (it == _activeSessions.end())
+        return _addToCache(lg, makeLogicalSessionRecord(opCtx, lsid, _service->now()));
+
+    auto& cacheEntry = it->second;
+    cacheEntry.setLastUse(_service->now());
+
     return Status::OK();
 }
 
@@ -389,13 +368,15 @@ LogicalSessionCacheStats LogicalSessionCacheImpl::getStats() {
     return _stats;
 }
 
-Status LogicalSessionCacheImpl::_addToCache(LogicalSessionRecord record) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_activeSessions.size() >= static_cast<size_t>(maxSessions)) {
-        return {ErrorCodes::TooManyLogicalSessions, "cannot add session into the cache"};
+Status LogicalSessionCacheImpl::_addToCache(WithLock, LogicalSessionRecord record) {
+    if (_activeSessions.size() >= size_t(maxSessions)) {
+        return {ErrorCodes::TooManyLogicalSessions,
+                "Unable to add session into the cache because the number of active sessions is too "
+                "high"};
     }
 
-    _activeSessions.insert(std::make_pair(record.getId(), record));
+    _activeSessions.insert(std::make_pair(record.getId(), std::move(record)));
+
     return Status::OK();
 }
 

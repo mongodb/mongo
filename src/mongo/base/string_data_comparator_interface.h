@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
-#include "string_data.h"
 
 namespace mongo {
 

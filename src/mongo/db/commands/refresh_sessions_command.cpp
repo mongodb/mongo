@@ -83,8 +83,12 @@ public:
         auto refreshSessionsRequest = RefreshSessionsCmdFromClient::parse(
             IDLParserErrorContext("RefreshSessionsCmdFromClient"), cmdObj);
 
-        uassertStatusOK(LogicalSessionCache::get(opCtx)->refreshSessions(
-            opCtx, refreshSessionsRequest.getSessions()));
+        const auto lsCache = LogicalSessionCache::get(opCtx);
+
+        for (const auto& lsid :
+             makeLogicalSessionIds(refreshSessionsRequest.getSessions(), opCtx)) {
+            uassertStatusOK(lsCache->vivify(opCtx, lsid));
+        }
 
         return true;
     }
