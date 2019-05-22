@@ -1097,6 +1097,33 @@ TEST_F(TxnParticipantTest, TransactionTooLargeWhileBuilding) {
                        ErrorCodes::TransactionTooLarge);
 }
 
+// Tests that a transaction aborts if it becomes too large based on the server parameter
+// 'transactionLimitBytes'.
+TEST_F(TxnParticipantTest, TransactionExceedsSizeParameter) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+    auto oldLimit = gTransactionSizeLimitBytes.load();
+    ON_BLOCK_EXIT([oldLimit] { gTransactionSizeLimitBytes.store(oldLimit); });
+
+    // Set a limit of 2.5 MB
+    gTransactionSizeLimitBytes.store(2 * 1024 * 1024 + 512 * 1024);
+
+    // Two 1MB operations should succeed; three 1MB operations should fail.
+    constexpr size_t kBigDataSize = 1 * 1024 * 1024;
+    std::unique_ptr<uint8_t[]> bigData(new uint8_t[kBigDataSize]());
+    auto operation = repl::OplogEntry::makeInsertOperation(
+        kNss,
+        _uuid,
+        BSON("_id" << 0 << "data" << BSONBinData(bigData.get(), kBigDataSize, BinDataGeneral)));
+    txnParticipant.addTransactionOperation(opCtx(), operation);
+    txnParticipant.addTransactionOperation(opCtx(), operation);
+    ASSERT_THROWS_CODE(txnParticipant.addTransactionOperation(opCtx(), operation),
+                       AssertionException,
+                       ErrorCodes::TransactionTooLarge);
+}
+
 TEST_F(TxnParticipantTest, StashInNestedSessionIsANoop) {
     auto outerScopedSession = checkOutSession();
     Locker* originalLocker = opCtx()->lockState();

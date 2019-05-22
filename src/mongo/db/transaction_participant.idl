@@ -74,3 +74,12 @@ server_parameters:
         cpp_varname: gMaxNumberOfTransactionOperationsInSingleOplogEntry
         default: 2147483647  # INT_MAX
         validator: { gte: 1 }
+
+    transactionSizeLimitBytes:
+        description: >-
+            Maximum total size of operations in a multi-document transaction.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<long long>
+        cpp_varname: gTransactionSizeLimitBytes
+        default:
+          expr: std::numeric_limits<long long>::max()

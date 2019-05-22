@@ -1128,6 +1128,13 @@ void TransactionParticipant::Participant::addTransactionOperation(
     p().transactionOperations.push_back(operation);
     p().transactionOperationBytes += repl::OplogEntry::getDurableReplOperationSize(operation);
 
+    auto transactionSizeLimitBytes = gTransactionSizeLimitBytes.load();
+    uassert(ErrorCodes::TransactionTooLarge,
+            str::stream() << "Total size of all transaction operations must be less than "
+                          << "server parameter 'transactionSizeLimitBytes' = "
+                          << transactionSizeLimitBytes,
+            p().transactionOperationBytes <= static_cast<size_t>(transactionSizeLimitBytes));
+
     // Creating transactions larger than 16MB requires a new oplog format only available in FCV 4.2.
     const auto isFCV42 = serverGlobalParams.featureCompatibility.getVersion() ==
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
