@@ -42,6 +42,10 @@
         assert.commandWorked(session.getDatabase("test").test.insert({myTransaction: 1}));
         const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
+        const oldestRequiredTimestampForCrashRecovery =
+            PrepareHelpers.getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
+        assert.lte(oldestRequiredTimestampForCrashRecovery, prepareTimestamp);
+
         jsTestLog("Get transaction entry from config.transactions");
 
         const txnEntry = primary.getDB("config").transactions.findOne();

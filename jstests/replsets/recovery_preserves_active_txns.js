@@ -40,6 +40,10 @@
         assert.commandWorked(session.getDatabase("test").test.insert({myTransaction: 1}));
         const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
+        const oldestRequiredTimestampForCrashRecovery =
+            PrepareHelpers.getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
+        assert.lte(oldestRequiredTimestampForCrashRecovery, prepareTimestamp);
+
         jsTestLog("Insert documents until oplog exceeds oplogSize");
 
         // Oplog with prepared txn grows indefinitely - let it reach twice its supposed max size.

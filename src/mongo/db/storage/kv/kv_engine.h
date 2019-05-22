@@ -389,6 +389,11 @@ public:
     virtual Timestamp getOldestOpenReadTimestamp() const = 0;
 
     /**
+     * See `StorageEngine::getOplogNeededForCrashRecovery`
+     */
+    virtual boost::optional<Timestamp> getOplogNeededForCrashRecovery() const = 0;
+
+    /**
      * See `StorageEngine::supportsReadConcernSnapshot`
      */
     virtual bool supportsReadConcernSnapshot() const {

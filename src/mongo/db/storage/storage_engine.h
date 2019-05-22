@@ -501,6 +501,14 @@ public:
     virtual Timestamp getOldestOpenReadTimestamp() const = 0;
 
     /**
+     * Returns the minimum possible Timestamp value in the oplog that replication may need for
+     * recovery in the event of a crash.
+     *
+     * Returns boost::none when called on an ephemeral database.
+     */
+    virtual boost::optional<Timestamp> getOplogNeededForCrashRecovery() const = 0;
+
+    /**
      * Returns the path to the directory which has the data files of database with `dbName`.
      */
     virtual std::string getFilesystemPathForDb(const std::string& dbName) const = 0;

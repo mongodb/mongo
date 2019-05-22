@@ -41,6 +41,10 @@
         const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
         const txnEntry = primary.getDB("config").transactions.findOne();
 
+        const oldestRequiredTimestampForCrashRecovery =
+            PrepareHelpers.getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
+        assert.lte(oldestRequiredTimestampForCrashRecovery, prepareTimestamp);
+
         // Make sure that the timestamp of the first oplog entry for this transaction matches the
         // start timestamp in the transactions table.
         let oplog = primary.getDB("local").getCollection("oplog.rs");

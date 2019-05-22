@@ -769,6 +769,10 @@ Timestamp KVStorageEngine::getOldestOpenReadTimestamp() const {
     return _engine->getOldestOpenReadTimestamp();
 }
 
+boost::optional<Timestamp> KVStorageEngine::getOplogNeededForCrashRecovery() const {
+    return _engine->getOplogNeededForCrashRecovery();
+}
+
 void KVStorageEngine::_dumpCatalog(OperationContext* opCtx) {
     auto catalogRs = _catalogRecordStore.get();
     auto cursor = catalogRs->getCursor(opCtx);

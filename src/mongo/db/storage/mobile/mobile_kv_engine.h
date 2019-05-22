@@ -136,6 +136,10 @@ public:
         return Timestamp();
     }
 
+    boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
+        return boost::none;
+    }
+
 private:
     void maybeVacuum(Client* client, Date_t deadline);
 

@@ -144,6 +144,10 @@ public:
         return Timestamp();
     }
 
+    boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
+        return boost::none;
+    }
+
     // Biggie Specific
 
     /**

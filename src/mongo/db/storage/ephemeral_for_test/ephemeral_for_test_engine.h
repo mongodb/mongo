@@ -120,6 +120,10 @@ public:
         return Timestamp();
     }
 
+    boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
+        return boost::none;
+    }
+
 private:
     typedef StringMap<std::shared_ptr<void>> DataMap;
 

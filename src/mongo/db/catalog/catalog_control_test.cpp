@@ -87,6 +87,9 @@ public:
     Timestamp getOldestOpenReadTimestamp() const final {
         return {};
     }
+    boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
+        return boost::none;
+    }
     std::string getFilesystemPathForDb(const std::string& dbName) const final {
         return "";
     }

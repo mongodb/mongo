@@ -129,6 +129,10 @@ public:
         return Timestamp();
     }
 
+    boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
+        return boost::none;
+    }
+
     virtual Status beginBackup(OperationContext* opCtx) override {
         return Status::OK();
     }
