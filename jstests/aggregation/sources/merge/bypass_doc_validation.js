@@ -1,5 +1,5 @@
 /**
- * Tests for $out with bypassDocumentValidation.
+ * Tests for $merge with bypassDocumentValidation.
  *
  * @tags: [assumes_unsharded_collection]
  */
@@ -21,22 +21,30 @@
     // Test that the bypassDocumentValidation flag is passed through to the writes on the output
     // collection.
     (function testBypassDocValidationTrue() {
-        sourceColl.aggregate([{$out: targetColl.getName()}], {bypassDocumentValidation: true});
-        assert.eq([{_id: 0, a: 1}], targetColl.find().toArray());
-
-        sourceColl.aggregate([{$out: {to: targetColl.getName(), mode: "replaceCollection"}}],
-                             {bypassDocumentValidation: true});
+        sourceColl.aggregate([{$merge: targetColl.getName()}], {bypassDocumentValidation: true});
         assert.eq([{_id: 0, a: 1}], targetColl.find().toArray());
 
         sourceColl.aggregate(
-            [{$addFields: {a: 3}}, {$out: {to: targetColl.getName(), mode: "replaceDocuments"}}],
+            [
+              {$addFields: {a: 3}},
+              {
+                $merge: {
+                    into: targetColl.getName(),
+                    whenMatched: "replaceWithNew",
+                    whenNotMatched: "insert"
+                }
+              }
+            ],
             {bypassDocumentValidation: true});
         assert.eq([{_id: 0, a: 3}], targetColl.find().toArray());
 
         sourceColl.aggregate(
             [
               {$replaceRoot: {newRoot: {_id: 1, a: 4}}},
-              {$out: {to: targetColl.getName(), mode: "insertDocuments"}}
+              {
+                $merge:
+                    {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}
+              }
             ],
             {bypassDocumentValidation: true});
         assert.eq([{_id: 0, a: 3}, {_id: 1, a: 4}], targetColl.find().sort({_id: 1}).toArray());
@@ -45,11 +53,28 @@
     // Test that mode "replaceDocuments" passes without the bypassDocumentValidation flag if the
     // updated doc is valid.
     (function testReplacementStyleUpdateWithoutBypass() {
-        sourceColl.aggregate(
-            [{$addFields: {a: 2}}, {$out: {to: targetColl.getName(), mode: "replaceDocuments"}}]);
+        sourceColl.aggregate([
+            {$addFields: {a: 2}},
+            {
+              $merge: {
+                  into: targetColl.getName(),
+                  whenMatched: "replaceWithNew",
+                  whenNotMatched: "insert"
+              }
+            }
+        ]);
         assert.eq([{_id: 0, a: 2}], targetColl.find({_id: 0}).toArray());
         sourceColl.aggregate(
-            [{$addFields: {a: 2}}, {$out: {to: targetColl.getName(), mode: "replaceDocuments"}}],
+            [
+              {$addFields: {a: 2}},
+              {
+                $merge: {
+                    into: targetColl.getName(),
+                    whenMatched: "replaceWithNew",
+                    whenNotMatched: "insert"
+                }
+              }
+            ],
             {bypassDocumentValidation: false});
         assert.eq([{_id: 0, a: 2}], targetColl.find({_id: 0}).toArray());
     }());
@@ -57,40 +82,46 @@
     function assertDocValidationFailure(cmdOptions) {
         assert.commandWorked(targetColl.remove({}));
         assertErrorCode(sourceColl,
-                        [{$out: targetColl.getName()}],
+                        [{$merge: targetColl.getName()}],
                         ErrorCodes.DocumentValidationFailure,
                         "Expected failure without bypass set",
                         cmdOptions);
 
         assertErrorCode(sourceColl,
-                        [{$out: {to: targetColl.getName(), mode: "replaceCollection"}}],
+                        [
+                          {$addFields: {a: 3}},
+                          {
+                            $merge: {
+                                into: targetColl.getName(),
+                                whenMatched: "replaceWithNew",
+                                whenNotMatched: "insert"
+                            }
+                          }
+                        ],
                         ErrorCodes.DocumentValidationFailure,
                         "Expected failure without bypass set",
                         cmdOptions);
 
         assertErrorCode(
             sourceColl,
-            [{$addFields: {a: 3}}, {$out: {to: targetColl.getName(), mode: "replaceDocuments"}}],
+            [
+              {$replaceRoot: {newRoot: {_id: 1, a: 4}}},
+              {
+                $merge:
+                    {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}
+              }
+            ],
             ErrorCodes.DocumentValidationFailure,
             "Expected failure without bypass set",
             cmdOptions);
-
-        assertErrorCode(sourceColl,
-                        [
-                          {$replaceRoot: {newRoot: {_id: 1, a: 4}}},
-                          {$out: {to: targetColl.getName(), mode: "insertDocuments"}}
-                        ],
-                        ErrorCodes.DocumentValidationFailure,
-                        "Expected failure without bypass set",
-                        cmdOptions);
         assert.eq(0, targetColl.find().itcount());
     }
 
-    // Test that $out fails if the output document is not valid, and the bypassDocumentValidation
+    // Test that $merge fails if the output document is not valid, and the bypassDocumentValidation
     // flag is not set.
     assertDocValidationFailure({});
 
-    // Test that $out fails if the output document is not valid, and the bypassDocumentValidation
+    // Test that $merge fails if the output document is not valid, and the bypassDocumentValidation
     // flag is explicitly set to false.
     assertDocValidationFailure({bypassDocumentValidation: false});
 
@@ -100,19 +131,24 @@
         targetColl.drop();
         assert.commandWorked(testDB.runCommand({collMod: sourceColl.getName(), validator: {a: 1}}));
 
-        sourceColl.aggregate([{$out: targetColl.getName()}]);
+        sourceColl.aggregate([{$merge: targetColl.getName()}]);
         assert.eq([{_id: 0, a: 1}], targetColl.find().toArray());
 
-        sourceColl.aggregate([{$out: {to: targetColl.getName(), mode: "replaceCollection"}}]);
-        assert.eq([{_id: 0, a: 1}], targetColl.find().toArray());
-
-        sourceColl.aggregate(
-            [{$addFields: {a: 3}}, {$out: {to: targetColl.getName(), mode: "replaceDocuments"}}]);
+        sourceColl.aggregate([
+            {$addFields: {a: 3}},
+            {
+              $merge: {
+                  into: targetColl.getName(),
+                  whenMatched: "replaceWithNew",
+                  whenNotMatched: "insert"
+              }
+            }
+        ]);
         assert.eq([{_id: 0, a: 3}], targetColl.find().toArray());
 
         sourceColl.aggregate([
             {$replaceRoot: {newRoot: {_id: 1, a: 4}}},
-            {$out: {to: targetColl.getName(), mode: "insertDocuments"}}
+            {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}}
         ]);
         assert.eq([{_id: 0, a: 3}, {_id: 1, a: 4}], targetColl.find().sort({_id: 1}).toArray());
     }());
@@ -124,16 +160,25 @@
         sourceColl.drop();
         assert.commandWorked(sourceColl.insert({_id: 0, a: 1}));
 
-        sourceColl.aggregate([{$out: targetColl.getName()}], {bypassDocumentValidation: 5});
+        sourceColl.aggregate([{$merge: targetColl.getName()}], {bypassDocumentValidation: 5});
         assert.eq([{_id: 0, a: 1}], targetColl.find().toArray());
 
         sourceColl.aggregate(
-            [{$addFields: {a: 3}}, {$out: {to: targetColl.getName(), mode: "replaceDocuments"}}],
+            [
+              {$addFields: {a: 3}},
+              {
+                $merge: {
+                    into: targetColl.getName(),
+                    whenMatched: "replaceWithNew",
+                    whenNotMatched: "insert"
+                }
+              }
+            ],
             {bypassDocumentValidation: "false"});
         assert.eq([{_id: 0, a: 3}], targetColl.find().toArray());
     }());
 
-    // Test bypassDocumentValidation with $out to a collection in a foreign database.
+    // Test bypassDocumentValidation with $merge to a collection in a foreign database.
     (function testForeignDb() {
         const foreignDB = db.getSiblingDB("foreign_db");
         const foreignColl = foreignDB.foreign_coll;
@@ -145,10 +190,13 @@
             [
               {$addFields: {a: 3}},
               {
-                $out: {
-                    db: foreignDB.getName(),
-                    to: foreignColl.getName(),
-                    mode: "replaceDocuments"
+                $merge: {
+                    into: {
+                        db: foreignDB.getName(),
+                        coll: foreignColl.getName(),
+                    },
+                    whenMatched: "replaceWithNew",
+                    whenNotMatched: "insert"
                 }
               }
             ],
@@ -159,8 +207,14 @@
             [
               {$replaceRoot: {newRoot: {_id: 1, a: 4}}},
               {
-                $out:
-                    {db: foreignDB.getName(), to: foreignColl.getName(), mode: "insertDocuments"}
+                $merge: {
+                    into: {
+                        db: foreignDB.getName(),
+                        coll: foreignColl.getName(),
+                    },
+                    whenMatched: "fail",
+                    whenNotMatched: "insert"
+                }
               }
             ],
             {bypassDocumentValidation: true});
@@ -171,25 +225,33 @@
                         [
                           {$addFields: {a: 3}},
                           {
-                            $out: {
-                                db: foreignDB.getName(),
-                                to: foreignColl.getName(),
-                                mode: "replaceDocuments"
+                            $merge: {
+                                into: {
+                                    db: foreignDB.getName(),
+                                    coll: foreignColl.getName(),
+                                },
+                                whenMatched: "replaceWithNew",
+                                whenNotMatched: "insert"
                             }
                           }
                         ],
                         ErrorCodes.DocumentValidationFailure);
 
-        assertErrorCode(
-            sourceColl,
-            [
-              {$replaceRoot: {newRoot: {_id: 1, a: 4}}},
-              {
-                $out:
-                    {db: foreignDB.getName(), to: foreignColl.getName(), mode: "insertDocuments"}
-              }
-            ],
-            ErrorCodes.DocumentValidationFailure);
+        assertErrorCode(sourceColl,
+                        [
+                          {$replaceRoot: {newRoot: {_id: 1, a: 4}}},
+                          {
+                            $merge: {
+                                into: {
+                                    db: foreignDB.getName(),
+                                    coll: foreignColl.getName(),
+                                },
+                                whenMatched: "fail",
+                                whenNotMatched: "insert"
+                            }
+                          }
+                        ],
+                        ErrorCodes.DocumentValidationFailure);
         assert.eq(0, foreignColl.find().itcount());
     }());
 }());

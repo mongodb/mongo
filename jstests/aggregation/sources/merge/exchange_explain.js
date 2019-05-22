@@ -1,5 +1,5 @@
 /**
- * Test $out and exchange with explain.
+ * Test $merge and exchange with explain.
  *
  * @tags: [requires_sharding]
  */
@@ -13,33 +13,39 @@ load('jstests/aggregation/extras/utils.js');
     const mongosDB = st.s.getDB("test_db");
 
     const inColl = mongosDB["inColl"];
-    const outCollRange = mongosDB["outCollRange"];
-    const outCollRangeOtherField = mongosDB["outCollRangeOtherField"];
-    const outCollHash = mongosDB["outCollHash"];
+    const targetCollRange = mongosDB["targetCollRange"];
+    const targetCollRangeOtherField = mongosDB["targetCollRangeOtherField"];
+    const targetCollHash = mongosDB["targetCollHash"];
 
     const numDocs = 1000;
 
-    function runExplainQuery(outColl) {
+    function runExplainQuery(targetColl) {
         return inColl.explain("allPlansExecution").aggregate([
             {$group: {_id: "$a", a: {$avg: "$a"}}},
             {
-              $out: {
-                  to: outColl.getName(),
-                  db: outColl.getDB().getName(),
-                  mode: "replaceDocuments"
+              $merge: {
+                  into: {
+                      db: targetColl.getDB().getName(),
+                      coll: targetColl.getName(),
+                  },
+                  whenMatched: "replaceWithNew",
+                  whenNotMatched: "insert"
               }
             }
         ]);
     }
 
-    function runRealQuery(outColl) {
+    function runRealQuery(targetColl) {
         return inColl.aggregate([
             {$group: {_id: "$a", a: {$avg: "$a"}}},
             {
-              $out: {
-                  to: outColl.getName(),
-                  db: outColl.getDB().getName(),
-                  mode: "replaceDocuments"
+              $merge: {
+                  into: {
+                      db: targetColl.getDB().getName(),
+                      coll: targetColl.getName(),
+                  },
+                  whenMatched: "replaceWithNew",
+                  whenNotMatched: "insert"
               }
             }
         ]);
@@ -63,12 +69,12 @@ load('jstests/aggregation/extras/utils.js');
     assert.commandWorked(bulk.execute());
 
     // Shard the output collections.
-    st.shardColl(outCollRange, {_id: 1}, {_id: 500}, {_id: 500}, mongosDB.getName());
-    st.shardColl(outCollRangeOtherField, {b: 1}, {b: 500}, {b: 500}, mongosDB.getName());
-    st.shardColl(outCollHash, {_id: "hashed"}, false, false, mongosDB.getName());
+    st.shardColl(targetCollRange, {_id: 1}, {_id: 500}, {_id: 500}, mongosDB.getName());
+    st.shardColl(targetCollRangeOtherField, {b: 1}, {b: 500}, {b: 500}, mongosDB.getName());
+    st.shardColl(targetCollHash, {_id: "hashed"}, false, false, mongosDB.getName());
 
     // Run the explain. We expect to see the range based exchange here.
-    let explain = runExplainQuery(outCollRange);
+    let explain = runExplainQuery(targetCollRange);
 
     // Make sure we see the exchange in the explain output.
     assert.eq(explain.mergeType, "exchange", tojson(explain));
@@ -77,12 +83,12 @@ load('jstests/aggregation/extras/utils.js');
     assert.eq(exchangeSpec.key, {_id: 1});
 
     // Run the real query.
-    runRealQuery(outCollRange);
-    let results = outCollRange.aggregate([{'$count': "count"}]).next().count;
+    runRealQuery(targetCollRange);
+    let results = targetCollRange.aggregate([{'$count': "count"}]).next().count;
     assert.eq(results, numDocs);
 
     // Rerun the same query with the hash based exchange.
-    explain = runExplainQuery(outCollHash);
+    explain = runExplainQuery(targetCollHash);
 
     // Make sure we see the exchange in the explain output.
     assert.eq(explain.mergeType, "exchange", tojson(explain));
@@ -91,39 +97,44 @@ load('jstests/aggregation/extras/utils.js');
     assert.eq(exchangeSpec.key, {_id: "hashed"});
 
     // Run the real query.
-    runRealQuery(outCollHash);
-    results = outCollHash.aggregate([{'$count': "count"}]).next().count;
+    runRealQuery(targetCollHash);
+    results = targetCollHash.aggregate([{'$count': "count"}]).next().count;
     assert.eq(results, numDocs);
 
-    // This should fail with the error '$out write error: uniqueKey field 'b' cannot be missing,
-    // null, undefined or an array.' as we are trying to insert an array value.
+    // This should fail because the "on" field ('b' in this case, the shard key of the target
+    // collection) cannot be an array.
     assertErrorCode(inColl,
                     [{
-                       $out: {
-                           to: outCollRangeOtherField.getName(),
-                           db: outCollRangeOtherField.getDB().getName(),
-                           mode: "replaceDocuments"
+                       $merge: {
+                           into: {
+                               db: targetCollRangeOtherField.getDB().getName(),
+                               coll: targetCollRangeOtherField.getName(),
+                           },
+                           whenMatched: "replaceWithNew",
+                           whenNotMatched: "insert"
                        }
                     }],
                     51132);
 
     // Turn off the exchange and rerun the query.
     assert.commandWorked(mongosDB.adminCommand({setParameter: 1, internalQueryDisableExchange: 1}));
-    explain = runExplainQuery(outCollRange);
+    explain = runExplainQuery(targetCollRange);
 
     // Make sure there is no exchange.
     assert.eq(explain.mergeType, "anyShard", tojson(explain));
     assert(explain.hasOwnProperty("splitPipeline"), tojson(explain));
     assert(!explain.splitPipeline.hasOwnProperty("exchange"), tojson(explain));
 
-    // This should fail with the same error '$out write error: uniqueKey field 'b' cannot be
-    // missing, null, undefined or an array.' as before even if we are not running the exchange.
+    // This should fail similar to before even if we are not running the exchange.
     assertErrorCode(inColl,
                     [{
-                       $out: {
-                           to: outCollRangeOtherField.getName(),
-                           db: outCollRangeOtherField.getDB().getName(),
-                           mode: "replaceDocuments"
+                       $merge: {
+                           into: {
+                               db: targetCollRangeOtherField.getDB().getName(),
+                               coll: targetCollRangeOtherField.getName(),
+                           },
+                           whenMatched: "replaceWithNew",
+                           whenNotMatched: "insert"
                        }
                     }],
                     51132);
@@ -145,7 +156,13 @@ load('jstests/aggregation/extras/utils.js');
 
     assert.commandFailedWithCode(mongosDB.runCommand({
         aggregate: inColl.getName(),
-        pipeline: [{$out: {to: outCollRange.getName(), mode: "replaceDocuments"}}],
+        pipeline: [{
+            $merge: {
+                into: targetCollRange.getName(),
+                whenMatched: "replaceWithNew",
+                whenNotMatched: "insert"
+            }
+        }],
         cursor: {},
         exchange: {
             policy: "keyRange",

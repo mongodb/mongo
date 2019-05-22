@@ -7,7 +7,7 @@ selector:
   - jstests/aggregation/extras/*.js
   - jstests/aggregation/data/*.js
   # Blocked by SERVER-37191
-  - jstests/aggregation/sources/out/exchange_explain.js
+  - jstests/aggregation/sources/merge/exchange_explain.js
   # This test specifies a $out stage not as the last stage in the aggregation pipeline, causing a
   # non-local readConcern to erroneously be sent with the command.
   - jstests/aggregation/sources/out/required_last_position.js

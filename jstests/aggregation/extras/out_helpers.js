@@ -4,13 +4,6 @@
 
 load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
-// TODO SERVER-40432: Remove this helper as it shouldn't be needed anymore.
-function withEachOutMode(callback) {
-    callback("replaceCollection");
-    callback("insertDocuments");
-    callback("replaceDocuments");
-}
-
 /**
  * Executes the callback function with each valid combination of 'whenMatched' and 'whenNotMatched'
  * modes (as named arguments). Note that one mode is a pipeline.
@@ -33,51 +26,6 @@ function withEachMergeMode(callback) {
     callback({whenMatchedMode: [], whenNotMatchedMode: "discard"});
 }
 
-// TODO SERVER-40432: Remove this helper as it shouldn't be needed anymore.
-function assertUniqueKeyIsInvalid({source, target, uniqueKey, options, prevStages}) {
-    withEachOutMode((mode) => {
-        if (mode === "replaceCollection" && FixtureHelpers.isSharded(target))
-            return;
-
-        prevStages = (prevStages || []);
-        const pipeline = prevStages.concat([{
-            $out: {
-                db: target.getDB().getName(),
-                to: target.getName(),
-                mode: mode,
-                uniqueKey: uniqueKey
-            }
-        }]);
-
-        const cmd = {aggregate: source.getName(), pipeline: pipeline, cursor: {}};
-        assert.commandFailedWithCode(source.getDB().runCommand(Object.merge(cmd, options)), 50938);
-    });
-}
-
-// TODO SERVER-40432: Remove this helper as it shouldn't be needed anymore.
-function assertUniqueKeyIsValid({source, target, uniqueKey, options, prevStages}) {
-    withEachOutMode((mode) => {
-        if (mode === "replaceCollection" && FixtureHelpers.isSharded(target))
-            return;
-
-        prevStages = (prevStages || []);
-        let outStage = {
-            db: target.getDB().getName(),
-            to: target.getName(),
-            mode: mode,
-        };
-
-        // Do not include the uniqueKey in the command if the caller did not specify it.
-        if (uniqueKey !== undefined) {
-            outStage = Object.extend(outStage, {uniqueKey: uniqueKey});
-        }
-        const pipeline = prevStages.concat([{$out: outStage}]);
-
-        assert.commandWorked(target.remove({}));
-        assert.doesNotThrow(() => source.aggregate(pipeline, options));
-    });
-}
-
 function assertFailsWithoutUniqueIndex({source, target, onFields, options, prevStages}) {
     withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
         prevStages = (prevStages || []);
@@ -90,8 +38,11 @@ function assertFailsWithoutUniqueIndex({source, target, onFields, options, prevS
             }
         }]);
 
+        // In sharded passthrough suites, the error code may be different depending on where we
+        // extract the "on" fields.
         const cmd = {aggregate: source.getName(), pipeline: pipeline, cursor: {}};
-        assert.commandFailedWithCode(source.getDB().runCommand(Object.merge(cmd, options)), 51190);
+        assert.commandFailedWithCode(source.getDB().runCommand(Object.merge(cmd, options)),
+                                     [51183, 51190]);
     });
 }
 

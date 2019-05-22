@@ -1,7 +1,6 @@
 /**
- * Tests for the validation of the "uniqueKey" at parse-time of the "uniqueKey" specification
- * itself, as well as during runtime extraction of the "uniqueKey" from documents in the aggregation
- * pipeline.
+ * Tests for the validation of the "on" fields at parse-time of $merge stage itself, as well as
+ * during runtime extraction of the "on" fields from documents in the aggregation pipeline.
  *
  * This test creates unique indexes on various combinations of fields, so it cannot be run in suites
  * that implicitly shard the collection with a hashed shard key.
@@ -19,51 +18,47 @@
     assert.commandWorked(source.insert({_id: 0}));
 
     //
-    // Tests for invalid "uniqueKey" specifications.
+    // Tests for invalid "on" fields specifications.
     //
-    function assertUniqueKeyIsInvalid(uniqueKey, expectedErrorCode) {
+    function assertOnFieldsIsInvalid(onFields, expectedErrorCode) {
         const stage = {
-            $out: {to: target.getName(), mode: "replaceDocuments", uniqueKey: uniqueKey}
+            $merge: {
+                into: target.getName(),
+                whenMatched: "replaceWithNew",
+                whenNotMatched: "insert",
+                on: onFields
+            }
         };
         assertErrorCode(source, stage, expectedErrorCode);
     }
 
-    // A non-object "uniqueKey" is prohibited.
-    assertUniqueKeyIsInvalid(3.14, ErrorCodes.TypeMismatch);
-    assertUniqueKeyIsInvalid("_id", ErrorCodes.TypeMismatch);
+    // A non-array or string "on" fields is prohibited.
+    assertOnFieldsIsInvalid(3.14, 51186);
+    assertOnFieldsIsInvalid({_id: 1}, 51186);
 
-    // Explicitly specifying an empty-object "uniqueKey" is invalid.
-    assertUniqueKeyIsInvalid({}, ErrorCodes.InvalidOptions);
+    // Explicitly specifying an empty-array "on" fields is invalid.
+    assertOnFieldsIsInvalid([], 51187);
 
-    // The "uniqueKey" won't be accepted if any field is not a number.
-    assertUniqueKeyIsInvalid({name: "hashed"}, ErrorCodes.TypeMismatch);
-    assertUniqueKeyIsInvalid({x: 1, y: 1, z: [1]}, ErrorCodes.TypeMismatch);
-    assertUniqueKeyIsInvalid({nested: {field: 1}}, ErrorCodes.TypeMismatch);
-    assertUniqueKeyIsInvalid({uniqueKey: true}, ErrorCodes.TypeMismatch);
-    assertUniqueKeyIsInvalid({string: "true"}, ErrorCodes.TypeMismatch);
-    assertUniqueKeyIsInvalid({bool: false}, ErrorCodes.TypeMismatch);
-
-    // A numerical "uniqueKey" won't be accepted if any field isn't exactly the value 1.
-    assertUniqueKeyIsInvalid({_id: -1}, ErrorCodes.BadValue);
-    assertUniqueKeyIsInvalid({x: 10}, ErrorCodes.BadValue);
-
-    // Test that the value 1 represented as different numerical types will be accepred.
-    [1.0, NumberInt(1), NumberLong(1), NumberDecimal(1)].forEach(one => {
-        assert.commandWorked(target.remove({}));
-        assert.doesNotThrow(
-            () => source.aggregate(
-                {$out: {to: target.getName(), mode: "replaceDocuments", uniqueKey: {_id: one}}}));
-        assert.eq(target.find().toArray(), [{_id: 0}]);
-    });
+    // The "on" fields array won't be accepted if any element is not a string.
+    assertOnFieldsIsInvalid(["hashed", 1], 51134);
+    assertOnFieldsIsInvalid([["_id"]], 51134);
+    assertOnFieldsIsInvalid([null], 51134);
+    assertOnFieldsIsInvalid([true, "a"], 51134);
 
     //
-    // An error is raised if $out encounters a document that is missing one or more of the
-    // "uniqueKey" fields.
+    // An error is raised if $merge encounters a document that is missing one or more of the
+    // "on" fields.
     //
     assert.commandWorked(target.remove({}));
     assert.commandWorked(target.createIndex({name: 1, team: -1}, {unique: true}));
-    const pipelineNameTeam =
-        [{$out: {to: target.getName(), mode: "replaceDocuments", uniqueKey: {name: 1, team: 1}}}];
+    const pipelineNameTeam = [{
+        $merge: {
+            into: target.getName(),
+            whenMatched: "replaceWithNew",
+            whenNotMatched: "insert",
+            on: ["name", "team"]
+        }
+    }];
 
     // Missing both "name" and "team".
     assertErrorCode(source, pipelineNameTeam, 51132);
@@ -82,19 +77,25 @@
     assert.eq(target.find().toArray(), [{_id: 0, name: "nicholas", team: "query"}]);
 
     //
-    // An error is raised if $out encounters a document where one of the "uniqueKey" fields is a
-    // nullish value.
+    // An error is raised if $merge encounters a document where one of the "on" fields is a nullish
+    // value.
     //
     assert.commandWorked(target.remove({}));
     assert.commandWorked(target.createIndex({"song.artist": 1}, {unique: 1}));
-    const pipelineSongDotArtist =
-        [{$out: {to: target.getName(), mode: "replaceDocuments", uniqueKey: {"song.artist": 1}}}];
+    const pipelineSongDotArtist = [{
+        $merge: {
+            into: target.getName(),
+            whenMatched: "replaceWithNew",
+            whenNotMatched: "insert",
+            on: ["song.artist"]
+        }
+    }];
 
-    // Explicit null "song" (a prefix of a "uniqueKey" field).
+    // Explicit null "song" (a prefix of an "on" field).
     assert.commandWorked(source.update({_id: 0}, {_id: 0, song: null}));
     assertErrorCode(source, pipelineSongDotArtist, 51132);
 
-    // Explicit undefined "song" (a prefix of a "uniqueKey" field).
+    // Explicit undefined "song" (a prefix of an "on" field).
     assert.commandWorked(source.update({_id: 0}, {_id: 0, song: undefined}));
     assertErrorCode(source, pipelineSongDotArtist, 51132);
 
@@ -112,21 +113,26 @@
     assert.eq(target.find().toArray(), [{_id: 0, song: {artist: "Illenium"}}]);
 
     //
-    // An error is raised if $out encounters a document where one of the "uniqueKey" fields (or a
-    // prefix of a "uniqueKey" field) is an array.
+    // An error is raised if $merge encounters a document where one of the "on" fields (or a prefix
+    // of an "on" field) is an array.
     //
     assert.commandWorked(target.remove({}));
     assert.commandWorked(target.createIndex({"address.street": 1}, {unique: 1}));
-    const pipelineAddressDotStreet = [
-        {$out: {to: target.getName(), mode: "replaceDocuments", uniqueKey: {"address.street": 1}}}
-    ];
+    const pipelineAddressDotStreet = [{
+        $merge: {
+            into: target.getName(),
+            whenMatched: "replaceWithNew",
+            whenNotMatched: "insert",
+            on: ["address.street"]
+        }
+    }];
 
     // "address.street" is an array.
     assert.commandWorked(
         source.update({_id: 0}, {_id: 0, address: {street: ["West 43rd St", "1633 Broadway"]}}));
     assertErrorCode(source, pipelineAddressDotStreet, 51185);
 
-    // "address" is an array (a prefix of a "uniqueKey" field).
+    // "address" is an array (a prefix of an "on" field).
     assert.commandWorked(source.update({_id: 0}, {_id: 0, address: [{street: "1633 Broadway"}]}));
     assertErrorCode(source, pipelineAddressDotStreet, 51132);
 

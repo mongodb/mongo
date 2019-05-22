@@ -78,7 +78,7 @@ std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem) {
         while (iter.more()) {
             const BSONElement matchByElem = iter.next();
             uassert(51134,
-                    "{} 'on' array elements must be strings, but found "_format(
+                    "{} 'on' array elements must be strings, but found {}"_format(
                         DocumentSourceMerge::kStageName, typeName(matchByElem.type())),
                     matchByElem.type() == BSONType::String);
             fields.push_back(matchByElem.str());

@@ -1,5 +1,5 @@
 /**
- * Tests a practical use case for $out from a collection of samples to an hourly rollup output
+ * Tests a practical use case for $merge from a collection of samples to an hourly rollup output
  * collection.
  *
  * @tags: [requires_sharding]
@@ -40,9 +40,9 @@
         return [ticksSum, tempSum];
     }
 
-    // Runs a $out aggregate on the metrics collection to the rollup collection, grouping by hour,
+    // Runs a $merge aggregate on the metrics collection to the rollup collection, grouping by hour,
     // summing the ticks, and averaging the temps.
-    function runAggregate(startDate, mode) {
+    function runAggregate({startDate, whenMatchedMode, whenNotMatchedMode}) {
         metricsColl.aggregate([
             {$match: {_id: {$gte: startDate}}},
             {
@@ -52,7 +52,13 @@
                   avgTemp: {$avg: "$temp"},
               }
             },
-            {$out: {to: rollupColl.getName(), db: rollupColl.getDB().getName(), mode: mode}}
+            {
+              $merge: {
+                  into: {db: rollupColl.getDB().getName(), coll: rollupColl.getName()},
+                  whenMatched: whenMatchedMode,
+                  whenNotMatched: whenNotMatchedMode
+              }
+            }
         ]);
     }
 
@@ -65,29 +71,30 @@
     const samplesPerHour = 10;
     let [ticksSum, tempSum] = insertRandomData(metricsColl, hourZero, samplesPerHour);
 
-    runAggregate(hourZero, "insertDocuments");
+    runAggregate({startDate: hourZero, whenMatchedMode: "fail", whenNotMatchedMode: "insert"});
 
-    // Verify the results of the $out in the rollup collection.
+    // Verify the results of the $merge in the rollup collection.
     let res = rollupColl.find().sort({_id: 1});
     assert.eq([{_id: "2018-08-15T00", ticks: ticksSum, avgTemp: tempSum / samplesPerHour}],
               res.toArray());
 
-    // Insert another hour's worth of data, and verify that the $out will append the result to the
+    // Insert another hour's worth of data, and verify that the $merge will append the result to the
     // output collection.
     [ticksSum, tempSum] = insertRandomData(metricsColl, hourOne, samplesPerHour);
 
-    runAggregate(hourOne, "insertDocuments");
+    runAggregate({startDate: hourOne, whenMatchedMode: "fail", whenNotMatchedMode: "insert"});
 
     res = rollupColl.find().sort({_id: 1}).toArray();
     assert.eq(2, res.length);
     assert.eq(res[1], {_id: "2018-08-15T01", ticks: ticksSum, avgTemp: tempSum / samplesPerHour});
 
     // Whoops, there was a mistake in the last hour of data. Let's re-run the aggregation and update
-    // the rollup collection using the "replaceDocuments" mode.
+    // the rollup collection using the "replaceWithNew".
     assert.commandWorked(metricsColl.update({_id: hourOne}, {$inc: {ticks: 10}}));
     ticksSum += 10;
 
-    runAggregate(hourOne, "replaceDocuments");
+    runAggregate(
+        {startDate: hourOne, whenMatchedMode: "replaceWithNew", whenNotMatchedMode: "insert"});
 
     res = rollupColl.find().sort({_id: 1}).toArray();
     assert.eq(2, res.length);
@@ -100,7 +107,7 @@
     // Insert hour 7 data into the metrics collection and re-run the aggregation.
     [ticksSum, tempSum] = insertRandomData(metricsColl, hourSix, samplesPerHour);
 
-    runAggregate(hourSix, "insertDocuments");
+    runAggregate({startDate: hourSix, whenMatchedMode: "fail", whenNotMatchedMode: "insert"});
 
     res = rollupColl.find().sort({_id: 1}).toArray();
     assert.eq(3, res.length, tojson(res));
