@@ -1888,6 +1888,10 @@ boost::optional<Timestamp> WiredTigerKVEngine::getOplogNeededForCrashRecovery() 
         return boost::none;
     }
 
+    if (_readOnly) {
+        return boost::none;
+    }
+
     return Timestamp(_checkpointThread->getOplogNeededForCrashRecovery());
 }
 
