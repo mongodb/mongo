@@ -146,6 +146,28 @@ TEST(DurationCast, OverflowingCastsThrow) {
                        ErrorCodes::DurationOverflow);
 }
 
+TEST(DurationCast, DurationCastConstexpr) {
+    // Converting from one Duration period to another is constexpr.
+    {
+        constexpr auto ms = duration_cast<Milliseconds>(Seconds(2));
+        ASSERT_EQ(2000, ms.count());
+        constexpr auto secs = duration_cast<Seconds>(ms);
+        ASSERT_EQ(2, secs.count());
+    }
+
+    // Converting from std::chrono::duration to Duration is constexpr.
+    {
+        constexpr auto ms = duration_cast<Milliseconds>(stdx::chrono::seconds(2));
+        ASSERT_EQ(2000, ms.count());
+    }
+
+    // Test implicit conversion constructor.
+    {
+        constexpr Milliseconds ms = Seconds(2);
+        ASSERT_EQ(2000, ms.count());
+    }
+}
+
 TEST(DurationCast, ImplicitConversionToStdxDuration) {
     auto standardMillis = Milliseconds{10}.toSystemDuration();
     ASSERT_EQUALS(Milliseconds{10}, duration_cast<Milliseconds>(standardMillis));
@@ -210,7 +232,7 @@ TEST(DurationArithmetic, MultiplyNoOverflowSucceds) {
     ASSERT_EQ(Milliseconds{150}, Milliseconds{15} * 10);
 }
 
-TEST(DurationArithmetic, MultilpyOverflowThrows) {
+TEST(DurationArithmetic, MultiplyOverflowThrows) {
     ASSERT_THROWS_CODE(Milliseconds::max() * 2, AssertionException, ErrorCodes::DurationOverflow);
     ASSERT_THROWS_CODE(2 * Milliseconds::max(), AssertionException, ErrorCodes::DurationOverflow);
     ASSERT_THROWS_CODE(Milliseconds::max() * -2, AssertionException, ErrorCodes::DurationOverflow);

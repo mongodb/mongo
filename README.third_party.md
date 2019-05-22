@@ -38,6 +38,7 @@ a notice will be included in
 | [MurmurHash3]              | Public Domain     |                  | Unknown + changes |          ✗           |                ✗                |
 | [Pcre]                     | BSD-3-Clause      | 8.43             | 8.42              |                      |                ✗                |
 | [S2]                       | Apache-2.0        |                  | Unknown           |          ✗           |                ✗                |
+| [SafeInt]                  | MIT               | 3.0.20p          | 3.0.20p           |                      |                                 |
 | [scons]                    | MIT               | 3.0.4            | 3.0.4             |                      |                                 |
 | [Snappy]                   | BSD-3-Clause      | 1.1.7            | 1.1.7             |          ✗           |                ✗                |
 | [sqlite]                   | Public Domain     | 3280000          | 3260000           |          ✗           |                ✗                |
@@ -67,6 +68,7 @@ a notice will be included in
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
 [Pcre]: http://www.pcre.org/
 [S2]: https://github.com/google/s2geometry
+[SafeInt]: https://github.com/dcleblanc/SafeInt
 [scons]: https://github.com/SCons/scons
 [Snappy]: https://github.com/google/snappy/releases
 [sqlite]: https://sqlite.org/

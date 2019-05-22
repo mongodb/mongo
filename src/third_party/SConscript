@@ -27,6 +27,11 @@ thirdPartyEnvironmentModifications = {
    's2' : {
         'CPPPATH' : ['#src/third_party/s2'],
    },
+   'safeint' : {
+        'CPPPATH' : ['#src/third_party/SafeInt'],
+        # SAFEINT_USE_INTRINSICS=0 for overflow-safe constexpr multiply. See comment in SafeInt.hpp.
+        'CPPDEFINES' : [('SAFEINT_USE_INTRINSICS', 0)],
+   },
    'timelib' : {
         'CPPPATH' : ['#/src/third_party/timelib' + timelibSuffix],
    }
@@ -200,7 +205,7 @@ murmurEnv.SConscript('murmurhash3/SConscript', exports={ 'env' : murmurEnv })
 
 
 s2Env = env.Clone()
-s2Env.InjectThirdParty(libraries=['s2', 'boost', 'abseil-cpp', 'fmt'])
+s2Env.InjectThirdParty(libraries=['s2', 'boost', 'abseil-cpp', 'fmt', 'safeint'])
 s2Env.InjectMongoIncludePaths()
 s2Env.SConscript('s2/SConscript', exports={'env' : s2Env})
 
@@ -489,7 +494,7 @@ yamlEnv.Library(
         'shim_yaml.cpp',
     ])
 
-timelibEnv = env.Clone();
+timelibEnv = env.Clone()
 timelibEnv.InjectThirdParty(libraries=['timelib'])
 timelibEnv.SConscript('timelib' + timelibSuffix + '/SConscript', exports={ 'env' : timelibEnv })
 timelibEnv = timelibEnv.Clone(

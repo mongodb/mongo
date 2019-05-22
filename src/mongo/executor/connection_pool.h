@@ -34,12 +34,12 @@
 
 #include "mongo/executor/egress_tag_closer.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -75,12 +75,12 @@ public:
 
     using GetConnectionCallback = unique_function<void(StatusWith<ConnectionHandle>)>;
 
-    static constexpr Milliseconds kDefaultHostTimeout = Milliseconds(300000);  // 5mins
+    static constexpr Milliseconds kDefaultHostTimeout = Minutes(5);
     static constexpr size_t kDefaultMaxConns = std::numeric_limits<size_t>::max();
     static constexpr size_t kDefaultMinConns = 1;
     static constexpr size_t kDefaultMaxConnecting = 2;
-    static constexpr Milliseconds kDefaultRefreshRequirement = Milliseconds(60000);  // 1min
-    static constexpr Milliseconds kDefaultRefreshTimeout = Milliseconds(20000);      // 20secs
+    static constexpr Milliseconds kDefaultRefreshRequirement = Minutes(1);
+    static constexpr Milliseconds kDefaultRefreshTimeout = Seconds(20);
 
     static const Status kConnectionStateUnknown;
 

@@ -104,10 +104,10 @@ using HigherPrecisionDuration =
  * attempting to cast that value to Milliseconds will throw an exception.
  */
 template <typename ToDuration, typename FromPeriod>
-ToDuration duration_cast(const Duration<FromPeriod>& from) {
+constexpr ToDuration duration_cast(const Duration<FromPeriod>& from) {
     using FromOverTo = std::ratio_divide<FromPeriod, typename ToDuration::period>;
     if (ToDuration::template isHigherPrecisionThan<Duration<FromPeriod>>()) {
-        typename ToDuration::rep toCount;
+        typename ToDuration::rep toCount = 0;
         uassert(ErrorCodes::DurationOverflow,
                 "Overflow casting from a lower-precision duration to a higher-precision duration",
                 !mongoSignedMultiplyOverflow64(from.count(), FromOverTo::num, &toCount));
@@ -117,7 +117,7 @@ ToDuration duration_cast(const Duration<FromPeriod>& from) {
 }
 
 template <typename ToDuration, typename FromRep, typename FromPeriod>
-inline ToDuration duration_cast(const stdx::chrono::duration<FromRep, FromPeriod>& d) {
+constexpr ToDuration duration_cast(const stdx::chrono::duration<FromRep, FromPeriod>& d) {
     return duration_cast<ToDuration>(Duration<FromPeriod>{d.count()});
 }
 
@@ -232,16 +232,14 @@ public:
     }
 
     /**
-     * Constructs a higher-precision duration from a lower-precision one, as by duration_cast.
+     * Implicit converting constructor from a lower-precision duration to a higher-precision one, as
+     * by duration_cast.
      *
-     * Throws a AssertionException if "from" is out of the range of this duration type.
-     *
-     * It is a compilation error to attempt a conversion from higher-precision to lower-precision by
-     * this constructor.
+     * It is a compilation error to convert from higher precision to lower, or if the conversion
+     * would cause an integer overflow.
      */
     template <typename FromPeriod>
-    /*implicit*/ Duration(const Duration<FromPeriod>& from)
-        : Duration(duration_cast<Duration>(from)) {
+    constexpr Duration(const Duration<FromPeriod>& from) : Duration(duration_cast<Duration>(from)) {
         MONGO_STATIC_ASSERT_MSG(
             !isLowerPrecisionThan<Duration<FromPeriod>>(),
             "Use duration_cast to convert from higher precision Duration types to lower "
