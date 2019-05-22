@@ -216,11 +216,10 @@ void abortInProgressTransactions(OperationContext* opCtx) {
             IDLParserErrorContext("abort-in-progress-transactions"), cursor->next());
         opCtx->setLogicalSessionId(txnRecord.getSessionId());
         opCtx->setTxnNumber(txnRecord.getTxnNum());
-        MongoDOperationContextSession ocs(opCtx);
+        MongoDOperationContextSessionWithoutRefresh ocs(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         LOG(3) << "Aborting transaction sessionId: " << txnRecord.getSessionId().toBSON()
                << " txnNumber " << txnRecord.getTxnNum();
-        txnParticipant.beginOrContinueTransactionUnconditionally(opCtx, txnRecord.getTxnNum());
         txnParticipant.abortTransactionForStepUp(opCtx);
     }
 }
