@@ -455,7 +455,7 @@ __wt_las_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 	    previous_state != WT_REF_LOOKASIDE)
 		return (false);
 
-	if (!__wt_atomic_casv32(&ref->state, previous_state, WT_REF_LOCKED))
+	if (!WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
 		return (false);
 
 	skip = __wt_las_page_skip_locked(session, ref);
@@ -863,6 +863,33 @@ __wt_las_remove_block(WT_SESSION_IMPL *session, uint64_t pageid)
 }
 
 /*
+ * __wt_las_remove_dropped --
+ *	Remove an opened btree ID if it is in the dropped table.
+ */
+void
+__wt_las_remove_dropped(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_CACHE *cache;
+	u_int i, j;
+
+	btree = S2BT(session);
+	cache = S2C(session)->cache;
+
+	__wt_spin_lock(session, &cache->las_sweep_lock);
+	for (i = 0; i < cache->las_dropped_next &&
+	    cache->las_dropped[i] != btree->id; i++)
+		;
+
+	if (i < cache->las_dropped_next) {
+		cache->las_dropped_next--;
+		for (j = i; j < cache->las_dropped_next; j++)
+			cache->las_dropped[j] = cache->las_dropped[j + 1];
+	}
+	__wt_spin_unlock(session, &cache->las_sweep_lock);
+}
+
+/*
  * __wt_las_save_dropped --
  *	Save a dropped btree ID to be swept from the lookaside table.
  */
@@ -938,6 +965,19 @@ __las_sweep_init(WT_SESSION_IMPL *session)
 			ret = WT_NOTFOUND;
 		goto err;
 	}
+
+	/*
+	 * Record the current page ID: sweep will stop after this point.
+	 *
+	 * Since the btree IDs we're scanning are closed, any eviction must
+	 * have already completed, so we won't miss anything with this
+	 * approach.
+	 *
+	 * Also, if a tree is reopened and there is lookaside activity before
+	 * this sweep completes, it will have a higher page ID and should not
+	 * be removed.
+	 */
+	cache->las_sweep_max_pageid = cache->las_pageid;
 
 	/* Scan the btree IDs to find min/max. */
 	cache->las_sweep_dropmin = UINT32_MAX;
@@ -1035,7 +1075,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * table. Searching for the same key could leave us stuck at
 		 * the end of the table, repeatedly checking the same rows.
 		 */
-		sweep_key->size = 0;
+		__wt_buf_free(session, sweep_key);
 	} else
 		ret = __las_sweep_init(session);
 	if (ret != 0)
@@ -1063,6 +1103,17 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 */
 		if (__wt_cache_stuck(session))
 			cnt = 0;
+
+		/*
+		 * Don't go past the end of lookaside from when sweep started.
+		 * If a file is reopened, its ID may be reused past this point
+		 * so the bitmap we're using is not valid.
+		 */
+		if (las_pageid > cache->las_sweep_max_pageid) {
+			__wt_buf_free(session, sweep_key);
+			ret = WT_NOTFOUND;
+			break;
+		}
 
 		/*
 		 * We only want to break between key blocks. Stop if we've

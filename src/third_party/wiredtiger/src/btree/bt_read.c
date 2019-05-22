@@ -290,6 +290,13 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 		}
 	}
 
+	/*
+	 * Now the lookaside history has been read into cache there is no
+	 * further need to maintain a reference to it.
+	 */
+	ref->page_las->eviction_to_lookaside = false;
+	ref->page_las->resolved = true;
+
 err:	if (locked)
 		__wt_readunlock(session, &cache->las_sweepwalk_lock);
 	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
@@ -413,7 +420,6 @@ __page_read_lookaside(WT_SESSION_IMPL *session, WT_REF *ref,
 	}
 
 	WT_RET(__las_page_instantiate(session, ref));
-	ref->page_las->eviction_to_lookaside = false;
 	return (0);
 }
 
@@ -463,7 +469,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	default:
 		return (0);
 	}
-	if (!__wt_atomic_casv32(&ref->state, previous_state, new_state))
+	if (!WT_REF_CAS_STATE(session, ref, previous_state, new_state))
 		return (0);
 
 	final_state = WT_REF_MEM;
@@ -538,10 +544,8 @@ skip_read:
 		 * information), first update based on the lookaside table and
 		 * then apply the delete.
 		 */
-		if (ref->page_las != NULL) {
+		if (ref->page_las != NULL)
 			WT_ERR(__las_page_instantiate(session, ref));
-			ref->page_las->eviction_to_lookaside = false;
-		}
 
 		/* Move all records to a deleted state. */
 		WT_ERR(__wt_delete_page_instantiate(session, ref));

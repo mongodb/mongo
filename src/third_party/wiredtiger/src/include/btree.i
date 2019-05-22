@@ -1190,6 +1190,8 @@ __wt_page_las_active(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	if ((page_las = ref->page_las) == NULL)
 		return (false);
+	if (page_las->resolved)
+		return (false);
 	if (!page_las->skew_newest || page_las->has_prepares)
 		return (true);
 	if (__wt_txn_visible_all(session, page_las->max_txn,

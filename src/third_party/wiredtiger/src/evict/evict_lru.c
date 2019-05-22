@@ -2225,8 +2225,8 @@ __evict_get_ref(WT_SESSION_IMPL *session,
 		 */
 		if (((previous_state = evict->ref->state) != WT_REF_MEM &&
 		    previous_state != WT_REF_LIMBO) ||
-		    !__wt_atomic_casv32(
-		    &evict->ref->state, previous_state, WT_REF_LOCKED)) {
+		    !WT_REF_CAS_STATE(
+		    session, evict->ref, previous_state, WT_REF_LOCKED)) {
 			__evict_list_clear(session, evict);
 			continue;
 		}

@@ -238,7 +238,7 @@ __wt_compact_page_skip(
 	 * reference an on-page cell, and page eviction can free that memory.
 	 * Lock the WT_REF so we can look at its address.
 	 */
-	if (!__wt_atomic_casv32(&ref->state, WT_REF_DISK, WT_REF_LOCKED))
+	if (!WT_REF_CAS_STATE(session, ref, WT_REF_DISK, WT_REF_LOCKED))
 		return (0);
 
 	/*

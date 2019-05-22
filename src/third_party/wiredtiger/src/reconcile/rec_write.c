@@ -791,7 +791,8 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	/*
 	 * Fake up a reference structure, and write the next root page.
 	 */
-	__wt_root_ref_init(&fake_ref, next, page->type == WT_PAGE_COL_INT);
+	__wt_root_ref_init(session,
+	    &fake_ref, next, page->type == WT_PAGE_COL_INT);
 	return (__wt_reconcile(session, &fake_ref, NULL, flags, NULL));
 
 err:	__wt_page_out(session, &next);
@@ -1193,7 +1194,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	wt_timestamp_t timestamp;
 	size_t upd_memsize;
 	uint64_t max_txn, txnid;
-	bool all_visible, prepared, skipped_birthmark, uncommitted;
+	bool all_visible, prepared, skipped_birthmark, uncommitted, upd_saved;
 
 	if (upd_savedp != NULL)
 		*upd_savedp = false;
@@ -1203,7 +1204,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	first_ts_upd = first_txn_upd = NULL;
 	upd_memsize = 0;
 	max_txn = WT_TXN_NONE;
-	prepared = skipped_birthmark = uncommitted = false;
+	prepared = skipped_birthmark = uncommitted = upd_saved = false;
 
 	/*
 	 * If called with a WT_INSERT item, use its WT_UPDATE list (which must
@@ -1421,6 +1422,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * unresolved updates, move the entire update list.
 	 */
 	WT_RET(__rec_update_save(session, r, ins, ripcip, *updp, upd_memsize));
+	upd_saved = true;
 	if (upd_savedp != NULL)
 		*upd_savedp = true;
 
@@ -1458,18 +1460,15 @@ check_original_value:
 
 	/*
 	 * Returning an update means the original on-page value might be lost,
-	 * and that's a problem if there's a reader that needs it. There are
-	 * several cases:
-	 * - any update from a modify operation (because the modify has to be
-	 *   applied to a stable update, not the new on-page update),
-	 * - any lookaside table eviction (because the backing disk image is
-	 *   rewritten),
-	 * - or any reconciliation of a backing overflow record that will be
-	 *   physically removed once it's no longer needed.
+	 * and that's a problem if there's a reader that needs it.  This call
+	 * makes a copy of the on-page value and if there is a birthmark in the
+	 * update list, replaces it.  We do that any time there are saved
+	 * updates and during reconciliation of a backing overflow record that
+	 * will be physically removed once it's no longer needed.
 	 */
-	if (*updp != NULL && (!WT_UPDATE_DATA_VALUE(*updp) ||
-	    F_ISSET(r, WT_REC_LOOKASIDE) || (vpack != NULL &&
-	    vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)))
+	if (*updp != NULL && (upd_saved ||
+	    (vpack != NULL && vpack->ovfl &&
+	    vpack->raw != WT_CELL_VALUE_OVFL_RM)))
 		WT_RET(
 		    __rec_append_orig_value(session, page, first_upd, vpack));
 
@@ -1657,8 +1656,8 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * to see if the delete is visible to us.  Lock down the
 			 * structure.
 			 */
-			if (!__wt_atomic_casv32(
-			    &ref->state, WT_REF_DELETED, WT_REF_LOCKED))
+			if (!WT_REF_CAS_STATE(
+			    session, ref, WT_REF_DELETED, WT_REF_LOCKED))
 				break;
 			ret = __rec_child_deleted(session, r, ref, statep);
 			WT_REF_SET_STATE(ref, WT_REF_DELETED);

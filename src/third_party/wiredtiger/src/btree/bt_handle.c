@@ -115,6 +115,12 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	/* Initialize and configure the WT_BTREE structure. */
 	WT_ERR(__btree_conf(session, &ckpt));
 
+	/*
+	 * We could be a re-open of a table that was put in the lookaside
+	 * dropped list. Remove our id from that list.
+	 */
+	__wt_las_remove_dropped(session);
+
 	/* Connect to the underlying block manager. */
 	filename = dhandle->name;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
@@ -234,6 +240,16 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	if (F_ISSET(btree, WT_BTREE_CLOSED))
 		return (0);
 	F_SET(btree, WT_BTREE_CLOSED);
+
+	/*
+	 * If closing a tree let sweep drop lookaside entries for it.
+	 */
+	if (F_ISSET(S2C(session), WT_CONN_LOOKASIDE_OPEN) &&
+	    btree->lookaside_entries) {
+		WT_ASSERT(session, !WT_IS_METADATA(btree->dhandle) &&
+		    !F_ISSET(btree, WT_BTREE_LOOKASIDE));
+		WT_TRET(__wt_las_save_dropped(session));
+	}
 
 	/*
 	 * If we turned eviction off and never turned it back on, do that now,
@@ -533,12 +549,14 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
  *	Initialize a tree root reference, and link in the root page.
  */
 void
-__wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, bool is_recno)
+__wt_root_ref_init(WT_SESSION_IMPL *session,
+    WT_REF *root_ref, WT_PAGE *root, bool is_recno)
 {
+	WT_UNUSED(session);	/* Used in a macro for diagnostic builds */
 	memset(root_ref, 0, sizeof(*root_ref));
 
 	root_ref->page = root;
-	root_ref->state = WT_REF_MEM;
+	WT_REF_SET_STATE(root_ref, WT_REF_MEM);
 
 	root_ref->ref_recno = is_recno ? 1 : WT_RECNO_OOB;
 
@@ -613,7 +631,8 @@ __wt_btree_tree_open(
 	dsk.mem = NULL;
 
 	/* Finish initializing the root, root reference links. */
-	__wt_root_ref_init(&btree->root, page, btree->type != BTREE_ROW);
+	__wt_root_ref_init(session,
+	    &btree->root, page, btree->type != BTREE_ROW);
 
 err:	__wt_buf_free(session, &dsk);
 	__wt_scr_free(session, &tmp);
@@ -697,7 +716,8 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 	}
 
 	/* Finish initializing the root, root reference links. */
-	__wt_root_ref_init(&btree->root, root, btree->type != BTREE_ROW);
+	__wt_root_ref_init(session,
+	    &btree->root, root, btree->type != BTREE_ROW);
 
 	return (0);
 

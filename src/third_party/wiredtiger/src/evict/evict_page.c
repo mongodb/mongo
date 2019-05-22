@@ -73,7 +73,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	previous_state = ref->state;
 	if ((previous_state == WT_REF_MEM || previous_state == WT_REF_LIMBO) &&
-	    __wt_atomic_casv32(&ref->state, previous_state, WT_REF_LOCKED))
+	    WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
 		locked = true;
 	if ((ret = __wt_hazard_clear(session, ref)) != 0 || !locked) {
 		if (locked)

@@ -1208,7 +1208,7 @@ __slvg_col_build_internal(
 		++ref;
 	}
 
-	__wt_root_ref_init(&ss->root_ref, page, true);
+	__wt_root_ref_init(session, &ss->root_ref, page, true);
 
 	if (0) {
 err:		__wt_free(session, addr);
@@ -1870,7 +1870,7 @@ __slvg_row_build_internal(
 		++ref;
 	}
 
-	__wt_root_ref_init(&ss->root_ref, page, false);
+	__wt_root_ref_init(session, &ss->root_ref, page, false);
 
 	if (0) {
 err:		__wt_free(session, addr);

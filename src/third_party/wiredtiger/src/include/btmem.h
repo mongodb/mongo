@@ -240,6 +240,7 @@ struct __wt_page_lookaside {
 	wt_timestamp_t unstable_timestamp;/* First timestamp not on page */
 	bool eviction_to_lookaside;	/* Revert to lookaside on eviction */
 	bool has_prepares;		/* One or more updates are prepared */
+	bool resolved;			/* History has been read into cache */
 	bool skew_newest;		/* Page image has newest versions */
 };
 
@@ -879,6 +880,10 @@ struct __wt_ref {
 	WT_PAGE_DELETED	  *page_del;	/* Deleted page information */
 	WT_PAGE_LOOKASIDE *page_las;	/* Lookaside information */
 
+/* A macro wrapper allowing us to remember the callers code location */
+#define	WT_REF_CAS_STATE(session, ref, old_state, new_state)          \
+	__wt_ref_cas_state_int((session), (ref), (old_state), (new_state),\
+	__FILE__, __LINE__)
 #ifdef HAVE_DIAGNOSTIC
 	/* Capture history of ref state changes. */
 	struct __wt_ref_hist {
@@ -889,14 +894,17 @@ struct __wt_ref {
 		uint32_t state;
 	} hist[3];
 	uint64_t histoff;
-#define	WT_REF_SET_STATE(ref, s) do {					\
+#define	WT_REF_SAVE_STATE(ref, s, f, l) do {				\
 	(ref)->hist[(ref)->histoff].session = session;			\
 	(ref)->hist[(ref)->histoff].name = session->name;		\
-	(ref)->hist[(ref)->histoff].file = __FILE__;			\
-	(ref)->hist[(ref)->histoff].line = __LINE__;			\
+	(ref)->hist[(ref)->histoff].file = (f);				\
+	(ref)->hist[(ref)->histoff].line = (l);				\
 	(ref)->hist[(ref)->histoff].state = s;				\
 	(ref)->histoff =						\
 	    ((ref)->histoff + 1) % WT_ELEMENTS((ref)->hist);		\
+} while (0)
+#define	WT_REF_SET_STATE(ref, s) do {					\
+	WT_REF_SAVE_STATE(ref, s, __FILE__, __LINE__);			\
 	WT_PUBLISH((ref)->state, s);					\
 } while (0)
 #else
