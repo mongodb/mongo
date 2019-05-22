@@ -35,6 +35,9 @@ selector:
   # there is a concurrent dropDatabase waiting for the global X lock.
   # TODO: SERVER-37876
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+
+  # This workload assumes no locks are taken outside of the workload.
+  - jstests/concurrency/fsm_workloads/access_collection_in_transaction_after_catalog_changes.js
   exclude_with_any_tags:
   - requires_sharding
 
