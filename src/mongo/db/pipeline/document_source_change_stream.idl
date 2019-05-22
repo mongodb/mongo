@@ -99,3 +99,13 @@ structs:
                 description: A flag indicating whether the stream should report all changes that
                              occur on the deployment, aside from those on internal databases or
                              collections.
+            showMigrationEvents:
+                cpp_name: showMigrationEvents
+                type: bool
+                default: false
+                description: A flag indicating whether the stream should report changes that occur
+                             on the deployment that are related to chunk migrations. These
+                             operations are reported like normal events. For example, inserts and
+                             deletes may appear that do not reflect actual deletions or insertions
+                             of data. Instead they reflect this data moving from one shard to
+                             another.
