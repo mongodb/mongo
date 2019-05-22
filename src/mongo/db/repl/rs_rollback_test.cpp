@@ -2113,30 +2113,6 @@ DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutSessionIdIsFatal, "in
                   RSFatalException);
 }
 
-DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutStmtIdIsFatal, "invariant") {
-    auto validOplogEntry = BSON("ts" << Timestamp(Seconds(1), 0) << "t" << 1LL << "op"
-                                     << "i"
-                                     << "ui"
-                                     << UUID::gen()
-                                     << "ns"
-                                     << "test.t"
-                                     << "o"
-                                     << BSON("_id" << 1 << "a" << 1));
-    FixUpInfo fui;
-    ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(
-        nullptr /* opCtx */, OplogInterfaceMock(), fui, validOplogEntry, false));
-
-    const auto txnNumber = BSON("txnNumber" << 1LL);
-    const auto noSessionIdOrStmtId = validOplogEntry.addField(txnNumber.firstElement());
-
-    const auto lsid = makeLogicalSessionIdForTest();
-    const auto sessionId = BSON("lsid" << lsid.toBSON());
-    const auto noStmtId = noSessionIdOrStmtId.addField(sessionId.firstElement());
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(
-                      nullptr /* opCtx */, OplogInterfaceMock(), fui, noStmtId, false),
-                  RSFatalException);
-}
-
 TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutTxnTableUUIDIsFatal) {
     // If txnNumber is present, but the transaction collection has no UUID, rollback fails.
     UUID uuid = UUID::gen();

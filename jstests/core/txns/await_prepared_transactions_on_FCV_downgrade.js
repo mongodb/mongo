@@ -1,6 +1,6 @@
 /**
  * Test that we wait for prepared transactions to finish during downgrade to FCV 4.0.
- * @tags: [uses_transactions, uses_prepare_transaction, exclude_from_large_txns_due_to_stmtids]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
     "use strict";

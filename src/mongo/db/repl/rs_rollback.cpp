@@ -274,7 +274,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
     if (txnNumber) {
         auto sessionId = operationSessionInfo.getSessionId();
         invariant(sessionId);
-        invariant(oplogEntry.getStatementId());
 
         auto transactionTableUUID = fixUpInfo.transactionTableUUID;
         if (transactionTableUUID) {

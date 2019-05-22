@@ -135,29 +135,37 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
     if ((serverGlobalParams.featureCompatibility.getVersion() >=
          ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo40)) {
 
+        // The state being kPrepared marks a prepared transaction. We should never be refreshing
+        // a prepared transaction from storage since it should already be in a valid state after
+        // replication recovery.
+        invariant(result.lastTxnRecord->getState() != DurableTxnStateEnum::kPrepared);
+
         // The state being kCommitted marks the commit of a transaction.
         if (result.lastTxnRecord->getState() == DurableTxnStateEnum::kCommitted) {
             result.state = result.TxnRecordState::kCommitted;
+            return result;
         }
 
         // The state being kAborted marks the abort of a prepared transaction since we do not write
         // down abortTransaction oplog entries in 4.0.
         if (result.lastTxnRecord->getState() == DurableTxnStateEnum::kAborted) {
             result.state = result.TxnRecordState::kAbortedWithPrepare;
+            return result;
         }
 
-        // The state being kPrepared marks a prepared transaction. We should never be refreshing
-        // a prepared transaction from storage since it should already be in a valid state after
-        // replication recovery.
-        invariant(result.lastTxnRecord->getState() != DurableTxnStateEnum::kPrepared);
+        if (result.lastTxnRecord->getState() == DurableTxnStateEnum::kInProgress) {
+            return result;
+        }
     }
 
     auto it = TransactionHistoryIterator(result.lastTxnRecord->getLastWriteOpTime());
     while (it.hasNext()) {
         try {
             const auto entry = it.next(opCtx);
-            invariant(entry.getStatementId());
 
+            // Each entry should correspond to a retryable write or a FCV4.0 format transaction.
+            // These oplog entries must have statementIds.
+            invariant(entry.getStatementId());
             if (*entry.getStatementId() == kIncompleteHistoryStmtId) {
                 // Only the dead end sentinel can have this id for oplog write history
                 invariant(entry.getObject2());

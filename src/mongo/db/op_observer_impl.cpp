@@ -85,7 +85,7 @@ repl::OpTime logOperation(OperationContext* opCtx,
                           bool fromMigrate,
                           Date_t wallClockTime,
                           const OperationSessionInfo& sessionInfo,
-                          StmtId stmtId,
+                          boost::optional<StmtId> stmtId,
                           const repl::OplogLink& oplogLink,
                           const OplogSlot& oplogSlot) {
     auto& times = OpObserver::Times::get(opCtx).reservedOpTimes;
@@ -297,7 +297,7 @@ OpTimeBundle replLogApplyOps(OperationContext* opCtx,
                              const NamespaceString& cmdNss,
                              const BSONObj& applyOpCmd,
                              const OperationSessionInfo& sessionInfo,
-                             StmtId stmtId,
+                             boost::optional<StmtId> stmtId,
                              const repl::OplogLink& oplogLink,
                              const OplogSlot& oplogSlot) {
     OpTimeBundle times;
@@ -1018,7 +1018,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
                                        BSONObjBuilder* applyOpsBuilder,
                                        const OplogSlot& oplogSlot,
                                        repl::OpTime prevWriteOpTime,
-                                       StmtId stmtId,
+                                       boost::optional<StmtId> stmtId,
                                        const bool prepare,
                                        const bool isPartialTxn,
                                        const bool shouldWriteStateField,
@@ -1066,13 +1066,8 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
         }();
 
         if (updateTxnTable) {
-            onWriteOpCompleted(opCtx,
-                               cmdNss,
-                               {stmtId},
-                               times.writeOpTime,
-                               times.wallClockTime,
-                               txnState,
-                               startOpTime);
+            onWriteOpCompleted(
+                opCtx, cmdNss, {}, times.writeOpTime, times.wallClockTime, txnState, startOpTime);
         }
         return times;
     } catch (const AssertionException& e) {
@@ -1094,7 +1089,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
                                        const std::vector<repl::ReplOperation>& statements,
                                        const OplogSlot& oplogSlot,
                                        repl::OpTime prevWriteOpTime,
-                                       StmtId stmtId,
+                                       boost::optional<StmtId> stmtId,
                                        const bool prepare,
                                        const bool isPartialTxn,
                                        const bool shouldWriteStateField,
@@ -1115,33 +1110,6 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
                                      updateTxnTable,
                                      count,
                                      startOpTime);
-}
-
-OpTimeBundle logReplOperationForTransaction(OperationContext* opCtx,
-                                            const OperationSessionInfo& sessionInfo,
-                                            repl::OpTime prevOpTime,
-                                            StmtId stmtId,
-                                            const repl::ReplOperation& stmt,
-                                            const OplogSlot& oplogSlot) {
-    repl::OplogLink oplogLink;
-    oplogLink.prevOpTime = prevOpTime;
-    OpTimeBundle times;
-    // The IDL serializer always returns null-terminated string literals, so rawData is safe.
-    const char* optype = repl::OpType_serializer(stmt.getOpType()).rawData();
-    times.wallClockTime = getWallClockTimeForOpLog(opCtx);
-    times.writeOpTime = logOperation(opCtx,
-                                     optype,
-                                     stmt.getNss(),
-                                     stmt.getUuid(),
-                                     stmt.getObject(),
-                                     stmt.getObject2() ? &*stmt.getObject2() : nullptr,
-                                     false /* fromMigrate*/,
-                                     times.wallClockTime,
-                                     sessionInfo,
-                                     stmtId,
-                                     oplogLink,
-                                     oplogSlot);
-    return times;
 }
 
 // Logs transaction oplog entries for preparing a transaction or committing an unprepared
@@ -1172,7 +1140,7 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
 
     const auto txnParticipant = TransactionParticipant::get(opCtx);
     OpTimeBundle prevWriteOpTime;
-    StmtId stmtId = 0;
+    auto numEntriesWritten = 0;
     writeConflictRetry(
         opCtx, "logOplogEntriesForTransaction", NamespaceString::kRsOplogNamespace.ns(), [&] {
             // Writes to the oplog only require a Global intent lock. Guaranteed by
@@ -1182,8 +1150,6 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
             WriteUnitOfWork wuow(opCtx);
 
             prevWriteOpTime.writeOpTime = txnParticipant.getLastWriteOpTime();
-            // Note the logged statement IDs are not the same as the user-chosen statement IDs.
-            stmtId = 0;
             auto currOplogSlot = oplogSlots.begin();
 
             // At the beginning of each loop iteration below, 'stmtsIter' will always point to the
@@ -1233,7 +1199,7 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
                                                             &applyOpsBuilder,
                                                             oplogSlot,
                                                             prevWriteOpTime.writeOpTime,
-                                                            stmtId,
+                                                            boost::none /* stmtId */,
                                                             implicitPrepare,
                                                             isPartialTxn,
                                                             true /* shouldWriteStateField */,
@@ -1242,11 +1208,11 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
                                                             startOpTime);
                 // Advance the iterator to the beginning of the remaining unpacked statements.
                 stmtsIter = nextStmt;
-                stmtId++;
+                numEntriesWritten++;
             }
             wuow.commit();
         });
-    return stmtId;
+    return numEntriesWritten;
 }
 
 void logCommitOrAbortForTransaction(OperationContext* opCtx,
@@ -1263,22 +1229,6 @@ void logCommitOrAbortForTransaction(OperationContext* opCtx,
     auto txnParticipant = TransactionParticipant::get(opCtx);
     oplogLink.prevOpTime = txnParticipant.getLastWriteOpTime();
 
-    StmtId stmtId(1);
-    if (gUseMultipleOplogEntryFormatForTransactions &&
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 &&
-        durableState != DurableTxnStateEnum::kAborted) {
-        // Statement ids are only required to increase monotonically within a transaction. They
-        // don't need to be strictly consecutive. The statements from this transaction may have been
-        // packed into some number of oplog entries <= the total number of statements, so the
-        // statement id we use for the commit here should always be safe.
-        stmtId = txnParticipant.retrieveCompletedTransactionOperations(opCtx).size() + 1;
-    }
-    // When we abort a transaction on stepup, we won't know the number of operations since we
-    // don't reconstruct them. Using the max integer would be safe.
-    if (durableState == DurableTxnStateEnum::kAborted) {
-        stmtId = std::numeric_limits<StmtId>::max();
-    }
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
 
     // There should not be a parent WUOW outside of this one. This guarantees the safety of the
@@ -1307,14 +1257,14 @@ void logCommitOrAbortForTransaction(OperationContext* opCtx,
                                                   false /* fromMigrate */,
                                                   wallClockTime,
                                                   sessionInfo,
-                                                  stmtId,
+                                                  boost::none /* stmtId */,
                                                   oplogLink,
                                                   oplogSlot);
             invariant(oplogSlot.isNull() || oplogSlot == oplogOpTime);
 
             onWriteOpCompleted(opCtx,
                                cmdNss,
-                               {stmtId},
+                               {},
                                oplogOpTime,
                                wallClockTime,
                                durableState,
@@ -1434,7 +1384,7 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                     statements,
                     prepareOpTime,
                     lastWriteOpTime,
-                    StmtId(0),
+                    boost::none /* stmtId */,
                     true /* prepare */,
                     false /* isPartialTxn */,
                     fcv >= ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42,
@@ -1477,7 +1427,7 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                                               &applyOpsBuilder,
                                               oplogSlot,
                                               repl::OpTime() /* prevWriteOpTime */,
-                                              StmtId(0),
+                                              boost::none /* stmtId */,
                                               true /* prepare */,
                                               false /* isPartialTxn */,
                                               true /* shouldWriteStateField */,

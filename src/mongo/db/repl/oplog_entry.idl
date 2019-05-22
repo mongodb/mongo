@@ -124,8 +124,7 @@ structs:
             stmtId:
                 cpp_name: statementId
                 type: StmtId
-                optional: true # If txnNumber is missing, this will also be absent, otherwise it
-                               # must exist.
+                optional: true
                 description: "Identifier of the transaction statement which generated this oplog
                               entry"
             prevOpTime:

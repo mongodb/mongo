@@ -2008,7 +2008,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
     }
     oplogEntryObjs = getNOplogEntries(opCtx(), 3);
     const auto commitOplogObj = oplogEntryObjs.back();
-    // Statement id's for the insert and implicit prepare should be 0 and 1, respectively.
     checkSessionAndTransactionFields(commitOplogObj);
     auto commitEntry = assertGet(OplogEntry::parse(commitOplogObj));
     auto o = commitEntry.getObject();
@@ -2083,7 +2082,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, AbortPreparedTest) {
 
     oplogEntryObjs = getNOplogEntries(opCtx(), 2);
     auto abortOplogObj = oplogEntryObjs.back();
-    // Statement id for the implicit prepare should be 0.
     checkSessionAndTransactionFields(abortOplogObj);
     auto abortEntry = assertGet(OplogEntry::parse(abortOplogObj));
     auto o = abortEntry.getObject();

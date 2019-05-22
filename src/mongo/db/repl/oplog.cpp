@@ -336,21 +336,25 @@ namespace {
  */
 void appendSessionInfo(OperationContext* opCtx,
                        BSONObjBuilder* builder,
-                       StmtId statementId,
+                       boost::optional<StmtId> statementId,
                        const OperationSessionInfo& sessionInfo,
                        const OplogLink& oplogLink) {
     if (!sessionInfo.getTxnNumber()) {
         return;
     }
 
-    // Note: certain operations, like implicit collection creation will not have a stmtId.
+    // Note: certain non-transaction operations, like implicit collection creation will have an
+    // uninitialized statementId.
     if (statementId == kUninitializedStmtId) {
         return;
     }
 
     sessionInfo.serialize(builder);
 
-    builder->append(OplogEntryBase::kStatementIdFieldName, statementId);
+    // Only non-transaction operations will have a statementId.
+    if (statementId) {
+        builder->append(OplogEntryBase::kStatementIdFieldName, *statementId);
+    }
     oplogLink.prevOpTime.append(builder,
                                 OplogEntryBase::kPrevWriteOpTimeInTransactionFieldName.toString());
 
@@ -375,7 +379,7 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             OpTime optime,
                             Date_t wallTime,
                             const OperationSessionInfo& sessionInfo,
-                            StmtId statementId,
+                            boost::optional<StmtId> statementId,
                             const OplogLink& oplogLink) {
     BSONObjBuilder b(256);
 
@@ -485,7 +489,7 @@ OpTime logOp(OperationContext* opCtx,
              bool fromMigrate,
              Date_t wallClockTime,
              const OperationSessionInfo& sessionInfo,
-             StmtId statementId,
+             boost::optional<StmtId> statementId,
              const OplogLink& oplogLink,
              const OplogSlot& oplogSlot) {
     // All collections should have UUIDs now, so all insert, update, and delete oplog entries should
@@ -502,10 +506,11 @@ OpTime logOp(OperationContext* opCtx,
     // For commands, the test below is on the command ns and therefore does not check for
     // specific namespaces such as system.profile. This is the caller's responsibility.
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
+        invariant(statementId);
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "retryable writes is not supported for unreplicated ns: "
                               << nss.ns(),
-                statementId == kUninitializedStmtId);
+                *statementId == kUninitializedStmtId);
         return {};
     }
 

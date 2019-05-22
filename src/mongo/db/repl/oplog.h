@@ -120,6 +120,8 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
  * wallClockTime this specifies the wall-clock timestamp of then this oplog entry was generated. It
  *   is purely informational, may not be monotonically increasing and is not interpreted in any way
  *   by the replication subsystem.
+ * stmtId specifies the statementId of an operation. For transaction operations, stmtId is always
+ *   boost::none.
  * oplogLink this contains the timestamp that points to the previous write that will be
  *   linked via prevTs, and the timestamps of the oplog entry that contains the document
  *   before/after update was applied. The timestamps are ignored if isNull() is true.
@@ -138,7 +140,7 @@ OpTime logOp(OperationContext* opCtx,
              bool fromMigrate,
              Date_t wallClockTime,
              const OperationSessionInfo& sessionInfo,
-             StmtId stmtId,
+             boost::optional<StmtId> stmtId,
              const OplogLink& oplogLink,
              const OplogSlot& oplogSlot);
 
