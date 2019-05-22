@@ -45,7 +45,7 @@
     // Create a unique index on 'a' in the output collection to create a unique key violation when
     // running the $merge. The second document to be written ({_id: 1, a: 1}) will conflict with the
     // existing document in the output collection. We use a unique index on a field other than _id
-    // because whenMatched: "replaceWithNew" will not change _id when one already exists.
+    // because whenMatched: "replace" will not change _id when one already exists.
     outColl.drop();
     assert.commandWorked(outColl.insert({_id: 2, a: 1}));
     assert.commandWorked(outColl.createIndex({a: 1}, {unique: true}));
@@ -63,10 +63,7 @@
 
     assertErrorCode(
         coll,
-        [{
-           $merge:
-               {into: outColl.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}
-        }],
+        [{$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}],
         ErrorCodes.DuplicateKey);
     assert.soon(() => {
         return outColl.find().itcount() == 9;

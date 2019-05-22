@@ -83,15 +83,10 @@
         coll,
         [{$merge: {into: "emptyPipelineView", whenMatched: "fail", whenNotMatched: "insert"}}],
         ErrorCodes.CommandNotSupportedOnView);
-    assertErrorCode(coll,
-                    [{
-                       $merge: {
-                           into: "emptyPipelineView",
-                           whenMatched: "replaceWithNew",
-                           whenNotMatched: "insert"
-                       }
-                    }],
-                    ErrorCodes.CommandNotSupportedOnView);
+    assertErrorCode(
+        coll,
+        [{$merge: {into: "emptyPipelineView", whenMatched: "replace", whenNotMatched: "insert"}}],
+        ErrorCodes.CommandNotSupportedOnView);
 
     // Test that the $merge stage errors when writing to a view namespace in a foreign database.
     let foreignDB = db.getSiblingDB("views_aggregation_foreign");
@@ -110,7 +105,7 @@
                     [{
                        $merge: {
                            into: {db: foreignDB.getName(), coll: "view"},
-                           whenMatched: "replaceWithNew",
+                           whenMatched: "replace",
                            whenNotMatched: "insert"
                        }
                     }],

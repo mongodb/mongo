@@ -82,11 +82,9 @@
     // Note that the actual error is NamespaceNotFound but it is wrapped in a generic error code by
     // mistake.
     runPipelineWithStage({$out: targetColl.getName()}, sourceColl, ErrorCodes.CommandFailed);
-    runPipelineWithStage({
-        $merge:
-            {into: targetColl.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}
-    },
-                         sourceColl);
+    runPipelineWithStage(
+        {$merge: {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+        sourceColl);
     runPipelineWithStage(
         {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
         sourceColl);
@@ -101,11 +99,9 @@
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
     runPipelineWithStage({$out: targetColl.getName()}, sourceColl, ErrorCodes.CommandFailed);
-    runPipelineWithStage({
-        $merge:
-            {into: targetColl.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}
-    },
-                         sourceColl);
+    runPipelineWithStage(
+        {$merge: {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+        sourceColl);
     runPipelineWithStage(
         {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
         sourceColl);
@@ -121,11 +117,9 @@
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
     runPipelineWithStage({$out: targetColl.getName()}, targetColl, ErrorCodes.CommandFailed);
-    runPipelineWithStage({
-        $merge:
-            {into: targetColl.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}
-    },
-                         targetColl);
+    runPipelineWithStage(
+        {$merge: {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+        targetColl);
     runPipelineWithStage(
         {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
         targetColl);
@@ -143,11 +137,9 @@
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
     // Note that the legacy $out is not supported with an existing sharded output collection.
-    runPipelineWithStage({
-        $merge:
-            {into: targetColl.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}
-    },
-                         targetColl);
+    runPipelineWithStage(
+        {$merge: {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
+        targetColl);
     runPipelineWithStage(
         {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
         targetColl);

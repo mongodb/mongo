@@ -3,7 +3,7 @@
 /**
  * agg_merge_when_matched_replace_with_new.js
  *
- * Tests $merge with whenMatched set to "replaceWithNew" concurrently with moveChunk operations on
+ * Tests $merge with whenMatched set to "replace" concurrently with moveChunk operations on
  * the output collection.
  *
  * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off,
@@ -25,7 +25,7 @@ var $config = extendWorkload($config, function($config, $super) {
             {
               $merge: {
                   into: this.collWithMigrations,
-                  whenMatched: "replaceWithNew",
+                  whenMatched: "replace",
                   whenNotMatched: "insert"
               }
             },

@@ -30,7 +30,7 @@
               {
                 $merge: {
                     into: targetColl.getName(),
-                    whenMatched: "replaceWithNew",
+                    whenMatched: "replace",
                     whenNotMatched: "insert"
                 }
               }
@@ -56,11 +56,8 @@
         sourceColl.aggregate([
             {$addFields: {a: 2}},
             {
-              $merge: {
-                  into: targetColl.getName(),
-                  whenMatched: "replaceWithNew",
-                  whenNotMatched: "insert"
-              }
+              $merge:
+                  {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}
             }
         ]);
         assert.eq([{_id: 0, a: 2}], targetColl.find({_id: 0}).toArray());
@@ -70,7 +67,7 @@
               {
                 $merge: {
                     into: targetColl.getName(),
-                    whenMatched: "replaceWithNew",
+                    whenMatched: "replace",
                     whenNotMatched: "insert"
                 }
               }
@@ -93,7 +90,7 @@
                           {
                             $merge: {
                                 into: targetColl.getName(),
-                                whenMatched: "replaceWithNew",
+                                whenMatched: "replace",
                                 whenNotMatched: "insert"
                             }
                           }
@@ -137,11 +134,8 @@
         sourceColl.aggregate([
             {$addFields: {a: 3}},
             {
-              $merge: {
-                  into: targetColl.getName(),
-                  whenMatched: "replaceWithNew",
-                  whenNotMatched: "insert"
-              }
+              $merge:
+                  {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}
             }
         ]);
         assert.eq([{_id: 0, a: 3}], targetColl.find().toArray());
@@ -169,7 +163,7 @@
               {
                 $merge: {
                     into: targetColl.getName(),
-                    whenMatched: "replaceWithNew",
+                    whenMatched: "replace",
                     whenNotMatched: "insert"
                 }
               }
@@ -195,7 +189,7 @@
                         db: foreignDB.getName(),
                         coll: foreignColl.getName(),
                     },
-                    whenMatched: "replaceWithNew",
+                    whenMatched: "replace",
                     whenNotMatched: "insert"
                 }
               }
@@ -230,7 +224,7 @@
                                     db: foreignDB.getName(),
                                     coll: foreignColl.getName(),
                                 },
-                                whenMatched: "replaceWithNew",
+                                whenMatched: "replace",
                                 whenNotMatched: "insert"
                             }
                           }

@@ -89,12 +89,11 @@
     assert.eq(res[1], {_id: "2018-08-15T01", ticks: ticksSum, avgTemp: tempSum / samplesPerHour});
 
     // Whoops, there was a mistake in the last hour of data. Let's re-run the aggregation and update
-    // the rollup collection using the "replaceWithNew".
+    // the rollup collection using the "replace".
     assert.commandWorked(metricsColl.update({_id: hourOne}, {$inc: {ticks: 10}}));
     ticksSum += 10;
 
-    runAggregate(
-        {startDate: hourOne, whenMatchedMode: "replaceWithNew", whenNotMatchedMode: "insert"});
+    runAggregate({startDate: hourOne, whenMatchedMode: "replace", whenNotMatchedMode: "insert"});
 
     res = rollupColl.find().sort({_id: 1}).toArray();
     assert.eq(2, res.length);

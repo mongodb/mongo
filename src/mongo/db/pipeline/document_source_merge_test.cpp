@@ -157,7 +157,7 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfMergeSpecObjectWithoutInto) {
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 40414);
 
     spec = BSON("$merge" << BSON("whenMatched"
-                                 << "replaceWithNew"));
+                                 << "replace"));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 40414);
 }
 
@@ -597,7 +597,7 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
     auto spec = BSON("$merge" << BSON("into"
                                       << "target_collection"
                                       << "whenMatched"
-                                      << "replaceWithNew"
+                                      << "replace"
                                       << "whenNotMatched"
                                       << "insert"));
     ASSERT(createMergeStage(spec));
@@ -605,7 +605,7 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
                                  << "whenMatched"
-                                 << "replaceWithNew"
+                                 << "replace"
                                  << "whenNotMatched"
                                  << "fail"));
     ASSERT(createMergeStage(spec));
@@ -613,7 +613,7 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
                                  << "whenMatched"
-                                 << "replaceWithNew"
+                                 << "replace"
                                  << "whenNotMatched"
                                  << "discard"));
     ASSERT(createMergeStage(spec));
@@ -769,7 +769,7 @@ TEST_F(DocumentSourceMergeTest, LetVariablesCanOnlyBeUsedWithPipelineMode) {
                                  << "let"
                                  << let
                                  << "whenMatched"
-                                 << "replaceWithNew"
+                                 << "replace"
                                  << "whenNotMatched"
                                  << "insert"));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51199);
@@ -779,7 +779,7 @@ TEST_F(DocumentSourceMergeTest, LetVariablesCanOnlyBeUsedWithPipelineMode) {
                                  << "let"
                                  << let
                                  << "whenMatched"
-                                 << "replaceWithNew"
+                                 << "replace"
                                  << "whenNotMatched"
                                  << "fail"));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51199);
@@ -789,7 +789,7 @@ TEST_F(DocumentSourceMergeTest, LetVariablesCanOnlyBeUsedWithPipelineMode) {
                                  << "let"
                                  << let
                                  << "whenMatched"
-                                 << "replaceWithNew"
+                                 << "replace"
                                  << "whenNotMatched"
                                  << "discard"));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51199);

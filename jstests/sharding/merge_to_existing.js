@@ -65,7 +65,7 @@
                     db: targetColl.getDB().getName(),
                     coll: targetColl.getName(),
                 },
-                whenMatched: "replaceWithNew",
+                whenMatched: "replace",
                 whenNotMatched: "insert"
             }
         }]);
@@ -80,7 +80,7 @@
                     db: targetColl.getDB().getName(),
                     coll: targetColl.getName(),
                 },
-                whenMatched: "replaceWithNew",
+                whenMatched: "replace",
                 whenNotMatched: "insert"
             }
         }]);

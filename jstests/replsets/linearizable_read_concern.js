@@ -85,7 +85,7 @@ load('jstests/libs/write_concern_util.js');
     // A $merge aggregation is not allowed with readConcern level "linearizable".
     let mergeResult = assert.throws(
         () => primary.getDB("test").foo.aggregate(
-            [{$merge: {into: "out", whenMatched: "replaceWithNew", whenNotMatched: "insert"}}],
+            [{$merge: {into: "out", whenMatched: "replace", whenNotMatched: "insert"}}],
             {readConcern: {level: "linearizable"}}));
     assert.eq(mergeResult.code, ErrorCodes.InvalidOptions);
 

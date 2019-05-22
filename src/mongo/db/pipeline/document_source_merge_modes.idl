@@ -49,7 +49,7 @@ enums:
             # descriptors map, which keys are pairs of whenMatched/whenNotMatched values, this
             # 'kPipeline' element is added for internal use only.
             kPipeline: "pipeline"
-            kReplaceWithNew: "replaceWithNew"
+            kReplace: "replace"
 
     MergeWhenNotMatchedMode:
         description: "Possible merge mode values for $merge's 'whenNotMatched'. field"

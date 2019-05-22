@@ -111,7 +111,7 @@
     assert.commandWorked(sourceColl.insert({shardKey: -1}));
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-    runMergeWithMode("replaceWithNew", "insert", sourceColl);
+    runMergeWithMode("replace", "insert", sourceColl);
     runMergeWithMode("fail", "insert", sourceColl);
 
     // Run a similar test with chunk migrations on the output collection instead.
@@ -125,7 +125,7 @@
     assert.commandWorked(sourceColl.insert({shardKey: -1}));
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-    runMergeWithMode("replaceWithNew", "insert", targetColl);
+    runMergeWithMode("replace", "insert", targetColl);
     runMergeWithMode("fail", "insert", targetColl);
 
     st.stop();

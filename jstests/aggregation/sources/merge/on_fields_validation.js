@@ -24,7 +24,7 @@
         const stage = {
             $merge: {
                 into: target.getName(),
-                whenMatched: "replaceWithNew",
+                whenMatched: "replace",
                 whenNotMatched: "insert",
                 on: onFields
             }
@@ -54,7 +54,7 @@
     const pipelineNameTeam = [{
         $merge: {
             into: target.getName(),
-            whenMatched: "replaceWithNew",
+            whenMatched: "replace",
             whenNotMatched: "insert",
             on: ["name", "team"]
         }
@@ -85,7 +85,7 @@
     const pipelineSongDotArtist = [{
         $merge: {
             into: target.getName(),
-            whenMatched: "replaceWithNew",
+            whenMatched: "replace",
             whenNotMatched: "insert",
             on: ["song.artist"]
         }
@@ -121,7 +121,7 @@
     const pipelineAddressDotStreet = [{
         $merge: {
             into: target.getName(),
-            whenMatched: "replaceWithNew",
+            whenMatched: "replace",
             whenNotMatched: "insert",
             on: ["address.street"]
         }

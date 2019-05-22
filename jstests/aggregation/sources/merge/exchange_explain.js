@@ -28,7 +28,7 @@ load('jstests/aggregation/extras/utils.js');
                       db: targetColl.getDB().getName(),
                       coll: targetColl.getName(),
                   },
-                  whenMatched: "replaceWithNew",
+                  whenMatched: "replace",
                   whenNotMatched: "insert"
               }
             }
@@ -44,7 +44,7 @@ load('jstests/aggregation/extras/utils.js');
                       db: targetColl.getDB().getName(),
                       coll: targetColl.getName(),
                   },
-                  whenMatched: "replaceWithNew",
+                  whenMatched: "replace",
                   whenNotMatched: "insert"
               }
             }
@@ -110,7 +110,7 @@ load('jstests/aggregation/extras/utils.js');
                                db: targetCollRangeOtherField.getDB().getName(),
                                coll: targetCollRangeOtherField.getName(),
                            },
-                           whenMatched: "replaceWithNew",
+                           whenMatched: "replace",
                            whenNotMatched: "insert"
                        }
                     }],
@@ -133,7 +133,7 @@ load('jstests/aggregation/extras/utils.js');
                                db: targetCollRangeOtherField.getDB().getName(),
                                coll: targetCollRangeOtherField.getName(),
                            },
-                           whenMatched: "replaceWithNew",
+                           whenMatched: "replace",
                            whenNotMatched: "insert"
                        }
                     }],
@@ -159,7 +159,7 @@ load('jstests/aggregation/extras/utils.js');
         pipeline: [{
             $merge: {
                 into: targetCollRange.getName(),
-                whenMatched: "replaceWithNew",
+                whenMatched: "replace",
                 whenNotMatched: "insert"
             }
         }],

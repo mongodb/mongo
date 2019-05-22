@@ -9,9 +9,9 @@ load("jstests/libs/fixture_helpers.js");  // For isSharded.
  * modes (as named arguments). Note that one mode is a pipeline.
  */
 function withEachMergeMode(callback) {
-    callback({whenMatchedMode: "replaceWithNew", whenNotMatchedMode: "insert"});
-    callback({whenMatchedMode: "replaceWithNew", whenNotMatchedMode: "fail"});
-    callback({whenMatchedMode: "replaceWithNew", whenNotMatchedMode: "discard"});
+    callback({whenMatchedMode: "replace", whenNotMatchedMode: "insert"});
+    callback({whenMatchedMode: "replace", whenNotMatchedMode: "fail"});
+    callback({whenMatchedMode: "replace", whenNotMatchedMode: "discard"});
 
     callback({whenMatchedMode: "merge", whenNotMatchedMode: "insert"});
     callback({whenMatchedMode: "merge", whenNotMatchedMode: "fail"});

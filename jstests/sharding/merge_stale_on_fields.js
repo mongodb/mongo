@@ -163,18 +163,13 @@
         failpointData: {namespace: source.getFullName()}
     });
     testEpochChangeDuringAgg({
-        mergeSpec:
-            {into: target.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"},
+        mergeSpec: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert"},
         failpoint: "setYieldAllLocksHang",
         failpointData: {namespace: source.getFullName()}
     });
     testEpochChangeDuringAgg({
-        mergeSpec: {
-            into: target.getName(),
-            whenMatched: "replaceWithNew",
-            whenNotMatched: "insert",
-            on: "sk"
-        },
+        mergeSpec:
+            {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: "sk"},
         failpoint: "setYieldAllLocksHang",
         failpointData: {namespace: source.getFullName()}
     });
@@ -187,8 +182,7 @@
         failpointData: {nss: target.getFullName()}
     });
     testEpochChangeDuringAgg({
-        mergeSpec:
-            {into: target.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"},
+        mergeSpec: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert"},
         failpoint: "hangDuringBatchUpdate",
         failpointData: {nss: target.getFullName()}
     });

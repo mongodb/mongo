@@ -63,12 +63,9 @@ using UpdateModification = write_ops::UpdateModification;
 constexpr auto kStageName = DocumentSourceMerge::kStageName;
 constexpr auto kDefaultWhenMatched = WhenMatched::kMerge;
 constexpr auto kDefaultWhenNotMatched = WhenNotMatched::kInsert;
-constexpr auto kReplaceWithNewInsertMode =
-    MergeMode{WhenMatched::kReplaceWithNew, WhenNotMatched::kInsert};
-constexpr auto kReplaceWithNewFailMode =
-    MergeMode{WhenMatched::kReplaceWithNew, WhenNotMatched::kFail};
-constexpr auto kReplaceWithNewDiscardMode =
-    MergeMode{WhenMatched::kReplaceWithNew, WhenNotMatched::kDiscard};
+constexpr auto kReplaceInsertMode = MergeMode{WhenMatched::kReplace, WhenNotMatched::kInsert};
+constexpr auto kReplaceFailMode = MergeMode{WhenMatched::kReplace, WhenNotMatched::kFail};
+constexpr auto kReplaceDiscardMode = MergeMode{WhenMatched::kReplace, WhenNotMatched::kDiscard};
 constexpr auto kMergeInsertMode = MergeMode{WhenMatched::kMerge, WhenNotMatched::kInsert};
 constexpr auto kMergeFailMode = MergeMode{WhenMatched::kMerge, WhenNotMatched::kFail};
 constexpr auto kMergeDiscardMode = MergeMode{WhenMatched::kMerge, WhenNotMatched::kDiscard};
@@ -175,17 +172,17 @@ const MergeStrategyDescriptorsMap& getDescriptors() {
     // initialized until the first use, which is when the program already started and all global
     // variables had been initialized.
     static const auto mergeStrategyDescriptors = MergeStrategyDescriptorsMap{
-        // whenMatched: replaceWithNew, whenNotMatched: insert
-        {kReplaceWithNewInsertMode,
-         {kReplaceWithNewInsertMode,
+        // whenMatched: replace, whenNotMatched: insert
+        {kReplaceInsertMode,
+         {kReplaceInsertMode,
           {ActionType::insert, ActionType::update},
           makeUpdateStrategy(true, {})}},
-        // whenMatched: replaceWithNew, whenNotMatched: fail
-        {kReplaceWithNewFailMode,
-         {kReplaceWithNewFailMode, {ActionType::update}, makeStrictUpdateStrategy(false, {})}},
-        // whenMatched: replaceWithNew, whenNotMatched: discard
-        {kReplaceWithNewDiscardMode,
-         {kReplaceWithNewDiscardMode, {ActionType::update}, makeUpdateStrategy(false, {})}},
+        // whenMatched: replace, whenNotMatched: fail
+        {kReplaceFailMode,
+         {kReplaceFailMode, {ActionType::update}, makeStrictUpdateStrategy(false, {})}},
+        // whenMatched: replace, whenNotMatched: discard
+        {kReplaceDiscardMode,
+         {kReplaceDiscardMode, {ActionType::update}, makeUpdateStrategy(false, {})}},
         // whenMatched: merge, whenNotMatched: insert
         {kMergeInsertMode,
          {kMergeInsertMode,
@@ -635,7 +632,7 @@ Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> 
                     MergeWhenMatchedMode_serializer(_descriptor.mode.first),
                     MergeWhenNotMatchedMode_serializer(_descriptor.mode.second)),
                 (_descriptor.mode.first == WhenMatched::kFail ||
-                 _descriptor.mode.first == WhenMatched::kReplaceWithNew) &&
+                 _descriptor.mode.first == WhenMatched::kReplace) &&
                     (_descriptor.mode.second == WhenNotMatched::kInsert));
         DocumentSourceOutSpec spec;
         spec.setTargetDb(_outputNs.db());

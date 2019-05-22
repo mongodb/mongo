@@ -54,7 +54,7 @@
     jsTestLog("Test that writes from an aggregation pipeline block on prepare conflicts");
     let pipeline = [
         {$addFields: {c: 1}},
-        {$merge: {into: outCollName, whenMatched: "replaceWithNew", whenNotMatched: "insert"}}
+        {$merge: {into: outCollName, whenMatched: "replace", whenNotMatched: "insert"}}
     ];
     assert.commandFailedWithCode(testDB.runCommand({
         aggregate: collName,

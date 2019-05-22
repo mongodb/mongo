@@ -1,4 +1,4 @@
-// Tests the behaviour of the $merge stage with whenMatched=replaceWithNew and
+// Tests the behaviour of the $merge stage with whenMatched=replace and
 // whenNotMatched=discard.
 //
 // Cannot implicitly shard accessed collections because a collection can be implictly created and
@@ -15,7 +15,7 @@
     const target = db[`${jsTest.name()}_target`];
     target.drop();
     const mergeStage = {
-        $merge: {into: target.getName(), whenMatched: "replaceWithNew", whenNotMatched: "discard"}
+        $merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "discard"}
     };
     const pipeline = [mergeStage];
 

@@ -196,7 +196,7 @@
         assert.commandWorked(sourceColl.update(
             {}, {$set: {newField: {subField: "hi"}, proofOfUpdate: "PROOF"}}, {multi: true}));
 
-        // If whenMatched is "replaceWithNew" and whenNotMatched is "insert", expect the command to
+        // If whenMatched is "replace" and whenNotMatched is "insert", expect the command to
         // fail if the "on" fields does not contain _id, since a replacement-style update will fail
         // if attempting to modify _id.
         if (dottedPathIndexSpec.hasOwnProperty("_id")) {
@@ -206,7 +206,7 @@
                         db: targetColl.getDB().getName(),
                         coll: targetColl.getName(),
                     },
-                    whenMatched: "replaceWithNew",
+                    whenMatched: "replace",
                     whenNotMatched: "insert",
                     on: Object.keys(dottedPathIndexSpec)
                 }
@@ -222,7 +222,7 @@
                                             db: targetColl.getDB().getName(),
                                             coll: targetColl.getName(),
                                         },
-                                        whenMatched: "replaceWithNew",
+                                        whenMatched: "replace",
                                         whenNotMatched: "insert",
                                         on: Object.keys(dottedPathIndexSpec)
                                     }
@@ -238,7 +238,7 @@
                           db: targetColl.getDB().getName(),
                           coll: targetColl.getName(),
                       },
-                      whenMatched: "replaceWithNew",
+                      whenMatched: "replace",
                       whenNotMatched: "insert",
                       on: Object.keys(dottedPathIndexSpec)
                   }

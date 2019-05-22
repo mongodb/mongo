@@ -46,7 +46,7 @@
             pipeline: [{
                 $merge: {
                     into: target.getName(),
-                    whenMatched: "replaceWithNew",
+                    whenMatched: "replace",
                     whenNotMatched: "insert",
                     on: Object.keys(shardKey)
                 }
@@ -87,7 +87,7 @@
             pipeline: [{
                 $merge: {
                     into: target.getName(),
-                    whenMatched: "replaceWithNew",
+                    whenMatched: "replace",
                     whenNotMatched: "insert",
                     on: Object.keys(shardKey)
                 }
@@ -134,7 +134,7 @@
             pipeline: [{
                 $merge: {
                     into: target.getName(),
-                    whenMatched: "replaceWithNew",
+                    whenMatched: "replace",
                     whenNotMatched: "insert",
                     on: Object.keys(shardKey)
                 }

@@ -31,10 +31,8 @@
     assert.setEq(new Set(["_id", "a", "b", "c"]),
                  new Set(getAggPlanStage(explainResult, "$merge").$merge.on));
 
-    explainResult = sourceCollection.explain().aggregate([{
-        $merge:
-            {into: firstColl.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}
-    }]);
+    explainResult = sourceCollection.explain().aggregate(
+        [{$merge: {into: firstColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}]);
     assert.setEq(new Set(["_id", "a", "b", "c"]),
                  new Set(getAggPlanStage(explainResult, "$merge").$merge.on));
 
@@ -51,10 +49,8 @@
     assert.setEq(new Set(["_id", "a", "b"]),
                  new Set(getAggPlanStage(explainResult, "$merge").$merge.on));
 
-    explainResult = sourceCollection.explain().aggregate([{
-        $merge:
-            {into: firstColl.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}
-    }]);
+    explainResult = sourceCollection.explain().aggregate(
+        [{$merge: {into: firstColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}]);
     assert.setEq(new Set(["_id", "a", "b", "c"]),
                  new Set(getAggPlanStage(explainResult, "$merge").$merge.on));
 

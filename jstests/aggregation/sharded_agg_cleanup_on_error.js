@@ -121,7 +121,7 @@
             coll,
             [
               {$group: {_id: "$fakeShardKey"}},
-              {$merge: {into: "target", whenMatched: "replaceWithNew", whenNotMatched: "insert"}}
+              {$merge: {into: "target", whenMatched: "replace", whenNotMatched: "insert"}}
             ],
             ErrorCodes.FailPointEnabled);
 

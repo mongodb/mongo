@@ -81,7 +81,7 @@
         assert.doesNotThrow(() => source.aggregate([{
             $merge: {
                 into: target.getName(),
-                whenMatched: "replaceWithNew",
+                whenMatched: "replace",
                 whenNotMatched: "insert",
                 on: ["_id", "a"]
             }
@@ -89,7 +89,7 @@
         assert.doesNotThrow(() => source.aggregate([{
             $merge: {
                 into: target.getName(),
-                whenMatched: "replaceWithNew",
+                whenMatched: "replace",
                 whenNotMatched: "insert",
                 on: ["a", "_id"]
             }
@@ -106,7 +106,7 @@
         assert.doesNotThrow(() => source.aggregate([{
             $merge: {
                 into: target.getName(),
-                whenMatched: "replaceWithNew",
+                whenMatched: "replace",
                 whenNotMatched: "insert",
                 on: "a"
             }
@@ -159,7 +159,7 @@
         assert.doesNotThrow(() => source.aggregate([{
                                                       $merge: {
                                                           into: target.getName(),
-                                                          whenMatched: "replaceWithNew",
+                                                          whenMatched: "replace",
                                                           whenNotMatched: "insert",
                                                           on: "a"
                                                       }
@@ -192,7 +192,7 @@
         assert.doesNotThrow(() => source.aggregate([{
                                                       $merge: {
                                                           into: target.getName(),
-                                                          whenMatched: "replaceWithNew",
+                                                          whenMatched: "replace",
                                                           whenNotMatched: "insert",
                                                           on: "a"
                                                       }
@@ -212,7 +212,7 @@
         assert.doesNotThrow(() => newSourceColl.aggregate([{
             $merge: {
                 into: target.getName(),
-                whenMatched: "replaceWithNew",
+                whenMatched: "replace",
                 whenNotMatched: "insert",
                 on: "a"
             }
@@ -224,7 +224,7 @@
         assert.doesNotThrow(() => source.aggregate([{
                                                       $merge: {
                                                           into: target.getName(),
-                                                          whenMatched: "replaceWithNew",
+                                                          whenMatched: "replace",
                                                           whenNotMatched: "insert",
                                                           on: "a"
                                                       }
@@ -285,7 +285,7 @@
             {
               $merge: {
                   into: target.getName(),
-                  whenMatched: "replaceWithNew",
+                  whenMatched: "replace",
                   whenNotMatched: "insert",
                   on: ["a", "b.c.d"]
               }
@@ -300,7 +300,7 @@
             {
               $merge: {
                   into: target.getName(),
-                  whenMatched: "replaceWithNew",
+                  whenMatched: "replace",
                   whenNotMatched: "insert",
                   on: ["id.x", "id.y"]
               }
@@ -312,7 +312,7 @@
             {
               $merge: {
                   into: target.getName(),
-                  whenMatched: "replaceWithNew",
+                  whenMatched: "replace",
                   whenNotMatched: "insert",
                   on: ["id.y", "id.x"]
               }
@@ -353,7 +353,7 @@
             {
               $merge: {
                   into: target.getName(),
-                  whenMatched: "replaceWithNew",
+                  whenMatched: "replace",
                   whenNotMatched: "insert",
                   on: "a.b"
               }
@@ -366,7 +366,7 @@
             {
               $merge: {
                   into: target.getName(),
-                  whenMatched: "replaceWithNew",
+                  whenMatched: "replace",
                   whenNotMatched: "insert",
                   on: "a.b"
               }
@@ -385,7 +385,7 @@
         assert.doesNotThrow(() => source.aggregate([{
             $merge: {
                 into: target.getName(),
-                whenMatched: "replaceWithNew",
+                whenMatched: "replace",
                 whenNotMatched: "insert",
                 on: "a"
             }
@@ -394,7 +394,7 @@
         assert.doesNotThrow(() => source.aggregate([{
             $merge: {
                 into: target.getName(),
-                whenMatched: "replaceWithNew",
+                whenMatched: "replace",
                 whenNotMatched: "insert",
                 on: "a"
             }

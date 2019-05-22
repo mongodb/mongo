@@ -1235,7 +1235,7 @@ var authCommandsLib = {
                   pipeline: [{
                       $merge: {
                           into: {db: args.targetDB, coll: "foo_out"},
-                          whenMatched: "replaceWithNew",
+                          whenMatched: "replace",
                           whenNotMatched: "insert"
                       }
                   }],

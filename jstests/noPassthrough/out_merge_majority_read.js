@@ -82,7 +82,7 @@
         assert.docEq(res.next(), {_id: 1, state: 'merge'});
         assert(res.isExhausted());
 
-        // The same $merge but with whenMatched set to "replaceWithNew".
+        // The same $merge but with whenMatched set to "replace".
         res = sourceColl.aggregate(
             [
               {$match: {state: 'before'}},
@@ -93,7 +93,7 @@
                         db: targetReplaceDocsColl.getDB().getName(),
                         coll: targetReplaceDocsColl.getName()
                     },
-                    whenMatched: "replaceWithNew",
+                    whenMatched: "replace",
                     whenNotMatched: "insert"
                 }
               }

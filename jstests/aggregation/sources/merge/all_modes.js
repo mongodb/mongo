@@ -21,17 +21,13 @@
 
     })();
 
-    // Test 'whenMatched=replaceWithNew whenNotMatched=insert' mode. This is an equivalent of a
+    // Test 'whenMatched=replace whenNotMatched=insert' mode. This is an equivalent of a
     // replacement-style update with upsert=true.
-    (function testWhenMatchedReplaceWithNewWhenNotMatchedInsert() {
+    (function testWhenMatchedReplaceWhenNotMatchedInsert() {
         assert.commandWorked(target.insert([{_id: 1, a: 10}, {_id: 3, a: 30}, {_id: 4, a: 40}]));
-        assert.doesNotThrow(() => source.aggregate([{
-            $merge: {
-                into: target.getName(),
-                whenMatched: "replaceWithNew",
-                whenNotMatched: "insert"
-            }
-        }]));
+        assert.doesNotThrow(() => source.aggregate([
+            {$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert"}}
+        ]));
         assertArrayEq({
             actual: target.find().toArray(),
             expected: [
@@ -43,16 +39,15 @@
         });
     })();
 
-    // Test 'whenMatched=replaceWithNew whenNotMatched=fail' mode. For matched documents the update
+    // Test 'whenMatched=replace whenNotMatched=fail' mode. For matched documents the update
     // should be unordered and report an error at the end when all documents in a batch have been
     // processed, it will not fail as soon as we hit the first document without a match.
-    (function testWhenMatchedReplaceWithNewWhenNotMatchedFail() {
+    (function testWhenMatchedReplaceWhenNotMatchedFail() {
         assert(target.drop());
         assert.commandWorked(target.insert([{_id: 1, a: 10}, {_id: 3, a: 30}, {_id: 4, a: 40}]));
-        const error = assert.throws(() => source.aggregate([{
-            $merge:
-                {into: target.getName(), whenMatched: "replaceWithNew", whenNotMatched: "fail"}
-        }]));
+        const error = assert.throws(() => source.aggregate([
+            {$merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "fail"}}
+        ]));
         assert.commandFailedWithCode(error, ErrorCodes.MergeStageNoMatchingDocument);
         assertArrayEq({
             actual: target.find().toArray(),
@@ -60,18 +55,14 @@
         });
     })();
 
-    // Test 'whenMatched=replaceWithNew whenNotMatched=discard' mode. Documents in the target
+    // Test 'whenMatched=replace whenNotMatched=discard' mode. Documents in the target
     // collection without a match in the source collection should not be modified as a result
     // of the merge operation.
-    (function testWhenMatchedReplaceWithNewWhenNotMatchedDiscard() {
+    (function testWhenMatchedReplaceWhenNotMatchedDiscard() {
         assert(target.drop());
         assert.commandWorked(target.insert([{_id: 1, a: 10}, {_id: 3, a: 30}, {_id: 4, a: 40}]));
         assert.doesNotThrow(() => source.aggregate([{
-            $merge: {
-                into: target.getName(),
-                whenMatched: "replaceWithNew",
-                whenNotMatched: "discard"
-            }
+            $merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "discard"}
         }]));
         assertArrayEq({
             actual: target.find().toArray(),

@@ -18,7 +18,7 @@
 
     assertErrorCode(
         coll,
-        [{$merge: {into: coll.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}}],
+        [{$merge: {into: coll.getName(), whenMatched: "replace", whenNotMatched: "insert"}}],
         51188);
 
     assertErrorCode(

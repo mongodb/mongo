@@ -1,4 +1,4 @@
-// Tests for the $merge stage with whenMatched: "replaceWithNew" and whenNotMatched: "insert".
+// Tests for the $merge stage with whenMatched: "replace" and whenNotMatched: "insert".
 // @tags: [assumes_unsharded_collection]
 (function() {
     "use strict";
@@ -16,12 +16,10 @@
         assert.commandWorked(coll.insert({_id: i, a: i}));
     }
 
-    // Test that a $merge with whenMatched: "replaceWithNew" and whenNotMatched: "insert" mode will
+    // Test that a $merge with whenMatched: "replace" and whenNotMatched: "insert" mode will
     // default the "on" fields to "_id".
-    coll.aggregate([{
-        $merge:
-            {into: outColl.getName(), whenMatched: "replaceWithNew", whenNotMatched: "insert"}
-    }]);
+    coll.aggregate(
+        [{$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}]);
     assert.eq(nDocs, outColl.find().itcount());
 
     // Test that $merge will update existing documents that match the "on" fields.
@@ -31,7 +29,7 @@
         {
           $merge: {
               into: outColl.getName(),
-              whenMatched: "replaceWithNew",
+              whenMatched: "replace",
               whenNotMatched: "insert",
               on: "_id"
           }
@@ -49,7 +47,7 @@
         {
           $merge: {
               into: outColl.getName(),
-              whenMatched: "replaceWithNew",
+              whenMatched: "replace",
               whenNotMatched: "insert",
               on: ["_id", "a.b"]
           }
@@ -66,7 +64,7 @@
         {
           $merge: {
               into: outColl.getName(),
-              whenMatched: "replaceWithNew",
+              whenMatched: "replace",
               whenNotMatched: "insert",
           }
         }
@@ -82,7 +80,7 @@
         {
           $merge: {
               into: outColl.getName(),
-              whenMatched: "replaceWithNew",
+              whenMatched: "replace",
               whenNotMatched: "insert",
               on: ["_id", "name"]
           }
@@ -104,7 +102,7 @@
         {
           $merge: {
               into: outColl.getName(),
-              whenMatched: "replaceWithNew",
+              whenMatched: "replace",
               whenNotMatched: "insert",
               on: "name"
           }
@@ -126,7 +124,7 @@
         [{
            $merge: {
                into: outColl.getName(),
-               whenMatched: "replaceWithNew",
+               whenMatched: "replace",
                whenNotMatched: "insert",
                on: "missing"
            }
@@ -142,18 +140,13 @@
 
     outColl.drop();
     assert.commandWorked(outColl.createIndex({a: 1}, {unique: true}));
-    assertErrorCode(coll,
-                    [
-                      {$addFields: {a: 0}},
-                      {
-                        $merge: {
-                            into: outColl.getName(),
-                            whenMatched: "replaceWithNew",
-                            whenNotMatched: "insert"
-                        }
-                      }
-                    ],
-                    ErrorCodes.DuplicateKey);
+    assertErrorCode(
+        coll,
+        [
+          {$addFields: {a: 0}},
+          {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}
+        ],
+        ErrorCodes.DuplicateKey);
 
     // Test that $merge fails if the "on" fields contains an array.
     coll.drop();
@@ -165,7 +158,7 @@
                       {
                         $merge: {
                             into: outColl.getName(),
-                            whenMatched: "replaceWithNew",
+                            whenMatched: "replace",
                             whenNotMatched: "insert",
                             on: ["_id", "a.b"]
                         }
@@ -181,7 +174,7 @@
                       {
                         $merge: {
                             into: outColl.getName(),
-                            whenMatched: "replaceWithNew",
+                            whenMatched: "replace",
                             whenNotMatched: "insert",
                             on: ["_id", "a.b"]
                         }
@@ -198,7 +191,7 @@
                 db: foreignDb.getName(),
                 coll: foreignTargetColl.getName(),
             },
-            whenMatched: "replaceWithNew",
+            whenMatched: "replace",
             whenNotMatched: "insert",
         }
     }];
