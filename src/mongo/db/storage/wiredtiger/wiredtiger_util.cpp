@@ -602,6 +602,14 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                                          const std::string& uri,
                                          const std::string& config,
                                          BSONObjBuilder* bob) {
+    return exportTableToBSON(session, uri, config, bob, {});
+}
+
+Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
+                                         const std::string& uri,
+                                         const std::string& config,
+                                         BSONObjBuilder* bob,
+                                         const std::vector<std::string>& filter) {
     invariant(session);
     invariant(bob);
     WT_CURSOR* c = NULL;
@@ -646,6 +654,11 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
         if (prefix.size() == 0) {
             bob->appendNumber(desc, v);
         } else {
+            bool shouldSkipField = std::find(filter.begin(), filter.end(), prefix) != filter.end();
+            if (shouldSkipField) {
+                continue;
+            }
+
             BSONObjBuilder*& sub = subs[prefix.toString()];
             if (!sub)
                 sub = new BSONObjBuilder();

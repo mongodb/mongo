@@ -66,8 +66,12 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
     invariant(s);
     const string uri = "statistics:";
 
+    // Filter out unrelevant statistic fields.
+    std::vector<std::string> fieldsToIgnore = {"LSM"};
+
     BSONObjBuilder bob;
-    Status status = WiredTigerUtil::exportTableToBSON(s, uri, "statistics=(fast)", &bob);
+    Status status =
+        WiredTigerUtil::exportTableToBSON(s, uri, "statistics=(fast)", &bob, fieldsToIgnore);
     if (!status.isOK()) {
         bob.append("error", "unable to retrieve statistics");
         bob.append("code", static_cast<int>(status.code()));

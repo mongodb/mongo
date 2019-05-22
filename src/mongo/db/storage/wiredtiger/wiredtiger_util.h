@@ -140,12 +140,18 @@ public:
 
     /**
      * Reads contents of table using URI and exports all keys to BSON as string elements.
-     * Additional, adds 'uri' field to output document.
+     * Additional, adds 'uri' field to output document. A filter can be specified to skip desired
+     * fields.
      */
     static Status exportTableToBSON(WT_SESSION* s,
                                     const std::string& uri,
                                     const std::string& config,
                                     BSONObjBuilder* bob);
+    static Status exportTableToBSON(WT_SESSION* s,
+                                    const std::string& uri,
+                                    const std::string& config,
+                                    BSONObjBuilder* bob,
+                                    const std::vector<std::string>& filter);
 
     /**
      * Appends information about the storage engine's currently available snapshots and the settings
