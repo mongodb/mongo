@@ -61,8 +61,8 @@ public:
     void setSort(const BSONObj& sort) {
         _sort = sort;
     }
-    void setRuntimeConstants(const RuntimeConstants& runtimeConstants) {
-        _runtimeConstants = runtimeConstants;
+    void setRuntimeConstants(RuntimeConstants runtimeConstants) {
+        _runtimeConstants = std::move(runtimeConstants);
     }
     void setCollation(const BSONObj& collation) {
         _collation = collation;

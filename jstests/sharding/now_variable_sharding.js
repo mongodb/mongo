@@ -16,30 +16,43 @@
     const numdocs = 1000;
 
     const coll = db[jsTest.name()];
+    const otherColl = db[coll.getName() + "_other"];
 
-    coll.createIndex({_id: 1}, {unique: true});
+    for (let testColl of[coll, otherColl]) {
+        testColl.createIndex({_id: 1}, {unique: true});
 
-    st.adminCommand({shardcollection: coll.getFullName(), key: {_id: 1}});
-    st.adminCommand({split: coll.getFullName(), middle: {_id: numdocs / 2}});
+        st.adminCommand({shardcollection: testColl.getFullName(), key: {_id: 1}});
+        st.adminCommand({split: testColl.getFullName(), middle: {_id: numdocs / 2}});
 
-    st.adminCommand({
-        moveChunk: coll.getFullName(),
-        find: {_id: 0},
-        to: st.shard1.shardName,
-        _waitForDelete: true
-    });
-    st.adminCommand({
-        moveChunk: coll.getFullName(),
-        find: {_id: numdocs / 2},
-        to: st.shard0.shardName,
-        _waitForDelete: true
-    });
+        st.adminCommand({
+            moveChunk: testColl.getFullName(),
+            find: {_id: 0},
+            to: st.shard1.shardName,
+            _waitForDelete: true
+        });
+        st.adminCommand({
+            moveChunk: testColl.getFullName(),
+            find: {_id: numdocs / 2},
+            to: st.shard0.shardName,
+            _waitForDelete: true
+        });
+    }
 
-    const bulk = coll.initializeUnorderedBulkOp();
+    // Insert simple documents into the main test collection. Aggregation and view pipelines will
+    // augment these docs with time-based fields.
+    let bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < numdocs; ++i) {
         bulk.insert({_id: i});
     }
-    assert.writeOK(bulk.execute());
+    assert.commandWorked(bulk.execute());
+
+    // Insert into another collection with pre-made fields for testing the find() command.
+    bulk = otherColl.initializeUnorderedBulkOp();
+    const timeFieldValue = new Date();
+    for (let i = 0; i < numdocs; ++i) {
+        bulk.insert({_id: i, timeField: timeFieldValue, clusterTimeField: new Timestamp(0, 1)});
+    }
+    assert.commandWorked(bulk.execute());
 
     assert.commandWorked(
         db.createView("viewWithNow", coll.getName(), [{$addFields: {timeField: "$$NOW"}}]));
@@ -49,8 +62,12 @@
         "viewWithClusterTime", coll.getName(), [{$addFields: {timeField: "$$CLUSTER_TIME"}}]));
     const viewWithClusterTime = db["viewWithClusterTime"];
 
+    function toResultsArray(queryRes) {
+        return Array.isArray(queryRes) ? queryRes : queryRes.toArray();
+    }
+
     function runTests(query) {
-        const results = query().toArray();
+        const results = toResultsArray(query());
         assert.eq(results.length, numdocs);
 
         // Make sure the values are the same for all documents
@@ -61,18 +78,32 @@
         // Sleep for a while and then rerun.
         sleep(3000);
 
-        const resultsLater = query().toArray();
+        const resultsLater = toResultsArray(query());
         assert.eq(resultsLater.length, numdocs);
 
         // Later results should be later in time.
         assert.lte(results[0].timeField, resultsLater[0].timeField);
     }
 
-    function baseCollectionNow() {
+    function baseCollectionNowFind() {
+        return otherColl.find({$expr: {$lte: ["$timeField", "$$NOW"]}});
+    }
+
+    function baseCollectionClusterTimeFind() {
+        // The test validator examines 'timeField', so we copy clusterTimeField into timeField here.
+        const results =
+            otherColl.find({$expr: {$lt: ["$clusterTimeField", "$$CLUSTER_TIME"]}}).toArray();
+        results.forEach((val, idx) => {
+            results[idx].timeField = results[idx].clusterTimeField;
+        });
+        return results;
+    }
+
+    function baseCollectionNowAgg() {
         return coll.aggregate([{$addFields: {timeField: "$$NOW"}}]);
     }
 
-    function baseCollectionClusterTime() {
+    function baseCollectionClusterTimeAgg() {
         return coll.aggregate([{$addFields: {timeField: "$$CLUSTER_TIME"}}]);
     }
 
@@ -93,14 +124,29 @@
     }
 
     // $$NOW
-    runTests(baseCollectionNow);
+    runTests(baseCollectionNowFind);
+    runTests(baseCollectionNowAgg);
     runTests(fromViewWithNow);
     runTests(withExprNow);
 
+    // Test that $$NOW can be used in explain for both find and aggregate.
+    assert.commandWorked(coll.explain().find({$expr: {$lte: ["$timeField", "$$NOW"]}}).finish());
+    assert.commandWorked(
+        viewWithNow.explain().find({$expr: {$eq: ["$timeField", "$$NOW"]}}).finish());
+    assert.commandWorked(coll.explain().aggregate([{$addFields: {timeField: "$$NOW"}}]));
+
     // $$CLUSTER_TIME
-    runTests(baseCollectionClusterTime);
+    runTests(baseCollectionClusterTimeFind);
+    runTests(baseCollectionClusterTimeAgg);
     runTests(fromViewWithClusterTime);
     runTests(withExprClusterTime);
+
+    // Test that $$CLUSTER_TIME can be used in explain for both find and aggregate.
+    assert.commandWorked(
+        coll.explain().find({$expr: {$lte: ["$timeField", "$$CLUSTER_TIME"]}}).finish());
+    assert.commandWorked(
+        viewWithNow.explain().find({$expr: {$eq: ["$timeField", "$$CLUSTER_TIME"]}}).finish());
+    assert.commandWorked(coll.explain().aggregate([{$addFields: {timeField: "$$CLUSTER_TIME"}}]));
 
     st.stop();
 }());

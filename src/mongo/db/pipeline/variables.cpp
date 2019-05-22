@@ -151,7 +151,7 @@ Value Variables::getValue(Id id, const Document& root) const {
                 }
 
                 uasserted(51144,
-                          str::stream() << "Buildin variable '$$" << getBuiltinVariableName(id)
+                          str::stream() << "Builtin variable '$$" << getBuiltinVariableName(id)
                                         << "' is not available");
                 MONGO_UNREACHABLE;
             default:

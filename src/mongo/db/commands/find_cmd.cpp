@@ -42,6 +42,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
@@ -61,6 +62,20 @@ namespace mongo {
 namespace {
 
 const auto kTermField = "term"_sd;
+
+// Parses the command object to a QueryRequest. If the client request did not specify any runtime
+// constants, make them available to the query here.
+std::unique_ptr<QueryRequest> parseCmdObjectToQueryRequest(OperationContext* opCtx,
+                                                           NamespaceString nss,
+                                                           BSONObj cmdObj,
+                                                           bool isExplain) {
+    auto qr = uassertStatusOK(
+        QueryRequest::makeFromFindCommand(std::move(nss), std::move(cmdObj), isExplain));
+    if (!qr->getRuntimeConstants()) {
+        qr->setRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+    }
+    return qr;
+}
 
 /**
  * A command for running .find() queries.
@@ -168,8 +183,7 @@ public:
 
             // Parse the command BSON to a QueryRequest.
             const bool isExplain = true;
-            auto qr =
-                uassertStatusOK(QueryRequest::makeFromFindCommand(nss, _request.body, isExplain));
+            auto qr = parseCmdObjectToQueryRequest(opCtx, nss, _request.body, isExplain);
 
             // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
@@ -239,13 +253,13 @@ public:
             ServerReadConcernMetrics::get(opCtx)->recordReadConcern(
                 repl::ReadConcernArgs::get(opCtx));
 
-            // Parse the command BSON to a QueryRequest.
+            // Parse the command BSON to a QueryRequest. Pass in the parsedNss in case _request.body
+            // does not have a UUID.
+            auto parsedNss =
+                NamespaceString{CommandHelpers::parseNsFromCommand(_dbName, _request.body)};
             const bool isExplain = false;
-            // Pass parseNs to makeFromFindCommand in case _request.body does not have a UUID.
-            auto qr = uassertStatusOK(QueryRequest::makeFromFindCommand(
-                NamespaceString(CommandHelpers::parseNsFromCommand(_dbName, _request.body)),
-                _request.body,
-                isExplain));
+            auto qr =
+                parseCmdObjectToQueryRequest(opCtx, std::move(parsedNss), _request.body, isExplain);
 
             // Only allow speculative majority for internal commands that specify the correct flag.
             uassert(ErrorCodes::ReadConcernMajorityNotEnabled,

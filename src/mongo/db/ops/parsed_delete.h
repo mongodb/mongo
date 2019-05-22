@@ -107,9 +107,6 @@ private:
     // Unowned pointer to the request object that this executor will process.
     const DeleteRequest* const _request;
 
-    // The collator for the parsed delete's expression context.
-    std::unique_ptr<CollatorInterface> _collator;
-
     // Parsed query object, or NULL if the query proves to be an id hack query.
     std::unique_ptr<CanonicalQuery> _canonicalQuery;
 };

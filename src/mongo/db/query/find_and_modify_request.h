@@ -167,8 +167,8 @@ public:
     /**
      * Sets any constant values which may be required by the query and/or update.
      */
-    void setRuntimeConstants(const RuntimeConstants& runtimeConstants) {
-        _runtimeConstants = runtimeConstants;
+    void setRuntimeConstants(RuntimeConstants runtimeConstants) {
+        _runtimeConstants = std::move(runtimeConstants);
     }
 
     /**

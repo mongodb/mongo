@@ -115,9 +115,9 @@ public:
         return *_shardVersion;
     }
 
-    void setRuntimeConstants(const RuntimeConstants& runtimeConstants) {
+    void setRuntimeConstants(RuntimeConstants runtimeConstants) {
         invariant(_updateReq);
-        _updateReq->setRuntimeConstants(runtimeConstants);
+        _updateReq->setRuntimeConstants(std::move(runtimeConstants));
     }
 
     bool hasRuntimeConstants() const {

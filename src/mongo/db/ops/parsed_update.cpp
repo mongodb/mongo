@@ -123,8 +123,12 @@ Status ParsedUpdate::parseQueryToCQ() {
         allowedMatcherFeatures &= ~MatchExpressionParser::AllowedFeatures::kExpr;
     }
 
-    auto expCtx =
-        make_intrusive<ExpressionContext>(_opCtx, _collator.get(), _request->getRuntimeConstants());
+    // If the update request has runtime constants attached to it, pass them to the QueryRequest.
+    if (auto& runtimeConstants = _request->getRuntimeConstants()) {
+        qr->setRuntimeConstants(*runtimeConstants);
+    }
+
+    boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ = CanonicalQuery::canonicalize(
         _opCtx, std::move(qr), std::move(expCtx), _extensionsCallback, allowedMatcherFeatures);
     if (statusWithCQ.isOK()) {

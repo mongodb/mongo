@@ -36,6 +36,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/runtime_constants_gen.h"
 #include "mongo/db/query/tailable_mode.h"
 
 namespace mongo {
@@ -329,6 +330,14 @@ public:
         return _tailableMode;
     }
 
+    void setRuntimeConstants(RuntimeConstants runtimeConstants) {
+        _runtimeConstants = std::move(runtimeConstants);
+    }
+
+    const boost::optional<RuntimeConstants>& getRuntimeConstants() const {
+        return _runtimeConstants;
+    }
+
     bool isSlaveOk() const {
         return _slaveOk;
     }
@@ -513,6 +522,9 @@ private:
     bool _returnKey = false;
     bool _showRecordId = false;
     bool _hasReadPref = false;
+
+    // Runtime constants which may be referenced by $expr, if present.
+    boost::optional<RuntimeConstants> _runtimeConstants;
 
     // Options that can be specified in the OP_QUERY 'flags' header.
     TailableModeEnum _tailableMode = TailableModeEnum::kNormal;

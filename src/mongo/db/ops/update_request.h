@@ -119,8 +119,8 @@ public:
         return _updateConstants;
     }
 
-    inline void setRuntimeConstants(const RuntimeConstants& runtimeConstants) {
-        _runtimeConstants = runtimeConstants;
+    inline void setRuntimeConstants(RuntimeConstants runtimeConstants) {
+        _runtimeConstants = std::move(runtimeConstants);
     }
 
     inline const boost::optional<RuntimeConstants>& getRuntimeConstants() const {
