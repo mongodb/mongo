@@ -31,7 +31,11 @@ var fsm = (function() {
             // same session, we override the "_defaultSession" property of the connections in the
             // cache to be the same as the session underlying 'args.db'.
             const makeNewConnWithExistingSession = function(connStr) {
-                const conn = new Mongo(connStr);
+                // We may fail to connect if the continuous stepdown thread had just terminated
+                // or killed a primary. We therefore use the connect() function defined in
+                // network_error_and_transaction_override.js to add automatic retries to
+                // connections. The override is loaded in worker_thread.js.
+                const conn = connect(connStr).getMongo();
                 conn._defaultSession = new _DelegatingDriverSession(conn, args.db.getSession());
                 return conn;
             };
