@@ -173,8 +173,7 @@ std::string WiredTigerIndex::generateAppMetadataString(const IndexDescriptor& de
 
     // Index metadata
     ss << ",app_metadata=("
-       << "formatVersion=" << keyStringVersion << ',' << "infoObj=" << desc.infoObj().jsonString()
-       << "),";
+       << "formatVersion=" << keyStringVersion << "),";
 
     return (ss.str());
 }
