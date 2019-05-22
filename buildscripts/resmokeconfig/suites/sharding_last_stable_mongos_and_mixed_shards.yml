@@ -87,6 +87,7 @@ selector:
   - jstests/sharding/update_shard_key_doc_on_same_shard.js
   - jstests/sharding/update_shard_key_doc_moves_shards.js
   - jstests/sharding/update_shard_key_conflicting_writes.js
+  - jstests/sharding/update_shard_key_pipeline_update.js
   # mongos in 4.0 doesn't like an aggregation explain without stages for optimized away pipelines,
   # so blacklisting the test until 4.2 becomes last-stable.
   - jstests/sharding/views.js

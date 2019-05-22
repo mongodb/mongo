@@ -9,12 +9,12 @@
 
     load("jstests/sharding/libs/update_shard_key_helpers.js");
 
-    var st = new ShardingTest({mongos: 1, shards: 2});
-    var kDbName = 'db';
-    var ns = kDbName + '.foo';
-    var mongos = st.s0;
-    var shard0 = st.shard0.shardName;
-    var shard1 = st.shard1.shardName;
+    const st = new ShardingTest({mongos: 1, shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
+    const kDbName = 'db';
+    const ns = kDbName + '.foo';
+    const mongos = st.s0;
+    const shard0 = st.shard0.shardName;
+    const shard1 = st.shard1.shardName;
 
     assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
     st.ensurePrimaryShard(kDbName, shard0);

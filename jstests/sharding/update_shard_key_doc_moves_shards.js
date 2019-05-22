@@ -9,12 +9,12 @@
 
     load("jstests/sharding/libs/update_shard_key_helpers.js");
 
-    var st = new ShardingTest({mongos: 1, shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
-    var kDbName = 'db';
-    var mongos = st.s0;
-    var shard0 = st.shard0.shardName;
-    var shard1 = st.shard1.shardName;
-    var ns = kDbName + '.foo';
+    const st = new ShardingTest({mongos: 1, shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
+    const kDbName = 'db';
+    const mongos = st.s0;
+    const shard0 = st.shard0.shardName;
+    const shard1 = st.shard1.shardName;
+    const ns = kDbName + '.foo';
 
     assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
     st.ensurePrimaryShard(kDbName, shard0);
@@ -119,12 +119,12 @@
     //
     //  Tests for op-style updates.
     //
-    changeShardKeyOptions.forEach(function(updateConfig) {
-        let runInTxn = updateConfig[0];
-        let isFindAndModify = updateConfig[1];
-        let upsert = updateConfig[2];
 
-        jsTestLog("Testing changing the shard key using " +
+    changeShardKeyOptions.forEach(function(updateConfig) {
+        let runInTxn, isFindAndModify, upsert;
+        [runInTxn, isFindAndModify, upsert] = [updateConfig[0], updateConfig[1], updateConfig[2]];
+
+        jsTestLog("Testing changing the shard key using op style update and " +
                   (isFindAndModify ? "findAndModify command " : "update command ") +
                   (runInTxn ? "in transaction " : "as retryable write"));
 
@@ -194,12 +194,9 @@
     // Tests for replacement style updates.
     //
 
-    mongos.getDB(kDbName).foo.drop();
-
     changeShardKeyOptions.forEach(function(updateConfig) {
-        let runInTxn = updateConfig[0];
-        let isFindAndModify = updateConfig[1];
-        let upsert = updateConfig[2];
+        let runInTxn, isFindAndModify, upsert;
+        [runInTxn, isFindAndModify, upsert] = [updateConfig[0], updateConfig[1], updateConfig[2]];
 
         jsTestLog("Testing changing the shard key using replacement style update and " +
                   (isFindAndModify ? "findAndModify command " : "update command ") +

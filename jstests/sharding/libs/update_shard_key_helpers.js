@@ -64,12 +64,22 @@ function assertUpdateSucceeds(st, session, sessionDB, inTxn, query, update, upse
     }
 }
 
-function runUpdateCmdSuccess(
-    st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, collectionSplitPoint) {
+function runUpdateCmdSuccess(st,
+                             kDbName,
+                             session,
+                             sessionDB,
+                             inTxn,
+                             queries,
+                             updates,
+                             upsert,
+                             collectionSplitPoint,
+                             pipelineUpdateResult) {
     for (let i = 0; i < queries.length; i++) {
         assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[i], updates[i], upsert);
 
         let updatedVal = updates[i]["$set"] ? updates[i]["$set"] : updates[i];
+        if (pipelineUpdateResult)
+            updatedVal = pipelineUpdateResult[i];
         assert.eq(0, st.s.getDB(kDbName).foo.find(queries[i]).itcount());
         assert.eq(1, st.s.getDB(kDbName).foo.find(updatedVal).itcount());
         if (bsonWoCompare(updatedVal, collectionSplitPoint) > 0) {
@@ -91,7 +101,8 @@ function runFindAndModifyCmdSuccess(st,
                                     updates,
                                     upsert,
                                     returnNew,
-                                    collectionSplitPoint) {
+                                    collectionSplitPoint,
+                                    pipelineUpdateResult) {
     let res;
     for (let i = 0; i < queries.length; i++) {
         let oldDoc;
@@ -110,6 +121,8 @@ function runFindAndModifyCmdSuccess(st,
         }
 
         let updatedVal = updates[i]["$set"] ? updates[i]["$set"] : updates[i];
+        if (pipelineUpdateResult)
+            updatedVal = pipelineUpdateResult[i];
         let newDoc = st.s.getDB(kDbName).foo.find(updatedVal).toArray();
         assert.eq(0, st.s.getDB(kDbName).foo.find(queries[i]).itcount());
         assert.eq(1, newDoc.length);
@@ -133,8 +146,16 @@ function runFindAndModifyCmdSuccess(st,
     }
 }
 
-function runUpdateCmdFail(
-    st, kDbName, session, sessionDB, inTxn, query, update, multiParamSet, errorCode) {
+function runUpdateCmdFail(st,
+                          kDbName,
+                          session,
+                          sessionDB,
+                          inTxn,
+                          query,
+                          update,
+                          multiParamSet,
+                          errorCode,
+                          pipelineUpdateResult) {
     let res;
     if (inTxn) {
         session.startTransaction();
@@ -153,13 +174,16 @@ function runUpdateCmdFail(
     }
 
     let updatedVal = update["$set"] ? update["$set"] : update;
+    if (pipelineUpdateResult)
+        updatedVal = pipelineUpdateResult;
     assert.eq(1, st.s.getDB(kDbName).foo.find(query).itcount());
-    if (!update["$unset"] && Object.keys(update).length != 0) {
+    if (!update["$unset"] && Object.keys(update).length != 0 && !pipelineUpdateResult) {
         assert.eq(0, st.s.getDB(kDbName).foo.find(updatedVal).itcount());
     }
 }
 
-function runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update, upsert) {
+function runFindAndModifyCmdFail(
+    st, kDbName, session, sessionDB, inTxn, query, update, upsert, pipelineUpdateResult) {
     if (inTxn) {
         session.startTransaction();
         assert.throws(function() {
@@ -172,14 +196,25 @@ function runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, 
         });
     }
     let updatedVal = update["$set"] ? update["$set"] : update;
+    if (pipelineUpdateResult)
+        updatedVal = pipelineUpdateResult;
     assert.eq(1, st.s.getDB(kDbName).foo.find(query).itcount());
-    if (!update["$unset"] && Object.keys(update).length != 0) {
+    if (!update["$unset"] && Object.keys(update).length != 0 && !pipelineUpdateResult) {
         assert.eq(0, st.s.getDB(kDbName).foo.find(updatedVal).itcount());
     }
 }
 
-function assertCanUpdatePrimitiveShardKey(
-    st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, queries, updates, upsert) {
+function assertCanUpdatePrimitiveShardKey(st,
+                                          kDbName,
+                                          ns,
+                                          session,
+                                          sessionDB,
+                                          inTxn,
+                                          isFindAndModify,
+                                          queries,
+                                          updates,
+                                          upsert,
+                                          pipelineUpdateResult) {
     let docsToInsert = upsert
         ? [{"x": 1}, {"x": 100}]
         : [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
@@ -191,24 +226,59 @@ function assertCanUpdatePrimitiveShardKey(
     if (isFindAndModify) {
         // Run once with {new: false} and once with {new: true} to make sure findAndModify
         // returns pre and post images correctly
-        runFindAndModifyCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, false, splitDoc);
+        runFindAndModifyCmdSuccess(st,
+                                   kDbName,
+                                   session,
+                                   sessionDB,
+                                   inTxn,
+                                   queries,
+                                   updates,
+                                   upsert,
+                                   false,
+                                   splitDoc,
+                                   pipelineUpdateResult);
         sessionDB.foo.drop();
 
         shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, splitDoc, {"x": 300});
         cleanupOrphanedDocs(st, ns);
-        runFindAndModifyCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true, splitDoc);
+        runFindAndModifyCmdSuccess(st,
+                                   kDbName,
+                                   session,
+                                   sessionDB,
+                                   inTxn,
+                                   queries,
+                                   updates,
+                                   upsert,
+                                   true,
+                                   splitDoc,
+                                   pipelineUpdateResult);
     } else {
-        runUpdateCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, splitDoc);
+        runUpdateCmdSuccess(st,
+                            kDbName,
+                            session,
+                            sessionDB,
+                            inTxn,
+                            queries,
+                            updates,
+                            upsert,
+                            splitDoc,
+                            pipelineUpdateResult);
     }
 
     sessionDB.foo.drop();
 }
 
-function assertCanUpdateDottedPath(
-    st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, queries, updates, upsert) {
+function assertCanUpdateDottedPath(st,
+                                   kDbName,
+                                   ns,
+                                   session,
+                                   sessionDB,
+                                   inTxn,
+                                   isFindAndModify,
+                                   queries,
+                                   updates,
+                                   upsert,
+                                   pipelineUpdateResult) {
     let docsToInsert = upsert ? [{"x": {"a": 1}}, {"x": {"a": 100}}] : [
         {"x": {"a": 4, "y": 1}, "a": 3},
         {"x": {"a": 100, "y": 1}},
@@ -222,26 +292,61 @@ function assertCanUpdateDottedPath(
     if (isFindAndModify) {
         // Run once with {new: false} and once with {new: true} to make sure findAndModify
         // returns pre and post images correctly
-        runFindAndModifyCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, false, splitDoc);
+        runFindAndModifyCmdSuccess(st,
+                                   kDbName,
+                                   session,
+                                   sessionDB,
+                                   inTxn,
+                                   queries,
+                                   updates,
+                                   upsert,
+                                   false,
+                                   splitDoc,
+                                   pipelineUpdateResult);
         sessionDB.foo.drop();
 
         shardCollectionMoveChunks(
             st, kDbName, ns, {"x.a": 1}, docsToInsert, splitDoc, {"x.a": 300});
         cleanupOrphanedDocs(st, ns);
 
-        runFindAndModifyCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true, splitDoc);
+        runFindAndModifyCmdSuccess(st,
+                                   kDbName,
+                                   session,
+                                   sessionDB,
+                                   inTxn,
+                                   queries,
+                                   updates,
+                                   upsert,
+                                   true,
+                                   splitDoc,
+                                   pipelineUpdateResult);
     } else {
-        runUpdateCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, splitDoc);
+        runUpdateCmdSuccess(st,
+                            kDbName,
+                            session,
+                            sessionDB,
+                            inTxn,
+                            queries,
+                            updates,
+                            upsert,
+                            splitDoc,
+                            pipelineUpdateResult);
     }
 
     sessionDB.foo.drop();
 }
 
-function assertCanUpdatePartialShardKey(
-    st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, queries, updates, upsert) {
+function assertCanUpdatePartialShardKey(st,
+                                        kDbName,
+                                        ns,
+                                        session,
+                                        sessionDB,
+                                        inTxn,
+                                        isFindAndModify,
+                                        queries,
+                                        updates,
+                                        upsert,
+                                        pipelineUpdateResult) {
     let docsToInsert = upsert
         ? [{"x": 1, "y": 1}, {"x": 100, "y": 50}]
         : [{"x": 4, "y": 3}, {"x": 100, "y": 50}, {"x": 300, "y": 80}, {"x": 500, "y": 600}];
@@ -253,8 +358,17 @@ function assertCanUpdatePartialShardKey(
     if (isFindAndModify) {
         // Run once with {new: false} and once with {new: true} to make sure findAndModify
         // returns pre and post images correctly
-        runFindAndModifyCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, false, splitDoc);
+        runFindAndModifyCmdSuccess(st,
+                                   kDbName,
+                                   session,
+                                   sessionDB,
+                                   inTxn,
+                                   queries,
+                                   updates,
+                                   upsert,
+                                   false,
+                                   splitDoc,
+                                   pipelineUpdateResult);
         sessionDB.foo.drop();
 
         shardCollectionMoveChunks(st,
@@ -266,18 +380,43 @@ function assertCanUpdatePartialShardKey(
                                   {"x": 300, "y": 80});
         cleanupOrphanedDocs(st, ns);
 
-        runFindAndModifyCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, true, splitDoc);
+        runFindAndModifyCmdSuccess(st,
+                                   kDbName,
+                                   session,
+                                   sessionDB,
+                                   inTxn,
+                                   queries,
+                                   updates,
+                                   upsert,
+                                   true,
+                                   splitDoc,
+                                   pipelineUpdateResult);
     } else {
-        runUpdateCmdSuccess(
-            st, kDbName, session, sessionDB, inTxn, queries, updates, upsert, splitDoc);
+        runUpdateCmdSuccess(st,
+                            kDbName,
+                            session,
+                            sessionDB,
+                            inTxn,
+                            queries,
+                            updates,
+                            upsert,
+                            splitDoc,
+                            pipelineUpdateResult);
     }
 
     sessionDB.foo.drop();
 }
 
-function assertCannotUpdate_id(
-    st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update) {
+function assertCannotUpdate_id(st,
+                               kDbName,
+                               ns,
+                               session,
+                               sessionDB,
+                               inTxn,
+                               isFindAndModify,
+                               query,
+                               update,
+                               pipelineUpdateResult) {
     let docsToInsert =
         [{"_id": 4, "a": 3}, {"_id": 100}, {"_id": 300, "a": 3}, {"_id": 500, "a": 6}];
     shardCollectionMoveChunks(
@@ -285,16 +424,34 @@ function assertCannotUpdate_id(
     cleanupOrphanedDocs(st, ns);
 
     if (isFindAndModify) {
-        runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
+        runFindAndModifyCmdFail(
+            st, kDbName, session, sessionDB, inTxn, query, update, false, pipelineUpdateResult);
     } else {
-        runUpdateCmdFail(st, kDbName, session, sessionDB, inTxn, query, update, false);
+        runUpdateCmdFail(st,
+                         kDbName,
+                         session,
+                         sessionDB,
+                         inTxn,
+                         query,
+                         update,
+                         false,
+                         null,
+                         pipelineUpdateResult);
     }
 
     sessionDB.foo.drop();
 }
 
-function assertCannotUpdate_idDottedPath(
-    st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update) {
+function assertCannotUpdate_idDottedPath(st,
+                                         kDbName,
+                                         ns,
+                                         session,
+                                         sessionDB,
+                                         inTxn,
+                                         isFindAndModify,
+                                         query,
+                                         update,
+                                         pipelineUpdateResult) {
     let docsToInsert = [
         {"_id": {"a": 4, "y": 1}, "a": 3},
         {"_id": {"a": 100, "y": 1}},
@@ -306,9 +463,19 @@ function assertCannotUpdate_idDottedPath(
     cleanupOrphanedDocs(st, ns);
 
     if (isFindAndModify) {
-        runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
+        runFindAndModifyCmdFail(
+            st, kDbName, session, sessionDB, inTxn, query, update, false, pipelineUpdateResult);
     } else {
-        runUpdateCmdFail(st, kDbName, session, sessionDB, inTxn, query, update, false);
+        runUpdateCmdFail(st,
+                         kDbName,
+                         session,
+                         sessionDB,
+                         inTxn,
+                         query,
+                         update,
+                         false,
+                         null,
+                         pipelineUpdateResult);
     }
 
     sessionDB.foo.drop();
@@ -332,12 +499,13 @@ function assertCannotDoReplacementUpdateWhereShardKeyMissingFields(
 }
 
 function assertCannotUpdateWithMultiTrue(
-    st, kDbName, ns, session, sessionDB, inTxn, query, update) {
+    st, kDbName, ns, session, sessionDB, inTxn, query, update, pipelineUpdateResult) {
     let docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
     cleanupOrphanedDocs(st, ns);
 
-    runUpdateCmdFail(st, kDbName, session, sessionDB, inTxn, query, update, true);
+    runUpdateCmdFail(
+        st, kDbName, session, sessionDB, inTxn, query, update, true, null, pipelineUpdateResult);
 
     sessionDB.foo.drop();
 }
@@ -368,6 +536,43 @@ function assertCannotUnsetSKField(
         runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, update);
     } else {
         runUpdateCmdFail(st, kDbName, session, sessionDB, inTxn, query, update, false);
+    }
+
+    sessionDB.foo.drop();
+}
+
+function assertCannotUnsetSKFieldUsingPipeline(st,
+                                               kDbName,
+                                               ns,
+                                               session,
+                                               sessionDB,
+                                               inTxn,
+                                               isFindAndModify,
+                                               query,
+                                               update,
+                                               pipelineUpdateResult) {
+    // Updates to the shard key cannot $project out a shard key field from a doc
+    let docsToInsert =
+        [{"x": 4, "y": 3}, {"x": 100, "y": 50}, {"x": 300, "y": 80}, {"x": 500, "y": 600}];
+    let splitDoc = {"x": 100, "y": 50};
+    shardCollectionMoveChunks(
+        st, kDbName, ns, {"x": 1, "y": 1}, docsToInsert, splitDoc, {"x": 300, "y": 80});
+    cleanupOrphanedDocs(st, ns);
+
+    if (isFindAndModify) {
+        runFindAndModifyCmdFail(
+            st, kDbName, session, sessionDB, inTxn, query, update, false, pipelineUpdateResult);
+    } else {
+        runUpdateCmdFail(st,
+                         kDbName,
+                         session,
+                         sessionDB,
+                         inTxn,
+                         query,
+                         update,
+                         false,
+                         null,
+                         pipelineUpdateResult);
     }
 
     sessionDB.foo.drop();
