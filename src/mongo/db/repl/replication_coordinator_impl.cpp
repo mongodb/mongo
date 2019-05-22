@@ -47,6 +47,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
@@ -97,6 +98,7 @@ namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions);
 MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
+MONGO_FAIL_POINT_DEFINE(stepdownHangBeforeRSTLEnqueue);
 
 // Tracks the number of operations killed on step down.
 Counter64 userOpsKilled;
@@ -1965,6 +1967,9 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // other path before we acquire the global exclusive lock.  This check is just to try to save us
     // from acquiring the global X lock unnecessarily.
     uassert(ErrorCodes::NotMaster, "not primary so can't step down", getMemberState().primary());
+
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &stepdownHangBeforeRSTLEnqueue, opCtx, "stepdownHangBeforeRSTLEnqueue");
 
     // Using 'force' sets the default for the wait time to zero, which means the stepdown will
     // fail if it does not acquire the lock immediately. In such a scenario, we use the
