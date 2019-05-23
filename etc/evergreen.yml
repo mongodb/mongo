@@ -4294,6 +4294,51 @@ tasks:
         content_type: application/tar
         display_name: "MongoDB Embedded C Driver Transport Tar Archive"
 
+- name: embedded_sdk_multiarch_apple_release
+  depends_on:
+    - name: embedded_sdk_multiarch_apple_package
+      variant: embedded-sdk-apple-multiarch
+
+  commands:
+    - command: manifest.load
+    - func: "git get project"
+    - func: "get buildnumber"
+    - func: "set up credentials"
+    - func: "generate compile expansions"
+    - func: "apply compile expansions"
+
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}.tgz"
+        remote_file: "${project}/embedded-sdk/embedded-sdk-apple-multiarch/${revision}/mongo-embedded-sdk-${version}.tgz"
+        bucket: mciuploads
+
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}-mongo-c-driver.tgz"
+        remote_file: "${project}/embedded-sdk/mongo-c-driver-apple-multiarch/${revision}/mongo-embedded-sdk-${version}.tgz"
+        bucket: mciuploads
+
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}-mongo-embedded.tgz"
+        remote_file: "${project}/embedded-sdk/mongo-embedded-apple-multiarch/${revision}/mongo-embedded-sdk-${version}.tgz"
+        bucket: mciuploads
+
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}-mongoc-embedded.tgz"
+        remote_file: "${project}/embedded-sdk/mongoc-embedded-apple-multiarch/${revision}/mongo-embedded-sdk-${version}.tgz"
+        bucket: mciuploads
+
     # If this is a patch build, blow away the file so our subsequent and optional s3.put
     # doesn't run. That way, we won't overwrite the latest part in our patches.
     - command: shell.exec
@@ -9219,7 +9264,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: macos
     push_arch: x86_64
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 4
     tooltags: "ssl"
@@ -9266,7 +9311,7 @@ buildvariants:
   - macos-1014
   expansions:
     resmoke_jobs_max: 4
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     tooltags: ""
     build_mongoreplay: true
@@ -9303,7 +9348,7 @@ buildvariants:
     push_name: macos
     push_arch: x86_64-enterprise
     mh_target: dist-mh
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 4
     tooltags: "ssl sasl gssapi"
@@ -9341,7 +9386,7 @@ buildvariants:
     push_name: osx
     push_arch: x86_64-enterprise
     tooltags: "ssl sasl gssapi"
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --release --libc++ LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include" --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 4
     build_mongoreplay: true
@@ -9375,7 +9420,7 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: >-
       --lto
       --variables-files=etc/scons/xcode_macosx.vars
@@ -9405,7 +9450,7 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: >-
       --lto
       --variables-files=etc/scons/xcode_ios.vars
@@ -9437,7 +9482,7 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: >-
       --lto
       --variables-files=etc/scons/xcode_ios_sim.vars
@@ -9472,7 +9517,7 @@ buildvariants:
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     test_flags: --excludeWithAnyTags=uses_transactions
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: >-
       --lto
       --variables-files=etc/scons/xcode_tvos.vars
@@ -9504,7 +9549,7 @@ buildvariants:
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     test_flags: --excludeWithAnyTags=uses_transactions
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: >-
       --lto
       --variables-files=etc/scons/xcode_tvos_sim.vars
@@ -9539,7 +9584,7 @@ buildvariants:
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions,requires_http_client
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: >-
       --lto
       --variables-files=etc/scons/xcode_watchos.vars
@@ -9571,7 +9616,7 @@ buildvariants:
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions,requires_http_client
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: >-
       --lto
       --variables-files=etc/scons/xcode_watchos_sim.vars
@@ -9601,15 +9646,18 @@ buildvariants:
 - name: embedded-sdk-apple-multiarch
   display_name: "Embedded SDK - Apple Multiarch"
   run_on:
-  - macos-release
+  - macos-1014
   batchtime: 1440 # 1 day
   expansions:
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     push_path: mobile
     push_name: apple
     push_bucket: downloads.mongodb.org
   tasks:
   - name: embedded_sdk_multiarch_apple_package
+  - name: embedded_sdk_multiarch_apple_release
+    run_on:
+      - macos-release
 
 - name: embedded-sdk-ubuntu-1604-x86_64
   display_name: "Embedded SDK - Ubuntu 16.04 x86_64"
@@ -11495,7 +11543,7 @@ buildvariants:
       --storageEngine=mobile
       --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling,requires_compact,requires_document_locking,requires_snapshot_read,requires_db_locking
       --excludeWithAnyTags=SERVER-32869,SERVER-40561
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --libc++
