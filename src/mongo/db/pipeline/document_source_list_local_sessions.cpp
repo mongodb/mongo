@@ -160,12 +160,12 @@ mongo::ListSessionsSpec mongo::listSessionsParseSpec(StringData stageName,
     uassert(
         31106,
         str::stream() << "The " << DocumentSourceListLocalSessions::kStageName
-                      << "stage is not allowed in this context :: missing an AuthorizationManager",
+                      << " stage is not allowed in this context :: missing an AuthorizationManager",
         AuthorizationManager::get(Client::getCurrent()->getServiceContext()));
     uassert(
         31111,
         str::stream() << "The " << DocumentSourceListLocalSessions::kStageName
-                      << "stage is not allowed in this context :: missing a LogicalSessionCache",
+                      << " stage is not allowed in this context :: missing a LogicalSessionCache",
         LogicalSessionCache::get(Client::getCurrent()->getOperationContext()));
 
     if (!ret.getAllUsers() && (!ret.getUsers() || ret.getUsers()->empty())) {

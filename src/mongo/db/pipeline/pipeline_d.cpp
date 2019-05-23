@@ -473,7 +473,7 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
     BSONObj sortObj;
     if (sortStage) {
         sortObj = sortStage
-                      ->sortKeyPattern(
+                      ->serializeSortKeyPattern(
                           DocumentSourceSort::SortKeySerialization::kForPipelineSerialization)
                       .toBson();
     }

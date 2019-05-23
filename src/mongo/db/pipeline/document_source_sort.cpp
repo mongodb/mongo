@@ -145,12 +145,13 @@ DocumentSource::GetNextResult DocumentSourceSort::getNext() {
 void DocumentSourceSort::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {  // always one Value for combined $sort + $limit
-        array.push_back(
-            Value(DOC(kStageName << DOC(
-                          "sortKey" << sortKeyPattern(SortKeySerialization::kForExplain) << "limit"
-                                    << (_limitSrc ? Value(_limitSrc->getLimit()) : Value())))));
+        array.push_back(Value(DOC(
+            kStageName << DOC(
+                "sortKey" << serializeSortKeyPattern(SortKeySerialization::kForExplain) << "limit"
+                          << (_limitSrc ? Value(_limitSrc->getLimit()) : Value())))));
     } else {  // one Value for $sort and maybe a Value for $limit
-        MutableDocument inner(sortKeyPattern(SortKeySerialization::kForPipelineSerialization));
+        MutableDocument inner(
+            serializeSortKeyPattern(SortKeySerialization::kForPipelineSerialization));
         array.push_back(Value(DOC(kStageName << inner.freeze())));
 
         if (_limitSrc) {
@@ -167,7 +168,7 @@ long long DocumentSourceSort::getLimit() const {
     return _limitSrc ? _limitSrc->getLimit() : -1;
 }
 
-Document DocumentSourceSort::sortKeyPattern(SortKeySerialization serializationMode) const {
+Document DocumentSourceSort::serializeSortKeyPattern(SortKeySerialization serializationMode) const {
     MutableDocument keyObj;
     const size_t n = _sortPattern.size();
     for (size_t i = 0; i < n; ++i) {
@@ -313,7 +314,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     pSort->_sortKeyGen = SortKeyGenerator{
         // The SortKeyGenerator expects the expressions to be serialized in order to detect a sort
         // by a metadata field.
-        pSort->sortKeyPattern(SortKeySerialization::kForPipelineSerialization).toBson(),
+        pSort->serializeSortKeyPattern(SortKeySerialization::kForPipelineSerialization).toBson(),
         pExpCtx->getCollator()};
 
     if (limit > 0) {
@@ -533,7 +534,8 @@ int DocumentSourceSort::compare(const Value& lhs, const Value& rhs) const {
 boost::optional<DocumentSource::MergingLogic> DocumentSourceSort::mergingLogic() {
     MergingLogic split;
     split.shardsStage = this;
-    split.inputSortPattern = sortKeyPattern(SortKeySerialization::kForSortKeyMerging).toBson();
+    split.inputSortPattern =
+        serializeSortKeyPattern(SortKeySerialization::kForSortKeyMerging).toBson();
     if (_limitSrc) {
         split.mergingStage = DocumentSourceLimit::create(pExpCtx, _limitSrc->getLimit());
     }
