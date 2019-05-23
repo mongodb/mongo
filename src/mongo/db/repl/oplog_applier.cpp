@@ -275,6 +275,13 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
             }
         }
 
+        // If we have a forced batch boundary, apply it.
+        if (totalOps > 0 && !batchLimits.forceBatchBoundaryAfter.isNull() &&
+            entry.getOpTime().getTimestamp() > batchLimits.forceBatchBoundaryAfter &&
+            ops.back().getOpTime().getTimestamp() <= batchLimits.forceBatchBoundaryAfter) {
+            return std::move(ops);
+        }
+
         // Add op to buffer.
         totalOps += opCount;
         totalBytes += opBytes;
