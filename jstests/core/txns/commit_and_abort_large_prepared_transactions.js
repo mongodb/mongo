@@ -13,16 +13,6 @@
     const testDB = db.getSiblingDB(dbName);
     const testColl = testDB.getCollection(collName);
 
-    const paramResult =
-        testDB.adminCommand({"getParameter": 1, useMultipleOplogEntryFormatForTransactions: 1});
-    if (!paramResult["useMultipleOplogEntryFormatForTransactions"]) {
-        // TODO: SERVER-39810 Remove this early return once the new oplog format for large
-        // transactions is made the default.
-        jsTestLog(
-            "Skipping the test because useMultipleOplogEntryFormatForTransactions is not set to true.");
-        return;
-    }
-
     // As we are not able to send a single request larger than 16MB, we insert two documents
     // of 10MB each to create a "large" transaction.
     const kSize10MB = 10 * 1024 * 1024;

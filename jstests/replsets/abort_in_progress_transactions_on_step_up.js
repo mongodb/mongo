@@ -41,17 +41,6 @@
     const newPrimary = replTest.nodes[1];
     const newTestDB = newPrimary.getDB(dbName);
 
-    const paramResult =
-        testDB.adminCommand({"getParameter": 1, useMultipleOplogEntryFormatForTransactions: 1});
-    if (!paramResult["useMultipleOplogEntryFormatForTransactions"]) {
-        // TODO: SERVER-39810 Remove this early return once the new oplog format for large
-        // transactions is made the default.
-        jsTestLog(
-            "Skipping the test because useMultipleOplogEntryFormatForTransactions is not set to true.");
-        replTest.stopSet();
-        return;
-    }
-
     testDB.dropDatabase();
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 

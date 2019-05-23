@@ -2,6 +2,8 @@
  * Tests that downgrading from FCV4.2 to FCV4.0 while a large partial transaction is in progress
  * will fail on commit. This tests the case where a race condition may lead to the running
  * transaction committing before it could be aborted due to downgrade.
+ *
+ * @tags: [uses_transactions]
  */
 
 (function() {
@@ -10,16 +12,6 @@
     const dbName = "test";
     const collName = "downgrade_fcv_while_large_partial_txn_in_progress";
     const testDB = db.getSiblingDB(dbName);
-
-    const paramResult =
-        testDB.adminCommand({"getParameter": 1, useMultipleOplogEntryFormatForTransactions: 1});
-    if (!paramResult["useMultipleOplogEntryFormatForTransactions"]) {
-        // TODO: SERVER-39810 Remove this early return once the new oplog format for large
-        // transactions is made the default.
-        jsTestLog(
-            "Skipping the test because useMultipleOplogEntryFormatForTransactions is not set to true.");
-        return;
-    }
 
     assert.commandWorked(db.adminCommand({
         configureFailPoint: "hangBeforeAbortingRunningTransactionsOnFCVDowngrade",

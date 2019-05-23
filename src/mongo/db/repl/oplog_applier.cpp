@@ -167,8 +167,6 @@ bool isUnpreparedCommit(const OplogEntry& entry) {
  * of transaction.
  */
 bool isUnpreparedApplyOps(const OplogEntry& entry) {
-    // TODO (SERVER-39810): Remove the check of the prepare flag in the root oplog level once the
-    // multiple oplog format becomes the default.
     return entry.getCommandType() == OplogEntry::CommandType::kApplyOps && !entry.shouldPrepare();
 }
 

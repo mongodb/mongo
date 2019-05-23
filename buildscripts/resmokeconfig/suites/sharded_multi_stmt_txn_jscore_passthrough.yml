@@ -118,15 +118,6 @@ selector:
   # SERVER-38096 Mongos opCounter doesn't increase when last op causes the transaction to implicitly abort
   - jstests/core/opcounters_write_cmd.js
 
-  # Consecutive writes totalling more than the size upper threshold will cause the txn to
-  # abort with a TransactionTooLarge error.
-  - jstests/core/batch_size.js
-  - jstests/core/single_batch.js
-  # For insert1.js, only Windows DEBUG builds are affected. We compute the in-memory size
-  # of the transaction, which uses the size of the oplog entry and is 8 bytes larger on
-  # Windows debug builds than other builds.
-  - jstests/core/insert1.js
-
   ##
   ## Some aggregation stages don't support snapshot readconcern.
   ##
