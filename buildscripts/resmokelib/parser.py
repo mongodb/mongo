@@ -252,6 +252,10 @@ def _make_parser():  # pylint: disable=too-many-statements
                       choices=("on",
                                "off"), metavar="ON|OFF", help=("Enable or disable flow control."))
 
+    parser.add_option("--flowControlTicketOverride", type="int", action="store",
+                      dest="flow_control_tickets", metavar="TICKET_OVERRIDE",
+                      help=("Number of tickets available for flow control."))
+
     parser.add_option("--storageEngine", dest="storage_engine", metavar="ENGINE",
                       help="The storage engine used by dbtests and jstests.")
 
@@ -570,6 +574,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
         utils.default_if_none(_tags_from_list(config.pop("exclude_with_any_tags")), []))
     _config.FAIL_FAST = not config.pop("continue_on_failure")
     _config.FLOW_CONTROL = config.pop("flow_control")
+    _config.FLOW_CONTROL_TICKETS = config.pop("flow_control_tickets")
     _config.INCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("include_with_any_tags"))
     _config.GENNY_EXECUTABLE = _expand_user(config.pop("genny_executable"))
     _config.JOBS = config.pop("jobs")

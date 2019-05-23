@@ -122,6 +122,12 @@ def mongod_program(  # pylint: disable=too-many-branches
     if "enableFlowControl" not in suite_set_parameters and config.FLOW_CONTROL is not None:
         suite_set_parameters["enableFlowControl"] = (config.FLOW_CONTROL == "on")
 
+    if ("failpoint.flowControlTicketOverride" not in suite_set_parameters
+            and config.FLOW_CONTROL_TICKETS is not None):
+        suite_set_parameters["failpoint.flowControlTicketOverride"] = {
+            "mode": "alwaysOn", "data": {"numTickets": config.FLOW_CONTROL_TICKETS}
+        }
+
     _apply_set_parameters(args, suite_set_parameters)
 
     shortcut_opts = {

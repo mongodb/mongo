@@ -5267,6 +5267,72 @@ tasks:
       resmoke_args: --suites=jstestfuzz_interrupt_replication --storageEngine=wiredTiger
       name: jstestfuzz_interrupt_replication
 
+# jstestfuzz interrupt with flow control engaged #
+- <<: *jstestfuzz_template
+  name: jstestfuzz_interrupt_replication_flow_control_gen
+  tags: ["jstestfuzz", "interrupt", "flow_control"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      jstestfuzz_vars: --jsTestsDir ../jstests
+      resmoke_args: --suites=jstestfuzz_interrupt_replication --flowControlTicketOverride=1 --storageEngine=wiredTiger
+      name: jstestfuzz_interrupt_replication_flow_control
+
+## jstestfuzz sharded cluster continuous stepdown with flow control engaged ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_sharded_continuous_stepdown_flow_control_gen
+  tags: ["jstestfuzz", "flow_control"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 5
+      num_tasks: 10
+      jstestfuzz_vars: --jsTestsDir ../jstests
+      resmoke_args: --suites=jstestfuzz_sharded_continuous_stepdown --flowControlTicketOverride=3 --storageEngine=wiredTiger
+      name: jstestfuzz_sharded_continuous_stepdown_flow_control
+
+## jstestfuzz concurrent sharded cluster continuous stepdown with flow control engaged ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_sharded_continuous_stepdown_flow_control_gen
+  tags: ["jstestfuzz", "flow_control"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: ${jstestfuzz_concurrent_num_files|10}
+      num_tasks: 2
+      jstestfuzz_vars: --jsTestsDir ../jstests
+      resmoke_args: --suites=jstestfuzz_sharded_continuous_stepdown --flowControlTicketOverride=30 --storageEngine=wiredTiger --numClientsPerFixture=10
+      name: jstestfuzz_concurrent_sharded_continuous_stepdown_flow_control
+
+# jstestfuzz replication continuous stepdown with flow control engaged #
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_continuous_stepdown_flow_control_gen
+  tags: ["jstestfuzz", "repl", "flow_control"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      jstestfuzz_vars: --jsTestsDir ../jstests
+      resmoke_args: --suites=jstestfuzz_replication_continuous_stepdown --flowControlTicketOverride=1 --storageEngine=wiredTiger
+      name: jstestfuzz_replication_continuous_stepdown_flow_control
+
+## jstestfuzz concurrent replication continuous stepdown with flow control engaged ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control_gen
+  tags: ["jstestfuzz", "common", "repl", "flow_control"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: ${jstestfuzz_concurrent_num_files|10}
+      num_tasks: 15
+      jstestfuzz_vars: --jsTestsDir ../jstests
+      resmoke_args: --suites=jstestfuzz_replication_continuous_stepdown --flowControlTicketOverride=10 --storageEngine=wiredTiger --numClientsPerFixture=10
+      name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control
+
 ## jstestfuzz replica set ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_gen
@@ -10160,7 +10226,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsonSchema
-  - name: .jstestfuzz
+  - name: .jstestfuzz !.flow_control
   - name: .logical_session_cache .repl
   - name: multiversion
   - name: .read_write_concern .large
@@ -10239,7 +10305,7 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_txns_multi_oplog_entries
   - name: jsonSchema
-  - name: .jstestfuzz
+  - name: .jstestfuzz !.flow_control
   - name: .logical_session_cache
   - name: .multi_shard  .common
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
