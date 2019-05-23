@@ -4007,6 +4007,8 @@ tasks:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
     - command: s3.get
