@@ -67,8 +67,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
         const allowedErrorCodes = [
             ErrorCodes.CommandFailed,  // indexes of target collection changed during processing.
-            17017,  // $out with mode replaceCollection is not supported to an existing *sharded*
-                    // output collection.
+            17017,  // $out is not supported to an existing *sharded* output collection.
             17152,  // namespace is capped so it can't be used for $out.
             28769,  // $out collection cannot be sharded.
         ];

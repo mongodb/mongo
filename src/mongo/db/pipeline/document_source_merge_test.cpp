@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
+#include "mongo/db/pipeline/process_interface_standalone.h"
 
 namespace mongo {
 namespace {
@@ -391,53 +392,6 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfOnFieldIsNotStringOrArrayOfStrings
                                  << "on"
                                  << BSON("_id" << 1)));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51186);
-}
-
-TEST_F(DocumentSourceMergeTest, FailsToParseIfOnFieldHasDuplicateFields) {
-    auto spec = BSON("$merge" << BSON("into"
-                                      << "target_collection"
-                                      << "on"
-                                      << BSON_ARRAY("_id"
-                                                    << "_id")));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::BadValue);
-
-    spec = BSON("$merge" << BSON("into"
-                                 << "test"
-                                 << "on"
-                                 << BSON_ARRAY("x"
-                                               << "y"
-                                               << "x")));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::BadValue);
-}
-
-TEST_F(DocumentSourceMergeTest, FailsToParseIfTargetCollectionVersionIsSpecifiedOnMongos) {
-    auto spec = BSON("$merge" << BSON("into"
-                                      << "target_collection"
-                                      << "on"
-                                      << "_id"
-                                      << "targetCollectionVersion"
-                                      << ChunkVersion(0, 0, OID::gen()).toBSON()));
-    getExpCtx()->inMongos = true;
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51179);
-
-    // Test that 'targetCollectionVersion' is accepted if _from_ mongos.
-    getExpCtx()->inMongos = false;
-    getExpCtx()->fromMongos = true;
-    ASSERT(createMergeStage(spec) != nullptr);
-
-    // Test that 'targetCollectionVersion' is not accepted if on mongod but not from mongos.
-    getExpCtx()->inMongos = false;
-    getExpCtx()->fromMongos = false;
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51123);
-}
-
-TEST_F(DocumentSourceMergeTest, FailsToParseIfOnFieldIsNotSentFromMongos) {
-    auto spec = BSON("$merge" << BSON("into"
-                                      << "target_collection"
-                                      << "targetCollectionVersion"
-                                      << ChunkVersion(0, 0, OID::gen()).toBSON()));
-    getExpCtx()->fromMongos = true;
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51124);
 }
 
 TEST_F(DocumentSourceMergeTest, CorrectlyUsesTargetDbThatMatchesAggregationDb) {

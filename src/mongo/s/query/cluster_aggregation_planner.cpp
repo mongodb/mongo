@@ -290,7 +290,7 @@ ClusterClientCursorGuard convertPipelineToRouterStages(
 bool stageCanRunInParallel(const boost::intrusive_ptr<DocumentSource>& stage,
                            const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) {
     if (stage->distributedPlanLogic()) {
-        return stage->canRunInParallelBeforeOut(nameOfShardKeyFieldsUponEntryToStage);
+        return stage->canRunInParallelBeforeWriteStage(nameOfShardKeyFieldsUponEntryToStage);
     } else {
         // This stage is fine to execute in parallel on each stream. For example, a $match can be
         // applied to each stream in parallel.

@@ -461,10 +461,11 @@ public:
 
     /**
      * Returns true if it would be correct to execute this stage in parallel across the shards in
-     * cases where the final stage is an $out. For example, a $group stage which is just merging the
-     * groups from the shards can be run in parallel since it will preserve the shard key.
+     * cases where the final stage is a stage which can perform a write operation, such as $merge.
+     * For example, a $group stage which is just merging the groups from the shards can be run in
+     * parallel since it will preserve the shard key.
      */
-    virtual bool canRunInParallelBeforeOut(
+    virtual bool canRunInParallelBeforeWriteStage(
         const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
         return false;
     }

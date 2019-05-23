@@ -542,11 +542,11 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distri
     return split;
 }
 
-bool DocumentSourceSort::canRunInParallelBeforeOut(
+bool DocumentSourceSort::canRunInParallelBeforeWriteStage(
     const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
     // This is an interesting special case. If there are no further stages which require merging the
     // streams into one, a $sort should not require it. This is only the case because the sort order
-    // doesn't matter for a pipeline ending with a $out stage. We may encounter it here as an
+    // doesn't matter for a pipeline ending with a write stage. We may encounter it here as an
     // intermediate stage before a final $group with a $sort, which would make sense. Should we
     // extend our analysis to detect if an exchange is appropriate in a general pipeline, a $sort
     // would generally require merging the streams before producing output.

@@ -186,7 +186,6 @@
         }]);
         assertFailsWithCode(() => coll.aggregate(nestedPipeline));
 
-        testDB.dropDatabase();  // Clear any of the collections which would be created by the
-                                // successful "replaceCollection" mode of this test.
+        testDB.dropDatabase();
     });
 }());

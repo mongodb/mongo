@@ -80,8 +80,9 @@ public:
      *   3. boost::optional<BSONObj> - for pipeline-style updated, specifies variables that can be
      *      referred to in the pipeline performing the custom update.
      */
-    using BatchedObjects =
-        std::vector<std::tuple<BSONObj, write_ops::UpdateModification, boost::optional<BSONObj>>>;
+    using BatchObject =
+        std::tuple<BSONObj, write_ops::UpdateModification, boost::optional<BSONObj>>;
+    using BatchedObjects = std::vector<BatchObject>;
 
     enum class CurrentOpConnectionsMode { kIncludeIdle, kExcludeIdle };
     enum class CurrentOpUserMode { kIncludeAll, kExcludeOthers };
@@ -346,15 +347,16 @@ public:
 
     /**
      * Returns true if there is an index on 'nss' with properties that will guarantee that a
-     * document with non-array values for each of 'uniqueKeyPaths' will have at most one matching
+     * document with non-array values for each of 'fieldPaths' will have at most one matching
      * document in 'nss'.
      *
      * Specifically, such an index must include all the fields, be unique, not be a partial index,
      * and match the operation's collation as given by 'expCtx'.
      */
-    virtual bool uniqueKeyIsSupportedByIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                             const NamespaceString& nss,
-                                             const std::set<FieldPath>& uniqueKeyPaths) const = 0;
+    virtual bool fieldsHaveSupportingUniqueIndex(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        const std::set<FieldPath>& fieldPaths) const = 0;
 
     /**
      * Refreshes the CatalogCache entry for the namespace 'nss', and returns the epoch associated
@@ -376,6 +378,21 @@ public:
                                               ChunkVersion targetCollectionVersion) const = 0;
 
     virtual std::unique_ptr<ResourceYielder> getResourceYielder() const = 0;
+
+    /**
+     * If the user supplied the 'fields' array, ensures that it can be used to uniquely identify a
+     * document. Otherwise, picks a default unique key, which can be either the "_id" field, or
+     * or a shard key, depending on the 'outputNs' collection type and the server type (mongod or
+     * mongos). Also returns an optional ChunkVersion, populated with the version stored in the
+     * sharding catalog when we asked for the shard key (on mongos only). On mongod, this is the
+     * value of the 'targetCollectionVersion' parameter, which is the target shard version of the
+     * collection, as sent by mongos.
+     */
+    virtual std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
+    ensureFieldsUniqueOrResolveDocumentKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           boost::optional<std::vector<std::string>> fields,
+                                           boost::optional<ChunkVersion> targetCollectionVersion,
+                                           const NamespaceString& outputNs) const = 0;
 };
 
 }  // namespace mongo

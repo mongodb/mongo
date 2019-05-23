@@ -24,8 +24,7 @@
     let explain = sourceColl.explain("queryPlanner").aggregate([{$out: targetColl.getName()}]);
     let outExplain = getAggPlanStage(explain, "$out");
     assert.neq(outExplain, null, explain);
-    // TODO SERVER-40432 $out serialization should never use the 'mode: "replaceCollection"'.
-    assert.eq(outExplain.$out.to, targetColl.getName(), explain);
+    assert.eq(outExplain.$out, targetColl.getName(), explain);
     assert.eq(targetColl.find().itcount(), 0, explain);
 
     // Test each $merge mode with 'queryPlanner' explain verbosity.

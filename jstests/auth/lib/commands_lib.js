@@ -1111,7 +1111,7 @@ var authCommandsLib = {
           command: function(state, args) {
               return {
                   aggregate: "foo",
-                  pipeline: [{$out: {db: args.targetDB, to: "foo_out", mode: "replaceCollection"}}],
+                  pipeline: [{$out: "foo_out"}],
                   cursor: {},
                   bypassDocumentValidation: args.bypassDocumentValidation,
               };
@@ -1119,7 +1119,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: firstDbName,
-                commandArgs: {targetDB: firstDbName, bypassDocumentValidation: false},
+                commandArgs: {bypassDocumentValidation: false},
                 roles: {readWrite: 1, readWriteAnyDatabase: 1, dbOwner: 1, root: 1, __system: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
@@ -1129,7 +1129,7 @@ var authCommandsLib = {
               },
               {
                 runOnDb: secondDbName,
-                commandArgs: {targetDB: secondDbName, bypassDocumentValidation: false},
+                commandArgs: {bypassDocumentValidation: false},
                 roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
                 privileges: [
                     {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
@@ -1139,7 +1139,7 @@ var authCommandsLib = {
               },
               {
                 runOnDb: firstDbName,
-                commandArgs: {targetDB: firstDbName, bypassDocumentValidation: true},
+                commandArgs: {bypassDocumentValidation: true},
                 // Note that the built-in role must have 'bypassDocumentValidation' for this test.
                 roles: {dbOwner: 1, root: 1, __system: 1},
                 privileges: [
@@ -1150,7 +1150,7 @@ var authCommandsLib = {
                     },
                 ]
               },
-              // TODO SERVER-36832: Test with mode "replaceCollection" to a foreign database.
+              // TODO SERVER-36832: Test with a foreign database.
           ]
         },
         {

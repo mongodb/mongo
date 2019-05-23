@@ -127,9 +127,9 @@ public:
                                                         const NamespaceString&,
                                                         const MatchExpression*) const final;
 
-    bool uniqueKeyIsSupportedByIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     const NamespaceString& nss,
-                                     const std::set<FieldPath>& uniqueKeyPaths) const final;
+    bool fieldsHaveSupportingUniqueIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         const NamespaceString& nss,
+                                         const std::set<FieldPath>& fieldPaths) const;
 
     virtual void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               const NamespaceString& nss,
@@ -138,6 +138,12 @@ public:
     }
 
     std::unique_ptr<ResourceYielder> getResourceYielder() const override;
+
+    std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
+    ensureFieldsUniqueOrResolveDocumentKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           boost::optional<std::vector<std::string>> fields,
+                                           boost::optional<ChunkVersion> targetCollectionVersion,
+                                           const NamespaceString& outputNs) const override;
 
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,

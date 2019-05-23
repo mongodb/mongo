@@ -265,10 +265,10 @@ bool MongoSInterface::isSharded(OperationContext* opCtx, const NamespaceString& 
     return routingInfo.isOK() && routingInfo.getValue().cm();
 }
 
-bool MongoSInterface::uniqueKeyIsSupportedByIndex(
+bool MongoSInterface::fieldsHaveSupportingUniqueIndex(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
-    const std::set<FieldPath>& uniqueKeyPaths) const {
+    const std::set<FieldPath>& fieldPaths) const {
     const auto opCtx = expCtx->opCtx;
     const auto routingInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
@@ -281,17 +281,59 @@ bool MongoSInterface::uniqueKeyIsSupportedByIndex(
         BSON("listIndexes" << nss.coll()),
         opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1));
 
-    // If the namespace does not exist, then the unique key *must* be _id only.
+    // If the namespace does not exist, then the field paths *must* be _id only.
     if (response.getStatus() == ErrorCodes::NamespaceNotFound) {
-        return uniqueKeyPaths == std::set<FieldPath>{"_id"};
+        return fieldPaths == std::set<FieldPath>{"_id"};
     }
     uassertStatusOK(response);
 
     const auto& indexes = response.getValue().docs;
-    return std::any_of(
-        indexes.begin(), indexes.end(), [&expCtx, &uniqueKeyPaths](const auto& index) {
-            return supportsUniqueKey(expCtx, index, uniqueKeyPaths);
-        });
+    return std::any_of(indexes.begin(), indexes.end(), [&expCtx, &fieldPaths](const auto& index) {
+        return supportsUniqueKey(expCtx, index, fieldPaths);
+    });
+}
+
+std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
+MongoSInterface::ensureFieldsUniqueOrResolveDocumentKey(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    boost::optional<std::vector<std::string>> fields,
+    boost::optional<ChunkVersion> targetCollectionVersion,
+    const NamespaceString& outputNs) const {
+    invariant(expCtx->inMongos);
+    uassert(
+        51179, "Received unexpected 'targetCollectionVersion' on mongos", !targetCollectionVersion);
+
+    if (fields) {
+        // Convert 'fields' array to a set of FieldPaths.
+        auto fieldPaths = _convertToFieldPaths(*fields);
+        uassert(51190,
+                "Cannot find index to verify that join fields will be unique",
+                fieldsHaveSupportingUniqueIndex(expCtx, outputNs, fieldPaths));
+
+        // If the user supplies the 'fields' array, we don't need to attach a ChunkVersion for the
+        // shards since we are not at risk of 'guessing' the wrong shard key.
+        return {fieldPaths, boost::none};
+    }
+
+    // In case there are multiple shards which will perform this stage in parallel, we need to
+    // figure out and attach the collection's shard version to ensure each shard is talking about
+    // the same version of the collection. This mongos will coordinate that. We force a catalog
+    // refresh to do so because there is no shard versioning protocol on this namespace and so we
+    // otherwise could not be sure this node is (or will become) at all recent. We will also
+    // figure out and attach the 'joinFields' to send to the shards.
+
+    // There are edge cases when the collection could be dropped or re-created during or near the
+    // time of the operation (for example, during aggregation). This is okay - we are mostly
+    // paranoid that this mongos is very stale and want to prevent returning an error if the
+    // collection was dropped a long time ago. Because of this, we are okay with piggy-backing off
+    // another thread's request to refresh the cache, simply waiting for that request to return
+    // instead of forcing another refresh.
+    targetCollectionVersion = refreshAndGetCollectionVersion(expCtx, outputNs);
+
+    auto docKeyPaths = collectDocumentKeyFieldsActingAsRouter(expCtx->opCtx, outputNs);
+    return {std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
+                                std::make_move_iterator(docKeyPaths.end())),
+            targetCollectionVersion};
 }
 
 }  // namespace mongo

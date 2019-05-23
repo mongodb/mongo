@@ -1,4 +1,4 @@
-// Tests the $out in the 'replaceCollection' mode and read concern majority.
+// Tests the $out and read concern majority.
 (function() {
     "use strict";
 
@@ -42,16 +42,9 @@
         const testDB = db.getSiblingDB("${name}");
         const sourceColl = testDB.sourceColl;
 
-        // Run $out in the replaceCollecion mode and make sure the {state:1} index is carried over.
-        let res = sourceColl.aggregate(
-        [
-            {$out: {
-                to: sourceColl.getName(),
-                db: sourceColl.getDB().getName(),
-                mode: "replaceCollection"}
-            }
-        ],
-        {readConcern: {level: 'majority'}});
+        // Run $out and make sure the {state:1} index is carried over.
+        const res = sourceColl.aggregate([{$out: sourceColl.getName()}],
+                                         {readConcern: {level: 'majority'}});
 
         assert.eq(res.itcount(), 0);
 

@@ -701,7 +701,7 @@ bool DocumentSourceGroup::pathIncludedInGroupKeys(const std::string& dottedPath)
         });
 }
 
-bool DocumentSourceGroup::canRunInParallelBeforeOut(
+bool DocumentSourceGroup::canRunInParallelBeforeWriteStage(
     const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
     if (_doingMerge) {
         return true;  // This is fine.

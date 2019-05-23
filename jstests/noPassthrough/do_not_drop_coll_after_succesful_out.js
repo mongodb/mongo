@@ -1,5 +1,4 @@
-// Confirms that there's no attempt to drop a temp collection after a 'replaceCollection' $out is
-// performed.
+// Confirms that there's no attempt to drop a temp collection after $out is performed.
 (function() {
     "use strict";
 
@@ -12,13 +11,12 @@
     const testDB = conn.getDB("test");
     const coll = testDB.do_not_drop_coll_after_succesful_out;
 
-    // Insert some data.
     assert.commandWorked(coll.insert({a: 1}));
 
     assert.commandWorked(testDB.setLogLevel(2, "command"));
     assert.commandWorked(testDB.adminCommand({clearLog: "global"}));
-    // Run a $out.
-    coll.aggregate({$out: {mode: "replaceCollection", to: coll.getName() + "_out"}});
+
+    coll.aggregate([{$out: coll.getName() + "_out"}]);
     const log = assert.commandWorked(testDB.adminCommand({getLog: "global"})).log;
 
     for (let i = 0; i < log.length; ++i) {

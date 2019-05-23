@@ -29,46 +29,13 @@
 
 #pragma once
 
-#include "mongo/db/db_raii.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_out_gen.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/s/chunk_version.h"
+#include "mongo/db/pipeline/document_source_writer.h"
 
 namespace mongo {
-
 /**
- * Manipulates the state of the OperationContext so that while this object is in scope, reads and
- * writes will use a local read concern and see the latest version of the data. It will also reset
- * ignore_prepared on the recovery unit so that any reads or writes will block on a conflict with a
- * prepared transaction. Resets the OperationContext back to its original state upon destruction.
+ * Implementation for the $out aggregation stage.
  */
-class OutStageWriteBlock {
-    OperationContext* _opCtx;
-    repl::ReadConcernArgs _originalArgs;
-    RecoveryUnit::ReadSource _originalSource;
-    EnforcePrepareConflictsBlock _enforcePrepareConflictsBlock;
-
-public:
-    OutStageWriteBlock(OperationContext* opCtx)
-        : _opCtx(opCtx), _enforcePrepareConflictsBlock(opCtx) {
-        _originalArgs = repl::ReadConcernArgs::get(_opCtx);
-        _originalSource = _opCtx->recoveryUnit()->getTimestampReadSource();
-
-        repl::ReadConcernArgs::get(_opCtx) = repl::ReadConcernArgs();
-        _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::kUnset);
-    }
-
-    ~OutStageWriteBlock() {
-        repl::ReadConcernArgs::get(_opCtx) = _originalArgs;
-        _opCtx->recoveryUnit()->setTimestampReadSource(_originalSource);
-    }
-};
-
-/**
- * Abstract class for the $out aggregation stage.
- */
-class DocumentSourceOut : public DocumentSource {
+class DocumentSourceOut final : public DocumentSourceWriter<BSONObj> {
 public:
     static constexpr StringData kStageName = "$out"_sd;
 
@@ -78,172 +45,46 @@ public:
      */
     class LiteParsed final : public LiteParsedDocumentSourceForeignCollections {
     public:
+        using LiteParsedDocumentSourceForeignCollections::
+            LiteParsedDocumentSourceForeignCollections;
+
+
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec);
 
-        LiteParsed(NamespaceString outNss, PrivilegeVector privileges, bool allowShardedOutNss)
-            : LiteParsedDocumentSourceForeignCollections(outNss, privileges),
-              _allowShardedOutNss(allowShardedOutNss) {}
-
         bool allowShardedForeignCollection(NamespaceString nss) const final {
-            return _allowShardedOutNss ? true : (_foreignNssSet.find(nss) == _foreignNssSet.end());
+            return _foreignNssSet.find(nss) == _foreignNssSet.end();
         }
 
         bool allowedToPassthroughFromMongos() const final {
-            // Do not allow passthrough from mongos even if the source collection is unsharded. This
-            // ensures that the unique index verification happens once on mongos and can be bypassed
-            // on the shards.
             return false;
         }
-
-    private:
-        bool _allowShardedOutNss;
     };
 
-    /**
-     * Builds a new $out stage which will spill all documents into 'outputNs' as inserts. If
-     * 'targetCollectionVersion' is provided then processing will stop with an error if the
-     * collection's epoch changes during the course of execution. This is used as a mechanism to
-     * prevent the shard key from changing.
-     */
-    DocumentSourceOut(NamespaceString outputNs,
-                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                      WriteModeEnum mode,
-                      std::set<FieldPath> uniqueKey,
-                      boost::optional<ChunkVersion> targetCollectionVersion);
+    ~DocumentSourceOut() override;
 
-    virtual ~DocumentSourceOut() = default;
-
-    GetNextResult getNext() final;
-    const char* getSourceName() const final;
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    DepsTracker::State getDependencies(DepsTracker* deps) const final;
-    /**
-     * For purposes of tracking which fields come from where, this stage does not modify any fields.
-     */
-    GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
+    const char* getSourceName() const final override {
+        return kStageName.rawData();
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        // A $out to an unsharded collection should merge on the primary shard to perform local
-        // writes. A $out to a sharded collection has no requirement, since each shard can perform
-        // its own portion of the write. We use 'kAnyShard' to direct it to execute on one of the
-        // shards in case some of the writes happen to end up being local.
-        //
-        // Note that this decision is inherently racy and subject to become stale. This is okay
-        // because either choice will work correctly, we are simply applying a heuristic
-        // optimization.
-        auto hostTypeRequirement = HostTypeRequirement::kPrimaryShard;
-        if (pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _outputNs) &&
-            _mode != WriteModeEnum::kModeReplaceCollection) {
-            hostTypeRequirement = HostTypeRequirement::kAnyShard;
-        }
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final override {
         return {StreamType::kStreaming,
                 PositionRequirement::kLast,
-                hostTypeRequirement,
+                HostTypeRequirement::kPrimaryShard,
                 DiskUseRequirement::kWritesPersistentData,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kNotAllowed,
                 LookupRequirement::kNotAllowed};
     }
 
-    const NamespaceString& getOutputNs() const {
-        return _outputNs;
-    }
-
-    WriteModeEnum getMode() const {
-        return _mode;
-    }
-
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        // It should always be faster to avoid splitting the pipeline if the output collection is
-        // sharded. If we avoid splitting the pipeline then each shard can perform the writes to the
-        // target collection in parallel.
-        //
-        // Note that this decision is inherently racy and subject to become stale. This is okay
-        // because either choice will work correctly, we are simply applying a heuristic
-        // optimization.
-        if (pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _outputNs)) {
-            return boost::none;
-        }
-        // {shardsStage, mergingStage, sortPattern}
-        return DistributedPlanLogic{nullptr, this, boost::none};
-    }
-
-    virtual bool canRunInParallelBeforeOut(
-        const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const final {
-        // If someone is asking the question, this must be the $out stage in question, so yes!
-        return true;
-    }
-
-
-    /**
-     * Retrieves the namespace to direct each batch to, which may be a temporary namespace or the
-     * final output namespace.
-     */
-    virtual const NamespaceString& getWriteNs() const = 0;
-
-    /**
-     * Prepares the DocumentSource to be able to write incoming batches to the desired collection.
-     */
-    virtual void initializeWriteNs() = 0;
-
-    /**
-     * Storage for a batch of BSON Objects to be inserted/updated to the write namespace. The
-     * extracted unique key values are also stored in a batch, used by $out with mode
-     * "replaceDocuments" as the query portion of the update.
-     *
-     */
-    struct BatchedObjects {
-        void emplace(BSONObj&& obj, BSONObj&& key) {
-            objects.emplace_back(std::move(obj));
-            uniqueKeys.emplace_back(std::move(key));
-        }
-
-        bool empty() const {
-            return objects.empty();
-        }
-
-        size_t size() const {
-            return objects.size();
-        }
-
-        void clear() {
-            objects.clear();
-            uniqueKeys.clear();
-        }
-
-        std::vector<BSONObj> objects;
-        // Store the unique keys as BSON objects instead of Documents for compatibility with the
-        // batch update command. (e.g. {q: <array of uniqueKeys>, u: <array of objects>})
-        std::vector<BSONObj> uniqueKeys;
-    };
-
-    /**
-     * Writes the documents in 'batch' to the write namespace.
-     */
-    virtual void spill(BatchedObjects&& batch) {
-        OutStageWriteBlock writeBlock(pExpCtx->opCtx);
-
-        pExpCtx->mongoProcessInterface->insert(
-            pExpCtx, getWriteNs(), std::move(batch.objects), _writeConcern, _targetEpoch());
-    };
-
-    /**
-     * Finalize the output collection, called when there are no more documents to write.
-     */
-    virtual void finalize() = 0;
+    Value serialize(
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final override;
 
     /**
      * Creates a new $out stage from the given arguments.
      */
     static boost::intrusive_ptr<DocumentSource> create(
-        NamespaceString outputNs,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        WriteModeEnum,
-        std::set<FieldPath> uniqueKey = std::set<FieldPath>{"_id"},
-        boost::optional<ChunkVersion> targetCollectionVersion = boost::none);
+        NamespaceString outputNs, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Parses a $out stage from the user-supplied BSON.
@@ -251,59 +92,37 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-protected:
-    // Stash the writeConcern of the original command as the operation context may change by the
-    // time we start to spill $out writes. This is because certain aggregations (e.g. $exchange)
-    // establish cursors with batchSize 0 then run subsequent getMore's which use a new operation
-    // context. The getMore's will not have an attached writeConcern however we still want to
-    // respect the writeConcern of the original command.
-    WriteConcernOptions _writeConcern;
+private:
+    DocumentSourceOut(NamespaceString outputNs,
+                      const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceWriter(std::move(outputNs), expCtx) {}
 
-    const NamespaceString _outputNs;
-    boost::optional<ChunkVersion> _targetCollectionVersion;
+    void initialize() override;
 
-    boost::optional<OID> _targetEpoch() {
-        return _targetCollectionVersion ? boost::optional<OID>(_targetCollectionVersion->epoch())
-                                        : boost::none;
+    void finalize() override;
+
+    void spill(BatchedObjects&& batch) override {
+        DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
+
+        auto targetEpoch = boost::none;
+        pExpCtx->mongoProcessInterface->insert(
+            pExpCtx, _tempNs, std::move(batch), _writeConcern, targetEpoch);
     }
 
-private:
-    /**
-     * If 'spec' does not specify a uniqueKey, uses the sharding catalog to pick a default key of
-     * the shard key + _id. Returns a pair of the uniqueKey (either from the spec or generated), and
-     * an optional ChunkVersion, populated with the version stored in the sharding catalog when we
-     * asked for the shard key.
-     */
-    static std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>> resolveUniqueKeyOnMongoS(
-        const boost::intrusive_ptr<ExpressionContext>&,
-        const DocumentSourceOutSpec& spec,
-        const NamespaceString& outputNs);
+    std::pair<BSONObj, int> makeBatchObject(Document&& doc) const override {
+        auto obj = doc.toBson();
+        return {obj, obj.objsize()};
+    }
 
-    /**
-     * Ensures that 'spec' contains a uniqueKey which has a supporting index - either because the
-     * uniqueKey was sent from mongos or because there is a corresponding unique index. Returns the
-     * target ChunkVersion already attached to 'spec', but verifies that this node's cached routing
-     * table agrees on the epoch for that version before returning. Throws a StaleConfigException if
-     * not.
-     */
-    static std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>> resolveUniqueKeyOnMongoD(
-        const boost::intrusive_ptr<ExpressionContext>&,
-        const DocumentSourceOutSpec& spec,
-        const NamespaceString& outputNs);
+    void waitWhileFailPointEnabled() override;
 
-    bool _initialized = false;
-    bool _done = false;
+    // Holds on to the original collection options and index specs so we can check they didn't
+    // change during computation.
+    BSONObj _originalOutOptions;
+    std::list<BSONObj> _originalIndexes;
 
-    WriteModeEnum _mode;
-
-    // Holds the unique key used for uniquely identifying documents. There must exist a unique index
-    // with this key pattern (up to order). Default is "_id" for unsharded collections, and "_id"
-    // plus the shard key for sharded collections.
-    std::set<FieldPath> _uniqueKeyFields;
-
-    // True if '_uniqueKeyFields' contains the _id. We store this as a separate boolean to avoid
-    // repeated lookups into the set.
-    bool _uniqueKeyIncludesId;
+    // The temporary namespace for the $out writes.
+    NamespaceString _tempNs;
 };
 
 }  // namespace mongo

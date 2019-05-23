@@ -39,7 +39,6 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"
-#include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -227,23 +226,6 @@ bool isSupportedMergeMode(WhenMatched whenMatched, WhenNotMatched whenNotMatched
 }
 
 /**
- * Parses the fields of the $merge 'on' from the user-specified 'fields', returning a set of field
- * paths. Throws if 'fields' contains duplicate elements.
- */
-std::set<FieldPath> parseMergeOnFieldsFromSpec(const std::vector<std::string>& fields) {
-    std::set<FieldPath> mergeOnFields;
-
-    for (const auto& field : fields) {
-        const auto res = mergeOnFields.insert(FieldPath(field));
-        uassert(ErrorCodes::BadValue,
-                "Found a duplicate field '{}' in {} 'on'"_format(field, kStageName),
-                res.second);
-    }
-
-    return mergeOnFields;
-}
-
-/**
  * Extracts the fields of $merge 'on' from 'doc' and returns the key as a BSONObj. Throws if any
  * field of the 'on' extracted from 'doc' is nullish or an array.
  */
@@ -262,93 +244,6 @@ BSONObj extractMergeOnFieldsFromDoc(const Document& doc, const std::set<FieldPat
         result.addField(field.fullPath(), std::move(value));
     }
     return result.freeze().toBson();
-}
-
-/**
- * Extracts $merge 'on' fields from the $merge spec when the pipeline is executed on mongoD, or use
- * a default _id field if the user hasn't supplied the 'on' field. For the user supplied field
- * ensures that it can be used to uniquely identify documents for merge.
- */
-std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>> resolveMergeOnFieldsOnMongoD(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const DocumentSourceMergeSpec& spec,
-    const NamespaceString& outputNs) {
-    invariant(!expCtx->inMongos);
-    auto targetCollectionVersion = spec.getTargetCollectionVersion();
-    if (targetCollectionVersion) {
-        uassert(51123, "Unexpected target chunk version specified", expCtx->fromMongos);
-        // If mongos has sent us a target shard version, we need to be sure we are prepared to
-        // act as a router which is at least as recent as that mongos.
-        expCtx->mongoProcessInterface->checkRoutingInfoEpochOrThrow(
-            expCtx, outputNs, *targetCollectionVersion);
-    }
-
-    auto userSpecifiedMergeOnFields = spec.getOn();
-    if (!userSpecifiedMergeOnFields) {
-        uassert(51124, "Expected 'on' field to be provided from mongos", !expCtx->fromMongos);
-        return {std::set<FieldPath>{"_id"}, targetCollectionVersion};
-    }
-
-    // Make sure the 'on' field has a supporting index. Skip this check if the command is sent
-    // from mongos since the 'on' field check would've happened already.
-    auto mergeOnFields = parseMergeOnFieldsFromSpec(*userSpecifiedMergeOnFields);
-    if (!expCtx->fromMongos) {
-        uassert(51183,
-                "Cannot find index to verify that 'on' fields will be unique",
-                expCtx->mongoProcessInterface->uniqueKeyIsSupportedByIndex(
-                    expCtx, outputNs, mergeOnFields));
-    }
-    return {mergeOnFields, targetCollectionVersion};
-}
-
-/**
- * Extracts $merge 'on' fields from the $merge spec when the pipeline is executed on mongoS. If the
- * user supplied the 'on' field, ensures that it can be used to uniquely identify documents for
- * merge. Otherwise, extracts the shard key and use it as the 'on' field.
- */
-std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>> resolveMergeOnFieldsOnMongoS(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const DocumentSourceMergeSpec& spec,
-    const NamespaceString& outputNs) {
-    invariant(expCtx->inMongos);
-    uassert(51179,
-            "{} received unexpected 'targetCollectionVersion' on mongos"_format(kStageName),
-            !spec.getTargetCollectionVersion());
-
-    if (auto userSpecifiedMergeOnFields = spec.getOn()) {
-        // Convert 'on' array to a vector of FieldPaths.
-        auto mergeOnFields = parseMergeOnFieldsFromSpec(*userSpecifiedMergeOnFields);
-        uassert(51190,
-                "Cannot find index to verify that 'on' fields will be unique",
-                expCtx->mongoProcessInterface->uniqueKeyIsSupportedByIndex(
-                    expCtx, outputNs, mergeOnFields));
-
-        // If the user supplies the 'on' field we don't need to attach a ChunkVersion for the shards
-        // since we are not at risk of 'guessing' the wrong shard key.
-        return {mergeOnFields, boost::none};
-    }
-
-    // In case there are multiple shards which will perform this stage in parallel, we need to
-    // figure out and attach the collection's shard version to ensure each shard is talking about
-    // the same version of the collection. This mongos will coordinate that. We force a catalog
-    // refresh to do so because there is no shard versioning protocol on this namespace and so we
-    // otherwise could not be sure this node is (or will become) at all recent. We will also
-    // figure out and attach the 'on' field to send to the shards.
-
-    // There are cases where the aggregation could fail if the collection is dropped or re-created
-    // during or near the time of the aggregation. This is okay - we are mostly paranoid that this
-    // mongos is very stale and want to prevent returning an error if the collection was dropped a
-    // long time ago. Because of this, we are okay with piggy-backing off another thread's request
-    // to refresh the cache, simply waiting for that request to return instead of forcing another
-    // refresh.
-    boost::optional<ChunkVersion> targetCollectionVersion =
-        expCtx->mongoProcessInterface->refreshAndGetCollectionVersion(expCtx, outputNs);
-
-    auto docKeyPaths = expCtx->mongoProcessInterface->collectDocumentKeyFieldsActingAsRouter(
-        expCtx->opCtx, outputNs);
-    return {std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
-                                std::make_move_iterator(docKeyPaths.end())),
-            targetCollectionVersion};
 }
 
 /**
@@ -432,18 +327,13 @@ DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,
                                          boost::optional<BSONObj> letVariables,
                                          boost::optional<std::vector<BSONObj>> pipeline,
                                          std::set<FieldPath> mergeOnFields,
-                                         boost::optional<ChunkVersion> targetCollectionVersion,
-                                         bool serializeAsOutStage)
-    : DocumentSource(expCtx),
-      _writeConcern(expCtx->opCtx->getWriteConcern()),
-      _outputNs(std::move(outputNs)),
+                                         boost::optional<ChunkVersion> targetCollectionVersion)
+    : DocumentSourceWriter(std::move(outputNs), expCtx),
       _targetCollectionVersion(targetCollectionVersion),
-      _done(false),
       _descriptor(descriptor),
       _pipeline(std::move(pipeline)),
       _mergeOnFields(std::move(mergeOnFields)),
-      _mergeOnFieldsIncludesId(_mergeOnFields.count("_id") == 1),
-      _serializeAsOutStage(serializeAsOutStage) {
+      _mergeOnFieldsIncludesId(_mergeOnFields.count("_id") == 1) {
     if (letVariables) {
         _letVariables.emplace();
 
@@ -466,9 +356,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
     boost::optional<BSONObj> letVariables,
     boost::optional<std::vector<BSONObj>> pipeline,
     std::set<FieldPath> mergeOnFields,
-    boost::optional<ChunkVersion> targetCollectionVersion,
-    bool serializeAsOutStage) {
-
+    boost::optional<ChunkVersion> targetCollectionVersion) {
     uassert(51189,
             "Combination of {} modes 'whenMatched: {}' and 'whenNotMatched: {}' "
             "is not supported"_format(kStageName,
@@ -515,8 +403,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
                                    std::move(letVariables),
                                    std::move(pipeline),
                                    std::move(mergeOnFields),
-                                   targetCollectionVersion,
-                                   serializeAsOutStage);
+                                   targetCollectionVersion);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
@@ -531,10 +418,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
         mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->mode : kDefaultWhenMatched;
     auto whenNotMatched = mergeSpec.getWhenNotMatched().value_or(kDefaultWhenNotMatched);
     auto pipeline = mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->pipeline : boost::none;
-    // TODO SERVER-40432: move resolveMergeOnFieldsOnMongo* into MongoProcessInterface.
-    auto[mergeOnFields, targetCollectionVersion] = expCtx->inMongos
-        ? resolveMergeOnFieldsOnMongoS(expCtx, mergeSpec, targetNss)
-        : resolveMergeOnFieldsOnMongoD(expCtx, mergeSpec, targetNss);
+    auto[mergeOnFields, targetCollectionVersion] =
+        expCtx->mongoProcessInterface->ensureFieldsUniqueOrResolveDocumentKey(
+            expCtx, mergeSpec.getOn(), mergeSpec.getTargetCollectionVersion(), targetNss);
 
     return DocumentSourceMerge::create(std::move(targetNss),
                                        expCtx,
@@ -543,137 +429,61 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
                                        mergeSpec.getLet(),
                                        std::move(pipeline),
                                        std::move(mergeOnFields),
-                                       targetCollectionVersion,
-                                       false /* serialize as $out stage */);
-}
-
-DocumentSource::GetNextResult DocumentSourceMerge::getNext() {
-    pExpCtx->checkForInterrupt();
-
-    if (_done) {
-        return GetNextResult::makeEOF();
-    }
-
-    if (!_initialized) {
-        // Explain of a $merge should never try to actually execute any writes. We only ever expect
-        // getNext() to be called for the 'executionStats' and 'allPlansExecution' explain modes.
-        // This assertion should not be triggered for 'queryPlanner' explain of a $merge, which is
-        // perfectly legal.
-        uassert(51184,
-                "explain of {} is not allowed with verbosity {}"_format(
-                    kStageName, ExplainOptions::verbosityString(*pExpCtx->explain)),
-                !pExpCtx->explain);
-        _initialized = true;
-    }
-
-    BatchedObjects batch;
-    int bufferedBytes = 0;
-
-    auto nextInput = pSource->getNext();
-    for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-        CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangWhileBuildingDocumentSourceMergeBatch,
-            pExpCtx->opCtx,
-            "hangWhileBuildingDocumentSourceMergeBatch",
-            []() {
-                log() << "Hanging aggregation due to 'hangWhileBuildingDocumentSourceMergeBatch' "
-                      << "failpoint";
-            });
-
-        auto doc = nextInput.releaseDocument();
-
-        // Generate an _id if the uniqueKey includes _id but the document doesn't have one.
-        if (_mergeOnFieldsIncludesId && doc.getField("_id"_sd).missing()) {
-            MutableDocument mutableDoc(std::move(doc));
-            mutableDoc["_id"_sd] = Value(OID::gen());
-            doc = mutableDoc.freeze();
-        }
-
-        auto mergeOnFields = extractMergeOnFieldsFromDoc(doc, _mergeOnFields);
-        auto mod = makeBatchUpdateModification(doc);
-        auto vars = resolveLetVariablesIfNeeded(doc);
-        auto modSize = mod.objsize() + (vars ? vars->objsize() : 0);
-
-        bufferedBytes += modSize;
-        if (!batch.empty() &&
-            (bufferedBytes > BSONObjMaxUserSize || batch.size() >= write_ops::kMaxWriteBatchSize)) {
-            spill(std::move(batch));
-            batch.clear();
-            bufferedBytes = modSize;
-        }
-        batch.emplace_back(std::move(mergeOnFields), std::move(mod), std::move(vars));
-    }
-    if (!batch.empty()) {
-        spill(std::move(batch));
-        batch.clear();
-    }
-
-    switch (nextInput.getStatus()) {
-        case GetNextResult::ReturnStatus::kAdvanced: {
-            MONGO_UNREACHABLE;  // We consumed all advances above.
-        }
-        case GetNextResult::ReturnStatus::kPauseExecution: {
-            return nextInput;  // Propagate the pause.
-        }
-        case GetNextResult::ReturnStatus::kEOF: {
-            _done = true;
-            return nextInput;
-        }
-    }
-    MONGO_UNREACHABLE;
+                                       targetCollectionVersion);
 }
 
 Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (_serializeAsOutStage) {
-        uassert(ErrorCodes::BadValue,
-                "Cannot serialize {} stage as $out for 'whenMatched: {}' and "
-                "'whenNotMatched: {}'"_format(
-                    kStageName,
-                    MergeWhenMatchedMode_serializer(_descriptor.mode.first),
-                    MergeWhenNotMatchedMode_serializer(_descriptor.mode.second)),
-                (_descriptor.mode.first == WhenMatched::kFail ||
-                 _descriptor.mode.first == WhenMatched::kReplace) &&
-                    (_descriptor.mode.second == WhenNotMatched::kInsert));
-        DocumentSourceOutSpec spec;
-        spec.setTargetDb(_outputNs.db());
-        spec.setTargetCollection(_outputNs.coll());
-        spec.setMode(_descriptor.mode.first == WhenMatched::kFail
-                         ? WriteModeEnum::kModeInsertDocuments
-                         : WriteModeEnum::kModeReplaceDocuments);
-        spec.setUniqueKey([&]() {
-            BSONObjBuilder uniqueKeyBob;
-            for (auto path : _mergeOnFields) {
-                uniqueKeyBob.append(path.fullPath(), 1);
-            }
-            return uniqueKeyBob.obj();
-        }());
-        spec.setTargetCollectionVersion(_targetCollectionVersion);
-        return Value(Document{{DocumentSourceOut::kStageName.rawData(), spec.toBSON()}});
-    } else {
-        DocumentSourceMergeSpec spec;
-        spec.setTargetNss(_outputNs);
-        spec.setLet([&]() -> boost::optional<BSONObj> {
-            if (!_letVariables) {
-                return boost::none;
-            }
+    DocumentSourceMergeSpec spec;
+    spec.setTargetNss(_outputNs);
+    spec.setLet([&]() -> boost::optional<BSONObj> {
+        if (!_letVariables) {
+            return boost::none;
+        }
 
-            BSONObjBuilder bob;
-            for (auto && [ name, expr ] : *_letVariables) {
-                bob << name << expr->serialize(static_cast<bool>(explain));
-            }
-            return bob.obj();
-        }());
-        spec.setWhenMatched(MergeWhenMatchedPolicy{_descriptor.mode.first, _pipeline});
-        spec.setWhenNotMatched(_descriptor.mode.second);
-        spec.setOn([&]() {
-            std::vector<std::string> mergeOnFields;
-            for (auto path : _mergeOnFields) {
-                mergeOnFields.push_back(path.fullPath());
-            }
-            return mergeOnFields;
-        }());
-        spec.setTargetCollectionVersion(_targetCollectionVersion);
-        return Value(Document{{getSourceName(), spec.toBSON()}});
-    }
+        BSONObjBuilder bob;
+        for (auto && [ name, expr ] : *_letVariables) {
+            bob << name << expr->serialize(static_cast<bool>(explain));
+        }
+        return bob.obj();
+    }());
+    spec.setWhenMatched(MergeWhenMatchedPolicy{_descriptor.mode.first, _pipeline});
+    spec.setWhenNotMatched(_descriptor.mode.second);
+    spec.setOn([&]() {
+        std::vector<std::string> mergeOnFields;
+        for (auto path : _mergeOnFields) {
+            mergeOnFields.push_back(path.fullPath());
+        }
+        return mergeOnFields;
+    }());
+    spec.setTargetCollectionVersion(_targetCollectionVersion);
+    return Value(Document{{getSourceName(), spec.toBSON()}});
 }
+
+std::pair<DocumentSourceMerge::BatchObject, int> DocumentSourceMerge::makeBatchObject(
+    Document&& doc) const {
+    // Generate an _id if the uniqueKey includes _id but the document doesn't have one.
+    if (_mergeOnFieldsIncludesId && doc.getField("_id"_sd).missing()) {
+        MutableDocument mutableDoc(std::move(doc));
+        mutableDoc["_id"_sd] = Value(OID::gen());
+        doc = mutableDoc.freeze();
+    }
+
+    auto mergeOnFields = extractMergeOnFieldsFromDoc(doc, _mergeOnFields);
+    auto mod = makeBatchUpdateModification(doc);
+    auto vars = resolveLetVariablesIfNeeded(doc);
+    auto modSize = mod.objsize() + (vars ? vars->objsize() : 0);
+    return {{std::move(mergeOnFields), std::move(mod), std::move(vars)}, modSize};
+}
+
+void DocumentSourceMerge::waitWhileFailPointEnabled() {
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangWhileBuildingDocumentSourceMergeBatch,
+        pExpCtx->opCtx,
+        "hangWhileBuildingDocumentSourceMergeBatch",
+        []() {
+            log() << "Hanging aggregation due to 'hangWhileBuildingDocumentSourceMergeBatch' "
+                  << "failpoint";
+        });
+}
+
 }  // namespace mongo

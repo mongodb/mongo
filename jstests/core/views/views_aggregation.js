@@ -75,9 +75,6 @@
 
     // Test that the $out stage errors when writing to a view namespace.
     assertErrorCode(coll, [{$out: "emptyPipelineView"}], ErrorCodes.CommandNotSupportedOnView);
-    assertErrorCode(coll,
-                    [{$out: {to: "emptyPipelineView", mode: "replaceCollection"}}],
-                    ErrorCodes.CommandNotSupportedOnView);
     // Test that the $merge stage errors when writing to a view namespace.
     assertErrorCode(
         coll,
@@ -110,10 +107,6 @@
                        }
                     }],
                     ErrorCodes.CommandNotSupportedOnView);
-    // TODO (SERVER-36832): When $out to foreign database is allowed with "replaceCollection", this
-    // should fail with ErrorCodes.CommandNotSupportedOnView.
-    assertErrorCode(
-        coll, [{$out: {db: foreignDB.getName(), to: "view", mode: "replaceCollection"}}], 50939);
 
     // Test that an aggregate on a view propagates the 'bypassDocumentValidation' option.
     const validatedCollName = "collectionWithValidator";

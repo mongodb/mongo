@@ -1808,8 +1808,7 @@ public:
             rawPipeline.push_back(stageElem.embeddedObject());
         }
         AggregationRequest request(kTestNss, rawPipeline);
-        intrusive_ptr<ExpressionContextForTest> ctx =
-            new ExpressionContextForTest(&_opCtx, request);
+        intrusive_ptr<ExpressionContextForTest> ctx = createExpressionContext(request);
         TempDir tempDir("PipelineTest");
         ctx->tempDir = tempDir.path();
 
@@ -1836,6 +1835,11 @@ public:
     }
 
     virtual ~Base() {}
+
+    virtual intrusive_ptr<ExpressionContextForTest> createExpressionContext(
+        const AggregationRequest& request) {
+        return new ExpressionContextForTest(&_opCtx, request);
+    }
 
 protected:
     std::unique_ptr<Pipeline, PipelineDeleter> mergePipe;
@@ -2271,7 +2275,7 @@ class ShouldNotCoalesceUnwindNotOnAs : public Base {
 
 namespace needsPrimaryShardMerger {
 
-class needsPrimaryShardMergerBase : public Base {
+class ShardMergerBase : public Base {
 public:
     void run() override {
         Base::run();
@@ -2281,7 +2285,7 @@ public:
     virtual bool needsPrimaryShardMerger() = 0;
 };
 
-class Out : public needsPrimaryShardMergerBase {
+class Out : public ShardMergerBase {
     bool needsPrimaryShardMerger() {
         return true;
     }
@@ -2292,13 +2296,56 @@ class Out : public needsPrimaryShardMergerBase {
         return "[]";
     }
     string mergePipeJson() {
-        return "[{$out: {to: 'outColl', db: 'a', mode: '" +
-            WriteMode_serializer(WriteModeEnum::kModeReplaceCollection) +
-            "', uniqueKey: {_id: 1}}}]";
+        return "[{$out: 'outColl'}]";
     }
 };
 
-class Project : public needsPrimaryShardMergerBase {
+class MergeWithUnshardedCollection : public ShardMergerBase {
+    bool needsPrimaryShardMerger() {
+        return true;
+    }
+    string inputPipeJson() {
+        return "[{$merge: 'outColl'}]";
+    }
+    string shardPipeJson() {
+        return "[]";
+    }
+    string mergePipeJson() {
+        return "[{$merge: {into: {db: 'a', coll: 'outColl'}, on: '_id', "
+               "whenMatched: 'merge', whenNotMatched: 'insert'}}]";
+    }
+};
+
+class MergeWithShardedCollection : public ShardMergerBase {
+    intrusive_ptr<ExpressionContextForTest> createExpressionContext(
+        const AggregationRequest& request) override {
+        class ProcessInterface : public StubMongoProcessInterface {
+            bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
+                return true;
+            }
+        };
+
+        auto expCtx = ShardMergerBase::createExpressionContext(request);
+        expCtx->mongoProcessInterface = std::make_shared<ProcessInterface>();
+        return expCtx;
+    }
+
+    bool needsPrimaryShardMerger() {
+        return false;
+    }
+    string inputPipeJson() {
+        return "[{$merge: 'outColl'}]";
+    }
+    string shardPipeJson() {
+        return "[{$merge: {into: {db: 'a', coll: 'outColl'}, on: '_id', "
+               "whenMatched: 'merge', whenNotMatched: 'insert'}}]";
+    }
+    string mergePipeJson() {
+        return "[]";
+    }
+};
+
+class Project : public ShardMergerBase {
     bool needsPrimaryShardMerger() {
         return false;
     }
@@ -2313,7 +2360,7 @@ class Project : public needsPrimaryShardMergerBase {
     }
 };
 
-class LookUp : public needsPrimaryShardMergerBase {
+class LookUp : public ShardMergerBase {
     bool needsPrimaryShardMerger() {
         return true;
     }
@@ -3252,6 +3299,8 @@ public:
                 ShardedMatchSortProjLimBecomesMatchTopKSortProj>();
         add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
         add<Optimizations::Sharded::needsPrimaryShardMerger::Out>();
+        add<Optimizations::Sharded::needsPrimaryShardMerger::MergeWithUnshardedCollection>();
+        add<Optimizations::Sharded::needsPrimaryShardMerger::MergeWithShardedCollection>();
         add<Optimizations::Sharded::needsPrimaryShardMerger::Project>();
         add<Optimizations::Sharded::needsPrimaryShardMerger::LookUp>();
     }
