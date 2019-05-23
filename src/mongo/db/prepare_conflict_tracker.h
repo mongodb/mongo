@@ -36,11 +36,8 @@ namespace mongo {
 
 /**
  * The PrepareConflictTracker tracks if a read operation encounters a prepare conflict. If it
- * is blocked on a prepare conflict, we will kill the operation during step down. This will
- * help us avoid deadlocks between prepare conflicts and state transitions.
- *
- * TODO SERVER-41037: Modify above comment to include step up or use "state transitions" to
- * encompass both.
+ * is blocked on a prepare conflict, we will kill the operation during state transitions (step
+ * up/step down). This will help us avoid deadlocks between prepare conflicts and state transitions.
  */
 class PrepareConflictTracker {
 public:

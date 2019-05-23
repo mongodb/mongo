@@ -1025,7 +1025,11 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
 
     _externalState->onDrainComplete(opCtx);
 
-    ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);
+    // Kill all user writes and user reads that encounter a prepare conflict. Also kills select
+    // internal operations. Although secondaries cannot accept writes, a step up can kill writes
+    // that were blocked behind the RSTL lock held by a step down attempt. These writes will be
+    // killed with a retryable error code during step up.
+    AutoGetRstlForStepUpStepDown arsu(this, opCtx);
     lk.lock();
 
     // Exit drain mode only if we're actually in draining mode, the apply buffer is empty in the
