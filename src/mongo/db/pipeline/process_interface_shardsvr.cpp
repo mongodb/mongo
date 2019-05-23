@@ -140,8 +140,7 @@ void MongoInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionCont
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
 
-    BatchedCommandRequest updateCommand(
-        buildUpdateOp(ns, std::move(batch), upsert, multi, expCtx->bypassDocumentValidation));
+    BatchedCommandRequest updateCommand(buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
 
     // If applicable, attach a write concern to the batched command request.
     attachWriteConcern(&updateCommand, wc);

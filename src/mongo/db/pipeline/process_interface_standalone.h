@@ -154,16 +154,13 @@ protected:
                          bool bypassDocValidation);
 
     /**
-     * Builds an ordered update op on namespace 'nss' with update entries {q: <queries>, u:
-     * <updates>}.
-     *
-     * Note that 'queries' and 'updates' must be the same length.
+     * Builds an ordered update op on namespace 'nss' with update entries contained in 'batch'.
      */
-    Update buildUpdateOp(const NamespaceString& nss,
+    Update buildUpdateOp(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         const NamespaceString& nss,
                          BatchedObjects&& batch,
                          bool upsert,
-                         bool multi,
-                         bool bypassDocValidation);
+                         bool multi);
 
 private:
     /**

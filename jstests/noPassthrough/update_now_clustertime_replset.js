@@ -15,7 +15,9 @@
     rst.initiate();
 
     const db = rst.getPrimary().getDB(jsTestName());
+    const otherColl = db.other;
     const coll = db.test;
+    otherColl.drop();
     coll.drop();
 
     // Insert N docs, with the _id field set to the current Date. We sleep for a short period
@@ -240,6 +242,49 @@
         sort: {_id: 1},
         new: true
     }));
+
+    // Test that we can use $$NOW and $$CLUSTER_TIME in an update via a $merge aggregation. We first
+    // use $merge to copy the current contents of 'coll' into 'otherColl'.
+    assert.commandWorked(db.createCollection(otherColl.getName()));
+    assert.doesNotThrow(() => coll.aggregate([
+        {$merge: {into: otherColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}}
+    ]));
+    // Run an aggregation which adds $$NOW and $$CLUSTER_TIME fields into the pipeline document,
+    // then do the same to the documents in the output collection via a pipeline update.
+    assert.doesNotThrow(() => coll.aggregate([
+        {$addFields: {aggNow: "$$NOW", aggCT: "$$CLUSTER_TIME"}},
+        {
+          $merge: {
+              into: otherColl.getName(),
+              let : {aggNow: "$aggNow", aggCT: "$aggCT"},
+              whenMatched: [{
+                  $addFields: {
+                      aggNow: "$$aggNow",
+                      aggCT: "$$aggCT",
+                      mergeNow: "$$NOW",
+                      mergeCT: "$$CLUSTER_TIME"
+                  }
+              }],
+              whenNotMatched: "fail"
+          }
+        }
+    ]));
+    // Verify that the agg pipeline's $$NOW and $$CLUSTER_TIME match the $merge update pipeline's.
+    results = otherColl.find().toArray();
+    assert.eq(results.length, numDocs);
+    assert(results[0].mergeNow instanceof Date);
+    assert(results[0].mergeCT instanceof Timestamp);
+    for (let result of results) {
+        // The mergeNow and mergeCT fields are greater than the values from the previous updates.
+        assert.gt(result.mergeNow, result.now5);
+        assert.gt(result.mergeCT, result.ctime5);
+        // The mergeNow and mergeCT fields are the same across all documents.
+        assert.eq(result.mergeNow, results[0].mergeNow);
+        assert.eq(result.mergeCT, results[0].mergeCT);
+        // The mergeNow and mergeCT fields are the same as aggNow and aggCT across all documents.
+        assert.eq(result.mergeNow, result.aggNow);
+        assert.eq(result.mergeCT, result.aggCT);
+    }
 
     rst.stopSet();
 }());
