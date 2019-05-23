@@ -193,6 +193,9 @@ Decimal128::Decimal128(std::int32_t int32Value)
 Decimal128::Decimal128(std::int64_t int64Value)
     : _value(libraryTypeToValue(bid128_from_int64(int64Value))) {}
 
+Decimal128::Decimal128(std::uint64_t uint64Value)
+    : _value(libraryTypeToValue(bid128_from_uint64(uint64Value))) {}
+
 /**
  * Quantize a doubleValue argument to a Decimal128 with exactly 15 digits
  * of precision.
@@ -524,6 +527,30 @@ std::int64_t Decimal128::toLongExact(std::uint32_t* signalingFlags, RoundingMode
             return bid128_to_int64_xrninta(dec128, signalingFlags);
         default:
             return bid128_to_int64_xrnint(dec128, signalingFlags);
+    }
+}
+
+std::uint64_t Decimal128::toULongExact(RoundingMode roundMode) const {
+    std::uint32_t throwAwayFlag = 0;
+    return toLongExact(&throwAwayFlag, roundMode);
+}
+
+std::uint64_t Decimal128::toULongExact(std::uint32_t* signalingFlags,
+                                       RoundingMode roundMode) const {
+    BID_UINT128 dec128 = decimal128ToLibraryType(_value);
+    switch (roundMode) {
+        case kRoundTiesToEven:
+            return bid128_to_uint64_xrnint(dec128, signalingFlags);
+        case kRoundTowardNegative:
+            return bid128_to_uint64_xfloor(dec128, signalingFlags);
+        case kRoundTowardPositive:
+            return bid128_to_uint64_xceil(dec128, signalingFlags);
+        case kRoundTowardZero:
+            return bid128_to_uint64_xint(dec128, signalingFlags);
+        case kRoundTiesToAway:
+            return bid128_to_uint64_xrninta(dec128, signalingFlags);
+        default:
+            return bid128_to_uint64_xrnint(dec128, signalingFlags);
     }
 }
 

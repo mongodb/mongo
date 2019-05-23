@@ -171,6 +171,7 @@ public:
 
     explicit Decimal128(std::int32_t int32Value);
     explicit Decimal128(std::int64_t int64Value);
+    explicit Decimal128(std::uint64_t uint64Value);
 
     /**
      * This constructor takes a double and constructs a Decimal128 object given a roundMode, either
@@ -372,6 +373,9 @@ public:
     std::int64_t toLongExact(RoundingMode roundMode = kRoundTiesToEven) const;
     std::int64_t toLongExact(std::uint32_t* signalingFlags,
                              RoundingMode roundMode = kRoundTiesToEven) const;
+    std::uint64_t toULongExact(RoundingMode roundMode = kRoundTiesToEven) const;
+    std::uint64_t toULongExact(std::uint32_t* signalingFlags,
+                               RoundingMode roundMode = kRoundTiesToEven) const;
 
     /**
      * These functions convert decimals to doubles and have the ability to signal
