@@ -58,9 +58,9 @@ protected:
 
     BSONObj getDoc();
 
-    std::string getStateString(const CollectionState& state1,
-                               const CollectionState& state2,
-                               const std::vector<OplogEntry>& ops) override;
+    std::string getStatesString(const std::vector<CollectionState>& state1,
+                                const std::vector<CollectionState>& state2,
+                                const MultiApplier::OperationPtrs& opPtrs) override;
 
     Status resetState() override;
 
@@ -111,30 +111,30 @@ std::vector<OplogEntry> RandomizedIdempotencyTest::createUpdateSequence(
     return updateSequence;
 }
 
-std::string RandomizedIdempotencyTest::getStateString(const CollectionState& state1,
-                                                      const CollectionState& state2,
-                                                      const std::vector<OplogEntry>& ops) {
-    unittest::log() << IdempotencyTest::getStateString(state1, state2, ops);
+std::string RandomizedIdempotencyTest::getStatesString(const std::vector<CollectionState>& state1,
+                                                       const std::vector<CollectionState>& state2,
+                                                       const MultiApplier::OperationPtrs& opPtrs) {
+    unittest::log() << IdempotencyTest::getStatesString(state1, state2, opPtrs);
     StringBuilder sb;
     sb << "Ran update ops: ";
     sb << "[ ";
     bool firstIter = true;
-    for (auto op : ops) {
+    for (auto op : opPtrs) {
         if (!firstIter) {
             sb << ", ";
         } else {
             firstIter = false;
         }
-        sb << op.toString();
+        sb << op->toString();
     }
     sb << " ]\n";
 
     ASSERT_OK(resetState());
 
     sb << "Start: " << getDoc() << "\n";
-    for (auto op : ops) {
-        ASSERT_OK(runOpInitialSync(op));
-        sb << "Apply: " << op.getObject() << "\n  ==> " << getDoc() << "\n";
+    for (auto op : opPtrs) {
+        ASSERT_OK(runOpInitialSync(*op));
+        sb << "Apply: " << op->getObject() << "\n  ==> " << getDoc() << "\n";
     }
 
     sb << "Found from the seed: " << this->seed;

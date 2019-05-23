@@ -401,31 +401,31 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
         // we don't drop and re-create the collections. Dropping and re-creating the collections
         // won't work either because we don't have ways to wait until second-phase drop to
         // completely finish.
-        std::vector<OplogEntry> fullSequence;
+        MultiApplier::OperationPtrs fullSequence;
 
         if (sequenceType == SequenceType::kEntireSequence) {
             ASSERT_OK(runOpPtrsInitialSync(opPtrs));
-            fullSequence.insert(fullSequence.end(), ops.begin(), ops.end());
+            fullSequence.insert(fullSequence.end(), opPtrs.begin(), opPtrs.end());
         } else if (sequenceType == SequenceType::kAnyPrefix ||
                    sequenceType == SequenceType::kAnyPrefixOrSuffix) {
-            std::vector<OplogEntry> prefix(ops.begin(), ops.begin() + i + 1);
-            ASSERT_OK(runOpPtrsInitialSync(opPtrs));
+            MultiApplier::OperationPtrs prefix(opPtrs.begin(), opPtrs.begin() + i + 1);
+            ASSERT_OK(runOpPtrsInitialSync(prefix));
             fullSequence.insert(fullSequence.end(), prefix.begin(), prefix.end());
         }
 
         ASSERT_OK(runOpPtrsInitialSync(opPtrs));
-        fullSequence.insert(fullSequence.end(), ops.begin(), ops.end());
+        fullSequence.insert(fullSequence.end(), opPtrs.begin(), opPtrs.end());
 
         if (sequenceType == SequenceType::kAnySuffix ||
             sequenceType == SequenceType::kAnyPrefixOrSuffix) {
-            std::vector<OplogEntry> suffix(ops.begin() + i, ops.end());
-            ASSERT_OK(runOpPtrsInitialSync(opPtrs));
+            MultiApplier::OperationPtrs suffix(opPtrs.begin() + i, opPtrs.end());
+            ASSERT_OK(runOpPtrsInitialSync(suffix));
             fullSequence.insert(fullSequence.end(), suffix.begin(), suffix.end());
         }
 
         auto state2 = validateAllCollections();
         if (state1 != state2) {
-            FAIL(getStateVectorString(state1, state2, fullSequence));
+            FAIL(getStatesString(state1, state2, fullSequence));
         }
     }
 }
@@ -634,28 +634,23 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
     return collectionState;
 }
 
-std::string IdempotencyTest::getStateString(const CollectionState& state1,
-                                            const CollectionState& state2,
-                                            const std::vector<OplogEntry>& ops) {
+std::string IdempotencyTest::getStatesString(const std::vector<CollectionState>& state1,
+                                             const std::vector<CollectionState>& state2,
+                                             const MultiApplier::OperationPtrs& opPtrs) {
     StringBuilder sb;
-    sb << "The state: " << state1 << " does not match with the state: " << state2
-       << " found after applying the operations a second time, therefore breaking idempotency.";
-    return sb.str();
-}
-
-std::string IdempotencyTest::getStateVectorString(std::vector<CollectionState>& state1,
-                                                  std::vector<CollectionState>& state2,
-                                                  const std::vector<OplogEntry>& ops) {
-    StringBuilder sb;
-    sb << "The states: ";
+    sb << "The states:\n";
     for (const auto& s : state1) {
-        sb << s << " ";
+        sb << s << "\n";
     }
-    sb << "do not match with the states: ";
+    sb << "do not match with the states:\n";
     for (const auto& s : state2) {
-        sb << s << " ";
+        sb << s << "\n";
     }
-    sb << " found after applying the operations a second time, therefore breaking idempotency.";
+    sb << "found after applying the operations a second time, therefore breaking idempotency.\n";
+    sb << "Applied ops:\n";
+    for (auto op : opPtrs) {
+        sb << op->toString() << "\n";
+    }
     return sb.str();
 }
 
