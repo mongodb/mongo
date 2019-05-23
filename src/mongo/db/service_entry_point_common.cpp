@@ -531,7 +531,7 @@ bool runCommandImpl(OperationContext* opCtx,
             // Do no-op write before returning NoSuchTransaction if command has writeConcern.
             if (ex.toStatus().code() == ErrorCodes::NoSuchTransaction &&
                 !opCtx->getWriteConcern().usedDefault) {
-                TransactionParticipant::performNoopWrite(opCtx, "NoSuchTransaction");
+                TransactionParticipant::performNoopWrite(opCtx, "NoSuchTransaction error");
             }
             waitForWriteConcern(*extraFieldsBuilder);
             throw;

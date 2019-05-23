@@ -222,6 +222,10 @@ public:
         _readTimestamp = readTimestamp;
     }
 
+    Timestamp getReadTimestamp() const {
+        return _readTimestamp;
+    }
+
     /**
      * Append the stats to the builder.
      */

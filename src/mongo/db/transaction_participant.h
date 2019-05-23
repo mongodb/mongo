@@ -61,21 +61,6 @@ namespace mongo {
 class OperationContext;
 
 /**
- * Read timestamp to be used for a speculative transaction.  For transactions with read
- * concern level specified as 'snapshot', we will use 'kAllCommitted' which ensures a snapshot
- * with no 'holes'; that is, it is a state of the system that could be reconstructed from
- * the oplog.  For transactions with read concern level specified as 'local' or 'majority',
- * we will use 'kNoTimestamp' which gives us the most recent snapshot.  This snapshot may
- * reflect oplog 'holes' from writes earlier than the last applied write which have not yet
- * completed.  Using 'kNoTimestamp' ensures that transactions with mode 'local' are always able to
- * read writes from earlier transactions with mode 'local' on the same connection.
- */
-enum class SpeculativeTransactionOpTime {
-    kNoTimestamp,
-    kAllCommitted,
-};
-
-/**
  * Reason a transaction was terminated.
  */
 enum class TerminationCause {
@@ -663,10 +648,6 @@ public:
             return p().transactionOperations;
         }
 
-        repl::OpTime getSpeculativeTransactionReadOpTimeForTest() const {
-            return p().speculativeTransactionReadOpTime;
-        }
-
         const Locker* getTxnResourceStashLockerForTest() const {
             invariant(o().txnResourceStash);
             return o().txnResourceStash->locker();
@@ -705,17 +686,12 @@ public:
                                           std::vector<StmtId> stmtIdsWritten,
                                           const repl::OpTime& lastStmtIdWriteTs);
 
-        // Called for speculative transactions to fix the optime of the snapshot to read from.
-        void _setSpeculativeTransactionOpTime(OperationContext* opCtx,
-                                              SpeculativeTransactionOpTime opTimeChoice);
-
-
-        // Like _setSpeculativeTransactionOpTime, but caller chooses timestamp of snapshot
-        // explicitly.
-        // It is up to the caller to ensure that Timestamp is greater than or equal to the
-        // all-committed optime before calling this method (e.g. by calling
+        // Chooses a snapshot from which a new transaction will read by beginning a storage
+        // transaction. This is chosen based on the read concern arguments. If an atClusterTime is
+        // provided, it is up to the caller to ensure that timestamp is greater than or equal to the
+        // all-committed timestamp before calling this method (e.g. by calling
         // ReplCoordinator::waitForOpTimeForRead).
-        void _setSpeculativeTransactionReadTimestamp(OperationContext* opCtx, Timestamp timestamp);
+        void _setReadSnapshot(OperationContext* opCtx, repl::ReadConcernArgs readConcernArgs);
 
         // Finishes committing the multi-document transaction after the storage-transaction has been
         // committed, the oplog entry has been inserted into the oplog, and the transactions table
@@ -935,10 +911,6 @@ private:
         // The autocommit setting of this transaction. Should always be false for multi-statement
         // transaction. Currently only needed for diagnostics reporting.
         boost::optional<bool> autoCommit;
-
-        // The OpTime a speculative transaction is reading from and also the earliest opTime it
-        // should wait for write concern for on commit.
-        repl::OpTime speculativeTransactionReadOpTime;
 
         // Contains uncommitted multi-key path info entries which were modified under this
         // transaction so they can be applied to subsequent opreations before the transaction

@@ -2875,8 +2875,7 @@ std::string buildTransactionInfoString(OperationContext* opCtx,
     StringBuilder readTimestampInfo;
     readTimestampInfo
         << " readTimestamp:"
-        << txnParticipant.getSpeculativeTransactionReadOpTimeForTest().getTimestamp().toString()
-        << ",";
+        << txnParticipant.getSingleTransactionStatsForTest().getReadTimestamp().toString() << ",";
 
     StringBuilder singleTransactionStatsInfo;
     buildSingleTransactionStatsString(&singleTransactionStatsInfo, metricValue);
