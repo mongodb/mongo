@@ -1270,8 +1270,37 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
     }
 
     WiredTigerItem value(data, len);
-    c->set_value(c, value.Get());
-    ret = WT_OP_CHECK(c->insert(c));
+
+    // Check if we should modify rather than doing a full update.  Look for deltas for documents
+    // larger than 1KB, up to 16 changes representing up to 10% of the data.
+    const int kMinLengthForDiff = 1024;
+    const int kMaxEntries = 16;
+    const int kMaxDiffBytes = len / 10;
+
+    bool skip_update = false;
+    if (len > kMinLengthForDiff && len <= old_length + kMaxDiffBytes) {
+        int nentries = kMaxEntries;
+        std::vector<WT_MODIFY> entries(nentries);
+
+        if ((ret = wiredtiger_calc_modify(
+                 c->session, &old_value, value.Get(), kMaxDiffBytes, entries.data(), &nentries)) ==
+            0) {
+            invariantWTOK(WT_OP_CHECK(nentries == 0 ? c->reserve(c)
+                                                    : c->modify(c, entries.data(), nentries)));
+            WT_ITEM new_value;
+            dassert(nentries == 0 ||
+                    (c->get_value(c, &new_value) == 0 && new_value.size == value.size &&
+                     memcmp(data, new_value.data, len) == 0));
+            skip_update = true;
+        } else if (ret != WT_NOTFOUND) {
+            invariantWTOK(ret);
+        }
+    }
+
+    if (!skip_update) {
+        c->set_value(c, value.Get());
+        ret = WT_OP_CHECK(c->insert(c));
+    }
     invariantWTOK(ret);
 
     _increaseDataSize(opCtx, len - old_length);
