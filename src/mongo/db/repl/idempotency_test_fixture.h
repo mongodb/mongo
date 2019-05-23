@@ -100,11 +100,13 @@ protected:
     OplogEntry prepare(LogicalSessionId lsid,
                        TxnNumber txnNum,
                        StmtId stmtId,
-                       const BSONArray& ops);
+                       const BSONArray& ops,
+                       OpTime prevOpTime = OpTime());
     OplogEntry commitUnprepared(LogicalSessionId lsid,
                                 TxnNumber txnNum,
                                 StmtId stmtId,
-                                const BSONArray& ops);
+                                const BSONArray& ops,
+                                OpTime prevOpTime = OpTime());
     OplogEntry commitPrepared(LogicalSessionId lsid,
                               TxnNumber txnNum,
                               StmtId stmtId,
@@ -113,6 +115,11 @@ protected:
                              TxnNumber txnNum,
                              StmtId stmtId,
                              OpTime prepareOpTime);
+    OplogEntry partialTxn(LogicalSessionId lsid,
+                          TxnNumber txnNum,
+                          StmtId stmtId,
+                          OpTime prevOpTime,
+                          const BSONArray& ops);
     virtual Status resetState();
 
     /**

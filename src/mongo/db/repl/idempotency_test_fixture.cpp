@@ -467,7 +467,8 @@ OplogEntry IdempotencyTest::dropIndex(const std::string& indexName, const UUID& 
 OplogEntry IdempotencyTest::prepare(LogicalSessionId lsid,
                                     TxnNumber txnNum,
                                     StmtId stmtId,
-                                    const BSONArray& ops) {
+                                    const BSONArray& ops,
+                                    OpTime prevOpTime) {
     OperationSessionInfo info;
     info.setSessionId(lsid);
     info.setTxnNumber(txnNum);
@@ -480,18 +481,19 @@ OplogEntry IdempotencyTest::prepare(LogicalSessionId lsid,
                           Date_t::min() /* wallClockTime -- required but not checked */,
                           stmtId,
                           boost::none /* uuid */,
-                          OpTime());
+                          prevOpTime);
 }
 
 OplogEntry IdempotencyTest::commitUnprepared(LogicalSessionId lsid,
                                              TxnNumber txnNum,
                                              StmtId stmtId,
-                                             const BSONArray& ops) {
+                                             const BSONArray& ops,
+                                             OpTime prevOpTime) {
     OperationSessionInfo info;
     info.setSessionId(lsid);
     info.setTxnNumber(txnNum);
     return makeCommandOplogEntryWithSessionInfoAndStmtId(
-        nextOpTime(), nss, BSON("applyOps" << ops), lsid, txnNum, stmtId, OpTime());
+        nextOpTime(), nss, BSON("applyOps" << ops), lsid, txnNum, stmtId, prevOpTime);
 }
 
 OplogEntry IdempotencyTest::commitPrepared(LogicalSessionId lsid,
@@ -514,6 +516,26 @@ OplogEntry IdempotencyTest::abortPrepared(LogicalSessionId lsid,
                                           OpTime prepareOpTime) {
     return makeCommandOplogEntryWithSessionInfoAndStmtId(
         nextOpTime(), nss, BSON("abortTransaction" << 1), lsid, txnNum, stmtId, prepareOpTime);
+}
+
+OplogEntry IdempotencyTest::partialTxn(LogicalSessionId lsid,
+                                       TxnNumber txnNum,
+                                       StmtId stmtId,
+                                       OpTime prevOpTime,
+                                       const BSONArray& ops) {
+    OperationSessionInfo info;
+    info.setSessionId(lsid);
+    info.setTxnNumber(txnNum);
+    return makeOplogEntry(nextOpTime(),
+                          OpTypeEnum::kCommand,
+                          nss.getCommandNS(),
+                          BSON("applyOps" << ops << "partialTxn" << true),
+                          boost::none /* o2 */,
+                          info /* sessionInfo */,
+                          Date_t::min() /* wallClockTime -- required but not checked */,
+                          stmtId,
+                          boost::none /* uuid */,
+                          prevOpTime);
 }
 
 std::string IdempotencyTest::computeDataHash(Collection* collection) {
