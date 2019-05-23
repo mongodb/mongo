@@ -93,23 +93,24 @@ class ConnectionPool::SpecificPool final
     : public std::enable_shared_from_this<ConnectionPool::SpecificPool> {
 public:
     /**
-     * Whenever a function enters a specific pool,
-     * the function needs to be guarded by the pool lock.
+     * Whenever a function enters a specific pool, the function needs to be guarded by the lock.
      *
      * This callback also (perhaps overly aggressively) binds a shared pointer to the guard.
      * It is *always* safe to reference the original specific pool in the guarded function object.
      *
      * For a function object of signature:
-     * R riskyBusiness(stdx::unique_lock<stdx::mutex>, ArgTypes...);
+     * void riskyBusiness(ArgTypes...);
      *
      * It returns a function object of signature:
-     * R safeCallback(ArgTypes...);
+     * void safeCallback(ArgTypes...);
      */
     template <typename Callback>
     auto guardCallback(Callback&& cb) {
-        return [ cb = std::forward<Callback>(cb), anchor = shared_from_this() ](auto&&... args) {
-            return cb(stdx::unique_lock(anchor->_parent->_mutex),
-                      std::forward<decltype(args)>(args)...);
+        return
+            [ this, cb = std::forward<Callback>(cb), anchor = shared_from_this() ](auto&&... args) {
+            stdx::lock_guard lk(_parent->_mutex);
+            cb(std::forward<decltype(args)>(args)...);
+            updateState();
         };
     }
 
@@ -122,7 +123,7 @@ public:
      * Gets a connection from the specific pool. Sinks a unique_lock from the
      * parent to preserve the lock on _mutex
      */
-    Future<ConnectionHandle> getConnection(Milliseconds timeout, stdx::unique_lock<stdx::mutex> lk);
+    Future<ConnectionHandle> getConnection(Milliseconds timeout);
 
     /**
      * Triggers the shutdown procedure. This function marks the state as kInShutdown
@@ -130,61 +131,59 @@ public:
      * delist or destruct this pool. However, both will happen eventually as ConnectionHandles
      * are deleted.
      */
-    void triggerShutdown(const Status& status, stdx::unique_lock<stdx::mutex> lk);
+    void triggerShutdown(const Status& status);
 
     /**
      * Cascades a failure across existing connections and requests. Invoking
      * this function drops all current connections and fails all current
      * requests with the passed status.
      */
-    void processFailure(const Status& status, stdx::unique_lock<stdx::mutex> lk);
+    void processFailure(const Status& status);
 
     /**
      * Returns a connection to a specific pool. Sinks a unique_lock from the
      * parent to preserve the lock on _mutex
      */
-    void returnConnection(ConnectionInterface* connection, stdx::unique_lock<stdx::mutex> lk);
+    void returnConnection(ConnectionInterface* connection);
 
     /**
      * Returns the number of connections currently checked out of the pool.
      */
-    size_t inUseConnections(const stdx::unique_lock<stdx::mutex>& lk);
+    size_t inUseConnections();
 
     /**
      * Returns the number of available connections in the pool.
      */
-    size_t availableConnections(const stdx::unique_lock<stdx::mutex>& lk);
+    size_t availableConnections();
 
     /**
      * Returns the number of in progress connections in the pool.
      */
-    size_t refreshingConnections(const stdx::unique_lock<stdx::mutex>& lk);
+    size_t refreshingConnections();
 
     /**
      * Returns the total number of connections ever created in this pool.
      */
-    size_t createdConnections(const stdx::unique_lock<stdx::mutex>& lk);
+    size_t createdConnections();
 
     /**
      * Returns the total number of connections currently open that belong to
      * this pool. This is the sum of refreshingConnections, availableConnections,
      * and inUseConnections.
      */
-    size_t openConnections(const stdx::unique_lock<stdx::mutex>& lk);
+    size_t openConnections();
 
     /**
      * Return true if the tags on the specific pool match the passed in tags
      */
-    bool matchesTags(const stdx::unique_lock<stdx::mutex>& lk,
-                     transport::Session::TagMask tags) const {
+    bool matchesTags(transport::Session::TagMask tags) const {
         return !!(_tags & tags);
     }
 
     /**
      * Atomically manipulate the tags in the pool
      */
-    void mutateTags(const stdx::unique_lock<stdx::mutex>& lk,
-                    const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>&
+    void mutateTags(const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>&
                         mutateFunc) {
         _tags = mutateFunc(_tags);
     }
@@ -195,6 +194,20 @@ public:
             fassertFailedNoTrace(51043);
         }
     }
+
+    void spawnConnections();
+
+    template <typename CallableT>
+    void runOnExecutor(CallableT&& cb) {
+        ExecutorFuture(ExecutorPtr(_parent->_factory->getExecutor()))  //
+            .getAsync([ anchor = shared_from_this(),
+                        cb = std::forward<CallableT>(cb) ](Status && status) mutable {
+                invariant(status);
+                cb();
+            });
+    }
+
+    void updateState();
 
 private:
     using OwnedConnection = std::shared_ptr<ConnectionInterface>;
@@ -209,27 +222,21 @@ private:
 
     ConnectionHandle makeHandle(ConnectionInterface* connection);
 
-    void finishRefresh(stdx::unique_lock<stdx::mutex> lk,
-                       ConnectionInterface* connPtr,
-                       Status status);
+    void finishRefresh(ConnectionInterface* connPtr, Status status);
 
-    void addToReady(stdx::unique_lock<stdx::mutex>& lk, OwnedConnection conn);
+    void addToReady(OwnedConnection conn);
 
-    void fulfillRequests(stdx::unique_lock<stdx::mutex>& lk);
-
-    void spawnConnections(stdx::unique_lock<stdx::mutex>& lk);
+    void fulfillRequests();
 
     // This internal helper is used both by get and by fulfillRequests and differs in that it
     // skips some bookkeeping that the other callers do on their own
-    ConnectionHandle tryGetConnection(const stdx::unique_lock<stdx::mutex>& lk);
+    ConnectionHandle tryGetConnection();
 
     template <typename OwnershipPoolType>
     typename OwnershipPoolType::mapped_type takeFromPool(
         OwnershipPoolType& pool, typename OwnershipPoolType::key_type connPtr);
 
     OwnedConnection takeFromProcessingPool(ConnectionInterface* connection);
-
-    void updateStateInLock();
 
 private:
     const std::shared_ptr<ConnectionPool> _parent;
@@ -280,13 +287,6 @@ private:
     State _state;
 };
 
-constexpr Milliseconds ConnectionPool::kDefaultHostTimeout;
-size_t const ConnectionPool::kDefaultMaxConns = std::numeric_limits<size_t>::max();
-size_t const ConnectionPool::kDefaultMinConns = 1;
-size_t const ConnectionPool::kDefaultMaxConnecting = std::numeric_limits<size_t>::max();
-constexpr Milliseconds ConnectionPool::kDefaultRefreshRequirement;
-constexpr Milliseconds ConnectionPool::kDefaultRefreshTimeout;
-
 const Status ConnectionPool::kConnectionStateUnknown =
     Status(ErrorCodes::InternalError, "Connection is in an unknown state");
 
@@ -317,20 +317,20 @@ void ConnectionPool::shutdown() {
 
     // Grab all current pools (under the lock)
     auto pools = [&] {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::lock_guard lk(_mutex);
         return _pools;
     }();
 
     for (const auto& pair : pools) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::lock_guard lk(_mutex);
         pair.second->triggerShutdown(
-            Status(ErrorCodes::ShutdownInProgress, "Shutting down the connection pool"),
-            std::move(lk));
+            Status(ErrorCodes::ShutdownInProgress, "Shutting down the connection pool"));
+        pair.second->updateState();
     }
 }
 
 void ConnectionPool::dropConnections(const HostAndPort& hostAndPort) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
 
     auto iter = _pools.find(hostAndPort);
 
@@ -338,34 +338,35 @@ void ConnectionPool::dropConnections(const HostAndPort& hostAndPort) {
         return;
 
     auto pool = iter->second;
-    pool->processFailure(Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"),
-                         std::move(lk));
+    pool->processFailure(
+        Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"));
+    pool->updateState();
 }
 
 void ConnectionPool::dropConnections(transport::Session::TagMask tags) {
     // Grab all current pools (under the lock)
     auto pools = [&] {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::lock_guard lk(_mutex);
         return _pools;
     }();
 
     for (const auto& pair : pools) {
         auto& pool = pair.second;
 
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (pool->matchesTags(lk, tags))
+        stdx::lock_guard lk(_mutex);
+        if (pool->matchesTags(tags))
             continue;
 
         pool->processFailure(
-            Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"),
-            std::move(lk));
+            Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"));
+        pool->updateState();
     }
 }
 
 void ConnectionPool::mutateTags(
     const HostAndPort& hostAndPort,
     const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
 
     auto iter = _pools.find(hostAndPort);
 
@@ -373,57 +374,60 @@ void ConnectionPool::mutateTags(
         return;
 
     auto pool = iter->second;
-    pool->mutateTags(lk, mutateFunc);
+    pool->mutateTags(mutateFunc);
 }
 
 void ConnectionPool::get_forTest(const HostAndPort& hostAndPort,
                                  Milliseconds timeout,
                                  GetConnectionCallback cb) {
-    return get(hostAndPort, transport::kGlobalSSLMode, timeout).getAsync(std::move(cb));
+    // We kick ourselves onto the executor queue to prevent us from deadlocking with our own thread
+    auto getConnectionFunc = [ this, hostAndPort, timeout, cb = std::move(cb) ](Status &&) mutable {
+        get(hostAndPort, transport::kGlobalSSLMode, timeout)
+            .thenRunOn(_factory->getExecutor())
+            .getAsync(std::move(cb));
+    };
+    _factory->getExecutor()->schedule(std::move(getConnectionFunc));
 }
 
-Future<ConnectionPool::ConnectionHandle> ConnectionPool::get(const HostAndPort& hostAndPort,
-                                                             transport::ConnectSSLMode sslMode,
-                                                             Milliseconds timeout) {
-    std::shared_ptr<SpecificPool> pool;
-
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-    auto iter = _pools.find(hostAndPort);
-
-    if (iter == _pools.end()) {
+SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::get(const HostAndPort& hostAndPort,
+                                                                 transport::ConnectSSLMode sslMode,
+                                                                 Milliseconds timeout) {
+    stdx::lock_guard lk(_mutex);
+    auto& pool = _pools[hostAndPort];
+    if (!pool) {
         pool = std::make_shared<SpecificPool>(shared_from_this(), hostAndPort, sslMode);
-        _pools[hostAndPort] = pool;
     } else {
-        pool = iter->second;
         pool->fassertSSLModeIs(sslMode);
     }
 
     invariant(pool);
 
-    return pool->getConnection(timeout, std::move(lk));
+    auto connFuture = pool->getConnection(timeout);
+    pool->updateState();
+
+    return std::move(connFuture).semi();
 }
 
 void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
 
     for (const auto& kv : _pools) {
         HostAndPort host = kv.first;
 
         auto& pool = kv.second;
-        ConnectionStatsPer hostStats{pool->inUseConnections(lk),
-                                     pool->availableConnections(lk),
-                                     pool->createdConnections(lk),
-                                     pool->refreshingConnections(lk)};
+        ConnectionStatsPer hostStats{pool->inUseConnections(),
+                                     pool->availableConnections(),
+                                     pool->createdConnections(),
+                                     pool->refreshingConnections()};
         stats->updateStatsForHost(_name, host, hostStats);
     }
 }
 
 size_t ConnectionPool::getNumConnectionsPerHost(const HostAndPort& hostAndPort) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::lock_guard lk(_mutex);
     auto iter = _pools.find(hostAndPort);
     if (iter != _pools.end()) {
-        return iter->second->openConnections(lk);
+        return iter->second->openConnections();
     }
 
     return 0;
@@ -452,35 +456,31 @@ ConnectionPool::SpecificPool::~SpecificPool() {
     invariant(_checkedOutPool.empty());
 }
 
-size_t ConnectionPool::SpecificPool::inUseConnections(const stdx::unique_lock<stdx::mutex>& lk) {
+size_t ConnectionPool::SpecificPool::inUseConnections() {
     return _checkedOutPool.size();
 }
 
-size_t ConnectionPool::SpecificPool::availableConnections(
-    const stdx::unique_lock<stdx::mutex>& lk) {
+size_t ConnectionPool::SpecificPool::availableConnections() {
     return _readyPool.size();
 }
 
-size_t ConnectionPool::SpecificPool::refreshingConnections(
-    const stdx::unique_lock<stdx::mutex>& lk) {
+size_t ConnectionPool::SpecificPool::refreshingConnections() {
     return _processingPool.size();
 }
 
-size_t ConnectionPool::SpecificPool::createdConnections(const stdx::unique_lock<stdx::mutex>& lk) {
+size_t ConnectionPool::SpecificPool::createdConnections() {
     return _created;
 }
 
-size_t ConnectionPool::SpecificPool::openConnections(const stdx::unique_lock<stdx::mutex>& lk) {
+size_t ConnectionPool::SpecificPool::openConnections() {
     return _checkedOutPool.size() + _readyPool.size() + _processingPool.size();
 }
 
 Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnection(
-    Milliseconds timeout, stdx::unique_lock<stdx::mutex> lk) {
+    Milliseconds timeout) {
     invariant(_state != State::kInShutdown);
 
-    auto conn = tryGetConnection(lk);
-
-    updateStateInLock();
+    auto conn = tryGetConnection();
 
     if (conn) {
         return Future<ConnectionPool::ConnectionHandle>::makeReady(std::move(conn));
@@ -496,29 +496,23 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     _requests.push_back(make_pair(expiration, std::move(pf.promise)));
     std::push_heap(begin(_requests), end(_requests), RequestComparator{});
 
-    updateStateInLock();
-
-    lk.unlock();
-    _parent->_factory->getExecutor()->schedule(guardCallback([this](auto lk, auto schedStatus) {
-        fassert(51169, schedStatus);
-
-        spawnConnections(lk);
-    }));
+    spawnConnections();
 
     return std::move(pf.future);
 }
 
 auto ConnectionPool::SpecificPool::makeHandle(ConnectionInterface* connection) -> ConnectionHandle {
-    auto fun = guardCallback(
-        [this](auto lk, auto connection) { returnConnection(connection, std::move(lk)); });
-
-    auto handle = ConnectionHandle(connection, fun);
-    return handle;
+    auto deleter = [ this, anchor = shared_from_this() ](ConnectionInterface * connection) {
+        runOnExecutor([this, connection]() {
+            stdx::lock_guard lk(_parent->_mutex);
+            returnConnection(connection);
+            updateState();
+        });
+    };
+    return ConnectionHandle(connection, std::move(deleter));
 }
 
-ConnectionPool::ConnectionHandle ConnectionPool::SpecificPool::tryGetConnection(
-    const stdx::unique_lock<stdx::mutex>&) {
-
+ConnectionPool::ConnectionHandle ConnectionPool::SpecificPool::tryGetConnection() {
     while (_readyPool.size()) {
         // _readyPool is an LRUCache, so its begin() object is the MRU item.
         auto iter = _readyPool.begin();
@@ -549,9 +543,7 @@ ConnectionPool::ConnectionHandle ConnectionPool::SpecificPool::tryGetConnection(
     return {};
 }
 
-void ConnectionPool::SpecificPool::finishRefresh(stdx::unique_lock<stdx::mutex> lk,
-                                                 ConnectionInterface* connPtr,
-                                                 Status status) {
+void ConnectionPool::SpecificPool::finishRefresh(ConnectionInterface* connPtr, Status status) {
     auto conn = takeFromProcessingPool(connPtr);
 
     // If we're in shutdown, we don't need refreshed connections
@@ -565,42 +557,35 @@ void ConnectionPool::SpecificPool::finishRefresh(stdx::unique_lock<stdx::mutex> 
     if (status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
         LOG(0) << "Pending connection to host " << _hostAndPort
                << " did not complete within the connection timeout,"
-               << " retrying with a new connection;" << openConnections(lk)
+               << " retrying with a new connection;" << openConnections()
                << " connections to that host remain open";
-        spawnConnections(lk);
+        spawnConnections();
         return;
     }
 
     // Pass a failure on through
     if (!status.isOK()) {
-        processFailure(status, std::move(lk));
+        processFailure(status);
         return;
     }
 
     // If the host and port were dropped, let this lapse and spawn new connections
     if (conn->getGeneration() != _generation) {
-        spawnConnections(lk);
+        spawnConnections();
         return;
     }
 
     // If the connection refreshed successfully, throw it back in the ready pool
-    addToReady(lk, std::move(conn));
+    addToReady(std::move(conn));
 
-    lk.unlock();
-    _parent->_factory->getExecutor()->schedule(guardCallback([this](auto lk, auto schedStatus) {
-        fassert(51170, schedStatus);
-        fulfillRequests(lk);
-    }));
+    fulfillRequests();
 }
 
-void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr,
-                                                    stdx::unique_lock<stdx::mutex> lk) {
+void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr) {
     auto needsRefreshTP = connPtr->getLastUsed() + _parent->_options.refreshRequirement;
 
     auto conn = takeFromPool(_checkedOutPool, connPtr);
     invariant(conn);
-
-    updateStateInLock();
 
     if (conn->getGeneration() != _generation) {
         // If the connection is from an older generation, just return.
@@ -610,7 +595,7 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
     if (!conn->getStatus().isOK()) {
         // TODO: alert via some callback if the host is bad
         log() << "Ending connection to host " << _hostAndPort << " due to bad connection status; "
-              << openConnections(lk) << " connections to that host remain open";
+              << openConnections() << " connections to that host remain open";
         return;
     }
 
@@ -622,37 +607,29 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
             _parent->_options.minConnections) {
             // If we already have minConnections, just let the connection lapse
             log() << "Ending idle connection to host " << _hostAndPort
-                  << " because the pool meets constraints; " << openConnections(lk)
+                  << " because the pool meets constraints; " << openConnections()
                   << " connections to that host remain open";
             return;
         }
 
         _processingPool[connPtr] = std::move(conn);
 
-        // Unlock in case refresh can occur immediately
-        lk.unlock();
         connPtr->refresh(_parent->_options.refreshTimeout,
-                         guardCallback([this](auto lk, auto conn, auto status) {
-                             finishRefresh(std::move(lk), conn, status);
+                         guardCallback([this](auto conn, auto status) {
+                             finishRefresh(std::move(conn), std::move(status));
                          }));
-        lk.lock();
-    } else {
-        // If it's fine as it is, just put it in the ready queue
-        addToReady(lk, std::move(conn));
 
-        lk.unlock();
-        _parent->_factory->getExecutor()->schedule(guardCallback([this](auto lk, auto schedStatus) {
-            fassert(51171, schedStatus);
-            fulfillRequests(lk);
-        }));
+        return;
     }
 
-    updateStateInLock();
+    // If it's fine as it is, just put it in the ready queue
+    addToReady(std::move(conn));
+
+    fulfillRequests();
 }
 
 // Adds a live connection to the ready pool
-void ConnectionPool::SpecificPool::addToReady(stdx::unique_lock<stdx::mutex>& lk,
-                                              OwnedConnection conn) {
+void ConnectionPool::SpecificPool::addToReady(OwnedConnection conn) {
     auto connPtr = conn.get();
 
     // This makes the connection the new most-recently-used connection.
@@ -661,8 +638,7 @@ void ConnectionPool::SpecificPool::addToReady(stdx::unique_lock<stdx::mutex>& lk
     // Our strategy for refreshing connections is to check them out and
     // immediately check them back in (which kicks off the refresh logic in
     // returnConnection
-    connPtr->setTimeout(_parent->_options.refreshRequirement,
-                        guardCallback([this, connPtr](stdx::unique_lock<stdx::mutex> lk) {
+    connPtr->setTimeout(_parent->_options.refreshRequirement, guardCallback([this, connPtr]() {
                             auto conn = takeFromPool(_readyPool, connPtr);
 
                             // We've already been checked out. We don't need to refresh
@@ -678,21 +654,19 @@ void ConnectionPool::SpecificPool::addToReady(stdx::unique_lock<stdx::mutex>& lk
 
                             connPtr->indicateSuccess();
 
-                            returnConnection(connPtr, std::move(lk));
+                            returnConnection(connPtr);
                         }));
 }
 
 // Sets state to shutdown and kicks off the failure protocol to tank existing connections
-void ConnectionPool::SpecificPool::triggerShutdown(const Status& status,
-                                                   stdx::unique_lock<stdx::mutex> lk) {
+void ConnectionPool::SpecificPool::triggerShutdown(const Status& status) {
     _state = State::kInShutdown;
     _droppedProcessingPool.clear();
-    processFailure(status, std::move(lk));
+    processFailure(status);
 }
 
 // Drop connections and fail all requests
-void ConnectionPool::SpecificPool::processFailure(const Status& status,
-                                                  stdx::unique_lock<stdx::mutex> lk) {
+void ConnectionPool::SpecificPool::processFailure(const Status& status) {
     // Bump the generation so we don't reuse any pending or checked out
     // connections
     _generation++;
@@ -727,20 +701,13 @@ void ConnectionPool::SpecificPool::processFailure(const Status& status,
         swap(requestsToFail, _requests);
     }
 
-    // Update state to reflect the lack of requests
-    updateStateInLock();
-
-    // Drop the lock and process all of the requests
-    // with the same failed status
-    lk.unlock();
-
     for (auto& request : requestsToFail) {
         request.second.setError(status);
     }
 }
 
 // fulfills as many outstanding requests as possible
-void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex>& lk) {
+void ConnectionPool::SpecificPool::fulfillRequests() {
     // If some other thread (possibly this thread) is fulfilling requests,
     // don't keep padding the callstack.
     if (_inFulfillRequests)
@@ -755,7 +722,7 @@ void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex
         // deadlock).
         //
         // None of the heap manipulation code throws, but it's something to keep in mind.
-        auto conn = tryGetConnection(lk);
+        auto conn = tryGetConnection();
 
         if (!conn) {
             break;
@@ -766,19 +733,15 @@ void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex
         std::pop_heap(begin(_requests), end(_requests), RequestComparator{});
         _requests.pop_back();
 
-        lk.unlock();
         promise.emplaceValue(std::move(conn));
-        lk.lock();
-
-        updateStateInLock();
     }
 
-    spawnConnections(lk);
+    spawnConnections();
 }
 
 // spawn enough connections to satisfy open requests and minpool, while
 // honoring maxpool
-void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mutex>& lk) {
+void ConnectionPool::SpecificPool::spawnConnections() {
     // If some other thread (possibly this thread) is spawning connections,
     // don't keep padding the callstack.
     if (_inSpawnConnections)
@@ -817,16 +780,13 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
         ++_created;
 
         // Run the setup callback
-        lk.unlock();
         handle->setup(_parent->_options.refreshTimeout,
-                      guardCallback([this](auto lk, auto conn, auto status) {
-                          finishRefresh(std::move(lk), conn, status);
+                      guardCallback([this](auto conn, auto status) {
+                          finishRefresh(std::move(conn), std::move(status));
                       }));
 
         // Note that this assumes that the refreshTimeout is sound for the
         // setupTimeout
-
-        lk.lock();
     }
 }
 
@@ -855,7 +815,7 @@ ConnectionPool::SpecificPool::OwnedConnection ConnectionPool::SpecificPool::take
 
 
 // Updates our state and manages the request timer
-void ConnectionPool::SpecificPool::updateStateInLock() {
+void ConnectionPool::SpecificPool::updateState() {
     if (_state == State::kInShutdown) {
         // If we're in shutdown, there is nothing to update. Our clients are all gone.
         if (_processingPool.empty()) {
@@ -885,7 +845,7 @@ void ConnectionPool::SpecificPool::updateStateInLock() {
         // We set a timer for the most recent request, then invoke each timed
         // out request we couldn't service
         _requestTimer->setTimeout(
-            timeout, guardCallback([this](stdx::unique_lock<stdx::mutex> lk) {
+            timeout, guardCallback([this]() {
                 auto now = _parent->_factory->now();
 
                 while (_requests.size()) {
@@ -896,16 +856,12 @@ void ConnectionPool::SpecificPool::updateStateInLock() {
                         std::pop_heap(begin(_requests), end(_requests), RequestComparator{});
                         _requests.pop_back();
 
-                        lk.unlock();
                         promise.setError(Status(ErrorCodes::NetworkInterfaceExceededTimeLimit,
                                                 "Couldn't get a connection within the time limit"));
-                        lk.lock();
                     } else {
                         break;
                     }
                 }
-
-                updateStateInLock();
             }));
     } else if (_checkedOutPool.size()) {
         // If we have no requests, but someone's using a connection, we just
@@ -931,14 +887,13 @@ void ConnectionPool::SpecificPool::updateStateInLock() {
 
         // Set the shutdown timer, this gets reset on any request
         _requestTimer->setTimeout(
-            timeout, guardCallback([this](auto lk) {
+            timeout, guardCallback([this]() {
                 if (_state != State::kIdle)
                     return;
 
                 triggerShutdown(
                     Status(ErrorCodes::NetworkInterfaceExceededTimeLimit,
-                           "Connection pool has been idle for longer than the host timeout"),
-                    std::move(lk));
+                           "Connection pool has been idle for longer than the host timeout"));
             }));
     }
 }

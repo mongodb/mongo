@@ -98,16 +98,19 @@ void TLTimer::setTimeout(Milliseconds timeoutVal, TimeoutCallback cb) {
         return;
     }
 
-    _timer->waitUntil(_reactor->now() + timeoutVal).getAsync([cb = std::move(cb)](Status status) {
-        // If we get canceled, then we don't worry about the timeout anymore
-        if (status == ErrorCodes::CallbackCanceled) {
-            return;
-        }
+    // Wait until our timeoutVal then run on the reactor
+    _timer->waitUntil(_reactor->now() + timeoutVal)
+        .thenRunOn(_reactor)
+        .getAsync([cb = std::move(cb)](Status status) {
+            // If we get canceled, then we don't worry about the timeout anymore
+            if (status == ErrorCodes::CallbackCanceled) {
+                return;
+            }
 
-        fassert(50475, status);
+            fassert(50475, status);
 
-        cb();
-    });
+            cb();
+        });
 }
 
 void TLTimer::cancelTimeout() {
@@ -209,7 +212,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
 
     auto pf = makePromiseFuture<void>();
     auto handler = std::make_shared<TimeoutHandler>(std::move(pf.promise));
-    std::move(pf.future).getAsync(
+    std::move(pf.future).thenRunOn(_reactor).getAsync(
         [ this, cb = std::move(cb), anchor ](Status status) { cb(this, std::move(status)); });
 
     setTimeout(timeout, [this, handler, timeout] {
@@ -281,7 +284,7 @@ void TLConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
 
     auto pf = makePromiseFuture<void>();
     auto handler = std::make_shared<TimeoutHandler>(std::move(pf.promise));
-    std::move(pf.future).getAsync(
+    std::move(pf.future).thenRunOn(_reactor).getAsync(
         [ this, cb = std::move(cb), anchor ](Status status) { cb(this, status); });
 
     setTimeout(timeout, [this, handler] {

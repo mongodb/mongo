@@ -32,6 +32,7 @@
 #include <set>
 
 #include "mongo/executor/connection_pool.h"
+#include "mongo/util/functional.h"
 
 namespace mongo {
 namespace executor {
@@ -77,8 +78,8 @@ private:
  */
 class ConnectionImpl final : public ConnectionPool::ConnectionInterface {
 public:
-    using PushSetupCallback = stdx::function<Status()>;
-    using PushRefreshCallback = stdx::function<Status()>;
+    using PushSetupCallback = unique_function<Status()>;
+    using PushRefreshCallback = unique_function<Status()>;
 
     ConnectionImpl(const HostAndPort& hostAndPort, size_t generation, PoolImpl* global);
 
@@ -114,6 +115,9 @@ private:
     void setup(Milliseconds timeout, SetupCallback cb) override;
 
     void refresh(Milliseconds timeout, RefreshCallback cb) override;
+
+    static void processSetup();
+    static void processRefresh();
 
     HostAndPort _hostAndPort;
     SetupCallback _setupCallback;
@@ -167,6 +171,7 @@ public:
  */
 class PoolImpl final : public ConnectionPool::DependentTypeFactoryInterface {
     friend class ConnectionImpl;
+    friend class TimerImpl;
 
 public:
     PoolImpl() = default;

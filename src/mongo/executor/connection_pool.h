@@ -76,9 +76,9 @@ public:
     using GetConnectionCallback = unique_function<void(StatusWith<ConnectionHandle>)>;
 
     static constexpr Milliseconds kDefaultHostTimeout = Milliseconds(300000);  // 5mins
-    static const size_t kDefaultMaxConns;
-    static const size_t kDefaultMinConns;
-    static const size_t kDefaultMaxConnecting;
+    static constexpr size_t kDefaultMaxConns = std::numeric_limits<size_t>::max();
+    static constexpr size_t kDefaultMinConns = 1;
+    static constexpr size_t kDefaultMaxConnecting = 2;
     static constexpr Milliseconds kDefaultRefreshRequirement = Milliseconds(60000);  // 1min
     static constexpr Milliseconds kDefaultRefreshTimeout = Milliseconds(20000);      // 20secs
 
@@ -155,9 +155,9 @@ public:
                     const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>&
                         mutateFunc) override;
 
-    Future<ConnectionHandle> get(const HostAndPort& hostAndPort,
-                                 transport::ConnectSSLMode sslMode,
-                                 Milliseconds timeout);
+    SemiFuture<ConnectionHandle> get(const HostAndPort& hostAndPort,
+                                     transport::ConnectSSLMode sslMode,
+                                     Milliseconds timeout);
     void get_forTest(const HostAndPort& hostAndPort,
                      Milliseconds timeout,
                      GetConnectionCallback cb);
@@ -294,8 +294,8 @@ protected:
      * Making these protected makes the definitions available to override in
      * children.
      */
-    using SetupCallback = stdx::function<void(ConnectionInterface*, Status)>;
-    using RefreshCallback = stdx::function<void(ConnectionInterface*, Status)>;
+    using SetupCallback = unique_function<void(ConnectionInterface*, Status)>;
+    using RefreshCallback = unique_function<void(ConnectionInterface*, Status)>;
 
     /**
      * Sets up the connection. This should include connection + auth + any

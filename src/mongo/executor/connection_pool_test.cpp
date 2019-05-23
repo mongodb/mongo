@@ -76,10 +76,13 @@ void doneWith(const ConnectionPool::ConnectionHandle& conn) {
 
 using StatusWithConn = StatusWith<ConnectionPool::ConnectionHandle>;
 
+auto getId(const ConnectionPool::ConnectionHandle& conn) {
+    return dynamic_cast<ConnectionImpl*>(conn.get())->id();
+}
 auto verifyAndGetId(StatusWithConn& swConn) {
     ASSERT(swConn.isOK());
     auto& conn = swConn.getValue();
-    return dynamic_cast<ConnectionImpl*>(conn.get())->id();
+    return getId(conn);
 }
 
 /**
@@ -1271,7 +1274,7 @@ TEST_F(ConnectionPoolTest, SetupTimeoutsDontTimeoutUnrelatedRequests) {
 
     ASSERT(conn1);
     ASSERT(!conn1->isOK());
-    ASSERT(conn1->getStatus().code() == ErrorCodes::NetworkInterfaceExceededTimeLimit);
+    ASSERT_EQ(conn1->getStatus(), ErrorCodes::NetworkInterfaceExceededTimeLimit);
 }
 
 /**
@@ -1324,7 +1327,7 @@ TEST_F(ConnectionPoolTest, RefreshTimeoutsDontTimeoutRequests) {
 
     ASSERT(conn1);
     ASSERT(!conn1->isOK());
-    ASSERT(conn1->getStatus().code() == ErrorCodes::NetworkInterfaceExceededTimeLimit);
+    ASSERT_EQ(conn1->getStatus(), ErrorCodes::NetworkInterfaceExceededTimeLimit);
 }
 
 template <typename Ptr>
@@ -1438,10 +1441,9 @@ TEST_F(ConnectionPoolTest, AsyncGet) {
 
         // Future should be ready now
         ASSERT_TRUE(connFuture.isReady());
-        std::move(connFuture).getAsync([&](StatusWithConn swConn) mutable {
-            connId = verifyAndGetId(swConn);
-            doneWith(swConn.getValue());
-        });
+        auto conn = std::move(connFuture).get();
+        connId = getId(conn);
+        doneWith(conn);
         ASSERT(connId);
     }
 
@@ -1457,27 +1459,21 @@ TEST_F(ConnectionPoolTest, AsyncGet) {
         auto connFuture1 = pool->get(HostAndPort(), transport::kGlobalSSLMode, Seconds{1});
         auto connFuture2 = pool->get(HostAndPort(), transport::kGlobalSSLMode, Seconds{10});
 
-        // Queue up the second future to resolve as soon as it is ready
-        std::move(connFuture2).getAsync([&](StatusWithConn swConn) mutable {
-            connId2 = verifyAndGetId(swConn);
-            doneWith(swConn.getValue());
-        });
-
         // The first future should be immediately ready. The second should be in the queue.
         ASSERT_TRUE(connFuture1.isReady());
         ASSERT_FALSE(connFuture2.isReady());
 
         // Resolve the first future to return the connection and continue on to the second.
         decltype(connFuture1) connFuture3;
-        std::move(connFuture1).getAsync([&](StatusWithConn swConn) mutable {
-            // Grab our third future while our first one is being fulfilled
-            connFuture3 = pool->get(HostAndPort(), transport::kGlobalSSLMode, Seconds{1});
+        auto conn1 = std::move(connFuture1).get();
 
-            connId1 = verifyAndGetId(swConn);
-            doneWith(swConn.getValue());
-        });
+        // Grab our third future while our first one is being fulfilled
+        connFuture3 = pool->get(HostAndPort(), transport::kGlobalSSLMode, Seconds{1});
+
+        connId1 = getId(conn1);
+        doneWith(conn1);
+        conn1.reset();
         ASSERT(connId1);
-        ASSERT_FALSE(connId2);
 
         // Since the third future has a smaller timeout than the second,
         // it should take priority over the second
@@ -1485,13 +1481,20 @@ TEST_F(ConnectionPoolTest, AsyncGet) {
         ASSERT_FALSE(connFuture2.isReady());
 
         // Resolve the third future. This should trigger the second future
-        std::move(connFuture3).getAsync([&](StatusWithConn swConn) mutable {
-            // We run before the second future
-            ASSERT_FALSE(connId2);
+        auto conn3 = std::move(connFuture3).get();
 
-            connId3 = verifyAndGetId(swConn);
-            doneWith(swConn.getValue());
-        });
+        // We've run before the second future
+        ASSERT_FALSE(connFuture2.isReady());
+
+        connId3 = getId(conn3);
+        doneWith(conn3);
+        conn3.reset();
+
+        // The second future is now finally ready
+        ASSERT_TRUE(connFuture2.isReady());
+        auto conn2 = std::move(connFuture2).get();
+        connId2 = getId(conn2);
+        doneWith(conn2);
 
         ASSERT_EQ(connId1, connId2);
         ASSERT_EQ(connId2, connId3);

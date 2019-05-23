@@ -139,6 +139,9 @@ public:
      * Returns ErrorCodes::ShutdownInProgress if NetworkInterface::shutdown has already started
      * and Status::OK() otherwise. If it returns Status::OK(), then the onFinish argument will be
      * executed by NetworkInterface eventually; otherwise, it will not.
+     *
+     * Note that if you pass a baton to startCommand and that baton refuses work, then your onFinish
+     * function will not run.
      */
     virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                 RemoteCommandRequest& request,
