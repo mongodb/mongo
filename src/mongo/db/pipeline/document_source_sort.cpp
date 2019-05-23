@@ -531,8 +531,8 @@ int DocumentSourceSort::compare(const Value& lhs, const Value& rhs) const {
     return 0;
 }
 
-boost::optional<DocumentSource::MergingLogic> DocumentSourceSort::mergingLogic() {
-    MergingLogic split;
+boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distributedPlanLogic() {
+    DistributedPlanLogic split;
     split.shardsStage = this;
     split.inputSortPattern =
         serializeSortKeyPattern(SortKeySerialization::kForSortKeyMerging).toBson();

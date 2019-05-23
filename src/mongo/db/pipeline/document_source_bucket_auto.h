@@ -62,9 +62,9 @@ public:
     /**
      * The $bucketAuto stage must be run on the merging shard.
      */
-    boost::optional<MergingLogic> mergingLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         // {shardsStage, mergingStage, sortPattern}
-        return MergingLogic{nullptr, this, boost::none};
+        return DistributedPlanLogic{nullptr, this, boost::none};
     }
 
     static const uint64_t kDefaultMaxMemoryUsageBytes = 100 * 1024 * 1024;

@@ -82,7 +82,7 @@ public:
         return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
     }
 
-    boost::optional<MergingLogic> mergingLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         return boost::none;
     }
 

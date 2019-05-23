@@ -131,7 +131,7 @@ public:
     /**
      * In a sharded cluster, this becomes a merge sort by distance, from nearest to furthest.
      */
-    boost::optional<MergingLogic> mergingLogic() final;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 
 
 private:

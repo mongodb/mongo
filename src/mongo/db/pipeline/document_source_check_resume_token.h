@@ -73,7 +73,7 @@ public:
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 
-    boost::optional<MergingLogic> mergingLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
     }
 
@@ -129,8 +129,8 @@ public:
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 
-    boost::optional<MergingLogic> mergingLogic() final {
-        MergingLogic logic;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+        DistributedPlanLogic logic;
         // This stage must run on mongos to ensure it sees the resume token, which could have come
         // from any shard.  We also must include a mergingPresorted $sort stage to communicate to
         // the AsyncResultsMerger that we need to merge the streams in a particular order.

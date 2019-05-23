@@ -58,7 +58,7 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
-    boost::optional<MergingLogic> mergingLogic() final;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 
     long long getSampleSize() const {
         return _size;

@@ -157,7 +157,7 @@ public:
      */
     bool usedDisk() final;
 
-    boost::optional<MergingLogic> mergingLogic() final;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     bool canRunInParallelBeforeOut(
         const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const final;
 

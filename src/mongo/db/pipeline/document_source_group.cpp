@@ -666,7 +666,7 @@ Document DocumentSourceGroup::makeDocument(const Value& id,
     return out.freeze();
 }
 
-boost::optional<DocumentSource::MergingLogic> DocumentSourceGroup::mergingLogic() {
+boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceGroup::distributedPlanLogic() {
     intrusive_ptr<DocumentSourceGroup> mergingGroup(new DocumentSourceGroup(pExpCtx));
     mergingGroup->setDoingMerge(true);
 
@@ -686,7 +686,7 @@ boost::optional<DocumentSource::MergingLogic> DocumentSourceGroup::mergingLogic(
     }
 
     // {shardsStage, mergingStage, sortPattern}
-    return MergingLogic{this, mergingGroup, boost::none};
+    return DistributedPlanLogic{this, mergingGroup, boost::none};
 }
 
 bool DocumentSourceGroup::pathIncludedInGroupKeys(const std::string& dottedPath) const {

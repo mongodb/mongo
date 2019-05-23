@@ -136,7 +136,7 @@ public:
                 LookupRequirement::kNotAllowed};
     }
 
-    boost::optional<MergingLogic> mergingLogic() final override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final override {
         // It should always be faster to avoid splitting the pipeline if the output collection is
         // sharded. If we avoid splitting the pipeline then each shard can perform the writes to the
         // target collection in parallel.
@@ -148,7 +148,7 @@ public:
             return boost::none;
         }
         // {shardsStage, mergingStage, sortPattern}
-        return MergingLogic{nullptr, this, boost::none};
+        return DistributedPlanLogic{nullptr, this, boost::none};
     }
 
     bool canRunInParallelBeforeOut(

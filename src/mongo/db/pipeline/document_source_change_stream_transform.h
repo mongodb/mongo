@@ -54,7 +54,7 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const;
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
-    boost::optional<MergingLogic> mergingLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
     }
 

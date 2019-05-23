@@ -56,7 +56,7 @@ public:
                                 LookupRequirement::kAllowed};
     }
 
-    virtual boost::optional<MergingLogic> mergingLogic() override {
+    virtual boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         return boost::none;
     }
 

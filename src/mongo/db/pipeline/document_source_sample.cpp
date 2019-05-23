@@ -118,10 +118,10 @@ intrusive_ptr<DocumentSource> DocumentSourceSample::createFromBson(
 }
 
 
-boost::optional<DocumentSource::MergingLogic> DocumentSourceSample::mergingLogic() {
+boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSample::distributedPlanLogic() {
     // On the merger we need to merge the pre-sorted documents by their random values, then limit to
     // the number we need.
-    MergingLogic logic;
+    DistributedPlanLogic logic;
     logic.shardsStage = this;
     if (_size > 0) {
         logic.mergingStage = DocumentSourceLimit::create(pExpCtx, _size);

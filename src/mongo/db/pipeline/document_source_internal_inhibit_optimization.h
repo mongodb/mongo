@@ -63,7 +63,7 @@ public:
                 LookupRequirement::kAllowed};
     }
 
-    boost::optional<MergingLogic> mergingLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
     }
 
