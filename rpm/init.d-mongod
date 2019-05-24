@@ -100,7 +100,27 @@ mongo_killproc()
   local -i duration=10
   local pid=`pidofproc -p "${pid_file}" ${procname}`
 
-  kill -TERM $pid >/dev/null 2>&1
+  # Per the man page the process name should always be the second
+  # field. In our case mongod is wrapped in parens hence the parens in
+  # the if condition below.
+  local stat_procname=`cat /proc/$pid/stat | cut -d" " -f2`
+  # $procname is the full path to the mongod binary but the process
+  # name will only match the binary's file name.
+  local binary_name=`basename $procname`
+  if [ "($binary_name)" != "$stat_procname" ]; then
+     echo "PID file may have been tampered with, refusing to kill process"
+     echo "Expected (${binary_name}) but found ${stat_procname}"
+     exit 1
+  fi
+
+  # This doesn't actually "daemonize" this process. All this function
+  # does (defined in /etc/init.d/function) is run a process as another
+  # user in a way that doesn't require sudo or other packages which
+  # are not guaranteed to exist on any given system.
+  #
+  # The check flag here can be ignored it doesn't do anything except
+  # prevent the daemon function's PID checking from throwing an error.
+  daemon --check "$mongod" --user "$MONGO_USER" "kill -TERM $pid >/dev/null 2>&1"
   usleep 100000
   local -i x=0
   while [ $x -le $delay ] && checkpid $pid; do
@@ -108,7 +128,7 @@ mongo_killproc()
     x=$(( $x + $duration))
   done
 
-  kill -KILL $pid >/dev/null 2>&1
+  daemon --check "$mongod" --user "$MONGO_USER" "kill -KILL $pid >/dev/null 2>&1"
   usleep 100000
 
   checkpid $pid # returns 0 only if the process exists
