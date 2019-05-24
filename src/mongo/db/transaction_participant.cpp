@@ -159,16 +159,6 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                 continue;
             }
 
-            const auto insertRes =
-                result.committedStatements.emplace(*entry.getStatementId(), entry.getOpTime());
-            if (!insertRes.second) {
-                const auto& existingOpTime = insertRes.first->second;
-                fassertOnRepeatedExecution(lsid,
-                                           result.lastTxnRecord->getTxnNum(),
-                                           *entry.getStatementId(),
-                                           existingOpTime,
-                                           entry.getOpTime());
-            }
 
             // State is a new field in FCV 4.2, so look for an applyOps oplog entry without a
             // prepare flag to mark a committed transaction in FCV 4.0 or downgrading to 4.0. Check
@@ -179,6 +169,18 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                 (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
                  !entry.shouldPrepare() && !entry.isPartialTransaction())) {
                 result.lastTxnRecord->setState(DurableTxnStateEnum::kCommitted);
+                return result;
+            }
+
+            const auto insertRes =
+                result.committedStatements.emplace(*entry.getStatementId(), entry.getOpTime());
+            if (!insertRes.second) {
+                const auto& existingOpTime = insertRes.first->second;
+                fassertOnRepeatedExecution(lsid,
+                                           result.lastTxnRecord->getTxnNum(),
+                                           *entry.getStatementId(),
+                                           existingOpTime,
+                                           entry.getOpTime());
             }
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
