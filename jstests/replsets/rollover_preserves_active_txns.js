@@ -49,11 +49,7 @@
         jsTestLog("Get transaction entry from config.transactions");
 
         const txnEntry = primary.getDB("config").transactions.findOne();
-        if (TestData.setParameters.useMultipleOplogEntryFormatForTransactions) {
-            assert.lte(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
-        } else {
-            assert.eq(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
-        }
+        assert.lte(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
 
         assert.soonNoExcept(() => {
             const secondaryTxnEntry = secondary.getDB("config").transactions.findOne();

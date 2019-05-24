@@ -64,11 +64,8 @@
         jsTestLog("Get transaction entry from config.transactions");
 
         const txnEntry = primary.getDB("config").transactions.findOne();
-        if (TestData.setParameters.useMultipleOplogEntryFormatForTransactions) {
-            assert.lt(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
-        } else {
-            assert.eq(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
-        }
+        // The prepare oplog entry may or may not be the first oplog entry depending on packing.
+        assert.lte(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
 
         assert.soonNoExcept(() => {
             const secondaryTxnEntry = secondary.getDB("config").transactions.findOne();

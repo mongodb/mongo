@@ -5,6 +5,7 @@
 (function() {
     "use strict";
     load("jstests/core/txns/libs/prepare_helpers.js");
+    load("jstests/replsets/rslib.js");
 
     /**
      * Verifies that the serverStatus response has the fields that we expect.
@@ -39,9 +40,9 @@
 
     /**
      * Verifies that the timestamp of the oldest active transaction in the transactions table
-     * has the value we expect.
+     * is greater than the lower bound and less than or equal to the upper bound.
      */
-    function verifyOldestActiveTransactionTimestamp(testDB, expectedTimestamp) {
+    function verifyOldestActiveTransactionTimestamp(testDB, lowerBound, upperBound) {
         let res = assert.commandWorked(
             testDB.getSiblingDB("config").getCollection("transactions").runCommand("find", {
                 "filter": {"state": {"$in": ["prepared", "inProgress"]}},
@@ -53,10 +54,13 @@
         let entry = res.cursor.firstBatch[0];
         assert.neq(undefined, entry);
 
-        assert.eq(entry.startOpTime.ts,
-                  expectedTimestamp,
-                  "expected the timestamp of the oldest active transaction to have a value of " +
-                      expectedTimestamp);
+        assert.lt(lowerBound,
+                  entry.startOpTime.ts,
+                  "oldest active transaction timestamp should be greater than the lower bound");
+        assert.lte(
+            entry.startOpTime.ts,
+            upperBound,
+            "oldest active transaction timestamp should be less than or equal to the upper bound");
     }
 
     // Set up the replica set.
@@ -92,6 +96,7 @@
     session.startTransaction();
     assert.commandWorked(sessionColl.insert(doc1));
 
+    const opTimeBeforePrepareForCommit = getLastOpTime(primary);
     const prepareTimestampForCommit = PrepareHelpers.prepareTransaction(session);
 
     // Verify the total and current prepared transaction counter is updated and the oldest active
@@ -105,7 +110,8 @@
 
     // Verify that the prepare entry has the oldest timestamp of any active transaction
     // in the transactions table.
-    verifyOldestActiveTransactionTimestamp(testDB, prepareTimestampForCommit);
+    verifyOldestActiveTransactionTimestamp(
+        testDB, opTimeBeforePrepareForCommit.ts, prepareTimestampForCommit);
 
     // Verify the total prepared and committed transaction counters are updated after a commit
     // and that the current prepared counter is decremented.
@@ -132,6 +138,7 @@
     session.startTransaction();
     assert.commandWorked(sessionColl.insert(doc2));
 
+    const opTimeBeforePrepareForAbort = getLastOpTime(primary);
     const prepareTimestampForAbort = PrepareHelpers.prepareTransaction(session);
 
     // Verify that the total and current prepared counter is updated and the oldest active oplog
@@ -145,7 +152,8 @@
 
     // Verify that the prepare entry has the oldest timestamp of any active transaction
     // in the transactions table.
-    verifyOldestActiveTransactionTimestamp(testDB, prepareTimestampForAbort);
+    verifyOldestActiveTransactionTimestamp(
+        testDB, opTimeBeforePrepareForAbort.ts, prepareTimestampForAbort);
 
     // Verify the total prepared and aborted transaction counters are updated after an abort and the
     // current prepared counter is decremented.
