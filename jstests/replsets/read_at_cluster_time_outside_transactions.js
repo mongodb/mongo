@@ -2,7 +2,7 @@
  * Tests that the "find" and "dbHash" commands support reading at a Timestamp by using the
  * $_internalReadAtClusterTime option.
  *
- * @tags: [requires_document_locking]
+ * @tags: [requires_document_locking, uses_transactions]
  */
 (function() {
     "use strict";
@@ -110,6 +110,29 @@
         $_internalReadAtClusterTime: futureClusterTime,
     }),
                                  ErrorCodes.InvalidOptions);
+
+    // $_internalReadAtClusterTime is not supported in transactions.
+    const session = primary.startSession();
+    const sessionDB = session.getDatabase("test");
+    const sessionColl = sessionDB[collName];
+
+    session.startTransaction();
+    assert.commandFailedWithCode(sessionColl.runCommand("find", {
+        batchSize: 2,
+        sort: {_id: 1},
+        $_internalReadAtClusterTime: clusterTime,
+    }),
+                                 ErrorCodes.OperationNotSupportedInTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
+
+    // dbHash is not supported in transactions at all.
+    session.startTransaction();
+    assert.commandFailedWithCode(
+        sessionDB.runCommand({dbHash: 1, $_internalReadAtClusterTime: clusterTime}),
+        ErrorCodes.OperationNotSupportedInTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // Create a new collection to move the minimum visible snapshot to that operation time. Then
     // read at a cluster time behind the minimum visible snapshot which should fail.

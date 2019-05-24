@@ -286,6 +286,12 @@ public:
                     " commands are enabled",
                     !qr->getReadAtClusterTime() || getTestCommandsEnabled());
 
+            uassert(
+                ErrorCodes::OperationNotSupportedInTransaction,
+                "The '$_internalReadAtClusterTime' option is not supported within a transaction.",
+                !txnParticipant || !txnParticipant.inActiveOrKilledMultiDocumentTransaction() ||
+                    !qr->getReadAtClusterTime());
+
             uassert(ErrorCodes::InvalidOptions,
                     "The '$_internalReadAtClusterTime' option is only supported when replication is"
                     " enabled",
