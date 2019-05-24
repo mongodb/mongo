@@ -227,7 +227,14 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         // where we commit data file changes separately from oplog changes, so ignore
         // a non-incrementing timestamp.
         if (newTimestamp <= _oplogReadTimestamp.load()) {
-            LOG(2) << "no new oplog entries were made visible: " << newTimestamp;
+            // Even if we didn't need to move the oplogReadTimestamp forward, we still need to take
+            // care of moving the oldest timestamp.  WiredTigerRecordStore::oplogDiskLocRegister()
+            // may have moved the oplogReadTimestamp forward without also moving the oldest
+            // timestamp.
+            if (updateOldestTimestamp) {
+                const bool force = false;
+                sessionCache->getKVEngine()->setOldestTimestamp(Timestamp(newTimestamp), force);
+            }
             continue;
         }
 
