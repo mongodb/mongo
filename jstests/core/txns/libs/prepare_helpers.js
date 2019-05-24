@@ -132,7 +132,8 @@ const PrepareHelpers = (function() {
         assert.soon(() => {
             const ts = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}))
                            .optimes.lastCommittedOpTime.ts;
-            if (ts >= timestamp) {
+            if (timestampCmp(ts, timestamp) >= 0) {
+                print(`Finished awaiting lastCommittedOpTime.ts, now at ${ts}`);
                 return true;
             } else {
                 print(`Awaiting lastCommittedOpTime.ts, now at ${ts}`);
