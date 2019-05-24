@@ -31,7 +31,9 @@ EXIT_CODE_MAP = {
     -7: "Process Termination Error",
     249: "Process Termination Error",
     -1073741819: "Windows Access Violation",
+    3221225477: "Windows Access Violation",
     -1073741571: "Stack Overflow",
+    3221225725: "Stack Overflow",
 }
 
 
