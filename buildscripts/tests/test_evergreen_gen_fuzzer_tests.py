@@ -34,9 +34,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
 
         self.assertEqual(options.num_tasks, len(config["tasks"]))
 
-        self.assertEqual("setup jstestfuzz", config["tasks"][0]["commands"][1]["func"])
-
-        command1 = config["tasks"][0]["commands"][2]
+        command1 = config["tasks"][0]["commands"][1]
         self.assertIn(str(options.num_files), command1["vars"]["jstestfuzz_vars"])
         self.assertIn(options.npm_command, command1["vars"]["npm_command"])
         self.assertEqual("run jstestfuzz", command1["func"])
@@ -57,4 +55,4 @@ class TestGenerateEvgTasks(unittest.TestCase):
 
         self.assertEqual("do multiversion setup", config["tasks"][0]["commands"][1]["func"])
         self.assertEqual("/data/multiversion",
-                         config["tasks"][0]["commands"][4]["vars"]["task_path_suffix"])
+                         config["tasks"][0]["commands"][3]["vars"]["task_path_suffix"])
