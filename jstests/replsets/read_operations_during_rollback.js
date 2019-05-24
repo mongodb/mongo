@@ -35,12 +35,17 @@
         db.getMongo().setSlaveOk();
         const cursorID =
             assert.commandWorked(db.runCommand({"find": "coll", batchSize: 0})).cursor.id;
-        let res = assert.throws(function() {
-            db.runCommand({"getMore": cursorID, collection: "coll"});
-        }, [], "network error");
-        // Make sure the connection of an outstanding read operation gets closed during rollback
-        // even though the read was started before rollback.
-        assert.includes(res.toString(), "network error while attempting to run command");
+        // Make sure an outstanding read operation gets killed during rollback even though the read
+        // was started before rollback. Outstanding read operations are killed during rollback and
+        // their connections are closed shortly after. So we would get either an error
+        // (InterruptedDueToReplStateChange) if the error message is sent out and received before
+        // the connection is closed or a network error exception.
+        try {
+            assert.commandFailedWithCode(db.runCommand({"getMore": cursorID, collection: "coll"}),
+                                         ErrorCodes.InterruptedDueToReplStateChange);
+        } catch (e) {
+            assert.includes(e.toString(), "network error while attempting to run command");
+        }
     }, rollbackNode.port);
 
     const cursorIdToBeReadDuringRollback =
