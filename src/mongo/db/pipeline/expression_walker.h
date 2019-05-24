@@ -42,28 +42,24 @@ namespace mongo::expression_walker {
  *   pair of children. walker.inVisit() is skipped if the Expression has fewer than two children.
  * * walker.postVisit() once after walking to each child.
  * Each of the Expression's child Expressions is recursively walked and the same three methods are
- * called for it. preVisit() and postVisit() must return a pointer to an Expression. If either does,
- * walk() will replace the current Expression with the return value. If no change is needed during a
- * particular call, preVisit() and postVisit() may return their argument.
+ * called for it.
  */
 template <typename Walker>
-void walk(Walker& walker, boost::intrusive_ptr<Expression>& expression) {
+void walk(Walker* walker, Expression* expression) {
     if (expression) {
-        expression = walker.preVisit(expression);
+        walker->preVisit(expression);
 
         // InVisit needs to be called between every two nodes which requires more complicated
-        // branching logic. InVisit is forbidden from replacing its Expression through the return
-        // value and must return void since it would break our iteration and be confusing to
-        // replace a node while only a portion of its children have been walked.
+        // branching logic.
         auto count = 0ull;
         for (auto&& child : expression->getChildren()) {
             if (count != 0ull)
-                walker.inVisit(count, expression);
+                walker->inVisit(count, expression);
             ++count;
-            walk(walker, child);
+            walk(walker, child.get());
         }
 
-        expression = walker.postVisit(expression);
+        walker->postVisit(expression);
     }
 }
 

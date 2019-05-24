@@ -67,34 +67,28 @@ using namespace expression_walker;
 
 TEST_F(ExpressionWalkerTest, NullTreeWalkSucceeds) {
     struct {
-        boost::intrusive_ptr<Expression> preVisit(boost::intrusive_ptr<Expression>& expression) {
-            return expression;
-        }
-        void inVisit(unsigned long long, boost::intrusive_ptr<Expression>&) {}
-        boost::intrusive_ptr<Expression> postVisit(boost::intrusive_ptr<Expression>& expression) {
-            return expression;
-        }
+        void preVisit(Expression*) {}
+        void inVisit(unsigned long long, Expression*) {}
+        void postVisit(Expression*) {}
     } nothingWalker;
     auto expression = boost::intrusive_ptr<Expression>();
-    walk(nothingWalker, expression);
+    walk(&nothingWalker, expression.get());
 }
 
 TEST_F(ExpressionWalkerTest, PrintWalkReflectsMutation) {
     struct {
-        boost::intrusive_ptr<Expression> preVisit(boost::intrusive_ptr<Expression>& expression) {
+        void preVisit(Expression* expression) {
             if (typeid(*expression) == typeid(ExpressionConcat))
                 string += "{$concat: [";
-            if (auto constant = dynamic_cast<ExpressionConstant*>(expression.get()))
+            if (auto constant = dynamic_cast<ExpressionConstant*>(expression))
                 string += "\""s + constant->getValue().getString() + "\"";
-            return expression;
         }
-        void inVisit(unsigned long long, boost::intrusive_ptr<Expression>& expression) {
+        void inVisit(unsigned long long, Expression* expression) {
             string += ", ";
         }
-        boost::intrusive_ptr<Expression> postVisit(boost::intrusive_ptr<Expression>& expression) {
+        void postVisit(Expression* expression) {
             if (typeid(*expression) == typeid(ExpressionConcat))
                 string += "]}";
-            return expression;
         }
 
         std::string string;
@@ -102,46 +96,23 @@ TEST_F(ExpressionWalkerTest, PrintWalkReflectsMutation) {
 
     auto expressionString = "{$concat: [\"black\", \"green\", \"yellow\"]}"s;
     auto expression = parseExpression(expressionString);
-    walk(stringWalker, expression);
+    walk(&stringWalker, expression.get());
     ASSERT_EQ(stringWalker.string, expressionString);
-
-    struct {
-        boost::intrusive_ptr<Expression> preVisit(boost::intrusive_ptr<Expression>& expression) {
-            if (auto constant = dynamic_cast<ExpressionConstant*>(expression.get()))
-                if (constant->getValue().getString() == "black")
-                    return ExpressionConstant::create(expCtx, Value("white"s));
-            return expression;
-        }
-        void inVisit(unsigned long long, boost::intrusive_ptr<Expression>& expression) {}
-        boost::intrusive_ptr<Expression> postVisit(boost::intrusive_ptr<Expression>& expression) {
-            return expression;
-        }
-        const boost::intrusive_ptr<ExpressionContext>& expCtx;
-    } whiteWalker{getExpCtx()};
-
-    walk(whiteWalker, expression);
-    stringWalker.string.clear();
-    walk(stringWalker, expression);
-    ASSERT_EQ(stringWalker.string, "{$concat: [\"white\", \"green\", \"yellow\"]}"s);
 }
 
 TEST_F(ExpressionWalkerTest, InVisitCanCount) {
     struct {
-        boost::intrusive_ptr<Expression> preVisit(boost::intrusive_ptr<Expression>& expression) {
-            return expression;
-        }
-        void inVisit(unsigned long long count, boost::intrusive_ptr<Expression>&) {
+        void preVisit(Expression*) {}
+        void inVisit(unsigned long long count, Expression*) {
             counter.push_back(count);
         }
-        boost::intrusive_ptr<Expression> postVisit(boost::intrusive_ptr<Expression>& expression) {
-            return expression;
-        }
+        void postVisit(Expression*) {}
         std::vector<unsigned long long> counter;
     } countWalker;
 
     auto expressionString = "{$and: [true, false, true, true, false, true]}"s;
     auto expression = parseExpression(expressionString);
-    walk(countWalker, expression);
+    walk(&countWalker, expression.get());
     ASSERT(countWalker.counter == std::vector({1ull, 2ull, 3ull, 4ull, 5ull}));
 }
 
