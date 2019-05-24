@@ -567,6 +567,10 @@ public:
         return _value;
     }
 
+    void setValue(const Value& value) {
+        _value = value;
+    };
+
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
     }
