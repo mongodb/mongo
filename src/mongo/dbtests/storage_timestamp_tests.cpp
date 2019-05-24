@@ -3052,7 +3052,10 @@ public:
 
         txnParticipant.unstashTransactionResources(_opCtx, "commitTransaction");
 
-        txnParticipant.commitPreparedTransaction(_opCtx, commitEntryTs, {});
+        {
+            FailPointEnableBlock failPointBlock("skipCommitTxnCheckPrepareMajorityCommitted");
+            txnParticipant.commitPreparedTransaction(_opCtx, commitEntryTs, {});
+        }
 
         txnParticipant.stashTransactionResources(_opCtx);
         {
@@ -3325,7 +3328,11 @@ public:
         }
         txnParticipant.unstashTransactionResources(_opCtx, "commitTransaction");
 
-        txnParticipant.commitPreparedTransaction(_opCtx, commitEntryTs, {});
+        {
+            FailPointEnableBlock failPointBlock("skipCommitTxnCheckPrepareMajorityCommitted");
+            txnParticipant.commitPreparedTransaction(_opCtx, commitEntryTs, {});
+        }
+
         assertNoStartOpTime();
 
         txnParticipant.stashTransactionResources(_opCtx);

@@ -52,7 +52,6 @@ MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForAbortAfterExecutingAbort
 MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic);
 MONGO_FAIL_POINT_DEFINE(hangBeforeCommitingTxn);
 MONGO_FAIL_POINT_DEFINE(hangBeforeAbortingTxn);
-MONGO_FAIL_POINT_DEFINE(skipCommitTxnCheckPrepareMajorityCommitted);
 // TODO SERVER-39704: Remove this fail point once the router can safely retry within a transaction
 // on stale version and snapshot errors.
 MONGO_FAIL_POINT_DEFINE(dontRemoveTxnCoordinatorOnAbort);
@@ -122,13 +121,6 @@ public:
 
         auto optionalCommitTimestamp = cmd.getCommitTimestamp();
         if (optionalCommitTimestamp) {
-            const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            uassert(ErrorCodes::InvalidOptions,
-                    "commitTransaction for a prepared transaction cannot be run before its prepare "
-                    "oplog entry has been majority committed",
-                    replCoord->getLastCommittedOpTime().getTimestamp() >=
-                            txnParticipant.getPrepareOpTime().getTimestamp() ||
-                        MONGO_FAIL_POINT(skipCommitTxnCheckPrepareMajorityCommitted));
             // commitPreparedTransaction will throw if the transaction is not prepared.
             txnParticipant.commitPreparedTransaction(opCtx, optionalCommitTimestamp.get(), {});
         } else {

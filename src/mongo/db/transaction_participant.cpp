@@ -81,6 +81,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterSettingPrepareStartTime);
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeReleasingTransactionOplogHole);
 
+MONGO_FAIL_POINT_DEFINE(skipCommitTxnCheckPrepareMajorityCommitted);
+
 const auto getTransactionParticipant = Session::declareDecoration<TransactionParticipant>();
 
 // The command names that are allowed in a prepared transaction.
@@ -1260,8 +1262,10 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     // transaction was prepared, we dropped the RSTL. We do not need to reacquire the PBWM because
     // if we're not the primary we will uassert anyways.
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+
     if (opCtx->writesAreReplicated()) {
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(ErrorCodes::NotMaster,
                 "Not primary so we cannot commit a prepared transaction",
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
@@ -1272,9 +1276,20 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
             o().txnState.isPrepared());
     uassert(
         ErrorCodes::InvalidOptions, "'commitTimestamp' cannot be null", !commitTimestamp.isNull());
+
+    const auto prepareTimestamp = o().prepareOpTime.getTimestamp();
+
     uassert(ErrorCodes::InvalidOptions,
             "'commitTimestamp' must be greater than or equal to 'prepareTimestamp'",
-            commitTimestamp >= o().prepareOpTime.getTimestamp());
+            commitTimestamp >= prepareTimestamp);
+
+    if (!commitOplogEntryOpTime) {
+        uassert(ErrorCodes::InvalidOptions,
+                "commitTransaction for a prepared transaction cannot be run before its prepare "
+                "oplog entry has been majority committed",
+                replCoord->getLastCommittedOpTime().getTimestamp() >= prepareTimestamp ||
+                    MONGO_FAIL_POINT(skipCommitTxnCheckPrepareMajorityCommitted));
+    }
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
