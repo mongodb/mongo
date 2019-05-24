@@ -24,8 +24,7 @@
     const dbName = "test";
     const collName = "recover_prepared_transaction_state_after_rollback";
 
-    const rollbackTest =
-        new RollbackTest(dbName, undefined, true /* expect prepared transaction after rollback */);
+    const rollbackTest = new RollbackTest(dbName);
     let primary = rollbackTest.getPrimary();
 
     // Create collection we're using beforehand.
@@ -92,7 +91,7 @@
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
     try {
-        rollbackTest.transitionToSteadyStateOperations();
+        rollbackTest.transitionToSteadyStateOperations({skipDataConsistencyChecks: true});
     } finally {
         assert.commandWorked(
             primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'off'}));

@@ -16,8 +16,7 @@
     const dbName = "test";
     const collName = "prepare_failover_rollback_commit";
 
-    const rollbackTest =
-        new RollbackTest(collName, undefined, true /* expectPreparedTxnsDuringRollback */);
+    const rollbackTest = new RollbackTest(collName);
 
     let primary = rollbackTest.getPrimary();
     const testDB = primary.getDB(dbName);
@@ -41,7 +40,7 @@
     rollbackTest.transitionToRollbackOperations();
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
-    rollbackTest.transitionToSteadyStateOperations();
+    rollbackTest.transitionToSteadyStateOperations({skipDataConsistencyChecks: true});
 
     // Now set up a rollback scenario for that new primary.
     rollbackTest.transitionToRollbackOperations();
@@ -55,7 +54,7 @@
 
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
-    rollbackTest.transitionToSteadyStateOperations();
+    rollbackTest.transitionToSteadyStateOperations({skipDataConsistencyChecks: true});
 
     // Create a proxy session to reuse the session state of the old primary.
     primary = rollbackTest.getPrimary();

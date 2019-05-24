@@ -37,10 +37,8 @@ load("jstests/hooks/validate_collections.js");
  *
  * @param {string} [optional] name the name of the test being run
  * @param {Object} [optional] replSet the ReplSetTest instance to adopt
- * @param {bool} [optional] expectPreparedTxnsDuringRollback a flag for knowing if we expect to see
- *                          transactions in prepare after a rollback
  */
-function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRollback = false) {
+function RollbackTest(name = "RollbackTest", replSet) {
     const State = {
         kStopped: "kStopped",
         kRollbackOps: "kRollbackOps",
@@ -251,9 +249,8 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         // After the previous rollback (if any) has completed and await replication has finished,
         // the replica set should be in a consistent and "fresh" state. We now prepare for the next
         // rollback.
-        if (expectPreparedTxnsDuringRollback === true || skipDataConsistencyChecks === true) {
-            print('Skipping data consistency checks because there may be active transactions ' +
-                  'on the primary after rollback');
+        if (skipDataConsistencyChecks) {
+            print('Skipping data consistency checks');
         } else {
             checkDataConsistency();
         }

@@ -14,8 +14,7 @@
     const dbName = "test";
     const collName = "rollback_reconstructs_transactions_prepared_before_stable";
 
-    const rollbackTest =
-        new RollbackTest(dbName, undefined, true /* expect prepared transaction after rollback */);
+    const rollbackTest = new RollbackTest(dbName);
     let primary = rollbackTest.getPrimary();
 
     // Create collection we're using beforehand.
@@ -56,7 +55,7 @@
     rollbackTest.transitionToRollbackOperations();
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
-    rollbackTest.transitionToSteadyStateOperations();
+    rollbackTest.transitionToSteadyStateOperations({skipDataConsistencyChecks: true});
 
     // Make sure there is still one transaction in the transactions table. This is because the
     // entry in the transactions table is made durable when a transaction is prepared.
