@@ -101,8 +101,8 @@ std::unique_ptr<OplogInterface::Iterator> OplogInterfaceLocal::makeIterator() co
 }
 
 std::unique_ptr<TransactionHistoryIteratorBase> OplogInterfaceLocal::makeTransactionHistoryIterator(
-    const OpTime& startingOpTime) const {
-    return std::make_unique<TransactionHistoryIterator>(startingOpTime);
+    const OpTime& startingOpTime, bool permitYield) const {
+    return std::make_unique<TransactionHistoryIterator>(startingOpTime, permitYield);
 }
 
 HostAndPort OplogInterfaceLocal::hostAndPort() const {

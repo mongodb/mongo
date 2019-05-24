@@ -129,7 +129,7 @@ std::unique_ptr<OplogInterface::Iterator> OplogInterfaceMock::makeIterator() con
 }
 
 std::unique_ptr<TransactionHistoryIteratorBase> OplogInterfaceMock::makeTransactionHistoryIterator(
-    const OpTime& startOpTime) const {
+    const OpTime& startOpTime, bool permitYield) const {
     return std::make_unique<TransactionHistoryIteratorMock>(startOpTime, makeIterator());
 }
 

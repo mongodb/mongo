@@ -88,7 +88,7 @@ std::unique_ptr<OplogInterface::Iterator> OplogInterfaceRemote::makeIterator() c
 }
 
 std::unique_ptr<TransactionHistoryIteratorBase>
-OplogInterfaceRemote::makeTransactionHistoryIterator(const OpTime&) const {
+OplogInterfaceRemote::makeTransactionHistoryIterator(const OpTime&, bool permitYield) const {
     // Should never ask for remote transaction history.
     MONGO_UNREACHABLE;
 }

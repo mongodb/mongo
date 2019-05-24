@@ -121,7 +121,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     size_t plannerOptions = 0);
 
 /**
- * Get a plan executor for a .find() operation.
+ * Get a plan executor for a .find() operation. The executor will have a 'YIELD_AUTO' yield policy
+ * unless a false value for 'permitYield' or a snapshot read concern (according to the
+ * OperationContext) forces it to have a 'NO_INTERRUPT' yield policy.
  *
  * If the query is valid and an executor could be created, returns a StatusWith with the
  * PlanExecutor.
@@ -132,6 +134,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     OperationContext* opCtx,
     Collection* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
+    bool permitYield = false,
     size_t plannerOptions = QueryPlannerParams::DEFAULT);
 
 /**

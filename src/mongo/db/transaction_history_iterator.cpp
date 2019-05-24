@@ -47,7 +47,7 @@ namespace {
 /**
  * Query the oplog for an entry with the given timestamp.
  */
-BSONObj findOneOplogEntry(OperationContext* opCtx, const repl::OpTime& opTime) {
+BSONObj findOneOplogEntry(OperationContext* opCtx, const repl::OpTime& opTime, bool permitYield) {
     BSONObj oplogBSON;
     invariant(!opTime.isNull());
 
@@ -73,7 +73,8 @@ BSONObj findOneOplogEntry(OperationContext* opCtx, const repl::OpTime& opTime) {
                                         Date_t::max(),
                                         AutoStatsTracker::LogMode::kUpdateTop);
 
-    auto exec = uassertStatusOK(getExecutorFind(opCtx, ctx.getCollection(), std::move(cq)));
+    auto exec =
+        uassertStatusOK(getExecutorFind(opCtx, ctx.getCollection(), std::move(cq), permitYield));
 
     auto getNextResult = exec->getNext(&oplogBSON, nullptr);
     uassert(ErrorCodes::IncompleteTransactionHistory,
@@ -92,15 +93,16 @@ BSONObj findOneOplogEntry(OperationContext* opCtx, const repl::OpTime& opTime) {
 
 }  // namespace
 
-TransactionHistoryIterator::TransactionHistoryIterator(repl::OpTime startingOpTime)
-    : _nextOpTime(std::move(startingOpTime)) {}
+TransactionHistoryIterator::TransactionHistoryIterator(repl::OpTime startingOpTime,
+                                                       bool permitYield)
+    : _permitYield(permitYield), _nextOpTime(std::move(startingOpTime)) {}
 
 bool TransactionHistoryIterator::hasNext() const {
     return !_nextOpTime.isNull();
 }
 
 repl::OplogEntry TransactionHistoryIterator::next(OperationContext* opCtx) {
-    BSONObj oplogBSON = findOneOplogEntry(opCtx, _nextOpTime);
+    BSONObj oplogBSON = findOneOplogEntry(opCtx, _nextOpTime, _permitYield);
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
     const auto& oplogPrevTsOption = oplogEntry.getPrevWriteOpTimeInTransaction();

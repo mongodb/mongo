@@ -62,13 +62,18 @@ public:
     /**
      * Creates a new iterator starting with an oplog entry with the given start opTime.
      */
-    TransactionHistoryIterator(repl::OpTime startingOpTime);
+    TransactionHistoryIterator(repl::OpTime startingOpTime, bool permitYield = false);
     virtual ~TransactionHistoryIterator() = default;
 
     bool hasNext() const override;
     repl::OplogEntry next(OperationContext* opCtx);
 
 private:
+    // Clients can set this to allow PlanExecutors created by this TransactionHistoryIterator to
+    // have a YIELD_AUTO yield policy. It is only safe to set this if next() will never be called
+    // while holding a lock that should not be yielded, such as the PBWM lock.
+    bool _permitYield;
+
     repl::OpTime _nextOpTime;
 };
 

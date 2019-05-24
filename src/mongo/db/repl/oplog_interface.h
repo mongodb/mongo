@@ -66,7 +66,7 @@ public:
      * oplogs.
      */
     virtual std::unique_ptr<TransactionHistoryIteratorBase> makeTransactionHistoryIterator(
-        const OpTime& startingOpTime) const = 0;
+        const OpTime& startingOpTime, bool permitYield = false) const = 0;
 
     /**
      * The host and port of the server.

@@ -151,7 +151,8 @@ repl::OplogEntry MongoInterfaceStandalone::lookUpOplogEntryByOpTime(OperationCon
                                                                     repl::OpTime lookupTime) {
     invariant(!lookupTime.isNull());
 
-    TransactionHistoryIterator iterator(lookupTime);
+    bool permitYield = true;
+    TransactionHistoryIterator iterator(lookupTime, permitYield);
     try {
         auto result = iterator.next(opCtx);
 

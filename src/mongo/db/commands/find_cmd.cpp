@@ -230,7 +230,9 @@ public:
             Collection* const collection = ctx->getCollection();
 
             // Get the execution plan for the query.
-            auto exec = uassertStatusOK(getExecutorFind(opCtx, collection, std::move(cq)));
+            bool permitYield = true;
+            auto exec =
+                uassertStatusOK(getExecutorFind(opCtx, collection, std::move(cq), permitYield));
 
             auto bodyBuilder = result->getBodyBuilder();
             // Got the execution tree. Explain it.
@@ -417,7 +419,9 @@ public:
             }
 
             // Get the execution plan for the query.
-            auto exec = uassertStatusOK(getExecutorFind(opCtx, collection, std::move(cq)));
+            bool permitYield = true;
+            auto exec =
+                uassertStatusOK(getExecutorFind(opCtx, collection, std::move(cq), permitYield));
 
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());

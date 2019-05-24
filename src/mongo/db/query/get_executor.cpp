@@ -750,11 +750,13 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
     Collection* collection,
     unique_ptr<CanonicalQuery> canonicalQuery,
+    bool permitYield,
     size_t plannerOptions) {
     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    auto yieldPolicy = readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
-        ? PlanExecutor::INTERRUPT_ONLY
-        : PlanExecutor::YIELD_AUTO;
+    auto yieldPolicy = (permitYield && (readConcernArgs.getLevel() !=
+                                        repl::ReadConcernLevel::kSnapshotReadConcern))
+        ? PlanExecutor::YIELD_AUTO
+        : PlanExecutor::INTERRUPT_ONLY;
     return _getExecutorFind(
         opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions);
 }
