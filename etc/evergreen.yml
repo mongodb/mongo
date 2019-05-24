@@ -1857,7 +1857,7 @@ functions:
           set -o verbose
 
           ${add_nodejs_to_path}
-          source scripts/npm_run.sh ${npm_command|jstestfuzz} -- ${jstestfuzz_vars}
+          npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars}
 
     - command: archive.targz_pack
       params:
