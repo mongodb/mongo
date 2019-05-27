@@ -1571,7 +1571,10 @@ functions:
           cmds="$cmds;    fi"
           cmds="$cmds; else echo Cannot change the core pattern and no core dumps will be generated."
           cmds="$cmds; fi"
-          cmds="$cmds; $sudo reboot"
+          # The following line for restarting the machine is based on
+          # https://unix.stackexchange.com/a/349558 in order to ensure the ssh client gets a
+          # response from the remote machine before it restarts.
+          cmds="$cmds; nohup $sudo reboot &>/dev/null & exit"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${activate_virtualenv}
           $python buildscripts/remote_operations.py          \
@@ -6216,6 +6219,27 @@ buildvariants:
   - name: bulk_gle_passthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
+  - name: powercycle_WT
+    distros:
+    - ubuntu1604-powercycle
+  - name: powercycle_fcv3.4_WT
+    distros:
+    - ubuntu1604-powercycle
+  - name: powercycle_kill_mongod
+    distros:
+    - ubuntu1604-powercycle
+  - name: powercycle_replication_WT
+    distros:
+    - ubuntu1604-powercycle
+  - name: powercycle_replication_smalloplog_WT
+    distros:
+    - ubuntu1604-powercycle
+  - name: powercycle_syncdelay_WT
+    distros:
+    - ubuntu1604-powercycle
+  - name: powercycle_write_concern_majority_WT
+    distros:
+    - ubuntu1604-powercycle
   - name: concurrency_WT
   - name: concurrency_replication_WT
   - name: concurrency_sharded_WT
