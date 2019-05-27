@@ -772,7 +772,10 @@ class ProcessControl(object):
         """Return a list of 'proc' for the associated pids."""
         procs = []
         for pid in self.get_pids():
-            procs.append(psutil.Process(pid))
+            try:
+                procs.append(psutil.Process(pid))
+            except psutil.NoSuchProcess:
+                pass
         return procs
 
     def is_running(self):

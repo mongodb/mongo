@@ -2390,7 +2390,10 @@ functions:
           cmds="$cmds;    fi"
           cmds="$cmds; else echo Cannot change the core pattern and no core dumps will be generated."
           cmds="$cmds; fi"
-          cmds="$cmds; $sudo reboot"
+          # The following line for restarting the machine is based on
+          # https://unix.stackexchange.com/a/349558 in order to ensure the ssh client gets a
+          # response from the remote machine before it restarts.
+          cmds="$cmds; nohup $sudo reboot &>/dev/null & exit"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${activate_virtualenv}
           $python buildscripts/remote_operations.py          \
@@ -8269,6 +8272,15 @@ buildvariants:
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: multiversion
+  - name: .powercycle
+    distros:
+    - ubuntu1604-powercycle
+  - name: powercycle_replication_smalloplog
+    distros:
+    - ubuntu1604-powercycle
+  - name: powercycle_write_concern_majority
+    distros:
+    - ubuntu1604-powercycle
   - name: replica_sets
   - name: watchdog_wiredtiger
   - name: .replica_sets .common
