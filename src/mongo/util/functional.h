@@ -98,7 +98,8 @@ public:
         std::enable_if_t<stdx::is_invocable_r<RetType, Functor, Args...>::value, TagType> =
             makeTag(),
         std::enable_if_t<std::is_move_constructible<Functor>::value, TagType> = makeTag(),
-        std::enable_if_t<!std::is_same<Functor, unique_function>::value, TagType> = makeTag())
+        std::enable_if_t<!std::is_same<std::decay_t<Functor>, unique_function>::value, TagType> =
+            makeTag())
         : impl(makeImpl(std::forward<Functor>(functor))) {}
 
     unique_function(std::nullptr_t) noexcept {}
