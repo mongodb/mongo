@@ -85,6 +85,7 @@ if _IS_WINDOWS:
     # These modules are used on the 'server' side.
     _try_import("ntsecuritycon")
     _try_import("pywintypes")
+    _try_import("winerror")
     _try_import("win32file")
     _try_import("win32security")
     _try_import("win32service")
@@ -830,7 +831,7 @@ class WindowsService(object):
             output = "Service '{}' created".format(self.name)
         except pywintypes.error as err:
             ret = err.winerror
-            output = "{}: {}".format(err[1], err[2])
+            output = f"{err.args[1]}: {err.args[2]}"
 
         return ret, output
 
@@ -846,7 +847,7 @@ class WindowsService(object):
             output = "Service '{}' updated".format(self.name)
         except pywintypes.error as err:
             ret = err.winerror
-            output = "{}: {}".format(err[1], err[2])
+            output = f"{err.args[1]}: {err.args[2]}"
 
         return ret, output
 
@@ -860,7 +861,7 @@ class WindowsService(object):
             output = "Service '{}' deleted".format(self.name)
         except pywintypes.error as err:
             ret = err.winerror
-            output = "{}: {}".format(err[1], err[2])
+            output = f"{err.args[1]}: {err.args[2]}"
 
         return ret, output
 
@@ -874,7 +875,7 @@ class WindowsService(object):
             output = "Service '{}' started".format(self.name)
         except pywintypes.error as err:
             ret = err.winerror
-            output = "{}: {}".format(err[1], err[2])
+            output = f"{err.args[1]}: {err.args[2]}"
 
         proc = ProcessControl(name=self.bin_name)
         self.pids = proc.get_pids()
@@ -901,7 +902,14 @@ class WindowsService(object):
             output = "Service '{}' stopped".format(self.name)
         except pywintypes.error as err:
             ret = err.winerror
-            output = "{}: {}".format(err[1], err[2])
+            output = f"{err.args[1]}: {err.args[2]}"
+
+            if ret == winerror.ERROR_BROKEN_PIPE:
+                # win32serviceutil.StopService() returns a "The pipe has been ended" error message
+                # (winerror=109) when stopping the "mongod-powertest" service on
+                # Windows Server 2016 and the underlying mongod process has already exited.
+                ret = 0
+                output = f"Assuming service '{self.name}' stopped despite error: {output}"
 
         return ret, output
 
