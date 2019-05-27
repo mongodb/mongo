@@ -1197,7 +1197,7 @@ buildvariants:
     - name: industry_benchmarks_wmajority
     - name: non_sharded_workloads
     - name: bestbuy_agg
-    - name: bestbuy_agg_out
+    - name: bestbuy_agg_merge
     - name: bestbuy_query
     - name: change_streams_throughput
     - name: change_streams_latency
