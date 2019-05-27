@@ -312,7 +312,7 @@ def get_bin_dir(root_dir):
 
 def create_temp_executable_file(cmds):
     """Create an executable temporary file containing 'cmds'. Returns file name."""
-    temp_file_name = NamedTempFile.create(suffix=".sh", directory="tmp")
+    temp_file_name = NamedTempFile.create(newline="\n", suffix=".sh", directory="tmp")
     with NamedTempFile.get(temp_file_name) as temp_file:
         temp_file.write(cmds)
     os_st = os.stat(temp_file_name)
@@ -668,14 +668,14 @@ class NamedTempFile(object):
     _DIR_LIST = []  # type: ignore
 
     @classmethod
-    def create(cls, directory=None, suffix=""):
+    def create(cls, newline=None, suffix="", directory=None):
         """Create a temporary file, and optional directory, and returns the file name."""
         if directory and not os.path.isdir(directory):
             LOGGER.debug("Creating temporary directory %s", directory)
             os.makedirs(directory)
             cls._DIR_LIST.append(directory)
-        temp_file = tempfile.NamedTemporaryFile(mode="w+", suffix=suffix, dir=directory,
-                                                delete=False)
+        temp_file = tempfile.NamedTemporaryFile(mode="w+", newline=newline, suffix=suffix,
+                                                dir=directory, delete=False)
         cls._FILE_MAP[temp_file.name] = temp_file
         return temp_file.name
 
@@ -1336,9 +1336,27 @@ def rsync(src_dir, dest_dir, exclude_files=None):
     LOGGER.info("Rsync'ing %s to %s%s", src_dir, dest_dir, exclude_str)
     if not distutils.spawn.find_executable("rsync"):
         return 1, "No rsync exists on the host, not rsync'ing"
-    cmds = "rsync -va --delete --quiet {} {} {}".format(exclude_options, src_dir, dest_dir)
-    ret, output = execute_cmd(cmds)
-    return ret, output
+
+    # We retry running the rsync command up to 'max_attempts' times in order to work around how it
+    # sporadically fails under cygwin on Windows Server 2016 with a "No medium found" error message.
+    max_attempts = 5
+    for attempt in range(1, max_attempts + 1):
+        rsync_cmd = f"rsync -va --delete --quiet {exclude_options} {src_dir} {dest_dir}"
+        ret, rsync_output = execute_cmd(rsync_cmd)
+
+        if ret == 0 or "No medium found" not in rsync_output:
+            break
+
+        LOGGER.warning("[%d/%d] rsync command failed (code=%d): %s", attempt, max_attempts, ret,
+                       rsync_output)
+
+        # If the rsync command failed with an "No medium found" error message, then we log some
+        # basic information about the /log mount point.
+        diag_cmds = "ls -ld /data/db /log; df"
+        _, diag_output = execute_cmd(diag_cmds, use_file=True)
+        LOGGER.info("Output from running '%s':\n%s", diag_cmds, diag_output)
+
+    return ret, rsync_output
 
 
 def kill_mongod():
