@@ -103,6 +103,10 @@ public:
         return true;
     }
 
+    bool canIgnorePrepareConflicts() const override {
+        return true;
+    }
+
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) const override {
