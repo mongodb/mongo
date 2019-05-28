@@ -975,7 +975,8 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
 
     p().terminationInitiated = true;
 
-    auto abortCmd = BSON("abortTransaction" << 1);
+    auto abortCmd = BSON("abortTransaction" << 1 << WriteConcernOptions::kWriteConcernField
+                                            << opCtx->getWriteConcern().toBSON());
     std::vector<AsyncRequestsSender::Request> abortRequests;
     for (const auto& participantEntry : o().participants) {
         abortRequests.emplace_back(ShardId(participantEntry.first), abortCmd);
