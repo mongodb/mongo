@@ -431,6 +431,13 @@ public:
     }
 
     /**
+     * Returns the expression context from the stage's context.
+     */
+    const ExpressionContext& getContext() const {
+        return *pExpCtx;
+    }
+
+    /**
      * Given 'currentNames' which describes a set of paths which the caller is interested in,
      * returns boost::none if any of those paths are modified by this stage, or a mapping from
      * their old name to their new name if they are preserved but possibly renamed by this stage.

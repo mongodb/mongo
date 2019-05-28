@@ -50,6 +50,15 @@ class DocumentSourceLookUp final : public DocumentSource {
 public:
     static constexpr size_t kMaxSubPipelineDepth = 20;
 
+    struct LetVariable {
+        LetVariable(std::string name, boost::intrusive_ptr<Expression> expression, Variables::Id id)
+            : name(std::move(name)), expression(std::move(expression)), id(id) {}
+
+        std::string name;
+        boost::intrusive_ptr<Expression> expression;
+        Variables::Id id;
+    };
+
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
@@ -166,6 +175,18 @@ public:
         return !static_cast<bool>(_localField);
     }
 
+    boost::optional<FieldPath> getForeignField() const {
+        return _foreignField;
+    }
+
+    boost::optional<FieldPath> getLocalField() const {
+        return _localField;
+    }
+
+    const std::vector<LetVariable>& getLetVariables() const {
+        return _letVariables;
+    }
+
     /**
      * Returns a non-executable pipeline which can be useful for introspection. In this pipeline,
      * all view definitions are resolved. This pipeline is present in both the sub-pipeline version
@@ -204,15 +225,6 @@ protected:
                                                      Pipeline::SourceContainer* container) final;
 
 private:
-    struct LetVariable {
-        LetVariable(std::string name, boost::intrusive_ptr<Expression> expression, Variables::Id id)
-            : name(std::move(name)), expression(std::move(expression)), id(id) {}
-
-        std::string name;
-        boost::intrusive_ptr<Expression> expression;
-        Variables::Id id;
-    };
-
     /**
      * Target constructor. Handles common-field initialization for the syntax-specific delegating
      * constructors.

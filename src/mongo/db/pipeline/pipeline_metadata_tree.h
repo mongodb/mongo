@@ -31,8 +31,8 @@
 
 #include <algorithm>
 #include <boost/optional.hpp>
-#include <deque>
 #include <functional>
+#include <map>
 #include <memory>
 #include <type_traits>
 #include <utility>
@@ -111,6 +111,18 @@ struct Stage {
     std::vector<Stage> additionalChildren;
 };
 
+template <typename T>
+inline auto findStageContents(const NamespaceString& ns,
+                              const std::map<NamespaceString, T>& initialStageContents) {
+    auto it = initialStageContents.find(ns);
+    uassert(51213,
+            str::stream() << "Metadata to initialize an aggregation pipeline associated with "
+                          << ns.coll()
+                          << " is missing.",
+            it != initialStageContents.end());
+    return it->second;
+}
+
 /**
  * Following convention, the nested detail namespace should be treated as private and not accessed
  * directly.
@@ -118,23 +130,23 @@ struct Stage {
 namespace detail {
 template <typename T>
 std::pair<boost::optional<Stage<T>>, std::function<T(const T&)>> makeTreeWithOffTheEndStage(
-    std::deque<T>&& initialStageContents,
+    std::map<NamespaceString, T>&& initialStageContents,
     const Pipeline& pipeline,
     const std::function<T(const T&, const std::vector<T>&, const DocumentSource&)>& propagator);
 
 /**
  * Produces additional children to be included in a given Stage if it has sub-pipelines. Included
  * are off-the-end contents that would be generated for those sub-pipelines if they had one
- * additional Stage. A deque 'initialStageContents' is provided to dequeue from in order to populate
- * sub-pipelines that, in a graph model, never source from the current pipeline but only feed into
- * it. For example, the initial stage contents are used to seed the contents of $lookup
- * sub-pipelines. The current Stage's contents are provided to copy and populate sub-pipelines that
- * source from the current pipeline and feed back into it through a successive edge. For example,
- * $facet sub-pipelines are populated using a copy of the current Stage's contents.
+ * additional Stage. A map 'initialStageContents' is provided in order to populate sub-pipelines
+ * that, in a graph model, never source from the current pipeline but only feed into it. For
+ * example, the initial stage contents are used to seed the contents of $lookup sub-pipelines. The
+ * current Stage's contents are provided to copy and populate sub-pipelines that source from the
+ * current pipeline and feed back into it through a successive edge. For example, $facet
+ * sub-pipelines are populated using a copy of the current Stage's contents.
  */
 template <typename T>
 inline auto makeAdditionalChildren(
-    std::deque<T>&& initialStageContents,
+    std::map<NamespaceString, T>&& initialStageContents,
     const DocumentSource& source,
     const std::function<T(const T&, const std::vector<T>&, const DocumentSource&)>& propagator,
     const T& currentContentsToCopyForFacet) {
@@ -154,7 +166,6 @@ inline auto makeAdditionalChildren(
                        facetSource->getFacetPipelines().end(),
                        std::back_inserter(children),
                        [&](const auto& fPipe) {
-                           initialStageContents.push_front(currentContentsToCopyForFacet);
                            auto[child, offTheEndReshaper] = makeTreeWithOffTheEndStage(
                                std::move(initialStageContents), *fPipe.pipeline, propagator);
                            offTheEndContents.push_back(offTheEndReshaper(child.get().contents));
@@ -168,20 +179,18 @@ inline auto makeAdditionalChildren(
  * an optional reference to a previous stage which is disengaged at the start of a pipeline or sub-
  * pipeline. Also given is 'reshapeContents', a function to produce the content of the current
  * stage. The current DocumentSource to build a corresponding Stage for is given through 'source'.
- * The front of the 'initialStageContents' deque is used to populate the new Stage if there is no
- * previous Stage and is ignored otherwise.
+ * If there is no previous Stage, the entry from the 'initialStageContents' matching the current
+ * namespace is used to populate the new Stage. If the entry is missing, an exception is thrown.
  */
 template <typename T>
 inline auto makeStage(
-    std::deque<T>&& initialStageContents,
+    std::map<NamespaceString, T>&& initialStageContents,
     boost::optional<Stage<T>>&& previous,
     const std::function<T(const T&)>& reshapeContents,
     const DocumentSource& source,
     const std::function<T(const T&, const std::vector<T>&, const DocumentSource&)>& propagator) {
-    auto contents =
-        previous ? reshapeContents(previous.get().contents) : initialStageContents.front();
-    if (!previous)
-        initialStageContents.pop_front();
+    auto contents = (previous) ? reshapeContents(previous.get().contents)
+                               : findStageContents(source.getContext().ns, initialStageContents);
 
     auto[additionalChildren, offTheEndContents] =
         makeAdditionalChildren(std::move(initialStageContents), source, propagator, contents);
@@ -198,7 +207,7 @@ inline auto makeStage(
 
 template <typename T>
 inline std::pair<boost::optional<Stage<T>>, std::function<T(const T&)>> makeTreeWithOffTheEndStage(
-    std::deque<T>&& initialStageContents,
+    std::map<NamespaceString, T>&& initialStageContents,
     const Pipeline& pipeline,
     const std::function<T(const T&, const std::vector<T>&, const DocumentSource&)>& propagator) {
     std::pair<boost::optional<Stage<T>>, std::function<T(const T&)>> stageAndReshapeContents;
@@ -259,13 +268,14 @@ inline void walk(Stage<T>* stage,
  */
 template <typename T>
 inline std::pair<boost::optional<Stage<T>>, T> makeTree(
-    std::deque<T>&& initialStageContents,
+    std::map<NamespaceString, T>&& initialStageContents,
     const Pipeline& pipeline,
     const std::function<T(const T&, const std::vector<T>&, const DocumentSource&)>& propagator) {
     // For empty pipelines, there's no Stage<T> to return and the output schema is the same as the
     // input schema.
     if (pipeline.getSources().empty()) {
-        return std::pair(boost::none, initialStageContents.front());
+        return std::pair(boost::none,
+                         findStageContents(pipeline.getContext()->ns, initialStageContents));
     }
 
     auto && [ finalStage, reshaper ] =
