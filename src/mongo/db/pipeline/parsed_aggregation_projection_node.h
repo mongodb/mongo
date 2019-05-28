@@ -64,6 +64,12 @@ public:
     void addProjectionForPath(const FieldPath& path);
 
     /**
+     * Get the expression for the given path. Returns null if no expression for the given path is
+     * found.
+     */
+    boost::intrusive_ptr<Expression> getExpressionForPath(const FieldPath& path) const;
+
+    /**
      * Recursively adds 'path' into the tree as a computed field, creating any child nodes if
      * necessary.
      *
