@@ -10526,7 +10526,7 @@ buildvariants:
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: multiversion
-  - replica_sets
+  - name: replica_sets
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: .sharding .common !.op_query !.csrs
