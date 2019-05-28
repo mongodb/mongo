@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import tarfile
+from tempfile import TemporaryDirectory
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -21,7 +22,62 @@ except ImportError:
 import requests
 import yaml
 
+# Get relative imports to work when the package is not installed on the PYTHONPATH.
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# pylint: disable=wrong-import-position
+from buildscripts.ciconfig.evergreen import parse_evergreen_file
+from buildscripts.git import Repository
+# pylint: enable=wrong-import-position
+
 _IS_WINDOWS = (sys.platform == "win32" or sys.platform == "cygwin")
+
+# If changes are only from files in the bypass_files list or the bypass_directories list, then
+# bypass compile, unless they are also found in the requires_compile_directories lists. All
+# other file changes lead to compile.
+BYPASS_WHITELIST = {
+    "files": {
+        "etc/evergreen.yml",
+    },
+    "directories": {
+        "buildscripts/",
+        "jstests/",
+        "pytests/",
+    },
+}  # yapf: disable
+
+# These files are exceptions to any whitelisted directories in bypass_directories. Changes to
+# any of these files will disable compile bypass. Add files you know should specifically cause
+# compilation.
+BYPASS_BLACKLIST = {
+    "files": {
+        "buildscripts/errorcodes.py",
+        "buildscripts/make_archive.py",
+        "buildscripts/moduleconfig.py",
+        "buildscripts/msitrim.py",
+        "buildscripts/packager_enterprise.py",
+        "buildscripts/packager.py",
+        "buildscripts/scons.py",
+        "buildscripts/utils.py",
+    },
+    "directories": {
+        "buildscripts/idl/",
+        "src/",
+    }
+}  # yapf: disable
+
+# Changes to the BYPASS_EXTRA_CHECKS_REQUIRED_LIST may or may not allow bypass compile, depending
+# on the change. If a file is added to this list, the _check_file_for_bypass() function should be
+# updated to perform any extra checks on that file.
+BYPASS_EXTRA_CHECKS_REQUIRED = {
+    "etc/evergreen.yml",
+}  # yapf: disable
+
+# Expansions in etc/evergreen.yml that must not be changed in order to bypass compile.
+EXPANSIONS_TO_CHECK = {
+    "compile_flags",
+}  # yapf: disable
 
 
 def executable_name(pathname):
@@ -80,74 +136,123 @@ def write_out_artifacts(json_file, artifacts):
         json.dump(artifacts, out_file)
 
 
+def _create_bypass_path(prefix, build_id, name):
+    """
+    Create the path for the bypass expansions.
+
+    :param prefix: Prefix of the path.
+    :param build_id: Build-Id to use.
+    :param name: Name of file.
+    :return: Path to use for bypass expansion.
+    """
+    return archive_name(f"{prefix}/{name}-{build_id}")
+
+
 def generate_bypass_expansions(project, build_variant, revision, build_id):
-    """Perform the generate bypass expansions."""
-    expansions = {}
-    # With compile bypass we need to update the URL to point to the correct name of the base commit
-    # binaries.
-    expansions["mongo_binaries"] = (archive_name("{}/{}/{}/binaries/mongo-{}".format(
-        project, build_variant, revision, build_id)))
+    """
+    Create a dictionary of the generate bypass expansions.
 
-    # With compile bypass we need to update the URL to point to the correct name of the base commit
-    # debug symbols.
-    expansions["mongo_debugsymbols"] = (archive_name("{}/{}/{}/debugsymbols/debugsymbols-{}".format(
-        project, build_variant, revision, build_id)))
+    :param project: Evergreen project.
+    :param build_variant: Build variant being run in.
+    :param revision: Revision to use in expansions.
+    :param build_id: Build id to use in expansions.
+    :returns: Dictionary of expansions to update.
+    """
+    prefix = f"{project}/{build_variant}/{revision}"
 
-    # With compile bypass we need to update the URL to point to the correct name of the base commit
-    # mongo shell.
-    expansions["mongo_shell"] = (archive_name("{}/{}/{}/binaries/mongo-shell-{}".format(
-        project, build_variant, revision, build_id)))
+    return {
+        # With compile bypass we need to update the URL to point to the correct name of the base
+        # commit binaries.
+        "mongo_binaries": _create_bypass_path(prefix, build_id, "binaries/mongo"),
+        # With compile bypass we need to update the URL to point to the correct name of the base
+        # commit debug symbols.
+        "mongo_debugsymbols": _create_bypass_path(prefix, build_id, "debugsymbols/debugsymbols"),
+        # With compile bypass we need to update the URL to point to the correct name of the base
+        # commit mongo shell.
+        "mongo_shell": _create_bypass_path(prefix, build_id, "binaries/mongo-shell"),
+        # Enable bypass compile
+        "bypass_compile": True,
+    }
 
-    # Enable bypass compile
-    expansions["bypass_compile"] = True
-    return expansions
+
+def _get_original_etc_evergreen(path):
+    """
+    Get the etc/evergreen configuration before the changes were made.
+
+    :param path: path to etc/evergreen.
+    :return: An EvergreenProjectConfig for the previous etc/evergreen file.
+    """
+    repo = Repository(".")
+    previous_contents = repo.git_show([f"HEAD:{path}"])
+    with TemporaryDirectory() as tmpdir:
+        file_path = os.path.join(tmpdir, "evergreen.yml")
+        with open(file_path, "w") as fp:
+            fp.write(previous_contents)
+        return parse_evergreen_file(file_path)
 
 
-def should_bypass_compile():
-    """Determine whether the compile stage should be bypassed based on the modified patch files.
+def _check_etc_evergreen_for_bypass(path, build_variant):
+    """
+    Check if changes to etc/evergreen can be allowed to bypass compile.
+
+    :param path: Path to etc/evergreen file.
+    :param build_variant: Build variant to check.
+    :return: True if changes can bypass compile.
+    """
+    variant_before = _get_original_etc_evergreen(path).get_variant(build_variant)
+    variant_after = parse_evergreen_file(path).get_variant(build_variant)
+
+    for expansion in EXPANSIONS_TO_CHECK:
+        if variant_before.expansion(expansion) != variant_after.expansion(expansion):
+            return False
+
+    return True
+
+
+def _check_file_for_bypass(file, build_variant):
+    """
+    Check if changes to the given file can be allowed to bypass compile.
+
+    :param file: File to check.
+    :param build_variant: Build Variant to check.
+    :return: True if changes can bypass compile.
+    """
+    if file == "etc/evergreen.yml":
+        return _check_etc_evergreen_for_bypass(file, build_variant)
+
+    return True
+
+
+def _file_in_group(filename, group):
+    """
+    Determine if changes to the given filename require compile to be run.
+
+    :param filename: Filename to check.
+    :param group: Dictionary containing files and filename to check.
+    :return: True if compile should be run for filename.
+    """
+    if "files" not in group:
+        raise TypeError("No list of files to check.")
+    if filename in group["files"]:
+        return True
+
+    if "directories" not in group:
+        raise TypeError("No list of directories to check.")
+    if any(filename.startswith(directory) for directory in group["directories"]):
+        return True
+
+    return False
+
+
+def should_bypass_compile(args):
+    """
+    Determine whether the compile stage should be bypassed based on the modified patch files.
 
     We use lists of files and directories to more precisely control which modified patch files will
     lead to compile bypass.
+    :param args: Command line arguments.
+    :returns: True if compile should be bypassed.
     """
-
-    # If changes are only from files in the bypass_files list or the bypass_directories list, then
-    # bypass compile, unless they are also found in the requires_compile_directories lists. All
-    # other file changes lead to compile.
-    # Add files to this list that should not cause compilation.
-    bypass_files = [
-        "etc/evergreen.yml",
-    ]
-
-    # Add directories to this list that should not cause compilation.
-    bypass_directories = [
-        "buildscripts/",
-        "jstests/",
-        "pytests/",
-    ]
-
-    # These files are exceptions to any whitelisted directories in bypass_directories. Changes to
-    # any of these files will disable compile bypass. Add files you know should specifically cause
-    # compilation.
-    requires_compile_files = [
-        "buildscripts/errorcodes.py",
-        "buildscripts/make_archive.py",
-        "buildscripts/moduleconfig.py",
-        "buildscripts/msitrim.py",
-        "buildscripts/packager_enterprise.py",
-        "buildscripts/packager.py",
-        "buildscripts/scons.py",
-        "buildscripts/utils.py",
-    ]
-
-    # These directories are exceptions to any whitelisted directories in bypass_directories and will
-    # disable compile bypass. Add directories you know should specifically cause compilation.
-    requires_compile_directories = [
-        "buildscripts/idl/",
-        "src/",
-    ]
-
-    args = parse_args()
-
     with open(args.patchFile, "r") as pch:
         for filename in pch:
             filename = filename.rstrip()
@@ -155,18 +260,22 @@ def should_bypass_compile():
             if os.path.isdir(filename):
                 continue
 
-            if (filename in requires_compile_files or any(
-                    filename.startswith(directory) for directory in requires_compile_directories)):
+            if _file_in_group(filename, BYPASS_BLACKLIST):
                 print("Compile bypass disabled after detecting {} as being modified because"
                       " it is a file known to affect compilation.".format(filename))
                 return False
 
-            if (filename not in bypass_files
-                    and not any(filename.startswith(directory)
-                                for directory in bypass_directories)):
+            if not _file_in_group(filename, BYPASS_WHITELIST):
                 print("Compile bypass disabled after detecting {} as being modified because"
                       " it isn't a file known to not affect compilation.".format(filename))
                 return False
+
+            if filename in BYPASS_EXTRA_CHECKS_REQUIRED:
+                if not _check_file_for_bypass(filename, args.buildVariant):
+                    print("Compile bypass disabled after detecting {} as being modified because"
+                          " the changes could affect compilation.".format(filename))
+                    return False
+
     return True
 
 
@@ -209,7 +318,7 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
     args = parse_args()
 
     # Determine if we should bypass compile based on modified patch files.
-    if should_bypass_compile():
+    if should_bypass_compile(args):
         evg_config = read_evg_config()
         if evg_config is None:
             print("Could not find ~/.evergreen.yml config file. Default compile bypass to false.")
@@ -221,7 +330,6 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
                                                                     args.revision)
         revisions = requests_get_json(revision_url)
 
-        match = None
         prefix = "{}_{}_{}_".format(args.project, args.buildVariant, args.revision)
         # The "project" and "buildVariant" passed in may contain "-", but the "builds" listed from
         # Evergreen only contain "_". Replace the hyphens before searching for the build.
@@ -298,10 +406,11 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
             else:
                 print("Linking base artifact {} to this patch build".format(filename))
                 # For other artifacts we just add their URLs to the JSON file to upload.
-                files = {}
-                files["name"] = artifact["name"]
-                files["link"] = artifact["url"]
-                files["visibility"] = "private"
+                files = {
+                    "name": artifact["name"],
+                    "link": artifact["url"],
+                    "visibility": "private",
+                }
                 # Check the link exists, else raise an exception. Compile bypass is disabled.
                 requests.head(artifact["url"]).raise_for_status()
                 artifacts.append(files)

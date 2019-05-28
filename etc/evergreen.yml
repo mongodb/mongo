@@ -1098,7 +1098,8 @@ functions:
         # For patch builds determine if we can bypass compile.
         if [[ "${is_patch}" = "true" && "${task_name}" = "compile" ]]; then
           ${activate_virtualenv}
-          $python buildscripts/bypass_compile_and_fetch_binaries.py            \
+          # Evergreen executable is in $HOME, so add that to the path.
+          PATH=$PATH:$HOME $python buildscripts/bypass_compile_and_fetch_binaries.py            \
             --project ${project}                                               \
             --buildVariant ${build_variant}                                    \
             --revision ${revision}                                             \
