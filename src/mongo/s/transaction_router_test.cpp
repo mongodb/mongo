@@ -937,9 +937,9 @@ void checkSessionDetails(const BSONObj& cmdObj,
 }
 
 void checkWriteConcern(const BSONObj& cmdObj, const WriteConcernOptions& expectedWC) {
-    auto writeCocernElem = cmdObj["writeConcern"];
-    ASSERT_FALSE(writeCocernElem.eoo());
-    ASSERT_BSONOBJ_EQ(expectedWC.toBSON(), writeCocernElem.Obj());
+    auto writeConcernElem = cmdObj["writeConcern"];
+    ASSERT_FALSE(writeConcernElem.eoo());
+    ASSERT_BSONOBJ_EQ(expectedWC.toBSON(), writeConcernElem.Obj());
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
@@ -2264,6 +2264,33 @@ TEST_F(TransactionRouterTest, ImplicitAbortIgnoresErrors) {
 
     // Shouldn't throw.
     future.default_timed_get();
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, AbortPropagatesWriteConcern) {
+    TxnNumber txnNum{3};
+    auto opCtx = operationContext();
+    auto txnRouter = TransactionRouter::get(opCtx);
+
+    WriteConcernOptions writeConcern(10, WriteConcernOptions::SyncMode::NONE, 0);
+    opCtx->setWriteConcern(writeConcern);
+
+    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+
+    txnRouter->setDefaultAtClusterTime(opCtx);
+    txnRouter->attachTxnFieldsIfNeeded(opCtx, shard1, {});
+
+    auto future = launchAsync([&] { return txnRouter->abortTransaction(operationContext()); });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+        ASSERT_EQ(cmdName, "abortTransaction");
+
+        checkWriteConcern(request.cmdObj, writeConcern);
+
+        return kOkReadOnlyFalseResponse;
+    });
+
+    auto response = future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
