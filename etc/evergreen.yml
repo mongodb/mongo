@@ -1138,6 +1138,18 @@ functions:
           fi
 
           echo "python set to $(which $python)"
+      - key: add_nodejs_to_path
+        value: |
+          # Add node and npm binaries to PATH
+          if [ "Windows_NT" = "$OS" ]; then
+            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
+            # Work around the issue by specifying a different %APPDATA% path.
+            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
+            export APPDATA=${workdir}/npm-app-data
+            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
+          else
+            export PATH="$PATH:/opt/node/bin"
+          fi
       - key: posix_workdir
         value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
       # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
@@ -1775,6 +1787,55 @@ functions:
         files:
           - src/generated_resmoke_config/${name}.json
 
+  "setup jstestfuzz":
+    - command: shell.exec
+      shell: bash
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          ${add_nodejs_to_path}
+
+          git clone git@github.com:10gen/jstestfuzz.git
+
+          pushd jstestfuzz
+            npm install
+            npm run prepare
+          popd
+
+  "lint fuzzer sanity patch":
+    - command: shell.exec
+      shell: bash
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -eo pipefail
+          set -o verbose
+
+          ${add_nodejs_to_path}
+
+          # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
+          # Grep returns 1 if it fails to find a match.
+          (grep "\.js$" patch_files.txt || true) | sed -e "s|^|$PWD/|" | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
+
+  "lint fuzzer sanity all":
+    - command: shell.exec
+      shell: bash
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -eo pipefail
+          set -o verbose
+
+          ${add_nodejs_to_path}
+
+          # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
+          find "$PWD/jstests" "$PWD/src/mongo/db/modules/enterprise" -name "*.js" -print | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
+
   "run jstestfuzz":
     - command: shell.exec
       params:
@@ -1783,39 +1844,10 @@ functions:
           set -o errexit
           set -o verbose
 
-          git clone git@github.com:10gen/jstestfuzz.git
-
           cp mongodb*/bin/mongod .
-
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
 
           git clone --depth 1 git@github.com:10gen/mongo-enterprise-modules.git jstests/enterprise_tests
           git clone --depth 1 git@github.com:10gen/QA.git jstests/qa_tests
-
-    - command: shell.exec
-      params:
-        working_dir: src/jstestfuzz
-        script: |
-          set -o errexit
-          set -o verbose
-
-          # Add node and npm binaries to PATH
-          if [ "Windows_NT" = "$OS" ]; then
-            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
-            # Work around the issue by specifying a different %APPDATA% path.
-            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
-            export APPDATA=${workdir}/npm-app-data
-            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
-          else
-            export PATH="$PATH:/opt/node/bin"
-          fi
-
-          npm install
 
     - command: shell.exec
       type: test
@@ -1825,35 +1857,7 @@ functions:
           set -o errexit
           set -o verbose
 
-          # Add node and npm binaries to PATH
-          if [ "Windows_NT" = "$OS" ]; then
-            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
-            # Work around the issue by specifying a different %APPDATA% path.
-            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
-            export APPDATA=${workdir}/npm-app-data
-            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
-          else
-            export PATH="$PATH:/opt/node/bin"
-          fi
-
-          echo "jstestfuzz self-tests are starting"
-          set +o errexit
-          npm test > npm_test.log 2>&1
-          if [ $? -ne 0 ]; then
-            echo "jstestfuzz self-tests failure"
-            branch=$(git symbolic-ref --short HEAD)
-            commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
-            echo "Git branch: $branch, commit: $commit"
-            which node
-            node --version
-            which npm
-            npm --version
-            cat npm_test.log
-            exit 1
-          fi
-          rm -f npm_test.log
-          set -o errexit
-          echo "jstestfuzz self-tests finished"
+          ${add_nodejs_to_path}
 
           npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars}
 
@@ -5350,6 +5354,26 @@ tasks:
       jstestfuzz_vars: --jsTestsDir ../jstests
       resmoke_args: --suites=jstestfuzz_sharded_session --storageEngine=wiredTiger
       name: jstestfuzz_sharded_session
+
+# Check that the mutational fuzzer can parse JS files modified in a patch build.
+- name: lint_fuzzer_sanity_patch
+  patch_only: true
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "set task expansion macros"
+  - func: "get modified patch files"
+  - func: "setup jstestfuzz"
+  - func: "lint fuzzer sanity patch"
+
+# Check that the mutational fuzzer can parse all JS filess.
+- name: lint_fuzzer_sanity_all
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "set task expansion macros"
+  - func: "setup jstestfuzz"
+  - func: "lint fuzzer sanity all"
 
 ## integration test suites ##
 
@@ -8875,6 +8899,17 @@ buildvariants:
     - ubuntu1604-packer
   - name: .publish
 
+- name: tig-daily-cron
+  modules:
+  - enterprise
+  display_name: "~ TIG Daily Cron"
+  run_on:
+  - rhel62-small
+  batchtime: 1440 # 1 day
+  stepback: false
+  tasks:
+  - name: lint_fuzzer_sanity_all
+
 ###########################################
 #         Windows buildvariants           #
 ###########################################
@@ -9889,12 +9924,14 @@ buildvariants:
     requires:
     - name: burn_in_tests_gen
     - name: lint
+    - name: lint_fuzzer_sanity_patch
     distros:
     - rhel62-large
   - name: compile_benchmarks
     distros:
     - rhel62-large
   - name: lint
+  - name: lint_fuzzer_sanity_patch
   - name: lint_yaml
   - name: burn_in_tests_gen
     distros:
