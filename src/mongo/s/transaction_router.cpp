@@ -307,9 +307,9 @@ void TransactionRouter::processParticipantResponse(const ShardId& shardId,
     auto participant = getParticipant(shardId);
     invariant(participant, "Participant should exist if processing participant response");
 
-    if (_commitType != CommitType::kNotInitiated) {
-        // Do not update a participant's transaction metadata after commit has been initiated, since
-        // a participant's state is partially reset on commit.
+    if (_terminationInitiated) {
+        // Do not process the transaction metadata after commit or abort have been initiated,
+        // since a participant's state is partially reset on commit and abort.
         return;
     }
 
@@ -759,6 +759,8 @@ BSONObj TransactionRouter::_handOffCommitToCoordinator(OperationContext* opCtx) 
 
 BSONObj TransactionRouter::commitTransaction(
     OperationContext* opCtx, const boost::optional<TxnRecoveryToken>& recoveryToken) {
+    _terminationInitiated = true;
+
     auto commitRes = _commitTransaction(opCtx, recoveryToken);
 
     auto commitStatus = getStatusFromCommandResult(commitRes);
@@ -873,6 +875,8 @@ BSONObj TransactionRouter::abortTransaction(OperationContext* opCtx) {
             "no known command has been sent by this router for this transaction",
             !_participants.empty());
 
+    _terminationInitiated = true;
+
     auto abortCmd = BSON("abortTransaction" << 1);
     std::vector<AsyncRequestsSender::Request> abortRequests;
     for (const auto& participantEntry : _participants) {
@@ -925,6 +929,8 @@ void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx,
     if (_participants.empty()) {
         return;
     }
+
+    _terminationInitiated = true;
 
     auto abortCmd = BSON("abortTransaction" << 1);
     std::vector<AsyncRequestsSender::Request> abortRequests;
@@ -981,6 +987,7 @@ void TransactionRouter::_resetRouterState(const TxnNumber& txnNumber) {
     _atClusterTime.reset();
     _abortCause = std::string();
     _timingStats = TimingStats();
+    _terminationInitiated = false;
 
     // TODO SERVER-37115: Parse statement ids from the client and remember the statement id
     // of the command that started the transaction, if one was included.

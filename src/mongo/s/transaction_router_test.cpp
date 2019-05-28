@@ -2711,6 +2711,82 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                        51112);
 }
 
+TEST_F(TransactionRouterTestWithDefaultSession,
+       ProcessParticipantSkipsValidationIfAbortAlreadyInitiated) {
+    TxnNumber txnNum{3};
+    auto opCtx = operationContext();
+
+    auto& txnRouter(*TransactionRouter::get(opCtx));
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+
+    txnRouter.setDefaultAtClusterTime(opCtx);
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, {});
+
+    // Continue causes the _latestStmtId to be bumped.
+    repl::ReadConcernArgs::get(opCtx) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kContinue);
+
+    // Aborting will set the termination initiation state.
+    auto future = launchAsync([&] { txnRouter.abortTransaction(opCtx); });
+    expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum);
+    future.default_timed_get();
+
+    // The participant's response metadata should not be processed since abort has been initiated.
+    txnRouter.processParticipantResponse(shard1, BSON("ok" << 0));
+    ASSERT(TransactionRouter::Participant::ReadOnly::kUnset ==
+           txnRouter.getParticipant(shard1)->readOnly);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       ProcessParticipantSkipsValidationIfImplicitAbortAlreadyInitiated) {
+    TxnNumber txnNum{3};
+    auto opCtx = operationContext();
+
+    auto& txnRouter(*TransactionRouter::get(opCtx));
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+
+    txnRouter.setDefaultAtClusterTime(opCtx);
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, {});
+
+    // Aborting will set the termination initiation state.
+    auto future = launchAsync([&] { txnRouter.implicitlyAbortTransaction(opCtx, kDummyStatus); });
+    expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum);
+    future.default_timed_get();
+
+    // The participant's response metadata should not be processed since abort has been initiated.
+    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    ASSERT(TransactionRouter::Participant::ReadOnly::kUnset ==
+           txnRouter.getParticipant(shard1)->readOnly);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       ProcessParticipantSkipsValidationIfCommitAlreadyInitiated) {
+    TxnNumber txnNum{3};
+    auto opCtx = operationContext();
+
+    auto& txnRouter(*TransactionRouter::get(opCtx));
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+
+    txnRouter.setDefaultAtClusterTime(opCtx);
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, {});
+
+    // Process !readonly response to set participant state.
+    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    ASSERT(TransactionRouter::Participant::ReadOnly::kNotReadOnly ==
+           txnRouter.getParticipant(shard1)->readOnly);
+
+    // Commit causes the _latestStmtId to be bumped.
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+
+    // Committing will set the termination initiation state.
+    auto future = launchAsync([&] { txnRouter.commitTransaction(opCtx, boost::none); });
+    expectCommitTransaction();
+    future.default_timed_get();
+
+    // Processing readonly response should not throw since commit has been initiated.
+    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+}
+
 // Begins a transaction with snapshot level read concern and sets a default cluster time.
 class TransactionRouterTestWithDefaultSessionAndStartedSnapshot
     : public TransactionRouterTestWithDefaultSession {

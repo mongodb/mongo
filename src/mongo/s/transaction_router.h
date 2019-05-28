@@ -533,6 +533,9 @@ private:
 
     // Stats used for calculating durations for the active transaction.
     TimingStats _timingStats;
+
+    // Track whether commit or abort have been initiated.
+    bool _terminationInitiated{false};
 };
 
 }  // namespace mongo
