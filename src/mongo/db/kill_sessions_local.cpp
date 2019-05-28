@@ -194,7 +194,8 @@ void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
                                       << " TxnNumber: " << txnParticipant.getActiveTxnNumber();
                                txnParticipant.refreshLocksForPreparedTransaction(killerOpCtx, true);
                            }
-                       });
+                       },
+                       ErrorCodes::InterruptedDueToReplStateChange);
 }
 
 }  // namespace mongo
