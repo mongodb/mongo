@@ -904,6 +904,22 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSo
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss));
 }
 
+TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSourceEqualsTarget) {
+    auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), _targetNss);
+    auto uuidDoc = BSON("ui" << _createCollectionWithUUID(_opCtx.get(), _sourceNss));
+    auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _sourceNss.ns() << "dropTarget"
+                                       << dropTargetUUID);
+    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+    repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
+    auto dpns = _targetNss.makeDropPendingNamespace(renameOpTime);
+    ASSERT_OK(renameCollectionForApplyOps(
+        _opCtx.get(), _sourceNss.db().toString(), uuidDoc["ui"], cmd, renameOpTime));
+
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), _sourceNss));
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), dpns));
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
+}
+
 void _testRenameCollectionStayTemp(OperationContext* opCtx,
                                    const NamespaceString& sourceNss,
                                    const NamespaceString& targetNss,
