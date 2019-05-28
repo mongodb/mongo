@@ -977,27 +977,38 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
             if (!ret.isOK()) {
                 return ret;
             }
-            invariant(option);
+
+            std::string canonicalName;
+            if (option) {
+                canonicalName = option->_dottedName;
+            } else {
+                // Possible if using non-strict parsing.
+                canonicalName = dottedName;
+            }
 
             Value dummyVal;
-            if (environment->get(option->_dottedName, &dummyVal).isOK()) {
+            if (environment->get(canonicalName, &dummyVal).isOK()) {
                 StringBuilder sb;
-                sb << "Error parsing YAML config: duplicate key: " << dottedName
-                   << "(canonical key: " << option->_dottedName << ")";
-                return Status(ErrorCodes::BadValue, sb.str());
+                sb << "Error parsing YAML config: duplicate key: " << dottedName;
+                if (dottedName != canonicalName) {
+                    sb << "(canonical key: " << canonicalName << ")";
+                }
+                return {ErrorCodes::BadValue, sb.str()};
             }
 
             // Only add the value if it is not empty.  YAMLNodeToValue will set the
             // optionValue to an empty Value if we should not set it in the Environment.
             if (!optionValue.isEmpty()) {
-                ret = environment->set(option->_dottedName, optionValue);
+                ret = environment->set(canonicalName, optionValue);
                 if (!ret.isOK()) {
                     return ret;
                 }
 
-                ret = canonicalizeOption(*option, environment);
-                if (!ret.isOK()) {
-                    return ret;
+                if (option) {
+                    ret = canonicalizeOption(*option, environment);
+                    if (!ret.isOK()) {
+                        return ret;
+                    }
                 }
             }
         }
