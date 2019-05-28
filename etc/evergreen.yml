@@ -253,7 +253,7 @@ variables:
   - func: "clear OOM messages"
   - command: manifest.load
   - func: "git get project"
-  - func: "get modified patch files"
+  - func: "get all modified patch files"
   # NOTE: To disable the compile bypass feature, comment out the next line.
   #
   - func: "bypass compile and fetch binaries"
@@ -873,7 +873,7 @@ functions:
         mkdir -p ../../../../../../mongo-tools/distsrc
         cp THIRD-PARTY-NOTICES ../../../../../../mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools
 
-  "get modified patch files" :
+  "get all modified patch files":
     command: shell.exec
     params:
       working_dir: src
@@ -894,7 +894,24 @@ functions:
           fi
         fi
 
-  "determine resmoke jobs" : &determine_resmoke_jobs
+  # This function should only be called from patch-build-only tasks.
+  "get added and modified patch files":
+    command: shell.exec
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        git diff HEAD --name-only --line-prefix="${workdir}/src/" --diff-filter=d >> modified_and_created_patch_files.txt
+        if [ -d src/mongo/db/modules/enterprise ]; then
+          pushd src/mongo/db/modules/enterprise
+          git diff HEAD --name-only --line-prefix="${workdir}/src/src/mongo/db/modules/enterprise/" --diff-filter=d >> ~1/modified_and_created_patch_files.txt
+          popd
+        fi
+
+  "determine resmoke jobs": &determine_resmoke_jobs
     command: shell.exec
     params:
       working_dir: src
@@ -1549,6 +1566,55 @@ functions:
         files:
           - src/generated_resmoke_config/${name}.json
 
+  "setup jstestfuzz":
+    - command: shell.exec
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+
+          ${add_nodejs_to_path}
+
+          git clone git@github.com:10gen/jstestfuzz.git
+
+          pushd jstestfuzz
+            npm install
+            npm run prepare
+          popd
+
+  "lint fuzzer sanity patch":
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          set -eo pipefail
+          set -o verbose
+
+          ${add_nodejs_to_path}
+
+          # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
+          # Grep returns 1 if it fails to find a match.
+          (grep "\.js$" modified_and_created_patch_files.txt || true) | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
+
+  "lint fuzzer sanity all":
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          set -eo pipefail
+          set -o verbose
+
+          ${add_nodejs_to_path}
+
+          # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
+          find "$PWD/jstests" "$PWD/src/mongo/db/modules/enterprise" -name "*.js" -print | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
+
   "run jstestfuzz":
     - command: shell.exec
       params:
@@ -1557,39 +1623,10 @@ functions:
           set -o errexit
           set -o verbose
 
-          git clone git@github.com:10gen/jstestfuzz.git
-
           cp mongodb*/bin/mongod .
-
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
 
           git clone --depth 1 git@github.com:10gen/mongo-enterprise-modules.git jstests/enterprise_tests
           git clone --depth 1 git@github.com:10gen/QA.git jstests/qa_tests
-
-    - command: shell.exec
-      params:
-        working_dir: src/jstestfuzz
-        script: |
-          set -o errexit
-          set -o verbose
-
-          # Add node and npm binaries to PATH
-          if [ "Windows_NT" = "$OS" ]; then
-            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
-            # Work around the issue by specifying a different %APPDATA% path.
-            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
-            export APPDATA=${workdir}/npm-app-data
-            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
-          else
-            export PATH="$PATH:/opt/node/bin"
-          fi
-
-          npm install
 
     - command: shell.exec
       type: test
@@ -1599,35 +1636,7 @@ functions:
           set -o errexit
           set -o verbose
 
-          # Add node and npm binaries to PATH
-          if [ "Windows_NT" = "$OS" ]; then
-            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
-            # Work around the issue by specifying a different %APPDATA% path.
-            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
-            export APPDATA=${workdir}/npm-app-data
-            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
-          else
-            export PATH="$PATH:/opt/node/bin"
-          fi
-
-          echo "jstestfuzz self-tests are starting"
-          set +o errexit
-          npm test > npm_test.log 2>&1
-          if [ $? -ne 0 ]; then
-            echo "jstestfuzz self-tests failure"
-            branch=$(git symbolic-ref --short HEAD)
-            commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
-            echo "Git branch: $branch, commit: $commit"
-            which node
-            node --version
-            which npm
-            npm --version
-            cat npm_test.log
-            exit 1
-          fi
-          rm -f npm_test.log
-          set -o errexit
-          echo "jstestfuzz self-tests finished"
+          ${add_nodejs_to_path}
 
           npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars}
 
@@ -2642,6 +2651,18 @@ functions:
             fi
           fi
           echo "python set to $(which $python)"
+      - key: add_nodejs_to_path
+        value: |
+          # Add node and npm binaries to PATH
+          if [ "Windows_NT" = "$OS" ]; then
+            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
+            # Work around the issue by specifying a different %APPDATA% path.
+            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
+            export APPDATA=${workdir}/npm-app-data
+            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
+          else
+            export PATH="$PATH:/opt/node/bin"
+          fi
       - key: posix_workdir
         value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
       # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
@@ -4931,6 +4952,26 @@ tasks:
       jstestfuzz_vars: --jsTestsDir ../jstests
       resmoke_args: --suites=jstestfuzz_sharded_session --storageEngine=wiredTiger
       name: jstestfuzz_sharded_session
+
+# Check that the mutational fuzzer can parse JS files modified in a patch build.
+- name: lint_fuzzer_sanity_patch
+  patch_only: true
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "set task expansion macros"
+  - func: "get added and modified patch files"
+  - func: "setup jstestfuzz"
+  - func: "lint fuzzer sanity patch"
+
+# Check that the mutational fuzzer can parse all JS filess.
+- name: lint_fuzzer_sanity_all
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "set task expansion macros"
+  - func: "setup jstestfuzz"
+  - func: "lint fuzzer sanity all"
 
 ## integration test suites ##
 
@@ -9701,12 +9742,14 @@ buildvariants:
     requires:
     - name: burn_in_tests
     - name: lint
+    - name: lint_fuzzer_sanity_patch
     distros:
     - rhel62-large
   - name: compile_benchmarks
     distros:
     - rhel62-large
   - name: lint
+  - name: lint_fuzzer_sanity_patch
   - name: burn_in_tests
     distros:
     - rhel62-large
@@ -12723,17 +12766,18 @@ buildvariants:
     - ubuntu1604-build
 
 - name: tig-daily-cron
+  modules:
+  - enterprise
   display_name: "~ TIG Daily Cron"
   run_on:
-  - rhel62-large
+  - rhel62-small
   batchtime: 1440 # 1 day
   stepback: false
   tasks:
 # Test lifecycle is temporarily disabled to reduce load on Evergreen API.
 # - name: update_test_lifecycle
   - name: fetch_test_lifecycle
-    distros:
-    - rhel62-small
+  - name: lint_fuzzer_sanity_all
 
 - name: enterprise-rhel-62-64-bit-mmapv1
   display_name: Enterprise RHEL 6.2 MMAPv1

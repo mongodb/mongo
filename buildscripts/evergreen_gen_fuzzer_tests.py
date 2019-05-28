@@ -115,6 +115,7 @@ def _generate_evg_tasks(options):
         if options.use_multiversion:
             commands.append(CommandDefinition().function("do multiversion setup"))
 
+        commands.append(CommandDefinition().function("setup jstestfuzz"))
         commands.append(CommandDefinition().function("run jstestfuzz").vars({
             "jstestfuzz_vars":
                 "--numGeneratedFiles {0} {1}".format(options.num_files, options.jstestfuzz_vars),
