@@ -38,6 +38,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/parsed_inclusion_projection.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/unittest/unittest.h"
 
@@ -571,6 +572,42 @@ TEST(ParsedAggregationProjectionType, ShouldCoerceNumericsToBools) {
         ASSERT(parsedProject->getType() ==
                TransformerInterface::TransformerType::kInclusionProjection);
     }
+}
+
+TEST(ParsedAggregationProjectionType, GetExpressionForPathGetsTopLevelExpression) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto projectObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 3)));
+    auto expr = Expression::parseObject(expCtx, projectObj, expCtx->variablesParseState);
+    ParsedAggregationProjection::ProjectionPolicies defaultPolicies;
+    auto node = InclusionNode(defaultPolicies);
+    node.addExpressionForPath(FieldPath("key"), expr);
+    BSONObjBuilder bob;
+    ASSERT_EQ(expr, node.getExpressionForPath(FieldPath("key")));
+}
+
+TEST(ParsedAggregationProjectionType, GetExpressionForPathGetsCorrectTopLevelExpression) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto correctObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 3)));
+    auto incorrectObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 2) << BSON("$const" << 4)));
+    auto correctExpr = Expression::parseObject(expCtx, correctObj, expCtx->variablesParseState);
+    auto incorrectExpr = Expression::parseObject(expCtx, incorrectObj, expCtx->variablesParseState);
+    ParsedAggregationProjection::ProjectionPolicies defaultPolicies;
+    auto node = InclusionNode(defaultPolicies);
+    node.addExpressionForPath(FieldPath("key"), correctExpr);
+    node.addExpressionForPath(FieldPath("other"), incorrectExpr);
+    BSONObjBuilder bob;
+    ASSERT_EQ(correctExpr, node.getExpressionForPath(FieldPath("key")));
+}
+
+TEST(ParsedAggregationProjectionType, GetExpressionForPathGetsNonTopLevelExpression) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto projectObj = BSON("$add" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 3)));
+    auto expr = Expression::parseObject(expCtx, projectObj, expCtx->variablesParseState);
+    ParsedAggregationProjection::ProjectionPolicies defaultPolicies;
+    auto node = InclusionNode(defaultPolicies);
+    node.addExpressionForPath(FieldPath("key.second"), expr);
+    BSONObjBuilder bob;
+    ASSERT_EQ(expr, node.getExpressionForPath(FieldPath("key.second")));
 }
 
 }  // namespace

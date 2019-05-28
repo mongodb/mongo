@@ -76,6 +76,10 @@ public:
         return TransformerType::kComputedProjection;
     }
 
+    const InclusionNode& getRoot() const {
+        return *_root;
+    }
+
     /**
      * Parses the addFields specification given by 'spec', populating internal data structures.
      */
