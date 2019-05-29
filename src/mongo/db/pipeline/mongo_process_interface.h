@@ -59,6 +59,7 @@ namespace mongo {
 class ExpressionContext;
 class Pipeline;
 class PipelineDeleter;
+class TransactionHistoryIteratorBase;
 
 /**
  * Any functionality needed by an aggregation stage that is either context specific to a mongod or
@@ -119,10 +120,11 @@ public:
     virtual DBClientBase* directClient() = 0;
 
     /**
-     * Query the oplog for an entry with a matching OpTime.
+     * Creates a new TransactionHistoryIterator object. Only applicable in processes which support
+     * locally traversing the oplog.
      */
-    virtual repl::OplogEntry lookUpOplogEntryByOpTime(OperationContext* opCtx,
-                                                      repl::OpTime lookupTime) = 0;
+    virtual std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
+        repl::OpTime time) const = 0;
 
     /**
      * Note that in some rare cases this could return a false negative but will never return a false

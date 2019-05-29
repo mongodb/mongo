@@ -47,13 +47,21 @@ namespace {
 /**
  * Query the oplog for an entry with the given timestamp.
  */
-BSONObj findOneOplogEntry(OperationContext* opCtx, const repl::OpTime& opTime, bool permitYield) {
+BSONObj findOneOplogEntry(OperationContext* opCtx,
+                          const repl::OpTime& opTime,
+                          bool permitYield,
+                          bool prevOpOnly = false) {
     BSONObj oplogBSON;
     invariant(!opTime.isNull());
 
     auto qr = std::make_unique<QueryRequest>(NamespaceString::kRsOplogNamespace);
     qr->setFilter(opTime.asQuery());
     qr->setOplogReplay(true);  // QueryOption_OplogReplay
+
+    if (prevOpOnly) {
+        qr->setProj(
+            BSON("_id" << 0 << repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName << 1LL));
+    }
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
 
@@ -106,15 +114,30 @@ repl::OplogEntry TransactionHistoryIterator::next(OperationContext* opCtx) {
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
     const auto& oplogPrevTsOption = oplogEntry.getPrevWriteOpTimeInTransaction();
-    uassert(
-        ErrorCodes::FailedToParse,
-        str::stream() << "Missing prevTs field on oplog entry of previous write in transaction: "
-                      << redact(oplogBSON),
-        oplogPrevTsOption);
+    uassert(ErrorCodes::FailedToParse,
+            str::stream()
+                << "Missing prevOpTime field on oplog entry of previous write in transaction: "
+                << redact(oplogBSON),
+            oplogPrevTsOption);
 
     _nextOpTime = oplogPrevTsOption.value();
 
     return oplogEntry;
+}
+
+repl::OpTime TransactionHistoryIterator::nextOpTime(OperationContext* opCtx) {
+    BSONObj oplogBSON = findOneOplogEntry(opCtx, _nextOpTime, _permitYield, true /* prevOpOnly */);
+
+    auto prevOpTime = oplogBSON[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName];
+    uassert(ErrorCodes::FailedToParse,
+            str::stream()
+                << "Missing prevOpTime field on oplog entry of previous write in transaction: "
+                << redact(oplogBSON),
+            !prevOpTime.eoo() && prevOpTime.isABSONObj());
+
+    auto returnOpTime = _nextOpTime;
+    _nextOpTime = repl::OpTime::parse(prevOpTime.Obj());
+    return returnOpTime;
 }
 
 }  // namespace mongo

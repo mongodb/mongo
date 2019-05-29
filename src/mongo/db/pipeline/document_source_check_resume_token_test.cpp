@@ -63,19 +63,19 @@ public:
 protected:
     /**
      * Pushes a document with a resume token corresponding to the given timestamp, version,
-     * applyOpsIndex, docKey, and namespace into the mock queue.
+     * txnOpIndex, docKey, and namespace into the mock queue.
      */
     void addDocument(
-        Timestamp ts, int version, std::size_t applyOpsIndex, Document docKey, UUID uuid) {
+        Timestamp ts, int version, std::size_t txnOpIndex, Document docKey, UUID uuid) {
         _mock->push_back(
             Document{{"_id",
-                      ResumeToken(ResumeTokenData(ts, version, applyOpsIndex, uuid, Value(docKey)))
+                      ResumeToken(ResumeTokenData(ts, version, txnOpIndex, uuid, Value(docKey)))
                           .toDocument()}});
     }
 
     /**
      * Pushes a document with a resume token corresponding to the given timestamp, version,
-     * applyOpsIndex, docKey, and namespace into the mock queue.
+     * txnOpIndex, docKey, and namespace into the mock queue.
      */
     void addDocument(Timestamp ts, Document docKey, UUID uuid = testUuid()) {
         addDocument(ts, 0, 0, docKey, uuid);
@@ -99,11 +99,11 @@ protected:
     intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> createCheckResumeToken(
         Timestamp ts,
         int version,
-        std::size_t applyOpsIndex,
+        std::size_t txnOpIndex,
         boost::optional<Document> docKey,
         UUID uuid) {
         auto checkResumeToken = DocumentSourceEnsureResumeTokenPresent::create(
-            getExpCtx(), {ts, version, applyOpsIndex, uuid, docKey ? Value(*docKey) : Value()});
+            getExpCtx(), {ts, version, txnOpIndex, uuid, docKey ? Value(*docKey) : Value()});
         checkResumeToken->setSource(_mock.get());
         return checkResumeToken;
     }
@@ -409,7 +409,7 @@ TEST_F(CheckResumeTokenTest,
     ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
 }
 
-TEST_F(CheckResumeTokenTest, ShouldSkipResumeTokensWithEarlierApplyOpsIndex) {
+TEST_F(CheckResumeTokenTest, ShouldSkipResumeTokensWithEarlierTxnOpIndex) {
     Timestamp resumeTimestamp(100, 1);
 
     // Create an ordered array of 3 UUIDs.

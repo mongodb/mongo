@@ -54,8 +54,8 @@ public:
 
     void setOperationContext(OperationContext* opCtx) final;
     DBClientBase* directClient() final;
-    virtual repl::OplogEntry lookUpOplogEntryByOpTime(OperationContext* opCtx,
-                                                      repl::OpTime lookupTime) final;
+    std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
+        repl::OpTime time) const final;
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
     void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,

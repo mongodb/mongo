@@ -97,6 +97,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    repl::OpTime nextOpTime(OperationContext*) override {
+        MONGO_UNREACHABLE;
+    }
+
     virtual ~TransactionHistoryIteratorMock() {}
 
     bool hasNext() const override {

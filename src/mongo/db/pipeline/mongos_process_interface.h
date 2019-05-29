@@ -89,8 +89,8 @@ public:
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const final;
 
-    repl::OplogEntry lookUpOplogEntryByOpTime(OperationContext* opCtx,
-                                              repl::OpTime lookupTime) final {
+    std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
+        repl::OpTime time) const override {
         MONGO_UNREACHABLE;
     }
 

@@ -159,19 +159,46 @@ void DocumentSourceChangeStream::checkValueType(const Value v,
 namespace {
 
 /**
- * Constructs a filter matching 'applyOps' oplog entries that:
- * 1) Represent a committed transaction (i.e., not just the "prepare" part of a two-phase
- *    transaction).
- * 2) Have sub-entries which should be returned in the change stream.
+ * Constructs a filter matching any 'applyOps' commands that commit a transaction. An 'applyOps'
+ * command implicitly commits a transaction if _both_ of the following are true:
+ * 1) it is not marked with the 'partialTxn' field, which would indicate that there are more entries
+ *    to come in the transaction and
+ * 2) it is not marked with the 'prepare' field, which would indicate that the transaction is only
+ *    committed if there is a follow-up 'commitTransaction' command in the oplog.
+ *
+ * This filter will ignore all but the last 'applyOps' command in a transaction comprising multiple
+ * 'applyOps' commands, and it will ignore all 'applyOps' commands in a prepared transaction. The
+ * change stream traverses back through the oplog to recover the ignored commands when it sees an
+ * entry that commits a transaction.
+ *
+ * As an optimization, this filter also ignores any transaction with just a single 'applyOps' if
+ * that 'applyOps' does not contain any updates that modify the namespace that the change stream is
+ * watching.
  */
 BSONObj getTxnApplyOpsFilter(BSONElement nsMatch, const NamespaceString& nss) {
     BSONObjBuilder applyOpsBuilder;
     applyOpsBuilder.append("op", "c");
+
+    // "o.applyOps" must be an array with at least one element
+    applyOpsBuilder.append("o.applyOps.0", BSON("$exists" << true));
     applyOpsBuilder.append("lsid", BSON("$exists" << true));
     applyOpsBuilder.append("txnNumber", BSON("$exists" << true));
     applyOpsBuilder.append("o.prepare", BSON("$not" << BSON("$eq" << true)));
-    const std::string& kApplyOpsNs = "o.applyOps.ns";
-    applyOpsBuilder.appendAs(nsMatch, kApplyOpsNs);
+    applyOpsBuilder.append("o.partialTxn", BSON("$not" << BSON("$eq" << true)));
+    {
+        // Include this 'applyOps' if it has an operation with a matching namespace _or_ if it has a
+        // 'prevOpTime' link to another 'applyOps' command, indicating a multi-entry transaction.
+        BSONArrayBuilder orBuilder(applyOpsBuilder.subarrayStart("$or"));
+        {
+            {
+                BSONObjBuilder nsMatchBuilder(orBuilder.subobjStart());
+                nsMatchBuilder.appendAs(nsMatch, "o.applyOps.ns"_sd);
+            }
+            // The default repl::OpTime is the value used to indicate a null "prevOpTime" link.
+            orBuilder.append(BSON(repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName
+                                  << BSON("$ne" << repl::OpTime().toBSON())));
+        }
+    }
     return applyOpsBuilder.obj();
 }
 }  // namespace

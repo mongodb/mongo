@@ -42,17 +42,17 @@ using ResumeStatus = DocumentSourceEnsureResumeTokenPresent::ResumeStatus;
 // the client's resume token, ResumeStatus::kCheckNextDoc if it is older than the client's token,
 // and ResumeToken::kCannotResume if it is more recent than the client's resume token (indicating
 // that we will never see the token). If the resume token's documentKey contains only the _id field
-// while the pipeline documentKey contains additional fields, then the collection has become
-// sharded since the resume token was generated. In that case, we relax the requirements such that
-// only the timestamp, version, applyOpsIndex, UUID and documentKey._id need match. This remains
-// correct, since the only circumstances under which the resume token omits the shard key is if it
-// was generated either (1) before the collection was sharded, (2) after the collection was sharded
-// but before the primary shard became aware of that fact, implying that it was before the first
-// chunk moved off the shard, or (3) by a malicious client who has constructed their own resume
-// token. In the first two cases, we can be guaranteed that the _id is unique and the stream can
-// therefore be resumed seamlessly; in the third case, the worst that can happen is that some
-// entries are missed or duplicated. Note that the simple collation is used to compare the resume
-// tokens, and that we purposefully avoid the user's requested collation if present.
+// while the pipeline documentKey contains additional fields, then the collection has become sharded
+// since the resume token was generated. In that case, we relax the requirements such that only the
+// timestamp, version, txnOpIndex, UUID and documentKey._id need match. This remains correct, since
+// the only circumstances under which the resume token omits the shard key is if it was generated
+// either (1) before the collection was sharded, (2) after the collection was sharded but before the
+// primary shard became aware of that fact, implying that it was before the first chunk moved off
+// the shard, or (3) by a malicious client who has constructed their own resume token. In the first
+// two cases, we can be guaranteed that the _id is unique and the stream can therefore be resumed
+// seamlessly; in the third case, the worst that can happen is that some entries are missed or
+// duplicated. Note that the simple collation is used to compare the resume tokens, and that we
+// purposefully avoid the user's requested collation if present.
 ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionContext>& expCtx,
                                              const Document& documentFromResumedStream,
                                              const ResumeTokenData& tokenDataFromClient) {
@@ -78,14 +78,14 @@ ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionConte
             : ResumeStatus::kCheckNextDoc;
     }
 
-    if (tokenDataFromResumedStream.applyOpsIndex < tokenDataFromClient.applyOpsIndex) {
+    if (tokenDataFromResumedStream.txnOpIndex < tokenDataFromClient.txnOpIndex) {
         return ResumeStatus::kCheckNextDoc;
-    } else if (tokenDataFromResumedStream.applyOpsIndex > tokenDataFromClient.applyOpsIndex) {
-        // This could happen if the client provided an applyOpsIndex of 0, yet the 0th document in
-        // the applyOps was irrelevant (meaning it was an operation on a collection or DB not being
+    } else if (tokenDataFromResumedStream.txnOpIndex > tokenDataFromClient.txnOpIndex) {
+        // This could happen if the client provided a txnOpIndex of 0, yet the 0th document in the
+        // applyOps was irrelevant (meaning it was an operation on a collection or DB not being
         // watched). If we are looking for the resume token on a shard then this simply means that
         // the resume token may be on a different shard; otherwise, it indicates a corrupt token.
-        uassert(50792, "Invalid resumeToken: applyOpsIndex was skipped", expCtx->needsMerge);
+        uassert(50792, "Invalid resumeToken: txnOpIndex was skipped", expCtx->needsMerge);
         // We are running on a merging shard. Signal that we have read beyond the resume token.
         return ResumeStatus::kSurpassedToken;
     }
@@ -96,7 +96,7 @@ ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionConte
     // resumable; we are past the point in the stream where the token should have appeared.
     if (tokenDataFromResumedStream.uuid != tokenDataFromClient.uuid) {
         // If we are running on a replica set deployment, we don't ever expect to see identical time
-        // stamps and applyOpsIndex but differing UUIDs, and we reject the resume attempt at once.
+        // stamps and txnOpIndex but differing UUIDs, and we reject the resume attempt at once.
         if (!expCtx->inMongos && !expCtx->needsMerge) {
             return ResumeStatus::kSurpassedToken;
         }

@@ -54,8 +54,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    repl::OplogEntry lookUpOplogEntryByOpTime(OperationContext* opCtx,
-                                              repl::OpTime lookupTime) override {
+    std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
+        repl::OpTime time) const override {
         MONGO_UNREACHABLE;
     }
 
