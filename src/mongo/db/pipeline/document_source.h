@@ -482,11 +482,10 @@ protected:
 
     /**
      * Attempt to perform an optimization with the following source in the pipeline. 'container'
-     * refers to the entire pipeline, and 'itr' points to this stage within the pipeline. The caller
-     * must guarantee that std::next(itr) != container->end().
+     * refers to the entire pipeline, and 'itr' points to this stage within the pipeline.
      *
      * The return value is an iterator over the same container which points to the first location
-     * in the container at which an optimization may be possible.
+     * in the container at which an optimization may be possible, or the end of the container().
      *
      * For example, if a swap takes place, the returned iterator should just be the position
      * directly preceding 'itr', if such a position exists, since the stage at that position may be

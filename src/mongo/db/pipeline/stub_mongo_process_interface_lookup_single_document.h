@@ -33,12 +33,28 @@
 #include <deque>
 #include <vector>
 
+#include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"
 
 namespace mongo {
+
+class StubShardFilterer : public ShardFilterer {
+public:
+    DocumentBelongsResult documentBelongsToMe(const MatchableDocument& doc) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    bool isCollectionSharded() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    const KeyPattern& getKeyPattern() const override {
+        MONGO_UNREACHABLE;
+    }
+};
 
 /**
  * A mock MongoProcessInterface which allows mocking a foreign pipeline.
@@ -66,6 +82,16 @@ public:
         const Document& documentKey,
         boost::optional<BSONObj> readConcern,
         bool allowSpeculativeMajorityRead);
+
+    std::unique_ptr<ShardFilterer> getShardFilterer(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
+        // Try to emulate the behavior mongos and mongod would each follow.
+        if (expCtx->inMongos) {
+            return nullptr;
+        } else {
+            return stdx::make_unique<StubShardFilterer>();
+        }
+    }
 
 private:
     std::deque<DocumentSource::GetNextResult> _mockResults;

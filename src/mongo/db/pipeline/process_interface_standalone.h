@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/mongo_process_common.h"
@@ -97,6 +98,12 @@ public:
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) override;
     std::string getShardName(OperationContext* opCtx) const final;
+
+    std::unique_ptr<ShardFilterer> getShardFilterer(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
+        // We'll never do shard filtering on a standalone.
+        return nullptr;
+    }
     std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
         OperationContext* opCtx, const NamespaceString&, UUID) const override;
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(

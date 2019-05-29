@@ -93,6 +93,11 @@ Value DocumentSourceSingleDocumentTransformation::serialize(
 Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
+
+    if (std::next(itr) == container->end()) {
+        return container->end();
+    }
+
     auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
 
     if (nextSkip) {
