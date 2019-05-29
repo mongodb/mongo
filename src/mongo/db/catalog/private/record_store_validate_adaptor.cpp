@@ -133,6 +133,8 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
         const Ordering ord = Ordering::make(pattern);
         bool largeKeyDisallowed = isLargeKeyDisallowed();
 
+        // We want to use the latest version of KeyString here.
+        KeyString ks(KeyString::kLatestVersion);
         for (const auto& key : documentKeySet) {
             if (largeKeyDisallowed &&
                 key.objsize() >= static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
@@ -141,8 +143,7 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                 continue;
             }
 
-            // We want to use the latest version of KeyString here.
-            KeyString ks(KeyString::kLatestVersion, key, ord, recordId);
+            ks.resetToKey(key, ord, recordId);
             _indexConsistency->addDocKey(ks, indexNumber, recordId, key);
         }
         (*_indexNsResultsMap)[indexName] = curRecordResults;
@@ -161,16 +162,17 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
     const auto& key = descriptor->keyPattern();
     const Ordering ord = Ordering::make(key);
     KeyString::Version version = KeyString::kLatestVersion;
-    std::unique_ptr<KeyString> prevIndexKeyString = nullptr;
     bool isFirstEntry = true;
 
     std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(_opCtx, true);
+    // We want to use the latest version of KeyString here.
+    std::unique_ptr<KeyString> indexKeyString = std::make_unique<KeyString>(version);
+    std::unique_ptr<KeyString> prevIndexKeyString = std::make_unique<KeyString>(version);
+
     // Seeking to BSONObj() is equivalent to seeking to the first entry of an index.
     for (auto indexEntry = cursor->seek(BSONObj(), true); indexEntry; indexEntry = cursor->next()) {
+        indexKeyString->resetToKey(indexEntry->key, ord, indexEntry->loc);
 
-        // We want to use the latest version of KeyString here.
-        std::unique_ptr<KeyString> indexKeyString =
-            std::make_unique<KeyString>(version, indexEntry->key, ord, indexEntry->loc);
         // Ensure that the index entries are in increasing or decreasing order.
         if (!isFirstEntry && *indexKeyString < *prevIndexKeyString) {
             if (results && results->valid) {
