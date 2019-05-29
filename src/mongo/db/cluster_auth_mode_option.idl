@@ -35,45 +35,14 @@ global:
         section: 'General options'
         source: [ cli, ini, yaml ]
         initializer:
-            register: addNonGeneralServerOptions
+            register: addClusterAuthModeServerOption
 
-# These are the general options that are supported by mongod and mongos but not cryptd.
 configs:
-    'net.bindIp':
-        description: 'Comma separated list of ip addresses to listen on - localhost by default'
-        short_name: bind_ip
-        arg_vartype: String
-    'net.bindIpAll':
-        description: 'Bind to all ip addresses'
-        short_name: bind_ip_all
-        arg_vartype: Switch
-        canonicalize: canonicalizeNetBindIpAll
-
-    noauth:
-        description: 'Run without security'
-        arg_vartype: Switch
-        source: [ cli, ini ]
-        conflicts:
-            - auth
-            - 'security.keyFile'
-            - 'security.transitionToAuth'
-            - clusterAuthMode
-    'security.transitionToAuth':
+    'security.clusterAuthMode':
         description: >-
-            For rolling access control upgrade. Attempt to authenticate over outgoing
-            connections and proceed regardless of success. Accept incoming connections
-            with or without authentication.
-        short_name: transitionToAuth
-        arg_vartype: Switch
-        conflicts: noauth
-
-    'operationProfiling.slowOpThresholdMs':
-        description: 'Value of slow for profile and console log'
-        short_name: slowms
-        arg_vartype: Int
-        default: 100
-    'operationProfiling.slowOpSampleRate':
-        description: 'Fraction of slow ops to include in the profile and console log'
-        short_name: slowOpSampleRate
-        arg_vartype: Double
-        default: 1.0
+            Authentication mode used for cluster authentication. Alternatives are
+            (keyFile|sendKeyFile|sendX509|x509)
+        short_name: clusterAuthMode
+        arg_vartype: String
+        validator:
+            callback: validateSecurityClusterAuthModeSetting

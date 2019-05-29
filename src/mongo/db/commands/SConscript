@@ -133,7 +133,6 @@ env.Library(
 env.Library(
     target='servers',
     source=[
-        'authentication_commands.cpp',
         'conn_pool_stats.cpp',
         'conn_pool_sync.cpp',
         'connection_status.cpp',
@@ -149,9 +148,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/auth/sasl_options',
-        '$BUILD_DIR/mongo/db/auth/user_document_parser',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/log_process_details',
@@ -170,10 +166,25 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_legacy_api',
         '$BUILD_DIR/mongo/scripting/scripting_common',
         '$BUILD_DIR/mongo/util/ntservice',
+        'authentication_commands',
         'core',
         'feature_compatibility_parsers',
         'server_status',
         'test_commands_enabled',
+    ]
+)
+
+env.Library(
+    target="authentication_commands",
+    source=[
+        'authentication_commands.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/auth/sasl_options',
+        '$BUILD_DIR/mongo/db/auth/user_document_parser',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/util/net/ssl_manager',
     ]
 )
 

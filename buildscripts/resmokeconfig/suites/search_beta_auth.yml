@@ -6,7 +6,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - src/mongo/db/modules/*/jstests/search_beta/ssl/*.js
+  - src/mongo/db/modules/*/jstests/search_beta/*.js
 
 executor:
   config:
@@ -20,8 +20,3 @@ executor:
           roleGraphInvalidationIsFatal: true
       nodb: ''
       readMode: commands
-      ssl: ''
-      tlsAllowInvalidHostnames: ''
-      tlsAllowInvalidCertificates: ''
-      tlsCAFile: jstests/libs/ca.pem
-      tlsCertificateKeyFile: jstests/libs/client.pem

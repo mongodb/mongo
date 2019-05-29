@@ -40,7 +40,9 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
+#include "mongo/db/cluster_auth_mode_option_gen.h"
 #include "mongo/db/global_settings.h"
+#include "mongo/db/keyfile_option_gen.h"
 #include "mongo/db/mongod_options_general_gen.h"
 #include "mongo/db/mongod_options_legacy_gen.h"
 #include "mongo/db/mongod_options_replication_gen.h"
@@ -84,6 +86,8 @@ Status addMongodOptions(moe::OptionSection* options) try {
     uassertStatusOK(addMongodShardingOptions(options));
     uassertStatusOK(addMongodStorageOptions(options));
     uassertStatusOK(addMongodLegacyOptions(options));
+    uassertStatusOK(addKeyfileServerOption(options));
+    uassertStatusOK(addClusterAuthModeServerOption(options));
 
     return Status::OK();
 } catch (const AssertionException& ex) {
