@@ -186,7 +186,9 @@ public:
         // collections in multi-document transactions.
         auto txnParticipant = TransactionParticipant::get(opCtx);
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                "Cannot run 'distinct' on a sharded collection in a multi-document transaction.",
+                "Cannot run 'distinct' on a sharded collection in a multi-document transaction. "
+                "Please see http://dochub.mongodb.org/core/transaction-distinct for a recommended "
+                "alternative.",
                 !txnParticipant || !txnParticipant.inMultiDocumentTransaction() ||
                     !CollectionShardingState::get(opCtx, nss)->getCurrentMetadata()->isSharded());
 
