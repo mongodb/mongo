@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/exec/shard_filterer_impl.h"
 
 namespace mongo {
 
@@ -96,9 +96,13 @@ private:
     // Stats
     ShardingFilterStats _specificStats;
 
-    // Note: it is important that this is the metadata from the time this stage is constructed.
-    // See class comment for details.
-    ScopedCollectionMetadata _metadata;
+    // Note: it is important that this owns the ScopedCollectionMetadata from the time this stage
+    // is constructed. See ScopedCollectionMetadata class comment and MetadataManager comment for
+    // details. The existence of the ScopedCollectionMetadata prevents data which may have been
+    // migrated from being deleted while the query is still active. If we didn't hold one
+    // ScopedCollectionMetadata for the entire query, it'd be possible for data which the query
+    // needs to read to be deleted while it's still running.
+    ShardFiltererImpl _shardFilterer;
 };
 
 }  // namespace mongo

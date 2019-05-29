@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/pipeline/mongo_process_common.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/s/async_requests_sender.h"
@@ -162,6 +163,11 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final {
         // It is not meaningful to perform a "local read" on mongos.
         MONGO_UNREACHABLE;
+    }
+
+    std::unique_ptr<ShardFilterer> getShardFilterer(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override {
+        return nullptr;
     }
 
     std::string getShardName(OperationContext* opCtx) const final {

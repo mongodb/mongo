@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source.h"
 
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
@@ -255,15 +256,9 @@ Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
-    // If we are at the end of the pipeline, only optimize in the special case of a cache stage.
-    if (std::next(itr) == container->end()) {
-        return dynamic_cast<DocumentSourceSequentialDocumentCache*>(this)
-            ? doOptimizeAt(itr, container)
-            : container->end();
-    }
-
     // Attempt to swap 'itr' with a subsequent $match or subsequent $sample.
-    if (pushMatchBefore(itr, container) || pushSampleBefore(itr, container)) {
+    if (std::next(itr) != container->end() &&
+        (pushMatchBefore(itr, container) || pushSampleBefore(itr, container))) {
         // The stage before the pushed before stage may be able to optimize further, if there is
         // such a stage.
         return std::prev(itr) == container->begin() ? std::prev(itr) : std::prev(std::prev(itr));

@@ -41,8 +41,10 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -200,6 +202,12 @@ unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSou
     // whether it's sharded and the time we took the lock.
 
     return attachCursorSourceToPipelineForLocalRead(expCtx, pipeline.release());
+}
+
+std::unique_ptr<ShardFilterer> MongoInterfaceShardServer::getShardFilterer(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+    return std::make_unique<ShardFiltererImpl>(
+        CollectionShardingState::get(expCtx->opCtx, expCtx->ns)->getOrphansFilter(expCtx->opCtx));
 }
 
 }  // namespace mongo

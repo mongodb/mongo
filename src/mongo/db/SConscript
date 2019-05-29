@@ -1226,6 +1226,7 @@ env.Library(
         'exec/requires_collection_stage.cpp',
         'exec/requires_index_stage.cpp',
         'exec/shard_filter.cpp',
+        'exec/shard_filterer_impl.cpp',
         'exec/skip.cpp',
         'exec/sort.cpp',
         'exec/sort_key_generator.cpp',

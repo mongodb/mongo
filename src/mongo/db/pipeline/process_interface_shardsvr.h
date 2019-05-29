@@ -84,6 +84,9 @@ public:
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final;
+
+    std::unique_ptr<ShardFilterer> getShardFilterer(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override final;
 };
 
 }  // namespace mongo

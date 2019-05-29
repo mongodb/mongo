@@ -365,6 +365,10 @@ Pipeline::SourceContainer::iterator DocumentSourceGraphLookUp::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
+    if (std::next(itr) == container->end()) {
+        return container->end();
+    }
+
     // If we are not already handling an $unwind stage internally, we can combine with the following
     // $unwind stage.
     auto nextUnwind = dynamic_cast<DocumentSourceUnwind*>((*std::next(itr)).get());

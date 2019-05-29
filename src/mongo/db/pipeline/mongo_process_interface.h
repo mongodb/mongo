@@ -56,6 +56,7 @@
 
 namespace mongo {
 
+class ShardFilterer;
 class ExpressionContext;
 class Pipeline;
 class PipelineDeleter;
@@ -258,6 +259,12 @@ public:
      */
     virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) = 0;
+
+    /**
+     * Produces a ShardFilterer. May return null.
+     */
+    virtual std::unique_ptr<ShardFilterer> getShardFilterer(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const = 0;
 
     /**
      * Returns a vector of owned BSONObjs, each of which contains details of an in-progress

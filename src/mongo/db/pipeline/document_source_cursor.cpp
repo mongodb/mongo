@@ -175,6 +175,10 @@ Pipeline::SourceContainer::iterator DocumentSourceCursor::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
+    if (std::next(itr) == container->end()) {
+        return container->end();
+    }
+
     auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
 
     if (nextLimit) {

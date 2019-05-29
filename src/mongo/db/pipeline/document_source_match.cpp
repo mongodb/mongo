@@ -113,6 +113,10 @@ Pipeline::SourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
+    if (std::next(itr) == container->end()) {
+        return container->end();
+    }
+
     auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get());
 
     // Since a text search must use an index, it must be the first stage in the pipeline. We cannot
