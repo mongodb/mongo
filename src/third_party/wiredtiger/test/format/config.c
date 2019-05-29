@@ -92,8 +92,8 @@ config_setup(void)
 	}
 	config_map_file_type(g.c_file_type, &g.type);
 
-	config_single("data_source=table", 0);
-	if (!config_is_perm("data_source"))
+	if (!config_is_perm("data_source")) {
+		config_single("data_source=table", 0);
 		switch (mmrand(NULL, 1, 5)) {
 		case 1:						/* 20% */
 			config_single("data_source=file", 0);
@@ -120,6 +120,7 @@ config_setup(void)
 		case 3: case 4: case 5:				/* 60% */
 			break;
 		}
+	}
 
 	/*
 	 * If data_source and file_type were both "permanent", we may still

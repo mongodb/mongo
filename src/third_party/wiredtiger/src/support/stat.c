@@ -104,6 +104,8 @@ static const char * const __stats_dsrc_desc[] = {
 	"cache_walk: Refs skipped during cache traversal",
 	"cache_walk: Size of the root page",
 	"cache_walk: Total number of pages currently in cache",
+	"compression: compressed page maximum internal page size prior to compression",
+	"compression: compressed page maximum leaf page size prior to compression ",
 	"compression: compressed pages read",
 	"compression: compressed pages written",
 	"compression: page written failed to compress",
@@ -290,6 +292,8 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 		/* not clearing cache_state_refs_skipped */
 		/* not clearing cache_state_root_size */
 		/* not clearing cache_state_pages */
+		/* not clearing compress_precomp_intl_max_page_size */
+		/* not clearing compress_precomp_leaf_max_page_size */
 	stats->compress_read = 0;
 	stats->compress_write = 0;
 	stats->compress_write_fail = 0;
@@ -477,6 +481,10 @@ __wt_stat_dsrc_aggregate_single(
 	to->cache_state_refs_skipped += from->cache_state_refs_skipped;
 	to->cache_state_root_size += from->cache_state_root_size;
 	to->cache_state_pages += from->cache_state_pages;
+	to->compress_precomp_intl_max_page_size +=
+	    from->compress_precomp_intl_max_page_size;
+	to->compress_precomp_leaf_max_page_size +=
+	    from->compress_precomp_leaf_max_page_size;
 	to->compress_read += from->compress_read;
 	to->compress_write += from->compress_write;
 	to->compress_write_fail += from->compress_write_fail;
@@ -697,6 +705,10 @@ __wt_stat_dsrc_aggregate(
 	to->cache_state_root_size +=
 	    WT_STAT_READ(from, cache_state_root_size);
 	to->cache_state_pages += WT_STAT_READ(from, cache_state_pages);
+	to->compress_precomp_intl_max_page_size +=
+	    WT_STAT_READ(from, compress_precomp_intl_max_page_size);
+	to->compress_precomp_leaf_max_page_size +=
+	    WT_STAT_READ(from, compress_precomp_leaf_max_page_size);
 	to->compress_read += WT_STAT_READ(from, compress_read);
 	to->compress_write += WT_STAT_READ(from, compress_write);
 	to->compress_write_fail += WT_STAT_READ(from, compress_write_fail);
@@ -800,6 +812,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: cache overflow score",
 	"cache: cache overflow table entries",
 	"cache: cache overflow table insert calls",
+	"cache: cache overflow table max on-disk size",
 	"cache: cache overflow table on-disk size",
 	"cache: cache overflow table remove calls",
 	"cache: checkpoint blocked page eviction",
@@ -1234,6 +1247,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing cache_lookaside_score */
 		/* not clearing cache_lookaside_entries */
 	stats->cache_lookaside_insert = 0;
+		/* not clearing cache_lookaside_ondisk_max */
 		/* not clearing cache_lookaside_ondisk */
 	stats->cache_lookaside_remove = 0;
 	stats->cache_eviction_checkpoint = 0;
@@ -1657,6 +1671,8 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_lookaside_entries);
 	to->cache_lookaside_insert +=
 	    WT_STAT_READ(from, cache_lookaside_insert);
+	to->cache_lookaside_ondisk_max +=
+	    WT_STAT_READ(from, cache_lookaside_ondisk_max);
 	to->cache_lookaside_ondisk +=
 	    WT_STAT_READ(from, cache_lookaside_ondisk);
 	to->cache_lookaside_remove +=

@@ -21,6 +21,9 @@
 #define	WT_LOG_SYNC_ENABLED	0x10u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 
+#define	WT_LOGOP_IGNORE	0x80000000
+#define	WT_LOGOP_IS_IGNORED(val)	(val & WT_LOGOP_IGNORE)
+
 /*
  * WT_LSN --
  *	A log sequence number, representing a position in the transaction log.

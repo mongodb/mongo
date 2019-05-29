@@ -253,6 +253,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
 		 */
 		if (upd_select->upd == NULL)
 			upd_select->upd = upd;
+
+		if (!F_ISSET(r, WT_REC_EVICT))
+			break;
 	}
 
 	/* Keep track of the selected update. */

@@ -122,6 +122,7 @@ struct __wt_named_extractor {
 	    F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));	\
 	TAILQ_INSERT_HEAD(&(conn)->dhqh, dhandle, q);			\
 	TAILQ_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashq);	\
+	++(conn)->dh_bucket_count[bucket];				\
 	++(conn)->dhandle_count;					\
 } while (0)
 
@@ -130,6 +131,7 @@ struct __wt_named_extractor {
 	    F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));	\
 	TAILQ_REMOVE(&(conn)->dhqh, dhandle, q);			\
 	TAILQ_REMOVE(&(conn)->dhhash[bucket], dhandle, hashq);		\
+	--(conn)->dh_bucket_count[bucket];				\
 	--(conn)->dhandle_count;					\
 } while (0)
 
@@ -207,6 +209,9 @@ struct __wt_connection_impl {
 	WT_SPINLOCK optrack_map_spinlock; /* Translation file spinlock. */
 	uintmax_t optrack_pid;		/* Cache the process ID. */
 
+	WT_LSN		*debug_ckpt;	/* Debug mode checkpoint LSNs. */
+	uint32_t	 debug_ckpt_cnt;/* Checkpoint retention number */
+
 	void  **foc;			/* Free-on-close array */
 	size_t  foc_cnt;		/* Array entries */
 	size_t  foc_size;		/* Array size */
@@ -235,6 +240,8 @@ struct __wt_connection_impl {
 	TAILQ_HEAD(__wt_blockhash, __wt_block) blockhash[WT_HASH_ARRAY_SIZE];
 	TAILQ_HEAD(__wt_block_qh, __wt_block) blockqh;
 
+					/* Locked: handles in each bucket */
+	u_int dh_bucket_count[WT_HASH_ARRAY_SIZE];
 	u_int dhandle_count;		/* Locked: handles in the queue */
 	u_int open_btree_count;		/* Locked: open writable btree count */
 	uint32_t next_file_id;		/* Locked: file ID counter */
@@ -339,15 +346,16 @@ struct __wt_connection_impl {
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define	WT_CONN_LOG_ARCHIVE		0x001u	/* Archive is enabled */
-#define	WT_CONN_LOG_DOWNGRADED		0x002u	/* Running older version */
-#define	WT_CONN_LOG_ENABLED		0x004u	/* Logging is enabled */
-#define	WT_CONN_LOG_EXISTED		0x008u	/* Log files found */
-#define	WT_CONN_LOG_FORCE_DOWNGRADE	0x010u	/* Force downgrade */
-#define	WT_CONN_LOG_RECOVER_DIRTY	0x020u	/* Recovering unclean */
-#define	WT_CONN_LOG_RECOVER_DONE	0x040u	/* Recovery completed */
-#define	WT_CONN_LOG_RECOVER_ERR		0x080u	/* Error if recovery required */
-#define	WT_CONN_LOG_RECOVER_FAILED	0x100u	/* Recovery failed */
-#define	WT_CONN_LOG_ZERO_FILL		0x200u	/* Manually zero files */
+#define	WT_CONN_LOG_DEBUG_MODE		0x002u	/* Debug-mode logging enabled */
+#define	WT_CONN_LOG_DOWNGRADED		0x004u	/* Running older version */
+#define	WT_CONN_LOG_ENABLED		0x008u	/* Logging is enabled */
+#define	WT_CONN_LOG_EXISTED		0x010u	/* Log files found */
+#define	WT_CONN_LOG_FORCE_DOWNGRADE	0x020u	/* Force downgrade */
+#define	WT_CONN_LOG_RECOVER_DIRTY	0x040u	/* Recovering unclean */
+#define	WT_CONN_LOG_RECOVER_DONE	0x080u	/* Recovery completed */
+#define	WT_CONN_LOG_RECOVER_ERR		0x100u	/* Error if recovery required */
+#define	WT_CONN_LOG_RECOVER_FAILED	0x200u	/* Recovery failed */
+#define	WT_CONN_LOG_ZERO_FILL		0x400u	/* Manually zero files */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t	 log_flags;	/* Global logging configuration */
 	WT_CONDVAR	*log_cond;	/* Log server wait mutex */
@@ -519,16 +527,17 @@ struct __wt_connection_impl {
 #define	WT_CONN_OPTRACK			0x0004000u
 #define	WT_CONN_PANIC			0x0008000u
 #define	WT_CONN_READONLY		0x0010000u
-#define	WT_CONN_RECOVERING		0x0020000u
-#define	WT_CONN_SALVAGE			0x0040000u
-#define	WT_CONN_SERVER_ASYNC		0x0080000u
-#define	WT_CONN_SERVER_CAPACITY		0x0100000u
-#define	WT_CONN_SERVER_CHECKPOINT	0x0200000u
-#define	WT_CONN_SERVER_LOG		0x0400000u
-#define	WT_CONN_SERVER_LSM		0x0800000u
-#define	WT_CONN_SERVER_STATISTICS	0x1000000u
-#define	WT_CONN_SERVER_SWEEP		0x2000000u
-#define	WT_CONN_WAS_BACKUP		0x4000000u
+#define	WT_CONN_RECONFIGURING		0x0020000u
+#define	WT_CONN_RECOVERING		0x0040000u
+#define	WT_CONN_SALVAGE			0x0080000u
+#define	WT_CONN_SERVER_ASYNC		0x0100000u
+#define	WT_CONN_SERVER_CAPACITY		0x0200000u
+#define	WT_CONN_SERVER_CHECKPOINT	0x0400000u
+#define	WT_CONN_SERVER_LOG		0x0800000u
+#define	WT_CONN_SERVER_LSM		0x1000000u
+#define	WT_CONN_SERVER_STATISTICS	0x2000000u
+#define	WT_CONN_SERVER_SWEEP		0x4000000u
+#define	WT_CONN_WAS_BACKUP		0x8000000u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 };

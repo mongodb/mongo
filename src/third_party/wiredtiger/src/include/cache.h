@@ -54,6 +54,7 @@ typedef enum __wt_cache_op {
 	WT_SYNC_WRITE_LEAVES
 } WT_CACHE_OP;
 
+#define	WT_LAS_FILE_MIN		(100 * WT_MEGABYTE)
 #define	WT_LAS_NUM_SESSIONS	5
 #define	WT_LAS_SWEEP_ENTRIES	(20 * WT_THOUSAND)
 #define	WT_LAS_SWEEP_SEC	2

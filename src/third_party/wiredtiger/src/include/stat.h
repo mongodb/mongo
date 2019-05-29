@@ -371,6 +371,7 @@ struct __wt_connection_stats {
 	int64_t cache_lookaside_score;
 	int64_t cache_lookaside_entries;
 	int64_t cache_lookaside_insert;
+	int64_t cache_lookaside_ondisk_max;
 	int64_t cache_lookaside_ondisk;
 	int64_t cache_lookaside_remove;
 	int64_t cache_eviction_checkpoint;
@@ -824,6 +825,8 @@ struct __wt_dsrc_stats {
 	int64_t cache_state_refs_skipped;
 	int64_t cache_state_root_size;
 	int64_t cache_state_pages;
+	int64_t compress_precomp_intl_max_page_size;
+	int64_t compress_precomp_leaf_max_page_size;
 	int64_t compress_read;
 	int64_t compress_write;
 	int64_t compress_write_fail;

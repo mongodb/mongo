@@ -56,20 +56,30 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
     # The API uses only the major and minor numbers but accepts with
     # and without the patch number. Test one on release and the
     # required minimum just for testing of parsing.
-    #
+
     compat_create = [
         ('def', dict(create_rel='none', log_create=3)),
         ('32', dict(create_rel="3.2", log_create=3)),
+        ('31', dict(create_rel="3.1", log_create=3)),
         ('30', dict(create_rel="3.0", log_create=2)),
         ('26', dict(create_rel="2.6", log_create=1)),
     ]
+
     compat_release = [
         ('def_rel', dict(rel='none', log_rel=3)),
         ('32_rel', dict(rel="3.2", log_rel=3)),
+        ('31_rel', dict(rel="3.1", log_rel=3)),
         ('30_rel', dict(rel="3.0", log_rel=2)),
         ('26_rel', dict(rel="2.6", log_rel=1)),
         ('26_patch_rel', dict(rel="2.6.1", log_rel=1)),
     ]
+
+    # Only the maximum version should exist below for each log version
+    # i.e. even though 3.1 is also log_max=3 3.2 is above it and also
+    # log_max=3 as such we don't need 3.1 in this list.
+    # However the exemption to this rule is versions which include a patch
+    # number as the patch number will get removed in the conn_reconfig.c
+    # This rule exemption applies to the minimum verison check as well.
     compat_max = [
         ('future_max', dict(max_req=future_rel, log_max=future_logv)),
         ('def_max', dict(max_req='none', log_max=3)),
@@ -78,10 +88,12 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
         ('26_max', dict(max_req="2.6", log_max=1)),
         ('26_patch_max', dict(max_req="2.6.1", log_max=1)),
     ]
+
+    # Only the minimum version should exist below for each log version.
     compat_min = [
         ('future_min', dict(min_req=future_rel, log_min=future_logv)),
         ('def_min', dict(min_req='none', log_min=3)),
-        ('32_min', dict(min_req="3.2", log_min=3)),
+        ('31_min', dict(min_req="3.1", log_min=3)),
         ('30_min', dict(min_req="3.0", log_min=2)),
         ('26_min', dict(min_req="2.6", log_min=1)),
         ('26_patch_min', dict(min_req="2.6.1", log_min=1)),
@@ -132,12 +144,11 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
         log_str = 'log=(enabled,file_max=%s,archive=false),' % self.logmax
         restart_config = log_str + compat_str
         self.pr("Restart conn " + restart_config)
-        #
+
         # We have a lot of error cases. There are too many and they are
         # dependent on the order of the library code so don't check specific
         # error messages. So just determine if an error should occur and
         # make sure it does.
-        #
         if ((self.log_min >= self.future_logv) or
           (self.log_max >= self.future_logv) or
           (self.max_req != 'none' and self.log_max < self.log_rel) or

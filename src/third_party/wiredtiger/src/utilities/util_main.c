@@ -30,9 +30,11 @@ usage(void)
 	fprintf(stderr,
 	    "global options:\n"
 	    "\t" "-C\t" "wiredtiger_open configuration\n"
+	    "\t" "-E\t" "secret encryption key\n"
 	    "\t" "-h\t" "database directory\n"
 	    "\t" "-L\t" "turn logging off for debug-mode\n"
-	    "\t" "-R\t" "run recovery if configured\n"
+	    "\t" "-R\t" "run recovery (if recovery configured)\n"
+	    "\t" "-S\t" "run salvage recovery (if recovery configured)\n"
 	    "\t" "-V\t" "display library version and exit\n"
 	    "\t" "-v\t" "verbose\n");
 	fprintf(stderr,

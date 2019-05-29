@@ -59,19 +59,15 @@ __txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
  *	Log an operation for the current transaction.
  */
 static int
-__txn_op_log(WT_SESSION_IMPL *session,
-    WT_ITEM *logrec, WT_TXN_OP *op, WT_CURSOR_BTREE *cbt)
+__txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec,
+    WT_TXN_OP *op, WT_CURSOR_BTREE *cbt, uint32_t fileid)
 {
 	WT_CURSOR *cursor;
 	WT_ITEM value;
 	WT_UPDATE *upd;
 	uint64_t recno;
-	uint32_t fileid;
 
 	cursor = &cbt->iface;
-
-	fileid = op->btree->id;
-
 	upd = op->u.op_upd;
 	value.data = upd->data;
 	value.size = upd->size;
@@ -210,7 +206,16 @@ __txn_logrec_init(WT_SESSION_IMPL *session)
 	if (txn->logrec != NULL)
 		return (0);
 
-	WT_ASSERT(session, txn->id != WT_TXN_NONE);
+	/*
+	 * The only way we should ever get in here without a txn id is if we
+	 * are recording diagnostic information. In that case, allocate an id.
+	 */
+	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_DEBUG_MODE) &&
+	    txn->id == WT_TXN_NONE)
+		WT_RET(__wt_txn_id_check(session));
+	else
+		WT_ASSERT(session, txn->id != WT_TXN_NONE);
+
 	WT_RET(__wt_struct_size(session, &header_size, fmt, rectype, txn->id));
 	WT_RET(__wt_logrec_alloc(session, header_size, &logrec));
 
@@ -233,6 +238,7 @@ err:		__wt_logrec_free(session, &logrec);
 int
 __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_ITEM *logrec;
 	WT_TXN *txn;
@@ -240,11 +246,13 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	uint32_t fileid;
 
+	conn = S2C(session);
 	txn = &session->txn;
 
-	if (!FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) ||
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) ||
 	    F_ISSET(session, WT_SESSION_NO_LOGGING) ||
-	    F_ISSET(S2BT(session), WT_BTREE_NO_LOGGING))
+	    (F_ISSET(S2BT(session), WT_BTREE_NO_LOGGING) &&
+	    !FLD_ISSET(conn->log_flags, WT_CONN_LOG_DEBUG_MODE)))
 		return (0);
 
 	/* We'd better have a transaction. */
@@ -254,6 +262,14 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_ASSERT(session, txn->mod_count > 0);
 	op = txn->mod + txn->mod_count - 1;
 	fileid = op->btree->id;
+
+	/*
+	 * If this operation is diagnostic only, set the ignore bit on the
+	 * fileid so that recovery can skip it.
+	 */
+	if (F_ISSET(S2BT(session), WT_BTREE_NO_LOGGING) &&
+	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_DEBUG_MODE))
+		FLD_SET(fileid, WT_LOGOP_IGNORE);
 
 	WT_RET(__txn_logrec_init(session));
 	logrec = txn->logrec;
@@ -267,7 +283,7 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		break;
 	case WT_TXN_OP_BASIC_COL:
 	case WT_TXN_OP_BASIC_ROW:
-		ret = __txn_op_log(session, logrec, op, cbt);
+		ret = __txn_op_log(session, logrec, op, cbt, fileid);
 		break;
 	case WT_TXN_OP_TRUNCATE_COL:
 		ret = __wt_logop_col_truncate_pack(session, logrec, fileid,
@@ -363,6 +379,50 @@ __wt_txn_checkpoint_logread(WT_SESSION_IMPL *session,
 	WT_SET_LSN(ckpt_lsn, ckpt_file, ckpt_offset);
 	*pp = end;
 	return (0);
+}
+
+/*
+ * __wt_txn_ts_log --
+ *	Write a log record recording timestamps in the transaction.
+ */
+int
+__wt_txn_ts_log(WT_SESSION_IMPL *session)
+{
+	struct timespec t;
+	WT_CONNECTION_IMPL *conn;
+	WT_ITEM *logrec;
+	WT_TXN *txn;
+	wt_timestamp_t commit, durable, first, prepare, read;
+
+	conn = S2C(session);
+	txn = &session->txn;
+
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) ||
+	    F_ISSET(session, WT_SESSION_NO_LOGGING) ||
+	    !FLD_ISSET(conn->log_flags, WT_CONN_LOG_DEBUG_MODE))
+		return (0);
+
+	/* We'd better have a transaction running. */
+	WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
+
+	WT_RET(__txn_logrec_init(session));
+	logrec = txn->logrec;
+	commit = durable = first = prepare = read = WT_TS_NONE;
+	if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
+		commit = txn->commit_timestamp;
+		first = txn->first_commit_timestamp;
+	}
+	if (F_ISSET(txn, WT_TXN_HAS_TS_DURABLE))
+		durable = txn->durable_timestamp;
+	if (F_ISSET(txn, WT_TXN_HAS_TS_PREPARE))
+		prepare = txn->prepare_timestamp;
+	if (F_ISSET(txn, WT_TXN_HAS_TS_READ))
+		read = txn->read_timestamp;
+
+	__wt_epoch(session, &t);
+	return (__wt_logop_txn_timestamp_pack(session, logrec,
+	    (uint64_t)t.tv_sec, (uint64_t)t.tv_nsec,
+	    commit, durable, first, prepare, read));
 }
 
 /*

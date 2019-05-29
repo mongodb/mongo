@@ -49,7 +49,7 @@ if [ ! -x "t" ]; then
 	exit 6
 fi
 
-lib_dir=$(dirname "${wt_binary}")
+export LD_LIBRARY_PATH=$(dirname "${wt_binary}")
 num_tables_verified=0
 
 # Work out the list of directories that include wt data files
@@ -62,7 +62,7 @@ for d in ${dirs_include_datafile}
 do
 	echo "${d}"
 
-	tables=$(LD_LIBRARY_PATH="${lib_dir}" ${wt_binary} -h "${d}" list)
+	tables=$(${wt_binary} -h "${d}" list)
 	rc=$?
 
 	if [ "$rc" -ne "0" ]; then 
@@ -74,20 +74,22 @@ do
 	for t in ${tables}
 	do
 		echo ${t}
-		LD_LIBRARY_PATH="${lib_dir}" ${wt_binary} -h ${d} verify ${t}
+		${wt_binary} -h ${d} verify ${t}
 		if [ "$?" -ne "0" ]; then
 			echo "Failed to verify '${t}' table under '${d}' directory, exiting ..."
 			exit 2
 		fi
 
-		dump=$(LD_LIBRARY_PATH="${lib_dir}" ${wt_binary} -h ${d} dump ${t})
+		if [ "${verbose}" == true ]; then
+			${wt_binary} -h ${d} dump ${t}
+		else
+			${wt_binary} -h ${d} dump ${t} > /dev/null
+		fi
+
 		if [ "$?" -ne "0" ]; then
 			echo "Failed to dump '${t}' table under '${d}' directory, exiting ..."
 			exit 3
 		fi
-
-		# Print out the table dump if verbose flag is on
-		[[ "${verbose}" == true ]] && echo ${dump}
 
 		# Table verification is successful, increment the counter
 		let "num_tables_verified+=1"

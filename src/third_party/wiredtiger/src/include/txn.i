@@ -1109,13 +1109,19 @@ static inline int
 __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
 	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
 	bool ignore_prepare_set;
 
 	txn = &session->txn;
+	txn_global = &S2C(session)->txn_global;
 
 	if (txn->isolation != WT_ISO_SNAPSHOT)
 		return (0);
 
+	if (txn_global->debug_rollback != 0 &&
+	    ++txn_global->debug_ops % txn_global->debug_rollback == 0)
+		return (__wt_txn_rollback_required(session,
+		    "debug mode simulated conflict"));
 	/*
 	 * Always include prepared transactions in this check: they are not
 	 * supposed to affect visibility for update operations.

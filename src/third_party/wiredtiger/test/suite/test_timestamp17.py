@@ -27,8 +27,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_timestamp17.py
-#   Test unintended timestamp usage on an update and ensure behaviour
-#   matches expectations. Additionally move the timestamp to ensure
+#   Test unintended timestamp usage on an update and ensure behavior
+#   matches expectations. Additionally, move the timestamp to ensure
 #   that values read are still consistent after those timestamps are
 #   moved.
 #

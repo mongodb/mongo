@@ -392,9 +392,19 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	 */
 	if (backup_file != 0)
 		min_lognum = WT_MIN(log->ckpt_lsn.l.file, backup_file);
-	else
-		min_lognum = WT_MIN(
-		    log->ckpt_lsn.l.file, log->sync_lsn.l.file);
+	else {
+		/*
+		 * Figure out the minimum log file to archive. Use the
+		 * LSN in the debugging array if necessary.
+		 */
+		if (conn->debug_ckpt_cnt == 0)
+			min_lognum = WT_MIN(
+			    log->ckpt_lsn.l.file, log->sync_lsn.l.file);
+		else
+			min_lognum = WT_MIN(
+			    conn->debug_ckpt[conn->debug_ckpt_cnt - 1].l.file,
+			    log->sync_lsn.l.file);
+	}
 	__wt_verbose(session, WT_VERB_LOG,
 	    "log_archive: archive to log number %" PRIu32, min_lognum);
 

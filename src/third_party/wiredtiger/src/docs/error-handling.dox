@@ -75,7 +75,7 @@ This error is only generated when wiredtiger_open is configured to run in-memory
 This error is generated when the application attempts to update an already updated record which is in prepared state. An updated record will be in prepared state, when the transaction that performed the update is in prepared state.
 
 @par <code>WT_TRY_SALVAGE</code>
-This error is generated when corruption is detected in an on-disk file. The application may choose to salvage the file or retry wiredtiger_open with the 'salvage=true' configuration setting.
+This error is generated when corruption is detected in an on-disk file. During normal operations, this may occur in rare circumstances as a result of a system crash. The application may choose to salvage the file or retry wiredtiger_open with the 'salvage=true' configuration setting.
 
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif

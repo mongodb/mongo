@@ -529,7 +529,8 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Check if prepared updates should be ignored during reads. */
 	WT_RET(__wt_config_gets_def(session, cfg, "ignore_prepare", 0, &cval));
-	if (cval.val)
+	if (cval.val ||
+	    (cval.len > 0 && WT_STRING_MATCH("force", cval.str, cval.len)))
 		F_SET(txn, WT_TXN_IGNORE_PREPARE);
 
 	/*
@@ -1079,8 +1080,12 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
 	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || txn->mod_count == 0);
-	/* Transaction should not have updated any of the logged tables. */
-	WT_ASSERT(session, txn->logrec == NULL);
+	/*
+	 * A transaction should not have updated any of the logged tables,
+	 * if debug mode logging is not turned on.
+	 */
+	if (!FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_DEBUG_MODE))
+		WT_ASSERT(session, txn->logrec == NULL);
 
 	/* Set the prepare timestamp.  */
 	WT_RET(__wt_txn_set_timestamp(session, cfg));

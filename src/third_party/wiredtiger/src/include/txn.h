@@ -170,6 +170,8 @@ struct __wt_txn_global {
 	WT_TXN_STATE	  checkpoint_state;	/* Checkpoint's txn state */
 	wt_timestamp_t	  checkpoint_timestamp;	/* Checkpoint's timestamp */
 
+	volatile uint64_t debug_ops;		/* Debug mode op counter */
+	uint64_t	  debug_rollback;	/* Debug mode rollback */
 	volatile uint64_t metadata_pinned;	/* Oldest ID for metadata */
 
 	/* Named snapshot state. */

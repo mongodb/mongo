@@ -454,6 +454,7 @@ __wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 
 	/* Serialize reconfiguration. */
 	__wt_spin_lock(session, &conn->reconfig_lock);
+	F_SET(conn, WT_CONN_RECONFIGURING);
 
 	/*
 	 * The configuration argument has been checked for validity, update the
@@ -490,19 +491,22 @@ __wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 	WT_ERR(__wt_cache_config(session, true, cfg));
 	WT_ERR(__wt_capacity_server_create(session, cfg));
 	WT_ERR(__wt_checkpoint_server_create(session, cfg));
+	WT_ERR(__wt_debug_mode_config(session, cfg));
+	WT_ERR(__wt_las_config(session, cfg));
 	WT_ERR(__wt_logmgr_reconfig(session, cfg));
 	WT_ERR(__wt_lsm_manager_reconfig(session, cfg));
 	WT_ERR(__wt_statlog_create(session, cfg));
 	WT_ERR(__wt_sweep_config(session, cfg));
-	WT_ERR(__wt_verbose_config(session, cfg));
 	WT_ERR(__wt_timing_stress_config(session, cfg));
+	WT_ERR(__wt_verbose_config(session, cfg));
 
 	/* Third, merge everything together, creating a new connection state. */
 	WT_ERR(__wt_config_merge(session, cfg, NULL, &p));
 	__wt_free(session, conn->cfg);
 	conn->cfg = p;
 
-err:	__wt_spin_unlock(session, &conn->reconfig_lock);
+err:	F_CLR(conn, WT_CONN_RECONFIGURING);
+	__wt_spin_unlock(session, &conn->reconfig_lock);
 
 	return (ret);
 }

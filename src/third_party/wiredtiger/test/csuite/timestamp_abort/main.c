@@ -71,9 +71,10 @@ static char home[1024];			/* Program working dir */
 #define	SESSION_MAX	(MAX_TH + 3 + MAX_TH * PREPARE_PCT)
 
 static const char * table_pfx = "table";
+static const char * const uri_collection = "collection";
 static const char * const uri_local = "local";
 static const char * const uri_oplog = "oplog";
-static const char * const uri_collection = "collection";
+static const char * const uri_shadow = "shadow";
 
 static const char * const ckpt_file = "checkpoint_done";
 
@@ -82,9 +83,13 @@ static volatile uint64_t global_ts = 1;
 
 #define	ENV_CONFIG_COMPAT	",compatibility=(release=\"2.9\")"
 #define	ENV_CONFIG_DEF						\
-    "create,log=(archive=false,file_max=10M,enabled),session_max=%" PRIu32
+    "cache_size=20M,create,log=(archive=true,file_max=10M,enabled),"	\
+    "debug_mode=(table_logging=true,checkpoint_retention=5),"		\
+    "statistics=(fast),statistics_log=(wait=1,json=true),session_max=%" PRIu32
 #define	ENV_CONFIG_TXNSYNC					\
-    "create,log=(archive=false,file_max=10M,enabled),"		\
+    "cache_size=20M,create,log=(archive=true,file_max=10M,enabled),"	\
+    "debug_mode=(table_logging=true,checkpoint_retention=5),"		\
+    "statistics=(fast),statistics_log=(wait=1,json=true),"		\
     "transaction_sync=(enabled,method=none),session_max=%" PRIu32
 #define	ENV_CONFIG_REC "log=(archive=false,recover=on)"
 
@@ -225,7 +230,7 @@ static WT_THREAD_RET
 thread_run(void *arg)
 {
 	FILE *fp;
-	WT_CURSOR *cur_coll, *cur_local, *cur_oplog;
+	WT_CURSOR *cur_coll, *cur_local, *cur_oplog, *cur_shadow;
 	WT_ITEM data;
 	WT_RAND_STATE rnd;
 	WT_SESSION *prepared_session, *session;
@@ -287,6 +292,15 @@ thread_run(void *arg)
 		testutil_check(session->open_cursor(session,
 		    uri, NULL, NULL, &cur_coll));
 	testutil_check(__wt_snprintf(
+	    uri, sizeof(uri), "%s:%s", table_pfx, uri_shadow));
+	if (use_prep)
+		testutil_check(prepared_session->open_cursor(prepared_session,
+		    uri, NULL, NULL, &cur_shadow));
+	else
+		testutil_check(session->open_cursor(session,
+		    uri, NULL, NULL, &cur_shadow));
+
+	testutil_check(__wt_snprintf(
 	    uri, sizeof(uri), "%s:%s", table_pfx, uri_local));
 	if (use_prep)
 		testutil_check(prepared_session->open_cursor(prepared_session,
@@ -316,7 +330,7 @@ thread_run(void *arg)
 
 		if (use_ts) {
 			testutil_check(pthread_rwlock_rdlock(&ts_lock));
-			active_ts = __wt_atomic_addv64(&global_ts, 1);
+			active_ts = __wt_atomic_addv64(&global_ts, 2);
 			testutil_check(__wt_snprintf(tscfg,
 			    sizeof(tscfg), "commit_timestamp=%" PRIx64,
 			    active_ts));
@@ -335,6 +349,7 @@ thread_run(void *arg)
 		cur_coll->set_key(cur_coll, kname);
 		cur_local->set_key(cur_local, kname);
 		cur_oplog->set_key(cur_oplog, kname);
+		cur_shadow->set_key(cur_shadow, kname);
 		/*
 		 * Put an informative string into the value so that it
 		 * can be viewed well in a binary dump.
@@ -352,6 +367,20 @@ thread_run(void *arg)
 		data.data = cbuf;
 		cur_coll->set_value(cur_coll, &data);
 		testutil_check(cur_coll->insert(cur_coll));
+		cur_shadow->set_value(cur_shadow, &data);
+		if (use_ts) {
+			/*
+			 * Change the timestamp in the middle of the
+			 * transaction so that we simulate a secondary.
+			 */
+			++active_ts;
+			testutil_check(__wt_snprintf(tscfg,
+			    sizeof(tscfg), "commit_timestamp=%" PRIx64,
+			    active_ts));
+			testutil_check(session->timestamp_transaction(
+			    session, tscfg));
+		}
+		testutil_check(cur_shadow->insert(cur_shadow));
 		data.size = __wt_random(&rnd) % MAX_VAL;
 		data.data = obuf;
 		cur_oplog->set_value(cur_oplog, &data);
@@ -441,6 +470,10 @@ run_workload(uint32_t nth)
 	 */
 	testutil_check(__wt_snprintf(
 	    uri, sizeof(uri), "%s:%s", table_pfx, uri_collection));
+	testutil_check(session->create(session, uri,
+		"key_format=S,value_format=u,log=(enabled=false)"));
+	testutil_check(__wt_snprintf(
+	    uri, sizeof(uri), "%s:%s", table_pfx, uri_shadow));
 	testutil_check(session->create(session, uri,
 		"key_format=S,value_format=u,log=(enabled=false)"));
 	testutil_check(__wt_snprintf(
@@ -555,7 +588,7 @@ main(int argc, char *argv[])
 	FILE *fp;
 	REPORT c_rep[MAX_TH], l_rep[MAX_TH], o_rep[MAX_TH];
 	WT_CONNECTION *conn;
-	WT_CURSOR *cur_coll, *cur_local, *cur_oplog;
+	WT_CURSOR *cur_coll, *cur_local, *cur_oplog, *cur_shadow;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
 	pid_t pid;
@@ -733,6 +766,10 @@ main(int argc, char *argv[])
 	testutil_check(session->open_cursor(session,
 	    buf, NULL, NULL, &cur_coll));
 	testutil_check(__wt_snprintf(
+	    buf, sizeof(buf), "%s:%s", table_pfx, uri_shadow));
+	testutil_check(session->open_cursor(session,
+	    buf, NULL, NULL, &cur_shadow));
+	testutil_check(__wt_snprintf(
 	    buf, sizeof(buf), "%s:%s", table_pfx, uri_local));
 	testutil_check(session->open_cursor(session,
 	    buf, NULL, NULL, &cur_local));
@@ -807,13 +844,20 @@ main(int argc, char *argv[])
 			cur_coll->set_key(cur_coll, kname);
 			cur_local->set_key(cur_local, kname);
 			cur_oplog->set_key(cur_oplog, kname);
+			cur_shadow->set_key(cur_shadow, kname);
 			/*
 			 * The collection table should always only have the
-			 * data as of the checkpoint.
+			 * data as of the checkpoint. The shadow table should
+			 * always have the exact same data (or not) as the
+			 * collection table.
 			 */
 			if ((ret = cur_coll->search(cur_coll)) != 0) {
 				if (ret != WT_NOTFOUND)
 					testutil_die(ret, "search");
+				if ((ret = cur_shadow->search(cur_shadow)) == 0)
+					testutil_die(ret,
+					   "shadow search success");
+
 				/*
 				 * If we don't find a record, the stable
 				 * timestamp written to our file better be
@@ -850,7 +894,10 @@ main(int argc, char *argv[])
 				    " > stable ts %" PRIu64 "\n",
 				    fname, key, stable_fp, stable_val);
 				fatal = true;
-			}
+			} else if ((ret = cur_shadow->search(cur_shadow)) != 0)
+				/* Collection and shadow both have the data. */
+				testutil_die(ret, "shadow search failure");
+
 			/*
 			 * The local table should always have all data.
 			 */

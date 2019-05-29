@@ -450,6 +450,18 @@ connection_runtime_config = [
         for space to be available in cache before giving up. Default will
         wait forever''',
         min=0),
+    Config('cache_overflow', '', r'''
+        cache overflow configuration options''',
+        type='category', subconfig=[
+        Config('file_max', '0', r'''
+            The maximum number of bytes that WiredTiger is allowed to use for
+            its cache overflow mechanism. If the cache overflow file exceeds
+            this size, a panic will be triggered. The default value means that
+            the cache overflow file is unbounded and may use as much space as
+            the filesystem will accommodate. The minimum non-zero setting is
+            100MB.''',    # !!! Must match WT_LAS_FILE_MIN
+            min='0')
+        ]),
     Config('cache_overhead', '8', r'''
         assume the heap allocator overhead is the specified percentage, and
         adjust the cache usage by that amount (for example, if there is 10GB
@@ -475,6 +487,25 @@ connection_runtime_config = [
             seconds to wait between each checkpoint; setting this value
             above 0 configures periodic checkpoints''',
             min='0', max='100000'),
+        ]),
+    Config('debug_mode', '', r'''
+        control the settings of various extended debugging features''',
+        type='category', subconfig=[
+        Config('checkpoint_retention', '0', r'''
+            adjust log archiving to retain the log records of this number
+            of checkpoints. Zero or one means perform normal archiving.''',
+            min='0', max='1024'),
+        Config('rollback_error', '0', r'''
+            return a WT_ROLLBACK error from a transaction operation about
+            every Nth operation to simulate a collision''',
+            min='0', max='10M'),
+        Config('table_logging', 'false', r'''
+            if true, write transaction related information to the log for all
+            operations, even operations for tables with logging turned off.
+            This setting introduces a log format change that may break older
+            versions of WiredTiger. These operations are informational and
+            skipped in recovery.''',
+            type='boolean'),
         ]),
     Config('error_prefix', '', r'''
         prefix string for error messages'''),
@@ -863,7 +894,7 @@ wiredtiger_open_common =\
         warnings.  Including \c "data" will cause WiredTiger data files to use
         direct I/O, including \c "log" will cause WiredTiger log files to use
         direct I/O, and including \c "checkpoint" will cause WiredTiger data
-        files opened at a checkpoint (i.e: read only) to use direct I/O.
+        files opened at a checkpoint (i.e: read-only) to use direct I/O.
         \c direct_io should be combined with \c write_through to get the
         equivalent of \c O_DIRECT on Windows''',
         type='list', choices=['checkpoint', 'data', 'log']),
@@ -1282,8 +1313,12 @@ methods = {
 'WT_SESSION.begin_transaction' : Method([
     Config('ignore_prepare', 'false', r'''
         whether to ignore the updates by other prepared transactions as part of
-        read operations of this transaction''',
-        type='boolean'),
+        read operations of this transaction.  When \c true, forces the
+        transaction to be read-only.  Use \c force to ignore prepared updates
+        and permit writes (which can cause lost updates unless the application
+        knows something about the relationship between prepared transactions
+        and the updates that are ignoring them)''',
+        choices=['false', 'force', 'true']),
     Config('isolation', '', r'''
         the isolation level for this transaction; defaults to the
         session's isolation level''',

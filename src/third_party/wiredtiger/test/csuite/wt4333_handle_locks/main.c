@@ -383,7 +383,7 @@ main(int argc, char *argv[])
 	/*
 	 * Bypass this test for OS X. We periodically see it hang without error,
 	 * leaving a zombie process that never exits (WT-4613, BUILD-7616).
-	*/
+	 */
 #if defined(__APPLE__)
 	skip = true;
 #endif

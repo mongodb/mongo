@@ -50,6 +50,11 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	WT_STAT_SET(session, stats, cache_bytes_inuse,
 	    __wt_btree_bytes_inuse(session));
 
+	WT_STAT_SET(session, stats,
+	    compress_precomp_leaf_max_page_size, btree->maxleafpage_precomp);
+	WT_STAT_SET(session, stats,
+	    compress_precomp_intl_max_page_size, btree->maxintlpage_precomp);
+
 	if (F_ISSET(cst, WT_STAT_TYPE_CACHE_WALK))
 		__wt_curstat_cache_walk(session);
 

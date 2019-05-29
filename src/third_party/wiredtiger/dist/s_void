@@ -116,6 +116,7 @@ func_ok()
 	    -e '/int snappy_pre_size$/d' \
 	    -e '/int snappy_terminate$/d' \
 	    -e '/int subtest_error_handler$/d' \
+	    -e '/int test_las_workload$/d' \
 	    -e '/int uri2name$/d' \
 	    -e '/int usage$/d' \
 	    -e '/int util_err$/d' \

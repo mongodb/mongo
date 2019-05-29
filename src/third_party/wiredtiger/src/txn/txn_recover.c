@@ -51,6 +51,11 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	c = NULL;
 
 	/*
+	 * File ids with the bit set to ignore this operation are skipped.
+	 */
+	if (WT_LOGOP_IS_IGNORED(id))
+		return (0);
+	/*
 	 * Metadata operations have an id of 0.  Match operations based
 	 * on the id and the current pass of recovery for metadata.
 	 *
@@ -115,7 +120,8 @@ __txn_op_apply(
 	WT_DECL_RET;
 	WT_ITEM key, start_key, stop_key, value;
 	WT_SESSION_IMPL *session;
-	uint64_t recno, start_recno, stop_recno;
+	wt_timestamp_t commit, durable, first, prepare, read;
+	uint64_t recno, start_recno, stop_recno, t_nsec, t_sec;
 	uint32_t fileid, mode, optype, opsize;
 
 	session = r->session;
@@ -124,6 +130,16 @@ __txn_op_apply(
 	/* Peek at the size and the type. */
 	WT_ERR(__wt_logop_read(session, pp, end, &optype, &opsize));
 	end = *pp + opsize;
+
+	/*
+	 * If it is an operation type that should be ignored, we're done.
+	 * Note that file ids within known operations also use the same
+	 * macros to indicate that operation should be ignored.
+	 */
+	if (WT_LOGOP_IS_IGNORED(optype)) {
+		*pp += opsize;
+		goto done;
+	}
 
 	switch (optype) {
 	case WT_LOGOP_COL_MODIFY:
@@ -266,10 +282,20 @@ __txn_op_apply(
 			WT_TRET(stop->close(stop));
 		WT_ERR(ret);
 		break;
+	case WT_LOGOP_TXN_TIMESTAMP:
+		/*
+		 * Timestamp records are informational only. We have to
+		 * unpack it to properly move forward in the log record
+		 * to the next operation, but otherwise ignore.
+		 */
+		WT_ERR(__wt_logop_txn_timestamp_unpack(session, pp, end, &t_sec,
+		    &t_nsec, &commit, &durable, &first, &prepare, &read));
+		break;
 
 	WT_ILLEGAL_VALUE_ERR(session, optype);
 	}
 
+done:
 	/* Reset the cursor so it doesn't block eviction. */
 	if (cursor != NULL)
 		WT_ERR(cursor->reset(cursor));

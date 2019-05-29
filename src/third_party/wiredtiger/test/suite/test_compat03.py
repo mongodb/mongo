@@ -56,15 +56,22 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
     # The API uses only the major and minor numbers but accepts with
     # and without the patch number. Test one on release and the
     # required minimum just for testing of parsing.
-    #
     compat_release = [
         ('def_rel', dict(rel='none', log_rel=3)),
         ('future_rel', dict(rel=future_rel, log_rel=future_logv)),
         ('32_rel', dict(rel="3.2", log_rel=3)),
+        ('31_rel', dict(rel="3.1", log_rel=3)),
         ('30_rel', dict(rel="3.0", log_rel=2)),
         ('26_rel', dict(rel="2.6", log_rel=1)),
         ('26_patch_rel', dict(rel="2.6.1", log_rel=1)),
     ]
+
+    # Only the maximum version should exist below for each log version
+    # i.e. even though 3.1 is also log_max=3 3.2 is above it and also
+    # log_max=3 as such we don't need 3.1 in this list.
+    # However the exemption to this rule is versions which include a patch
+    # number as the patch number will get removed in the conn_reconfig.c
+    # This rule exemption applies to the minimum verison check as well.
     compat_max = [
         ('def_max', dict(max_req='none', log_max=3)),
         ('future_max', dict(max_req=future_rel, log_max=future_logv)),
@@ -73,19 +80,18 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
         ('26_max', dict(max_req="2.6", log_max=1)),
         ('26_patch_max', dict(max_req="2.6.1", log_max=1)),
     ]
+
+    # Only the minimum version should exist below for each log version.
     compat_min = [
         ('def_min', dict(min_req='none', log_min=3)),
         ('future_min', dict(min_req=future_rel, log_min=future_logv)),
-        ('32_min', dict(min_req="3.2", log_min=3)),
+        ('31_min', dict(min_req="3.1", log_min=3)),
         ('30_min', dict(min_req="3.0", log_min=2)),
         ('26_min', dict(min_req="2.6", log_min=1)),
         ('26_patch_min', dict(min_req="2.6.1", log_min=1)),
     ]
-    base_config = [
-        ('basecfg_true', dict(basecfg='true')),
-        ('basecfg_false', dict(basecfg='false')),
-    ]
-    scenarios = make_scenarios(compat_release, compat_max, compat_min, base_config)
+
+    scenarios = make_scenarios(compat_release, compat_max, compat_min)
 
     # This test creates scenarios that lead to errors. This is different
     # than compat02 because it is testing errors (or success) using the
@@ -93,9 +99,10 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
     def test_compat03(self):
         testdir = 'TEST'
         os.mkdir(testdir)
-        config_str = 'create,config_base=%s,' % self.basecfg
+        config_str = 'create,'
         log_str = 'log=(archive=false,enabled,file_max=%s),' % self.logmax
         compat_str = ''
+
         if (self.rel != 'none'):
             compat_str += 'compatibility=(release="%s"),' % self.rel
         if (self.max_req != 'none'):
@@ -105,12 +112,11 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
         config_str += log_str + compat_str
         self.pr("Conn config:" + config_str)
 
-        #
         # We have a lot of error cases. There are too many and they are
         # dependent on the order of the library code so don't check specific
         # error messages. So just determine if an error should occur and
         # make sure it does.
-        #
+
         if ((self.log_min >= self.future_logv) or
           (self.log_max >= self.future_logv) or
           (self.log_rel >= self.future_logv) or

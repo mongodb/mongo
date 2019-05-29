@@ -206,12 +206,6 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 
 	memset(&ci, 0, sizeof(ci));
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
-		if (allocsize != 0 && (ret = __wt_block_ckpt_decode(
-		    session, allocsize, ckpt->raw.data, &ci)) != 0) {
-			(void)util_err(session, ret, "__wt_block_ckpt_decode");
-			/* continue if damaged */
-			ci.root_size = 0;
-		}
 		/*
 		 * Call ctime, not ctime_r; ctime_r has portability problems,
 		 * the Solaris version is different from the POSIX standard.
@@ -232,7 +226,12 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 			printf(" (%" PRIu64 " KB)\n", v / WT_KILOBYTE);
 		else
 			printf(" (%" PRIu64 " B)\n", v);
-		if (ci.root_size != 0) {
+
+		/* Decode the checkpoint block. */
+		if (ckpt->raw.data == NULL)
+			continue;
+		if ((ret = __wt_block_ckpt_decode(
+		    session, allocsize, ckpt->raw.data, &ci)) == 0) {
 			printf("\t\t" "root offset: %" PRIuMAX
 			    " (0x%" PRIxMAX ")\n",
 			    (uintmax_t)ci.root_offset,
@@ -243,6 +242,9 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 			printf("\t\t" "root checksum: %" PRIu32
 			    " (0x%" PRIx32 ")\n",
 			    ci.root_checksum, ci.root_checksum);
+		} else {
+			/* Ignore the error and continue if damaged. */
+			(void)util_err(session, ret, "__wt_block_ckpt_decode");
 		}
 	}
 
