@@ -47,6 +47,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/system/error_code.hpp>
+#include <fmt/format.h>
 #include <valgrind/valgrind.h>
 
 #include "mongo/base/error_codes.h"
@@ -1593,28 +1594,17 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
     // `CheckpointThread` is to transition it from a state of not taking any checkpoints, to
     // taking "stable checkpoints". In the transitioning case, it's imperative for the "stable
     // timestamp" to have first been communicated to WiredTiger.
-    char stableTSConfigString["force=true,oldest_timestamp=,commit_timestamp=,stable_timestamp="_sd
-                                  .size() +
-                              (8 * 2) /* 16 hexadecimal digits */ + 1 /* trailing null */];
-    int size = 0;
+    using namespace fmt::literals;
+    std::string stableTSConfigString;
+    auto ts = stableTimestamp.asULL();
     if (force) {
-        size = std::snprintf(stableTSConfigString,
-                             sizeof(stableTSConfigString),
-                             "force=true,oldest_timestamp=,commit_timestamp=,stable_timestamp=%llx",
-                             stableTimestamp.asULL());
+        stableTSConfigString =
+            "force=true,oldest_timestamp={:x},commit_timestamp={:x},stable_timestamp={:x}"_format(
+                ts, ts, ts);
     } else {
-        size = std::snprintf(stableTSConfigString,
-                             sizeof(stableTSConfigString),
-                             "stable_timestamp=%llx",
-                             stableTimestamp.asULL());
+        stableTSConfigString = "stable_timestamp={:x}"_format(ts);
     }
-    if (size < 0) {
-        int e = errno;
-        error() << "error snprintf " << errnoWithDescription(e);
-        fassertFailedNoTrace(50757);
-    }
-    invariant(static_cast<std::size_t>(size) < sizeof(stableTSConfigString));
-    invariantWTOK(_conn->set_timestamp(_conn, stableTSConfigString));
+    invariantWTOK(_conn->set_timestamp(_conn, stableTSConfigString.c_str()));
 
     // After publishing a stable timestamp to WT, we can record the updated stable timestamp value
     // for the necessary oplog to keep.
