@@ -24,6 +24,7 @@
     // Verify we have some methods we added.
     assert.contains('db.adminCommand(', db_stuff);
     assert.contains('db.runCommand(', db_stuff);
+    assert.contains('db.watch(', db_stuff);
 
     // Verify we enumerate collections.
     assert.contains('db.auto_complete_coll', db_stuff);

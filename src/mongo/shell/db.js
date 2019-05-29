@@ -620,6 +620,8 @@ var DB;
         print(
             "\tdb.unsetWriteConcern(<write concern doc>) - unsets the write concern for writes to the db");
         print("\tdb.version() current version of the server");
+        print("\tdb.watch() - opens a change stream cursor for a database to report on all " +
+              " changes to its non-system collections.");
         return __magicNoPrint;
     };
 
