@@ -34,7 +34,7 @@ server_parameters:
         set_at: [ startup, runtime ]
         cpp_vartype: 'AtomicWord<bool>'
         cpp_varname: 'gFlowControlEnabled'
-        default: false
+        default: true
     flowControlTargetLagSeconds:
         description: 'Target maximum majority committed lag with flow control enabled'
         set_at: [ startup, runtime ]

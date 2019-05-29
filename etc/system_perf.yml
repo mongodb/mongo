@@ -1071,12 +1071,12 @@ buildvariants:
     - name: linkbench
     - name: big_update
 
-- name: linux-3-node-replSet-flowcontrol
-  display_name: Linux 3-Node ReplSet with Flow Control
+- name: linux-3-node-replSet-noflowcontrol
+  display_name: Linux 3-Node ReplSet (Flow Control off)
   batchtime: 1440  # 24 hours
   modules: *modules
   expansions:
-    setup: replica-flowcontrol
+    setup: replica-noflowcontrol
     cluster: replica
     platform: linux
     project_dir: *project_dir

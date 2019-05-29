@@ -373,7 +373,8 @@ STAGGER_JOBS = None
 # If set to true, it enables read concern majority. Else, read concern majority is disabled.
 MAJORITY_READ_CONCERN = None
 
-# If set to true, it enables flow control. Else, flow control is disabled.
+# If set to "on", it enables flow control. If set to "off", it disables flow control. If left as
+# None, the server's default will determine whether flow control is enabled.
 FLOW_CONTROL = None
 
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
