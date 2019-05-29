@@ -85,12 +85,22 @@ public:
                      const bool background);
 
     /**
-     * Helper functions for `_addDocKey` and `_addIndexKey` for concurrency control.
+     * During the first phase of validation, given the document's key KeyString, increment the
+     * corresponding `_indexKeyCount` by hashing it.
+     * For the second phase of validation, keep track of the document keys that hashed to
+     * inconsistent hash buckets during the first phase of validation.
      */
     void addDocKey(const KeyString& ks,
                    int indexNumber,
                    const RecordId& recordId,
                    const BSONObj& indexKey);
+
+    /**
+     * During the first phase of validation, given the index entry's KeyString, decrement the
+     * corresponding `_indexKeyCount` by hashing it.
+     * For the second phase of validation, try to match the index entry keys that hashed to
+     * inconsistent hash buckets during the first phase of validation to document keys.
+     */
     void addIndexKey(const KeyString& ks,
                      int indexNumber,
                      const RecordId& recordId,
@@ -169,9 +179,6 @@ private:
     const RecordStore* _recordStore;
     ElapsedTracker _tracker;
 
-    // Protects the variables below.
-    mutable stdx::mutex _classMutex;
-
     // We map the hashed KeyString values to a bucket which contain the count of how many
     // index keys and document keys we've seen in each bucket.
     // Count rules:
@@ -203,28 +210,6 @@ private:
     // The map contains a KeyString pointing to a BSON object as there can only be one missing index
     // entry for a given KeyString.
     std::map<std::string, BSONObj> _missingIndexEntries;
-
-    /**
-     * During the first phase of validation, given the document's key KeyString, increment the
-     * corresponding `_indexKeyCount` by hashing it.
-     * For the second phase of validation, keep track of the document keys that hashed to
-     * inconsistent hash buckets during the first phase of validation.
-     */
-    void _addDocKey_inlock(const KeyString& ks,
-                           int indexNumber,
-                           const RecordId& recordId,
-                           const BSONObj& indexKey);
-
-    /**
-     * During the first phase of validation, given the index entry's KeyString, decrement the
-     * corresponding `_indexKeyCount` by hashing it.
-     * For the second phase of validation, try to match the index entry keys that hashed to
-     * inconsistent hash buckets during the first phase of validation to document keys.
-     */
-    void _addIndexKey_inlock(const KeyString& ks,
-                             int indexNumber,
-                             const RecordId& recordId,
-                             const BSONObj& indexKey);
 
     /**
      * Generates a key for the second phase of validation. The keys format is the following:
