@@ -7906,6 +7906,15 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
+  name: search_beta_auth
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=search_beta_auth --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
   name: search_beta_ssl
   commands:
   - func: "do setup"
@@ -9997,6 +10006,7 @@ buildvariants:
   - name: .rollbackfuzzer
   - name: sasl
   - name: search_beta
+  - name: search_beta_auth
   - name: search_beta_ssl
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -10188,6 +10198,7 @@ buildvariants:
   - name: .rollbackfuzzer
   - name: sasl
   - name: search_beta
+  - name: search_beta_auth
   - name: search_beta_ssl
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
@@ -10271,6 +10282,7 @@ buildvariants:
   - name: .rollbackfuzzer
   - name: sasl
   - name: search_beta
+  - name: search_beta_auth
   - name: search_beta_ssl
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
@@ -10355,6 +10367,7 @@ buildvariants:
     - name: retryable_writes_jscore_passthrough_gen
     - name: sasl
     - name: search_beta
+    - name: search_beta_auth
     - name: search_beta_ssl
     - name: secondary_reads_passthrough_gen
     - name: session_jscore_passthrough
@@ -10412,6 +10425,7 @@ buildvariants:
   - name: .replica_sets .multi_oplog
   - name: sasl
   - name: search_beta
+  - name: search_beta_auth
   - name: search_beta_ssl
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen

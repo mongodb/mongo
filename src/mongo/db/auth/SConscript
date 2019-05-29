@@ -276,12 +276,12 @@ env.Library(
         'saslauth',
     ],
     LIBDEPS_PRIVATE=[
-        'sasl_options_init',
         '$BUILD_DIR/mongo/client/sasl_client',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/commands/servers',
+        '$BUILD_DIR/mongo/db/commands/authentication_commands',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        'sasl_options_init',
     ],
 )
 

@@ -406,6 +406,8 @@ env.Library(
     target='server_options_base',
     source=[
         'server_options_base.cpp',
+        env.Idlc('cluster_auth_mode_option.idl')[0],
+        env.Idlc('keyfile_option.idl')[0],
         env.Idlc('server_options_base.idl')[0],
         env.Idlc('server_options_general.idl')[0],
         env.Idlc('server_options_nongeneral.idl')[0],
@@ -448,7 +450,7 @@ env.CppUnitTest(
 
 # This library is linked into mongos and mongod only, not into the shell or any tools.
 env.Library(
-    target="mongodandmongos",
+    target="initialize_server_security_state",
     source=[
         "initialize_server_security_state.cpp",
     ],
