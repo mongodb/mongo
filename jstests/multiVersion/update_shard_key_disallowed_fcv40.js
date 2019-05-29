@@ -127,13 +127,15 @@
         // both modify and replacement updates
         session.startTransaction();
         assert.writeError(sessionDB.foo.update({x: 80}, {$set: {x: 100}}));
-        session.abortTransaction();
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
 
         session.startTransaction();
         assert.throws(function() {
             sessionDB.foo.findAndModify({query: {x: 80}, update: {x: 100}});
         });
-        session.abortTransaction();
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
 
         mongos.getDB(kDbName).foo.drop();
 

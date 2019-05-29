@@ -145,14 +145,15 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
 
             } catch (e) {
                 if (!hasCommitTxnError) {
-                    // Use the version of abortTransaction() that ignores errors. We ignore the
-                    // error from abortTransaction because the transaction may have implicitly
-                    // been aborted by the server already and will therefore return a
-                    // NoSuchTransaction error response.
-                    // We need to call abortTransaction() in order to update the mongo shell's
-                    // state such that it agrees no transaction is currently in progress on this
-                    // session.
-                    session.abortTransaction();
+                    // We need to call abortTransaction_forTesting() in order to update the mongo
+                    // shell's state such that it agrees no transaction is currently in progress on
+                    // this session.
+                    // The transaction may have implicitly been aborted by the server or killed by
+                    // the kill_session helper and will therefore return a
+                    // NoSuchTransaction/Interrupted error code.
+                    assert.commandWorkedOrFailedWithCode(
+                        session.abortTransaction_forTesting(),
+                        [ErrorCodes.NoSuchTransaction, ErrorCodes.Interrupted]);
                 }
 
                 if (shouldRetryEntireTxnOnError(e, hasCommitTxnError, retryOnKilledSession)) {

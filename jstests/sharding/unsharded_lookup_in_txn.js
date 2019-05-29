@@ -76,7 +76,7 @@
             assert.eq(doc.matches.length, kUnshardedCollOriginalSize);
         }
 
-        session.abortTransaction();
+        assert.commandWorked(session.abortTransaction_forTesting());
     };
 
     // Run the test once, with all of the data on shard 1. This means that the merging shard (shard

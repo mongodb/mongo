@@ -157,7 +157,7 @@
 
     // Verify the total prepared and aborted transaction counters are updated after an abort and the
     // current prepared counter is decremented.
-    session.abortTransaction();
+    assert.commandWorked(session.abortTransaction_forTesting());
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     verifyServerStatusChange(

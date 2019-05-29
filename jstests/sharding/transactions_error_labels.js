@@ -172,7 +172,8 @@
     res = startTransaction(mongosSession, dbName, collName);
     checkMongosResponse(res, ErrorCodes.WriteConflict, "TransientTransactionError", null);
     turnOffFailCommand(st.rs0);
-    mongosSession.abortTransaction();
+    assert.commandFailedWithCode(mongosSession.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // statements prior to commit network error
     failCommandWithError(
@@ -181,7 +182,8 @@
     res = startTransaction(mongosSession, dbName, collName);
     checkMongosResponse(res, ErrorCodes.HostUnreachable, "TransientTransactionError", null);
     turnOffFailCommand(st.rs0);
-    mongosSession.abortTransaction();
+    assert.commandFailedWithCode(mongosSession.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // commitTransaction for single-shard transaction (mongos sends commitTransaction)
     runCommitTests("commitTransaction");
