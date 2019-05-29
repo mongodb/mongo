@@ -111,7 +111,7 @@
 
     jsTestLog("Aborting the second transaction");
 
-    session2.abortTransaction_forTesting();
+    assert.commandWorked(session2.abortTransaction_forTesting());
 
     replTest.stopSet();
 })();

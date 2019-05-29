@@ -24,7 +24,8 @@
     assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
     assert(res.hasOwnProperty("writeErrors"), "expected write errors, res: " + tojson(res));
 
-    session.abortTransaction_forTesting();
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // Failed delete.
 
@@ -34,7 +35,8 @@
     assert.commandFailedWithCode(res, ErrorCodes.ShardKeyNotFound);
     assert(res.hasOwnProperty("writeErrors"), "expected write errors, res: " + tojson(res));
 
-    session.abortTransaction_forTesting();
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     st.stop();
 }());

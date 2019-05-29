@@ -83,7 +83,7 @@
     // The following commit and abort will be rolled back.
     rollbackTest.transitionToRollbackOperations();
     PrepareHelpers.commitTransaction(session1, prepareTimestamp);
-    session2.abortTransaction_forTesting();
+    assert.commandWorked(session2.abortTransaction_forTesting());
 
     // The fastcount should be accurate because there are no open transactions.
     assert.eq(testColl.count(), 3);

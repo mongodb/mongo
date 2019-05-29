@@ -34,7 +34,7 @@
         "Test that we can't call prepareTransaction if the most recent transaction was aborted");
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: 1}));
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     assert.commandFailedWithCode(sessionDB.adminCommand({
         prepareTransaction: 1,

@@ -26,7 +26,7 @@
     assert.commandWorked(coll.insert(doc));
     assert.docEq(doc, coll.findOne());
     simulatePrompt();
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
     assert.docEq(null, coll.findOne());
 
     // Start a transaction, so the session has a running transaction now.

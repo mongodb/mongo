@@ -72,7 +72,8 @@
     assert(res instanceof WriteCommandError);
     assert(!res.hasOwnProperty("errorLabels"));
     assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
-    session.abortTransaction_forTesting();
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     jsTest.log("WriteConflict returned by commitTransaction command is TransientTransactionError");
     session.startTransaction();
@@ -125,7 +126,8 @@
     assert(res instanceof WriteCommandError);
     assert.eq(res.errorLabels, ["TransientTransactionError"]);
     assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
-    session.abortTransaction_forTesting();
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     jsTest.log(
         "ShutdownInProgress returned by commitTransaction command is not TransientTransactionError");
@@ -195,8 +197,9 @@
     assert.commandFailedWithCode(res, ErrorCodes.LockTimeout);
     assert(res instanceof WriteCommandError);
     assert.eq(res.errorLabels, ["TransientTransactionError"]);
-    sessionOther.abortTransaction_forTesting();
-    session.abortTransaction_forTesting();
+    assert.commandFailedWithCode(sessionOther.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
+    assert.commandWorked(session.abortTransaction_forTesting());
     thread.join();
     assert.commandWorked(thread.returnData());
 
@@ -213,7 +216,8 @@
     res = sessionDb.runCommand({aggregate: collName, pipeline: [{$match: {}}], cursor: {}});
     assert.commandFailedWithCode(res, ErrorCodes.HostUnreachable);
     assert.eq(res.errorLabels, ["TransientTransactionError"]);
-    session.abortTransaction_forTesting();
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
     assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
     jsTest.log("Network errors for commit should not be transient");
@@ -231,7 +235,7 @@
     });
     assert.commandFailedWithCode(res, ErrorCodes.HostUnreachable);
     assert(!res.hasOwnProperty("errorLabels"), tojson(res));
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
     assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
     session.endSession();

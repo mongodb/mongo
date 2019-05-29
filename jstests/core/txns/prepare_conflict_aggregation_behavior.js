@@ -46,7 +46,7 @@
     // prepared transaction.
     assert.eq([{_id: 0}, {_id: 1, b: 1}], outColl.find().toArray());
 
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
     session.startTransaction();
     assert.commandWorked(sessionOutColl.update({_id: 1}, {_id: 1, a: 1}));
     prepareTimestamp = PrepareHelpers.prepareTransaction(session);

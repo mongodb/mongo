@@ -62,7 +62,7 @@
     assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestamp));
 
     // Abort the second transaction.
-    session2.abortTransaction_forTesting();
+    assert.commandWorked(session2.abortTransaction_forTesting());
 
     // Check that we have two transactions in the transactions table.
     assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
@@ -119,7 +119,7 @@
     session1.startTransaction();
     assert.commandWorked(sessionColl1.insert({_id: 6}));
     PrepareHelpers.prepareTransaction(session1);
-    session1.abortTransaction_forTesting();
+    assert.commandWorked(session1.abortTransaction_forTesting());
     // Retrying the abortTransaction command should fail with a NoSuchTransaction error.
     assert.commandFailedWithCode(sessionDB1.adminCommand({
         abortTransaction: 1,

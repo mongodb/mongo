@@ -84,7 +84,7 @@
             PrepareHelpers.commitTransaction(session, prepareTimestamp);
         } else if (commitOrAbort === "abort") {
             jsTestLog("Abort prepared transaction and wait for oplog to shrink to max oplogSize");
-            session.abortTransaction_forTesting();
+            assert.commandWorked(session.abortTransaction_forTesting());
         } else {
             throw new Error(`Unrecognized value for commitOrAbort: ${commitOrAbort}`);
         }

@@ -61,7 +61,8 @@
 
             // Call abort for good measure, even though the transaction should have already been
             // aborted on the server.
-            session.abortTransaction_forTesting();
+            assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                         ErrorCodes.NotMaster);
         }
     }
 

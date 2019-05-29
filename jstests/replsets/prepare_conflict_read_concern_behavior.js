@@ -252,38 +252,42 @@
                   "prepareTimestamp blocks on a prepared transaction.");
         assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName),
                                      ErrorCodes.MaxTimeMSExpired);
-        session2.abortTransaction_forTesting();
+        assert.commandFailedWithCode(session2.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
 
         jsTestLog("Test read with read concern 'snapshot' and atClusterTime before " +
                   "prepareTimestamp doesn't block on a prepared transaction.");
         session2.startTransaction(
             {readConcern: {level: "snapshot", atClusterTime: clusterTimeBeforePrepare}});
         assert.commandWorked(read({}, successTimeout, sessionDB2, collName, 2));
-        session2.abortTransaction_forTesting();
+        assert.commandWorked(session2.abortTransaction_forTesting());
 
         jsTestLog("Test read from a transaction with read concern 'majority' blocks on a prepared" +
                   " transaction.");
         session2.startTransaction({readConcern: {level: "majority"}});
         assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName),
                                      ErrorCodes.MaxTimeMSExpired);
-        session2.abortTransaction_forTesting();
+        assert.commandFailedWithCode(session2.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
 
         jsTestLog("Test read from a transaction with read concern 'local' blocks on a prepared " +
                   "transaction.");
         session2.startTransaction({readConcern: {level: "local"}});
         assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName),
                                      ErrorCodes.MaxTimeMSExpired);
-        session2.abortTransaction_forTesting();
+        assert.commandFailedWithCode(session2.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
 
         jsTestLog("Test read from a transaction with no read concern specified blocks on a " +
                   "prepared transaction.");
         session2.startTransaction();
         assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName),
                                      ErrorCodes.MaxTimeMSExpired);
-        session2.abortTransaction_forTesting();
+        assert.commandFailedWithCode(session2.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
         session2.endSession();
 
-        session.abortTransaction_forTesting();
+        assert.commandWorked(session.abortTransaction_forTesting());
         session.endSession();
     }
 

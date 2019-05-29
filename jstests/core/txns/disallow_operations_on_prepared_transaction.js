@@ -28,7 +28,7 @@
     let firstTimestamp = PrepareHelpers.prepareTransaction(session);
     let secondTimestamp = PrepareHelpers.prepareTransaction(session);
     assert.eq(firstTimestamp, secondTimestamp);
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     jsTestLog("Test that you can call commitTransaction on a prepared transaction.");
     session.startTransaction();
@@ -110,7 +110,7 @@
     res = assert.commandFailedWithCode(sessionColl.update({_id: 4}, {a: 1}),
                                        ErrorCodes.PreparedTransactionInProgress);
     assert.eq(res.errorLabels, ["TransientTransactionError"]);
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     jsTestLog("Test that you can't run getMore on a prepared transaction.");
     session.startTransaction();
@@ -126,7 +126,7 @@
     assert.commandFailedWithCode(
         sessionDB.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
         ErrorCodes.PreparedTransactionInProgress);
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     session.endSession();
 }());

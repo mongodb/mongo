@@ -10,7 +10,7 @@
     function expectSuccessInTxnThenAbort(session, sessionConn, cmdObj) {
         session.startTransaction();
         assert.commandWorked(sessionConn.runCommand(cmdObj));
-        session.abortTransaction_forTesting();
+        assert.commandWorked(session.abortTransaction_forTesting());
     }
 
     // Runs the command as the first in a multi statement txn that is aborted right after, expecting
@@ -18,7 +18,8 @@
     function expectFailInTxnThenAbort(session, sessionConn, expectedErrorCode, cmdObj) {
         session.startTransaction();
         assert.commandFailedWithCode(sessionConn.runCommand(cmdObj), expectedErrorCode);
-        session.abortTransaction_forTesting();
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
     }
 
     const dbName = "test";

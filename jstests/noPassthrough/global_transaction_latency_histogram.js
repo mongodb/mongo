@@ -89,7 +89,7 @@
     // towards the "commands" counter.
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "insert-2"}));
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
     lastHistogram = checkHistogramDiff(lastHistogram,
                                        getHistogramStats(),
                                        {"reads": 0, "writes": 1, "commands": 2, "transactions": 1});

@@ -38,7 +38,8 @@
         assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}),
                                      ErrorCodes.CommandNotSupported);
         // Abort the transaction in the shell.
-        session.abortTransaction_forTesting();
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
 
     } finally {
         jsTestLog("Restore the original featureCompatibilityVersion.");

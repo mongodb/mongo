@@ -129,6 +129,6 @@
     assert.commandWorked(
         primary.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
 
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
     rst.stopSet();
 })();

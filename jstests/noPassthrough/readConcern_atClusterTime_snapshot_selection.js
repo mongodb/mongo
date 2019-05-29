@@ -89,7 +89,8 @@
     primarySession.startTransaction(
         {readConcern: {level: "snapshot", atClusterTime: Timestamp(1, 1)}});
     assert.commandFailedWithCode(primaryDB.runCommand({find: collName}), ErrorCodes.SnapshotTooOld);
-    primarySession.abortTransaction_forTesting();
+    assert.commandFailedWithCode(primarySession.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     rst.stopSet();
 }());

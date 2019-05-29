@@ -26,7 +26,8 @@
     session.startTransaction();
     assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}),
                                  ErrorCodes.OperationNotSupportedInTransaction);
-    session.abortTransaction_forTesting();
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // ---- Test 2. Only reads before prepare ----
 
@@ -35,7 +36,7 @@
     let res = assert.commandWorked(sessionDB.adminCommand({prepareTransaction: 1}));
     // Makes sure prepareTransaction returns prepareTimestamp in its response.
     assert(res.hasOwnProperty("prepareTimestamp"), tojson(res));
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     // ---- Test 3. Noop writes before prepare ----
 
@@ -47,6 +48,6 @@
     res = assert.commandWorked(sessionDB.adminCommand({prepareTransaction: 1}));
     // Makes sure prepareTransaction returns prepareTimestamp in its response.
     assert(res.hasOwnProperty("prepareTimestamp"), tojson(res));
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
 }());

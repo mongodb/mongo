@@ -39,7 +39,7 @@
     let res = sessionUnsharded.aggregate([{$match: {_id: {$gte: -200}}}]).toArray();
     assert.eq(2, res.length, tojson(res));
 
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     // merge on mongos
 
@@ -52,7 +52,7 @@
     res = sessionColl.aggregate([{$match: {_id: {$gte: -200}}}], {allowDiskUse: false}).toArray();
     assert.eq(2, res.length, tojson(res));
 
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     // merge on shard. This will require the merging shard to open a cursor on itself.
     session.startTransaction();
@@ -68,7 +68,7 @@
             .toArray();
     assert.eq(2, res.length, tojson(res));
 
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     // Error case: provide a readConcern on an operation which comes in the middle of a transaction.
     session.startTransaction();

@@ -91,7 +91,7 @@
             } else {
                 assert.commandWorked(sessionDB.foo.update({"x": 300}, {"$set": {"x": 30}}));
             }
-            session.abortTransaction_forTesting();
+            assert.commandWorked(session.abortTransaction_forTesting());
             assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 300}).itcount());
             assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 30}).itcount());
         }
@@ -290,7 +290,8 @@
     assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
     assert(res.errmsg.includes(
         "There is either an orphan for this document or _id for this collection is not globally unique."));
-    session.abortTransaction_forTesting();
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     mongos.getDB(kDbName).foo.drop();
 

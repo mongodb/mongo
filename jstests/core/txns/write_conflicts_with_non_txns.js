@@ -114,7 +114,7 @@
     // Abort the transaction, which should allow the single document write to finish and insert its
     // document successfully.
     jsTestLog("Abort the multi-document transaction.");
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
     thread.join();
     assert.commandWorked(thread.returnData());
 

@@ -112,7 +112,7 @@
         initialStatus.transactions, newStatus.transactions, "currentInactive", 1);
 
     // Compare server status after the transaction abort with the server status before.
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalStarted", 2);

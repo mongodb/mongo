@@ -33,7 +33,7 @@
     assert.eq(doc1, sessionColl.findOne(doc1));
 
     PrepareHelpers.prepareTransaction(session);
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     // After abort the insert is rolled back.
     assert.eq(null, testColl.findOne(doc1));
@@ -55,7 +55,7 @@
     assert.eq(doc2, sessionColl.findOne(doc2));
 
     PrepareHelpers.prepareTransaction(session);
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     // After abort the update is rolled back.
     assert.eq(doc1, testColl.findOne({_id: 1}));
@@ -75,7 +75,7 @@
     assert.eq(null, sessionColl.findOne(doc2));
 
     PrepareHelpers.prepareTransaction(session);
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     // After abort the delete is rolled back.
     assert.eq(doc2, testColl.findOne(doc2));

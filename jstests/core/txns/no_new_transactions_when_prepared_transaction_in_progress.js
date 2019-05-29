@@ -49,7 +49,7 @@
         autocommit: false
     }),
                                  ErrorCodes.NoSuchTransaction);
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     session.endSession();
 }());

@@ -24,7 +24,7 @@
     session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
 
     // Successfully call abortTransaction.
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     //
     // Test that calling commitTransaction as the first statement in a transaction is allowed and

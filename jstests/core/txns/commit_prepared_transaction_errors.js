@@ -33,9 +33,10 @@
     assert.commandFailedWithCode(
         anotherSession.getDatabase(dbName).getCollection(collName).insert(doc),
         ErrorCodes.WriteConflict);
-    anotherSession.abortTransaction_forTesting();
+    assert.commandFailedWithCode(anotherSession.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
     // Abort the original transaction.
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     jsTestLog("Test committing a prepared transaction with an invalid 'commitTimestamp'.");
     session.startTransaction();

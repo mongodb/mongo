@@ -96,7 +96,7 @@
         res = assert.commandFailedWithCode(db.runCommand({dbHash: 1, maxTimeMS: 1000}),
                                            ErrorCodes.MaxTimeMSExpired);
 
-        otherSession.abortTransaction_forTesting();
+        assert.commandWorked(otherSession.abortTransaction_forTesting());
         otherSession.endSession();
     }
 

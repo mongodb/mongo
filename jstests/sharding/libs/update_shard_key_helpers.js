@@ -164,7 +164,8 @@ function runUpdateCmdFail(st,
         if (errorCode) {
             assert.commandFailedWithCode(res, errorCode);
         }
-        session.abortTransaction_forTesting();
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
     } else {
         res = sessionDB.foo.update(query, update, {multi: multiParamSet});
         assert.writeError(res);
@@ -189,7 +190,8 @@ function runFindAndModifyCmdFail(
         assert.throws(function() {
             sessionDB.foo.findAndModify({query: query, update: update, "upsert": upsert});
         });
-        session.abortTransaction_forTesting();
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
     } else {
         assert.throws(function() {
             sessionDB.foo.findAndModify({query: query, update: update, "upsert": upsert});
@@ -705,7 +707,8 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
         bulkOp.execute();
     });
     if (inTxn) {
-        session.abortTransaction_forTesting();
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
     }
 
     if (!ordered && !inTxn) {
@@ -755,7 +758,8 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
         bulkOp.execute();
     });
     if (inTxn) {
-        session.abortTransaction_forTesting();
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
     }
 
     if (!inTxn) {
@@ -799,7 +803,8 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
         bulkOp.execute();
     });
     if (inTxn) {
-        session.abortTransaction_forTesting();
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
     }
 
     // The batch will fail on the first write and the second will not be attempted.
@@ -833,7 +838,8 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
         bulkOp.execute();
     });
     if (inTxn) {
-        session.abortTransaction_forTesting();
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
     }
 
     assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 300}).itcount());

@@ -40,5 +40,5 @@
         testDB.runCommand({insert: collName, documents: [{_id: 3, a: 1}], maxTimeMS: 5000}),
         ErrorCodes.MaxTimeMSExpired);
 
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 })();

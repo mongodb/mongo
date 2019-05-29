@@ -50,7 +50,7 @@
     assert.eq(testColl.count(), 2);
 
     // Abort the transaction explicitly.
-    session.abortTransaction_forTesting();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     assert.eq(testColl.find().itcount(), 1);
     assert.eq(testColl.count(), 1);
