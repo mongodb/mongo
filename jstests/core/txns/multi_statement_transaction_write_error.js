@@ -40,7 +40,8 @@
                 throw e;
             }
         } finally {
-            session.abortTransaction();
+            assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                         ErrorCodes.NoSuchTransaction);
         }
     }
 

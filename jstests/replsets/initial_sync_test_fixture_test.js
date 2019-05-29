@@ -159,7 +159,7 @@
     assert(initialSyncTest.step(), "Expected initial sync to have completed, but it did not");
 
     // Abort transaction so that the data consistency checks in stop() can run.
-    session.abortTransaction();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     // Issue a w:2 write to make sure the secondary has replicated the abortTransaction oplog entry.
     assert.commandWorked(primary.getDB("otherDB").otherColl.insert({x: 1}, {writeConcern: {w: 2}}));

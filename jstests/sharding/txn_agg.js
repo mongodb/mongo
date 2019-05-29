@@ -84,7 +84,7 @@
             ));
     assert.eq(err.code, ErrorCodes.InvalidOptions, err);
 
-    session.abortTransaction();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     // Insert some data outside of a transaction.
     assert.commandWorked(sessionColl.insert([{_id: -1}, {_id: 0}, {_id: 1}]));

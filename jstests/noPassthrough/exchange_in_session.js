@@ -79,7 +79,7 @@
         return true;
     });
 
-    session.abortTransaction();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     st.stop();
 })();

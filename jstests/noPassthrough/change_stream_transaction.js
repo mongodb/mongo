@@ -151,7 +151,7 @@
         assertNoChanges(changeStreamCursor);
 
         // Transition the second transaction to prepared. We skip capturing the prepare
-        // timestamp it is not required for abortTransaction().
+        // timestamp it is not required for abortTransaction_forTesting().
         PrepareHelpers.prepareTransaction(session2);
         assertNoChanges(changeStreamCursor);
 
@@ -164,7 +164,7 @@
         //
         // Abort second transaction.
         //
-        session2.abortTransaction();
+        assert.commandWorked(session2.abortTransaction_forTesting());
         assertWriteVisibleWithCapture(
             changeStreamCursor, "insert", {_id: "no-txn-doc-4"}, changeList);
         assertNoChanges(changeStreamCursor);
