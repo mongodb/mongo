@@ -235,8 +235,8 @@ ServiceContext* initialize(const char* yaml_config) {
     periodicRunner->startup();
     serviceContext->setPeriodicRunner(std::move(periodicRunner));
 
-    initializeStorageEngine(serviceContext, StorageEngineInitFlags::kAllowNoLockFile);
     setUpCatalog(serviceContext);
+    initializeStorageEngine(serviceContext, StorageEngineInitFlags::kAllowNoLockFile);
 
     // Warn if we detect configurations for multiple registered storage engines in the same
     // configuration file/environment.
