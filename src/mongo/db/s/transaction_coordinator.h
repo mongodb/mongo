@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+class TransactionCoordinatorMetricsObserver;
+
 /**
  * State machine, which implements the two-phase commit protocol for a specific transaction,
  * identified by lsid + txnNumber.
@@ -49,6 +51,18 @@ class TransactionCoordinator {
     TransactionCoordinator& operator=(const TransactionCoordinator&) = delete;
 
 public:
+    /**
+     * The two-phase commit steps.
+     */
+    enum class Step {
+        kInactive,
+        kWritingParticipantList,
+        kWaitingForVotes,
+        kWritingDecision,
+        kWaitingForDecisionAcks,
+        kDeletingCoordinatorDoc,
+    };
+
     /**
      * Instantiates a new TransactioncCoordinator for the specified lsid + txnNumber pair and gives
      * it a 'scheduler' to use for any asynchronous tasks it spawns.
@@ -103,6 +117,13 @@ public:
      */
     void cancelIfCommitNotYetStarted();
 
+    /**
+     * Returns the TransactionCoordinatorMetricsObserver for this TransactionCoordinator.
+     */
+    const TransactionCoordinatorMetricsObserver& getMetricsObserverForTest() {
+        return *_transactionCoordinatorMetricsObserver;
+    }
+
 private:
     bool _reserveKickOffCommitPromise();
 
@@ -128,6 +149,8 @@ private:
 
     // Protects the state below
     mutable stdx::mutex _mutex;
+
+    Step _step{Step::kInactive};
 
     // Promise/future pair which will be signaled when the coordinator has completed
     bool _kickOffCommitPromiseSet{false};
@@ -158,6 +181,10 @@ private:
     // TODO (SERVER-38346): Remove this when SharedSemiFuture supports continuations.
     bool _completionPromisesFired{false};
     std::vector<Promise<void>> _completionPromises;
+
+    // Store as unique_ptr to avoid a circular dependency between the TransactionCoordinator and the
+    // TransactionCoordinatorMetricsObserver.
+    std::unique_ptr<TransactionCoordinatorMetricsObserver> _transactionCoordinatorMetricsObserver;
 };
 
 }  // namespace mongo

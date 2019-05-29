@@ -126,6 +126,7 @@ env.Library(
         'transaction_coordinator_catalog.cpp',
         'transaction_coordinator_factory_mongod.cpp',
         'transaction_coordinator_futures_util.cpp',
+        'transaction_coordinator_metrics_observer.cpp',
         'transaction_coordinator_service.cpp',
         'transaction_coordinator_structures.cpp',
         'transaction_coordinator_util.cpp',

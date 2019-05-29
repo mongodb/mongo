@@ -34,15 +34,22 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
+#include "mongo/db/s/transaction_coordinator_metrics_observer.h"
 #include "mongo/db/s/transaction_coordinator_test_fixture.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/log.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 namespace {
 
 using PrepareResponse = txn::PrepareResponse;
 using TransactionCoordinatorDocument = txn::TransactionCoordinatorDocument;
+
+const Hours kLongFutureTimeout(8);
 
 const StatusWith<BSONObj> kNoSuchTransaction =
     BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction);
@@ -95,6 +102,42 @@ protected:
     void assertNoMessageSent() {
         executor::NetworkInterfaceMock::InNetworkGuard networkGuard(network());
         ASSERT_FALSE(network()->hasReadyRequests());
+    }
+
+    void waitUntilCoordinatorDocIsPresent() {
+        DBDirectClient dbClient(operationContext());
+        while (dbClient.findOne(NamespaceString::kTransactionCoordinatorsNamespace.ns(), Query())
+                   .isEmpty())
+            ;
+    }
+
+    /**
+     * Precondition: A coordinator document exists with or without a decision.
+     */
+    void waitUntilCoordinatorDocHasDecision() {
+        DBDirectClient dbClient(operationContext());
+        TransactionCoordinatorDocument doc;
+        do {
+            doc = TransactionCoordinatorDocument::parse(
+                IDLParserErrorContext("dummy"),
+                dbClient.findOne(NamespaceString::kTransactionCoordinatorsNamespace.ns(), Query()));
+        } while (!doc.getDecision());
+    }
+
+    void waitUntilNoCoordinatorDocIsPresent() {
+        DBDirectClient dbClient(operationContext());
+        while (!dbClient.findOne(NamespaceString::kTransactionCoordinatorsNamespace.ns(), Query())
+                    .isEmpty())
+            ;
+    }
+
+    void waitUntilMessageSent() {
+        while (true) {
+            executor::NetworkInterfaceMock::InNetworkGuard networkGuard(network());
+            if (network()->hasReadyRequests()) {
+                return;
+            }
+        }
     }
 
     LogicalSessionId _lsid{makeLogicalSessionIdForTest()};
@@ -778,5 +821,982 @@ TEST_F(TransactionCoordinatorTest,
     coordinator.onCompletion().get();
 }
 
+class TransactionCoordinatorMetricsTest : public TransactionCoordinatorTestBase {
+public:
+    void setUp() override {
+        TransactionCoordinatorTestBase::setUp();
+
+        getServiceContext()->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
+
+        auto tickSource = stdx::make_unique<TickSourceMock<Microseconds>>();
+        tickSource->reset(1);
+        getServiceContext()->setTickSource(std::move(tickSource));
+    }
+
+    ServerTransactionCoordinatorsMetrics* metrics() {
+        return ServerTransactionCoordinatorsMetrics::get(getServiceContext());
+    }
+
+    ClockSourceMock* clockSource() {
+        return dynamic_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
+    }
+
+    TickSourceMock<Microseconds>* tickSource() {
+        return dynamic_cast<TickSourceMock<Microseconds>*>(getServiceContext()->getTickSource());
+    }
+
+    struct Stats {
+        // Start times
+        boost::optional<Date_t> createTime;
+        boost::optional<Date_t> writingParticipantListStartTime;
+        boost::optional<Date_t> waitingForVotesStartTime;
+        boost::optional<Date_t> writingDecisionStartTime;
+        boost::optional<Date_t> waitingForDecisionAcksStartTime;
+        boost::optional<Date_t> deletingCoordinatorDocStartTime;
+        boost::optional<Date_t> endTime;
+
+        // Durations
+        boost::optional<Microseconds> totalDuration;
+        boost::optional<Microseconds> twoPhaseCommitDuration;
+        boost::optional<Microseconds> writingParticipantListDuration;
+        boost::optional<Microseconds> waitingForVotesDuration;
+        boost::optional<Microseconds> writingDecisionDuration;
+        boost::optional<Microseconds> waitingForDecisionAcksDuration;
+        boost::optional<Microseconds> deletingCoordinatorDocDuration;
+    };
+
+    void checkStats(const SingleTransactionCoordinatorStats& stats, const Stats& expected) {
+
+        // Start times
+
+        if (expected.createTime) {
+            ASSERT_EQ(*expected.createTime, stats.getCreateTime());
+        }
+
+        if (expected.writingParticipantListStartTime) {
+            ASSERT(*expected.writingParticipantListStartTime ==
+                   stats.getWritingParticipantListStartTime());
+        }
+
+        if (expected.waitingForVotesStartTime) {
+            ASSERT(*expected.waitingForVotesStartTime == stats.getWaitingForVotesStartTime());
+        }
+
+        if (expected.writingDecisionStartTime) {
+            ASSERT(*expected.writingDecisionStartTime == stats.getWritingDecisionStartTime());
+        }
+
+        if (expected.waitingForDecisionAcksStartTime) {
+            ASSERT(*expected.waitingForDecisionAcksStartTime ==
+                   stats.getWaitingForDecisionAcksStartTime());
+        }
+
+        if (expected.deletingCoordinatorDocStartTime) {
+            ASSERT(*expected.deletingCoordinatorDocStartTime ==
+                   stats.getDeletingCoordinatorDocStartTime());
+        }
+
+        if (expected.endTime) {
+            ASSERT(*expected.endTime == stats.getEndTime());
+        }
+
+        // Durations
+
+        if (expected.totalDuration) {
+            ASSERT_EQ(*expected.totalDuration,
+                      stats.getDurationSinceCreation(tickSource(), tickSource()->getTicks()));
+        }
+
+        if (expected.twoPhaseCommitDuration) {
+            ASSERT_EQ(*expected.twoPhaseCommitDuration,
+                      stats.getTwoPhaseCommitDuration(tickSource(), tickSource()->getTicks()));
+        }
+
+        if (expected.writingParticipantListDuration) {
+            ASSERT_EQ(
+                *expected.writingParticipantListDuration,
+                stats.getWritingParticipantListDuration(tickSource(), tickSource()->getTicks()));
+        }
+
+        if (expected.waitingForVotesDuration) {
+            ASSERT_EQ(*expected.waitingForVotesDuration,
+                      stats.getWaitingForVotesDuration(tickSource(), tickSource()->getTicks()));
+        }
+
+        if (expected.writingDecisionDuration) {
+            ASSERT_EQ(*expected.writingDecisionDuration,
+                      stats.getWritingDecisionDuration(tickSource(), tickSource()->getTicks()));
+        }
+
+        if (expected.waitingForDecisionAcksDuration) {
+            ASSERT_EQ(
+                *expected.waitingForDecisionAcksDuration,
+                stats.getWaitingForDecisionAcksDuration(tickSource(), tickSource()->getTicks()));
+        }
+
+        if (expected.deletingCoordinatorDocDuration) {
+            ASSERT_EQ(
+                *expected.deletingCoordinatorDocDuration,
+                stats.getDeletingCoordinatorDocDuration(tickSource(), tickSource()->getTicks()));
+        }
+    }
+
+    struct Metrics {
+        // Totals
+        std::int64_t totalCreated{0};
+        std::int64_t totalStartedTwoPhaseCommit{0};
+
+        // Current in steps
+        std::int64_t currentWritingParticipantList{0};
+        std::int64_t currentWaitingForVotes{0};
+        std::int64_t currentWritingDecision{0};
+        std::int64_t currentWaitingForDecisionAcks{0};
+        std::int64_t currentDeletingCoordinatorDoc{0};
+    };
+
+    void checkMetrics(const Metrics& expectedMetrics) {
+        // Totals
+        ASSERT_EQ(expectedMetrics.totalCreated, metrics()->getTotalCreated());
+        ASSERT_EQ(expectedMetrics.totalStartedTwoPhaseCommit,
+                  metrics()->getTotalStartedTwoPhaseCommit());
+
+        // Current in steps
+        ASSERT_EQ(expectedMetrics.currentWritingParticipantList,
+                  metrics()->getCurrentWritingParticipantList());
+        ASSERT_EQ(expectedMetrics.currentWaitingForVotes, metrics()->getCurrentWaitingForVotes());
+        ASSERT_EQ(expectedMetrics.currentWritingDecision, metrics()->getCurrentWritingDecision());
+        ASSERT_EQ(expectedMetrics.currentWaitingForDecisionAcks,
+                  metrics()->getCurrentWaitingForDecisionAcks());
+        ASSERT_EQ(expectedMetrics.currentDeletingCoordinatorDoc,
+                  metrics()->getCurrentDeletingCoordinatorDoc());
+    }
+
+    Date_t advanceClockSourceAndReturnNewNow() {
+        const auto newNow = Date_t::now();
+        clockSource()->reset(newNow);
+        return newNow;
+    }
+};
+
+TEST_F(TransactionCoordinatorMetricsTest, SingleCoordinatorStatsSimpleTwoPhaseCommit) {
+    Stats expectedStats;
+    TransactionCoordinatorMetricsObserver coordinatorObserver;
+    const auto& stats = coordinatorObserver.getSingleTransactionCoordinatorStats();
+
+    checkStats(stats, expectedStats);
+
+    // Stats are updated on onCreate.
+
+    expectedStats.createTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.totalDuration = Microseconds(0);
+    coordinatorObserver.onCreate(metrics(), tickSource(), clockSource()->now());
+    checkStats(stats, expectedStats);
+
+    // Advancing the time causes the total duration to increase.
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    checkStats(stats, expectedStats);
+
+    // Stats are updated on onStartWritingParticipantList.
+
+    expectedStats.writingParticipantListStartTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.twoPhaseCommitDuration = Microseconds(0);
+    expectedStats.writingParticipantListDuration = Microseconds(0);
+    coordinatorObserver.onStartWritingParticipantList(
+        metrics(), tickSource(), clockSource()->now());
+    checkStats(stats, expectedStats);
+
+    // Advancing the time causes the total duration, two-phase commit duration, and duration writing
+    // participant list to increase.
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.twoPhaseCommitDuration =
+        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
+    expectedStats.writingParticipantListDuration =
+        *expectedStats.writingParticipantListDuration + Microseconds(100);
+    checkStats(stats, expectedStats);
+
+    // Stats are updated on onStartWaitingForVotes.
+
+    expectedStats.waitingForVotesStartTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.waitingForVotesDuration = Microseconds(0);
+    coordinatorObserver.onStartWaitingForVotes(metrics(), tickSource(), clockSource()->now());
+    checkStats(stats, expectedStats);
+
+    // Advancing the time causes only the total duration, two-phase commit duration, and duration
+    // waiting for votes to increase.
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.twoPhaseCommitDuration =
+        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
+    expectedStats.waitingForVotesDuration =
+        *expectedStats.waitingForVotesDuration + Microseconds(100);
+    checkStats(stats, expectedStats);
+
+    // Stats are updated on onStartWritingDecision.
+
+    expectedStats.writingDecisionStartTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.writingDecisionDuration = Microseconds(0);
+    coordinatorObserver.onStartWritingDecision(metrics(), tickSource(), clockSource()->now());
+    checkStats(stats, expectedStats);
+
+    // Advancing the time causes only the total duration, two-phase commit duration, and duration
+    // writing decision to increase.
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.twoPhaseCommitDuration =
+        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
+    expectedStats.writingDecisionDuration =
+        *expectedStats.writingDecisionDuration + Microseconds(100);
+    checkStats(stats, expectedStats);
+
+    // Stats are updated on onStartWaitingForDecisionAcks.
+
+    expectedStats.waitingForDecisionAcksStartTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.waitingForDecisionAcksDuration = Microseconds(0);
+    coordinatorObserver.onStartWaitingForDecisionAcks(
+        metrics(), tickSource(), clockSource()->now());
+    checkStats(stats, expectedStats);
+
+    // Advancing the time causes only the total duration, two-phase commit duration, and duration
+    // waiting for decision acks to increase.
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.twoPhaseCommitDuration =
+        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
+    expectedStats.waitingForDecisionAcksDuration =
+        *expectedStats.waitingForDecisionAcksDuration + Microseconds(100);
+    checkStats(stats, expectedStats);
+
+    // Stats are updated on onStartDeletingCoordinatorDoc.
+
+    expectedStats.deletingCoordinatorDocStartTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.deletingCoordinatorDocDuration = Microseconds(0);
+    coordinatorObserver.onStartDeletingCoordinatorDoc(
+        metrics(), tickSource(), clockSource()->now());
+    checkStats(stats, expectedStats);
+
+    // Advancing the time causes only the total duration, two-phase commit duration, and duration
+    // deleting the coordinator doc to increase.
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.twoPhaseCommitDuration =
+        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
+    expectedStats.deletingCoordinatorDocDuration =
+        *expectedStats.deletingCoordinatorDocDuration + Microseconds(100);
+    checkStats(stats, expectedStats);
+
+    // Stats are updated on onEnd.
+
+    expectedStats.endTime = advanceClockSourceAndReturnNewNow();
+    coordinatorObserver.onEnd(metrics(),
+                              tickSource(),
+                              clockSource()->now(),
+                              TransactionCoordinator::Step::kDeletingCoordinatorDoc);
+    checkStats(stats, expectedStats);
+
+    // Once onEnd has been called, advancing the time does not cause any duration to increase.
+    tickSource()->advance(Microseconds(100));
+    checkStats(stats, expectedStats);
+}
+
+TEST_F(TransactionCoordinatorMetricsTest, ServerWideMetricsSimpleTwoPhaseCommit) {
+    TransactionCoordinatorMetricsObserver coordinatorObserver;
+    Metrics expectedMetrics;
+    checkMetrics(expectedMetrics);
+
+    // Metrics are updated on onCreate.
+    expectedMetrics.totalCreated++;
+    coordinatorObserver.onCreate(metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    // Metrics are updated on onStartWritingParticipantList.
+    expectedMetrics.totalStartedTwoPhaseCommit++;
+    expectedMetrics.currentWritingParticipantList++;
+    coordinatorObserver.onStartWritingParticipantList(
+        metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    // Metrics are updated on onStartWaitingForVotes.
+    expectedMetrics.currentWritingParticipantList--;
+    expectedMetrics.currentWaitingForVotes++;
+    coordinatorObserver.onStartWaitingForVotes(metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    // Metrics are updated on onStartWritingDecision.
+    expectedMetrics.currentWaitingForVotes--;
+    expectedMetrics.currentWritingDecision++;
+    coordinatorObserver.onStartWritingDecision(metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    // Metrics are updated on onStartWaitingForDecisionAcks.
+    expectedMetrics.currentWritingDecision--;
+    expectedMetrics.currentWaitingForDecisionAcks++;
+    coordinatorObserver.onStartWaitingForDecisionAcks(
+        metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    // Metrics are updated on onStartDeletingCoordinatorDoc.
+    expectedMetrics.currentWaitingForDecisionAcks--;
+    expectedMetrics.currentDeletingCoordinatorDoc++;
+    coordinatorObserver.onStartDeletingCoordinatorDoc(
+        metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    // Metrics are updated on onEnd.
+    expectedMetrics.currentDeletingCoordinatorDoc--;
+    coordinatorObserver.onEnd(metrics(),
+                              tickSource(),
+                              clockSource()->now(),
+                              TransactionCoordinator::Step::kDeletingCoordinatorDoc);
+    checkMetrics(expectedMetrics);
+}
+
+TEST_F(TransactionCoordinatorMetricsTest, ServerWideMetricsSimpleTwoPhaseCommitTwoCoordinators) {
+    TransactionCoordinatorMetricsObserver coordinatorObserver1;
+    TransactionCoordinatorMetricsObserver coordinatorObserver2;
+    Metrics expectedMetrics;
+    checkMetrics(expectedMetrics);
+
+    // Increment each coordinator one step at a time.
+
+    expectedMetrics.totalCreated++;
+    coordinatorObserver1.onCreate(metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.totalCreated++;
+    coordinatorObserver2.onCreate(metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.totalStartedTwoPhaseCommit++;
+    expectedMetrics.currentWritingParticipantList++;
+    coordinatorObserver1.onStartWritingParticipantList(
+        metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.totalStartedTwoPhaseCommit++;
+    expectedMetrics.currentWritingParticipantList++;
+    coordinatorObserver2.onStartWritingParticipantList(
+        metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.currentWritingParticipantList--;
+    expectedMetrics.currentWaitingForVotes++;
+    coordinatorObserver1.onStartWaitingForVotes(metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.currentWritingParticipantList--;
+    expectedMetrics.currentWaitingForVotes++;
+    coordinatorObserver2.onStartWaitingForVotes(metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.currentWaitingForVotes--;
+    expectedMetrics.currentWritingDecision++;
+    coordinatorObserver1.onStartWritingDecision(metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.currentWaitingForVotes--;
+    expectedMetrics.currentWritingDecision++;
+    coordinatorObserver2.onStartWritingDecision(metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.currentWritingDecision--;
+    expectedMetrics.currentWaitingForDecisionAcks++;
+    coordinatorObserver1.onStartWaitingForDecisionAcks(
+        metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.currentWritingDecision--;
+    expectedMetrics.currentWaitingForDecisionAcks++;
+    coordinatorObserver2.onStartWaitingForDecisionAcks(
+        metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.currentWaitingForDecisionAcks--;
+    expectedMetrics.currentDeletingCoordinatorDoc++;
+    coordinatorObserver1.onStartDeletingCoordinatorDoc(
+        metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.currentWaitingForDecisionAcks--;
+    expectedMetrics.currentDeletingCoordinatorDoc++;
+    coordinatorObserver2.onStartDeletingCoordinatorDoc(
+        metrics(), tickSource(), clockSource()->now());
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.currentDeletingCoordinatorDoc--;
+    coordinatorObserver1.onEnd(metrics(),
+                               tickSource(),
+                               clockSource()->now(),
+                               TransactionCoordinator::Step::kDeletingCoordinatorDoc);
+    checkMetrics(expectedMetrics);
+
+    expectedMetrics.currentDeletingCoordinatorDoc--;
+    coordinatorObserver2.onEnd(metrics(),
+                               tickSource(),
+                               clockSource()->now(),
+                               TransactionCoordinator::Step::kDeletingCoordinatorDoc);
+    checkMetrics(expectedMetrics);
+}
+
+TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
+    Stats expectedStats;
+    Metrics expectedMetrics;
+
+    checkMetrics(expectedMetrics);
+
+    log() << "Create the coordinator.";
+
+    expectedStats.createTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.totalDuration = Microseconds(0);
+    expectedMetrics.totalCreated++;
+
+    TransactionCoordinator coordinator(
+        getServiceContext(),
+        _lsid,
+        _txnNumber,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    const auto& stats =
+        coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    log() << "Start two-phase commit (allow the coordinator to progress to writing the participant "
+             "list).";
+
+    expectedStats.writingParticipantListStartTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.twoPhaseCommitDuration = Microseconds(0);
+    expectedStats.writingParticipantListDuration = Microseconds(0);
+    expectedMetrics.totalStartedTwoPhaseCommit++;
+    expectedMetrics.currentWritingParticipantList++;
+
+    setGlobalFailPoint("hangBeforeWaitingForParticipantListWriteConcern",
+                       BSON("mode"
+                            << "alwaysOn"
+                            << "data"
+                            << BSON("useUninterruptibleSleep" << 1)));
+    coordinator.runCommit(kTwoShardIdList);
+    waitUntilCoordinatorDocIsPresent();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    log() << "Allow the coordinator to progress to waiting for votes.";
+
+    expectedStats.waitingForVotesStartTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.twoPhaseCommitDuration =
+        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
+    expectedStats.writingParticipantListDuration =
+        *expectedStats.writingParticipantListDuration + Microseconds(100);
+    expectedStats.waitingForVotesDuration = Microseconds(0);
+    expectedMetrics.currentWritingParticipantList--;
+    expectedMetrics.currentWaitingForVotes++;
+
+    setGlobalFailPoint("hangBeforeWaitingForParticipantListWriteConcern",
+                       BSON("mode"
+                            << "off"));
+    waitUntilMessageSent();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    log() << "Allow the coordinator to progress to writing the decision.";
+
+    expectedStats.writingDecisionStartTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.twoPhaseCommitDuration =
+        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
+    expectedStats.waitingForVotesDuration =
+        *expectedStats.waitingForVotesDuration + Microseconds(100);
+    expectedStats.writingDecisionDuration = Microseconds(0);
+    expectedMetrics.currentWaitingForVotes--;
+    expectedMetrics.currentWritingDecision++;
+
+    setGlobalFailPoint("hangBeforeWaitingForDecisionWriteConcern",
+                       BSON("mode"
+                            << "alwaysOn"
+                            << "data"
+                            << BSON("useUninterruptibleSleep" << 1)));
+    // Respond to the second prepare request in a separate thread, because the coordinator will
+    // hijack that thread to run its continuation.
+    assertPrepareSentAndRespondWithSuccess();
+    auto future = launchAsync([this] { assertPrepareSentAndRespondWithSuccess(); });
+    waitUntilCoordinatorDocHasDecision();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    log() << "Allow the coordinator to progress to waiting for acks.";
+
+    expectedStats.waitingForDecisionAcksStartTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.twoPhaseCommitDuration =
+        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
+    expectedStats.writingDecisionDuration =
+        *expectedStats.writingDecisionDuration + Microseconds(100);
+    expectedStats.waitingForDecisionAcksDuration = Microseconds(0);
+    expectedMetrics.currentWritingDecision--;
+    expectedMetrics.currentWaitingForDecisionAcks++;
+
+    setGlobalFailPoint("hangBeforeWaitingForDecisionWriteConcern",
+                       BSON("mode"
+                            << "off"));
+    // The last thing the coordinator will do on the hijacked prepare response thread is schedule
+    // the commitTransaction network requests.
+    future.timed_get(kLongFutureTimeout);
+    waitUntilMessageSent();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    log() << "Allow the coordinator to progress to deleting the coordinator doc.";
+
+    expectedStats.deletingCoordinatorDocStartTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.twoPhaseCommitDuration =
+        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
+    expectedStats.waitingForDecisionAcksDuration =
+        *expectedStats.waitingForDecisionAcksDuration + Microseconds(100);
+    expectedStats.deletingCoordinatorDocDuration = Microseconds(0);
+    expectedMetrics.currentWaitingForDecisionAcks--;
+    expectedMetrics.currentDeletingCoordinatorDoc++;
+
+    setGlobalFailPoint("hangAfterDeletingCoordinatorDoc",
+                       BSON("mode"
+                            << "alwaysOn"
+                            << "data"
+                            << BSON("useUninterruptibleSleep" << 1)));
+    // Respond to the second commit request in a separate thread, because the coordinator will
+    // hijack that thread to run its continuation.
+    assertCommitSentAndRespondWithSuccess();
+    future = launchAsync([this] { assertCommitSentAndRespondWithSuccess(); });
+    waitUntilNoCoordinatorDocIsPresent();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    log() << "Allow the coordinator to complete.";
+
+    expectedStats.endTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.twoPhaseCommitDuration =
+        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
+    expectedStats.deletingCoordinatorDocDuration =
+        *expectedStats.deletingCoordinatorDocDuration + Microseconds(100);
+    expectedMetrics.currentDeletingCoordinatorDoc--;
+
+    setGlobalFailPoint("hangAfterDeletingCoordinatorDoc",
+                       BSON("mode"
+                            << "off"));
+    // The last thing the coordinator will do on the hijacked commit response thread is signal the
+    // coordinator's completion.
+    future.timed_get(kLongFutureTimeout);
+    coordinator.onCompletion().get();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+}
+
+TEST_F(TransactionCoordinatorMetricsTest, CoordinatorIsCanceledWhileInactive) {
+    Stats expectedStats;
+    Metrics expectedMetrics;
+
+    checkMetrics(expectedMetrics);
+
+    // Create the coordinator.
+
+    expectedStats.createTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.totalDuration = Microseconds(0);
+    expectedMetrics.totalCreated++;
+
+    TransactionCoordinator coordinator(
+        getServiceContext(),
+        _lsid,
+        _txnNumber,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    const auto& stats =
+        coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Cancel the coordinator.
+
+    expectedStats.endTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+
+    coordinator.cancelIfCommitNotYetStarted();
+    coordinator.onCompletion().get();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+}
+
+TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordinatorIsInactive) {
+    Stats expectedStats;
+    Metrics expectedMetrics;
+
+    checkMetrics(expectedMetrics);
+
+    // Create the coordinator.
+
+    expectedStats.createTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.totalDuration = Microseconds(0);
+    expectedMetrics.totalCreated++;
+
+    auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
+    auto awsPtr = aws.get();
+    TransactionCoordinator coordinator(
+        getServiceContext(), _lsid, _txnNumber, std::move(aws), Date_t::max());
+    const auto& stats =
+        coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Shut down the coordinator's AWS.
+
+    expectedStats.endTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+
+    awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
+    coordinator.onCompletion().get();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+}
+
+TEST_F(TransactionCoordinatorMetricsTest,
+       CoordinatorsAWSIsShutDownWhileCoordinatorIsWritingParticipantList) {
+    Stats expectedStats;
+    Metrics expectedMetrics;
+
+    checkMetrics(expectedMetrics);
+
+    // Create the coordinator.
+
+    expectedStats.createTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.totalDuration = Microseconds(0);
+    expectedMetrics.totalCreated++;
+
+    auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
+    auto awsPtr = aws.get();
+    TransactionCoordinator coordinator(
+        getServiceContext(), _lsid, _txnNumber, std::move(aws), Date_t::max());
+    const auto& stats =
+        coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Wait until the coordinator is writing the participant list.
+
+    expectedStats.writingParticipantListStartTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.writingParticipantListDuration = Microseconds(0);
+    expectedMetrics.totalStartedTwoPhaseCommit++;
+    expectedMetrics.currentWritingParticipantList++;
+
+    setGlobalFailPoint("hangBeforeWaitingForParticipantListWriteConcern",
+                       BSON("mode"
+                            << "alwaysOn"));
+    coordinator.runCommit(kTwoShardIdList);
+    waitUntilCoordinatorDocIsPresent();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Shut down the coordinator's AWS.
+
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.writingParticipantListDuration =
+        *expectedStats.writingParticipantListDuration + Microseconds(100);
+    expectedMetrics.currentWritingParticipantList--;
+
+    awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
+    coordinator.onCompletion().get();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Clear the failpoint before the next test.
+    setGlobalFailPoint("hangBeforeWaitingForParticipantListWriteConcern",
+                       BSON("mode"
+                            << "off"));
+}
+
+TEST_F(TransactionCoordinatorMetricsTest,
+       CoordinatorsAWSIsShutDownWhileCoordinatorIsWaitingForVotes) {
+    Stats expectedStats;
+    Metrics expectedMetrics;
+
+    checkMetrics(expectedMetrics);
+
+    // Create the coordinator.
+
+    expectedStats.createTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.totalDuration = Microseconds(0);
+    expectedMetrics.totalCreated++;
+
+    auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
+    auto awsPtr = aws.get();
+    TransactionCoordinator coordinator(
+        getServiceContext(), _lsid, _txnNumber, std::move(aws), Date_t::max());
+    const auto& stats =
+        coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Wait until the coordinator is waiting for votes.
+
+    expectedStats.waitingForVotesStartTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.waitingForVotesDuration = Microseconds(0);
+    expectedMetrics.totalStartedTwoPhaseCommit++;
+    expectedMetrics.currentWaitingForVotes++;
+
+    coordinator.runCommit(kTwoShardIdList);
+    waitUntilMessageSent();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Shut down the coordinator's AWS.
+
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.waitingForVotesDuration =
+        *expectedStats.waitingForVotesDuration + Microseconds(100);
+    expectedMetrics.currentWaitingForVotes--;
+
+    awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
+    network()->enterNetwork();
+    network()->runReadyNetworkOperations();
+    network()->exitNetwork();
+    coordinator.onCompletion().get();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+}
+
+TEST_F(TransactionCoordinatorMetricsTest,
+       CoordinatorsAWSIsShutDownWhileCoordinatorIsWritingDecision) {
+    Stats expectedStats;
+    Metrics expectedMetrics;
+
+    checkMetrics(expectedMetrics);
+
+    // Create the coordinator.
+
+    expectedStats.createTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.totalDuration = Microseconds(0);
+    expectedMetrics.totalCreated++;
+
+    auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
+    auto awsPtr = aws.get();
+    TransactionCoordinator coordinator(
+        getServiceContext(), _lsid, _txnNumber, std::move(aws), Date_t::max());
+    const auto& stats =
+        coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Wait until the coordinator is writing the decision.
+
+    expectedStats.writingDecisionStartTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.writingDecisionDuration = Microseconds(0);
+    expectedMetrics.totalStartedTwoPhaseCommit++;
+    expectedMetrics.currentWritingDecision++;
+
+    setGlobalFailPoint("hangBeforeWaitingForDecisionWriteConcern",
+                       BSON("mode"
+                            << "alwaysOn"));
+    coordinator.runCommit(kTwoShardIdList);
+    // Respond to the second prepare request in a separate thread, because the coordinator will
+    // hijack that thread to run its continuation.
+    assertPrepareSentAndRespondWithSuccess();
+    auto future = launchAsync([this] { assertPrepareSentAndRespondWithSuccess(); });
+    waitUntilCoordinatorDocHasDecision();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Shut down the coordinator's AWS.
+
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.writingDecisionDuration =
+        *expectedStats.writingDecisionDuration + Microseconds(100);
+    expectedMetrics.currentWritingDecision--;
+
+    awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
+    coordinator.onCompletion().get();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Clear the failpoint before the next test.
+    setGlobalFailPoint("hangBeforeWaitingForDecisionWriteConcern",
+                       BSON("mode"
+                            << "off"));
+}
+
+TEST_F(TransactionCoordinatorMetricsTest,
+       CoordinatorsAWSIsShutDownWhileCoordinatorIsWaitingForDecisionAcks) {
+    Stats expectedStats;
+    Metrics expectedMetrics;
+
+    checkMetrics(expectedMetrics);
+
+    // Create the coordinator.
+
+    expectedStats.createTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.totalDuration = Microseconds(0);
+    expectedMetrics.totalCreated++;
+
+    auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
+    auto awsPtr = aws.get();
+    TransactionCoordinator coordinator(
+        getServiceContext(), _lsid, _txnNumber, std::move(aws), Date_t::max());
+    const auto& stats =
+        coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Wait until the coordinator is waiting for decision acks.
+
+    expectedStats.waitingForDecisionAcksStartTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.waitingForDecisionAcksDuration = Microseconds(0);
+    expectedMetrics.totalStartedTwoPhaseCommit++;
+    expectedMetrics.currentWaitingForDecisionAcks++;
+
+    coordinator.runCommit(kTwoShardIdList);
+    // Respond to the second prepare request in a separate thread, because the coordinator will
+    // hijack that thread to run its continuation.
+    assertPrepareSentAndRespondWithSuccess();
+    auto future = launchAsync([this] { assertPrepareSentAndRespondWithSuccess(); });
+    // The last thing the coordinator will do on the hijacked prepare response thread is schedule
+    // the commitTransaction network requests.
+    future.timed_get(kLongFutureTimeout);
+    waitUntilMessageSent();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Shut down the coordinator's AWS.
+
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.waitingForDecisionAcksDuration =
+        *expectedStats.waitingForDecisionAcksDuration + Microseconds(100);
+    expectedMetrics.currentWaitingForDecisionAcks--;
+
+    awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
+    network()->enterNetwork();
+    network()->runReadyNetworkOperations();
+    network()->exitNetwork();
+    coordinator.onCompletion().get();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+}
+
+TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordinatorIsDeletingDoc) {
+    Stats expectedStats;
+    Metrics expectedMetrics;
+
+    checkMetrics(expectedMetrics);
+
+    // Create the coordinator.
+
+    expectedStats.createTime = advanceClockSourceAndReturnNewNow();
+    expectedStats.totalDuration = Microseconds(0);
+    expectedMetrics.totalCreated++;
+
+    auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
+    auto awsPtr = aws.get();
+    TransactionCoordinator coordinator(
+        getServiceContext(), _lsid, _txnNumber, std::move(aws), Date_t::max());
+    const auto& stats =
+        coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Wait until the coordinator is deleting the coordinator doc.
+
+    expectedStats.deletingCoordinatorDocStartTime = advanceClockSourceAndReturnNewNow();
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.deletingCoordinatorDocDuration = Microseconds(0);
+    expectedMetrics.totalStartedTwoPhaseCommit++;
+    expectedMetrics.currentDeletingCoordinatorDoc++;
+
+    setGlobalFailPoint("hangAfterDeletingCoordinatorDoc",
+                       BSON("mode"
+                            << "alwaysOn"));
+    coordinator.runCommit(kTwoShardIdList);
+    // Respond to the second prepare request in a separate thread, because the coordinator will
+    // hijack that thread to run its continuation.
+    assertPrepareSentAndRespondWithSuccess();
+    auto future = launchAsync([this] { assertPrepareSentAndRespondWithSuccess(); });
+    // The last thing the coordinator will do on the hijacked prepare response thread is schedule
+    // the commitTransaction network requests.
+    future.timed_get(kLongFutureTimeout);
+    waitUntilMessageSent();
+    // Respond to the second commit request in a separate thread, because the coordinator will
+    // hijack that thread to run its continuation.
+    assertCommitSentAndRespondWithSuccess();
+    future = launchAsync([this] { assertCommitSentAndRespondWithSuccess(); });
+    waitUntilNoCoordinatorDocIsPresent();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Shut down the coordinator's AWS.
+
+    tickSource()->advance(Microseconds(100));
+    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+    expectedStats.deletingCoordinatorDocDuration =
+        *expectedStats.deletingCoordinatorDocDuration + Microseconds(100);
+    expectedMetrics.currentDeletingCoordinatorDoc--;
+
+    awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
+    // The last thing the coordinator will do on the hijacked commit response thread is signal the
+    // coordinator's completion.
+    future.timed_get(kLongFutureTimeout);
+    coordinator.onCompletion().get();
+
+    checkStats(stats, expectedStats);
+    checkMetrics(expectedMetrics);
+
+    // Clear the failpoint before the next test.
+    setGlobalFailPoint("hangAfterDeletingCoordinatorDoc",
+                       BSON("mode"
+                            << "off"));
+}
 }  // namespace
 }  // namespace mongo

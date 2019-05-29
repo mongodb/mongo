@@ -33,17 +33,17 @@
 
 namespace mongo {
 
-void SingleTransactionCoordinatorStats::setStartTime(TickSource::Tick curTick,
-                                                     Date_t curWallClockTime) {
-    invariant(!_startTime);
+void SingleTransactionCoordinatorStats::setCreateTime(TickSource::Tick curTick,
+                                                      Date_t curWallClockTime) {
+    invariant(!_createTime);
 
-    _startTime = curTick;
-    _startWallClockTime = curWallClockTime;
+    _createTime = curTick;
+    _createWallClockTime = curWallClockTime;
 }
 
 void SingleTransactionCoordinatorStats::setEndTime(TickSource::Tick curTick,
                                                    Date_t curWallClockTime) {
-    invariant(_startTime);
+    invariant(_createTime);
     invariant(!_endTime);
 
     _endTime = curTick;
@@ -52,7 +52,7 @@ void SingleTransactionCoordinatorStats::setEndTime(TickSource::Tick curTick,
 
 void SingleTransactionCoordinatorStats::setWritingParticipantListStartTime(
     TickSource::Tick curTick, Date_t curWallClockTime) {
-    invariant(_startTime);
+    invariant(_createTime);
     invariant(!_writingParticipantListStartTime);
 
     _writingParticipantListStartTime = curTick;
@@ -86,14 +86,32 @@ void SingleTransactionCoordinatorStats::setWaitingForDecisionAcksStartTime(
     _waitingForDecisionAcksStartWallClockTime = curWallClockTime;
 }
 
-Microseconds SingleTransactionCoordinatorStats::getDuration(TickSource* tickSource,
-                                                            TickSource::Tick curTick) const {
-    invariant(_startTime);
+void SingleTransactionCoordinatorStats::setDeletingCoordinatorDocStartTime(
+    TickSource::Tick curTick, Date_t curWallClockTime) {
+    invariant(!_deletingCoordinatorDocStartTime);
+
+    _deletingCoordinatorDocStartTime = curTick;
+    _deletingCoordinatorDocStartWallClockTime = curWallClockTime;
+}
+
+Microseconds SingleTransactionCoordinatorStats::getDurationSinceCreation(
+    TickSource* tickSource, TickSource::Tick curTick) const {
+    invariant(_createTime);
 
     if (_endTime) {
-        return tickSource->ticksTo<Microseconds>(_endTime - _startTime);
+        return tickSource->ticksTo<Microseconds>(_endTime - _createTime);
     }
-    return tickSource->ticksTo<Microseconds>(curTick - _startTime);
+    return tickSource->ticksTo<Microseconds>(curTick - _createTime);
+}
+
+Microseconds SingleTransactionCoordinatorStats::getTwoPhaseCommitDuration(
+    TickSource* tickSource, TickSource::Tick curTick) const {
+    invariant(_writingParticipantListStartTime);
+
+    if (_endTime) {
+        return tickSource->ticksTo<Microseconds>(_endTime - _writingParticipantListStartTime);
+    }
+    return tickSource->ticksTo<Microseconds>(curTick - _writingParticipantListStartTime);
 }
 
 Microseconds SingleTransactionCoordinatorStats::getWritingParticipantListDuration(
@@ -104,6 +122,11 @@ Microseconds SingleTransactionCoordinatorStats::getWritingParticipantListDuratio
         return tickSource->ticksTo<Microseconds>(_waitingForVotesStartTime -
                                                  _writingParticipantListStartTime);
     }
+
+    if (_endTime) {
+        return tickSource->ticksTo<Microseconds>(_endTime - _writingParticipantListStartTime);
+    }
+
     return tickSource->ticksTo<Microseconds>(curTick - _writingParticipantListStartTime);
 }
 
@@ -115,6 +138,11 @@ Microseconds SingleTransactionCoordinatorStats::getWaitingForVotesDuration(
         return tickSource->ticksTo<Microseconds>(_writingDecisionStartTime -
                                                  _waitingForVotesStartTime);
     }
+
+    if (_endTime) {
+        return tickSource->ticksTo<Microseconds>(_endTime - _waitingForVotesStartTime);
+    }
+
     return tickSource->ticksTo<Microseconds>(curTick - _waitingForVotesStartTime);
 }
 
@@ -126,6 +154,11 @@ Microseconds SingleTransactionCoordinatorStats::getWritingDecisionDuration(
         return tickSource->ticksTo<Microseconds>(_waitingForDecisionAcksStartTime -
                                                  _writingDecisionStartTime);
     }
+
+    if (_endTime) {
+        return tickSource->ticksTo<Microseconds>(_endTime - _writingDecisionStartTime);
+    }
+
     return tickSource->ticksTo<Microseconds>(curTick - _writingDecisionStartTime);
 }
 
@@ -133,10 +166,26 @@ Microseconds SingleTransactionCoordinatorStats::getWaitingForDecisionAcksDuratio
     TickSource* tickSource, TickSource::Tick curTick) const {
     invariant(_waitingForDecisionAcksStartTime);
 
+    if (_deletingCoordinatorDocStartTime) {
+        return tickSource->ticksTo<Microseconds>(_deletingCoordinatorDocStartTime -
+                                                 _waitingForDecisionAcksStartTime);
+    }
+
     if (_endTime) {
         return tickSource->ticksTo<Microseconds>(_endTime - _waitingForDecisionAcksStartTime);
     }
+
     return tickSource->ticksTo<Microseconds>(curTick - _waitingForDecisionAcksStartTime);
 }
 
+Microseconds SingleTransactionCoordinatorStats::getDeletingCoordinatorDocDuration(
+    TickSource* tickSource, TickSource::Tick curTick) const {
+    invariant(_deletingCoordinatorDocStartTime);
+
+    if (_endTime) {
+        return tickSource->ticksTo<Microseconds>(_endTime - _deletingCoordinatorDocStartTime);
+    }
+
+    return tickSource->ticksTo<Microseconds>(curTick - _deletingCoordinatorDocStartTime);
+}
 }  // namespace mongo
