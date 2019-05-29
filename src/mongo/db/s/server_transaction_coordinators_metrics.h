@@ -70,6 +70,10 @@ public:
     void incrementCurrentWaitingForDecisionAcks();
     void decrementCurrentWaitingForDecisionAcks();
 
+    std::int64_t getCurrentDeletingCoordinatorDoc();
+    void incrementCurrentDeletingCoordinatorDoc();
+    void decrementCurrentDeletingCoordinatorDoc();
+
 private:
     // The total number of transaction coordinators created on this process since the process's
     // inception.
@@ -90,6 +94,9 @@ private:
 
     // The number of transaction coordinators currently in the "waiting for decision acks" phase.
     AtomicWord<std::int64_t> _totalWaitingForDecisionAcks{0};
+
+    // The number of transaction coordinators currently in the "deleting coordinator doc" phase.
+    AtomicWord<std::int64_t> _totalDeletingCoordinatorDoc{0};
 };
 
 }  // namespace mongo

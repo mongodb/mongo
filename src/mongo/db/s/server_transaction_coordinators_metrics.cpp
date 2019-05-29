@@ -104,4 +104,14 @@ void ServerTransactionCoordinatorsMetrics::decrementCurrentWaitingForDecisionAck
     _totalWaitingForDecisionAcks.fetchAndSubtract(1);
 }
 
+std::int64_t ServerTransactionCoordinatorsMetrics::getCurrentDeletingCoordinatorDoc() {
+    return _totalDeletingCoordinatorDoc.load();
+}
+void ServerTransactionCoordinatorsMetrics::incrementCurrentDeletingCoordinatorDoc() {
+    _totalDeletingCoordinatorDoc.fetchAndAdd(1);
+}
+void ServerTransactionCoordinatorsMetrics::decrementCurrentDeletingCoordinatorDoc() {
+    _totalDeletingCoordinatorDoc.fetchAndSubtract(1);
+}
+
 }  // namespace mongo

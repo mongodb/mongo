@@ -34,6 +34,7 @@
 #include "mongo/db/s/transaction_coordinator.h"
 
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/s/transaction_coordinator_metrics_observer.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -55,7 +56,9 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
       _lsid(lsid),
       _txnNumber(txnNumber),
       _scheduler(std::move(scheduler)),
-      _sendPrepareScheduler(_scheduler->makeChildScheduler()) {
+      _sendPrepareScheduler(_scheduler->makeChildScheduler()),
+      _transactionCoordinatorMetricsObserver(
+          stdx::make_unique<TransactionCoordinatorMetricsObserver>()) {
 
     auto kickOffCommitPF = makePromiseFuture<void>();
     _kickOffCommitPromise = std::move(kickOffCommitPF.promise);
@@ -80,6 +83,12 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
                 }
             });
 
+    // TODO: The duration will be meaningless after failover.
+    _transactionCoordinatorMetricsObserver->onCreate(
+        ServerTransactionCoordinatorsMetrics::get(_serviceContext),
+        _serviceContext->getTickSource(),
+        _serviceContext->getPreciseClockSource()->now());
+
     // Two-phase commit phases chain. Once this chain executes, the 2PC sequence has completed
     // either with success or error and the scheduled deadline task above has been joined.
     std::move(kickOffCommitPF.future)
@@ -92,6 +101,15 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
             {
                 stdx::lock_guard<stdx::mutex> lg(_mutex);
                 invariant(_participants);
+
+                _step = Step::kWritingParticipantList;
+
+                // TODO: The duration will be meaningless after failover.
+                _transactionCoordinatorMetricsObserver->onStartWritingParticipantList(
+                    ServerTransactionCoordinatorsMetrics::get(_serviceContext),
+                    _serviceContext->getTickSource(),
+                    _serviceContext->getPreciseClockSource()->now());
+
                 if (_participantsDurable)
                     return Future<void>::makeReady();
             }
@@ -113,6 +131,15 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
             {
                 stdx::lock_guard<stdx::mutex> lg(_mutex);
                 invariant(_participantsDurable);
+
+                _step = Step::kWaitingForVotes;
+
+                // TODO: The duration will be meaningless after failover.
+                _transactionCoordinatorMetricsObserver->onStartWaitingForVotes(
+                    ServerTransactionCoordinatorsMetrics::get(_serviceContext),
+                    _serviceContext->getTickSource(),
+                    _serviceContext->getPreciseClockSource()->now());
+
                 if (_decision)
                     return Future<void>::makeReady();
             }
@@ -146,6 +173,15 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
             {
                 stdx::lock_guard<stdx::mutex> lg(_mutex);
                 invariant(_decision);
+
+                _step = Step::kWritingDecision;
+
+                // TODO: The duration will be meaningless after failover.
+                _transactionCoordinatorMetricsObserver->onStartWritingDecision(
+                    ServerTransactionCoordinatorsMetrics::get(_serviceContext),
+                    _serviceContext->getTickSource(),
+                    _serviceContext->getPreciseClockSource()->now());
+
                 if (_decisionDurable)
                     return Future<void>::makeReady();
             }
@@ -167,6 +203,14 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
             {
                 stdx::lock_guard<stdx::mutex> lg(_mutex);
                 invariant(_decisionDurable);
+
+                _step = Step::kWaitingForDecisionAcks;
+
+                // TODO: The duration will be meaningless after failover.
+                _transactionCoordinatorMetricsObserver->onStartWaitingForDecisionAcks(
+                    ServerTransactionCoordinatorsMetrics::get(_serviceContext),
+                    _serviceContext->getTickSource(),
+                    _serviceContext->getPreciseClockSource()->now());
             }
 
             _decisionPromise.emplaceValue(_decision->getDecision());
@@ -189,6 +233,17 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
         .then([this] {
             // Do a best-effort attempt (i.e., writeConcern w:1) to delete the coordinator's durable
             // state.
+            {
+                stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+                _step = Step::kDeletingCoordinatorDoc;
+
+                _transactionCoordinatorMetricsObserver->onStartDeletingCoordinatorDoc(
+                    ServerTransactionCoordinatorsMetrics::get(_serviceContext),
+                    _serviceContext->getTickSource(),
+                    _serviceContext->getPreciseClockSource()->now());
+            }
+
             return txn::deleteCoordinatorDoc(*_scheduler, _lsid, _txnNumber);
         })
         .onCompletion([ this, deadlineFuture = std::move(deadlineFuture) ](Status s) mutable {
@@ -279,6 +334,15 @@ void TransactionCoordinator::_done(Status status) {
            << redact(status);
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
+
+    const auto tickSource = _serviceContext->getTickSource();
+
+    _transactionCoordinatorMetricsObserver->onEnd(
+        ServerTransactionCoordinatorsMetrics::get(_serviceContext),
+        tickSource,
+        _serviceContext->getPreciseClockSource()->now(),
+        _step);
+
     _completionPromisesFired = true;
 
     if (!_decisionDurable) {

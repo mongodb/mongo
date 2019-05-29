@@ -50,6 +50,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForParticipantListWriteConcern);
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForDecisionWriteConcern);
+MONGO_FAIL_POINT_DEFINE(hangAfterDeletingCoordinatorDoc);
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeWritingParticipantList);
 MONGO_FAIL_POINT_DEFINE(hangBeforeWritingDecision);
@@ -172,10 +173,15 @@ void persistParticipantListBlocking(OperationContext* opCtx,
 
     LOG(3) << "Wrote participant list for " << lsid.getId() << ':' << txnNumber;
 
-    if (MONGO_FAIL_POINT(hangBeforeWaitingForParticipantListWriteConcern)) {
+    MONGO_FAIL_POINT_BLOCK(hangBeforeWaitingForParticipantListWriteConcern, fp) {
         LOG(0) << "Hit hangBeforeWaitingForParticipantListWriteConcern failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-            opCtx, hangBeforeWaitingForParticipantListWriteConcern);
+        const BSONObj& data = fp.getData();
+        if (!data["useUninterruptibleSleep"].eoo()) {
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeWaitingForParticipantListWriteConcern);
+        } else {
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+                opCtx, hangBeforeWaitingForParticipantListWriteConcern);
+        }
     }
 
     WriteConcernResult unusedWCResult;
@@ -373,10 +379,15 @@ void persistDecisionBlocking(OperationContext* opCtx,
     LOG(3) << "Wrote decision " << (commitTimestamp ? "commit" : "abort") << " for " << lsid.getId()
            << ':' << txnNumber;
 
-    if (MONGO_FAIL_POINT(hangBeforeWaitingForDecisionWriteConcern)) {
+    MONGO_FAIL_POINT_BLOCK(hangBeforeWaitingForDecisionWriteConcern, fp) {
         LOG(0) << "Hit hangBeforeWaitingForDecisionWriteConcern failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
-                                                        hangBeforeWaitingForDecisionWriteConcern);
+        const BSONObj& data = fp.getData();
+        if (!data["useUninterruptibleSleep"].eoo()) {
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeWaitingForDecisionWriteConcern);
+        } else {
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+                opCtx, hangBeforeWaitingForDecisionWriteConcern);
+        }
     }
 
     WriteConcernResult unusedWCResult;
@@ -505,6 +516,16 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
     }
 
     LOG(3) << "Deleted coordinator doc for " << lsid.getId() << ':' << txnNumber;
+
+    MONGO_FAIL_POINT_BLOCK(hangAfterDeletingCoordinatorDoc, fp) {
+        LOG(0) << "Hit hangAfterDeletingCoordinatorDoc failpoint";
+        const BSONObj& data = fp.getData();
+        if (!data["useUninterruptibleSleep"].eoo()) {
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterDeletingCoordinatorDoc);
+        } else {
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangAfterDeletingCoordinatorDoc);
+        }
+    }
 }
 }  // namespace
 
