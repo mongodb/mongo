@@ -235,14 +235,16 @@ intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
 }
 
 size_t DocumentStorage::getMetadataApproximateSize() const {
+    // We count only the "deep" portion of the metadata values. The rest is counted in the size of
+    // the DocumentStorage class.
     size_t size = 0;
-    size += sizeof(_textScore);
-    size += sizeof(_randVal);
     size += _sortKey.objsize();
-    size += sizeof(_geoNearDistance);
     size += _geoNearPoint.getApproximateSize();
-    size += sizeof(_searchScore);
+    // Size of Value is double counted - once in sizeof(DocumentStorage) and once in
+    // getApproximateSize()
+    size -= sizeof(_geoNearPoint);
     size += _searchHighlights.getApproximateSize();
+    size -= sizeof(_searchHighlights);
     return size;
 }
 
