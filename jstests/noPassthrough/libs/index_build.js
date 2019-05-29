@@ -13,16 +13,29 @@ class IndexBuildTest {
     }
 
     /**
-     *  Returns the op id for the running index build, or -1 if there is no current index build.
+     * Returns the op id for the running index build on the provided 'collectionName' and
+     * 'indexName', or any index build if either is undefined. Returns -1 if there is no current
+     * index build.
      */
-    static getIndexBuildOpId(database) {
+    static getIndexBuildOpId(database, collectionName, indexName) {
         const result = database.currentOp();
         assert.commandWorked(result);
         let indexBuildOpId = -1;
 
         result.inprog.forEach(function(op) {
-            if (op.op == 'command' && 'createIndexes' in op.command) {
-                indexBuildOpId = op.opid;
+            if (op.op != 'command') {
+                return;
+            }
+            if (op.command.createIndexes === undefined) {
+                return;
+            }
+            // If no collection is provided, return any index build.
+            if (!collectionName || op.command.createIndexes === collectionName) {
+                op.command.indexes.forEach((index) => {
+                    if (!indexName || index.name === indexName) {
+                        indexBuildOpId = op.opid;
+                    }
+                });
             }
         });
         return indexBuildOpId;
@@ -31,10 +44,11 @@ class IndexBuildTest {
     /**
      * Wait for index build to start and return its op id.
      */
-    static waitForIndexBuildToStart(database) {
+    static waitForIndexBuildToStart(database, collectionName, indexName) {
         let opId;
         assert.soon(function() {
-            return (opId = IndexBuildTest.getIndexBuildOpId(database)) !== -1;
+            return (opId = IndexBuildTest.getIndexBuildOpId(
+                        database, collectionName, indexName)) !== -1;
         }, "Index build operation not found after starting via parallelShell");
         return opId;
     }
@@ -42,16 +56,18 @@ class IndexBuildTest {
     /**
      * Wait for all index builds to stop and return its op id.
      */
-    static waitForIndexBuildToStop(database) {
+    static waitForIndexBuildToStop(database, collectionName, indexName) {
         assert.soon(function() {
-            return IndexBuildTest.getIndexBuildOpId(database) === -1;
+            return IndexBuildTest.getIndexBuildOpId(database, collectionName, indexName) === -1;
         }, "Index build operations still running after unblocking or killOp");
     }
 
     /**
      * Checks the db.currentOp() output for the index build with opId.
+     *
+     * An optional 'onOperationFn' callback accepts an operation to perform any additional checks.
      */
-    static assertIndexBuildCurrentOpContents(database, opId) {
+    static assertIndexBuildCurrentOpContents(database, opId, onOperationFn) {
         const inprog = database.currentOp({opid: opId}).inprog;
         assert.eq(1,
                   inprog.length,
@@ -59,6 +75,9 @@ class IndexBuildTest {
                       tojson(database.currentOp()));
         const op = inprog[0];
         assert.eq(opId, op.opid, 'db.currentOp() returned wrong index build info: ' + tojson(op));
+        if (onOperationFn) {
+            onOperationFn(op);
+        }
     }
 
     /**

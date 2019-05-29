@@ -364,6 +364,10 @@ bool runCreateIndexes(OperationContext* opCtx,
     boost::optional<Lock::CollectionLock> exclusiveCollectionLock(
         boost::in_place_init, opCtx, ns, MODE_X);
 
+    // Index builds can safely ignore prepare conflicts. On primaries, an exclusive lock in the
+    // final drain phase conflicts with prepared transactions.
+    opCtx->recoveryUnit()->setIgnorePrepared(true);
+
     // Allow the strong lock acquisition above to be interrupted, but from this point forward do
     // not allow locks or re-locks to be interrupted.
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());

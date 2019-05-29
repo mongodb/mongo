@@ -848,10 +848,15 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
                                          Lock::DBLock* dbLock) {
     invariant(opCtx->lockState()->isDbLockedForMode(replState->dbName, MODE_X));
 
+
+    // Index builds can safely ignore prepare conflicts. On secondaries, prepare operations wait for
+    // index builds to complete.
+    opCtx->recoveryUnit()->abandonSnapshot();
+    opCtx->recoveryUnit()->setIgnorePrepared(true);
+
     // If we're a background index, replace exclusive db lock with an intent lock, so that
     // other readers and writers can proceed during this phase.
     if (_indexBuildsManager.isBackgroundBuilding(replState->buildUUID)) {
-        opCtx->recoveryUnit()->abandonSnapshot();
         dbLock->relockWithMode(MODE_IX);
     }
 
