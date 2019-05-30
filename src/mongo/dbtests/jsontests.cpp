@@ -2028,6 +2028,12 @@ class RegexInvalidOption5 : public Bad {
     }
 };
 
+class RegexInvalidOption6 : public Bad {
+    std::string json() const override {
+        return R"({ "a" : { "$regex" : "test", "$options" : "ii" } })";
+    }
+};
+
 class RegexEmptyOption : public Base {
     virtual BSONObj bson() const {
         BSONObjBuilder b;
@@ -2036,6 +2042,30 @@ class RegexEmptyOption : public Base {
     }
     virtual string json() const {
         return "{ \"a\" : { \"$regex\" : \"b\", \"$options\" : \"\" } }";
+    }
+};
+
+class RegexValidOption {
+public:
+    void run() {
+        BSONObjBuilder b;
+        b.appendRegex("a", "sometext", "ms");
+        BSONObj built = b.done();
+        ASSERT_EQUALS(R"({ "a" : { "$regex" : "sometext", "$options" : "ms" } })",
+                      built.jsonString(Strict));
+        ASSERT_EQUALS(R"({ "a" : /sometext/ms })", built.jsonString(TenGen));
+    }
+};
+
+class RegexMultiOption : public Base {
+
+    BSONObj bson() const override {
+        BSONObjBuilder b;
+        b.appendRegex("a", "b", "ms");
+        return b.obj();
+    }
+    std::string json() const override {
+        return R"({ "a" : { "$regex" : "b", "$options" : "ms" } })";
     }
 };
 
@@ -2897,7 +2927,10 @@ public:
         add<FromJsonTests::RegexInvalidOption3>();
         add<FromJsonTests::RegexInvalidOption4>();
         add<FromJsonTests::RegexInvalidOption5>();
+        add<FromJsonTests::RegexInvalidOption6>();
         add<FromJsonTests::RegexEmptyOption>();
+        add<FromJsonTests::RegexValidOption>();
+        add<FromJsonTests::RegexMultiOption>();
         add<FromJsonTests::RegexEmpty>();
         add<FromJsonTests::RegexEmpty1>();
         add<FromJsonTests::RegexOverlap>();

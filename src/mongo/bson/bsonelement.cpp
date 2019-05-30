@@ -280,6 +280,7 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
                         case 'g':
                         case 'i':
                         case 'm':
+                        case 's':
                             s << *f;
                         default:
                             break;

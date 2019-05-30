@@ -993,10 +993,13 @@ Status JParse::regexOpt(std::string* result) {
 Status JParse::regexOptCheck(StringData opt) {
     MONGO_JSON_DEBUG("opt: " << opt);
     std::size_t i;
+    std::string availableOptions = JOPTIONS;
     for (i = 0; i < opt.size(); i++) {
-        if (!match(opt[i], JOPTIONS)) {
+        std::size_t availIndex = availableOptions.find(opt[i]);
+        if (availIndex == std::string::npos) {
             return parseError(string("Bad regex option: ") + opt[i]);
         }
+        availableOptions.erase(availIndex, 1);
     }
     return Status::OK();
 }
