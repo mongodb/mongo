@@ -3438,7 +3438,7 @@ tasks:
             $python ../buildscripts/make_archive.py -o mongodb-cryptd.${ext|tgz} $(find mongodb-* -type f)
 
             # Validate that this build_variant is listed as a known enterprise task for mongocryptd
-            $python ../buildscripts/validate_mongocryptd.py --variant "${build_variant}" ../etc/evergreen.yml
+            PATH=$PATH:$HOME $python ../buildscripts/validate_mongocryptd.py --variant "${build_variant}" ../etc/evergreen.yml
           fi
           cd ..
 

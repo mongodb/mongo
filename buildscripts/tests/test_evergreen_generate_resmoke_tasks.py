@@ -21,7 +21,7 @@ _DATE = datetime.datetime(2018, 7, 15)
 NS = "buildscripts.evergreen_generate_resmoke_tasks"
 
 
-def ns(relative_name):  # pylint: disable-invalid-name
+def ns(relative_name):  # pylint: disable=invalid-name
     """Return a full name from a name relative to the test module"s name space."""
     return NS + "." + relative_name
 
