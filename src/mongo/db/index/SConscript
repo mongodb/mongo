@@ -93,6 +93,16 @@ env.CppUnitTest(
         ],
 )
 
+env.Library(
+    target='index_access_method_factory',
+        source=[
+            'index_access_method_factory.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+        ],
+)
+
 serveronlyEnv = env.Clone()
 serveronlyEnv.InjectThirdParty(libraries=['snappy'])
 serveronlyEnv.Library(
@@ -127,6 +137,7 @@ env.Library(
         "fts_access_method.cpp",
         "hash_access_method.cpp",
         "haystack_access_method.cpp",
+        "index_access_method_factory_impl.cpp",
         "s2_access_method.cpp",
         "wildcard_access_method.cpp",
     ],
