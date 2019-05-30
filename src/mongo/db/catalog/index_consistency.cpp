@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <algorithm>
 #include <third_party/murmurhash3/MurmurHash3.h>
 
 #include "mongo/platform/basic.h"
@@ -50,14 +51,15 @@ namespace mongo {
 
 namespace {
 
-// The number of items we can scan before we must yield.
-static const int kScanLimit = 1000;
-
 // TODO SERVER-36385: Completely remove the key size check in 4.4
 bool largeKeyDisallowed() {
     return (serverGlobalParams.featureCompatibility.getVersion() ==
             ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40);
 }
+
+// The number of items we can scan before we must yield.
+static const int kScanLimit = 1000;
+static const size_t kNumHashBuckets = 1U << 22;
 
 }  // namespace
 
@@ -74,6 +76,8 @@ IndexConsistency::IndexConsistency(OperationContext* opCtx,
                internalQueryExecYieldIterations.load(),
                Milliseconds(internalQueryExecYieldPeriodMS.load())),
       _firstPhase(true) {
+    _indexKeyCount.resize(kNumHashBuckets);
+
     IndexCatalog* indexCatalog = _collection->getIndexCatalog();
     std::unique_ptr<IndexCatalog::IndexIterator> indexIterator =
         indexCatalog->getIndexIterator(_opCtx, false);
@@ -149,13 +153,8 @@ int64_t IndexConsistency::getNumRecords(int indexNumber) const {
 }
 
 bool IndexConsistency::haveEntryMismatch() const {
-    for (auto iterator = _indexKeyCount.begin(); iterator != _indexKeyCount.end(); iterator++) {
-        if (iterator->second != 0) {
-            return true;
-        }
-    }
-
-    return false;
+    return std::any_of(
+        _indexKeyCount.begin(), _indexKeyCount.end(), [](int count) -> bool { return count; });
 }
 
 int64_t IndexConsistency::getNumExtraIndexKeys(int indexNumber) const {
@@ -291,15 +290,8 @@ void IndexConsistency::addDocKey(const KeyString& ks,
         // keys encountered.
         _indexKeyCount[hash]++;
         _indexesInfo.at(indexNumber).numRecords++;
-    } else {
-        // For the second phase of validation, we keep track of the document keys that mapped to
-        // an inconsistent hash bucket during the first phase.
-        auto searchBuckets = _indexKeyCount.find(hash);
-        invariant(searchBuckets != _indexKeyCount.end());
-        if (searchBuckets->second == 0) {
-            // No inconsistencies in this hash bucket during the first phase.
-            return;
-        }
+    } else if (_indexKeyCount[hash]) {
+        // Found a document key for a hash bucket that had mismatches.
 
         // Get the documents _id index key.
         auto cursor = _recordStore->getCursor(_opCtx);
@@ -337,19 +329,11 @@ void IndexConsistency::addIndexKey(const KeyString& ks,
         // keys encountered.
         _indexKeyCount[hash]--;
         _indexesInfo.at(indexNumber).numKeys++;
-    } else {
-        // For the second phase of validation, on the buckets that were inconsistent during the
-        // first phase, we see if there was a corresponding document key for the index entry key
-        // we have.
+    } else if (_indexKeyCount[hash]) {
+        // Found an index key for a bucket that has inconsistencies.
         // If there is a corresponding document key for the index entry key, we remove the key from
         // the '_missingIndexEntries' map. However if there was no document key for the index entry
         // key, we add the key to the '_extraIndexEntries' map.
-        auto searchBuckets = _indexKeyCount.find(hash);
-        invariant(searchBuckets != _indexKeyCount.end());
-        if (searchBuckets->second == 0) {
-            // No inconsistencies in this hash bucket during the first phase.
-            return;
-        }
 
         std::string key = std::string(ks.getBuffer(), ks.getSize());
         BSONObj info = _generateInfo(indexNumber, recordId, indexKey, boost::none);
@@ -408,6 +392,6 @@ uint32_t IndexConsistency::_hashKeyString(const KeyString& ks, int indexNumber) 
     MurmurHash3_x86_32(
         ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize(), indexNameHash, &indexNameHash);
     MurmurHash3_x86_32(ks.getBuffer(), ks.getSize(), indexNameHash, &indexNameHash);
-    return indexNameHash % (1U << 22);
+    return indexNameHash % kNumHashBuckets;
 }
 }  // namespace mongo
