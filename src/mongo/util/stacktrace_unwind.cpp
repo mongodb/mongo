@@ -27,6 +27,10 @@
  *    it in the license file.
  */
 
+/**
+ * Stacktraces using libunwind for non-Windows OSes.
+ */
+
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
 #include "mongo/platform/basic.h"
@@ -35,7 +39,11 @@
 
 #include <cstdlib>
 #include <dlfcn.h>
+#include <fmt/format.h>
+#include <fmt/printf.h>
 #include <iostream>
+#include <libunwind.h>
+#include <limits.h>
 #include <string>
 #include <sys/utsname.h>
 
@@ -47,21 +55,22 @@
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
-#if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
-#include <execinfo.h>
-#elif defined(__sun)
-#include <ucontext.h>
-#endif
-
 namespace mongo {
 
 namespace {
+
+using namespace fmt::literals;
+
 /// Maximum number of stack frames to appear in a backtrace.
-const int maxBackTraceFrames = 100;
+constexpr int maxBackTraceFrames = 100;
+
+/// Maximum size of a function name and signature. This is an arbitrary limit we impose to avoid
+/// having to malloc while backtracing.
+constexpr int maxSymbolLen = 512;
 
 /// Optional string containing extra unwinding information.  Should take the form of a
 /// JSON document.
-std::string* soMapJson = nullptr;
+std::string* soMapJson = NULL;
 
 /**
  * Returns the "basename" of a path.  The returned StringData is valid until the data referenced
@@ -76,69 +85,110 @@ StringData getBaseName(StringData path) {
     return path.substr(lastSlash + 1);
 }
 
-// All platforms we build on have execinfo.h and we use backtrace() directly, with one exception
-#if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
-using ::backtrace;
-
-// On Solaris 10, there is no execinfo.h, so we need to emulate it.
-// Solaris 11 has execinfo.h, and this code doesn't get used.
-#elif defined(__sun)
-class WalkcontextCallback {
-public:
-    WalkcontextCallback(uintptr_t* array, int size)
-        : _position(0), _count(size), _addresses(array) {}
-
-    // This callback function is called from C code, and so must not throw exceptions
-    //
-    static int callbackFunction(uintptr_t address,
-                                int signalNumber,
-                                WalkcontextCallback* thisContext) {
-        if (thisContext->_position < thisContext->_count) {
-            thisContext->_addresses[thisContext->_position++] = address;
-            return 0;
-        }
-        return 1;
-    }
-    int getCount() const {
-        return static_cast<int>(_position);
+struct frame {
+    frame() {
+        symbol[0] = '\0';
+        filename[0] = '\0';
     }
 
-private:
-    size_t _position;
-    size_t _count;
-    uintptr_t* _addresses;
+    void* address = nullptr;
+    // Some getFrames() implementations can fill this in, some can't.
+    constexpr static ssize_t kOffsetUnknown = -1;
+    ssize_t offset = kOffsetUnknown;
+    char symbol[maxSymbolLen];
+
+    // Filled in by completeFrame().
+    void* baseAddress = nullptr;
+    char filename[PATH_MAX];
 };
 
-typedef int (*WalkcontextCallbackFunc)(uintptr_t address, int signalNumber, void* thisContext);
-
-int backtrace(void** array, int size) {
-    WalkcontextCallback walkcontextCallback(reinterpret_cast<uintptr_t*>(array), size);
-    ucontext_t context;
-    if (getcontext(&context) != 0) {
-        return 0;
-    }
-    int wcReturn = walkcontext(
-        &context,
-        reinterpret_cast<WalkcontextCallbackFunc>(WalkcontextCallback::callbackFunction),
-        static_cast<void*>(&walkcontextCallback));
-    if (wcReturn == 0) {
-        return walkcontextCallback.getCount();
-    }
-    return 0;
-}
-#else
-// On unsupported platforms, we print an error instead of printing a stacktrace.
-#define MONGO_NO_BACKTRACE
-#endif
-
-}  // namespace
-
-#if defined(MONGO_NO_BACKTRACE)
-void printStackTrace(std::ostream& os) {
-    os << "This platform does not support printing stacktraces" << std::endl;
+void strncpyTerm(char* dst, const char* src, size_t len) {
+    strncpy(dst, src, len);
+    // In case src is longer than dst, ensure dst is terminated.
+    dst[len - 1] = '\0';
 }
 
-#else
+void completeFrame(frame* pFrame, std::ostream& logStream) {
+    Dl_info dlinfo{};
+    if (dladdr(pFrame->address, &dlinfo)) {
+        pFrame->baseAddress = dlinfo.dli_fbase;
+        if (pFrame->offset == frame::kOffsetUnknown) {
+            pFrame->offset =
+                static_cast<char*>(pFrame->address) - static_cast<char*>(dlinfo.dli_saddr);
+        }
+        if (dlinfo.dli_fname) {
+            strncpyTerm(pFrame->filename, dlinfo.dli_fname, sizeof(pFrame->filename));
+        }
+
+        // Don't overwrite pFrame->symbol if getFrames() has already figured out the symbol name.
+        if (dlinfo.dli_sname && !*pFrame->symbol) {
+            strncpyTerm(pFrame->symbol, dlinfo.dli_sname, sizeof(pFrame->symbol));
+        }
+    } else {
+        logStream << "error: unable to obtain symbol information for function "
+                  << "{:p}\n"_format(pFrame->address) << std::endl;
+    }
+
+    // Don't log errors, they're expected for C functions in the stack, like "main".
+    int status;
+    if (char* demangled_name = abi::__cxa_demangle(pFrame->symbol, nullptr, nullptr, &status)) {
+        strncpyTerm(pFrame->symbol, demangled_name, sizeof(pFrame->symbol));
+        free(demangled_name);
+    }
+}
+
+#define MONGO_UNWIND_CHECK(FUNC, ...)                                                 \
+    do {                                                                              \
+        unw_status = FUNC(__VA_ARGS__);                                               \
+        if (unw_status < 0) {                                                         \
+            logStream << "error from {}: {}"_format(#FUNC, unw_strerror(unw_status)); \
+            return 0;                                                                 \
+        }                                                                             \
+    } while (0)
+
+size_t getFrames(frame* frames, bool fromSignal, std::ostream& logStream) {
+    size_t nFrames = 0;
+    frame* pFrame = frames;
+    unw_cursor_t cursor;
+    unw_context_t context;
+    int unw_status;
+
+    // Initialize cursor to current frame for local unwinding.
+    MONGO_UNWIND_CHECK(unw_getcontext, &context);
+    MONGO_UNWIND_CHECK(unw_init_local2, &cursor, &context, fromSignal ? UNW_INIT_SIGNAL_FRAME : 0);
+
+    // Inspect this frame, then step to calling frame, and repeat.
+    while (nFrames < maxBackTraceFrames) {
+        unw_word_t pc;
+        MONGO_UNWIND_CHECK(unw_get_reg, &cursor, UNW_REG_IP, &pc);
+        if (pc == 0) {
+            break;
+        }
+
+        pFrame->address = reinterpret_cast<void*>(pc);
+        unw_word_t offset;
+        if ((unw_status = unw_get_proc_name(
+                 &cursor, pFrame->symbol, sizeof(pFrame->symbol), &offset)) != 0) {
+            logStream << "error: unable to obtain symbol name for function "
+                      << "{:p}: {}\n"_format(pFrame->address, unw_strerror(unw_status))
+                      << std::endl;
+        } else {
+            pFrame->offset = static_cast<size_t>(offset);
+        }
+
+        nFrames++;
+        pFrame++;
+
+        MONGO_UNWIND_CHECK(unw_step, &cursor);
+        if (unw_status == 0) {
+            // Finished.
+            break;
+        }
+    }
+
+    return nFrames;
+}
+
 /**
  * Prints a stack backtrace for the current thread to the specified ostream.
  *
@@ -160,39 +210,37 @@ void printStackTrace(std::ostream& os) {
  * analysis tool.  For example, on Linux it contains a subobject named "somap", describing
  * the objects referenced in the "b" fields of the "backtrace" list.
  *
+ * Notes for future refinements: we have a goal of making this malloc-free so it's signal-safe. This
+ * huge stack-allocated structure reduces the need for malloc, at the risk of a stack overflow while
+ * trying to print a stack trace, which would make life very hard for us when we're debugging
+ * crashes for customers. It would also be bad to crash from stack overflow when printing backtraces
+ * on demand (SERVER-33445).
+ *
+ * A better idea is to get rid of the "frame" struct idea. Instead, iterate stack frames with
+ * unw_step while printing the JSON stack, then reset the cursor and iterate with unw_step again
+ * while printing the human-readable stack. Then there's no need for a large amount of storage.
+ *
  * @param os    ostream& to receive printed stack backtrace
  */
-void printStackTrace(std::ostream& os) {
-    static const char unknownFileName[] = "???";
-    void* addresses[maxBackTraceFrames];
-    Dl_info dlinfoForFrames[maxBackTraceFrames];
+void printStackTraceInternal(std::ostream& os, bool fromSignal) {
+    frame frames[maxBackTraceFrames];
 
     ////////////////////////////////////////////////////////////
-    // Get the backtrace addresses.
+    // Get the backtrace.
     ////////////////////////////////////////////////////////////
-
-    const int addressCount = backtrace(addresses, maxBackTraceFrames);
-    if (addressCount == 0) {
-        const int err = errno;
-        os << "Unable to collect backtrace addresses (errno: " << err << ' ' << strerror(err) << ')'
-           << std::endl;
+    size_t nFrames = getFrames(frames, fromSignal, os);
+    if (!nFrames) {
+        // getFrames logged an error to "os".
         return;
     }
 
-    ////////////////////////////////////////////////////////////
-    // Collect symbol information for each backtrace address.
-    ////////////////////////////////////////////////////////////
+    for (size_t i = 0; i < nFrames; i++) {
+        completeFrame(&frames[i], os);
+    }
 
     os << std::hex << std::uppercase;
-    for (int i = 0; i < addressCount; ++i) {
-        Dl_info& dlinfo(dlinfoForFrames[i]);
-        if (!dladdr(addresses[i], &dlinfo)) {
-            dlinfo.dli_fname = unknownFileName;
-            dlinfo.dli_fbase = nullptr;
-            dlinfo.dli_sname = nullptr;
-            dlinfo.dli_saddr = nullptr;
-        }
-        os << ' ' << addresses[i];
+    for (size_t i = 0; i < nFrames; ++i) {
+        os << ' ' << frames[i].address;
     }
 
     os << "\n----- BEGIN BACKTRACE -----\n";
@@ -202,14 +250,15 @@ void printStackTrace(std::ostream& os) {
     ////////////////////////////////////////////////////////////
 
     os << "{\"backtrace\":[";
-    for (int i = 0; i < addressCount; ++i) {
-        const Dl_info& dlinfo = dlinfoForFrames[i];
-        const uintptr_t fileOffset = uintptr_t(addresses[i]) - uintptr_t(dlinfo.dli_fbase);
+    for (size_t i = 0; i < nFrames; ++i) {
         if (i)
             os << ',';
-        os << "{\"b\":\"" << uintptr_t(dlinfo.dli_fbase) << "\",\"o\":\"" << fileOffset;
-        if (dlinfo.dli_sname) {
-            os << "\",\"s\":\"" << dlinfo.dli_sname;
+        frame* pFrame = &frames[i];
+        const uintptr_t fileOffset =
+            static_cast<char*>(pFrame->address) - static_cast<char*>(pFrame->baseAddress);
+        os << "{\"b\":\"" << pFrame->baseAddress << "\",\"o\":\"" << fileOffset;
+        if (*pFrame->symbol) {
+            os << "\",\"s\":\"" << pFrame->symbol;
         }
         os << "\"}";
     }
@@ -222,36 +271,40 @@ void printStackTrace(std::ostream& os) {
     ////////////////////////////////////////////////////////////
     // Display the human-readable trace
     ////////////////////////////////////////////////////////////
-    for (int i = 0; i < addressCount; ++i) {
-        Dl_info& dlinfo(dlinfoForFrames[i]);
-        os << ' ';
-        if (dlinfo.dli_fbase) {
-            os << getBaseName(dlinfo.dli_fname) << '(';
-            if (dlinfo.dli_sname) {
-                const uintptr_t offset = uintptr_t(addresses[i]) - uintptr_t(dlinfo.dli_saddr);
-                os << dlinfo.dli_sname << "+0x" << offset;
-            } else {
-                const uintptr_t offset = uintptr_t(addresses[i]) - uintptr_t(dlinfo.dli_fbase);
-                os << "+0x" << offset;
+
+    for (size_t i = 0; i < nFrames; ++i) {
+        frame* pFrame = &frames[i];
+        os << ' ' << getBaseName(pFrame->filename);
+        if (pFrame->baseAddress) {
+            os << '(';
+            if (*pFrame->symbol) {
+                os << pFrame->symbol;
             }
+
+            if (pFrame->offset != frame::kOffsetUnknown) {
+                os << "+0x" << pFrame->offset;
+            }
+
             os << ')';
-        } else {
-            os << unknownFileName;
         }
-        os << " [" << addresses[i] << ']' << std::endl;
+        os << " [0x" << reinterpret_cast<uintptr_t>(pFrame->address) << ']' << std::endl;
     }
 
     os << std::dec << std::nouppercase;
     os << "-----  END BACKTRACE  -----" << std::endl;
 }
 
-#endif
+}  // namespace
 
-void printStackTraceFromSignal(std::ostream& os) {
-    printStackTrace(os);
+void printStackTrace(std::ostream& os) {
+    printStackTraceInternal(os, false /* fromSignal */);
 }
 
-// From here down, a copy of stacktrace_unwind.cpp.
+void printStackTraceFromSignal(std::ostream& os) {
+    printStackTraceInternal(os, true /* fromSignal */);
+}
+
+// From here down, a copy of stacktrace_posix.cpp.
 namespace {
 
 void addOSComponentsToSoMap(BSONObjBuilder* soMap);
@@ -507,7 +560,7 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
         } else {
             continue;
         }
-        soInfo << "machType" << static_cast<int32_t>(header->filetype);
+        soInfo << "machType" << header->filetype;
         soInfo << "b" << integerToHex(reinterpret_cast<intptr_t>(header));
         const char* const loadCommandsBegin = reinterpret_cast<const char*>(header) + headerSize;
         const char* const loadCommandsEnd = loadCommandsBegin + header->sizeofcmds;

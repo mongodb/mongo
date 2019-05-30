@@ -340,7 +340,7 @@ for pack in [
     ('sqlite',),
     ('stemmer',),
     ('tcmalloc',),
-    ('unwind',),
+    ('libunwind',),
     ('valgrind',),
     ('wiredtiger',),
     ('yaml',),
@@ -513,6 +513,15 @@ add_option('msvc-debugging-format',
     choices=["codeview", "pdb"],
     default="codeview",
     help='Debugging format in debug builds using msvc. Codeview (/Z7) or Program database (/Zi). Default is codeview.',
+    type='choice',
+)
+
+add_option('use-libunwind',
+    choices=["on", "off"],
+    const="on",
+    default="off",
+    help="Enable libunwind for backtraces (experimental)",
+    nargs="?",
     type='choice',
 )
 
@@ -952,6 +961,17 @@ usemozjs = (jsEngine.startswith('mozjs'))
 
 if not serverJs and not usemozjs:
     print("Warning: --server-js=off is not needed with --js-engine=none")
+
+use_libunwind = get_option("use-libunwind") == "on"
+if use_libunwind:
+    use_system_libunwind = use_system_version_of_library("libunwind")
+    use_vendored_libunwind = not use_system_libunwind
+else:
+    if use_system_version_of_library("libunwind"):
+        print("Error: --use-system-libunwind requires --use-libunwind")
+        Exit(1)
+
+    use_system_libunwind = use_vendored_libunwind = False
 
 # We defer building the env until we have determined whether we want certain values. Some values
 # in the env actually have semantics for 'None' that differ from being absent, so it is better
@@ -3240,7 +3260,7 @@ def doConfigure(myenv):
     if use_system_version_of_library("fmt"):
         conf.FindSysLibDep("fmt", ["fmt"])
 
-    if use_system_version_of_library("unwind"):
+    if use_system_version_of_library("libunwind"):
         conf.FindSysLibDep("unwind", ["unwind"])
 
     if use_system_version_of_library("intel_decimal128"):
@@ -3826,20 +3846,26 @@ module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
 # Currently, however, the SConscript files do need some predicates for
 # conditional decision making that hasn't been moved up to this SConstruct file,
 # and they are exported here, as well.
-Export("get_option")
-Export("has_option")
-Export("use_system_version_of_library")
-Export("serverJs")
-Export("usemozjs")
-Export('module_sconscripts')
-Export("debugBuild optBuild")
-Export("wiredtiger")
-Export("mmapv1")
-Export("mobile_se")
-Export("endian")
-Export("ssl_provider")
-Export("free_monitoring")
-Export("http_client")
+Export([
+    'debugBuild',
+    'endian',
+    'free_monitoring',
+    'get_option',
+    'has_option',
+    'http_client',
+    'mmapv1',
+    'mobile_se',
+    'module_sconscripts',
+    'optBuild',
+    'serverJs',
+    'ssl_provider',
+    'use_libunwind',
+    'use_system_libunwind',
+    'use_system_version_of_library',
+    'use_vendored_libunwind',
+    'usemozjs',
+    'wiredtiger',
+])
 
 def injectMongoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])

@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 Import("env")
+Import("use_libunwind")
 
 env = env.Clone()
 
@@ -106,8 +107,7 @@ env.CppUnitTest(
     ],
 )
 
-# To be enabled by a '--enable-libunwind' option coming soon.
-if False:
+if use_libunwind:
     unwindTestEnv = env.Clone()
     unwindTestEnv.InjectThirdParty(libraries=['unwind'])
     unwindTestEnv.CppUnitTest(
@@ -115,9 +115,10 @@ if False:
             'unwind_test',
         ],
         source=[
+            'backtrace_visibility_test.cpp',
             'unwind_test.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/third_party/shim_unwind',
-        ]
+        ],
     )

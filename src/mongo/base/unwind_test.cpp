@@ -32,6 +32,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cxxabi.h>
+#include <functional>
 #include <sstream>
 
 #include <fmt/format.h>
@@ -39,9 +40,10 @@
 
 #include <libunwind.h>
 
-#include "mongo/stdx/functional.h"
+#include "mongo/base/backtrace_visibility_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/if_constexpr.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -89,7 +91,7 @@ std::string trace() {
 }
 
 struct Context {
-    std::vector<stdx::function<void(Context&)>> plan;
+    std::vector<std::function<void(Context&)>> plan;
     std::string s;
 };
 
@@ -102,12 +104,50 @@ void callNext(Context& ctx) {
     else {
         ctx.plan[N - 1](ctx);
     }
+
     // Forces compiler to invoke next plan with `call` instead of `jmp`.
     asm volatile("");  // NOLINT
 }
 
+void assertAndRemovePrefix(std::string_view& v, const std::string_view prefix) {
+    auto pos = v.find(prefix);
+    ASSERT(pos != v.npos) << "expected to find '{}' in '{}'"_format(prefix, v);
+    v.remove_prefix(pos);
+    v.remove_prefix(prefix.length());
+}
+
+void assertAndRemoveSuffix(std::string_view& v, const std::string_view suffix) {
+    auto pos = v.rfind(suffix);
+    ASSERT(pos != v.npos) << "expected to find '{}' in '{}'"_format(suffix, v);
+    v.remove_suffix(v.length() - pos);
+}
+
+template <size_t size>
+void assertTraceContains(const std::string (&names)[size], const std::string stacktrace) {
+    std::string_view view{stacktrace};
+    assertAndRemovePrefix(view, "----- BEGIN BACKTRACE -----");
+    assertAndRemovePrefix(view, "{\"backtrace\":");
+    // Remove the rest of the JSON object, which is all one line.
+    assertAndRemovePrefix(view, "\n");
+    assertAndRemoveSuffix(view, "-----  END BACKTRACE  -----");
+    std::string_view remainder{stacktrace};
+    for (const auto& name : names) {
+        auto pos = remainder.find(name);
+
+        if (pos == remainder.npos) {
+            unittest::log().setIsTruncatable(false) << std::endl
+                                                    << "--- BEGIN SAMPLE BACKTRACE ---" << std::endl
+                                                    << std::string(stacktrace)
+                                                    << "--- END SAMPLE BACKTRACE ---";
+            FAIL("name '{}' is missing or out of order in sample backtrace"_format(
+                std::string(name)));
+        }
+        remainder.remove_prefix(pos);
+    }
+}
+
 TEST(Unwind, Demangled) {
-    // Trickery with std::vector<stdx::function> is to hide from the optimizer.
+    // Trickery with std::vector<std::function> is to hide from the optimizer.
     Context ctx{{
         callNext<0>, callNext<1>, callNext<2>, callNext<3>, callNext<4>, callNext<5>,
     }};
@@ -128,6 +168,23 @@ TEST(Unwind, Demangled) {
         pos = ctx.s.find(expected, pos);
         ASSERT_NE(pos, ctx.s.npos) << ctx.s;
     }
+}
+
+TEST(Unwind, Linkage) {
+    std::string stacktrace;
+
+    // From backtrace_visibility_test.h. Calls a chain of functions and stores the backtrace at the
+    // bottom in the "stacktrace" argument.
+    normal_function(stacktrace);
+
+    // Check that these function names appear in the trace, in order. The tracing code which
+    // preceded our libunwind integration could *not* symbolize hidden/static_function.
+    const std::string frames[] = {"printStackTrace",
+                                  "static_function",
+                                  "anonymous_namespace_function",
+                                  "hidden_function",
+                                  "normal_function"};
+    assertTraceContains(frames, stacktrace);
 }
 
 }  // namespace unwind_test_detail

@@ -117,7 +117,7 @@ env.Append(
 # propagates to consumers that Inject (depend on) unwind.
 env.RegisterConsumerModifications(
     CPPPATH=[unwind_platform.Dir("install/include")],
-    CPPDEFINES=['UNW_LOCAL_ONLY'],
+    CPPDEFINES=['UNW_LOCAL_ONLY', 'MONGO_USE_LIBUNWIND'],
     LIBS=['lzma'])
 
 env.Append(

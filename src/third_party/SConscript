@@ -4,8 +4,11 @@ import libdeps
 import json
 
 Import("env use_system_version_of_library usemozjs get_option")
-Import("wiredtiger")
 Import("mobile_se")
+Import("use_libunwind")
+Import("use_system_libunwind")
+Import("use_vendored_libunwind")
+Import("wiredtiger")
 
 boostSuffix = "-1.70.0"
 snappySuffix = '-1.1.7'
@@ -187,6 +190,18 @@ if not use_system_version_of_library('kms-message'):
         'CPPDEFINES' :['KMS_MSG_STATIC']
     }
 
+if use_system_libunwind:
+    thirdPartyEnvironmentModifications['unwind'] = {
+        'CPPDEFINES' : ['MONGO_USE_LIBUNWIND', 'UNW_LOCAL_ONLY'],
+        'SYSLIBDEPS' : [env['LIBDEPS_UNWIND_SYSLIBDEP'], 'lzma'],
+    }
+elif use_vendored_libunwind:
+    thirdPartyEnvironmentModifications['unwind'] = {
+        'CPPDEFINES' : ['MONGO_USE_LIBUNWIND', 'UNW_LOCAL_ONLY'],
+        'LIBDEPS' : ['$BUILD_DIR/third_party/shim_unwind'],
+        'SYSLIBDEPS' : ['lzma'],
+    }
+
 def injectThirdParty(thisEnv, libraries=[], parts=[]):
     libraries = thisEnv.Flatten([libraries])
     parts = thisEnv.Flatten([parts])
@@ -212,42 +227,36 @@ s2Env.InjectThirdParty(libraries=['s2', 'boost', 'abseil-cpp', 'fmt', 'safeint']
 s2Env.InjectMongoIncludePaths()
 s2Env.SConscript('s2/SConscript', exports={'env' : s2Env})
 
-unwindEnv = None
-if use_system_version_of_library("unwind"):
-    unwindEnv = env.Clone(
-        SYSLIBDEPS=[
-            env['LIBDEPS_UNWIND_SYSLIBDEP'],
+if use_libunwind:
+    if use_system_libunwind:
+        unwindEnv = env.Clone(
+            SYSLIBDEPS=[
+                env['LIBDEPS_UNWIND_SYSLIBDEP'],
+            ])
+    else:
+        unwindEnv = env.Clone()
+
+        # SCons uses the "$CC" tool for both C and assembler files. Distinguish them for the sake of
+        # later tools like our Ninja SCons module.
+        unwindEnv['ASPP'] = '$CC'
+        unwindEnv['ASPPCOM'] = unwindEnv['ASPPCOM'].replace('$CC ', '$ASPP ')
+
+        def registerConsumerModifications(env, **kwargs):
+            for k,v in kwargs.items():
+                thirdPartyEnvironmentModifications['unwind'][k] = v
+
+        unwindEnv.AddMethod(registerConsumerModifications, 'RegisterConsumerModifications')
+        unwindEnv.SConscript('unwind/SConscript', exports={'env' : unwindEnv})
+        unwindEnv.Append(
+            LIBDEPS_INTERFACE=[
+                'unwind/unwind',
+            ])
+
+    unwindEnv.Library(
+        target="shim_unwind",
+        source=[
+            'shim_unwind.cpp',
         ])
-else:
-    unwindEnv = env.Clone()
-    # SCons uses the "$CC" tool for both C and assembler files. Distinguish them for the sake of
-    # later tools like our Ninja SCons module.
-    unwindEnv['ASPP'] = '$CC'
-    unwindEnv['ASPPCOM'] = unwindEnv['ASPPCOM'].replace('$CC ', '$ASPP ')
-    unwindEnv.InjectThirdParty(libraries=['unwind'])
-    unwindEnv.InjectMongoIncludePaths()
-
-    def registerConsumerModifications(env, **kwargs):
-        for k,v in kwargs.items():
-            thirdPartyEnvironmentModifications['unwind'][k] = v
-
-    unwindEnv.AddMethod(registerConsumerModifications, 'RegisterConsumerModifications')
-    unwindEnv.SConscript('unwind/SConscript', exports={'env' : unwindEnv})
-
-    print("third_party/unwind modifications:",
-          ",".join(thirdPartyEnvironmentModifications['unwind'].keys()))
-
-    unwindEnv = unwindEnv.Clone(
-        LIBDEPS_INTERFACE=[
-            'unwind/unwind',
-        ])
-
-unwindEnv.Library(
-    target="shim_unwind",
-    source=[
-        'shim_unwind.cpp',
-    ])
-
 
 if use_system_version_of_library("fmt"):
     fmtEnv = env.Clone(

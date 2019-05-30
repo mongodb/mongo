@@ -235,8 +235,6 @@ static const int maxBackTraceFrames = 100;
 
 /**
  * Print a stack backtrace for the current thread to the specified ostream.
- *
- * @param os    ostream& to receive printed stack backtrace
  */
 void printStackTrace(std::ostream& os) {
     CONTEXT context;
@@ -246,6 +244,13 @@ void printStackTrace(std::ostream& os) {
     printWindowsStackTrace(context, os);
 }
 
+/**
+ * Print a stack backtrace for the current thread to the specified ostream, signal-safe variant.
+ * (Currently the same as printStackTrace.)
+ */
+void printStackTraceFromSignal(std::ostream& os) {
+    printStackTrace(os);
+}
 
 /**
  * Print stack trace (using a specified stack context) to "os"

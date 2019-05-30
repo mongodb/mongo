@@ -47,6 +47,9 @@ namespace mongo {
 void printStackTrace(std::ostream& os);
 void printStackTrace();
 
+// Signal-safe variant.
+void printStackTraceFromSignal(std::ostream& os);
+
 #if defined(_WIN32)
 // Print stack trace (using a specified stack context) to "os", default to the log stream.
 void printWindowsStackTrace(CONTEXT& context, std::ostream& os);

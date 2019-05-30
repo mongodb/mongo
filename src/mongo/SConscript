@@ -13,6 +13,7 @@ Import("has_option")
 Import("get_option")
 Import("usemozjs")
 Import("use_system_version_of_library")
+Import("use_libunwind")
 Import("wiredtiger")
 
 env = env.Clone()
@@ -50,10 +51,18 @@ env.SConscript(
     ],
 )
 
-# NOTE: This library does not really belong here. Its presence here is
-# temporary. Do not add to this library, do not remove from it, and do
-# not declare other libraries in this file.
-env.Library(
+# NOTE: The 'base' library does not really belong here. Its presence
+# here is temporary. Do not add to this library, do not remove from
+# it, and do not declare other libraries in this file.
+baseEnv = env.Clone()
+
+if use_libunwind:
+    baseEnv.InjectThirdParty('unwind')
+    stacktrace_impl_cpp = 'util/stacktrace_unwind.cpp'
+else:
+    stacktrace_impl_cpp = 'util/stacktrace_${TARGET_OS_FAMILY}.cpp'
+
+baseEnv.Library(
     target='base',
     source=[
         'base/data_range.cpp',
@@ -131,7 +140,7 @@ env.Library(
         'util/shell_exec.cpp',
         'util/signal_handlers_synchronous.cpp',
         'util/stacktrace.cpp',
-        'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
+        stacktrace_impl_cpp,
         'util/str.cpp',
         'util/system_clock_source.cpp',
         'util/system_tick_source.cpp',
@@ -151,6 +160,7 @@ env.Library(
         '$BUILD_DIR/third_party/shim_fmt',
         '$BUILD_DIR/third_party/shim_intel_decimal128',
         '$BUILD_DIR/third_party/shim_pcrecpp',
+        '$BUILD_DIR/third_party/shim_unwind' if use_libunwind else [],
         'boost_assert_shim',
         'util/quick_exit',
     ],
