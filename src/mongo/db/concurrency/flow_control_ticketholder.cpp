@@ -89,12 +89,18 @@ void FlowControlTicketholder::refreshTo(int numTickets) {
 void FlowControlTicketholder::getTicket(OperationContext* opCtx,
                                         FlowControlTicketholder::CurOp* stats) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
+    if (_inShutdown) {
+        return;
+    }
+
     LOG(4) << "Taking ticket. Available: " << _tickets;
     if (_tickets == 0) {
         ++stats->acquireWaitCount;
     }
 
-    while (_tickets == 0) {
+    // Make sure operations already waiting on a Flow Control ticket during shut down do not
+    // hang if the ticket refresher thread has been shut down.
+    while (_tickets == 0 && !_inShutdown) {
         stats->waiting = true;
         const std::uint64_t startWaitTime = curTimeMicros64();
 
@@ -117,9 +123,21 @@ void FlowControlTicketholder::getTicket(OperationContext* opCtx,
         uassertStatusOK(swCondStatus);
     }
     stats->waiting = false;
-    ++stats->ticketsAcquired;
 
+    if (_inShutdown) {
+        return;
+    }
+
+    ++stats->ticketsAcquired;
     --_tickets;
+}
+
+// Should only be called once, during shutdown.
+void FlowControlTicketholder::setInShutdown() {
+    LOG(4) << "Stopping further Flow Control ticket acquisitions.";
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _inShutdown = true;
+    _cv.notify_all();
 }
 
 }  // namespace mongo

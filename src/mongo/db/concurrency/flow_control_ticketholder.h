@@ -69,7 +69,7 @@ public:
         void writeToBuilder(BSONObjBuilder& infoBuilder);
     };
 
-    FlowControlTicketholder(int startTickets) : _tickets(startTickets) {
+    FlowControlTicketholder(int startTickets) : _tickets(startTickets), _inShutdown(false) {
         _totalTimeAcquiringMicros.store(0);
     }
 
@@ -87,6 +87,8 @@ public:
         return _totalTimeAcquiringMicros.load();
     }
 
+    void setInShutdown();
+
 private:
     // Use an int64_t as this is serialized to bson which does not support unsigned 64-bit numbers.
     AtomicWord<std::int64_t> _totalTimeAcquiringMicros;
@@ -94,6 +96,8 @@ private:
     stdx::mutex _mutex;
     stdx::condition_variable _cv;
     int _tickets;
+
+    bool _inShutdown;  // used to synchronize shutdown of the ticket refresher job
 };
 
 }  // namespace mongo

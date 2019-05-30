@@ -345,6 +345,7 @@ mongod = env.Program(
         'db/commands/mongod',
         'db/commands/server_status_servers',
         'db/common',
+        'db/concurrency/flow_control_ticketholder',
         'db/concurrency/lock_manager',
         'db/concurrency/write_conflict_exception',
         'db/curop_metrics',

@@ -302,15 +302,15 @@ int FlowControl::_calculateNewTicketsForLag(const std::vector<repl::MemberData>&
 }
 
 int FlowControl::getNumTickets() {
+    // Flow Control is only enabled on nodes that can accept writes.
+    const bool canAcceptWrites = _replCoord->canAcceptNonLocalWrites();
+
     MONGO_FAIL_POINT_BLOCK(flowControlTicketOverride, failpointObj) {
         int numTickets = failpointObj.getData().getIntField("numTickets");
-        if (numTickets > 0) {
+        if (numTickets > 0 && canAcceptWrites) {
             return numTickets;
         }
     }
-
-    // Flow Control is only enabled on nodes that can accept writes.
-    const bool canAcceptWrites = _replCoord->canAcceptNonLocalWrites();
 
     // Flow Control is only enabled if FCV is 4.2.
     const bool isFCV42 =

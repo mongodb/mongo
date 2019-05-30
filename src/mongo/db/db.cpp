@@ -62,6 +62,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -914,6 +915,12 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // storage engine.
     if (auto runner = serviceContext->getPeriodicRunner()) {
         runner->shutdown();
+    }
+
+    // Inform Flow Control to stop gating writes on ticket admission. This is necessary because the
+    // ticket refresher thread is stopped as part of the shut down process (see SERVER-41345).
+    if (auto flowControlTicketholder = FlowControlTicketholder::get(serviceContext)) {
+        flowControlTicketholder->setInShutdown();
     }
 
     if (serviceContext->getStorageEngine()) {
