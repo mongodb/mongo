@@ -176,7 +176,8 @@ class ServiceStateMachine::ThreadGuard {
 
 public:
     explicit ThreadGuard(ServiceStateMachine* ssm) : _ssm{ssm} {
-        auto owned = _ssm->_owned.compareAndSwap(Ownership::kUnowned, Ownership::kOwned);
+        auto owned = Ownership::kUnowned;
+        _ssm->_owned.compareAndSwap(&owned, Ownership::kOwned);
         if (owned == Ownership::kStatic) {
             dassert(haveClient());
             dassert(Client::getCurrent() == _ssm->_dbClientPtr);

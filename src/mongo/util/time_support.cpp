@@ -66,8 +66,8 @@ namespace mongo {
 AtomicWord<long long> Date_t::lastNowVal;
 
 Date_t Date_t::now() {
-    int64_t curTime = curTimeMillis64();
-    int64_t oldLastNow = lastNowVal.loadRelaxed();
+    decltype(lastNowVal)::WordType curTime = curTimeMillis64();
+    auto oldLastNow = lastNowVal.loadRelaxed();
 
     // If curTime is different than old last now, unconditionally try to cas it to the new value.
     // This is an optimization to avoid performing stores for multiple clock reads in the same
@@ -80,7 +80,7 @@ Date_t Date_t::now() {
         // which case it's likely their time is also recent.  It's important that we don't loop so
         // that we avoid forcing time backwards if we have multiple callers at a millisecond
         // boundary.
-        lastNowVal.compareAndSwap(oldLastNow, curTime);
+        lastNowVal.compareAndSwap(&oldLastNow, curTime);
     }
 
     return fromMillisSinceEpoch(curTime);

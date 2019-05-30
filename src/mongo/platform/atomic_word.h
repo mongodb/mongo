@@ -114,13 +114,14 @@ public:
     /**
      * Atomic compare and swap.
      *
-     * If this value equals "expected", sets this to "newValue".
-     * Always returns the original of this.
+     * If this value equals the value at "expected", sets this value to "newValue".
+     * Otherwise, sets the storage at "expected" to this value.
+     *
+     * Returns true if swap successful, false otherwise
      */
-    WordType compareAndSwap(WordType expected, WordType newValue) {
+    bool compareAndSwap(WordType* expected, WordType newValue) {
         // NOTE: Subtle: compare_exchange mutates its first argument.
-        _value.compare_exchange_strong(expected, newValue);
-        return expected;
+        return _value.compare_exchange_strong(*expected, newValue);
     }
 
 protected:
