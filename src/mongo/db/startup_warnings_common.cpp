@@ -81,6 +81,24 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         warned = true;
     }
 
+#ifdef MONGO_CONFIG_SSL
+    if (sslGlobalParams.sslAllowInvalidCertificates) {
+        log() << "** WARNING: While invalid X509 certificates may be used to" << startupWarningsLog;
+        log() << "**          connect to this server, they will not be considered"
+              << startupWarningsLog;
+        log() << "**          permissible for authentication." << startupWarningsLog;
+        log() << startupWarningsLog;
+    }
+
+    if (sslGlobalParams.sslAllowInvalidHostnames) {
+        log() << "** WARNING: This server will not perform X.509 hostname validation"
+              << startupWarningsLog;
+        log() << "** This may allow your server to make or accept connections to"
+              << startupWarningsLog;
+        log() << "** untrusted parties" << startupWarningsLog;
+    }
+#endif
+
     /*
     * We did not add the message to startupWarningsLog as the user can not
     * specify a sslCAFile parameter from the shell

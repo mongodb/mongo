@@ -378,18 +378,6 @@ ExitCode _initAndListen(int listenPort) {
 
     logMongodStartupWarnings(storageGlobalParams, serverGlobalParams, serviceContext);
 
-#ifdef MONGO_CONFIG_SSL
-    if (sslGlobalParams.sslAllowInvalidCertificates &&
-        ((serverGlobalParams.clusterAuthMode.load() == ServerGlobalParams::ClusterAuthMode_x509) ||
-         sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-X509"))) {
-        log() << "** WARNING: While invalid X509 certificates may be used to" << startupWarningsLog;
-        log() << "**          connect to this server, they will not be considered"
-              << startupWarningsLog;
-        log() << "**          permissible for authentication." << startupWarningsLog;
-        log() << startupWarningsLog;
-    }
-#endif
-
     {
         std::stringstream ss;
         ss << endl;

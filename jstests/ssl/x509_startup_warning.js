@@ -3,31 +3,61 @@
 (function() {
     'use strict';
 
-    function runTest(opts, expectWarning) {
+    function runTest(checkMongos, opts, expectWarningCertifcates, expectWarningHostnames) {
         clearRawMongoProgramOutput();
-        const mongod = MongoRunner.runMongod(Object.assign({
-            auth: '',
-            sslMode: 'requireSSL',
-            sslPEMKeyFile: 'jstests/libs/server.pem',
-            sslCAFile: 'jstests/libs/ca.pem',
-        },
-                                                           opts));
-        assert.eq(expectWarning,
-                  rawMongoProgramOutput().includes(
-                      'WARNING: While invalid X509 certificates may be used'));
-        MongoRunner.stopMongod(mongod);
+        let mongo;
+
+        if (checkMongos) {
+            mongo = MongoRunner.runMongos(Object.assign({
+                configdb: "fakeRS/localhost:27017",
+                waitForConnect: false,
+            },
+                                                        opts));
+        } else {
+            mongo = MongoRunner.runMongod(Object.assign({
+                auth: '',
+                sslMode: 'preferSSL',
+                sslPEMKeyFile: 'jstests/libs/server.pem',
+                sslCAFile: 'jstests/libs/ca.pem',
+                waitForConnect: false,
+            },
+                                                        opts));
+        }
+
+        assert.soon(function() {
+            const output = rawMongoProgramOutput();
+            return (expectWarningCertifcates ==
+                        output.includes('WARNING: While invalid X509 certificates may be used') &&
+                    expectWarningHostnames ==
+                        output.includes(
+                            'WARNING: This server will not perform X.509 hostname validation'));
+        });
+
+        stopMongoProgramByPid(mongo.pid);
     }
 
-    // Don't expect a warning when we're not using both options together.
-    runTest({}, false);
-    runTest({sslAllowInvalidCertificates: '', setParameter: 'authenticationMechanisms=SCRAM-SHA-1'},
-            false);
-    runTest({setParameter: 'authenticationMechanisms=MONGODB-X509'}, false);
-    runTest({clusterAuthMode: 'x509'}, false);
+    function runTests(checkMongos) {
+        // Don't expect a warning for certificates and hostnames when we're not using both options
+        // together.
+        runTest(checkMongos, {}, false, false);
 
-    // Do expect a warning when we're combining options.
-    runTest(
-        {sslAllowInvalidCertificates: '', setParameter: 'authenticationMechanisms=MONGODB-X509'},
-        true);
-    runTest({sslAllowInvalidCertificates: '', clusterAuthMode: 'x509'}, true);
+        // Do expect a warning for certificates when we're combining options.
+        runTest(checkMongos, {sslAllowInvalidCertificates: ''}, true, false);
+
+        // Do expect a warning for hostnames.
+        runTest(checkMongos, {sslAllowInvalidHostnames: ''}, false, true);
+
+        // Do expect a warning for certificates and hostnames.
+        runTest(checkMongos,
+                {sslAllowInvalidCertificates: '', sslAllowInvalidHostnames: ''},
+                true,
+                true);
+    }
+
+    // Run tests on mongos
+    runTests(true);
+
+    // Run tests on mongod
+    runTests(false);
+
 })();
