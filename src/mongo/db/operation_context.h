@@ -356,6 +356,8 @@ public:
         stdx::unique_lock<stdx::mutex>& m,
         Date_t deadline) noexcept override;
 
+    bool isIgnoringInterrupts() const;
+
 private:
     IgnoreInterruptsState pushIgnoreInterrupts() override {
         IgnoreInterruptsState iis{_ignoreInterrupts,

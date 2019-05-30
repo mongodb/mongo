@@ -79,6 +79,12 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
 
     PrepareConflictTracker::get(opCtx).beginPrepareConflict();
 
+    // It is contradictory to be running into a prepare conflict when we are ignoring interruptions,
+    // particularly when running code inside an
+    // OperationContext::runWithoutInterruptionExceptAtGlobalShutdown block. Operations executed in
+    // this way are expected to be set to ignore prepare conflicts.
+    invariant(!opCtx->isIgnoringInterrupts());
+
     if (MONGO_FAIL_POINT(WTPrintPrepareConflictLog)) {
         wiredTigerPrepareConflictFailPointLog();
     }
