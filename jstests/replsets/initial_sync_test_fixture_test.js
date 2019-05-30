@@ -161,11 +161,13 @@
     // Abort transaction so that the data consistency checks in stop() can run.
     session.abortTransaction();
 
+    // Issue a w:2 write to make sure the secondary has replicated the abortTransaction oplog entry.
+    assert.commandWorked(primary.getDB("otherDB").otherColl.insert({x: 1}, {writeConcern: {w: 2}}));
+
     // Confirm that node can be read from and that it has the inserts that were made while the node
     // was in initial sync.
-    // TODO SERVER-40973: use fastcount after it is fixed instead of itcount.
-    // assert.eq(secondary.getDB("test").foo.find().count(), 6);
-    // assert.eq(secondary.getDB("test").bar.find().count(), 6);
+    assert.eq(secondary.getDB("test").foo.find().count(), 6);
+    assert.eq(secondary.getDB("test").bar.find().count(), 6);
     assert.eq(secondary.getDB("test").foo.find().itcount(), 6);
     assert.eq(secondary.getDB("test").bar.find().itcount(), 6);
 
