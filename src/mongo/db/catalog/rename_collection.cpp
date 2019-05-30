@@ -64,7 +64,7 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(writeConfilctInRenameCollCopyToTmp);
+MONGO_FAIL_POINT_DEFINE(writeConflictInRenameCollCopyToTmp);
 
 boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
     return CollectionCatalog::get(opCtx).lookupNSSByUUID(uuid);
@@ -685,7 +685,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
                         opCtx, "retryRestoreCursor", ns, [&cursor] { cursor->restore(); });
                 });
                 // Used to make sure that a WCE can be handled by this logic without data loss.
-                if (MONGO_FAIL_POINT(writeConfilctInRenameCollCopyToTmp)) {
+                if (MONGO_FAIL_POINT(writeConflictInRenameCollCopyToTmp)) {
                     throw WriteConflictException();
                 }
                 wunit.commit();
