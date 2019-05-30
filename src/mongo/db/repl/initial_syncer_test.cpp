@@ -3995,6 +3995,10 @@ TEST_F(
     // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
 
+    // Skip clearing initial sync progress so that we can check if missing documents have been
+    // fetched after the initial sync attempt.
+    FailPointEnableBlock skipClearInitialSyncState("skipClearInitialSyncState");
+
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
@@ -4091,7 +4095,7 @@ TEST_F(
     ASSERT_TRUE(fetchCountIncremented);
 
     auto progress = initialSyncer->getInitialSyncProgress();
-    log() << "Progress after failed initial sync attempt: " << progress;
+    log() << "Progress after initial sync attempt: " << progress;
     ASSERT_EQUALS(1, progress.getIntField("fetchedMissingDocs")) << progress;
 }
 
@@ -4175,6 +4179,10 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
     // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+
+    // Skip clearing initial sync progress so that we can check initialSyncStatus fields after
+    // initial sync is complete.
+    FailPointEnableBlock skipClearInitialSyncState("skipClearInitialSyncState");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();

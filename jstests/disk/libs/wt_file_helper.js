@@ -128,16 +128,24 @@ let assertStartInReplSet = function(replSet, originalNode, cleanData, expectResy
     let node = replSet.start(
         originalNode, {dbpath: originalNode.dbpath, port: originalNode.port, restart: !cleanData});
 
+    // Skip clearing initial sync progress after a successful initial sync attempt so that we
+    // can check initialSyncStatus fields after initial sync is complete.
+    assert.commandWorked(
+        node.adminCommand({configureFailPoint: 'skipClearInitialSyncState', mode: 'alwaysOn'}));
+
     replSet.awaitSecondaryNodes();
 
     // Ensure that an initial sync attempt was made and succeeded if the data directory was cleaned.
-    let res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+    let res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
     if (expectResync) {
         assert.eq(1, res.initialSyncStatus.initialSyncAttempts.length);
         assert.eq(0, res.initialSyncStatus.failedInitialSyncAttempts);
     } else {
         assert.eq(undefined, res.initialSyncStatus);
     }
+
+    assert.commandWorked(
+        node.adminCommand({configureFailPoint: 'skipClearInitialSyncState', mode: 'off'}));
 
     testFunc(node);
     return node;

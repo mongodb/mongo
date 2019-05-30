@@ -35,6 +35,10 @@
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'alwaysOn'}));
+    // Skip clearing initial sync progress after a successful initial sync attempt so that we
+    // can check initialSyncStatus fields after initial sync is complete.
+    assert.commandWorked(secondary.getDB('admin').runCommand(
+        {configureFailPoint: 'skipClearInitialSyncState', mode: 'alwaysOn'}));
     replSet.reInitiate();
 
     // Wait for fail point message to be logged.
@@ -56,7 +60,7 @@
     // Re-insert deleted document.
     assert.writeOK(coll.insert(doc, {writeConcern: {w: 1}}));
 
-    var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+    var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
     assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
     var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
 
@@ -76,7 +80,7 @@
     assert.eq(1, coll.find().itcount(), 'collection successfully synced to secondary');
     assert.eq(doc, coll.findOne(), 'document on secondary matches primary');
 
-    res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+    res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
     assert.eq(res.initialSyncStatus.fetchedMissingDocs, 1);
     var finalOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
     assert(!friendlyEqual(firstOplogEnd, finalOplogEnd),

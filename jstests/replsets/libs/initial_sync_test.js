@@ -99,10 +99,13 @@ function InitialSyncTest(name = "InitialSyncTest", replSet, timeout) {
      * Calls replSetGetStatus and checks if the node is in the provided state.
      */
     function isNodeInState(node, state) {
+        // We suppress the initialSync field here, because initial sync is paused while holding the
+        // mutex needed to report initial sync progress.
         return state ===
             assert
-                .commandWorkedOrFailedWithCode(node.adminCommand({replSetGetStatus: 1}),
-                                               ErrorCodes.NotYetInitialized)
+                .commandWorkedOrFailedWithCode(
+                    node.adminCommand({replSetGetStatus: 1, initialSync: 0}),
+                    ErrorCodes.NotYetInitialized)
                 .myState;
     }
 
