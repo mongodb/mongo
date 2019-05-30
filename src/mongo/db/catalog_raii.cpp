@@ -42,14 +42,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
 
-void uassertLockTimeout(std::string resourceName, LockMode lockMode, bool isLocked) {
-    uassert(ErrorCodes::LockTimeout,
-            str::stream() << "Failed to acquire " << modeName(lockMode) << " lock for "
-                          << resourceName
-                          << " due to lock timeout.",
-            isLocked);
-}
-
 }  // namespace
 
 AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, Date_t deadline)
