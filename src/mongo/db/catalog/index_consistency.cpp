@@ -57,7 +57,7 @@ IndexConsistency::IndexConsistency(OperationContext* opCtx,
                                    NamespaceString nss,
                                    RecordStore* recordStore,
                                    std::unique_ptr<Lock::CollectionLock> collLk,
-                                   const bool background)
+                                   bool background)
     : _opCtx(opCtx),
       _collection(collection),
       _nss(nss),
@@ -72,12 +72,11 @@ IndexConsistency::IndexConsistency(OperationContext* opCtx,
     IndexCatalog* indexCatalog = _collection->getIndexCatalog();
     IndexCatalog::IndexIterator indexIterator = indexCatalog->getIndexIterator(_opCtx, false);
 
-    int indexNumber = 0;
     while (indexIterator.more()) {
 
         const IndexDescriptor* descriptor = indexIterator.next();
         std::string indexName = descriptor->indexName();
-        _indexNumber[indexName] = indexNumber;
+        _indexNumber[indexName] = _indexesInfo.size();
 
         IndexInfo indexInfo;
 
@@ -95,9 +94,7 @@ IndexConsistency::IndexConsistency(OperationContext* opCtx,
         indexInfo.numRecords = 0;
         indexInfo.numExtraIndexKeys = 0;
 
-        _indexesInfo[indexNumber] = indexInfo;
-
-        indexNumber++;
+        _indexesInfo.push_back(indexInfo);
     }
 }
 
