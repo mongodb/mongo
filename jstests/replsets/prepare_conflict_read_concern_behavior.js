@@ -67,7 +67,7 @@
             return res;
         };
 
-        const dbHash = function(read_concern, timeout, db) {
+        const dbHash = function(read_concern, db, timeout = successTimeout) {
             let res = db.runCommand({
                 dbHash: 1,
                 readConcern: read_concern,
@@ -77,7 +77,8 @@
             return res;
         };
 
-        const mapReduce = function(read_concern, timeout, db, outOptions = {inline: 1}) {
+        const mapReduce = function(
+            read_concern, db, outOptions = {inline: 1}, timeout = successTimeout) {
             let map = function() {
                 emit(this.a, this.a);
             };
@@ -170,28 +171,25 @@
         // primaries.
         jsTestLog("Test dbHash doesn't support afterClusterTime read.");
         assert.commandFailedWithCode(
-            dbHash({level: 'local', afterClusterTime: clusterTimeAfterPrepare},
-                   failureTimeout,
-                   secondaryTestDB),
+            dbHash({level: 'local', afterClusterTime: clusterTimeAfterPrepare}, secondaryTestDB),
             ErrorCodes.InvalidOptions);
 
         jsTestLog("Test dbHash doesn't support read concern other than local.");
-        assert.commandWorked(dbHash({level: 'local'}, successTimeout, secondaryTestDB));
-        assert.commandFailedWithCode(dbHash({level: 'available'}, failureTimeout, secondaryTestDB),
+        assert.commandWorked(dbHash({level: 'local'}, secondaryTestDB));
+        assert.commandFailedWithCode(dbHash({level: 'available'}, secondaryTestDB),
                                      ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(dbHash({level: 'majority'}, failureTimeout, secondaryTestDB),
+        assert.commandFailedWithCode(dbHash({level: 'majority'}, secondaryTestDB),
                                      ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(dbHash({level: 'snapshot'}, failureTimeout, secondaryTestDB),
+        assert.commandFailedWithCode(dbHash({level: 'snapshot'}, secondaryTestDB),
                                      ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(
-            dbHash({level: 'linearizable'}, failureTimeout, secondaryTestDB),
-            ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(dbHash({level: 'linearizable'}, secondaryTestDB),
+                                     ErrorCodes.InvalidOptions);
 
         jsTestLog("Test dbHash on secondary doesn't block on a prepared transaction.");
-        assert.commandWorked(dbHash({}, successTimeout, secondaryTestDB));
+        assert.commandWorked(dbHash({}, secondaryTestDB));
         jsTestLog("Test dbHash on primary blocks on collection S lock which conflicts with " +
                   "a prepared transaction.");
-        assert.commandFailedWithCode(dbHash({}, failureTimeout, testDB),
+        assert.commandFailedWithCode(dbHash({}, testDB, failureTimeout),
                                      ErrorCodes.MaxTimeMSExpired);
 
         // mapReduce does not accept a non local read concern or afterClusterTime and it also sets
@@ -201,37 +199,31 @@
         // that writes to the same collection if it is run on primaries.
         jsTestLog("Test mapReduce doesn't support afterClusterTime read.");
         assert.commandFailedWithCode(
-            mapReduce({level: 'local', afterClusterTime: clusterTimeAfterPrepare},
-                      failureTimeout,
-                      secondaryTestDB),
+            mapReduce({level: 'local', afterClusterTime: clusterTimeAfterPrepare}, secondaryTestDB),
             ErrorCodes.InvalidOptions);
 
         jsTestLog("Test mapReduce doesn't support read concern other than local.");
-        assert.commandWorked(mapReduce({level: 'local'}, successTimeout, secondaryTestDB));
-        assert.commandFailedWithCode(
-            mapReduce({level: 'available'}, failureTimeout, secondaryTestDB),
-            ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(
-            mapReduce({level: 'majority'}, failureTimeout, secondaryTestDB),
-            ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(
-            mapReduce({level: 'snapshot'}, failureTimeout, secondaryTestDB),
-            ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(
-            mapReduce({level: 'linearizable'}, failureTimeout, secondaryTestDB),
-            ErrorCodes.InvalidOptions);
+        assert.commandWorked(mapReduce({level: 'local'}, secondaryTestDB));
+        assert.commandFailedWithCode(mapReduce({level: 'available'}, secondaryTestDB),
+                                     ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(mapReduce({level: 'majority'}, secondaryTestDB),
+                                     ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(mapReduce({level: 'snapshot'}, secondaryTestDB),
+                                     ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(mapReduce({level: 'linearizable'}, secondaryTestDB),
+                                     ErrorCodes.InvalidOptions);
 
         jsTestLog("Test mapReduce that writes is not allowed to run on secondaries.");
         // It currently returns ErrorCodes.PrimarySteppedDown in this case.
-        assert.commandFailedWithCode(mapReduce({}, failureTimeout, secondaryTestDB, "outColl"),
+        assert.commandFailedWithCode(mapReduce({}, secondaryTestDB, "outColl"),
                                      [ErrorCodes.InvalidOptions, ErrorCodes.PrimarySteppedDown]);
 
         jsTestLog("Test mapReduce on secondary doesn't block on a prepared transaction.");
-        assert.commandWorked(mapReduce({}, successTimeout, secondaryTestDB));
+        assert.commandWorked(mapReduce({}, secondaryTestDB));
 
         jsTestLog("Test mapReduce on primary blocks on collection S lock which conflicts with " +
                   "a prepared transaction.");
-        assert.commandFailedWithCode(mapReduce({}, failureTimeout, testDB),
+        assert.commandFailedWithCode(mapReduce({}, testDB, {inline: 1}, failureTimeout),
                                      ErrorCodes.MaxTimeMSExpired);
 
         jsTestLog("Test read from an update blocks on a prepared transaction.");
