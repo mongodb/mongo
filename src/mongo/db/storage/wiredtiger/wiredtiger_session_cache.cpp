@@ -215,16 +215,9 @@ WiredTigerSessionCache::~WiredTigerSessionCache() {
 }
 
 void WiredTigerSessionCache::shuttingDown() {
-    uint32_t actual = _shuttingDown.load();
-    uint32_t expected;
-
     // Try to atomically set _shuttingDown flag, but just return if another thread was first.
-    do {
-        expected = actual;
-        actual = _shuttingDown.compareAndSwap(expected, expected | kShuttingDownMask);
-        if (actual & kShuttingDownMask)
-            return;
-    } while (actual != expected);
+    if (_shuttingDown.fetchAndBitOr(kShuttingDownMask) & kShuttingDownMask)
+        return;
 
     // Spin as long as there are threads in releaseSession
     while (_shuttingDown.load() != kShuttingDownMask) {

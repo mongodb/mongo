@@ -317,7 +317,7 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
         log() << "operation was interrupted because a client disconnected";
     }
 
-    if (_killCode.compareAndSwap(ErrorCodes::OK, killCode) == ErrorCodes::OK) {
+    if (auto status = ErrorCodes::OK; _killCode.compareAndSwap(&status, killCode)) {
         _baton->notify();
     }
 }
