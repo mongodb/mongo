@@ -82,7 +82,7 @@ public:
                      Collection* collection,
                      NamespaceString nss,
                      RecordStore* recordStore,
-                     const bool background);
+                     bool background);
 
     /**
      * During the first phase of validation, given the document's key KeyString, increment the
@@ -193,8 +193,8 @@ private:
     // Contains the corresponding index number for each index namespace
     std::map<std::string, int> _indexNumber;
 
-    // A mapping of index numbers to IndexInfo
-    std::map<int, IndexInfo> _indexesInfo;
+    // A vector of IndexInfo indexes by index number
+    std::vector<IndexInfo> _indexesInfo;
 
     // Whether we're in the first or second phase of index validation.
     bool _firstPhase;
