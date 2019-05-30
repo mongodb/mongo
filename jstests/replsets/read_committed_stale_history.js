@@ -138,9 +138,16 @@
     rst.awaitReplication();
 
     // Ensure that the old primary got the write that the new primary did and sees it as committed.
-    assert.neq(
-        null,
-        nodes[0].getDB(dbName).getCollection(collName).find({a: 3}).readConcern('majority').next());
+    assert.soonNoExcept(function() {
+        // Without a consistent stream of writes, secondary majority reads are not guaranteed to
+        // complete, since the commit point being stale is not sufficient to establish a sync
+        // source.
+        assert.commandWorked(nodes[1].getDB(dbName).getCollection("dummy").insert({dummy: 1}));
+        res = nodes[0].getDB(dbName).runCommand(
+            {find: collName, filter: {a: 3}, readConcern: {level: "majority"}, maxTimeMS: 10000});
+        assert.commandWorked(res);
+        return res.cursor.firstBatch.length === 1;
+    }, "Original primary never got the new write in its majority committed snapshot");
 
     rst.stopSet();
 }());
