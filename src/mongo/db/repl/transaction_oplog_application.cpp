@@ -70,7 +70,7 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
             if (!status.isOK()) {
                 return status;
             }
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             if (oplogApplicationMode != repl::OplogApplication::Mode::kInitialSync &&
                 oplogApplicationMode != repl::OplogApplication::Mode::kRecovering)
                 throw;
