@@ -188,10 +188,17 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
         estSize += UpdateOpEntry::kUpsertFieldName.size() + boolSize;
         estSize += UpdateOpEntry::kMultiFieldName.size() + boolSize;
 
-        // Add the sizes of the 'q' and 'u' fields, plus the constant updateOp overhead size.
+        // Add the sizes of the 'q' and 'u' fields.
         estSize += (UpdateOpEntry::kQFieldName.size() + item.getUpdate().getQ().objsize() +
-                    UpdateOpEntry::kUFieldName.size() + item.getUpdate().getU().objsize() +
-                    kEstUpdateOverheadBytes);
+                    UpdateOpEntry::kUFieldName.size() + item.getUpdate().getU().objsize());
+
+        // Add the size of the 'c' field if present.
+        if (auto constants = item.getUpdate().getC()) {
+            estSize += UpdateOpEntry::kCFieldName.size() + item.getUpdate().getC()->objsize();
+        }
+
+        // Finally, add the constant updateOp overhead size.
+        estSize += kEstUpdateOverheadBytes;
 
         // When running a debug build, verify that estSize is at least the BSON serialization size.
         dassert(estSize >= item.getUpdate().toBSON().objsize());

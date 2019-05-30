@@ -189,6 +189,17 @@
         nModified: 1
     });
 
+    const largeStr = "x".repeat(1000);
+    testUpdate({
+        query: {_id: 1},
+        initialDocumentList: [{_id: 1, x: 1}],
+        useUpdateCommand: true,
+        constants: {largeStr: largeStr},
+        update: [{$set: {foo: "$$largeStr"}}],
+        resultDocList: [{_id: 1, x: 1, foo: largeStr}],
+        nModified: 1
+    });
+
     // References to document fields are not resolved in constants.
     testUpdate({
         query: {_id: 1},
