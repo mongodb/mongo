@@ -29,21 +29,10 @@
 
 #pragma once
 
-// Feature detection is messy in C++17 (to be improved in C++20 with the <version> header).
-// __cpp_lib_variant is available to check after <variant> is included. Include it if it's available
-// (but only if C++17 as MSVS makes it available but emits a message if used). If the variant lib is
-// not high enough version, fall back to mpark.
-#if __cplusplus >= 201703L && defined(__has_include) && __has_include(<variant>)
-#include <variant>
-#endif
-
-#if !defined(__cpp_lib_variant) || __cpp_lib_variant < 201603
 #include "third_party/variant-1.3.0/include/mpark/variant.hpp"
-#endif
 
-namespace mongo {
-namespace stdx {
-#if !defined(__cpp_lib_variant) || __cpp_lib_variant < 201603
+namespace mongo::stdx {
+
 using ::mpark::variant;
 using ::mpark::visit;
 using ::mpark::holds_alternative;
@@ -67,31 +56,4 @@ using ::mpark::operator>=;
 using ::mpark::monostate;
 using ::mpark::bad_variant_access;
 
-#else
-using ::std::variant;
-using ::std::visit;
-using ::std::holds_alternative;
-using ::std::get;
-using ::std::get_if;
-
-using ::std::variant_size;
-using ::std::variant_size_v;
-using ::std::variant_alternative;
-using ::std::variant_alternative_t;
-
-constexpr auto variant_npos = ::std::variant_npos;
-
-using ::std::operator==;
-using ::std::operator!=;
-using ::std::operator<;
-using ::std::operator>;
-using ::std::operator<=;
-using ::std::operator>=;
-
-using ::std::monostate;
-using ::std::bad_variant_access;
-
-#endif
-
-}  // namespace stdx
-}  // namespace mongo
+}  // namespace mongo::stdx
