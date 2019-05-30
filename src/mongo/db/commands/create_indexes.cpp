@@ -368,10 +368,6 @@ bool runCreateIndexes(OperationContext* opCtx,
     // final drain phase conflicts with prepared transactions.
     opCtx->recoveryUnit()->setIgnorePrepared(true);
 
-    // Allow the strong lock acquisition above to be interrupted, but from this point forward do
-    // not allow locks or re-locks to be interrupted.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
     Collection* collection = db->getCollection(opCtx, ns);
     bool createCollectionAutomatically = collection == nullptr;
     result.appendBool("createdCollectionAutomatically", createCollectionAutomatically);
@@ -598,10 +594,6 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // held.
             opCtx->recoveryUnit()->abandonSnapshot();
             dbLock.relockWithMode(MODE_X);
-
-            // Allow the strong lock acquisition above to be interrupted, but from this point
-            // forward do not allow locks or re-locks to be interrupted.
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
             auto databaseHolder = DatabaseHolder::get(opCtx);
             db = databaseHolder->getDb(opCtx, ns.db());
