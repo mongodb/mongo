@@ -388,4 +388,8 @@ Date_t OperationContext::getExpirationDateForWaitForValue(Milliseconds waitFor) 
     return getServiceContext()->getPreciseClockSource()->now() + waitFor;
 }
 
+bool OperationContext::isIgnoringInterrupts() const {
+    return _ignoreInterrupts;
+}
+
 }  // namespace mongo
