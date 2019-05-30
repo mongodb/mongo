@@ -132,8 +132,6 @@ public:
      * Set 'isInternalRequest' to true if the upsert was issued by the replication or
      * sharding systems.
      *
-     * Fills out whether or not this is a fastmodinsert in 'stats'.
-     *
      * Returns the document to insert.
      */
     static BSONObj applyUpdateOpsForInsert(OperationContext* opCtx,

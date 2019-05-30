@@ -559,8 +559,7 @@ struct NearStats : public SpecificStats {
 };
 
 struct UpdateStats : public SpecificStats {
-    UpdateStats()
-        : nMatched(0), nModified(0), isModUpdate(false), fastmodinsert(false), inserted(false) {}
+    UpdateStats() : nMatched(0), nModified(0), isModUpdate(false), inserted(false) {}
 
     SpecificStats* clone() const final {
         return new UpdateStats(*this);
@@ -574,11 +573,6 @@ struct UpdateStats : public SpecificStats {
 
     // True iff this is a $mod update.
     bool isModUpdate;
-
-    // A 'fastmodinsert' is an insert resulting from an {upsert: true} update
-    // which is a doc-replacement style update. It's "fast" because we don't need
-    // to compute the document to insert based on the modifiers.
-    bool fastmodinsert;
 
     // Is this an {upsert: true} update that did an insert?
     bool inserted;

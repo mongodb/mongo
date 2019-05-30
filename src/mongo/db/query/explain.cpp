@@ -577,7 +577,6 @@ void Explain::statsToBSON(const PlanStageStats& stats,
             bob->appendNumber("nMatched", spec->nMatched);
             bob->appendNumber("nWouldModify", spec->nModified);
             bob->appendBool("wouldInsert", spec->inserted);
-            bob->appendBool("fastmodinsert", spec->fastmodinsert);
         }
     }
 

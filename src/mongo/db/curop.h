@@ -205,8 +205,7 @@ public:
     // True if a replan was triggered during the execution of this operation.
     bool replanned{false};
 
-    bool fastmodinsert{false};  // upsert of an $operation. builds a default object
-    bool upsert{false};         // true if the update actually did an insert
+    bool upsert{false};  // true if the update actually did an insert
     bool cursorExhausted{
         false};  // true if the cursor has been closed at end a find/getMore operation
 

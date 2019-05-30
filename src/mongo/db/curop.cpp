@@ -676,7 +676,6 @@ string OpDebug::report(Client* client,
     OPDEBUG_TOSTRING_HELP_OPTIONAL("nModified", additiveMetrics.nModified);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("ninserted", additiveMetrics.ninserted);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("ndeleted", additiveMetrics.ndeleted);
-    OPDEBUG_TOSTRING_HELP_BOOL(fastmodinsert);
     OPDEBUG_TOSTRING_HELP_BOOL(upsert);
     OPDEBUG_TOSTRING_HELP_BOOL(cursorExhausted);
 
@@ -779,7 +778,6 @@ void OpDebug::append(const CurOp& curop,
     OPDEBUG_APPEND_OPTIONAL("nModified", additiveMetrics.nModified);
     OPDEBUG_APPEND_OPTIONAL("ninserted", additiveMetrics.ninserted);
     OPDEBUG_APPEND_OPTIONAL("ndeleted", additiveMetrics.ndeleted);
-    OPDEBUG_APPEND_BOOL(fastmodinsert);
     OPDEBUG_APPEND_BOOL(upsert);
     OPDEBUG_APPEND_BOOL(cursorExhausted);
 
