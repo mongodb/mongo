@@ -108,6 +108,7 @@ selector:
   - jstests/concurrency/fsm_workloads/database_versioning.js
 
   exclude_with_any_tags:
+  - does_not_support_causal_consistency
   # This suite uses secondary read preference, which isn't currently compatible with transactions.
   - uses_transactions
   - assumes_balancer_off
