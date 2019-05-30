@@ -74,9 +74,7 @@ public:
     std::string help() const override {
         return "Validate contents of a namespace by scanning its data structures for correctness.  "
                "Slow.\n"
-               "Add full:true option to do a more thorough check\n"
-               "Add scandata:false to skip the scan of the collection data without skipping scans "
-               "of any indexes";
+               "Add full:true option to do a more thorough check";
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -89,7 +87,7 @@ public:
         actions.addAction(ActionType::validate);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
-    //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] [, full: <bool> } */
+    //{ validate: "collectionnamewithoutthedbpart" [, full: <bool> } */
 
     bool run(OperationContext* opCtx,
              const string& dbname,
@@ -103,14 +101,17 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
         const bool full = cmdObj["full"].trueValue();
-        const bool scanData = cmdObj["scandata"].trueValue();
 
-        ValidateCmdLevel level = kValidateIndex;
+        ValidateCmdLevel level = kValidateNormal;
 
         if (full) {
             level = kValidateFull;
-        } else if (scanData) {
-            level = kValidateRecordStore;
+        }
+
+        if (cmdObj["scandata"]) {
+            const char* deprecationWarning =
+                "the scandata option is deprecated and will be removed in a future release";
+            result.append("note", deprecationWarning);
         }
 
         if (!nss.isNormal() && full) {

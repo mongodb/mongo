@@ -92,7 +92,7 @@ protected:
         Database* db = _autoDb.get()->getDb();
         ASSERT_OK(db->getCollection(&_opCtx, _nss)
                       ->validate(&_opCtx,
-                                 _full ? kValidateFull : kValidateIndex,
+                                 _full ? kValidateFull : kValidateNormal,
                                  _background,
                                  &results,
                                  &output));

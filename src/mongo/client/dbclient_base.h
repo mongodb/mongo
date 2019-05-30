@@ -449,8 +449,8 @@ public:
     /** validate a collection, checking for errors and reporting back statistics.
         this operation is slow and blocking.
      */
-    bool validate(const std::string& ns, bool scandata = true) {
-        BSONObj cmd = BSON("validate" << nsGetCollection(ns) << "scandata" << scandata);
+    bool validate(const std::string& ns) {
+        BSONObj cmd = BSON("validate" << nsGetCollection(ns));
         BSONObj info;
         return runCommand(nsGetDB(ns).c_str(), cmd, info);
     }

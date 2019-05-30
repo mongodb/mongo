@@ -85,11 +85,7 @@ struct Record {
     RecordData data;
 };
 
-enum ValidateCmdLevel : int {
-    kValidateIndex = 0x01,
-    kValidateRecordStore = 0x02,
-    kValidateFull = 0x03
-};
+enum ValidateCmdLevel : int { kValidateNormal = 0x01, kValidateFull = 0x02 };
 
 
 /**

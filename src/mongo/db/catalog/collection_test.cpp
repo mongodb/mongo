@@ -48,7 +48,7 @@ protected:
     void makeCapped(NamespaceString nss, long long cappedSize = 8192);
     void makeUncapped(NamespaceString nss);
     void checkValidate(Collection* coll, bool valid, int records, int invalid, int errors);
-    std::vector<ValidateCmdLevel> levels{kValidateIndex, kValidateRecordStore, kValidateFull};
+    std::vector<ValidateCmdLevel> levels{kValidateNormal, kValidateFull};
 };
 
 void CollectionTest::makeCapped(NamespaceString nss, long long cappedSize) {
