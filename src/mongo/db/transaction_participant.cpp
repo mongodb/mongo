@@ -921,7 +921,7 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
     // Global intent lock before starting a transaction.  We pessimistically acquire an intent
     // exclusive lock here because we might be doing writes in this transaction, and it is currently
     // not deadlock-safe to upgrade IS to IX.
-    Lock::GlobalLock(opCtx, MODE_IX);
+    Lock::GlobalLock globalLock(opCtx, MODE_IX);
 
     // This begins the storage transaction and so we do it after acquiring the global lock.
     _setReadSnapshot(opCtx, repl::ReadConcernArgs::get(opCtx));
