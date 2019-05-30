@@ -206,7 +206,7 @@ private:
     //       are too few index entries.
     //     - If the count is < 0 in the bucket at the end of the validation pass, then there
     //       are too many index entries.
-    std::map<uint32_t, int32_t> _indexKeyCount;
+    std::vector<int32_t> _indexKeyCount;
 
     // Contains the corresponding index number for each index namespace
     std::map<std::string, int> _indexNumber;
