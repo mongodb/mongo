@@ -3469,6 +3469,34 @@ TEST_F(IdempotencyTestTxns, AbortInProgressTransaction) {
     ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));
 }
 
+TEST_F(IdempotencyTestTxns, CommitUnpreparedTransactionIgnoresNamespaceNotFoundErrors) {
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+
+    // Instead of creating a collection, we generate an arbitrary UUID to use for the operations
+    // below. This simulates the case where, during initial sync, a document D was inserted into a
+    // collection C on the sync source and then collection C was dropped, after we started fetching
+    // oplog entries but before we started collection cloning. In this case, we would not clone
+    // collection C, but when we try to apply the insertion of document D after collection cloning
+    // has finished, the collection would not exist since we never created it. It is acceptable to
+    // ignore the NamespaceNotFound error in this case since we know the collection will be dropped
+    // later on.
+    auto uuid = UUID::gen();
+    auto lsid = makeLogicalSessionId(_opCtx.get());
+    TxnNumber txnNum(0);
+
+    auto commitOp = commitUnprepared(
+        lsid, txnNum, StmtId(1), BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc)), OpTime());
+
+    ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
+                  ->setFollowerMode(MemberState::RS_RECOVERING));
+
+    testOpsAreIdempotent({commitOp});
+
+    // The op should have thrown a NamespaceNotFound error, which should have been ignored, so the
+    // operation has no effect.
+    ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));
+}
+
 TEST_F(IdempotencyTestTxns, CommitPreparedTransactionIgnoresNamespaceNotFoundErrors) {
     createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
 
@@ -3491,14 +3519,12 @@ TEST_F(IdempotencyTestTxns, CommitPreparedTransactionIgnoresNamespaceNotFoundErr
     ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
                   ->setFollowerMode(MemberState::RS_RECOVERING));
 
-    // TODO (SERVER-41113): Enable these assertions once this ticket is complete.
-    // ASSERT_OK(runOpsInitialSync({prepareOp, commitOp}));
+    testOpsAreIdempotent({prepareOp, commitOp});
 
     // The op should have thrown a NamespaceNotFound error, which should have been ignored, so the
     // operation has no effect.
-    // ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));
+    ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));
 }
-
 
 }  // namespace
 }  // namespace repl
