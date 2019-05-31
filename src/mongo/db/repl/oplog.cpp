@@ -1531,15 +1531,27 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     str::stream() << "Failed to apply insert due to missing _id: " << op.toString(),
                     o.hasField("_id"));
 
-            // 1. Try insert first, if we have no wrappingWriteUnitOfWork
-            // 2. If okay, commit
-            // 3. If not, do upsert (and commit)
-            // 4. If both !Ok, return status
+            // 1. Insert if
+            //   a) we do not have a wrapping WriteUnitOfWork, which implies we are not part of an
+            //      "applyOps" command, OR
+            //   b) we are part of a multi-document transaction[1].
+            //
+            // 2. Upsert[2] if
+            //   a) we have a wrapping WriteUnitOfWork AND we are not part of a transaction, which
+            //      implies we are part of an "applyOps" command, OR
+            //   b) the previous insert failed with a DuplicateKey error AND we are not part of a
+            //      transaction.
+            //
+            // [1] Transactions should not convert inserts to upserts because on secondaries they
+            //     will perform a lookup that never occurred on the primary. This may cause an
+            //     unintended prepare conflict and block replication. For this reason, transactions
+            //     should always fail with DuplicateKey errors and never retry inserts as upserts.
+            // [2] This upsert behavior exists to support idempotency guarantees outside
+            //     steady-state replication and existing users of applyOps.
 
-            // We cannot rely on a DuplicateKey error if we're part of a larger transaction,
-            // because that would require the transaction to abort. So instead, use upsert in that
-            // case.
-            bool needToDoUpsert = haveWrappingWriteUnitOfWork;
+            const auto txnParticipant = TransactionParticipant::get(opCtx);
+            const bool inTxn = txnParticipant && txnParticipant.inMultiDocumentTransaction();
+            bool needToDoUpsert = haveWrappingWriteUnitOfWork && !inTxn;
 
             Timestamp timestamp;
             long long term = OpTime::kUninitializedTerm;
@@ -1573,6 +1585,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 if (status.isOK()) {
                     wuow.commit();
                 } else if (status == ErrorCodes::DuplicateKey) {
+                    // Transactions cannot be retried as upserts once they fail with a duplicate key
+                    // error.
+                    if (inTxn) {
+                        return status;
+                    }
+                    // Continue to the next block to retry the operation as an upsert.
                     needToDoUpsert = true;
                 } else {
                     return status;

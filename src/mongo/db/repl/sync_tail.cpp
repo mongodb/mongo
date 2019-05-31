@@ -1022,10 +1022,6 @@ Status multiSyncApply(OperationContext* opCtx,
     // Explicitly start future read transactions without a timestamp.
     opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
 
-    // TODO: SERVER-40177 This should be removed once it is guaranteed operations applied on
-    // secondaries cannot encounter unnecessary prepare conflicts.
-    opCtx->recoveryUnit()->setIgnorePrepared(true);
-
     ApplierHelpers::stableSortByNamespace(ops);
 
     // Assume we are recovering if oplog writes are disabled in the options.

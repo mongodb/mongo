@@ -448,10 +448,6 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
             // Snapshot transaction can never conflict with the PBWM lock.
             newOpCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
-            // TODO: SERVER-40177 This should be removed once it is guaranteed operations applied on
-            // recovering nodes cannot encounter unnecessary prepare conflicts.
-            newOpCtx->recoveryUnit()->setIgnorePrepared(true);
-
             // Checks out the session, applies the operations and prepares the transaction.
             uassertStatusOK(
                 applyRecoveredPrepareTransaction(newOpCtx.get(), prepareOplogEntry, mode));

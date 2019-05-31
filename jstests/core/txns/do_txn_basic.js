@@ -209,12 +209,15 @@
     assert.eq(true, a.results[0], "Bad result value for valid insert");
 
     jsTestLog("Duplicate insert");
-    a = assert.commandWorked(db.adminCommand({
+    a = assert.commandFailedWithCode(db.adminCommand({
         doTxn: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}],
         txnNumber: NumberLong(txnNumber++)
-    }));
-    assert.eq(1, t.find().count(), "Duplicate insert failed");
-    assert.eq(true, a.results[0], "Bad result value for duplicate insert");
+    }),
+                                     ErrorCodes.DuplicateKey);
+    assert.eq(1,
+              t.find().count(),
+              "The number of documents changed despite the duplicate insert failing");
+    assert.eq(false, a.results[0], "Bad result value for duplicate insert");
 
     var o = {_id: 5, x: 17};
     assert.eq(o, t.findOne(), "Mismatching document inserted.");
