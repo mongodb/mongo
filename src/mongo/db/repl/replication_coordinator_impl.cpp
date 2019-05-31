@@ -3031,7 +3031,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
         log() << "**          in a future version." << startupWarningsLog;
     }
 
-    // Warn if running --nojournal and writeConcernMajorityJournalDefault = false
+    // Warn if running --nojournal and writeConcernMajorityJournalDefault = true
     StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
     if (storageEngine && !storageEngine->isDurable() &&
         (newConfig.getWriteConcernMajorityShouldJournal() &&
@@ -3046,6 +3046,23 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
         log() << "**          option to the replica set config must be set to false "
               << startupWarningsLog;
         log() << "**          or w:majority write concerns will never complete."
+              << startupWarningsLog;
+        log() << startupWarningsLog;
+    }
+
+    // Warn if using the in-memory (ephemeral) storage engine with
+    // writeConcernMajorityJournalDefault = true
+    if (storageEngine && storageEngine->isEphemeral() &&
+        (newConfig.getWriteConcernMajorityShouldJournal() &&
+         (!oldConfig.isInitialized() || !oldConfig.getWriteConcernMajorityShouldJournal()))) {
+        log() << startupWarningsLog;
+        log() << "** WARNING: This replica set is using in-memory (ephemeral) storage with the "
+              << startupWarningsLog;
+        log() << "**          writeConcernMajorityJournalDefault option to the replica set config "
+              << startupWarningsLog;
+        log() << "**          set to true. The writeConcernMajorityJournalDefault option to the "
+              << startupWarningsLog;
+        log() << "**          replica set config is unsupported while using in-memory storage."
               << startupWarningsLog;
         log() << startupWarningsLog;
     }
