@@ -35,6 +35,7 @@
 
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/s/transaction_coordinator_metrics_observer.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -343,6 +344,14 @@ void TransactionCoordinator::_done(Status status) {
         _serviceContext->getPreciseClockSource()->now(),
         _step);
 
+    if (status.isOK() &&
+        (shouldLog(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1)) ||
+         _transactionCoordinatorMetricsObserver->getSingleTransactionCoordinatorStats()
+                 .getTwoPhaseCommitDuration(tickSource, tickSource->getTicks()) >
+             Milliseconds(serverGlobalParams.slowMS))) {
+        _logSlowTwoPhaseCommit(*_decision);
+    }
+
     _completionPromisesFired = true;
 
     if (!_decisionDurable) {
@@ -359,6 +368,81 @@ void TransactionCoordinator::_done(Status status) {
     for (auto&& promise : promisesToTrigger) {
         promise.emplaceValue();
     }
+}
+
+void TransactionCoordinator::_logSlowTwoPhaseCommit(
+    const txn::CoordinatorCommitDecision& decision) {
+    log() << _twoPhaseCommitInfoForLog(decision);
+}
+
+std::string TransactionCoordinator::_twoPhaseCommitInfoForLog(
+    const txn::CoordinatorCommitDecision& decision) const {
+    StringBuilder s;
+
+    s << "two-phase commit";
+
+    BSONObjBuilder parametersBuilder;
+
+    BSONObjBuilder lsidBuilder(parametersBuilder.subobjStart("lsid"));
+    _lsid.serialize(&lsidBuilder);
+    lsidBuilder.doneFast();
+
+    parametersBuilder.append("txnNumber", _txnNumber);
+
+    s << " parameters:" << parametersBuilder.obj().toString();
+
+    switch (decision.getDecision()) {
+        case txn::CommitDecision::kCommit:
+            s << ", terminationCause:committed";
+            s << ", commitTimestamp: " << decision.getCommitTimestamp()->toString();
+            break;
+        case txn::CommitDecision::kAbort:
+            s << ", terminationCause:aborted";
+            // TODO: abortCause, abortSource
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    };
+
+    s << ", numParticipants:" << _participants->size();
+
+    auto tickSource = _serviceContext->getTickSource();
+    auto curTick = tickSource->getTicks();
+    const auto& singleTransactionCoordinatorStats =
+        _transactionCoordinatorMetricsObserver->getSingleTransactionCoordinatorStats();
+
+    BSONObjBuilder stepDurations;
+    stepDurations.append("writingParticipantListMicros",
+                         durationCount<Microseconds>(
+                             singleTransactionCoordinatorStats.getWritingParticipantListDuration(
+                                 tickSource, curTick)));
+    stepDurations.append(
+        "waitingForVotesMicros",
+        durationCount<Microseconds>(
+            singleTransactionCoordinatorStats.getWaitingForVotesDuration(tickSource, curTick)));
+    stepDurations.append(
+        "writingDecisionMicros",
+        durationCount<Microseconds>(
+            singleTransactionCoordinatorStats.getWritingDecisionDuration(tickSource, curTick)));
+    stepDurations.append("waitingForDecisionAcksMicros",
+                         durationCount<Microseconds>(
+                             singleTransactionCoordinatorStats.getWaitingForDecisionAcksDuration(
+                                 tickSource, curTick)));
+    stepDurations.append("deletingCoordinatorDocMicros",
+                         durationCount<Microseconds>(
+                             singleTransactionCoordinatorStats.getDeletingCoordinatorDocDuration(
+                                 tickSource, curTick)));
+    s << ", stepDurations:" << stepDurations.obj();
+
+    // Total duration of the commit coordination. Logged at the end of the line for consistency with
+    // slow command logging.
+    // Note that this is reported in milliseconds while the step durations are reported in
+    // microseconds.
+    s << " "
+      << duration_cast<Milliseconds>(
+             singleTransactionCoordinatorStats.getTwoPhaseCommitDuration(tickSource, curTick));
+
+    return s.str();
 }
 
 }  // namespace mongo

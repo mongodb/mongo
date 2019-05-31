@@ -132,6 +132,16 @@ private:
      */
     void _done(Status s);
 
+    /**
+     * Logs the diagnostic string for a commit coordination.
+     */
+    void _logSlowTwoPhaseCommit(const txn::CoordinatorCommitDecision& decision);
+
+    /**
+     * Builds the diagnostic string for a commit coordination.
+     */
+    std::string _twoPhaseCommitInfoForLog(const txn::CoordinatorCommitDecision& decision) const;
+
     // Shortcut to the service context under which this coordinator runs
     ServiceContext* const _serviceContext;
 
