@@ -590,6 +590,15 @@ TEST_F(ExprMatchTest, FailGracefullyOnInvalidExpression) {
         17041);
 }
 
+TEST_F(ExprMatchTest, ReturnsFalseInsteadOfErrorWithFailpointSet) {
+    createMatcher(fromjson("{$expr: {$divide: [10, '$divisor']}}"));
+    ASSERT_THROWS_CODE(matches(BSON("divisor" << 0)), AssertionException, 16608);
+
+    FailPointEnableBlock scopedFailpoint("ExprMatchExpressionMatchesReturnsFalseOnException");
+    createMatcher(fromjson("{$expr: {$divide: [10, '$divisor']}}"));
+    ASSERT_FALSE(matches(BSON("divisor" << 0)));
+}
+
 TEST(ExprMatchTest, IdenticalPostOptimizedExpressionsAreEquivalent) {
     BSONObj expression = BSON("$expr" << BSON("$multiply" << BSON_ARRAY(2 << 2)));
     BSONObj expressionEquiv = BSON("$expr" << BSON("$const" << 4));
