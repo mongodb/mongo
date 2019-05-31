@@ -38,7 +38,17 @@
 
 namespace mongo {
 
+EphemeralForTestRecoveryUnit::~EphemeralForTestRecoveryUnit() {
+    invariant(!_inUnitOfWork);
+}
+
+void EphemeralForTestRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
+    invariant(!_inUnitOfWork);
+    _inUnitOfWork = true;
+}
+
 void EphemeralForTestRecoveryUnit::commitUnitOfWork() {
+    invariant(_inUnitOfWork);
     try {
         for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
             (*it)->commit(boost::none);
@@ -52,9 +62,12 @@ void EphemeralForTestRecoveryUnit::commitUnitOfWork() {
     // SERVER-22575: Remove this once we add a generic mechanism to periodically wait
     // for durability.
     waitUntilDurable();
+    _inUnitOfWork = false;
 }
 
 void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
+    invariant(_inUnitOfWork);
+    _inUnitOfWork = false;
     try {
         for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend(); it != end;
              ++it) {
@@ -68,7 +81,26 @@ void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
     }
 }
 
+bool EphemeralForTestRecoveryUnit::waitUntilDurable() {
+    if (_waitUntilDurableCallback) {
+        _waitUntilDurableCallback();
+    }
+    return true;
+}
+
+bool EphemeralForTestRecoveryUnit::inActiveTxn() const {
+    return _inUnitOfWork;
+}
+
+void EphemeralForTestRecoveryUnit::abandonSnapshot() {
+    invariant(!_inUnitOfWork);
+}
+
 Status EphemeralForTestRecoveryUnit::obtainMajorityCommittedSnapshot() {
     return Status::OK();
 }
+
+void EphemeralForTestRecoveryUnit::registerChange(Change* change) {
+    _changes.push_back(ChangePtr(change));
 }
+}  // namespace mongo

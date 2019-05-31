@@ -105,6 +105,24 @@ TEST_F(RecoveryUnitTestHarness, CommitAndRollbackChanges) {
     ASSERT_EQUALS(count, 0);
 }
 
+TEST_F(RecoveryUnitTestHarness, CheckInActiveTxnWithCommit) {
+    const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
+    ru->beginUnitOfWork(opCtx.get());
+    ASSERT_TRUE(ru->inActiveTxn());
+    StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
+    ru->commitUnitOfWork();
+    ASSERT_FALSE(ru->inActiveTxn());
+}
+
+TEST_F(RecoveryUnitTestHarness, CheckInActiveTxnWithAbort) {
+    const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
+    ru->beginUnitOfWork(opCtx.get());
+    ASSERT_TRUE(ru->inActiveTxn());
+    StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
+    ru->abortUnitOfWork();
+    ASSERT_FALSE(ru->inActiveTxn());
+}
+
 DEATH_TEST_F(RecoveryUnitTestHarness, RegisterChangeMustBeInUnitOfWork, "invariant") {
     int count = 0;
     opCtx->recoveryUnit()->registerChange(new TestChange(&count));

@@ -407,6 +407,12 @@ public:
     };
 
     /**
+     * Indicates whether a unit of work is active. Will be true after beginUnitOfWork
+     * is called and before either commitUnitOfWork or abortUnitOfWork gets called.
+     */
+    virtual bool inActiveTxn() const = 0;
+
+    /**
      * A Change is an action that is registerChange()'d while a WriteUnitOfWork exists. The
      * change is either rollback()'d or commit()'d when the WriteUnitOfWork goes out of scope.
      *

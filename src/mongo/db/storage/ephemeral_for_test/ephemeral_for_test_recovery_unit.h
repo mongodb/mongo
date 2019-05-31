@@ -44,24 +44,21 @@ public:
     EphemeralForTestRecoveryUnit(std::function<void()> cb = nullptr)
         : _waitUntilDurableCallback(cb) {}
 
-    void beginUnitOfWork(OperationContext* opCtx) final{};
+    virtual ~EphemeralForTestRecoveryUnit();
+
+    void beginUnitOfWork(OperationContext* opCtx) final;
     void commitUnitOfWork() final;
     void abortUnitOfWork() final;
 
-    virtual bool waitUntilDurable() {
-        if (_waitUntilDurableCallback) {
-            _waitUntilDurableCallback();
-        }
-        return true;
-    }
+    virtual bool waitUntilDurable();
 
-    virtual void abandonSnapshot() {}
+    bool inActiveTxn() const;
+
+    virtual void abandonSnapshot();
 
     Status obtainMajorityCommittedSnapshot() final;
 
-    virtual void registerChange(Change* change) {
-        _changes.push_back(ChangePtr(change));
-    }
+    virtual void registerChange(Change* change);
 
     virtual SnapshotId getSnapshotId() const {
         return SnapshotId();
@@ -94,6 +91,8 @@ public:
 private:
     typedef std::shared_ptr<Change> ChangePtr;
     typedef std::vector<ChangePtr> Changes;
+
+    bool _inUnitOfWork = false;
 
     Changes _changes;
     std::function<void()> _waitUntilDurableCallback;

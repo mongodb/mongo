@@ -78,6 +78,10 @@ public:
 
     virtual void setOrderedCommit(bool orderedCommit) {}
 
+    bool inActiveTxn() const {
+        return false;
+    }
+
 private:
     std::vector<std::unique_ptr<Change>> _changes;
 };

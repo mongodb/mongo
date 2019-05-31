@@ -49,6 +49,10 @@ public:
     void commitUnitOfWork() override final;
     void abortUnitOfWork() override final;
 
+    bool inActiveTxn() const {
+        return _inUnitOfWork;
+    }
+
     virtual bool waitUntilDurable() override;
 
     virtual void abandonSnapshot() override;
