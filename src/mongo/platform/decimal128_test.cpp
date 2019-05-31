@@ -293,6 +293,24 @@ TEST(Decimal128Test, TestStringConstructorNaN) {
     ASSERT_EQUALS(val.low64, lowBytes);
 }
 
+TEST(Decimal128Test, TestLiteral) {
+#define ASSERT_LITERAL128(x) ASSERT_TRUE((x##_dec128).isBinaryEqual(Decimal128(#x)))
+    ASSERT_LITERAL128(5);
+    ASSERT_LITERAL128(-5);
+    ASSERT_LITERAL128(5.5);
+    ASSERT_LITERAL128(-5.5);
+    ASSERT_LITERAL128(5.1);
+    ASSERT_LITERAL128(-5.1);
+    ASSERT_LITERAL128(5.5E10);
+    ASSERT_LITERAL128(5.5E+10);
+    ASSERT_LITERAL128(5.5E-10);
+    ASSERT_LITERAL128(123456789012345678901234567890);  // 30 digits (100 bits)
+    ASSERT_LITERAL128(-123456789012345678901234567890);
+    ASSERT_LITERAL128(+123456789012345678901234567890);
+#undef ASSERT_LITERAL128
+    12345_dec128;
+}
+
 TEST(Decimal128Test, TestNonCanonicalDecimal) {
     // It is possible to encode a significand with more than 34 decimal digits.
     // Conforming implementations should not generate these, but they must be treated as zero
@@ -324,8 +342,8 @@ TEST(Decimal128Test, TestNonCanonicalDecimal) {
     const double minusZeroDouble = nonCanonicalM0E0.toDouble();
     ASSERT_EQUALS(minusZeroDouble, 0.0);
     ASSERT_EQUALS(-1.0, std::copysign(1.0, minusZeroDouble));
-    ASSERT_TRUE(nonCanonical0E3.add(Decimal128(1)).isEqual(Decimal128(1)));
-    ASSERT_TRUE(Decimal128(1).divide(nonCanonicalM0E0).isEqual(Decimal128::kNegativeInfinity));
+    ASSERT_TRUE(nonCanonical0E3.add(1_dec128).isEqual(1_dec128));
+    ASSERT_TRUE((1_dec128).divide(nonCanonicalM0E0).isEqual(Decimal128::kNegativeInfinity));
 }
 
 // Tests for absolute value function
@@ -414,33 +432,37 @@ TEST(Decimal128Test, TestDecimal128ToInt64Even) {
 
 TEST(Decimal128Test, TestDecimal128ToInt64Neg) {
     Decimal128::RoundingMode roundMode = Decimal128::RoundingMode::kRoundTowardNegative;
-    std::string in[6] = {"-4294967296.7",
-                         "-4294967296.5",
-                         "-4294967296.2",
-                         "4294967296.2",
-                         "4294967296.5",
-                         "4294967296.7"};
-    int64_t out[6] = {-4294967297, -4294967297, -4294967297, 4294967296, 4294967296, 4294967296};
-    std::unique_ptr<Decimal128> decPtr;
-    for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = std::make_unique<Decimal128>(in[testNo]);
-        ASSERT_EQUALS(decPtr->toLong(roundMode), out[testNo]);
+    struct {
+        Decimal128 in;
+        int64_t out;
+    } const specs[] = {
+        {-4294967296.7_dec128, -4294967297},
+        {-4294967296.5_dec128, -4294967297},
+        {-4294967296.2_dec128, -4294967297},
+        {4294967296.2_dec128, 4294967296},
+        {4294967296.5_dec128, 4294967296},
+        {4294967296.7_dec128, 4294967296},
+    };
+    for (const auto& spec : specs) {
+        ASSERT_EQUALS(spec.in.toLong(roundMode), spec.out);
     }
 }
 
 TEST(Decimal128Test, TestDecimal128ToInt64Pos) {
     Decimal128::RoundingMode roundMode = Decimal128::RoundingMode::kRoundTowardPositive;
-    std::string in[6] = {"-4294967296.7",
-                         "-4294967296.5",
-                         "-4294967296.2",
-                         "4294967296.2",
-                         "4294967296.5",
-                         "4294967296.7"};
-    int64_t out[6] = {-4294967296, -4294967296, -4294967296, 4294967297, 4294967297, 4294967297};
-    std::unique_ptr<Decimal128> decPtr;
-    for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = std::make_unique<Decimal128>(in[testNo]);
-        ASSERT_EQUALS(decPtr->toLong(roundMode), out[testNo]);
+    struct {
+        Decimal128 in;
+        int64_t out;
+    } const specs[] = {
+        {-4294967296.7_dec128, -4294967296},
+        {-4294967296.5_dec128, -4294967296},
+        {-4294967296.2_dec128, -4294967296},
+        {4294967296.2_dec128, 4294967297},
+        {4294967296.5_dec128, 4294967297},
+        {4294967296.7_dec128, 4294967297},
+    };
+    for (const auto& spec : specs) {
+        ASSERT_EQUALS(spec.in.toLong(roundMode), spec.out);
     }
 }
 
@@ -938,23 +960,21 @@ TEST(Decimal128Test, TestDecimal128AddSignaling) {
 TEST(Decimal128Test, TestDecimal128SubtractSignaling) {
     Decimal128 d = Decimal128::kLargestNegative;
     uint32_t sigFlags = Decimal128::SignalingFlag::kNoFlag;
-    Decimal128 res = d.subtract(Decimal128(1), &sigFlags);
+    Decimal128 res = d.subtract(1_dec128, &sigFlags);
     ASSERT_TRUE(res.isEqual(Decimal128::kLargestNegative));
     ASSERT_TRUE(Decimal128::hasFlag(sigFlags, Decimal128::SignalingFlag::kInexact));
 }
 
 TEST(Decimal128Test, TestDecimal128MultiplySignaling) {
-    Decimal128 d("2");
     uint32_t sigFlags = Decimal128::SignalingFlag::kNoFlag;
-    Decimal128 res = d.multiply(Decimal128::kLargestPositive, &sigFlags);
+    Decimal128 res = (2_dec128).multiply(Decimal128::kLargestPositive, &sigFlags);
     ASSERT_TRUE(res.isEqual(Decimal128::kPositiveInfinity));
     ASSERT_TRUE(Decimal128::hasFlag(sigFlags, Decimal128::SignalingFlag::kOverflow));
 }
 
 TEST(Decimal128Test, TestDecimal128DivideSignaling) {
-    Decimal128 d("2");
     uint32_t sigFlags = Decimal128::SignalingFlag::kNoFlag;
-    Decimal128 res = d.divide(Decimal128(0), &sigFlags);
+    Decimal128 res = (2_dec128).divide(0_dec128, &sigFlags);
     ASSERT_TRUE(res.isEqual(Decimal128::kPositiveInfinity));
     ASSERT_TRUE(Decimal128::hasFlag(sigFlags, Decimal128::SignalingFlag::kDivideByZero));
 }
@@ -968,12 +988,9 @@ TEST(Decimal128Test, TestDecimal128IsZero) {
 }
 
 TEST(Decimal128Test, TestDecimal128IsNaN) {
-    Decimal128 d1("NaN");
-    Decimal128 d2("10.5");
-    Decimal128 d3("Inf");
-    ASSERT_TRUE(d1.isNaN());
-    ASSERT_FALSE(d2.isNaN());
-    ASSERT_FALSE(d3.isNaN());
+    ASSERT_TRUE("NaN"_dec128.isNaN());
+    ASSERT_FALSE("10.5"_dec128.isNaN());
+    ASSERT_FALSE("Inf"_dec128.isNaN());
 }
 
 TEST(Decimal128Test, TestDecimal128IsInfinite) {

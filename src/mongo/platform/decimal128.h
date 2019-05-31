@@ -30,6 +30,7 @@
 #pragma once
 
 #include <array>
+#include <climits>
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -342,11 +343,9 @@ public:
     /**
      * Returns `this` with inverted sign bit
      */
-    Decimal128 negate() const {
-        Value negated = {_value.low64, _value.high64 ^ (1ULL << 63)};
-        return Decimal128(negated);
+    constexpr Decimal128 negate() const {
+        return Decimal128(Value{_value.low64, _value.high64 ^ (std::uint64_t{1} << 63)});
     }
-
 
     /**
      * This set of functions converts a Decimal128 to a certain integer type with a
@@ -528,6 +527,14 @@ public:
         return _value.high64 == other._value.high64 && _value.low64 == other._value.low64;
     }
 
+    constexpr Decimal128 operator-() const {
+        return negate();
+    }
+
+    constexpr Decimal128 operator+() const {
+        return *this;
+    }
+
 private:
     constexpr static std::uint8_t kSignFieldPos = 64 - 1;
     constexpr static std::uint8_t kCombinationFieldPos = kSignFieldPos - 17;
@@ -589,4 +596,13 @@ private:
 
     Value _value;
 };
+
+inline Decimal128 operator"" _dec128(const char* s) {
+    return Decimal128(s);
+}
+
+inline Decimal128 operator"" _dec128(const char* s, std::size_t len) {
+    return Decimal128(std::string(s, len));
+}
+
 }  // namespace mongo
