@@ -65,10 +65,9 @@
     // First we start up the mongod normally, all the files except mongod.lock should have the mode
     // 0600
     let conn = MongoRunner.runMongod(mongodOptions);
-
+    MongoRunner.stopMongod(conn);
     checkMask(conn.fullOptions.dbpath, defaultUmask, false);
 
-    MongoRunner.stopMongod(conn);
 
     // Restart the mongod with honorSystemUmask, all files should have the mode 0666
     mongodOptions.setParameter = {honorSystemUmask: true};
