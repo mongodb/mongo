@@ -496,7 +496,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     _requests.push_back(make_pair(expiration, std::move(pf.promise)));
     std::push_heap(begin(_requests), end(_requests), RequestComparator{});
 
-    spawnConnections();
+    runOnExecutor([ this, anchor = shared_from_this() ]() { spawnConnections(); });
 
     return std::move(pf.future);
 }

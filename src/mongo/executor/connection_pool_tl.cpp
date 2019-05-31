@@ -232,6 +232,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
     auto isMasterHook = std::make_shared<TLConnectionSetupHook>(_onConnectHook);
 
     AsyncDBClient::connect(_peer, _sslMode, _serviceContext, _reactor, timeout)
+        .thenRunOn(_reactor)
         .onError([](StatusWith<AsyncDBClient::Handle> swc) -> StatusWith<AsyncDBClient::Handle> {
             return Status(ErrorCodes::HostUnreachable, swc.getStatus().reason());
         })
