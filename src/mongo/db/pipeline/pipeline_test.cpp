@@ -660,6 +660,76 @@ TEST(PipelineOptimizationTest, LookupDoesNotAbsorbUnwindOnSubfieldOfAsButStillMo
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
+TEST(PipelineOptimizationTest, GroupShouldSwapWithMatchIfFilteringOnID) {
+    string inputPipe =
+        "[{$group : {_id:'$a'}}, "
+        " {$match: {_id : 4}}]";
+    string outputPipe =
+        "[{$match: {a:{$eq : 4}}}, "
+        " {$group:{_id:'$a'}}]";
+    string serializedPipe =
+        "[{$match: {a:{$eq :4}}}, "
+        " {$group:{_id:'$a'}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfNotFilteringOnID) {
+    string inputPipe =
+        "[{$group : {_id:'$a'}}, "
+        " {$match: {b : 4}}]";
+    string outputPipe =
+        "[{$group : {_id:'$a'}}, "
+        " {$match: {b : {$eq: 4}}}]";
+    string serializedPipe =
+        "[{$group : {_id:'$a'}}, "
+        " {$match: {b : 4}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfExistsPredicateOnID) {
+    string inputPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {_id : {$exists: true}}}]";
+    string outputPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {_id : {$exists: true}}}]";
+    string serializedPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {_id : {$exists: true}}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, GroupShouldNotSwapWithCompoundMatchIfExistsPredicateOnID) {
+    string inputPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {$or : [ {_id : {$exists: true}}, {_id : {$gt : 70}}]}}]";
+    string outputPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {$or : [ {_id : {$exists: true}}, {_id : {$gt : 70}}]}}]";
+    string serializedPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {$or : [ {_id : {$exists: true}}, {_id : {$gt : 70}}]}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, GroupShouldSwapWithCompoundMatchIfFilteringOnID) {
+    string inputPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {$or : [ {_id : {$lte : 50}}, {_id : {$gt : 70}}]}}]";
+    string outputPipe =
+        "[{$match: {$or : [  {x : {$lte : 50}}, {x : {$gt : 70}}]}},"
+        "{$group : {_id:'$x'}}]";
+    string serializedPipe =
+        "[{$match: {$or : [  {x : {$lte : 50}}, {x : {$gt : 70}}]}},"
+        "{$group : {_id:'$x'}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST(PipelineOptimizationTest, MatchShouldDuplicateItselfBeforeRedact) {
     string inputPipe = "[{$redact: '$$PRUNE'}, {$match: {a: 1, b:12}}]";
     string outputPipe =

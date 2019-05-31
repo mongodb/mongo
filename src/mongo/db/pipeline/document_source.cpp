@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source.h"
 
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_sample.h"
@@ -209,12 +210,36 @@ StringMap<std::string> computeNewNamesAssumingAnyPathsNotRenamedAreUnmodified(
     return renameOut;
 }
 
+/**
+ * Verifies whether or not a $group is able to swap with a succeeding $match stage. While ordinarily
+ * $group can swap with a $match, it cannot if the following $match has an $exists predicate on _id,
+ * and the $group has exactly one field as the $group key.  This is because every document will have
+ * an _id field following such a $group stage, including those whose group key was missing before
+ * the $group. As an example, the following optimization would be incorrect as the post-optimization
+ * pipeline would handle documents that had nullish _id fields differently. Thus, given such a
+ * $group and $match, this function would return false.
+ *   {$group: {_id: "$x"}}
+ *   {$match: {_id: {$exists: true}}
+ * ---->
+ *   {$match: {x: {$exists: true}}
+ *   {$group: {_id: "$x"}}
+ */
+bool groupMatchSwapVerified(const DocumentSourceMatch& nextMatch,
+                            const DocumentSourceGroup& thisGroup) {
+    if (thisGroup.getIdFields().size() != 1) {
+        return true;
+    }
+    return !expression::hasExistencePredicateOnPath(*(nextMatch.getMatchExpression()), "_id"_sd);
+}
+
 }  // namespace
 
 bool DocumentSource::pushMatchBefore(Pipeline::SourceContainer::iterator itr,
                                      Pipeline::SourceContainer* container) {
     auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get());
-    if (constraints().canSwapWithMatch && nextMatch && !nextMatch->isTextQuery()) {
+    auto thisGroup = dynamic_cast<DocumentSourceGroup*>(this);
+    if (constraints().canSwapWithMatch && nextMatch && !nextMatch->isTextQuery() &&
+        (!thisGroup || groupMatchSwapVerified(*nextMatch, *thisGroup))) {
         // We're allowed to swap with a $match and the stage after us is a $match. Furthermore, the
         // $match does not contain a text search predicate, which we do not attempt to optimize
         // because such a $match must already be the first stage in the pipeline. We can attempt to

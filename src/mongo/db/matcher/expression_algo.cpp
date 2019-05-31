@@ -357,6 +357,19 @@ splitMatchExpressionByWithoutRenames(unique_ptr<MatchExpression> expr,
 
 namespace expression {
 
+bool hasExistencePredicateOnPath(const MatchExpression& expr, StringData path) {
+    if (expr.getCategory() == MatchExpression::MatchCategory::kLeaf) {
+        return (expr.matchType() == MatchExpression::MatchType::EXISTS && expr.path() == path);
+    }
+    for (size_t i = 0; i < expr.numChildren(); i++) {
+        MatchExpression* child = expr.getChild(i);
+        if (hasExistencePredicateOnPath(*child, path)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
     invariant(lhs);
     invariant(rhs);
