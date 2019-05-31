@@ -1,0 +1,5 @@
+# To use our LLDB extensions add the following to the file ~/.lldbinit:
+#
+#     settings set target.load-cwd-lldbinit true
+#
+command script import buildscripts/lldb/lldb_printers.py
