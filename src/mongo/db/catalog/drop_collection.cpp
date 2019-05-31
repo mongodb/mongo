@@ -53,10 +53,9 @@ MONGO_FAIL_POINT_DEFINE(hangDropCollectionBeforeLockAcquisition);
 MONGO_FAIL_POINT_DEFINE(hangDuringDropCollection);
 
 Status _dropView(OperationContext* opCtx,
-                 std::unique_ptr<AutoGetDb>& autoDb,
+                 Database* db,
                  const NamespaceString& collectionName,
                  BSONObjBuilder& result) {
-    Database* db = autoDb->getDb();
     if (!db) {
         return Status(ErrorCodes::NamespaceNotFound, "ns not found");
     }
@@ -77,7 +76,7 @@ Status _dropView(OperationContext* opCtx,
                                   collectionName,
                                   Top::LockType::NotLocked,
                                   AutoStatsTracker::LogMode::kUpdateTopAndCurop,
-                                  autoDb->getDb()->getProfilingLevel());
+                                  db->getProfilingLevel());
 
     if (opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName)) {
@@ -161,17 +160,15 @@ Status dropCollection(OperationContext* opCtx,
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDropCollectionBeforeLockAcquisition);
     }
     return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
-        // TODO(SERVER-39520): Get rid of database MODE_X lock.
-        auto autoDb = std::make_unique<AutoGetDb>(opCtx, collectionName.db(), MODE_IX);
-
-        Database* db = autoDb->getDb();
+        AutoGetDb autoDb(opCtx, collectionName.db(), MODE_IX);
+        Database* db = autoDb.getDb();
         if (!db) {
             return Status(ErrorCodes::NamespaceNotFound, "ns not found");
         }
 
         Collection* coll = db->getCollection(opCtx, collectionName);
         if (!coll) {
-            return _dropView(opCtx, autoDb, collectionName, result);
+            return _dropView(opCtx, db, collectionName, result);
         } else {
             return _dropCollection(
                 opCtx, db, collectionName, dropOpTime, systemCollectionMode, result);
