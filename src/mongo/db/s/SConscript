@@ -132,9 +132,11 @@ env.Library(
         'transaction_coordinator_util.cpp',
         'transaction_coordinator.cpp',
         env.Idlc('transaction_coordinator_document.idl')[0],
+        env.Idlc('transaction_coordinators_stats.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/transaction',
+        '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/rw_concern_d',
@@ -428,6 +430,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
         '$BUILD_DIR/mongo/s/shard_server_test_fixture',
         'transaction_coordinator',

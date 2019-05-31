@@ -35,6 +35,7 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/s/server_transaction_coordinators_metrics.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_metrics_observer.h"
 #include "mongo/db/s/transaction_coordinator_test_fixture.h"
@@ -969,6 +970,28 @@ public:
                   metrics()->getCurrentWaitingForDecisionAcks());
         ASSERT_EQ(expectedMetrics.currentDeletingCoordinatorDoc,
                   metrics()->getCurrentDeletingCoordinatorDoc());
+    }
+
+    void checkServerStatus() {
+        TransactionCoordinatorsSSS tcsss;
+        BSONElement dummy;
+        const auto serverStatusSection = tcsss.generateSection(operationContext(), dummy);
+        ASSERT_EQ(metrics()->getTotalCreated(), serverStatusSection["totalCreated"].Long());
+        ASSERT_EQ(metrics()->getTotalStartedTwoPhaseCommit(),
+                  serverStatusSection["totalStartedTwoPhaseCommit"].Long());
+        ASSERT_EQ(
+            metrics()->getCurrentWritingParticipantList(),
+            serverStatusSection.getObjectField("currentInSteps")["writingParticipantList"].Long());
+        ASSERT_EQ(metrics()->getCurrentWaitingForVotes(),
+                  serverStatusSection.getObjectField("currentInSteps")["waitingForVotes"].Long());
+        ASSERT_EQ(metrics()->getCurrentWritingDecision(),
+                  serverStatusSection.getObjectField("currentInSteps")["writingDecision"].Long());
+        ASSERT_EQ(
+            metrics()->getCurrentWaitingForDecisionAcks(),
+            serverStatusSection.getObjectField("currentInSteps")["waitingForDecisionAcks"].Long());
+        ASSERT_EQ(
+            metrics()->getCurrentDeletingCoordinatorDoc(),
+            serverStatusSection.getObjectField("currentInSteps")["deletingCoordinatorDoc"].Long());
     }
 
     Date_t advanceClockSourceAndReturnNewNow() {
@@ -2099,6 +2122,44 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesStepDurationsAndTot
                                           "waitingForDecisionAcksMicros: 100000, "
                                           "deletingCoordinatorDocMicros: 100000 }"));
     ASSERT_EQUALS(1, countLogLinesContaining(" 500ms\n") + countLogLinesContaining(" 500ms\r\n"));
+}
+
+TEST_F(TransactionCoordinatorMetricsTest, ServerStatusSectionIncludesTotalCreated) {
+    metrics()->incrementTotalCreated();
+    checkServerStatus();
+}
+
+TEST_F(TransactionCoordinatorMetricsTest, ServerStatusSectionIncludesTotalStartedTwoPhaseCommit) {
+    metrics()->incrementTotalStartedTwoPhaseCommit();
+    checkServerStatus();
+}
+
+TEST_F(TransactionCoordinatorMetricsTest,
+       ServerStatusSectionIncludesCurrentWritingParticipantList) {
+    metrics()->incrementCurrentWritingParticipantList();
+    checkServerStatus();
+}
+
+TEST_F(TransactionCoordinatorMetricsTest, ServerStatusSectionIncludesCurrentWaitingForVotes) {
+    metrics()->incrementCurrentWaitingForVotes();
+    checkServerStatus();
+}
+
+TEST_F(TransactionCoordinatorMetricsTest, ServerStatusSectionIncludesCurrentWritingDecision) {
+    metrics()->incrementCurrentWritingDecision();
+    checkServerStatus();
+}
+
+TEST_F(TransactionCoordinatorMetricsTest,
+       ServerStatusSectionIncludesCurrentWaitingForDecisionAcks) {
+    metrics()->incrementCurrentWaitingForDecisionAcks();
+    checkServerStatus();
+}
+
+TEST_F(TransactionCoordinatorMetricsTest,
+       ServerStatusSectionIncludesCurrentDeletingCoordinatorDoc) {
+    metrics()->incrementCurrentDeletingCoordinatorDoc();
+    checkServerStatus();
 }
 
 }  // namespace
