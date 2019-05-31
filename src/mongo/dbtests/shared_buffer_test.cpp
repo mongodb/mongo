@@ -29,9 +29,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/shared_buffer.h"
+
+#include "mongo/base/string_data.h"
+
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

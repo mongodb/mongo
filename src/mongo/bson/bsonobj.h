@@ -33,6 +33,7 @@
 #include <list>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -590,6 +591,9 @@ private:
     const char* _objdata;
     ConstSharedBuffer _ownedBuffer;
 };
+
+MONGO_STATIC_ASSERT(std::is_nothrow_move_constructible_v<BSONObj>);
+MONGO_STATIC_ASSERT(std::is_nothrow_move_assignable_v<BSONObj>);
 
 std::ostream& operator<<(std::ostream& s, const BSONObj& o);
 std::ostream& operator<<(std::ostream& s, const BSONElement& e);

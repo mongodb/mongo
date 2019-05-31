@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <type_traits>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/shared_buffer.h"
 
@@ -97,5 +99,8 @@ private:
     int _size;
     SharedBuffer _ownedData;
 };
+
+MONGO_STATIC_ASSERT(std::is_nothrow_move_constructible_v<RecordData>);
+MONGO_STATIC_ASSERT(std::is_nothrow_move_assignable_v<RecordData>);
 
 }  // namespace mongo

@@ -30,10 +30,12 @@
 #pragma once
 
 #include <algorithm>
+#include <type_traits>
 
 #include <boost/intrusive_ptr.hpp>
 
 #include "mongo/platform/atomic_word.h"
+
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 
@@ -176,6 +178,9 @@ private:
 
     boost::intrusive_ptr<Holder> _holder;
 };
+
+MONGO_STATIC_ASSERT(std::is_nothrow_move_constructible_v<SharedBuffer>);
+MONGO_STATIC_ASSERT(std::is_nothrow_move_assignable_v<SharedBuffer>);
 
 inline void swap(SharedBuffer& one, SharedBuffer& two) {
     one.swap(two);
