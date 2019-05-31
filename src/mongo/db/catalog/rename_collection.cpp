@@ -399,24 +399,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
 
     if (targetColl) {
         if (sourceColl->uuid() == targetColl->uuid()) {
-            if (!uuidToDrop || uuidToDrop == targetColl->uuid()) {
-                return Status::OK();
-            }
-
-            // During initial sync, it is possible that the collection already
-            // got renamed to the target, so there is not much left to do other
-            // than drop the dropTarget. See SERVER-40861 for more details.
-            return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
-                WriteUnitOfWork wunit(opCtx);
-                auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, *uuidToDrop);
-                repl::UnreplicatedWritesBlock uwb(opCtx);
-                Status status =
-                    db->dropCollection(opCtx, *collToDropBasedOnUUID, renameOpTimeFromApplyOps);
-                if (!status.isOK())
-                    return status;
-                wunit.commit();
-                return Status::OK();
-            });
+            return Status::OK();
         }
         if (uuidToDrop && uuidToDrop != targetColl->uuid()) {
             // We need to rename the targetColl to a temporary name.
