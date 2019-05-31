@@ -45,6 +45,8 @@ class DBClientBase;
 
 namespace shell_utils {
 
+bool isBalanced(const std::string& code);
+
 extern std::string dbConnect;
 using EnterpriseShellCallback = void(Scope&);
 

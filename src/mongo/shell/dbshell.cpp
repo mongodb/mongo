@@ -69,7 +69,6 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
-#include "mongo/util/startup_test.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
@@ -442,165 +441,8 @@ std::string getURIFromArgs(const std::string& arg,
     return parseDbHost("", "127.0.0.1");
 }
 
-static std::string OpSymbols = "~!%^&*-+=|:,<>/?.";
-
-bool isOpSymbol(char c) {
-    for (size_t i = 0; i < OpSymbols.size(); i++)
-        if (OpSymbols[i] == c)
-            return true;
-    return false;
-}
-
-bool isUseCmd(const std::string& code) {
-    std::string cmd = code;
-    if (cmd.find(" ") > 0)
-        cmd = cmd.substr(0, cmd.find(" "));
-    return cmd == "use";
-}
-
-/**
- * Skip over a quoted string, including quotes escaped with backslash
- *
- * @param code      String
- * @param start     Starting position within string, always > 0
- * @param quote     Quote character (single or double quote)
- * @return          Position of ending quote, or code.size() if no quote found
- */
-size_t skipOverString(const std::string& code, size_t start, char quote) {
-    size_t pos = start;
-    while (pos < code.size()) {
-        pos = code.find(quote, pos);
-        if (pos == std::string::npos) {
-            return code.size();
-        }
-        // We want to break if the quote we found is not escaped, but we need to make sure
-        // that the escaping backslash is not itself escaped.  Comparisons of start and pos
-        // are to keep us from reading beyond the beginning of the quoted string.
-        //
-        if (start == pos || code[pos - 1] != '\\' ||  // previous char was backslash
-            start == pos - 1 ||
-            code[pos - 2] == '\\'  // char before backslash was not another
-            ) {
-            break;  // The quote we found was not preceded by an unescaped backslash; it is real
-        }
-        ++pos;  // The quote we found was escaped with backslash, so it doesn't count
-    }
-    return pos;
-}
-
-bool isBalanced(const std::string& code) {
-    if (isUseCmd(code))
-        return true;  // don't balance "use <dbname>" in case dbname contains special chars
-    int curlyBrackets = 0;
-    int squareBrackets = 0;
-    int parens = 0;
-    bool danglingOp = false;
-
-    for (size_t i = 0; i < code.size(); i++) {
-        switch (code[i]) {
-            case '/':
-                if (i + 1 < code.size() && code[i + 1] == '/') {
-                    while (i < code.size() && code[i] != '\n')
-                        i++;
-                }
-                continue;
-            case '{':
-                curlyBrackets++;
-                break;
-            case '}':
-                if (curlyBrackets <= 0)
-                    return true;
-                curlyBrackets--;
-                break;
-            case '[':
-                squareBrackets++;
-                break;
-            case ']':
-                if (squareBrackets <= 0)
-                    return true;
-                squareBrackets--;
-                break;
-            case '(':
-                parens++;
-                break;
-            case ')':
-                if (parens <= 0)
-                    return true;
-                parens--;
-                break;
-            case '"':
-            case '\'':
-                i = skipOverString(code, i + 1, code[i]);
-                if (i >= code.size()) {
-                    return true;  // Do not let unterminated strings enter multi-line mode
-                }
-                break;
-            case '\\':
-                if (i + 1 < code.size() && code[i + 1] == '/')
-                    i++;
-                break;
-            case '+':
-            case '-':
-                if (i + 1 < code.size() && code[i + 1] == code[i]) {
-                    i++;
-                    continue;  // postfix op (++/--) can't be a dangling op
-                }
-                break;
-        }
-        if (i >= code.size()) {
-            danglingOp = false;
-            break;
-        }
-        if (isOpSymbol(code[i]))
-            danglingOp = true;
-        else if (!std::isspace(static_cast<unsigned char>(code[i])))
-            danglingOp = false;
-    }
-
-    return curlyBrackets == 0 && squareBrackets == 0 && parens == 0 && !danglingOp;
-}
-
-struct BalancedTest : public mongo::StartupTest {
-public:
-    void run() {
-        verify(isBalanced("x = 5"));
-        verify(isBalanced("function(){}"));
-        verify(isBalanced("function(){\n}"));
-        verify(!isBalanced("function(){"));
-        verify(isBalanced("x = \"{\";"));
-        verify(isBalanced("// {"));
-        verify(!isBalanced("// \n {"));
-        verify(!isBalanced("\"//\" {"));
-        verify(isBalanced("{x:/x\\//}"));
-        verify(!isBalanced("{ \\/// }"));
-        verify(isBalanced("x = 5 + y "));
-        verify(!isBalanced("x = "));
-        verify(!isBalanced("x = // hello"));
-        verify(!isBalanced("x = 5 +"));
-        verify(isBalanced(" x ++"));
-        verify(isBalanced("-- x"));
-        verify(!isBalanced("a."));
-        verify(!isBalanced("a. "));
-        verify(isBalanced("a.b"));
-
-        // SERVER-5809 and related cases --
-        verify(isBalanced("a = {s:\"\\\"\"}"));            // a = {s:"\""}
-        verify(isBalanced("db.test.save({s:\"\\\"\"})"));  // db.test.save({s:"\""})
-        verify(isBalanced("printjson(\" \\\" \")"));       // printjson(" \" ") -- SERVER-8554
-        verify(isBalanced("var a = \"\\\\\";"));           // var a = "\\";
-        verify(isBalanced("var a = (\"\\\\\") //\""));     // var a = ("\\") //"
-        verify(isBalanced("var a = (\"\\\\\") //\\\""));   // var a = ("\\") //\"
-        verify(isBalanced("var a = (\"\\\\\") //"));       // var a = ("\\") //
-        verify(isBalanced("var a = (\"\\\\\")"));          // var a = ("\\")
-        verify(isBalanced("var a = (\"\\\\\\\"\")"));      // var a = ("\\\"")
-        verify(!isBalanced("var a = (\"\\\\\" //\""));     // var a = ("\\" //"
-        verify(!isBalanced("var a = (\"\\\\\" //"));       // var a = ("\\" //
-        verify(!isBalanced("var a = (\"\\\\\""));          // var a = ("\\"
-    }
-} balanced_test;
-
 std::string finishCode(std::string code) {
-    while (!isBalanced(code)) {
+    while (!shell_utils::isBalanced(code)) {
         inMultiLine = true;
         code += "\n";
         // cancel multiline if two blank lines are entered
@@ -844,8 +686,6 @@ int _main(int argc, char* argv[], char** envp) {
 
     if (!mongo::serverGlobalParams.quiet.load())
         std::cout << mongoShellVersion(VersionInfoInterface::instance()) << std::endl;
-
-    mongo::StartupTest::runTests();
 
     logger::globalLogManager()
         ->getNamedDomain("javascriptOutput")

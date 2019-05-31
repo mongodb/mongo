@@ -36,7 +36,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/util/md5.hpp"
-#include "mongo/util/startup_test.h"
 
 namespace mongo {
 
@@ -136,14 +135,6 @@ void recursiveHash(Hasher* h, const BSONElement& e, bool includeFieldName) {
         }
     }
 }
-
-struct HasherUnitTest : public StartupTest {
-    void run() {
-        // Hard-coded check to ensure the hash function is consistent across platforms
-        BSONObj o = BSON("check" << 42);
-        verify(BSONElementHasher::hash64(o.firstElement(), 0) == -944302157085130861LL);
-    }
-} hasherUnitTest;
 
 }  // namespace
 

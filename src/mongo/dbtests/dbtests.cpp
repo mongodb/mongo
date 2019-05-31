@@ -58,7 +58,6 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
-#include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -214,7 +213,6 @@ int dbtestsMain(int argc, char** argv, char** envp) {
 
     AuthorizationManager::get(service)->setAuthEnabled(false);
     ScriptEngine::setup();
-    StartupTest::runTests();
     return mongo::dbtests::runDbTests(argc, argv);
 }
 

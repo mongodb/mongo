@@ -114,3 +114,34 @@ env.CppUnitTest(
         'shell_options_register',
     ],
 )
+
+env.Library(
+    target='shell_utils',
+    source=[
+        'mongo-server.cpp',
+        'shell_options.cpp',
+        'shell_utils.cpp',
+        'shell_utils_extended.cpp',
+        'shell_utils_launcher.cpp',
+    ],
+    LIBDEPS=[
+        'benchrun',
+        '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/traffic_reader',
+        '$BUILD_DIR/mongo/scripting/scripting',
+        '$BUILD_DIR/mongo/transport/message_compressor',
+        '$BUILD_DIR/mongo/util/password',
+        'shell_options_storage',
+    ]
+)
+
+env.CppUnitTest(
+    target='shell_utils_test',
+    source=[
+        'shell_utils_test.cpp'
+    ],
+    LIBDEPS=[
+        'shell_utils'
+    ]
+)

@@ -131,7 +131,6 @@ env.Library(
         'util/signal_handlers_synchronous.cpp',
         'util/stacktrace.cpp',
         'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
-        'util/startup_test.cpp',
         'util/str.cpp',
         'util/system_clock_source.cpp',
         'util/system_tick_source.cpp',
@@ -566,12 +565,7 @@ if not has_option('noshell') and usemozjs:
     shell_core_env.Library("shell_core",
                 source=[
                     "shell/linenoise.cpp",
-                    "shell/mk_wcwidth.cpp",
-                    "shell/mongo-server.cpp",
-                    "shell/shell_options.cpp",
-                    "shell/shell_utils.cpp",
-                    "shell/shell_utils_extended.cpp",
-                    "shell/shell_utils_launcher.cpp",
+                    "shell/mk_wcwidth.cpp"
                 ],
                 LIBDEPS=[
                     'client/clientdriver_network',
@@ -587,7 +581,7 @@ if not has_option('noshell') and usemozjs:
                     'scripting/scripting',
                     'shell/benchrun',
                     'shell/mongojs',
-                    'shell/shell_options_storage',
+                    'shell/shell_utils',
                     'transport/message_compressor',
                     'transport/transport_layer_manager',
                     'util/net/network',

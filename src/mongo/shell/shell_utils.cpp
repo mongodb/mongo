@@ -35,6 +35,7 @@
 
 #include <algorithm>
 #include <boost/filesystem.hpp>
+#include <cctype>
 #include <memory>
 #include <set>
 #include <stdlib.h>
@@ -134,7 +135,132 @@ MONGO_REGISTER_SHIM(BenchRunConfig::createConnectionImpl)
     return connection;
 }
 
+namespace {
+
+// helper functions for isBalanced
+bool isUseCmd(std::string code) {
+    size_t first_space = code.find(" ");
+    if (first_space)
+        code = code.substr(0, first_space);
+    return code == "use";
+}
+
+/**
+ * Skip over a quoted string, including quotes escaped with backslash
+ *
+ * @param code      String
+ * @param start     Starting position within string, always > 0
+ * @param quote     Quote character (single or double quote)
+ * @return          Position of ending quote, or code.size() if no quote found
+ */
+size_t skipOverString(const std::string& code, size_t start, char quote) {
+    size_t pos = start;
+    while (pos < code.size()) {
+        pos = code.find(quote, pos);
+        if (pos == std::string::npos) {
+            return code.size();
+        }
+        // We want to break if the quote we found is not escaped, but we need to make sure
+        // that the escaping backslash is not itself escaped.  Comparisons of start and pos
+        // are to keep us from reading beyond the beginning of the quoted string.
+        //
+        if (start == pos || code[pos - 1] != '\\' ||  // previous char was backslash
+            start == pos - 1 ||
+            code[pos - 2] == '\\'  // char before backslash was not another
+            ) {
+            break;  // The quote we found was not preceded by an unescaped backslash; it is real
+        }
+        ++pos;  // The quote we found was escaped with backslash, so it doesn't count
+    }
+    return pos;
+}
+
+bool isOpSymbol(char c) {
+    static std::string OpSymbols = "~!%^&*-+=|:,<>/?.";
+
+    for (size_t i = 0; i < OpSymbols.size(); i++)
+        if (OpSymbols[i] == c)
+            return true;
+    return false;
+}
+
+}  // namespace
+
 namespace shell_utils {
+
+
+bool isBalanced(const std::string& code) {
+    if (isUseCmd(code))
+        return true;  // don't balance "use <dbname>" in case dbname contains special chars
+    int curlyBrackets = 0;
+    int squareBrackets = 0;
+    int parens = 0;
+    bool danglingOp = false;
+
+    for (size_t i = 0; i < code.size(); i++) {
+        switch (code[i]) {
+            case '/':
+                if (i + 1 < code.size() && code[i + 1] == '/') {
+                    while (i < code.size() && code[i] != '\n')
+                        i++;
+                }
+                continue;
+            case '{':
+                curlyBrackets++;
+                break;
+            case '}':
+                if (curlyBrackets <= 0)
+                    return true;
+                curlyBrackets--;
+                break;
+            case '[':
+                squareBrackets++;
+                break;
+            case ']':
+                if (squareBrackets <= 0)
+                    return true;
+                squareBrackets--;
+                break;
+            case '(':
+                parens++;
+                break;
+            case ')':
+                if (parens <= 0)
+                    return true;
+                parens--;
+                break;
+            case '"':
+            case '\'':
+                i = skipOverString(code, i + 1, code[i]);
+                if (i >= code.size()) {
+                    return true;  // Do not let unterminated strings enter multi-line mode
+                }
+                break;
+            case '\\':
+                if (i + 1 < code.size() && code[i + 1] == '/')
+                    i++;
+                break;
+            case '+':
+            case '-':
+                if (i + 1 < code.size() && code[i + 1] == code[i]) {
+                    i++;
+                    continue;  // postfix op (++/--) can't be a dangling op
+                }
+                break;
+        }
+        if (i >= code.size()) {
+            danglingOp = false;
+            break;
+        }
+        if ("~!%^&*-+=|:,<>/?."_sd.find(code[i]) != std::string::npos)
+            danglingOp = true;
+        else if (!std::isspace(code[i]))
+            danglingOp = false;
+    }
+
+    return curlyBrackets == 0 && squareBrackets == 0 && parens == 0 && !danglingOp;
+}
+
 
 std::string dbConnect;
 

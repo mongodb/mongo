@@ -47,7 +47,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/startup_test.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -71,7 +70,6 @@ bool handlePreValidationMongosOptions(const moe::Environment& params,
     if (params.count("test") && params["test"].as<bool>() == true) {
         ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
             ::mongo::logger::LogSeverity::Debug(5));
-        StartupTest::runTests();
         return false;
     }
 
