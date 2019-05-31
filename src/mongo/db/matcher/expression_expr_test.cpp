@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
@@ -589,6 +590,15 @@ TEST_F(ExprMatchTest, FailGracefullyOnInvalidExpression) {
         createMatcher(fromjson("{$nor: [{x: 1},{$expr: {$anyElementTrue: undefined}}]}")),
         AssertionException,
         17041);
+}
+
+TEST_F(ExprMatchTest, ReturnsFalseInsteadOfErrorWithFailpointSet) {
+    createMatcher(fromjson("{$expr: {$divide: [10, '$divisor']}}"));
+    ASSERT_THROWS_CODE(matches(BSON("divisor" << 0)), AssertionException, 16608);
+
+    FailPointEnableBlock scopedFailpoint("ExprMatchExpressionMatchesReturnsFalseOnException");
+    createMatcher(fromjson("{$expr: {$divide: [10, '$divisor']}}"));
+    ASSERT_FALSE(matches(BSON("divisor" << 0)));
 }
 
 TEST(ExprMatchTest, IdenticalPostOptimizedExpressionsAreEquivalent) {

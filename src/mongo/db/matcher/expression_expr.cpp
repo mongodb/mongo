@@ -32,7 +32,12 @@
 
 #include "mongo/db/matcher/expression_expr.h"
 
+#include "mongo/util/fail_point_service.h"
+
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(ExprMatchExpressionMatchesReturnsFalseOnException);
+
 ExprMatchExpression::ExprMatchExpression(boost::intrusive_ptr<Expression> expr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : MatchExpression(MatchType::EXPRESSION), _expCtx(expCtx), _expression(expr) {}
@@ -49,8 +54,16 @@ bool ExprMatchExpression::matches(const MatchableDocument* doc, MatchDetails* de
     }
 
     Document document(doc->toBSON());
-    auto value = _expression->evaluate(document);
-    return value.coerceToBool();
+    try {
+        auto value = _expression->evaluate(document);
+        return value.coerceToBool();
+    } catch (const DBException&) {
+        if (MONGO_FAIL_POINT(ExprMatchExpressionMatchesReturnsFalseOnException)) {
+            return false;
+        }
+
+        throw;
+    }
 }
 
 void ExprMatchExpression::serialize(BSONObjBuilder* out) const {
