@@ -390,7 +390,9 @@ Status listPlansOriginalFormat(std::unique_ptr<CanonicalQuery> cq,
 
     size_t numPlans = entry->plannerData.size();
     invariant(numPlans == entry->decision->stats.size());
-    invariant(numPlans == entry->decision->scores.size());
+    invariant(numPlans ==
+              entry->decision->scores.size() + entry->decision->failedCandidates.size());
+    invariant(entry->decision->candidateOrder.size() == entry->decision->scores.size());
     for (size_t i = 0; i < numPlans; ++i) {
         BSONObjBuilder planBob(plansBuilder.subobjStart());
 
@@ -404,7 +406,12 @@ Status listPlansOriginalFormat(std::unique_ptr<CanonicalQuery> cq,
         // reason is comprised of score and initial stats provided by
         // multi plan runner.
         BSONObjBuilder reasonBob(planBob.subobjStart("reason"));
-        reasonBob.append("score", entry->decision->scores[i]);
+        if (i < entry->decision->candidateOrder.size()) {
+            reasonBob.append("score", entry->decision->scores[i]);
+        } else {
+            reasonBob.append("score", 0.0);
+            reasonBob.append("failed", true);
+        }
         BSONObjBuilder statsBob(reasonBob.subobjStart("stats"));
         PlanStageStats* stats = entry->decision->stats[i].get();
         if (stats) {

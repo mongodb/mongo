@@ -65,10 +65,9 @@ using std::endl;
 using std::vector;
 
 // static
-size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRankingDecision* why) {
+StatusWith<std::unique_ptr<PlanRankingDecision>> PlanRanker::pickBestPlan(
+    const vector<CandidatePlan>& candidates) {
     invariant(!candidates.empty());
-    invariant(why);
-
     // A plan that hits EOF is automatically scored above
     // its peers. If multiple plans hit EOF during the same
     // set of round-robin calls to work(), then all such plans
@@ -89,27 +88,43 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
     // Holds (score, candidateInndex).
     // Used to derive scores and candidate ordering.
     vector<std::pair<double, size_t>> scoresAndCandidateindices;
+    vector<size_t> failed;
 
     // Compute score for each tree.  Record the best.
     for (size_t i = 0; i < statTrees.size(); ++i) {
-        LOG(5) << "Scoring plan " << i << ":" << endl
-               << redact(candidates[i].solution->toString()) << "Stats:\n"
-               << redact(Explain::statsToBSON(*statTrees[i]).jsonString(Strict, true));
-        LOG(2) << "Scoring query plan: " << Explain::getPlanSummary(candidates[i].root)
-               << " planHitEOF=" << statTrees[i]->common.isEOF;
+        if (!candidates[i].failed) {
+            LOG(5) << "Scoring plan " << i << ":" << endl
+                   << redact(candidates[i].solution->toString()) << "Stats:\n"
+                   << redact(Explain::statsToBSON(*statTrees[i]).jsonString(Strict, true));
+            LOG(2) << "Scoring query plan: " << Explain::getPlanSummary(candidates[i].root)
+                   << " planHitEOF=" << statTrees[i]->common.isEOF;
 
-        double score = scoreTree(statTrees[i].get());
-        LOG(5) << "score = " << score;
-        if (statTrees[i]->common.isEOF) {
-            LOG(5) << "Adding +" << eofBonus << " EOF bonus to score.";
-            score += 1;
+            double score = scoreTree(statTrees[i].get());
+            LOG(5) << "score = " << score;
+            if (statTrees[i]->common.isEOF) {
+                LOG(5) << "Adding +" << eofBonus << " EOF bonus to score.";
+                score += 1;
+            }
+
+            scoresAndCandidateindices.push_back(std::make_pair(score, i));
+        } else {
+            failed.push_back(i);
+            LOG(2) << "Not scording plan: " << Explain::getPlanSummary(candidates[i].root)
+                   << " because the plan failed.";
         }
-        scoresAndCandidateindices.push_back(std::make_pair(score, i));
+    }
+
+    // If there isn't a viable plan we should error.
+    if (scoresAndCandidateindices.size() == 0U) {
+        return {ErrorCodes::Error(31157),
+                "No viable plan was found because all candidate plans failed."};
     }
 
     // Sort (scores, candidateIndex). Get best child and populate candidate ordering.
     std::stable_sort(
         scoresAndCandidateindices.begin(), scoresAndCandidateindices.end(), scoreComparator);
+
+    auto why = std::make_unique<PlanRankingDecision>();
 
     // Determine whether plans tied for the win.
     if (scoresAndCandidateindices.size() > 1U) {
@@ -124,6 +139,7 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
     why->stats.clear();
     why->scores.clear();
     why->candidateOrder.clear();
+    why->failedCandidates = std::move(failed);
     for (size_t i = 0; i < scoresAndCandidateindices.size(); ++i) {
         double score = scoresAndCandidateindices[i].first;
         size_t candidateIndex = scoresAndCandidateindices[i].second;
@@ -155,9 +171,11 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
         why->scores.push_back(score);
         why->candidateOrder.push_back(candidateIndex);
     }
+    for (auto& i : why->failedCandidates) {
+        why->stats.push_back(std::move(statTrees[i]));
+    }
 
-    size_t bestChild = scoresAndCandidateindices[0].second;
-    return bestChild;
+    return StatusWith<std::unique_ptr<PlanRankingDecision>>(std::move(why));
 }
 
 // TODO: Move this out.  This is a signal for ranking but will become its own complicated
