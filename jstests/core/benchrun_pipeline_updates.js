@@ -32,7 +32,7 @@
     }
     let res = benchRun(benchArgs);
     assert.eq(res.errCount, 0);
-    assert.gt(
+    assert.gte(
         coll.findOne({_id: 0}).x, 2, "Expected at least one update to succeed and increment 'x'");
 
     // Now test that the pipeline is still subject to benchRun's keyword replacement.
