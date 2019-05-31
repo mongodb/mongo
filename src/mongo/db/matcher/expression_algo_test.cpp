@@ -1279,5 +1279,68 @@ TEST(IsPathPrefixOf, ComputesPrefixesCorrectly) {
     ASSERT_FALSE(expression::isPathPrefixOf("a.b", "a"));
 }
 
+TEST(HasExistencePredicateOnPath, IdentifiesLeavesCorrectly) {
+    BSONObj matchPredicate = fromjson("{$and: [{a: {$exists: true}}, {b: {$lte: 2}}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(swMatchExpression.getStatus());
+    ASSERT_TRUE(
+        expression::hasExistencePredicateOnPath(*swMatchExpression.getValue().get(), "a"_sd));
+    ASSERT_FALSE(
+        expression::hasExistencePredicateOnPath(*swMatchExpression.getValue().get(), "b"_sd));
+}
+
+TEST(HasExistencePredicateOnPath, HandlesMultiplePredicatesWithSamePath) {
+    BSONObj matchPredicate = fromjson("{$and: [{a: {$gt: 5000}}, {a: {$exists: false}}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(swMatchExpression.getStatus());
+    ASSERT_TRUE(
+        expression::hasExistencePredicateOnPath(*swMatchExpression.getValue().get(), "a"_sd));
+}
+
+TEST(HasExistencePredicateOnPath, DeeperTreeTest) {
+    BSONObj matchPredicate = fromjson(
+        "{$and: [{q: {$gt: 5000}}, {$and: [{z: {$lte: 50}},"
+        "{$or: [{f : {$gte: 4}}, {a : {$exists : true}}]}]}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(swMatchExpression.getStatus());
+    ASSERT_TRUE(
+        expression::hasExistencePredicateOnPath(*swMatchExpression.getValue().get(), "a"_sd));
+}
+
+TEST(HasExistencePredicateOnPath, HandlesDottedPathsInDeepTree) {
+    BSONObj matchPredicate = fromjson(
+        "{$and: [{q: {$gt: 5000}}, {$and: [{z: {$lte: 50}},"
+        "{$or: [{f : {$gte: 4}}, {'a.b.c.d' : {$exists : true}}]}]}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(swMatchExpression.getStatus());
+    ASSERT_TRUE(
+        expression::hasExistencePredicateOnPath(*swMatchExpression.getValue().get(), "a.b.c.d"_sd));
+}
+
+TEST(HasExistencePredicateOnPath, ReturnsFalseWhenExistsOnlyOnPrefix) {
+    BSONObj matchPredicate = fromjson(
+        "{$and: [{q: {$gt: 5000}}, {$and: [{z: {$lte: 50}},"
+        "{$or: [{f : {$gte: 4}}, {'a' : {$exists : true}}]}]}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(swMatchExpression.getStatus());
+    ASSERT_FALSE(
+        expression::hasExistencePredicateOnPath(*swMatchExpression.getValue().get(), "a.b"_sd));
+}
+
+TEST(HasExistencePredicateOnPath, ReturnsFalseWhenExistsOnSubpath) {
+    BSONObj matchPredicate = fromjson(
+        "{$and: [{q: {$gt: 5000}}, {$and: [{z: {$lte: 50}},"
+        "{$or: [{f : {$gte: 4}}, {'a.b' : {$exists : true}}]}]}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(swMatchExpression.getStatus());
+    ASSERT_FALSE(
+        expression::hasExistencePredicateOnPath(*swMatchExpression.getValue().get(), "a"_sd));
+}
 
 }  // namespace mongo
