@@ -46,9 +46,6 @@ namespace mongo {
 class ServiceContext;
 
 namespace repl {
-namespace {
-using UniqueLock = stdx::unique_lock<stdx::mutex>;
-}  // namespace
 
 class DropPendingCollectionReaper;
 class ReplicationProcess;
@@ -122,7 +119,7 @@ private:
     /**
      * Stops data replication and returns with 'lock' locked.
      */
-    void _stopDataReplication_inlock(OperationContext* opCtx, UniqueLock* lock);
+    void _stopDataReplication_inlock(OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lock);
 
     /**
      * Called when the instance transitions to primary in order to notify a potentially sharded host

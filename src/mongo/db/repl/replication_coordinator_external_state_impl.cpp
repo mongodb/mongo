@@ -262,20 +262,20 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
 
 void ReplicationCoordinatorExternalStateImpl::stopDataReplication(OperationContext* opCtx) {
     UniqueLock lk(_threadMutex);
-    _stopDataReplication_inlock(opCtx, &lk);
+    _stopDataReplication_inlock(opCtx, lk);
 }
 
 void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(OperationContext* opCtx,
-                                                                          UniqueLock* lock) {
+                                                                          UniqueLock& lock) {
     // Make sue no other _stopDataReplication calls are in progress.
-    _dataReplicationStopped.wait(*lock, [this]() { return !_stoppingDataReplication; });
+    _dataReplicationStopped.wait(lock, [this]() { return !_stoppingDataReplication; });
     _stoppingDataReplication = true;
 
     auto oldSSF = std::move(_syncSourceFeedbackThread);
     auto oldOplogBuffer = std::move(_oplogBuffer);
     auto oldBgSync = std::move(_bgSync);
     auto oldApplier = std::move(_oplogApplier);
-    lock->unlock();
+    lock.unlock();
 
     // _syncSourceFeedbackThread should be joined before _bgSync's shutdown because it has
     // a pointer of _bgSync.
@@ -314,7 +314,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
         oldOplogBuffer->shutdown(opCtx);
     }
 
-    lock->lock();
+    lock.lock();
     _stoppingDataReplication = false;
     _dataReplicationStopped.notify_all();
 }
@@ -347,7 +347,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     }
 
     _inShutdown = true;
-    _stopDataReplication_inlock(opCtx, &lk);
+    _stopDataReplication_inlock(opCtx, lk);
 
     if (_noopWriter) {
         LOG(1) << "Stopping noop writer";
