@@ -186,19 +186,10 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
                     MONGO_UNREACHABLE;
             };
         })
-        .onCompletion([this](Status s) {
-            // Do a best-effort attempt to delete the coordinator document from disk, regardless of
-            // the success of the commit sequence.
-            LOG(3) << "Two-phase commit completed for " << _lsid.getId() << ':' << _txnNumber;
-
-            return txn::deleteCoordinatorDoc(*_scheduler, _lsid, _txnNumber)
-                .onCompletion([ this, chainStatus = std::move(s) ](Status deleteDocStatus) {
-                    if (_participantsDurable) {
-                        LOG(0) << redact(deleteDocStatus);
-                    }
-
-                    return chainStatus;
-                });
+        .then([this] {
+            // Do a best-effort attempt (i.e., writeConcern w:1) to delete the coordinator's durable
+            // state.
+            return txn::deleteCoordinatorDoc(*_scheduler, _lsid, _txnNumber);
         })
         .onCompletion([ this, deadlineFuture = std::move(deadlineFuture) ](Status s) mutable {
             // Interrupt this coordinator's scheduler hierarchy and join the deadline task's future
