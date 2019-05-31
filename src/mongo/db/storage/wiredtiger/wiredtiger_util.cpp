@@ -309,19 +309,19 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
 }
 
 // static
-StatusWith<uint64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
-                                                        const std::string& uri,
-                                                        const std::string& config,
-                                                        int statisticsKey) {
+StatusWith<int64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
+                                                       const std::string& uri,
+                                                       const std::string& config,
+                                                       int statisticsKey) {
     invariant(session);
     WT_CURSOR* cursor = NULL;
     const char* cursorConfig = config.empty() ? NULL : config.c_str();
     int ret = session->open_cursor(session, uri.c_str(), NULL, cursorConfig, &cursor);
     if (ret != 0) {
-        return StatusWith<uint64_t>(ErrorCodes::CursorNotFound,
-                                    str::stream() << "unable to open cursor at URI " << uri
-                                                  << ". reason: "
-                                                  << wiredtiger_strerror(ret));
+        return StatusWith<int64_t>(ErrorCodes::CursorNotFound,
+                                   str::stream() << "unable to open cursor at URI " << uri
+                                                 << ". reason: "
+                                                 << wiredtiger_strerror(ret));
     }
     invariant(cursor);
     ON_BLOCK_EXIT([&] { cursor->close(cursor); });
@@ -329,24 +329,24 @@ StatusWith<uint64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
     cursor->set_key(cursor, statisticsKey);
     ret = cursor->search(cursor);
     if (ret != 0) {
-        return StatusWith<uint64_t>(
+        return StatusWith<int64_t>(
             ErrorCodes::NoSuchKey,
             str::stream() << "unable to find key " << statisticsKey << " at URI " << uri
                           << ". reason: "
                           << wiredtiger_strerror(ret));
     }
 
-    uint64_t value;
+    int64_t value;
     ret = cursor->get_value(cursor, NULL, NULL, &value);
     if (ret != 0) {
-        return StatusWith<uint64_t>(
+        return StatusWith<int64_t>(
             ErrorCodes::BadValue,
             str::stream() << "unable to get value for key " << statisticsKey << " at URI " << uri
                           << ". reason: "
                           << wiredtiger_strerror(ret));
     }
 
-    return StatusWith<uint64_t>(value);
+    return StatusWith<int64_t>(value);
 }
 
 int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s, const std::string& uri) {

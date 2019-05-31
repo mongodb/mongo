@@ -209,10 +209,10 @@ public:
      * Reads individual statistics using URI.
      * List of statistics keys WT_STAT_* can be found in wiredtiger.h.
      */
-    static StatusWith<uint64_t> getStatisticsValue(WT_SESSION* session,
-                                                   const std::string& uri,
-                                                   const std::string& config,
-                                                   int statisticsKey);
+    static StatusWith<int64_t> getStatisticsValue(WT_SESSION* session,
+                                                  const std::string& uri,
+                                                  const std::string& config,
+                                                  int statisticsKey);
 
     /**
      * Reads individual statistics using URI and casts to type ResultType.
