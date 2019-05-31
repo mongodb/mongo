@@ -1789,9 +1789,9 @@ functions:
 
   "setup jstestfuzz":
     - command: shell.exec
-      shell: bash
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -1807,10 +1807,10 @@ functions:
 
   "lint fuzzer sanity patch":
     - command: shell.exec
-      shell: bash
       type: test
       params:
         working_dir: src
+        shell: bash
         script: |
           set -eo pipefail
           set -o verbose
@@ -1823,10 +1823,10 @@ functions:
 
   "lint fuzzer sanity all":
     - command: shell.exec
-      shell: bash
       type: test
       params:
         working_dir: src
+        shell: bash
         script: |
           set -eo pipefail
           set -o verbose
