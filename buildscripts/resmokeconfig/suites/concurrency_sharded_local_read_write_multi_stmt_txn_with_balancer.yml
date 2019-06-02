@@ -149,6 +149,7 @@ selector:
 
   exclude_with_any_tags:
   - assumes_balancer_off
+  - does_not_support_causal_consistency
   - requires_replication
   # The touch command does not exist on mongos, which is enforced before session information is
   # parsed, causing state functions in these workloads to fail before starting a transaction despite
