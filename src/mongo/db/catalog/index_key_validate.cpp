@@ -305,7 +305,8 @@ StatusWith<BSONObj> validateIndexSpec(
                 (IndexNames::findPluginName(indexSpec.getObjectField(
                      IndexDescriptor::kKeyPatternFieldName)) == IndexNames::WILDCARD)) {
                 return {ErrorCodes::CannotCreateIndex,
-                        str::stream() << "Unknown index plugin '" << IndexNames::WILDCARD << "'"};
+                        str::stream()
+                            << "Wildcard indexes require feature compatibility version 4.2"};
             }
             hasKeyPatternField = true;
         } else if (IndexDescriptor::kIndexNameFieldName == indexSpecElemFieldName) {
