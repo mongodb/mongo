@@ -4478,9 +4478,6 @@ tasks:
           set -o errexit
           set -o verbose
 
-          echo "Releases disabled on master."
-          exit 0
-
           if [ "${is_release|false}" != "true" ]; then
               echo "Not a release build"
               exit 0
