@@ -261,7 +261,6 @@ variables:
   - func: "get buildnumber"
   - func: "set up credentials"
   - func: "fetch and build OpenSSL"
-  - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
   - func: "generate compile expansions"
   teardown_group:
   - func: "scons cache pruning"
@@ -392,7 +391,6 @@ variables:
   - enterprise-windows-64-2k8-nopush-template
   - enterprise-windows-64-2k8-openssl
   - enterprise-windows-64-2k8-required
-  - enterprise-windows-64-2k8-wtdevelop
   - ubuntu1804-debug-asan
   - ubuntu1804-debug-ubsan
   - ubuntu1804-debug-aubsan-lite
@@ -449,7 +447,6 @@ functions:
       directory: ${git_project_directory|src}
       revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
         enterprise: ${enterprise_rev}
-        wtdevelop: ${wtdevelop_rev}
 
   "fetch artifacts": &fetch_artifacts
     command: s3.get
@@ -528,7 +525,7 @@ functions:
   "get buildnumber": &get_buildnumber
     command: keyval.inc
     params:
-      key: "${build_variant}_master"
+      key: "${build_variant}_v4.2"
       destination: "builder_num"
 
   "run diskstats": &run_diskstats
@@ -779,21 +776,6 @@ functions:
             if [ "${build_openssl|}" = "true" ]; then
                 bash buildscripts/fetch_and_build_openssl.sh "${python|python3}" "${openssl_make_flags|}" "${openssl_config_flags|}"
             fi
-
-  "use WiredTiger develop":
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-        if [ "${use_wt_develop|}" = "true" ]; then
-        cd src/third_party
-        for wtdir in dist examples ext lang src test tools ; do
-          rm -rf wiredtiger/$wtdir
-          mv wtdevelop/$wtdir wiredtiger/
-        done
-        fi
 
   "setup gradle signing keys":
     command: shell.exec
@@ -4585,7 +4567,6 @@ tasks:
     - func: "set up virtualenv"
     - func: "get buildnumber"
     - func: "set up credentials"
-    - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions
     - func: "apply compile expansions"
@@ -8014,12 +7995,7 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
-  branch: master
-
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
+  branch: v4.2
 
 #######################################
 #            Buildvariants            #
@@ -8117,20 +8093,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot
   - name: sharding_gen
   - name: .stitch
-
-- <<: *linux-64-debug-template
-  name: linux-64-debug-wtdevelop
-  display_name: "~ Linux DEBUG WiredTiger develop"
-  batchtime: 1440 # 1 day
-  modules:
-  - wtdevelop
-  expansions:
-    use_wt_develop: true
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
-    use_scons_cache: true
-    build_mongoreplay: true
-    test_flags: --excludeWithAnyTags=requires_http_client
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -9147,17 +9109,6 @@ buildvariants:
   - name: push
     distros:
     - rhel70-small
-
-- <<: *enterprise-windows-64-2k8-nopush-template
-  name: enterprise-windows-64-2k8-wtdevelop
-  display_name: "~ Enterprise Windows 2008R2 WiredTiger develop"
-  batchtime: 1440 # 1 day
-  modules:
-  - enterprise
-  - wtdevelop
-  expansions:
-    <<: *enterprise-windows-64-2k8-nopush-expansions-template
-    use_wt_develop: true
 
 - <<: *enterprise-windows-64-2k8-nopush-template
   name: enterprise-windows-64-2k8-compile-all
