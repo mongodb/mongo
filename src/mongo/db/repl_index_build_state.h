@@ -46,24 +46,6 @@
 
 namespace mongo {
 
-namespace {
-
-std::vector<std::string> extractIndexNames(const std::vector<BSONObj>& specs) {
-    std::vector<std::string> indexNames;
-    for (const auto& spec : specs) {
-        std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
-        invariant(!name.empty(),
-                  str::stream() << "Bad spec passed into ReplIndexBuildState constructor, missing '"
-                                << IndexDescriptor::kIndexNameFieldName
-                                << "' field: "
-                                << spec);
-        indexNames.push_back(name);
-    }
-    return indexNames;
-}
-
-}  // namespace
-
 /**
  * Tracks the cross replica set progress of a particular index build identified by a build UUID.
  *
@@ -140,6 +122,22 @@ struct ReplIndexBuildState {
     // The coordinator for the index build will wait upon this when awaiting an external signal,
     // such as commit or commit readiness signals.
     stdx::condition_variable condVar;
+
+private:
+    std::vector<std::string> extractIndexNames(const std::vector<BSONObj>& specs) {
+        std::vector<std::string> indexNames;
+        for (const auto& spec : specs) {
+            std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
+            invariant(!name.empty(),
+                      str::stream()
+                          << "Bad spec passed into ReplIndexBuildState constructor, missing '"
+                          << IndexDescriptor::kIndexNameFieldName
+                          << "' field: "
+                          << spec);
+            indexNames.push_back(name);
+        }
+        return indexNames;
+    }
 };
 
 }  // namespace mongo
