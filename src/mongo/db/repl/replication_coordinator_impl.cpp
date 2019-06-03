@@ -3952,11 +3952,17 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible(bool skipDryRun) {
     if (finishEvent.isValid()) {
         _replExecutor->waitForEvent(finishEvent);
     }
-    auto state = getMemberState();
-    if (state.primary()) {
-        return Status::OK();
+    {
+        // Step up is considered successful only if we are currently a primary and we are not in the
+        // process of stepping down. If we know we are going to step down, we should fail the
+        // replSetStepUp command so caller can retry if necessary.
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        if (!_getMemberState_inlock().primary())
+            return Status(ErrorCodes::CommandFailed, "Election failed.");
+        else if (_topCoord->isSteppingDown())
+            return Status(ErrorCodes::CommandFailed, "Election failed due to concurrent stepdown.");
     }
-    return Status(ErrorCodes::CommandFailed, "Election failed.");
+    return Status::OK();
 }
 
 executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_cancelElectionIfNeeded_inlock() {
