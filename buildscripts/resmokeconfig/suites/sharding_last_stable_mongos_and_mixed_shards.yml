@@ -135,6 +135,8 @@ selector:
   - jstests/sharding/mr_output_sharded_validation.js
   # Enable when 4.4 becomes last stable
   - jstests/sharding/refine_collection_shard_key_basic.js
+  # Enable when SERVER-41237 is backported
+  - jstests/sharding/graph_lookup.js
 
 executor:
   config:

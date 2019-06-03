@@ -31,5 +31,19 @@
         assert.eq(c.res[0].x, 1);
     });
 
+    // Be sure $graphLookup is banned on sharded foreign collection.
+    assert.commandWorked(st.s0.adminCommand({shardCollection: "test.baz", key: {_id: "hashed"}}));
+    assert.commandWorked(db.baz.insert({_id: 1, x: 1}));
+    const err = assert.throws(() => db.foo.aggregate([{
+        $graphLookup: {
+            from: "baz",
+            startWith: {$literal: 1},
+            connectFromField: "x",
+            connectToField: "_id",
+            as: "res"
+        }
+    }]));
+    assert.eq(28769, err.code);
+
     st.stop();
 })();
