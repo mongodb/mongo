@@ -29,6 +29,9 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kConnectionPool
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/executor/connection_pool.h"
@@ -997,7 +1000,7 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
     _eventTimer->cancelTimeout();
 
     // Set our event timer to timeout requests, refresh the state, and potentially expire this pool
-    auto deferredStateUpdateFunc = guardCallback([this]() {
+    auto deferredStateUpdateFunc = guardCallback([this, timeout]() {
         auto now = _parent->_factory->now();
 
         _health.isFailed = false;
@@ -1006,8 +1009,9 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
             std::pop_heap(begin(_requests), end(_requests), RequestComparator{});
 
             auto& request = _requests.back();
-            request.second.setError(Status(ErrorCodes::NetworkInterfaceExceededTimeLimit,
-                                           "Couldn't get a connection within the time limit"));
+            request.second.setError(Status(
+                ErrorCodes::NetworkInterfaceExceededTimeLimit,
+                fmt::format("Couldn't get a connection within the time limit of {}", timeout)));
             _requests.pop_back();
 
             // Since we've failed a request, we've interacted with external users

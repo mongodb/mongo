@@ -37,6 +37,9 @@
 #include <stack>
 #include <tuple>
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 #include "mongo/executor/connection_pool.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
@@ -397,20 +400,24 @@ TEST_F(ConnectionPoolTest, DifferentConnWithoutReturn) {
 TEST_F(ConnectionPoolTest, TimeoutOnSetup) {
     auto pool = makePool();
 
-    bool notOk = false;
-
     auto now = Date_t::now();
+
+    Milliseconds hostTimeout = Milliseconds(5000);
 
     PoolImpl::setNow(now);
 
+    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn;
     pool->get_forTest(
-        HostAndPort(),
-        Milliseconds(5000),
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { notOk = !swConn.isOK(); });
+        HostAndPort(), hostTimeout, [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+            conn = std::move(swConn);
+        });
 
-    PoolImpl::setNow(now + Milliseconds(5000));
+    PoolImpl::setNow(now + hostTimeout);
 
-    ASSERT(notOk);
+    ASSERT(!conn->isOK());
+    ASSERT_EQ(conn->getStatus(), ErrorCodes::NetworkInterfaceExceededTimeLimit);
+    ASSERT_STRING_CONTAINS(conn->getStatus().reason(),
+                           fmt::format("{}", ConnectionPool::kHostRetryTimeout));
 }
 
 /**
