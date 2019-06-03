@@ -1,6 +1,6 @@
 'use strict';
 
-var {withTxnAndAutoRetry} = (function() {
+var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
 
     /**
      * Calls 'func' with the print() function overridden to be a no-op.
