@@ -10,7 +10,12 @@
 
     const rst = new ReplSetTest({nodes: 2});
     rst.startSet();
-    rst.initiate();
+
+    const config = rst.getReplSetConfig();
+    // Increase the election timeout so that we do not accidentally trigger an election while
+    // stepping up the old secondary.
+    config.settings = {"electionTimeoutMillis": 12 * 60 * 60 * 1000};
+    rst.initiate(config);
 
     // Get the connection to the replica set using MongoDB URI.
     const conn = new Mongo(rst.getURL());
