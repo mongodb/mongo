@@ -51,7 +51,7 @@ namespace mongo {
 namespace {
 // The number of items we can scan before we must yield.
 static const int kScanLimit = 1000;
-static const size_t kNumHashBuckets = 1U << 22;
+static const size_t kNumHashBuckets = 1U << 16;
 
 }  // namespace
 

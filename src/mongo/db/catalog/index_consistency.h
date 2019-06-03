@@ -197,16 +197,18 @@ private:
     const bool _isBackground;
     ElapsedTracker _tracker;
 
-    // We map the hashed KeyString values to a bucket which contain the count of how many
-    // index keys and document keys we've seen in each bucket.
+    // We map the hashed KeyString values to a bucket that contains the count of how many
+    // index keys and document keys we've seen in each bucket. This counter is unsigned to avoid
+    // undefined behavior in the (unlikely) case of overflow.
     // Count rules:
-    //     - If the count is 0 in the bucket, we have index consistency for
-    //       KeyStrings that mapped to it
-    //     - If the count is > 0 in the bucket at the end of the validation pass, then there
-    //       are too few index entries.
-    //     - If the count is < 0 in the bucket at the end of the validation pass, then there
-    //       are too many index entries.
-    std::vector<int32_t> _indexKeyCount;
+    //     - If the count is non-zero for a bucket after all documents and index entries have been
+    //       processed, one or more indexes are inconsistent for KeyStrings that map to it.
+    //       Otherwise, those keys are consistent for all indexes with a high degree of confidence.
+    //     - Absent overflow, if a count interpreted as twos complement integer ends up greater
+    //       than zero, there are too few index entries.
+    //     - Similarly, if that count ends up less than zero, there are too many index entries.
+
+    std::vector<uint32_t> _indexKeyCount;
 
     // Contains the corresponding index number for each index namespace
     std::map<std::string, int> _indexNumber;
