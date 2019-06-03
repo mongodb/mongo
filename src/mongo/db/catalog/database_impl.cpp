@@ -178,6 +178,12 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
         catalog.registerCollectionObject(uuid, std::move(ownedCollection));
     }
 
+    for (const auto& uuid : catalog.getAllCollectionUUIDsFromDb(_name)) {
+        auto collection = catalog.lookupCollectionByUUID(uuid);
+        collection->getIndexCatalog()->init(opCtx).transitional_ignore();
+        collection->infoCache()->init(opCtx);
+    }
+
     // At construction time of the viewCatalog, the CollectionCatalog map wasn't initialized yet,
     // so no system.views collection would be found. Now we're sufficiently initialized, signal a
     // version change. Also force a reload, so if there are problems with the catalog contents as
@@ -689,6 +695,8 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     // Create Collection object
     auto& catalog = CollectionCatalog::get(opCtx);
     auto ownedCollection = _createCollectionInstance(opCtx, nss);
+    ownedCollection->getIndexCatalog()->init(opCtx).transitional_ignore();
+    ownedCollection->infoCache()->init(opCtx);
     Collection* collection = ownedCollection.get();
     catalog.onCreateCollection(opCtx, std::move(ownedCollection), *(collection->uuid()));
     opCtx->recoveryUnit()->onCommit([collection](auto commitTime) {
