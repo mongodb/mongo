@@ -423,15 +423,6 @@ public:
                     opCtx, _request.nss, true));
             }
 
-            // Only used by the failpoints.
-            stdx::function<void()> dropAndReacquireReadLock = [&readLock, opCtx, this]() {
-                // Make sure an interrupted operation does not prevent us from reacquiring the lock.
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
-                readLock.reset();
-                readLock.emplace(opCtx, _request.nss);
-            };
-
             // A user can only call getMore on their own cursor. If there were multiple users
             // authenticated when the cursor was created, then at least one of them must be
             // authenticated in order to run getMore on the cursor.
@@ -484,6 +475,12 @@ public:
             // repeatedly release and re-acquire the collection readLock at regular intervals until
             // the failpoint is released. This is done in order to avoid deadlocks caused by the
             // pinned-cursor failpoints in this file (see SERVER-21997).
+            stdx::function<void()> dropAndReacquireReadLock = [&readLock, opCtx, this]() {
+                // Make sure an interrupted operation does not prevent us from reacquiring the lock.
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                readLock.reset();
+                readLock.emplace(opCtx, _request.nss);
+            };
             if (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitAfterPinningCursorBeforeGetMoreBatch,
@@ -556,14 +553,21 @@ public:
             // the 'waitWithPinnedCursorDuringGetMoreBatch' failpoint is active, set the 'msg' field
             // of this operation's CurOp to signal that we've hit this point and then spin until the
             // failpoint is released.
+            stdx::function<void()> saveAndRestoreStateWithReadLockReacquisition =
+                [exec, dropAndReacquireReadLock]() {
+                    exec->saveState();
+                    dropAndReacquireReadLock();
+                    exec->restoreState();
+                };
             MONGO_FAIL_POINT_BLOCK(waitWithPinnedCursorDuringGetMoreBatch, options) {
                 const BSONObj& data = options.getData();
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitWithPinnedCursorDuringGetMoreBatch,
                     opCtx,
                     "waitWithPinnedCursorDuringGetMoreBatch",
-                    data["shouldNotdropLock"].booleanSafe() ? []() {} /*empty function*/
-                                                            : dropAndReacquireReadLock,
+                    data["shouldNotdropLock"].booleanSafe()
+                        ? []() {} /*empty function*/
+                        : saveAndRestoreStateWithReadLockReacquisition,
                     false,
                     _request.nss);
             }
