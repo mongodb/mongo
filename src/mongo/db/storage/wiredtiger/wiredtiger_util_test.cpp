@@ -268,11 +268,10 @@ TEST(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
                                         harnessHelper.getOplogManager());
     WiredTigerSession* session = recoveryUnit.getSession();
-    StatusWith<uint64_t> result =
-        WiredTigerUtil::getStatisticsValue(session->getSession(),
-                                           "statistics:table:no_such_table",
-                                           "statistics=(fast)",
-                                           WT_STAT_DSRC_BLOCK_SIZE);
+    auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
+                                                     "statistics:table:no_such_table",
+                                                     "statistics=(fast)",
+                                                     WT_STAT_DSRC_BLOCK_SIZE);
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::CursorNotFound, result.getStatus().code());
 }
@@ -284,10 +283,10 @@ TEST(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
-    StatusWith<uint64_t> result = WiredTigerUtil::getStatisticsValue(session->getSession(),
-                                                                     "statistics:table:mytable",
-                                                                     "statistics=(fast)",
-                                                                     WT_STAT_DSRC_BLOCK_SIZE);
+    auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
+                                                     "statistics:table:mytable",
+                                                     "statistics=(fast)",
+                                                     WT_STAT_DSRC_BLOCK_SIZE);
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::CursorNotFound, result.getStatus().code());
 }
@@ -300,10 +299,10 @@ TEST(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
     // Use connection statistics key which does not apply to a table.
-    StatusWith<uint64_t> result = WiredTigerUtil::getStatisticsValue(session->getSession(),
-                                                                     "statistics:table:mytable",
-                                                                     "statistics=(fast)",
-                                                                     WT_STAT_CONN_SESSION_OPEN);
+    auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
+                                                     "statistics:table:mytable",
+                                                     "statistics=(fast)",
+                                                     WT_STAT_CONN_SESSION_OPEN);
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
 }
@@ -316,10 +315,10 @@ TEST(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     WT_SESSION* wtSession = session->getSession();
     ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
     // Use connection statistics key which does not apply to a table.
-    StatusWith<uint64_t> result = WiredTigerUtil::getStatisticsValue(session->getSession(),
-                                                                     "statistics:table:mytable",
-                                                                     "statistics=(fast)",
-                                                                     WT_STAT_DSRC_LSM_CHUNK_COUNT);
+    auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
+                                                     "statistics:table:mytable",
+                                                     "statistics=(fast)",
+                                                     WT_STAT_DSRC_LSM_CHUNK_COUNT);
     ASSERT_OK(result.getStatus());
     // Expect statistics value to be zero for a LSM key on a Btree.
     ASSERT_EQUALS(0U, result.getValue());
