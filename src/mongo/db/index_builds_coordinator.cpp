@@ -200,6 +200,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
         const auto uuid = cce->getCollectionOptions(opCtx).uuid;
         auto databaseHolder = DatabaseHolder::get(opCtx);
         collection = databaseHolder->makeCollection(opCtx, ns, uuid, cce, rs);
+        collection->getIndexCatalog()->init(opCtx).transitional_ignore();
+        collection->infoCache()->init(opCtx);
 
         // Register the index build. During recovery, collections may not have UUIDs present yet to
         // due upgrading. We don't require collection UUIDs during recovery except to create a
