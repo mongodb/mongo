@@ -631,18 +631,15 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         auto collection = autoColl.getCollection();
         if (collection) {
             invariant(db, str::stream() << "Database missing for index build: " << ns);
-            auto& dss = DatabaseShardingState::get(db);
-            auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
-            dss.checkDbVersion(opCtx, dssLock);
-            collectionUUID = collection->uuid();
+
+            checkDatabaseShardingState(opCtx, db);
+
             result.appendBool(kCreateCollectionAutomaticallyFieldName, false);
             auto specsCopy = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, specs);
             // Return from command invocation early if we  are not adding any new indexes.
             if (specsCopy.size() == 0) {
                 auto numIndexes = collection->getIndexCatalog()->numIndexesTotal(opCtx);
-                result.append(kNumIndexesBeforeFieldName, numIndexes);
-                result.append(kNumIndexesAfterFieldName, numIndexes);
-                result.append(kNoteFieldName, "all indexes already exist");
+                fillCommandResultWithIndexesAlreadyExistInfo(numIndexes, &result);
                 return true;
             }
         } else {
@@ -653,39 +650,16 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             opCtx->recoveryUnit()->abandonSnapshot();
             dbLock.relockWithMode(MODE_X);
 
-            auto databaseHolder = DatabaseHolder::get(opCtx);
-            db = databaseHolder->getDb(opCtx, ns.db());
-            if (!db) {
-                db = databaseHolder->openDb(opCtx, ns.db());
-            }
-            auto& dss = DatabaseShardingState::get(db);
-            auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
-            dss.checkDbVersion(opCtx, dssLock);
+            auto db = getOrCreateDatabase(opCtx, ns.db(), &dbLock);
+
+            checkDatabaseShardingState(opCtx, db);
 
             // We would not reach this point if we were able to check existing indexes on the
             // collection.
             invariant(!collection);
-            if (ViewCatalog::get(db)->lookup(opCtx, ns.ns())) {
-                errmsg = str::stream() << "Cannot create indexes on a view: " << ns.ns();
-                uasserted(ErrorCodes::CommandNotSupportedOnView, errmsg);
-            }
-
-            uassertStatusOK(userAllowedCreateNS(ns.db(), ns.coll()));
-
-            collectionUUID = UUID::gen();
-            CollectionOptions options;
-            options.uuid = collectionUUID;
-            writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
-                WriteUnitOfWork wunit(opCtx);
-                collection = db->createCollection(opCtx, ns, options);
-                invariant(collection,
-                          str::stream() << "Failed to create collection " << ns.ns()
-                                        << " during index creation: "
-                                        << redact(cmdObj));
-                wunit.commit();
-            });
-            result.appendBool(kCreateCollectionAutomaticallyFieldName, true);
+            collection = getOrCreateCollection(opCtx, db, ns, cmdObj, &errmsg, &result);
         }
+        collectionUUID = collection->uuid();
     }
 
     // Use AutoStatsTracker to update Top.
