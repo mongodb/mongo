@@ -573,9 +573,17 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
         });
     }
 
+    Date_t timeBefore = Date_t::now();
+
     connector->resolver.asyncResolve(connector->peer, _listenerOptions.enableIPv6)
-        .then([connector](WrappedResolver::EndpointVector results) {
+        .then([connector, timeBefore](WrappedResolver::EndpointVector results) {
             try {
+                Date_t timeAfter = Date_t::now();
+                if (timeAfter - timeBefore > Seconds(1)) {
+                    warning() << "DNS resolution while connecting to " << connector->peer
+                              << " took " << timeAfter - timeBefore;
+                }
+
                 stdx::lock_guard<stdx::mutex> lk(connector->mutex);
 
                 connector->resolvedEndpoint = results.front();
