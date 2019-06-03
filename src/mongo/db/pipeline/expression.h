@@ -1304,6 +1304,10 @@ public:
         return _fieldPath;
     }
 
+    auto getFieldPathWithoutCurrentPrefix() const {
+        return _fieldPath.tail();
+    }
+
     ComputedPaths getComputedPaths(const std::string& exprFieldPath,
                                    Variables::Id renamingVar) const final;
 
