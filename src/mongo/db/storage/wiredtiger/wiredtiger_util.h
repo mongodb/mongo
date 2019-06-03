@@ -214,27 +214,6 @@ public:
                                                   const std::string& config,
                                                   int statisticsKey);
 
-    /**
-     * Reads individual statistics using URI and casts to type ResultType.
-     * Caps statistics value at max(ResultType) in case of overflow.
-     */
-    template <typename ResultType>
-    static StatusWith<ResultType> getStatisticsValueAs(WT_SESSION* session,
-                                                       const std::string& uri,
-                                                       const std::string& config,
-                                                       int statisticsKey);
-
-    /**
-     * Reads individual statistics using URI and casts to type ResultType.
-     * Caps statistics value at 'maximumResultType'.
-     */
-    template <typename ResultType>
-    static StatusWith<ResultType> getStatisticsValueAs(WT_SESSION* session,
-                                                       const std::string& uri,
-                                                       const std::string& config,
-                                                       int statisticsKey,
-                                                       ResultType maximumResultType);
-
     static int64_t getIdentSize(WT_SESSION* s, const std::string& uri);
 
 
@@ -322,31 +301,6 @@ public:
 private:
     WT_CONFIG_PARSER* _parser;
 };
-
-// static
-template <typename ResultType>
-StatusWith<ResultType> WiredTigerUtil::getStatisticsValueAs(WT_SESSION* session,
-                                                            const std::string& uri,
-                                                            const std::string& config,
-                                                            int statisticsKey) {
-    return getStatisticsValueAs<ResultType>(
-        session, uri, config, statisticsKey, std::numeric_limits<ResultType>::max());
-}
-
-// static
-template <typename ResultType>
-StatusWith<ResultType> WiredTigerUtil::getStatisticsValueAs(WT_SESSION* session,
-                                                            const std::string& uri,
-                                                            const std::string& config,
-                                                            int statisticsKey,
-                                                            ResultType maximumResultType) {
-    StatusWith<uint64_t> result = getStatisticsValue(session, uri, config, statisticsKey);
-    if (!result.isOK()) {
-        return StatusWith<ResultType>(result.getStatus());
-    }
-    return StatusWith<ResultType>(
-        _castStatisticsValue<ResultType>(result.getValue(), maximumResultType));
-}
 
 // static
 template <typename ResultType>

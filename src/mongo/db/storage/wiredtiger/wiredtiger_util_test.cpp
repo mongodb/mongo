@@ -325,44 +325,4 @@ TEST(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     ASSERT_EQUALS(0U, result.getValue());
 }
 
-TEST(WiredTigerUtilTest, GetStatisticsValueAsUInt8) {
-    WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache(),
-                                        harnessHelper.getOplogManager());
-    WiredTigerSession* session = recoveryUnit.getSession();
-    WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
-
-    // Use data source statistics that has a value > 256 on an empty table.
-    StatusWith<uint64_t> resultUInt64 =
-        WiredTigerUtil::getStatisticsValue(session->getSession(),
-                                           "statistics:table:mytable",
-                                           "statistics=(fast)",
-                                           WT_STAT_DSRC_ALLOCATION_SIZE);
-    ASSERT_OK(resultUInt64.getStatus());
-    ASSERT_GREATER_THAN(resultUInt64.getValue(),
-                        static_cast<uint64_t>(std::numeric_limits<uint8_t>::max()));
-
-    // Ensure that statistics value retrieved as an 8-bit unsigned value
-    // is capped at maximum value for that type.
-    StatusWith<uint8_t> resultUInt8 =
-        WiredTigerUtil::getStatisticsValueAs<uint8_t>(session->getSession(),
-                                                      "statistics:table:mytable",
-                                                      "statistics=(fast)",
-                                                      WT_STAT_DSRC_ALLOCATION_SIZE);
-    ASSERT_OK(resultUInt8.getStatus());
-    ASSERT_EQUALS(std::numeric_limits<uint8_t>::max(), resultUInt8.getValue());
-
-    // Read statistics value as signed 16-bit value with alternative maximum value to
-    // std::numeric_limits.
-    StatusWith<int16_t> resultInt16 =
-        WiredTigerUtil::getStatisticsValueAs<int16_t>(session->getSession(),
-                                                      "statistics:table:mytable",
-                                                      "statistics=(fast)",
-                                                      WT_STAT_DSRC_ALLOCATION_SIZE,
-                                                      static_cast<int16_t>(100));
-    ASSERT_OK(resultInt16.getStatus());
-    ASSERT_EQUALS(static_cast<uint8_t>(100), resultInt16.getValue());
-}
-
 }  // namespace mongo

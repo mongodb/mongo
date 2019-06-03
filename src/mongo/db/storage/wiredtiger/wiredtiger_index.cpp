@@ -463,7 +463,7 @@ long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
 
         // Helper function to retrieve stats and check for errors
         auto getStats = [&](int key) -> int64_t {
-            StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValueAs<int64_t>(
+            StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValue(
                 session->getSession(), statsUri, "statistics=(fast)", key);
             if (!result.isOK()) {
                 if (result.getStatus().code() == ErrorCodes::CursorNotFound)

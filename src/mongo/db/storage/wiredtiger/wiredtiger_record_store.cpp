@@ -815,11 +815,10 @@ int64_t WiredTigerRecordStore::storageSize(OperationContext* opCtx,
         return dataSize(opCtx);
     }
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
-    StatusWith<int64_t> result =
-        WiredTigerUtil::getStatisticsValueAs<int64_t>(session->getSession(),
-                                                      "statistics:" + getURI(),
-                                                      "statistics=(size)",
-                                                      WT_STAT_DSRC_BLOCK_SIZE);
+    StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValue(session->getSession(),
+                                                                    "statistics:" + getURI(),
+                                                                    "statistics=(size)",
+                                                                    WT_STAT_DSRC_BLOCK_SIZE);
     uassertStatusOK(result.getStatus());
 
     int64_t size = result.getValue();

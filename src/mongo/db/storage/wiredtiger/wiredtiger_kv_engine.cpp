@@ -1934,7 +1934,7 @@ int64_t WiredTigerKVEngine::getCacheOverflowTableInsertCount(OperationContext* o
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
     invariant(session);
 
-    int64_t insertCount = uassertStatusOK(WiredTigerUtil::getStatisticsValueAs<int64_t>(
+    int64_t insertCount = uassertStatusOK(WiredTigerUtil::getStatisticsValue(
         session->getSession(), "statistics:", "", WT_STAT_CONN_CACHE_LOOKASIDE_INSERT));
 
     return insertCount;

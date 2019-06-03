@@ -350,7 +350,7 @@ StatusWith<int64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
 }
 
 int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s, const std::string& uri) {
-    StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValueAs<int64_t>(
+    StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValue(
         s, "statistics:" + uri, "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
     const Status& status = result.getStatus();
     if (!status.isOK()) {
@@ -688,9 +688,8 @@ void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
     const unsigned currentAvailableSnapshotWindow =
         stableTimestamp.getSecs() - oldestTimestamp.getSecs();
 
-    int64_t overflowTableInsertCount =
-        uassertStatusOK(WiredTigerUtil::getStatisticsValueAs<int64_t>(
-            session->getSession(), "statistics:", "", WT_STAT_CONN_CACHE_LOOKASIDE_INSERT));
+    int64_t overflowTableInsertCount = uassertStatusOK(WiredTigerUtil::getStatisticsValue(
+        session->getSession(), "statistics:", "", WT_STAT_CONN_CACHE_LOOKASIDE_INSERT));
     long long totalNumberOfSnapshotTooOldErrors =
         snapshotWindowParams.snapshotTooOldErrorCount.load();
 
