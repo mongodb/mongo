@@ -166,6 +166,10 @@
     res = t.runCommand('createIndexes', {indexes: [{key: {star: 1}, name: '*'}]});
     assert.commandFailedWithCode(res, ErrorCodes.BadValue);
 
+    // Test that index creation fails with an index value of empty string.
+    res = t.runCommand('createIndexes', {indexes: [{key: {f: ""}, name: 'f_1'}]});
+    assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
+
     // Test that user is not allowed to create indexes in config.transactions.
     var configDB = db.getSiblingDB('config');
     res = configDB.runCommand(

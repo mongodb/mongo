@@ -242,6 +242,31 @@ public:
     }
 };
 
+
+class CreateIndexWithEmptyStringAsValue : Base {
+public:
+    void run() {
+        ASSERT(db.createCollection(nss().ns()));
+
+        BSONObjBuilder indexSpec;
+        indexSpec.append("key",
+                         BSON("a"
+                              << ""));
+
+        BSONArrayBuilder indexes;
+        indexes.append(indexSpec.obj());
+
+        BSONObjBuilder cmd;
+        cmd.append("createIndexes", nsColl());
+        cmd.append("indexes", indexes.arr());
+
+        BSONObj result;
+        bool ok = db.runCommand(nsDb(), cmd.obj(), result);
+        log() << result.jsonString();
+        ASSERT(!ok);
+    }
+};
+
 class FindAndModify : Base {
 public:
     void run() {
@@ -372,6 +397,7 @@ public:
         add<SymbolArgument::GeoSearch>();
         add<SymbolArgument::CreateIndexWithNoKey>();
         add<SymbolArgument::CreateIndexWithDuplicateKey>();
+        add<SymbolArgument::CreateIndexWithEmptyStringAsValue>();
         add<RolesInfoShouldNotReturnDuplicateFieldNames>();
     }
 };

@@ -300,6 +300,14 @@ StatusWith<BSONObj> validateIndexSpec(
                 return keyPatternValidateStatus;
             }
 
+            for (const auto& keyElement : indexSpecElem.Obj()) {
+                if (keyElement.type() == String && keyElement.str().empty()) {
+                    return {ErrorCodes::CannotCreateIndex,
+                            str::stream()
+                                << "Values in the index key pattern cannot be empty strings"};
+                }
+            }
+
             if ((featureCompatibility.getVersion() <
                  ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) &&
                 (IndexNames::findPluginName(indexSpec.getObjectField(
