@@ -602,6 +602,8 @@ bool DBClientConnection::call(Message& toSend,
 
     auto sinkStatus = _session->sinkMessage(swm.getValue());
     if (!sinkStatus.isOK()) {
+        log() << "DBClientConnection failed to send message to " << getServerAddress() << " - "
+              << redact(sinkStatus);
         return maybeThrow(sinkStatus);
     }
 
@@ -609,6 +611,8 @@ bool DBClientConnection::call(Message& toSend,
     if (swm.isOK()) {
         response = std::move(swm.getValue());
     } else {
+        log() << "DBClientConnection failed to receive message from " << getServerAddress() << " - "
+              << redact(swm.getStatus());
         return maybeThrow(swm.getStatus());
     }
 
