@@ -192,6 +192,8 @@ private:
 
         repl::DropPendingCollectionReaper::set(
             service, std::make_unique<repl::DropPendingCollectionReaper>(_storageInterface));
+
+        setOplogCollectionName(service);
     }
 
     void tearDown() override {
@@ -324,6 +326,9 @@ void _setUpOplog(OperationContext* opCtx, StorageInterface* storage, std::vector
         ASSERT_OK(storage->insertDocument(
             opCtx, oplogNs, _makeInsertOplogEntry(ts), OpTime::kUninitializedTerm));
     }
+
+    // Initialize the cached pointer to the oplog collection.
+    acquireOplogCollectionForLogging(opCtx);
 }
 
 /**
