@@ -70,16 +70,14 @@
         };
 
         // Simulate the upsert that is performed by a config server on addShard.
-        var shardIdentityQuery = {
-            _id: shardIdentityDoc._id,
-            shardName: shardIdentityDoc.shardName,
-            clusterId: shardIdentityDoc.clusterId,
-        };
-        var shardIdentityUpdate = {
-            $set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString}
-        };
         assert.writeOK(mongodConn.getDB('admin').system.version.update(
-            shardIdentityQuery, shardIdentityUpdate, {upsert: true}));
+            {
+              _id: shardIdentityDoc._id,
+              shardName: shardIdentityDoc.shardName,
+              clusterId: shardIdentityDoc.clusterId,
+            },
+            {$set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString}},
+            {upsert: true}));
 
         var res = mongodConn.getDB('admin').runCommand({shardingState: 1});
 
@@ -146,20 +144,19 @@
 
     var st = new ShardingTest({shards: 1});
 
-    var mongod = MongoRunner.runMongod({shardsvr: ''});
+    {
+        var mongod = MongoRunner.runMongod({shardsvr: ''});
+        runTest(mongod, st.configRS.getURL());
+        MongoRunner.stopMongod(mongod);
+    }
 
-    runTest(mongod, st.configRS.getURL());
-
-    MongoRunner.stopMongod(mongod);
-
-    var replTest = new ReplSetTest({nodes: 1});
-    replTest.startSet({shardsvr: ''});
-    replTest.initiate();
-
-    runTest(replTest.getPrimary(), st.configRS.getURL());
-
-    replTest.stopSet();
+    {
+        var replTest = new ReplSetTest({nodes: 1});
+        replTest.startSet({shardsvr: ''});
+        replTest.initiate();
+        runTest(replTest.getPrimary(), st.configRS.getURL());
+        replTest.stopSet();
+    }
 
     st.stop();
-
 })();
