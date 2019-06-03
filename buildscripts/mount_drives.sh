@@ -147,15 +147,24 @@ function mount_drive {
       /sbin/mdadm --detail --scan > /etc/mdadm.conf
       /sbin/blockdev --setra 32 $device_name
     else
-      device_name=$devices
+      device_name="/dev/$device_names"
     fi
 
     # Mount the $root_dir drive(s)
     /sbin/mkfs.$fs_type $mount_options -f $device_name
-    echo "$device_name /$root_dir auto noatime 0 0" | tee -a /etc/fstab
+    # We add an entry for the device to /etc/fstab so it is automatically mounted following a
+    # machine reboot. The device is not guaranteed to be assigned the same name across restarts so
+    # we use its UUID in order to identify it.
+    #
+    # We also specify type=$fs_type in the /etc/fstab entry because specifying type=auto on
+    # Amazon Linux AMI 2018.03 leads to the drive not being mounted automatically following a
+    # machine reboot.
+    device_uuid=$(blkid -o value -s UUID "$device_name")
+    echo "Adding entry to /etc/fstab for device '$device_name' with UUID '$device_uuid'"
+    echo "UUID=$device_uuid /$root_dir $fs_type noatime 0 0" | tee -a /etc/fstab
     mkdir /$root_dir || true
     chmod 777 /$root_dir
-    mount -t $fs_type $device_name /$root_dir
+    mount -t $fs_type "UUID=$device_uuid" /$root_dir
     for sub_dir in $sub_dirs
     do
       mkdir -p /$root_dir/$sub_dir
