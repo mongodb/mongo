@@ -99,28 +99,12 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
         // Traverse the oplog chain with its own snapshot and read timestamp.
         ReadSourceScope readSourceScope(opCtx);
 
-        // If we are recovering, the lastApplied timestamp could be ahead of the common point in the
-        // case of rollback recovery because we do not update the lastAppliedOpTime until after we
-        // are done recovering the oplog. TransactionHistoryIterator by default does timestamped
-        // reads on the oplog using lastApplied. So this could race with the config.transactions
-        // table update (run by a different replication writer thread) whose commitTimestamp is less
-        // than the common point and thus less than the read timestamp of the
-        // TransactionHistoryIterator. We require that the commit timestamp of non-prepared storage
-        // transactions (which is the case for config.transactions update) is newer than the latest
-        // active read timestamp. So, we make TransactionHistoryIterator read untimestamped to avoid
-        // violating this rule. This is safe because there is no concurrent write to the oplog and
-        // all oplog entries we need on the transaction oplog chain should also be visible under
-        // untimestamped reads.
-        if (mode == repl::OplogApplication::Mode::kRecovering) {
-            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
-        }
-
         // Get the corresponding prepare applyOps oplog entry.
         const auto prepareOpTime = entry.getPrevWriteOpTimeInTransaction();
         invariant(prepareOpTime);
         TransactionHistoryIterator iter(prepareOpTime.get());
         invariant(iter.hasNext());
-        const auto prepareOplogEntry = iter.next(opCtx);
+        const auto prepareOplogEntry = iter.nextFatalOnErrors(opCtx);
         ops = readTransactionOperationsFromOplogChain(opCtx, prepareOplogEntry, {});
     }
 
@@ -258,7 +242,7 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     // First retrieve and transform the ops from the oplog, which will be retrieved in reverse
     // order.
     while (iter.hasNext()) {
-        const auto& operationEntry = iter.next(opCtx);
+        const auto& operationEntry = iter.nextFatalOnErrors(opCtx);
         invariant(operationEntry.isPartialTransaction());
         auto prevOpsEnd = ops.size();
         repl::ApplyOps::extractOperationsTo(operationEntry, commitOrPrepareObj, &ops);
@@ -434,7 +418,7 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
         invariant(!prepareOpTime.isNull());
         TransactionHistoryIterator iter(prepareOpTime);
         invariant(iter.hasNext());
-        auto prepareOplogEntry = iter.next(opCtx);
+        auto prepareOplogEntry = iter.nextFatalOnErrors(opCtx);
 
         {
             // Make a new opCtx so that we can set the lsid when applying the prepare transaction
