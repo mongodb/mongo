@@ -190,7 +190,9 @@ void cleanupTask(ServiceContext* serviceContext) {
         Client& client = cc();
 
         // Join the logical session cache before the transport layer
-        LogicalSessionCache::get(serviceContext)->joinOnShutDown();
+        if (auto lsc = LogicalSessionCache::get(serviceContext)) {
+            lsc->joinOnShutDown();
+        }
 
         // Shutdown the TransportLayer so that new connections aren't accepted
         if (auto tl = serviceContext->getTransportLayer()) {
@@ -396,7 +398,7 @@ private:
 };
 
 ExitCode runMongosServer(ServiceContext* serviceContext) {
-    Client::initThread("mongosMain");
+    ThreadClient tc("mongosMain", serviceContext);
     printShardingVersionInfo(false);
 
     initWireSpec();
@@ -447,13 +449,13 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         quickExit(EXIT_BADOPTIONS);
     }
 
-    auto opCtx = cc().makeOperationContext();
+    LogicalClock::set(serviceContext, stdx::make_unique<LogicalClock>(serviceContext));
 
-    auto logicalClock = stdx::make_unique<LogicalClock>(opCtx->getServiceContext());
-    LogicalClock::set(opCtx->getServiceContext(), std::move(logicalClock));
+    auto opCtxHolder = tc->makeOperationContext();
+    auto const opCtx = opCtxHolder.get();
 
     {
-        Status status = initializeSharding(opCtx.get());
+        Status status = initializeSharding(opCtx);
         if (!status.isOK()) {
             if (status == ErrorCodes::CallbackCanceled) {
                 invariant(globalInShutdownDeprecated());
@@ -464,15 +466,15 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
             return EXIT_SHARDING_ERROR;
         }
 
-        Grid::get(opCtx.get())
+        Grid::get(serviceContext)
             ->getBalancerConfiguration()
-            ->refreshAndCheck(opCtx.get())
+            ->refreshAndCheck(opCtx)
             .transitional_ignore();
     }
 
     startMongoSFTDC();
 
-    Status status = AuthorizationManager::get(serviceContext)->initialize(opCtx.get());
+    Status status = AuthorizationManager::get(serviceContext)->initialize(opCtx);
     if (!status.isOK()) {
         error() << "Initializing authorization data failed: " << status;
         return EXIT_SHARDING_ERROR;
@@ -486,17 +488,17 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     clusterCursorCleanupJob.go();
 
     UserCacheInvalidator cacheInvalidatorThread(AuthorizationManager::get(serviceContext));
-    {
-        cacheInvalidatorThread.initialize(opCtx.get());
-        cacheInvalidatorThread.go();
-    }
+    cacheInvalidatorThread.initialize(opCtx);
+    cacheInvalidatorThread.go();
 
     PeriodicTask::startRunningPeriodicTasks();
 
     // Set up the periodic runner for background job execution
-    auto runner = makePeriodicRunner(serviceContext);
-    runner->startup();
-    serviceContext->setPeriodicRunner(std::move(runner));
+    {
+        auto runner = makePeriodicRunner(serviceContext);
+        runner->startup();
+        serviceContext->setPeriodicRunner(std::move(runner));
+    }
 
     SessionKiller::set(serviceContext,
                        std::make_shared<SessionKiller>(serviceContext, killSessionsRemote));
