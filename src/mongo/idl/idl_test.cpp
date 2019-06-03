@@ -340,15 +340,15 @@ TEST(IDLOneTypeTests, TestNegativeRequiredUndefinedTypes) {
 
 
 // Mixed: test a type that accepts multiple bson types
-TEST(IDLOneTypeTests, TestSafeInt32) {
-    TestParse<One_safeint32, NumberInt, StringData, String>("test_value");
-    TestParse<One_safeint32, NumberInt, std::int32_t, NumberInt>(123);
-    TestParse<One_safeint32, NumberLong, std::int64_t, NumberLong>(456);
-    TestParse<One_safeint32, NumberDouble, double, NumberDouble>(3.14159);
-    TestParse<One_safeint32, NumberInt, bool, Bool>(true);
-    TestParse<One_safeint32, NumberInt, OID, jstOID>(OID::max());
-    TestParse<One_safeint32, NumberInt, Date_t, Date>(Date_t::now());
-    TestParse<One_safeint32, NumberInt, Timestamp, bsonTimestamp>(Timestamp::max());
+TEST(IDLOneTypeTests, TestSafeInt64) {
+    TestParse<One_safeint64, NumberInt, StringData, String>("test_value");
+    TestParse<One_safeint64, NumberInt, std::int32_t, NumberInt>(123);
+    TestParse<One_safeint64, NumberLong, std::int64_t, NumberLong>(456);
+    TestParse<One_safeint64, NumberDouble, double, NumberDouble>(3.14159);
+    TestParse<One_safeint64, NumberInt, bool, Bool>(true);
+    TestParse<One_safeint64, NumberInt, OID, jstOID>(OID::max());
+    TestParse<One_safeint64, NumberInt, Date_t, Date>(Date_t::now());
+    TestParse<One_safeint64, NumberInt, Timestamp, bsonTimestamp>(Timestamp::max());
 }
 
 // Mixed: test a type that accepts NamespaceString
@@ -1093,7 +1093,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
                             );
     auto testStruct = Complex_array_fields::parse(ctxt, testDoc);
 
-    assert_same_types<decltype(testStruct.getField1()), const std::vector<std::int32_t>&>();
+    assert_same_types<decltype(testStruct.getField1()), const std::vector<std::int64_t>&>();
     assert_same_types<decltype(testStruct.getField2()),
                       const std::vector<mongo::NamespaceString>&>();
     assert_same_types<decltype(testStruct.getField3()), const std::vector<mongo::AnyBasicType>&>();
@@ -1104,7 +1104,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
                       const std::vector<mongo::idl::import::One_string>&>();
 
     assert_same_types<decltype(testStruct.getField1o()),
-                      const boost::optional<std::vector<std::int32_t>>&>();
+                      const boost::optional<std::vector<std::int64_t>>&>();
     assert_same_types<decltype(testStruct.getField2o()),
                       const boost::optional<std::vector<mongo::NamespaceString>>&>();
     assert_same_types<decltype(testStruct.getField3o()),
@@ -1116,7 +1116,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
     assert_same_types<decltype(testStruct.getField6o()),
                       const boost::optional<std::vector<mongo::idl::import::One_string>>&>();
 
-    std::vector<std::int32_t> field1{1, 2, 3};
+    std::vector<std::int64_t> field1{1, 2, 3};
     ASSERT_TRUE(field1 == testStruct.getField1());
     std::vector<NamespaceString> field2{{"a", "b"}, {"c", "d"}};
     ASSERT_TRUE(field2 == testStruct.getField2());

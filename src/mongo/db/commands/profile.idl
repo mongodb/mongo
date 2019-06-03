@@ -39,10 +39,10 @@ commands:
     cpp_name: ProfileCmdRequest
     strict: false
     namespace: type
-    type: safeInt32
+    type: safeInt64
     fields:
       slowms:
-        type: safeInt32
+        type: safeInt64
         description: "The threshold, in milliseconds, at which ops are profiled and logged."
         optional: true
       sampleRate:

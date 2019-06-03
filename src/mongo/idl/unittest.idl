@@ -283,10 +283,10 @@ structs:
 #
 ##################################################################################################
 
-    one_safeint32:
-        description: UnitTest for a single safeInt32
+    one_safeint64:
+        description: UnitTest for a single safeInt64
         fields:
-            value: safeInt32
+            value: safeInt64
 
 ##################################################################################################
 #
@@ -295,7 +295,7 @@ structs:
 ##################################################################################################
 
     default_values:
-        description: UnitTest for a single safeInt32
+        description: UnitTest for default values
         fields:
             V_string:
                 type: string
@@ -392,7 +392,7 @@ structs:
         description: UnitTest for arrays of complex optional and non-optional simple types
         fields:
             field1:
-                type: array<safeInt32>
+                type: array<safeInt64>
             field2:
                 type: array<namespacestring>
             field3:
@@ -404,7 +404,7 @@ structs:
             field6:
                 type: array<one_string>
             field1o:
-                type: array<safeInt32>
+                type: array<safeInt64>
                 optional: true
             field2o:
                 type: array<namespacestring>
