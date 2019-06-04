@@ -6728,6 +6728,24 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 15
 
+- name: sharding_rs_matching_disabled_gen
+  tags: ["sharding", "common"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 15
+
+- name: sharding_rs_matching_match_busiest_node_gen
+  tags: ["sharding", "common"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 15
+
 - name: sharding_csrs_continuous_config_stepdown_gen
   tags: ["sharding", "common", "csrs"]
   commands:
@@ -10142,7 +10160,6 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
     distros:
     - rhel62-large
-
 - name: enterprise-rhel-62-64-bit-majority-read-concern-off
   display_name: "Enterprise RHEL 6.2 (majority read concern off)"
   modules:

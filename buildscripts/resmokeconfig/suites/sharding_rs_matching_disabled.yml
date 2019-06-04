@@ -1,0 +1,17 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/sharding/*.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands
+      global_vars:
+        TestData:
+          setParameters:
+            ShardingTaskExecutorPoolReplicaSetMatching: "disabled"
+          setParametersMongos:
+            ShardingTaskExecutorPoolReplicaSetMatching: "disabled"
