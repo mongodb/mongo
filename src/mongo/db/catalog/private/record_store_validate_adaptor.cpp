@@ -68,14 +68,11 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
     for (auto& it : _indexConsistency->getIndexInfo()) {
         IndexInfo& indexInfo = it.second;
         const IndexDescriptor* descriptor = indexInfo.descriptor;
-        ValidateResults curRecordResults;
-
         const IndexAccessMethod* iam = _indexCatalog->getIndex(descriptor);
 
         if (descriptor->isPartial()) {
             const IndexCatalogEntry* ice = _indexCatalog->getEntry(descriptor);
             if (!ice->getFilterExpression()->matchesBSON(recordBson)) {
-                (*_indexNsResultsMap)[descriptor->indexName()] = curRecordResults;
                 continue;
             }
         }
@@ -93,6 +90,7 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
             std::string msg = str::stream() << "Index " << descriptor->indexName()
                                             << " is not multi-key but has more than one"
                                             << " key in document " << recordId;
+            ValidateResults& curRecordResults = (*_indexNsResultsMap)[descriptor->indexName()];
             curRecordResults.errors.push_back(msg);
             curRecordResults.valid = false;
         }
@@ -109,7 +107,6 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
             ks.resetToKey(key, indexInfo.ord, recordId);
             _indexConsistency->addDocKey(ks, &indexInfo, recordId, key);
         }
-        (*_indexNsResultsMap)[descriptor->indexName()] = curRecordResults;
     }
     return status;
 }
