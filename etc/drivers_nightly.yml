@@ -63,7 +63,7 @@ variables:
   command: git.get_project
   params:
     directory: src
-    revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+    revisions: # for each module include revision as <module_name>: ${<module_name>_rev}
       enterprise: ${enterprise_rev}
       mongo-java-driver: ${mongo-java-driver_rev}
       mongo-python-driver: ${mongo-python-driver_rev}
@@ -102,7 +102,7 @@ variables:
 
 functions:
 
-  "fetch and extract binaries" : &fetch_extract_binaries
+  "fetch and extract binaries": &fetch_extract_binaries
     command: shell.exec
     params:
       working_dir: src
@@ -119,13 +119,13 @@ functions:
         chmod +x mongodb*/bin/*
         mv mongodb*/bin/* .
 
-  "get buildnumber" : &get_buildnumber
+  "get buildnumber": &get_buildnumber
     command: keyval.inc
     params:
       key: "v4.2"
       destination: "builder_num"
 
-  "setup credentials" : &setup_credentials
+  "setup credentials": &setup_credentials
     command: shell.exec
     params:
       working_dir: src
@@ -139,7 +139,7 @@ functions:
         build_phase='${task_name}_${execution}'
         END_OF_CREDS
 
-  "do setup" :
+  "do setup":
   - *git_get_project
   - *fetch_extract_binaries
   - *get_buildnumber
@@ -147,7 +147,7 @@ functions:
 
 
   ### FOR MONGODB TESTS ###
-  "set up virtualenv" :
+  "set up virtualenv":
     command: shell.exec
     type: test
     params:
@@ -159,7 +159,7 @@ functions:
 
           virtualenv --system-site-packages ./venv
 
-  "run mongo tests" :
+  "run mongo tests":
     command: shell.exec
     type: test
     params:
@@ -190,7 +190,7 @@ functions:
         ${rlp_environment}   \
         ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
-  "cleanup environment" :
+  "cleanup environment":
     command: shell.exec
     params:
       script: |
@@ -688,9 +688,9 @@ buildvariants:
 
 ### Python Matrix Linux
 - matrix_name: "python-driver-linux"
-  matrix_spec: {auth: "*", ssl: "*", os: "rhel62", python-linux: "2.6" }
+  matrix_spec: {auth: "*", ssl: "*", os: "rhel62", python-linux: "2.6"}
   display_name: "Python Driver ${os} ${python-linux} ${auth} ${ssl}"
-  modules: [ "mongo-python-driver", "drivers-evergreen-tools" ]
+  modules: ["mongo-python-driver", "drivers-evergreen-tools"]
   tasks:
      - name: "test-nightly-replica_set"
      - name: "test-nightly-sharded_cluster"
@@ -698,9 +698,9 @@ buildvariants:
 
 ### Python Matrix Windows
 - matrix_name: "python-driver-windows"
-  matrix_spec: {auth: "*", ssl: "*", os: "windows64", python-windows: "3.6" }
+  matrix_spec: {auth: "*", ssl: "*", os: "windows64", python-windows: "3.6"}
   display_name: "Python Driver ${os} ${python-windows} ${auth} ${ssl}"
-  modules: [ "mongo-python-driver", "drivers-evergreen-tools" ]
+  modules: ["mongo-python-driver", "drivers-evergreen-tools"]
   tasks:
      - name: "test-nightly-replica_set"
      - name: "test-nightly-sharded_cluster"
@@ -708,9 +708,9 @@ buildvariants:
 
 ### Java Matrix Linux
 - matrix_name: "java-driver-linux"
-  matrix_spec: {auth: "*", ssl: "*", os: "rhel62", jdk: "jdk8" }
+  matrix_spec: {auth: "*", ssl: "*", os: "rhel62", jdk: "jdk8"}
   display_name: "Java Driver ${os} ${jdk} ${auth} ${ssl}"
-  modules: [ "mongo-java-driver", "drivers-evergreen-tools" ]
+  modules: ["mongo-java-driver", "drivers-evergreen-tools"]
   tasks:
      - name: "test-nightly-replica_set"
      - name: "test-nightly-sharded_cluster"
