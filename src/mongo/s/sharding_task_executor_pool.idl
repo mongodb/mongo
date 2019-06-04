@@ -90,4 +90,4 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "ShardingTaskExecutorPoolController::gParameters.matchingStrategyString"
     on_update: "ShardingTaskExecutorPoolController::onUpdateMatchingStrategy"
-    default: "disabled"
+    default: "matchPrimaryNode"
