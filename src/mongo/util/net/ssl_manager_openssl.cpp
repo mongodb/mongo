@@ -1705,6 +1705,7 @@ std::string SSLManagerInterface::getSSLErrorMessage(int code) {
 void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
     int code = SSL_get_error(conn->ssl, ret);
     int err = ERR_get_error();
+    SocketErrorKind errToThrow = SocketErrorKind::CONNECT_ERROR;
 
     switch (code) {
         case SSL_ERROR_WANT_READ:
@@ -1713,12 +1714,15 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
             // However, it turns out this CAN happen during a connect, if the other side
             // accepts the socket connection but fails to do the SSL handshake in a timely
             // manner.
+            errToThrow = (code == SSL_ERROR_WANT_READ) ? SocketErrorKind::RECV_ERROR
+                                                       : SocketErrorKind::SEND_ERROR;
             error() << "SSL: " << code << ", possibly timed out during connect";
             break;
 
         case SSL_ERROR_ZERO_RETURN:
             // TODO: Check if we can avoid throwing an exception for this condition
-            LOG(3) << "SSL network connection closed";
+            // If so, change error() back to LOG(3)
+            error() << "SSL network connection closed";
             break;
         case SSL_ERROR_SYSCALL:
             // If ERR_get_error returned 0, the error queue is empty
@@ -1741,6 +1745,6 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
             break;
     }
     _flushNetworkBIO(conn);
-    throwSocketError(SocketErrorKind::CONNECT_ERROR, "");
+    throwSocketError(errToThrow, conn->socket->remoteString());
 }
 }  // namespace mongo
