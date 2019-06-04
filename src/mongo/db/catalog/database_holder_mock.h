@@ -54,14 +54,6 @@ public:
     std::set<std::string> getNamesWithConflictingCasing(StringData name) override {
         return std::set<std::string>();
     }
-
-    std::unique_ptr<Collection> makeCollection(OperationContext* const opCtx,
-                                               const StringData fullNS,
-                                               OptionalCollectionUUID uuid,
-                                               CollectionCatalogEntry* const details,
-                                               RecordStore* const recordStore) override {
-        return {};
-    }
 };
 
 }  // namespace mongo

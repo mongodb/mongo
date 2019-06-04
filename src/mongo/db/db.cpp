@@ -51,6 +51,7 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder_impl.h"
@@ -785,6 +786,7 @@ void startupConfigActions(const std::vector<std::string>& args) {
 void setUpCatalog(ServiceContext* serviceContext) {
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
     IndexAccessMethodFactory::set(serviceContext, std::make_unique<IndexAccessMethodFactoryImpl>());
+    Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
 }
 
 auto makeReplicationExecutor(ServiceContext* serviceContext) {

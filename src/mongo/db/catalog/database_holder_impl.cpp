@@ -268,13 +268,4 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
     }
 }
 
-std::unique_ptr<Collection> DatabaseHolderImpl::makeCollection(
-    OperationContext* const opCtx,
-    const StringData fullNS,
-    OptionalCollectionUUID uuid,
-    CollectionCatalogEntry* const details,
-    RecordStore* const recordStore) {
-    return std::make_unique<CollectionImpl>(opCtx, fullNS, uuid, details, recordStore);
-}
-
 }  // namespace mongo

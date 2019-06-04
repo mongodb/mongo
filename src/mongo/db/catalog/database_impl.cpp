@@ -84,22 +84,6 @@ namespace mongo {
 namespace {
 MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
 
-std::unique_ptr<Collection> _createCollectionInstance(OperationContext* opCtx,
-                                                      const NamespaceString& nss) {
-
-    auto cce = CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
-    auto rs = cce->getRecordStore();
-    auto uuid = cce->getCollectionOptions(opCtx).uuid;
-    invariant(rs,
-              str::stream() << "Record store did not exist. Collection: " << nss.ns() << " UUID: "
-                            << uuid);
-    invariant(uuid);
-
-    auto coll = std::make_unique<CollectionImpl>(opCtx, nss.ns(), uuid, cce, rs);
-
-    return coll;
-}
-
 Status validateDBNameForWindows(StringData dbname) {
     const std::vector<std::string> windowsReservedNames = {
         "con",  "prn",  "aux",  "nul",  "com1", "com2", "com3", "com4", "com5", "com6", "com7",
@@ -169,19 +153,12 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
     }
 
     auto& catalog = CollectionCatalog::get(opCtx);
-    for (const auto& nss : catalog.getAllCollectionNamesFromDb(opCtx, _name)) {
-        auto ownedCollection = _createCollectionInstance(opCtx, nss);
-        invariant(ownedCollection);
-
-        // Call registerCollectionObject directly because we're not in a WUOW.
-        auto uuid = *(ownedCollection->uuid());
-        catalog.registerCollectionObject(uuid, std::move(ownedCollection));
-    }
-
     for (const auto& uuid : catalog.getAllCollectionUUIDsFromDb(_name)) {
         auto collection = catalog.lookupCollectionByUUID(uuid);
-        collection->getIndexCatalog()->init(opCtx).transitional_ignore();
-        collection->infoCache()->init(opCtx);
+        invariant(collection);
+        // If this is called from the repair path, the collection is already initialized.
+        if (!collection->isInitialized())
+            collection->init(opCtx);
     }
 
     // At construction time of the viewCatalog, the CollectionCatalog map wasn't initialized yet,
@@ -694,9 +671,9 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     // Create Collection object
     auto& catalog = CollectionCatalog::get(opCtx);
-    auto ownedCollection = _createCollectionInstance(opCtx, nss);
-    ownedCollection->getIndexCatalog()->init(opCtx).transitional_ignore();
-    ownedCollection->infoCache()->init(opCtx);
+    auto catalogEntry = catalog.lookupCollectionCatalogEntryByUUID(optionsWithUUID.uuid.get());
+    auto ownedCollection = Collection::Factory::get(opCtx)->make(opCtx, catalogEntry);
+    ownedCollection->init(opCtx);
     Collection* collection = ownedCollection.get();
     catalog.onCreateCollection(opCtx, std::move(ownedCollection), *(collection->uuid()));
     opCtx->recoveryUnit()->onCommit([collection](auto commitTime) {

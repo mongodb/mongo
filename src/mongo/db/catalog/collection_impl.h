@@ -54,6 +54,12 @@ public:
 
     ~CollectionImpl();
 
+    class FactoryImpl : public Factory {
+    public:
+        std::unique_ptr<Collection> make(
+            OperationContext* opCtx, CollectionCatalogEntry* collectionCatalogEntry) const final;
+    };
+
     bool ok() const final {
         return _magic == kMagicNumber;
     }
@@ -366,6 +372,9 @@ public:
 
     void establishOplogCollectionForLogging(OperationContext* opCtx) final;
 
+    void init(OperationContext* opCtx) final;
+    bool isInitialized() const final;
+
 private:
     /**
      * Returns a non-ok Status if document does not pass this collection's validator.
@@ -391,6 +400,8 @@ private:
     NamespaceString _ns;
     OptionalCollectionUUID _uuid;
     CollectionCatalogEntry* const _details;
+
+    // The RecordStore may be null during a repair operation.
     RecordStore* const _recordStore;
     const bool _needCappedLock;
     std::unique_ptr<CollectionInfoCache> _infoCache;
@@ -420,5 +431,7 @@ private:
 
     // The earliest snapshot that is allowed to use this collection.
     boost::optional<Timestamp> _minVisibleSnapshot;
+
+    bool _initialized = false;
 };
 }  // namespace mongo

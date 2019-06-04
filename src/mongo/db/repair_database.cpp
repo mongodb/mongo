@@ -138,8 +138,7 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
 namespace {
 Status repairCollections(OperationContext* opCtx,
                          StorageEngine* engine,
-                         const std::string& dbName,
-                         stdx::function<void(const std::string& dbName)> onRecordStoreRepair) {
+                         const std::string& dbName) {
 
     auto colls = CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName);
 
@@ -152,8 +151,6 @@ Status repairCollections(OperationContext* opCtx,
         if (!status.isOK())
             return status;
     }
-
-    onRecordStoreRepair(dbName);
 
     for (const auto& nss : colls) {
         opCtx->checkForInterrupt();
@@ -175,10 +172,7 @@ Status repairCollections(OperationContext* opCtx,
 }
 }  // namespace
 
-Status repairDatabase(OperationContext* opCtx,
-                      StorageEngine* engine,
-                      const std::string& dbName,
-                      stdx::function<void(const std::string& dbName)> onRecordStoreRepair) {
+Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std::string& dbName) {
     DisableDocumentValidation validationDisabler(opCtx);
 
     // We must hold some form of lock here
@@ -195,7 +189,7 @@ Status repairDatabase(OperationContext* opCtx,
     auto databaseHolder = DatabaseHolder::get(opCtx);
     databaseHolder->close(opCtx, dbName);
 
-    auto status = repairCollections(opCtx, engine, dbName, onRecordStoreRepair);
+    auto status = repairCollections(opCtx, engine, dbName);
     if (!status.isOK()) {
         severe() << "Failed to repair database " << dbName << ": " << status.reason();
     }

@@ -348,6 +348,8 @@ public:
 private:
     using CollIter = std::list<std::string>::iterator;
 
+    void _initCollection(OperationContext* opCtx, const NamespaceString& nss, bool forRepair);
+
     Status _dropCollectionsNoTimestamp(OperationContext* opCtx,
                                        std::vector<NamespaceString>& toDrop);
 

@@ -162,6 +162,26 @@ public:
     };
 
     /**
+     * A Collection::Factory is a factory class that constructs Collection objects.
+     */
+    class Factory {
+    public:
+        Factory() = default;
+        virtual ~Factory() = default;
+
+        static Factory* get(ServiceContext* service);
+        static Factory* get(OperationContext* opCtx);
+        static void set(ServiceContext* service, std::unique_ptr<Factory> factory);
+
+        /**
+         * Constructs a Collection object. This does not persist any state to the storage engine,
+         * only constructs an in-memory representation of what already exists on disk.
+         */
+        virtual std::unique_ptr<Collection> make(
+            OperationContext* opCtx, CollectionCatalogEntry* collectionCatalogEntry) const = 0;
+    };
+
+    /**
      * Callback function for callers of insertDocumentForBulkLoader().
      */
     using OnRecordInsertedFn = stdx::function<Status(const RecordId& loc)>;
@@ -466,6 +486,12 @@ public:
      * onto the global lock in exclusive mode.
      */
     virtual void establishOplogCollectionForLogging(OperationContext* opCtx) = 0;
+
+    virtual void init(OperationContext* opCtx) {}
+
+    virtual bool isInitialized() const {
+        return false;
+    }
 };
 
 }  // namespace mongo
