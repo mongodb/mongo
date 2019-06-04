@@ -364,12 +364,6 @@ private:
 
     void scheduleIsMaster(const HostAndPort& host, WithLock);
 
-    /**
-     * Adjusts the _scan work queue based on information from this host.
-     * This should only be called with replies from non-masters.
-     */
-    void receivedIsMasterBeforeFoundMaster(const IsMasterReply& reply);
-
     // Both pointers are never NULL
     SetStatePtr _set;
     ScanStatePtr _scan;  // May differ from _set->currentScan if a new scan has started.

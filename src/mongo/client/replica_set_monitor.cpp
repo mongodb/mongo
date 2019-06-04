@@ -709,7 +709,7 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
         _set->notify(/*finishedScan*/ false);
     } else {
         // Populate possibleNodes.
-        receivedIsMasterBeforeFoundMaster(reply);
+        _scan->possibleNodes.insert(reply.normalHosts.begin(), reply.normalHosts.end());
         _scan->unconfirmedReplies[from] = reply;
     }
 
@@ -869,25 +869,6 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
     _set->lastSeenMaster = reply.host;
 
     return Status::OK();
-}
-
-void Refresher::receivedIsMasterBeforeFoundMaster(const IsMasterReply& reply) {
-    invariant(!reply.isMaster);
-
-    // Add everyone this host claims is in the set to possibleNodes.
-    _scan->possibleNodes.insert(reply.normalHosts.begin(), reply.normalHosts.end());
-
-    // If this node thinks the primary is someone we haven't tried, make that the next
-    // hostToScan.
-    if (!reply.primary.empty() && !_scan->triedHosts.count(reply.primary)) {
-        std::deque<HostAndPort>::iterator it = std::stable_partition(
-            _scan->hostsToScan.begin(), _scan->hostsToScan.end(), HostIs(reply.primary));
-
-        if (it == _scan->hostsToScan.begin()) {
-            // reply.primary wasn't in hostsToScan
-            _scan->hostsToScan.push_front(reply.primary);
-        }
-    }
 }
 
 void IsMasterReply::parse(const BSONObj& obj) {

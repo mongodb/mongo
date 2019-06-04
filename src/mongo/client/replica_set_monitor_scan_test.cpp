@@ -271,15 +271,14 @@ TEST_F(CoreScanTest, MasterNotInSeeds_PrimaryInIsMaster) {
     Refresher refresher(state);
 
     std::set<HostAndPort> seen;
+    std::set<HostAndPort> expected = basicSeedsSet;
+    HostAndPort d("d");
+    expected.insert(d);
 
     for (size_t i = 0; i < basicSeeds.size() + 1; i++) {
         NextStep ns = refresher.getNextStep();
         ASSERT_EQUALS(ns.step, NextStep::CONTACT_HOST);
-        if (i == 1) {  // d should be the second host we contact since we are told it is primary
-            ASSERT_EQUALS(ns.host.host(), "d");
-        } else {
-            ASSERT(basicSeedsSet.count(ns.host));
-        }
+        ASSERT(expected.count(ns.host));
 
         ASSERT(!seen.count(ns.host));
         seen.insert(ns.host);
