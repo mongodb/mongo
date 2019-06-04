@@ -83,6 +83,14 @@ public:
         return nullptr;
     }
 
+    boost::intrusive_ptr<ExpressionContext> getExpressionContext() {
+        return _expCtx;
+    }
+
+    boost::intrusive_ptr<Expression> getExpression() {
+        return _expression;
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final;
 
