@@ -45,6 +45,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -52,8 +53,12 @@ namespace {
 // The number of items we can scan before we must yield.
 static const int kScanLimit = 1000;
 static const size_t kNumHashBuckets = 1U << 16;
-
 }  // namespace
+
+IndexInfo::IndexInfo(const IndexDescriptor* descriptor)
+    : descriptor(descriptor),
+      indexNameHash(StringMapTraits::hash(descriptor->indexName())),
+      ord(Ordering::make(descriptor->keyPattern())) {}
 
 IndexConsistency::IndexConsistency(OperationContext* opCtx,
                                    Collection* collection,
@@ -77,26 +82,9 @@ IndexConsistency::IndexConsistency(OperationContext* opCtx,
     IndexCatalog::IndexIterator indexIterator = indexCatalog->getIndexIterator(_opCtx, false);
 
     while (indexIterator.more()) {
-
         const IndexDescriptor* descriptor = indexIterator.next();
-        std::string indexName = descriptor->indexName();
-        _indexNumber[indexName] = _indexesInfo.size();
-
-        IndexInfo indexInfo;
-
-        indexInfo.descriptor = descriptor;
-        indexInfo.isReady = _collection->getCatalogEntry()->isIndexReady(opCtx, indexName);
-
-        uint32_t indexNameHash;
-        MurmurHash3_x86_32(indexName.c_str(), indexName.size(), 0, &indexNameHash);
-        indexInfo.indexNameHash = indexNameHash;
-        indexInfo.indexScanFinished = false;
-
-        indexInfo.numKeys = 0;
-        indexInfo.numLongKeys = 0;
-        indexInfo.numRecords = 0;
-
-        _indexesInfo.push_back(indexInfo);
+        if (_collection->getCatalogEntry()->isIndexReady(opCtx, descriptor->indexName()))
+            _indexesInfo.emplace(descriptor->indexName(), IndexInfo(descriptor));
     }
 }
 
@@ -215,12 +203,6 @@ void IndexConsistency::addDocKey(const KeyString& ks,
                                  IndexInfo* indexInfo,
                                  RecordId recordId,
                                  const BSONObj& indexKey) {
-
-    // Ignore indexes that weren't ready before we started validation.
-    if (!indexInfo->isReady) {
-        return;
-    }
-
     const uint32_t hash = _hashKeyString(ks, indexInfo->indexNameHash);
 
     if (_firstPhase) {
@@ -255,12 +237,6 @@ void IndexConsistency::addIndexKey(const KeyString& ks,
                                    IndexInfo* indexInfo,
                                    RecordId recordId,
                                    const BSONObj& indexKey) {
-
-    // Ignore indexes that weren't ready before we started validation.
-    if (!indexInfo->isReady) {
-        return;
-    }
-
     const uint32_t hash = _hashKeyString(ks, indexInfo->indexNameHash);
 
     if (_firstPhase) {
