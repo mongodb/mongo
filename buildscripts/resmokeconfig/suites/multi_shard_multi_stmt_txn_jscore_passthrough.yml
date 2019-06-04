@@ -367,6 +367,9 @@ selector:
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
+  # Cannot retry a getMore command if a transient transaction or network error occurs during
+  # it, since we won't know whether the cursor was advanced or not.
+  - requires_getmore
 
 executor:
   archive:
