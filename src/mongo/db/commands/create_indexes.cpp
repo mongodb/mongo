@@ -623,42 +623,18 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                       str::stream() << "Not primary while creating indexes in " << ns.ns());
         }
 
-        // Before potentially taking an exclusive database lock, check if all indexes already exist
-        // while holding an intent lock. Only continue if new indexes need to be built and the
-        // database should be re-locked in exclusive mode.
-        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-        auto db = autoColl.getDb();
-        auto collection = autoColl.getCollection();
-        if (collection) {
-            invariant(db, str::stream() << "Database missing for index build: " << ns);
-
-            checkDatabaseShardingState(opCtx, db);
-
-            result.appendBool(kCreateCollectionAutomaticallyFieldName, false);
-            auto specsCopy = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, specs);
-            // Return from command invocation early if we  are not adding any new indexes.
-            if (specsCopy.size() == 0) {
-                auto numIndexes = collection->getIndexCatalog()->numIndexesTotal(opCtx);
-                fillCommandResultWithIndexesAlreadyExistInfo(numIndexes, &result);
-                return true;
-            }
-        } else {
-            // Relocking temporarily releases the Database lock while holding a Global IX lock. This
-            // prevents the replication state from changing, but requires abandoning the current
-            // snapshot in case indexes change during the period of time where no database lock is
-            // held.
-            opCtx->recoveryUnit()->abandonSnapshot();
-            dbLock.relockWithMode(MODE_X);
-
-            auto db = getOrCreateDatabase(opCtx, ns.db(), &dbLock);
-
-            checkDatabaseShardingState(opCtx, db);
-
-            // We would not reach this point if we were able to check existing indexes on the
-            // collection.
-            invariant(!collection);
-            collection = getOrCreateCollection(opCtx, db, ns, cmdObj, &errmsg, &result);
+        if (indexesAlreadyExist(opCtx, ns, specs, &result)) {
+            return true;
         }
+
+        auto db = getOrCreateDatabase(opCtx, ns.db(), &dbLock);
+
+        checkDatabaseShardingState(opCtx, db);
+
+        opCtx->recoveryUnit()->abandonSnapshot();
+        Lock::CollectionLock collLock(opCtx, ns, MODE_X);
+
+        auto collection = getOrCreateCollection(opCtx, db, ns, cmdObj, &errmsg, &result);
         collectionUUID = collection->uuid();
     }
 
