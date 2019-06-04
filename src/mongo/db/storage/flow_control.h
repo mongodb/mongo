@@ -120,6 +120,10 @@ private:
     AtomicWord<int> _lastTargetTicketsPermitted{_kMaxTickets};
     AtomicWord<double> _lastLocksPerOp{0.0};
     AtomicWord<int> _lastSustainerAppliedCount{0};
+    AtomicWord<bool> _isLagged{false};
+    AtomicWord<int> _isLaggedCount{0};
+    // Use an int64_t as this is serialized to bson which does not support unsigned 64-bit numbers.
+    AtomicWord<std::int64_t> _isLaggedTimeMicros{0};
 
     mutable stdx::mutex _sampledOpsMutex;
     std::deque<Sample> _sampledOpsApplied;
@@ -134,6 +138,9 @@ private:
     std::vector<repl::MemberData> _prevMemberData;
 
     Date_t _lastTimeSustainerAdvanced;
+
+    // This value is used for calculating server status metrics.
+    std::uint64_t _startWaitTime = 0;
 };
 
 }  // namespace mongo
