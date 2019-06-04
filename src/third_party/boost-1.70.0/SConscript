@@ -67,9 +67,94 @@ env.Library(
     source=[
         'libs/iostreams/src/file_descriptor.cpp',
         'libs/iostreams/src/mapped_file.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/boost_assert_shim',
+            'boost_system',
+        ])
+
+boost_thread_source = dict( 
+    posix=[
+        'libs/thread/src/pthread/once.cpp', 
+        'libs/thread/src/pthread/thread.cpp'
+    ], 
+    windows=[
+        'libs/thread/src/win32/thread.cpp', 
+        'libs/thread/src/win32/thread_primitives.cpp',
+        'libs/thread/src/win32/tss_dll.cpp',
+        'libs/thread/src/win32/tss_pe.cpp',
+    ] 
+).get(env['TARGET_OS_FAMILY'], 'UNKNOWN_OS_FAMILY_FOR_BOOST_THREADS__%s' % env['TARGET_OS_FAMILY'])
+
+boost_thread_defines = dict( 
+    posix=['BOOST_THREAD_PTHREAD'], 
+    windows=['BOOST_THREAD_WIN32'] 
+).get(env['TARGET_OS_FAMILY'], 'UNKNOWN_OS_FAMILY_FOR_BOOST_THREADS__%s' % env['TARGET_OS_FAMILY'])
+
+threadlib_env = env.Clone()
+threadlib_env.Append(CPPDEFINES=['BOOST_THREAD_BUILD_LIB'] + boost_thread_defines)
+threadlib_env.Library(
+    target='boost_thread', 
+    source=[
+        'libs/thread/src/future.cpp',
+    ] + boost_thread_source,
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/boost_assert_shim',
+    ]
+)
+
+loglib_env = env.Clone()
+loglib_env.AppendUnique(
+    CPPDEFINES=[
+        'BOOST_LOG_USE_COMPILER_TLS',
+        'BOOST_LOG_USE_STD_REGEX',
+        'BOOST_LOG_WITHOUT_DEFAULT_FACTORIES',
+        'BOOST_LOG_WITHOUT_IPC',
+        'BOOST_LOG_WITHOUT_SETTINGS_PARSERS',
+    ])
+if env.ToolchainIs('msvc'):
+    # warning C4828: The file contains a character starting at offset 0x6009 that is illegal in 
+    # the current source character set (codepage 65001).
+    loglib_env.AppendUnique(CCFLAGS=['/wd4828'])
+
+loglib_env.Library(
+    target='boost_log', 
+    source=[
+        'libs/log/src/attribute_name.cpp',
+        'libs/log/src/attribute_set.cpp',
+        'libs/log/src/attribute_value_set.cpp',
+        'libs/log/src/code_conversion.cpp',
+        'libs/log/src/core.cpp',
+        'libs/log/src/date_time_format_parser.cpp',
+        'libs/log/src/default_attribute_names.cpp',
+        'libs/log/src/default_sink.cpp',
+        'libs/log/src/dump.cpp',
+        'libs/log/src/event.cpp',
+        'libs/log/src/exceptions.cpp',
+        'libs/log/src/format_parser.cpp',
+        'libs/log/src/global_logger_storage.cpp',
+        'libs/log/src/named_scope.cpp',
+        'libs/log/src/named_scope_format_parser.cpp',
+        'libs/log/src/once_block.cpp',
+        'libs/log/src/permissions.cpp',
+        'libs/log/src/process_id.cpp',
+        'libs/log/src/process_name.cpp',
+        'libs/log/src/record_ostream.cpp',
+        'libs/log/src/severity_level.cpp',
+        'libs/log/src/spirit_encoding.cpp',
+        'libs/log/src/text_file_backend.cpp',
+        'libs/log/src/text_multifile_backend.cpp',
+        'libs/log/src/text_ostream_backend.cpp',
+        'libs/log/src/thread_id.cpp',
+        'libs/log/src/thread_specific.cpp',
+        'libs/log/src/threadsafe_queue.cpp',
+        'libs/log/src/timer.cpp',
+        'libs/log/src/timestamp.cpp',
+        'libs/log/src/trivial.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/boost_assert_shim',
-        'boost_system',
-    ],
+        'boost_filesystem',
+        'boost_thread',
+    ]
 )

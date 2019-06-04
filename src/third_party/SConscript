@@ -265,6 +265,8 @@ if use_system_version_of_library("boost"):
                 env['LIBDEPS_BOOST_FILESYSTEM_SYSLIBDEP'],
                 env['LIBDEPS_BOOST_SYSTEM_SYSLIBDEP'],
                 env['LIBDEPS_BOOST_IOSTREAMS_SYSLIBDEP'],
+                env['LIBDEPS_BOOST_THREAD_SYSLIBDEP'],
+                env['LIBDEPS_BOOST_LOG_SYSLIBDEP'],
             ])
 else:
     boostDirectory = 'boost' + boostSuffix
@@ -277,6 +279,7 @@ else:
             boostDirectory + '/boost_filesystem',
             boostDirectory + '/boost_system',
             boostDirectory + '/boost_iostreams',
+            boostDirectory + '/boost_log',
         ])
 
 boostEnv.Library(
