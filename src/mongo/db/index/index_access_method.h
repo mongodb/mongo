@@ -364,6 +364,23 @@ public:
 };
 
 /**
+ * Factory class that constructs an IndexAccessMethod depending on the type of index.
+ */
+class IndexAccessMethodFactory {
+public:
+    IndexAccessMethodFactory() = default;
+    virtual ~IndexAccessMethodFactory() = default;
+
+    static IndexAccessMethodFactory* get(ServiceContext* service);
+    static IndexAccessMethodFactory* get(OperationContext* opCtx);
+    static void set(ServiceContext* service,
+                    std::unique_ptr<IndexAccessMethodFactory> collectionFactory);
+
+    virtual std::unique_ptr<IndexAccessMethod> make(IndexCatalogEntry* entry,
+                                                    SortedDataInterface* sortedDataInterface) = 0;
+};
+
+/**
  * Records number of keys inserted and duplicate keys inserted, if applicable.
  */
 struct InsertResult {
