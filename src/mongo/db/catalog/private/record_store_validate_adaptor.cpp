@@ -65,12 +65,9 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
         return status;
     }
 
-    IndexCatalog::IndexIterator i = _indexCatalog->getIndexIterator(_opCtx, false);
-
-    while (i.more()) {
-        const IndexDescriptor* descriptor = i.next();
+    for (auto& indexInfo : _indexConsistency->getIndexInfo()) {
+        const IndexDescriptor* descriptor = indexInfo.descriptor;
         const std::string indexName = descriptor->indexName();
-        int indexNumber = _indexConsistency->getIndexNumber(indexName);
         ValidateResults curRecordResults;
 
         const IndexAccessMethod* iam = _indexCatalog->getIndex(descriptor);
@@ -108,12 +105,12 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
         for (const auto& key : documentKeySet) {
             if (key.objsize() >= static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
                 // Index keys >= 1024 bytes are not indexed.
-                _indexConsistency->addLongIndexKey(indexNumber);
+                _indexConsistency->addLongIndexKey(&indexInfo);
                 continue;
             }
 
             ks.resetToKey(key, ord, recordId);
-            _indexConsistency->addDocKey(ks, indexNumber, recordId, key);
+            _indexConsistency->addDocKey(ks, &indexInfo, recordId, key);
         }
         (*_indexNsResultsMap)[indexName] = curRecordResults;
     }
@@ -125,7 +122,7 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
                                                ValidateResults* results,
                                                int64_t* numTraversedKeys) {
     auto indexName = descriptor->indexName();
-    int indexNumber = _indexConsistency->getIndexNumber(indexName);
+    IndexInfo* indexInfo = &_indexConsistency->getIndexInfo(indexName);
     int64_t numKeys = 0;
 
     const auto& key = descriptor->keyPattern();
@@ -146,8 +143,7 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
         if (!isFirstEntry && *indexKeyString < *prevIndexKeyString) {
             if (results && results->valid) {
                 results->errors.push_back(
-                    "one or more indexes are not in strictly ascending or descending "
-                    "order");
+                    "one or more indexes are not in strictly ascending or descending order");
             }
 
             if (results) {
@@ -156,7 +152,7 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
         }
 
         _indexConsistency->addIndexKey(
-            *indexKeyString, indexNumber, indexEntry->loc, indexEntry->key);
+            *indexKeyString, indexInfo, indexEntry->loc, indexEntry->key);
 
         numKeys++;
         isFirstEntry = false;
@@ -226,9 +222,9 @@ void RecordStoreValidateAdaptor::validateIndexKeyCount(IndexDescriptor* idx,
                                                        int64_t numRecs,
                                                        ValidateResults& results) {
     const std::string indexName = idx->indexName();
-    int indexNumber = _indexConsistency->getIndexNumber(indexName);
-    int64_t numIndexedKeys = _indexConsistency->getNumKeys(indexNumber);
-    int64_t numLongKeys = _indexConsistency->getNumLongKeys(indexNumber);
+    IndexInfo* indexInfo = &_indexConsistency->getIndexInfo(indexName);
+    int64_t numIndexedKeys = indexInfo->numKeys;
+    int64_t numLongKeys = indexInfo->numLongKeys;
     auto totalKeys = numLongKeys + numIndexedKeys;
 
     bool hasTooFewKeys = false;

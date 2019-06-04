@@ -51,10 +51,7 @@ namespace mongo {
  * Contains all the index information and stats throughout the validation.
  */
 struct IndexInfo {
-    // The name of the index.
-    std::string indexName;
-    // The index key pattern.
-    BSONObj keyPattern;
+    const IndexDescriptor* descriptor;
     // Informs us if the index was ready or not for consumption during the start of validation.
     bool isReady;
     // Contains the pre-computed hash of the index name.
@@ -68,9 +65,6 @@ struct IndexInfo {
     // The number of records that have a key in their document that referenced back to the
     // this index
     int64_t numRecords;
-    // Keeps track of how many indexes were removed (-1) and added (+1) after the
-    // point of validity was set for this index.
-    int64_t numExtraIndexKeys;
 };
 
 class IndexConsistency final {
@@ -91,8 +85,8 @@ public:
      * inconsistent hash buckets during the first phase of validation.
      */
     void addDocKey(const KeyString& ks,
-                   int indexNumber,
-                   const RecordId& recordId,
+                   IndexInfo* indexInfo,
+                   RecordId recordId,
                    const BSONObj& indexKey);
 
     /**
@@ -102,30 +96,15 @@ public:
      * inconsistent hash buckets during the first phase of validation to document keys.
      */
     void addIndexKey(const KeyString& ks,
-                     int indexNumber,
-                     const RecordId& recordId,
+                     IndexInfo* indexInfo,
+                     RecordId recordId,
                      const BSONObj& indexKey);
 
     /**
      * Add one to the `_longKeys` count for the given `indexNs`.
      * This is required because index keys > `KeyString::kMaxKeyBytes` are not indexed.
      */
-    void addLongIndexKey(int indexNumber);
-
-    /**
-     * Returns the number of index entries for the given `indexNs`.
-     */
-    int64_t getNumKeys(int indexNumber) const;
-
-    /**
-     * Returns the number of long keys that were not indexed for the given `indexNs`.
-     */
-    int64_t getNumLongKeys(int indexNumber) const;
-
-    /**
-     * Return the number of records with keys for the given `indexNs`.
-     */
-    int64_t getNumRecords(int indexNumber) const;
+    void addLongIndexKey(IndexInfo* indexInfo);
 
     /**
      * Returns true if any value in the `_indexKeyCount` map is not equal to 0, otherwise
@@ -134,18 +113,14 @@ public:
     bool haveEntryMismatch() const;
 
     /**
-     * Index entries may be added or removed by concurrent writes during the index scan phase,
-     * after establishing the point of validity. We need to account for these additions and
-     * removals so that when we validate the index key count, we also have a pre-image of the
-     * index counts and won't get incorrect results because of the extra index entries we may or
-     * may not have scanned.
+     * Return info on all indexes tracked by this.
      */
-    int64_t getNumExtraIndexKeys(int indexNumber) const;
-
-    /**
-     * Returns the index number for the corresponding index name.
-     */
-    int getIndexNumber(const std::string& indexName);
+    std::vector<IndexInfo>& getIndexInfo() {
+        return _indexesInfo;
+    }
+    IndexInfo& getIndexInfo(const std::string& indexName) {
+        return _indexesInfo.at(_indexNumber.at(indexName));
+    }
 
     /**
      * Informs the IndexConsistency object that we're advancing to the second phase of index
@@ -243,15 +218,15 @@ private:
      *     }
      * }
      */
-    BSONObj _generateInfo(const int& indexNumber,
-                          const RecordId& recordId,
+    BSONObj _generateInfo(const IndexInfo& indexInfo,
+                          RecordId recordId,
                           const BSONObj& indexKey,
                           boost::optional<BSONElement> idKey);
 
     /**
      * Returns a hashed value from the given KeyString and index namespace.
      */
-    uint32_t _hashKeyString(const KeyString& ks, int indexNumbers) const;
+    uint32_t _hashKeyString(const KeyString& ks, uint32_t indexNameHash) const;
 
 };  // IndexConsistency
 }  // namespace mongo
