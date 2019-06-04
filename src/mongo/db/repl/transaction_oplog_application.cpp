@@ -342,7 +342,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     transaction.unstashTransactionResources(opCtx, "prepareTransaction");
 
     auto status = _applyOperationsForTransaction(opCtx, ops, oplogApplicationMode);
-    fassert(31137, status.isOK());
+    fassert(31137, status);
 
     if (MONGO_FAIL_POINT(applyOpsHangBeforePreparingTransaction)) {
         LOG(0) << "Hit applyOpsHangBeforePreparingTransaction failpoint";
