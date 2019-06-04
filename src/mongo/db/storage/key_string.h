@@ -51,15 +51,10 @@ public:
     /**
      * Selects version of KeyString to use. V0 and V1 differ in their encoding of numeric values.
      */
-    enum class Version : uint8_t { V0 = 0, V1 = 1 };
+    enum class Version : uint8_t { V0 = 0, V1 = 1, kLatestVersion = V1 };
     static StringData versionToString(Version version) {
         return version == Version::V0 ? "V0" : "V1";
     }
-
-    /**
-     * Provides the latest version of KeyString available.
-     */
-    static const Version kLatestVersion = Version::V1;
 
     /**
      * Encodes info needed to restore the original BSONTypes from a KeyString. They cannot be

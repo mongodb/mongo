@@ -58,7 +58,8 @@ static const size_t kNumHashBuckets = 1U << 16;
 IndexInfo::IndexInfo(const IndexDescriptor* descriptor)
     : descriptor(descriptor),
       indexNameHash(StringMapTraits::hash(descriptor->indexName())),
-      ord(Ordering::make(descriptor->keyPattern())) {}
+      ord(Ordering::make(descriptor->keyPattern())),
+      ks(std::make_unique<KeyString>(KeyString::Version::kLatestVersion)) {}
 
 IndexConsistency::IndexConsistency(OperationContext* opCtx,
                                    Collection* collection,

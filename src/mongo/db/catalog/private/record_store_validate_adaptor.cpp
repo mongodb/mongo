@@ -95,8 +95,6 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
             curRecordResults.valid = false;
         }
 
-        // We want to use the latest version of KeyString here.
-        KeyString ks(KeyString::kLatestVersion);
         for (const auto& key : documentKeySet) {
             if (key.objsize() >= static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
                 // Index keys >= 1024 bytes are not indexed.
@@ -104,8 +102,8 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                 continue;
             }
 
-            ks.resetToKey(key, indexInfo.ord, recordId);
-            _indexConsistency->addDocKey(ks, &indexInfo, recordId, key);
+            indexInfo.ks->resetToKey(key, indexInfo.ord, recordId);
+            _indexConsistency->addDocKey(*indexInfo.ks, &indexInfo, recordId, key);
         }
     }
     return status;
@@ -121,11 +119,11 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
 
     const auto& key = descriptor->keyPattern();
     const Ordering ord = Ordering::make(key);
-    KeyString::Version version = KeyString::kLatestVersion;
     bool isFirstEntry = true;
 
     std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(_opCtx, true);
     // We want to use the latest version of KeyString here.
+    const KeyString::Version version = KeyString::Version::kLatestVersion;
     std::unique_ptr<KeyString> indexKeyString = stdx::make_unique<KeyString>(version);
     std::unique_ptr<KeyString> prevIndexKeyString = stdx::make_unique<KeyString>(version);
 

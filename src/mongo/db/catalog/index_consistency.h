@@ -57,6 +57,8 @@ struct IndexInfo {
     const uint32_t indexNameHash;
     // More efficient representation of the ordering of the descriptor's key pattern.
     const Ordering ord;
+    // For conveniently building KeyStrings in a preallocated buffer.
+    std::unique_ptr<KeyString> ks;
     // The number of index entries belonging to the index.
     int64_t numKeys = 0;
     // The number of long keys that are not indexed for the index.
