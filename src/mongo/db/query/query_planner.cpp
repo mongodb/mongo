@@ -657,8 +657,10 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         BSONObj minObj = query.getQueryRequest().getMin();
         BSONObj maxObj = query.getQueryRequest().getMax();
 
-        if (!indexCompatibleMaxMin(
-                minObj.isEmpty() ? maxObj : minObj, query.getCollator(), *hintedIndexEntry)) {
+        if ((!minObj.isEmpty() &&
+             !indexCompatibleMaxMin(minObj, query.getCollator(), *hintedIndexEntry)) ||
+            (!maxObj.isEmpty() &&
+             !indexCompatibleMaxMin(maxObj, query.getCollator(), *hintedIndexEntry))) {
             return Status(ErrorCodes::Error(51174),
                           "The index chosen is not compatible with min/max");
         }

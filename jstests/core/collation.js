@@ -1975,6 +1975,20 @@
                                       .itcount());
         assert.commandFailedWithCode(err, 51174);
 
+        // This query should fail, because the hinted index does not match the requested
+        // collation, and the 'max' value is a string, which means we cannot ignore the
+        // collation.
+        const caseInsensitive = {locale: "en", strength: 2};
+        assert.commandWorked(coll.dropIndexes());
+        assert.commandWorked(coll.createIndex({str: 1}));
+        err = assert.throws(() => coll.find({}, {_id: 0})
+                                      .min({str: MinKey})
+                                      .max({str: "Hello1"})
+                                      .hint({str: 1})
+                                      .collation(caseInsensitive)
+                                      .toArray());
+        assert.commandFailedWithCode(err, 51174);
+
         // After building an index with the case-insensitive US English collation, the query should
         // work. Furthermore, the bounds defined by the min and max should respect the
         // case-insensitive collation.
