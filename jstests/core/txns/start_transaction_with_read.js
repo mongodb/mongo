@@ -41,7 +41,7 @@
     // Insert a doc within a transaction.
     assert.commandWorked(sessionColl.insert({_id: "insert-2"}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Read with default read concern sees the committed transaction.
     assert.eq({_id: "insert-1"}, coll.findOne({_id: "insert-1"}));

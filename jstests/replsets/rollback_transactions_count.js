@@ -22,7 +22,7 @@
     assert.commandWorked(sessionColl1.insert({a: 1}));
     session1.startTransaction();
     assert.commandWorked(sessionColl1.insert({b: 1}));
-    session1.commitTransaction();
+    assert.commandWorked(session1.commitTransaction_forTesting());
 
     rollbackTest.awaitLastOpCommitted();
     assert.commandWorked(
@@ -33,20 +33,20 @@
     const sessionColl2 = sessionDb2[collName];
     session2.startTransaction();
     assert.commandWorked(sessionColl2.insert({c: 1}));
-    session2.commitTransaction();
+    assert.commandWorked(session2.commitTransaction_forTesting());
 
     rollbackTest.transitionToRollbackOperations();
 
     session2.startTransaction();
     assert.commandWorked(sessionColl2.insert({d: 1}));
-    session2.commitTransaction();
+    assert.commandWorked(session2.commitTransaction_forTesting());
 
     const session3 = primary.startSession();
     const sessionDb3 = session3.getDatabase(dbName);
     const sessionColl3 = sessionDb3[collName];
     session3.startTransaction();
     assert.commandWorked(sessionColl3.insert({e: 1}));
-    session3.commitTransaction();
+    assert.commandWorked(session3.commitTransaction_forTesting());
 
     assert.eq(sessionColl1.find().itcount(), 5);
 

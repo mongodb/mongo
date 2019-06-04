@@ -22,7 +22,7 @@
 
     session.startTransaction();
     assert.commandWorked(sessionColl.insert(doc));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     const txnNumber = NumberLong(session.getTxnNumber_forTesting());
 

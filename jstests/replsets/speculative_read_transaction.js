@@ -50,7 +50,7 @@
         jsTestLog("Starting non-majority commit transaction");
         session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: 1}});
         assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 1});
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
 
         // This transaction should not complete because it uses snapshot read concern, majority
         // write concern and the commit point is not advancing.

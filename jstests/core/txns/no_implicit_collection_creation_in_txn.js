@@ -24,7 +24,7 @@
 
     session.startTransaction({writeConcern: {w: "majority"}});
     sessionColl.insert({_id: "doc"});
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     assert.eq({_id: "doc"}, testColl.findOne({_id: "doc"}));
 
     // Insert fails when the collection does not exist.
@@ -47,7 +47,7 @@
 
     session.startTransaction({writeConcern: {w: "majority"}});
     sessionColl.update({_id: "doc"}, {$set: {updated: true}}, {upsert: true});
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     assert.eq({_id: "doc", updated: true}, testColl.findOne({_id: "doc"}));
 
     // Update with upsert=true fails when the collection does not exist.
@@ -67,7 +67,7 @@
     session.startTransaction({writeConcern: {w: "majority"}});
     assert.commandWorked(
         sessionColl.update({_id: "doc"}, {$set: {updated: true}}, {upsert: false}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     assert.eq(null, testColl.findOne({_id: "doc"}));
 
     jsTest.log("Cannot implicitly create a collection in a transaction using findAndModify.");
@@ -80,7 +80,7 @@
     let res = sessionColl.findAndModify(
         {query: {_id: "doc"}, update: {$set: {updated: true}}, upsert: true});
     assert.eq(null, res);
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     assert.eq({_id: "doc", updated: true}, testColl.findOne({_id: "doc"}));
 
     // findAndModify with upsert=true fails when the collection does not exist.
@@ -101,7 +101,7 @@
     res = sessionColl.findAndModify(
         {query: {_id: "doc"}, update: {$set: {updated: true}}, upsert: false});
     assert.eq(null, res);
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     assert.eq(null, testColl.findOne({_id: "doc"}));
 
     session.endSession();

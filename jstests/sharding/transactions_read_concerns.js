@@ -63,7 +63,7 @@
                       " did not see expected number of documents, sessionOptions: " +
                       tojson(sessionOptions));
 
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
 
         // Clean up for the next iteration.
         assert.writeOK(sessionDB[collName].remove({_id: 5}));

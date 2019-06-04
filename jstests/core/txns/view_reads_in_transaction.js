@@ -55,6 +55,6 @@
 
     assert.eq(view.distinct("_id"), ["kyle"]);
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     jsTestLog("Transaction committed.");
 }());

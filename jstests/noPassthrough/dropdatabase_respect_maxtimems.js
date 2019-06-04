@@ -21,7 +21,7 @@
         assert.commandFailedWithCode(dropDB.runCommand({dropDatabase: 1, maxTimeMS: 100}),
                                      ErrorCodes.MaxTimeMSExpired);
 
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         session.endSession();
     })();
 
@@ -56,7 +56,7 @@
         // This should timeout.
         dropDatabaseShell();
 
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         session.endSession();
     })();
 

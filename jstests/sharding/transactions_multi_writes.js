@@ -75,7 +75,7 @@
         ]);
 
         // Commit the transaction and verify the write was successful.
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         if (isUpdate) {
             assert.sameMembers(st.getDB(dbName)[collName].find().toArray(),
                                [

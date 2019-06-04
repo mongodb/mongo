@@ -36,7 +36,7 @@
     simulatePrompt();
     assert.commandWorked(coll.insert(doc));
     simulatePrompt();
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     assert.docEq(doc, coll.findOne());
 
     coll.drop({writeConcern: {w: "majority"}});

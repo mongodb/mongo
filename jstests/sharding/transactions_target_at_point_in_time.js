@@ -97,7 +97,7 @@
                   1,
                   "expected to find document in second chunk, cmd: " + cmdName);
 
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
 
         // Move the chunk back to Shard1 for the next iteration.
         assert.commandWorked(

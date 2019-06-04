@@ -36,7 +36,7 @@
     assert.sameMembers(docs, [{_id: 0, a: 0}, {_id: 1, a: 1}, {_id: 2, a: 2}]);
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     /***********************************************************************************************
      * Do a non-matching find-and-modify with update.
@@ -52,7 +52,7 @@
     assert.sameMembers(docs, [{_id: 0, a: 0}, {_id: 1, a: 1}, {_id: 2, a: 2}]);
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     /***********************************************************************************************
      * Do a matching find-and-modify with remove.
@@ -68,7 +68,7 @@
     assert.sameMembers(docs, [{_id: 1, a: 1}, {_id: 2, a: 2}]);
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     /***********************************************************************************************
      * Do a matching find-and-modify with update, requesting the old doc.
@@ -83,7 +83,7 @@
     assert.sameMembers(docs, [{_id: 1, a: 101}, {_id: 2, a: 2}]);
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     /***********************************************************************************************
      * Do a matching find-and-modify with update, requesting the new doc.
@@ -98,7 +98,7 @@
     assert.sameMembers(docs, [{_id: 1, a: 101}, {_id: 2, a: 102}]);
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     /***********************************************************************************************
      * Do a matching find-and-modify with upsert, requesting the new doc.
@@ -114,7 +114,7 @@
     assert.sameMembers(docs, [{_id: 1, a: 101}, {_id: 2, a: 202}]);
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     /***********************************************************************************************
      * Do a non-matching find-and-modify with upsert, requesting the old doc.
@@ -129,7 +129,7 @@
     assert.sameMembers(docs, [{a: 103}]);
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     /***********************************************************************************************
      * Do a non-matching find-and-modify with upsert, requesting the new doc.
@@ -146,6 +146,6 @@
     assert.sameMembers(docs, [newdoc]);
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     session.endSession();
 }());

@@ -55,7 +55,7 @@
     assert.commandWorked(sessionColl.insert({_id: 4}));
 
     jsTest.log("Commit transaction.");
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     assert.sameMembers([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}],
                        sessionColl.find().toArray());
 

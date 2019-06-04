@@ -80,7 +80,7 @@
         initialStatus.transactions, newStatus.transactions, "currentInactive", 1);
 
     // Compare server status after the transaction commit with the server status before.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalStarted", 1);
@@ -180,7 +180,7 @@
 
         session.startTransaction({readConcern: {level: 'snapshot'}});
         assert.commandWorked(sessionColl.update({}, {"update-1": 2}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
     };
     const transactionProcess = startParallelShell(transactionFn, primary.port);
 

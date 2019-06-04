@@ -68,7 +68,7 @@
     }));
 
     // Commit the transaction, which will execute two-phase commit.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     jsTest.log("Verify that the transaction was committed on all shards.");
     // Use assert.soon(), because although coordinateCommitTransaction currently blocks

@@ -27,7 +27,7 @@
     // Implicit creation.
     assert.commandWorked(db.runCommand({insert: "c", documents: [{x: 2}]}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     rst.stopSet();
 })();

@@ -59,7 +59,7 @@
             assert.writeOK(sessionColl.update({_id: i}, {$inc: {i: 1}}));
         }
     }
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     session.endSession();
 
     jsTestLog('Applying updates on secondary ' + secondary.host);

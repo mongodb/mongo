@@ -21,7 +21,7 @@
             const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
             PrepareHelpers.commitTransaction(session, prepareTimestamp);
         } else {
-            session.commitTransaction();
+            assert.commandWorked(session.commitTransaction_forTesting());
         }
     }
 

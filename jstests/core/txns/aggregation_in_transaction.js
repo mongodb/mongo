@@ -94,7 +94,7 @@
     assert.eq(countRes.length, 1, tojson(countRes));
     assert.eq(countRes[0].count, 2, tojson(countRes));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     jsTestLog("Transaction committed.");
 
     // Perform aggregations with non-cursor initial sources and assert that they are not supported

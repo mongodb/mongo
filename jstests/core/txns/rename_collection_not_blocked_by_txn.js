@@ -29,7 +29,7 @@
         db.adminCommand({renameCollection: "test.a", to: "test.b", dropTarget: true}));
     assert.commandWorked(db.adminCommand({renameCollection: "test.b", to: "test.c"}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     rst.stopSet();
 })();

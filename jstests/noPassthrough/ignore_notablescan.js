@@ -19,7 +19,7 @@
         // Run a transaction so the 'config.transactions' collection is implicitly created.
         session.startTransaction();
         assert.writeOK(primaryDB.getCollection(collName).insert({x: 2}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
 
         // Run a predicate query that would fail if we did not ignore the 'notablescan' flag.
         assert.eq(configDB.transactions.find({any_nonexistent_field: {$exists: true}}).itcount(),

@@ -158,7 +158,7 @@
     assert.eq(profileObj.nModified, 1, tojson(profileObj));
 
     jsTestLog("Committing transaction.");
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     jsTestLog("Test delete with a write conflict.");
     assert.commandWorked(sessionColl.insert({_id: "delete-doc"}, {writeConcern: {w: "majority"}}));

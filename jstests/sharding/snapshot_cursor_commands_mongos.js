@@ -238,7 +238,7 @@
             assert(res.cursor.hasOwnProperty("nextBatch"));
             assert.eq(4, res.cursor.nextBatch.length);
 
-            session.commitTransaction();
+            assert.commandWorked(session.commitTransaction_forTesting());
 
             // Perform a second snapshot read under a new transaction.
             session.startTransaction({writeConcern: {w: "majority"}});
@@ -256,7 +256,7 @@
             // Remove the 11th document to preserve the collection for the next command.
             assert.writeOK(mainDb[collName].remove({_id: 10}, {writeConcern: {w: "majority"}}));
 
-            session.commitTransaction();
+            assert.commandWorked(session.commitTransaction_forTesting());
             session.endSession();
         }
 

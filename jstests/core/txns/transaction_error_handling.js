@@ -19,7 +19,7 @@
     jsTestLog("Test that we cannot abort or commit a nonexistant transaction.");
     // Cannot abort or commit a nonexistant transaction.
     try {
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
     } catch (e) {
         assert.eq(e.message, "There is no active transaction to commit on this session.");
     }
@@ -51,11 +51,11 @@
 
     // At this point, the transaction is still 'active'. We will commit this transaction and test
     // that calling commitTransaction again should work while calling abortTransaction should not.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     jsTestLog("Test that we can commit a transaction more than once.");
     // The transaction state is 'committed'. We can call commitTransaction again in this state.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     jsTestLog("Test that we cannot abort a transaction that has already been committed");
     // We cannot call abortTransaction on a transaction that has already been committed.
@@ -75,7 +75,7 @@
     jsTestLog("Test that we cannot commit a transaction that has already been aborted.");
     // We cannot call commitTransaction on a transaction that has already been aborted.
     try {
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
     } catch (e) {
         assert.eq(e.message, "Cannot call commitTransaction after calling abortTransaction.");
     }
@@ -94,11 +94,11 @@
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "insert-3"}));
     // The transaction state should be changed to 'committed'.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     // The transaction state should be changed to 'inactive'.
     assert.commandWorked(sessionColl.insert({_id: "normal-insert"}));
     try {
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
     } catch (e) {
         assert.eq(e.message, "There is no active transaction to commit on this session.");
     }

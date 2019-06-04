@@ -74,7 +74,7 @@
         // getMore tests snapshot isolation across multiple getMore invocations.
         res = assert.commandWorked(
             sessionDb.runCommand({getMore: cursor.id, collection: collName, batchSize: 20}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
 
         // The cursor has been exhausted.
         cursor = parseCursor(res);
@@ -89,7 +89,7 @@
         session.startTransaction({readConcern: readConcern});
         res = assert.commandWorked(
             sessionDb.runCommand({find: collName, sort: {_id: 1}, batchSize: 20}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
 
         // The cursor has been exhausted.
         cursor = parseCursor(res);

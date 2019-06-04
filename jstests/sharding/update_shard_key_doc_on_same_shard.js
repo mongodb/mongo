@@ -723,7 +723,7 @@
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 400}}));
     assert.commandWorked(sessionDB.foo.update({"x": 400}, {"x": 600, "_id": id}));
     assert.commandWorked(sessionDB.foo.update({"x": 4}, {"$set": {"x": 30}}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 500}).itcount());
     assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 400}).itcount());
@@ -742,7 +742,7 @@
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$set": {"x": 400}}));
     assert.commandWorked(sessionDB.foo.update({"x": 500}, {"$inc": {"a": 1}}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 500}).itcount());
     assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 400}).itcount());
@@ -757,7 +757,7 @@
     session.startTransaction();
     sessionDB.foo.findAndModify({query: {"x": 500}, update: {$set: {"x": 600}}});
     assert.commandWorked(sessionDB.foo.update({"x": 600}, {"$inc": {"a": 1}}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 500}).itcount());
     assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 600}).itcount());
@@ -773,7 +773,7 @@
     session.startTransaction();
     sessionDB.foo.findAndModify({query: {"x": 4}, update: {$set: {"x": 20}}});
     assert.commandWorked(sessionDB.foo.update({"x": 20}, {$set: {"x": 1}}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 4}).itcount());
     assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 20}).itcount());

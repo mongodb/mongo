@@ -64,7 +64,7 @@
     assert.sameMembers(
         [{_id: "doc"}],
         sessionColl.find({$where: "sleep(1000); return true;"}).comment("read failure").toArray());
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.commandWorked(testDB.killOp(opId));
     lockShell();
@@ -97,7 +97,7 @@
                "since the transaction already has an IX DB lock.");
     assert.commandWorked(sessionColl.update(
         {$where: "sleep(1000); return true;"}, {$inc: {good: 1}}, {collation: {locale: "fr"}}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.commandWorked(testDB.killOp(opId));
     lockShell();

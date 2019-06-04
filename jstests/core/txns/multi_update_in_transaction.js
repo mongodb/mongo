@@ -31,7 +31,7 @@
     res = sessionColl.find({});
     assert.sameMembers(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1}]);
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     jsTest.log("Do a single-result multi-update.");
     session.startTransaction({writeConcern: {w: "majority"}});
@@ -42,7 +42,7 @@
     res = sessionColl.find({});
     assert.sameMembers(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1, b: 1}]);
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     jsTest.log("Do a multiple-result multi-update.");
     session.startTransaction({writeConcern: {w: "majority"}});
@@ -54,7 +54,7 @@
     assert.sameMembers(res.toArray(),
                        [{_id: 0, a: 0, b: 2}, {_id: 1, a: 0, b: 2}, {_id: 2, a: 1, b: 1}]);
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     jsTest.log("Do a multiple-query multi-update.");
     session.startTransaction({writeConcern: {w: "majority"}});
@@ -71,7 +71,7 @@
         res.toArray(),
         [{_id: 0, a: 0, b: 2, c: 1}, {_id: 1, a: 0, b: 2, c: 1}, {_id: 2, a: 1, b: 1, c: 2}]);
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     jsTest.log("Do a multi-update with upsert.");
     session.startTransaction({writeConcern: {w: "majority"}});
@@ -87,5 +87,5 @@
         {_id: 3, d: 1}
     ]);
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 }());

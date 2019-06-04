@@ -84,7 +84,7 @@
     // single doc write should get serialized after the transaction, we expect it to fail with a
     // duplicate key error.
     jsTestLog("Commit the multi-document transaction.");
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     thread.join();
     assert.commandFailedWithCode(thread.returnData(), ErrorCodes.DuplicateKey);
 

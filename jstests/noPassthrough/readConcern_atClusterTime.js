@@ -43,7 +43,7 @@ function _getClusterTime(rst) {
     // 'atClusterTime' can be used with readConcern level 'snapshot'.
     session.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
     assert.commandWorked(sessionDb.runCommand({find: collName}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // 'atClusterTime' cannot be greater than the current cluster time.
     const futureClusterTime = new Timestamp(clusterTime.getTime() + 1000, 1);
@@ -130,7 +130,7 @@ function _getClusterTime(rst) {
         session.startTransaction(
             {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
         assert.commandWorked(sessionDb.runCommand({find: collName}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         session.endSession();
         rst.stopSet();
 
@@ -144,7 +144,7 @@ function _getClusterTime(rst) {
         session.startTransaction(
             {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
         assert.commandWorked(sessionDb.runCommand({find: collName}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         session.endSession();
         rst.stopSet();
     }

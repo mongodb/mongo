@@ -29,7 +29,7 @@
     session.startTransaction();
     assert.writeOK(coll.insert({_id: 0}));
     assert.writeOK(coll.insert({_id: 1}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     const opTime = session.getOperationTime();
     const txnNum = session.getTxnNumber_forTesting();
     jsTestLog('Successfully committed transaction at operation time ' + tojson(opTime) +

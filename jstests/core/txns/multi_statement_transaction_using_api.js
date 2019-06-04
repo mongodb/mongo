@@ -34,7 +34,7 @@
     session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
 
     // Successfully call commitTransaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     jsTestLog("Run CRUD ops, read ops, and commit transaction.");
     session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
@@ -67,7 +67,7 @@
     assert.docEq({_id: "insert-1", a: 1}, cursor.next());
     assert(!cursor.hasNext());
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Make sure the correct documents exist after committing the transaciton.
     assert.eq({_id: "insert-1", a: 1}, sessionColl.findOne({_id: "insert-1"}));
@@ -93,7 +93,7 @@
     bulk.find({_id: "bulk-1"}).updateOne({$set: {status: "bulk"}});
     bulk.find({_id: "bulk-2"}).updateOne({$set: {status: "bulk"}});
     assert.commandWorked(bulk.execute());
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.eq({_id: "bulk-1", status: "bulk"}, sessionColl.findOne({_id: "bulk-1"}));
     assert.eq({_id: "bulk-2", status: "bulk"}, sessionColl.findOne({_id: "bulk-2"}));
@@ -105,7 +105,7 @@
     bulk.find({_id: "bulk-1"}).removeOne();
     bulk.find({_id: "bulk-2"}).removeOne();
     assert.commandWorked(bulk.execute());
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.eq(null, sessionColl.findOne({_id: "bulk-1"}));
     assert.eq(null, sessionColl.findOne({_id: "bulk-2"}));

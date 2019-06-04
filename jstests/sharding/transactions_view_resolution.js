@@ -80,7 +80,7 @@
     function readFromViewOnFirstParticipantStatement(session, view, viewFunc, numDocsExpected) {
         session.startTransaction();
         assert.eq(viewFunc(view), numDocsExpected);
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
     }
 
     // Unsharded view.
@@ -124,7 +124,7 @@
         session.startTransaction();
         assert.eq(view.aggregate({$match: {}}).itcount(), numDocsExpected);
         assert.eq(viewFunc(view), numDocsExpected);
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
     }
 
     // Unsharded view.
@@ -229,7 +229,7 @@
         assert.eq(view.aggregate({$match: {_id: -1}}).itcount(), 1);
         // Targets the primary first, but the resolved retry only targets Shard1.
         assert.eq(viewFunc(view), numDocsExpected);
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
     }
 
     // This is only possible against sharded views.
@@ -262,7 +262,7 @@
         session.startTransaction();
         const resArray = coll.aggregate(pipeline).toArray();
         assert(arrayEq(resArray, expected), tojson({got: resArray, expected: expected}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
     }
 
     // Set up an unsharded collection to use for $lookup. We cannot lookup into sharded collections.

@@ -54,7 +54,7 @@
     primarySession.startTransaction(
         {readConcern: {level: "snapshot", atClusterTime: clusterTimePrimaryBefore}});
     res = assert.commandWorked(primaryDB.runCommand({find: collName}));
-    primarySession.commitTransaction();
+    assert.commandWorked(primarySession.commitTransaction_forTesting());
     assert.eq(res.cursor.firstBatch.length, 1, printjson(res));
     assert.eq(res.cursor.firstBatch[0]._id, "before", printjson(res));
 
@@ -80,7 +80,7 @@
     // Restart replication on one of the secondaries.
     restartServerReplication(secondaryConn1);
     // This time the transaction should commit.
-    primarySession.commitTransaction();
+    assert.commandWorked(primarySession.commitTransaction_forTesting());
 
     // Restart replication on the lagged secondary.
     restartServerReplication(secondaryConn0);

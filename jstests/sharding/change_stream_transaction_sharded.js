@@ -161,7 +161,7 @@
 
         // Commit first transaction and confirm that the change stream sees the changes expected
         // from each shard.
-        session1.commitTransaction();
+        assert.commandWorked(session1.commitTransaction_forTesting());
         assertWritesVisibleWithCapture(changeStreamCursor,
                                        [
                                          {operationType: "insert", _id: "no-txn-doc-3"},

@@ -79,7 +79,7 @@
     session.startTransaction();
     assert.commandWorked(sessionColl.update({_id: 1}, {$inc: {x: 1}}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Confirm that the results of the transaction are based on what the primary's data was when we
     // started the transaction.

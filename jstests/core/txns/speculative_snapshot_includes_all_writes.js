@@ -99,10 +99,10 @@
     checkReads(defaultSession, [{_id: 0}, {_id: 1}], [{_id: "a"}]);
 
     jsTestLog("Committing transactions.");
-    snapshotSession.commitTransaction();
-    majoritySession.commitTransaction();
-    localSession.commitTransaction();
-    defaultSession.commitTransaction();
+    assert.commandWorked(snapshotSession.commitTransaction_forTesting());
+    assert.commandWorked(majoritySession.commitTransaction_forTesting());
+    assert.commandWorked(localSession.commitTransaction_forTesting());
+    assert.commandWorked(defaultSession.commitTransaction_forTesting());
 
     jsTestLog("A new local read must see all committed writes.");
     checkReads(defaultSession, [{_id: 0}, {_id: 1}], [{_id: "a"}, {_id: "b"}]);

@@ -39,7 +39,7 @@
     // Start a transaction and verify that it succeeds.
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: 0}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.eq({_id: 0}, sessionColl.findOne({_id: 0}));
 

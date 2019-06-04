@@ -38,6 +38,6 @@
         assert(collObj.hasOwnProperty("info") == !nameOnly, tojson(collObj));
     }
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     session.endSession();
 }());

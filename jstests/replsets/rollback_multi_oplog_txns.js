@@ -26,7 +26,7 @@
         session.startTransaction();
         assert.commandWorked(sessionColl.insert({_id: 1}));
         assert.commandWorked(sessionColl.insert({_id: 2}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         session.endSession();
     };
 

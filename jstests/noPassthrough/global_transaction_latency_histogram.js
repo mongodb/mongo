@@ -66,7 +66,7 @@
     // commands are counted towards the "commands" counter.
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "insert-1"}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     lastHistogram = checkHistogramDiff(lastHistogram,
                                        getHistogramStats(),
                                        {"reads": 0, "writes": 1, "commands": 2, "transactions": 1});
@@ -99,7 +99,7 @@
     assert.commandWorked(sessionColl.insert({_id: "insert-3"}));
     assert.commandWorked(sessionColl.insert({_id: "insert-4"}));
     assert.eq(sessionColl.find({_id: "insert-1"}).itcount(), 1);
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     lastHistogram = checkHistogramDiff(lastHistogram,
                                        getHistogramStats(),
                                        {"reads": 1, "writes": 2, "commands": 2, "transactions": 1});
@@ -111,7 +111,7 @@
         session.startTransaction();
         assert.eq(sessionColl.find({_id: "insert-1"}).itcount(), 1);
         sleep(sleepTime);
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         lastHistogram = checkHistogramLatencyDiff(lastHistogram, getHistogramStats(), sleepTime);
     }
 

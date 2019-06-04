@@ -114,7 +114,8 @@ var $config = (function() {
             do {
                 try {
                     shouldJoin = false;
-                    quietly(() => this.session.commitTransaction());
+                    quietly(() =>
+                                assert.commandWorked(this.session.commitTransaction_forTesting()));
                 } catch (e) {
                     if (e.code === ErrorCodes.TransactionTooOld ||
                         e.code === ErrorCodes.TransactionCommitted ||

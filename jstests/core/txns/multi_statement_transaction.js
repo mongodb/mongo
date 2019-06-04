@@ -49,7 +49,7 @@
     assert.eq(null, testColl.findOne({_id: "insert-2"}));
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Read with default read concern sees the committed transaction.
     assert.eq({_id: "insert-1"}, testColl.findOne({_id: "insert-1"}));
@@ -83,7 +83,7 @@
     assert.eq({_id: "update-2", a: 0}, testColl.findOne({_id: "update-2"}));
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Read with default read concern sees the committed transaction.
     assert.eq({_id: "update-1", a: 2}, testColl.findOne({_id: "update-1"}));
@@ -113,7 +113,7 @@
     assert.sameMembers([{_id: "doc-1", a: 1}, {_id: "doc-2", a: 1}], docs);
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Read with default read concern sees the committed transaction.
     assert.eq({_id: "doc-1", a: 1}, testColl.findOne({_id: "doc-1"}));
@@ -148,7 +148,7 @@
     assert.sameMembers([], docs);
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Read with default read concern sees the commmitted transaction.
     assert.eq(null, testColl.findOne({_id: "doc-1"}));
