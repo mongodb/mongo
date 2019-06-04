@@ -13,6 +13,7 @@ from mock import patch, mock_open, call, Mock, MagicMock
 from buildscripts import evergreen_generate_resmoke_tasks as grt
 from buildscripts.evergreen_generate_resmoke_tasks import string_contains_any_of_args, \
     prepare_directory_for_suite, remove_gen_suffix, render_suite, render_misc_suite
+import buildscripts.util.teststats as teststats_utils
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
@@ -50,62 +51,6 @@ class TestHelperMethods(unittest.TestCase):
         args = ["random_string_1", "random_string_2", "random_string_3"]
         string = "--suite=suite 0.yml --originSuite=suite resmoke_args --repeat=5"
         self.assertEqual(False, string_contains_any_of_args(string, args))
-
-
-class TestTestStats(unittest.TestCase):
-    def test_no_hooks(self):
-        evg_results = [
-            self._make_evg_result("dir/test1.js", 1, 10),
-            self._make_evg_result("dir/test2.js", 1, 30),
-            self._make_evg_result("dir/test1.js", 2, 25),
-        ]
-        test_stats = grt.TestStats(evg_results)
-        expected_runtimes = [
-            ("dir/test2.js", 30),
-            ("dir/test1.js", 20),
-        ]
-        self.assertEqual(expected_runtimes, test_stats.get_tests_runtimes())
-
-    def test_hooks(self):
-        evg_results = [
-            self._make_evg_result("dir/test1.js", 1, 10),
-            self._make_evg_result("dir/test2.js", 1, 30),
-            self._make_evg_result("dir/test1.js", 2, 25),
-            self._make_evg_result("dir/test3.js", 5, 10),
-            self._make_evg_result("test3:CleanEveryN", 10, 30),
-            self._make_evg_result("test3:CheckReplDBHash", 10, 35),
-        ]
-        test_stats = grt.TestStats(evg_results)
-        expected_runtimes = [
-            ("dir/test3.js", 42.5),
-            ("dir/test2.js", 30),
-            ("dir/test1.js", 20),
-        ]
-        self.assertEqual(expected_runtimes, test_stats.get_tests_runtimes())
-
-    def test_zero_runs(self):
-        evg_results = [
-            self._make_evg_result("dir/test1.js", 0, 0),
-            self._make_evg_result("dir/test1.js", 0, 0),
-        ]
-        test_stats = grt.TestStats(evg_results)
-        expected_runtimes = [
-            ("dir/test1.js", 0),
-        ]
-        self.assertEqual(expected_runtimes, test_stats.get_tests_runtimes())
-
-    @staticmethod
-    def _make_evg_result(test_file="dir/test1.js", num_pass=0, duration=0):
-        return Mock(
-            test_file=test_file,
-            task_name="task1",
-            variant="variant1",
-            distro="distro1",
-            date=_DATE,
-            num_pass=num_pass,
-            num_fail=0,
-            avg_duration_pass=duration,
-        )
 
 
 class DivideRemainingTestsAmongSuitesTest(unittest.TestCase):
@@ -547,14 +492,6 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         self.assertEqual("do setup", timeout_cmd["func"])
 
 
-class NormalizeTestNameTest(unittest.TestCase):
-    def test_unix_names(self):
-        self.assertEqual("/home/user/test.js", grt.normalize_test_name("/home/user/test.js"))
-
-    def test_windows_names(self):
-        self.assertEqual("/home/user/test.js", grt.normalize_test_name("\\home\\user\\test.js"))
-
-
 class MainTest(unittest.TestCase):
     @staticmethod
     def get_mock_options():
@@ -662,9 +599,9 @@ class MainTest(unittest.TestCase):
 
     def test_filter_missing_files(self):
         tests_runtimes = [
-            ("dir1/file1.js", 20.32),
-            ("dir2/file2.js", 24.32),
-            ("dir1/file3.js", 36.32),
+            teststats_utils.TestRuntime(test_name="dir1/file1.js", runtime=20.32),
+            teststats_utils.TestRuntime(test_name="dir2/file2.js", runtime=24.32),
+            teststats_utils.TestRuntime(test_name="dir1/file3.js", runtime=36.32),
         ]
 
         with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
@@ -684,9 +621,9 @@ class MainTest(unittest.TestCase):
 
     def test_filter_blacklist_files(self):
         tests_runtimes = [
-            ("dir1/file1.js", 20.32),
-            ("dir2/file2.js", 24.32),
-            ("dir1/file3.js", 36.32),
+            teststats_utils.TestRuntime(test_name="dir1/file1.js", runtime=20.32),
+            teststats_utils.TestRuntime(test_name="dir2/file2.js", runtime=24.32),
+            teststats_utils.TestRuntime(test_name="dir1/file3.js", runtime=36.32),
         ]
 
         blacklisted_test = tests_runtimes[1][0]
@@ -708,9 +645,9 @@ class MainTest(unittest.TestCase):
 
     def test_filter_blacklist_files_for_windows(self):
         tests_runtimes = [
-            ("dir1/file1.js", 20.32),
-            ("dir2/file2.js", 24.32),
-            ("dir1/dir3/file3.js", 36.32),
+            teststats_utils.TestRuntime(test_name="dir1/file1.js", runtime=20.32),
+            teststats_utils.TestRuntime(test_name="dir2/file2.js", runtime=24.32),
+            teststats_utils.TestRuntime(test_name="dir1/dir3/file3.js", runtime=36.32),
         ]
 
         blacklisted_test = tests_runtimes[1][0]

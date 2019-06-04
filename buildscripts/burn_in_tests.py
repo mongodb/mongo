@@ -11,15 +11,22 @@ import re
 import shlex
 import sys
 import urllib.parse
+import datetime
+import logging
 
-import requests
+from math import ceil
+
 import yaml
+import requests
 
 from shrub.config import Configuration
 from shrub.command import CommandDefinition
 from shrub.task import TaskDependency
 from shrub.variant import DisplayTaskDefinition
 from shrub.variant import TaskSpec
+from shrub.operations import CmdTimeoutUpdate
+
+from evergreen.api import RetryingEvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -30,12 +37,20 @@ from buildscripts import git
 from buildscripts import resmokelib
 from buildscripts.ciconfig import evergreen
 from buildscripts.client import evergreen as evergreen_client
+from buildscripts.util import teststats
 # pylint: enable=wrong-import-position
+
+LOGGER = logging.getLogger(__name__)
 
 API_REST_PREFIX = "/rest/v1/"
 API_SERVER_DEFAULT = "https://evergreen.mongodb.com"
+AVG_TEST_RUNTIME_ANALYSIS_DAYS = 14
+AVG_TEST_TIME_MULTIPLIER = 3
+CONFIG_FILE = "../src/.evergreen.yml"
 REPEAT_SUITES = 2
 EVERGREEN_FILE = "etc/evergreen.yml"
+MIN_AVG_TEST_OVERFLOW_SEC = 60
+MIN_AVG_TEST_TIME_SEC = 5 * 60
 # The executor_file and suite_files defaults are required to make the suite resolver work
 # correctly.
 SELECTOR_FILE = "etc/burn_in_tests.yml"
@@ -96,6 +111,9 @@ def parse_command_line():
 
     parser.add_option("--reportFile", dest="report_file", default="report.json",
                       help="Write a JSON file with test results. Default is '%default'.")
+
+    parser.add_option("--project", dest="project", default="mongodb-mongo-master",
+                      help="The project the test history will be requested for.")
 
     parser.add_option("--testListFile", dest="test_list_file", default=None, metavar="TESTLIST",
                       help="Load a JSON file with tests to run.")
@@ -461,7 +479,101 @@ def _get_run_buildvariant(options):
     return options.buildvariant
 
 
-def create_generate_tasks_config(evg_config, options, tests_by_task, include_gen_task):
+def _parse_avg_test_runtime(test, task_avg_test_runtime_stats):
+    """
+    Parse list of teststats to find runtime for particular test.
+
+    :param task_avg_test_runtime_stats: Teststat data.
+    :param test: Test name.
+    :return: Historical average runtime of the test.
+    """
+    for test_stat in task_avg_test_runtime_stats:
+        if test_stat.test_name == test:
+            return test_stat.runtime
+    return None
+
+
+def _calculate_timeout(avg_test_runtime):
+    """
+    Calculate timeout_secs for the Evergreen task.
+
+    :param avg_test_runtime: How long a test has historically taken to run.
+    :return: The test runtime times AVG_TEST_TIME_MULTIPLIER, or MIN_AVG_TEST_TIME_SEC (whichever
+        is higher).
+    """
+    return max(MIN_AVG_TEST_TIME_SEC, ceil(avg_test_runtime * AVG_TEST_TIME_MULTIPLIER))
+
+
+def _calculate_exec_timeout(options, avg_test_runtime):
+    """
+    Calculate exec_timeout_secs for the Evergreen task.
+
+    :param avg_test_runtime: How long a test has historically taken to run.
+    :return: repeat_tests_secs + an amount of padding time so that the test has time to finish on
+        its final run.
+    """
+    test_execution_time_over_limit = avg_test_runtime - (
+        options.repeat_tests_secs % avg_test_runtime)
+    test_execution_time_over_limit = max(MIN_AVG_TEST_OVERFLOW_SEC, test_execution_time_over_limit)
+    return ceil(options.repeat_tests_secs +
+                (test_execution_time_over_limit * AVG_TEST_TIME_MULTIPLIER))
+
+
+def _generate_timeouts(options, commands, test, task_avg_test_runtime_stats):
+    """
+    Add timeout.update command to list of commands for a burn in execution task.
+
+    :param options: Command line options.
+    :param commands: List of commands for a burn in execution task.
+    :param test: Test name.
+    :param task_avg_test_runtime_stats: Teststat data.
+    """
+    if task_avg_test_runtime_stats:
+        avg_test_runtime = _parse_avg_test_runtime(test, task_avg_test_runtime_stats)
+        if avg_test_runtime:
+            cmd_timeout = CmdTimeoutUpdate()
+            LOGGER.debug("Avg test runtime for test %s is: %s", test, avg_test_runtime)
+
+            timeout = _calculate_timeout(avg_test_runtime)
+            cmd_timeout.timeout(timeout)
+
+            exec_timeout = _calculate_exec_timeout(options, avg_test_runtime)
+            cmd_timeout.exec_timeout(exec_timeout)
+
+            commands.append(cmd_timeout.validate().resolve())
+
+
+def _get_task_runtime_history(evergreen_api, project, task, variant):
+    """
+    Fetch historical average runtime for all tests in a task from Evergreen API.
+
+    :param evergreen_api: Evergreen API.
+    :param project: Project name.
+    :param task: Task name.
+    :param variant: Variant name.
+    :return: Test historical runtimes, parsed into teststat objects.
+    """
+    try:
+        end_date = datetime.datetime.utcnow().replace(microsecond=0)
+        start_date = end_date - datetime.timedelta(days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
+        data = evergreen_api.test_stats_by_project(
+            project, after_date=start_date.strftime("%Y-%m-%d"),
+            before_date=end_date.strftime("%Y-%m-%d"), tasks=[task], variants=[variant],
+            group_by="test", group_num_days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
+        test_runtimes = teststats.TestStats(data).get_tests_runtimes()
+        LOGGER.debug("Test_runtime data parsed from Evergreen history: %s", test_runtimes)
+        return test_runtimes
+    except requests.HTTPError as err:
+        if err.response.status_code == requests.codes.SERVICE_UNAVAILABLE:
+            # Evergreen may return a 503 when the service is degraded.
+            # We fall back to returning no test history
+            return []
+        else:
+            raise
+
+
+def create_generate_tasks_config(evergreen_api, evg_config, options, tests_by_task,
+                                 include_gen_task):
     """Create the config for the Evergreen generate.tasks file."""
     # pylint: disable=too-many-locals
     task_specs = []
@@ -470,6 +582,8 @@ def create_generate_tasks_config(evg_config, options, tests_by_task, include_gen
         task_names.append(BURN_IN_TESTS_GEN_TASK)
     for task in sorted(tests_by_task):
         multiversion_path = tests_by_task[task].get("use_multiversion")
+        task_avg_test_runtime_stats = _get_task_runtime_history(evergreen_api, options.project,
+                                                                task, options.buildvariant)
         for test_num, test in enumerate(tests_by_task[task]["tests"]):
             sub_task_name = _sub_task_name(options, task, test_num)
             task_names.append(sub_task_name)
@@ -485,6 +599,7 @@ def create_generate_tasks_config(evg_config, options, tests_by_task, include_gen
                                       get_resmoke_repeat_options(options), test),
             }
             commands = []
+            _generate_timeouts(options, commands, test, task_avg_test_runtime_stats)
             commands.append(CommandDefinition().function("do setup"))
             if multiversion_path:
                 run_tests_vars["task_path_suffix"] = multiversion_path
@@ -525,11 +640,11 @@ def create_tests_by_task(options):
     return tests_by_task
 
 
-def create_generate_tasks_file(options, tests_by_task):
+def create_generate_tasks_file(evergreen_api, options, tests_by_task):
     """Create the Evergreen generate.tasks file."""
 
     evg_config = Configuration()
-    evg_config = create_generate_tasks_config(evg_config, options, tests_by_task,
+    evg_config = create_generate_tasks_config(evergreen_api, evg_config, options, tests_by_task,
                                               include_gen_task=True)
     _write_json_file(evg_config.to_map(), options.generate_tasks_file)
 
@@ -561,8 +676,14 @@ def run_tests(no_exec, tests_by_task, resmoke_cmd, report_file):
     _write_json_file(test_results, report_file)
 
 
-def main():
+def main(evergreen_api):
     """Execute Main program."""
+
+    logging.basicConfig(
+        format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
+        level=logging.DEBUG,
+        stream=sys.stdout,
+    )
 
     options, args = parse_command_line()
 
@@ -585,10 +706,10 @@ def main():
             _write_json_file(tests_by_task, options.test_list_outfile)
 
     if options.generate_tasks_file:
-        create_generate_tasks_file(options, tests_by_task)
+        create_generate_tasks_file(evergreen_api, options, tests_by_task)
     else:
         run_tests(options.no_exec, tests_by_task, resmoke_cmd, options.report_file)
 
 
 if __name__ == "__main__":
-    main()
+    main(RetryingEvergreenApi.get_api(config_file=CONFIG_FILE))

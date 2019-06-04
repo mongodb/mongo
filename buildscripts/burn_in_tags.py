@@ -11,6 +11,8 @@ from shrub.config import Configuration
 from shrub.variant import TaskSpec
 from shrub.variant import Variant
 
+from evergreen.api import RetryingEvergreenApi
+
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,13 +20,13 @@ if __name__ == "__main__" and __package__ is None:
 # pylint: disable=wrong-import-position
 import buildscripts.util.read_config as read_config
 from buildscripts.ciconfig import evergreen
-from buildscripts.burn_in_tests import create_tests_by_task
-from buildscripts.burn_in_tests import create_generate_tasks_config
+from buildscripts.burn_in_tests import create_generate_tasks_config, create_tests_by_task
 # pylint: enable=wrong-import-position
 
 CONFIG_DIRECTORY = "generated_burn_in_tags_config"
 CONFIG_FILE = "burn_in_tags_gen.json"
 EVERGREEN_FILE = "etc/evergreen.yml"
+EVG_CONFIG_FILE = ".evergreen.yml"
 
 ConfigOptions = namedtuple("ConfigOptions", [
     "buildvariant",
@@ -37,6 +39,7 @@ ConfigOptions = namedtuple("ConfigOptions", [
     "repeat_tests_secs",
     "repeat_tests_min",
     "repeat_tests_max",
+    "project",
 ])
 
 
@@ -59,10 +62,11 @@ def _get_config_options(expansions_file_data, buildvariant, run_buildvariant):
     repeat_tests_min = int(expansions_file_data["repeat_tests_min"])
     repeat_tests_max = int(expansions_file_data["repeat_tests_max"])
     repeat_tests_secs = float(expansions_file_data["repeat_tests_secs"])
+    project = expansions_file_data["project"]
 
     return ConfigOptions(buildvariant, run_buildvariant, base_commit, max_revisions, branch,
                          check_evergreen, distro, repeat_tests_secs, repeat_tests_min,
-                         repeat_tests_max)
+                         repeat_tests_max, project)
 
 
 def _create_evg_buildvariant_map(expansions_file_data):
@@ -110,10 +114,11 @@ def _generate_evg_buildvariant(shrub_config, buildvariant, run_buildvariant):
     new_variant.modules(modules)
 
 
-def _generate_evg_tasks(shrub_config, expansions_file_data, buildvariant_map):
+def _generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data, buildvariant_map):
     """
     Generate burn in tests tasks for a given shrub config and group of buildvariants.
 
+    :param evergreen_api: Evergreen.py object.
     :param shrub_config: Shrub config object that the build variants will be built upon.
     :param expansions_file_data: Config data file to use.
     :param buildvariant_map: Map of base buildvariants to their generated buildvariant.
@@ -123,7 +128,8 @@ def _generate_evg_tasks(shrub_config, expansions_file_data, buildvariant_map):
         tests_by_task = create_tests_by_task(config_options)
         if tests_by_task:
             _generate_evg_buildvariant(shrub_config, buildvariant, run_buildvariant)
-            create_generate_tasks_config(shrub_config, config_options, tests_by_task, False)
+            create_generate_tasks_config(evergreen_api, shrub_config, config_options, tests_by_task,
+                                         False)
 
 
 def _write_to_file(shrub_config):
@@ -139,7 +145,7 @@ def _write_to_file(shrub_config):
         file_handle.write(shrub_config.to_json())
 
 
-def main():
+def main(evergreen_api):
     """Execute Main program."""
 
     parser = argparse.ArgumentParser(description=main.__doc__)
@@ -150,9 +156,9 @@ def main():
 
     shrub_config = Configuration()
     buildvariant_map = _create_evg_buildvariant_map(expansions_file_data)
-    _generate_evg_tasks(shrub_config, expansions_file_data, buildvariant_map)
+    _generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data, buildvariant_map)
     _write_to_file(shrub_config)
 
 
 if __name__ == '__main__':
-    main()
+    main(RetryingEvergreenApi.get_api(config_file=EVG_CONFIG_FILE))

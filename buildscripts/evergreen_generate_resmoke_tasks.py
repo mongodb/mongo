@@ -36,6 +36,7 @@ import buildscripts.resmokelib.suitesconfig as suitesconfig  # pylint: disable=w
 import buildscripts.util.read_config as read_config  # pylint: disable=wrong-import-position
 import buildscripts.util.taskname as taskname  # pylint: disable=wrong-import-position
 import buildscripts.util.testname as testname  # pylint: disable=wrong-import-position
+import buildscripts.util.teststats as teststats  # pylint: disable=wrong-import-position
 
 LOGGER = logging.getLogger(__name__)
 
@@ -463,77 +464,6 @@ class EvergreenConfigGenerator(object):
         return self.evg_config
 
 
-def normalize_test_name(test_name):
-    """Normalize test names that may have been run on windows or unix."""
-    return test_name.replace("\\", "/")
-
-
-class TestStats(object):
-    """Represent the test statistics for the task that is being analyzed."""
-
-    def __init__(self, evg_test_stats_results):
-        """Initialize the TestStats with raw results from the Evergreen API."""
-        # Mapping from test_file to {"num_run": X, "duration": Y} for tests
-        self._runtime_by_test = defaultdict(dict)
-        # Mapping from test_name to {"num_run": X, "duration": Y} for hooks
-        self._hook_runtime_by_test = defaultdict(dict)
-
-        for doc in evg_test_stats_results:
-            self._add_stats(doc)
-
-    def _add_stats(self, test_stats):
-        """Add the statistics found in a document returned by the Evergreen test_stats/ endpoint."""
-        test_file = testname.normalize_test_file(test_stats.test_file)
-        duration = test_stats.avg_duration_pass
-        num_run = test_stats.num_pass
-        is_hook = testname.is_resmoke_hook(test_file)
-        if is_hook:
-            self._add_test_hook_stats(test_file, duration, num_run)
-        else:
-            self._add_test_stats(test_file, duration, num_run)
-
-    def _add_test_stats(self, test_file, duration, num_run):
-        """Add the statistics for a test."""
-        self._add_runtime_info(self._runtime_by_test, test_file, duration, num_run)
-
-    def _add_test_hook_stats(self, test_file, duration, num_run):
-        """Add the statistics for a hook."""
-        test_name = testname.split_test_hook_name(test_file)[0]
-        self._add_runtime_info(self._hook_runtime_by_test, test_name, duration, num_run)
-
-    @staticmethod
-    def _add_runtime_info(runtime_dict, test_name, duration, num_run):
-        runtime_info = runtime_dict[test_name]
-        if not runtime_info:
-            runtime_info["duration"] = duration
-            runtime_info["num_run"] = num_run
-        else:
-            runtime_info["duration"] = TestStats._average(
-                runtime_info["duration"], runtime_info["num_run"], duration, num_run)
-            runtime_info["num_run"] += num_run
-
-    @staticmethod
-    def _average(value_a, num_a, value_b, num_b):
-        """Compute a weighted average of 2 values with associated numbers."""
-        divisor = num_a + num_b
-        if divisor == 0:
-            return 0
-        else:
-            return float(value_a * num_a + value_b * num_b) / divisor
-
-    def get_tests_runtimes(self):
-        """Return the list of (test_file, runtime_in_secs) tuples ordered by decreasing runtime."""
-        tests = []
-        for test_file, runtime_info in list(self._runtime_by_test.items()):
-            duration = runtime_info["duration"]
-            test_name = testname.get_short_name_from_test_file(test_file)
-            hook_runtime_info = self._hook_runtime_by_test[test_name]
-            if hook_runtime_info:
-                duration += hook_runtime_info["duration"]
-            tests.append((normalize_test_name(test_file), duration))
-        return sorted(tests, key=lambda x: x[1], reverse=True)
-
-
 class Suite(object):
     """A suite of tests that can be run by evergreen."""
 
@@ -667,18 +597,21 @@ class Main(object):
 
     def calculate_suites_from_evg_stats(self, data, execution_time_secs):
         """Divide tests into suites that can be run in less than the specified execution time."""
-        test_stats = TestStats(data)
+        test_stats = teststats.TestStats(data)
         tests_runtimes = self.filter_existing_tests(test_stats.get_tests_runtimes())
         if not tests_runtimes:
             return self.calculate_fallback_suites()
-        self.test_list = [info[0] for info in tests_runtimes]
+        self.test_list = [info.test_name for info in tests_runtimes]
         return divide_tests_into_suites(tests_runtimes, execution_time_secs,
                                         self.options.max_sub_suites)
 
     def filter_existing_tests(self, tests_runtimes):
         """Filter out tests that do not exist in the filesystem."""
-        all_tests = [normalize_test_name(test) for test in self.list_tests()]
-        return [info for info in tests_runtimes if os.path.exists(info[0]) and info[0] in all_tests]
+        all_tests = [teststats.normalize_test_name(test) for test in self.list_tests()]
+        return [
+            info for info in tests_runtimes
+            if os.path.exists(info.test_name) and info.test_name in all_tests
+        ]
 
     def calculate_fallback_suites(self):
         """Divide tests into a fixed number of suites."""

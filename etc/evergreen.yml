@@ -1487,6 +1487,7 @@ functions:
     - command: expansions.write
       params:
         file: expansions.yml
+    - *configure_evergreen_api_credentials
     - command: shell.exec
       params:
         working_dir: src
@@ -4860,6 +4861,14 @@ tasks:
         set -o errexit
         set -o verbose
         mkdir ../src
+  - func: "configure evergreen api credentials"
+  - command: shell.exec
+    params:
+      working_dir: burn_in_tests_clonedir
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
         ${activate_virtualenv}
         # If this is a scheduled build, we check for changes against the last scheduled commit.
         if [ "${is_patch}" != "true" ]; then
@@ -4875,7 +4884,7 @@ tasks:
         # Increase the burn_in repetition from 2 to 1000 executions or 10 minutes
         burn_in_args="$burn_in_args --repeatTestsMin=2 --repeatTestsMax=1000 --repeatTestsSecs=600"
         # Evergreen executable is in $HOME.
-        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --branch=${branch_name} $build_variant_opts --distro=${distro_id} --generateTasksFile=../src/burn_in_tests_gen.json --noExec $burn_in_args
+        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --branch=${branch_name} --project=${project} $build_variant_opts --distro=${distro_id} --generateTasksFile=../src/burn_in_tests_gen.json --noExec $burn_in_args
   - command: archive.targz_pack
     params:
       target: src/burn_in_tests_gen.tgz

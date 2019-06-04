@@ -3,14 +3,19 @@
 from __future__ import absolute_import
 
 import collections
+import datetime
 import os
 import sys
 import subprocess
 import unittest
 
+from math import ceil
 from mock import Mock, mock_open, patch, MagicMock
 
+import requests
+
 import buildscripts.burn_in_tests as burn_in
+import buildscripts.util.teststats as teststats_utils
 import buildscripts.ciconfig.evergreen as evg
 
 # pylint: disable=missing-docstring,protected-access,too-many-lines
@@ -18,6 +23,7 @@ import buildscripts.ciconfig.evergreen as evg
 BURN_IN = "buildscripts.burn_in_tests"
 EVG_CI = "buildscripts.ciconfig.evergreen"
 EVG_CLIENT = "buildscripts.client.evergreen"
+_DATE = datetime.datetime(2018, 7, 15)
 GIT = "buildscripts.git"
 RESMOKELIB = "buildscripts.resmokelib"
 
@@ -126,6 +132,23 @@ def _mock_parser():
     parser = Mock()
     parser.error = Mock()
     return parser
+
+
+def _mock_evergreen_api():
+    evergreen_api = Mock()
+    evergreen_api.test_stats_by_project.return_value = [
+        Mock(
+            test_file="jstests/test1.js",
+            task_name="task1",
+            variant="variant1",
+            distro="distro1",
+            date=_DATE,
+            num_pass=1,
+            num_fail=0,
+            avg_duration_pass=10,
+        )
+    ]
+    return evergreen_api
 
 
 class TestValidateOptions(unittest.TestCase):
@@ -371,6 +394,112 @@ class TestGetRunBuildvariant(unittest.TestCase):
         self.assertEqual(buildvariant, burn_in._get_run_buildvariant(options))
 
 
+class TestParseAvgTestRuntime(unittest.TestCase):
+    def test__parse_avg_test_runtime(self):
+        task_avg_test_runtime_stats = [
+            teststats_utils.TestRuntime(test_name="dir/test1.js", runtime=30.2),
+            teststats_utils.TestRuntime(test_name="dir/test2.js", runtime=455.1)
+        ]
+        result = burn_in._parse_avg_test_runtime("dir/test2.js", task_avg_test_runtime_stats)
+        self.assertEqual(result, 455.1)
+
+
+class TestCalculateTimeout(unittest.TestCase):
+    def test__calculate_timeout(self):
+        avg_test_runtime = 455.1
+        expected_result = ceil(avg_test_runtime * burn_in.AVG_TEST_TIME_MULTIPLIER)
+        self.assertEqual(expected_result, burn_in._calculate_timeout(avg_test_runtime))
+
+    def test__calculate_timeout_avg_is_less_than_min(self):
+        avg_test_runtime = 10
+        self.assertEqual(burn_in.MIN_AVG_TEST_TIME_SEC,
+                         burn_in._calculate_timeout(avg_test_runtime))
+
+
+class TestCalculateExecTimeout(unittest.TestCase):
+    def test__calculate_exec_timeout(self):
+        avg_test_runtime = 455.1
+        repeat_tests_secs = 600
+        options = Mock(repeat_tests_secs=repeat_tests_secs)
+        expected_result = repeat_tests_secs + (
+            (avg_test_runtime -
+             (repeat_tests_secs % avg_test_runtime)) * burn_in.AVG_TEST_TIME_MULTIPLIER)
+        self.assertEqual(
+            ceil(expected_result), burn_in._calculate_exec_timeout(options, avg_test_runtime))
+
+
+class TestGenerateTimeouts(unittest.TestCase):
+    def test__generate_timeouts(self):
+        shrub_commands = []
+        task_avg_test_runtime_stats = [
+            teststats_utils.TestRuntime(test_name="dir/test2.js", runtime=455.1)
+        ]
+        options = Mock(repeat_tests_secs=600)
+        test_name = "dir/test2.js"
+        burn_in._generate_timeouts(options, shrub_commands, test_name, task_avg_test_runtime_stats)
+
+        self.assertEqual(len(shrub_commands), 1)
+        command_definition = shrub_commands[0]
+        self.assertEqual(command_definition.to_map()['params']['exec_timeout_secs'], 1531)
+        self.assertEqual(command_definition.to_map()['params']['timeout_secs'], 1366)
+
+    def test__generate_timeouts_no_results(self):
+        shrub_commands = []
+        task_avg_test_runtime_stats = []
+        options = Mock(repeat_tests_secs=600)
+        test_name = "dir/new_test.js"
+        burn_in._generate_timeouts(options, shrub_commands, test_name, task_avg_test_runtime_stats)
+
+        self.assertEqual(len(shrub_commands), 0)
+
+    def test__generate_timeouts_avg_runtime_is_zero(self):
+        shrub_commands = []
+        task_avg_test_runtime_stats = [
+            teststats_utils.TestRuntime(test_name="dir/test_with_zero_runtime.js", runtime=0)
+        ]
+        options = Mock(repeat_tests_secs=600)
+        test_name = "dir/test_with_zero_runtime.js"
+        burn_in._generate_timeouts(options, shrub_commands, test_name, task_avg_test_runtime_stats)
+
+        self.assertEqual(len(shrub_commands), 0)
+
+
+class TestGetTaskRuntimeHistory(unittest.TestCase):
+    def test__get_task_runtime_history(self):
+        evergreen_api = Mock()
+        evergreen_api.test_stats_by_project.return_value = [
+            Mock(
+                test_file="dir/test2.js",
+                task_name="task1",
+                variant="variant1",
+                distro="distro1",
+                date=_DATE,
+                num_pass=1,
+                num_fail=0,
+                avg_duration_pass=10.1,
+            )
+        ]
+        analysis_duration = burn_in.AVG_TEST_RUNTIME_ANALYSIS_DAYS
+        end_date = datetime.datetime.utcnow().replace(microsecond=0)
+        start_date = end_date - datetime.timedelta(days=analysis_duration)
+
+        result = burn_in._get_task_runtime_history(evergreen_api, "project1", "task1", "variant1")
+        self.assertEqual(result, [("dir/test2.js", 10.1)])
+        evergreen_api.test_stats_by_project.assert_called_with(
+            "project1", after_date=start_date.strftime("%Y-%m-%d"),
+            before_date=end_date.strftime("%Y-%m-%d"), group_by="test", group_num_days=14,
+            tasks=["task1"], variants=["variant1"])
+
+    def test__get_task_runtime_history_evg_degraded_mode_error(self):  # pylint: disable=invalid-name
+        response = Mock()
+        response.status_code = requests.codes.SERVICE_UNAVAILABLE
+        evergreen_api = Mock()
+        evergreen_api.test_stats_by_project.side_effect = requests.HTTPError(response=response)
+
+        result = burn_in._get_task_runtime_history(evergreen_api, "project1", "task1", "variant1")
+        self.assertEqual(result, [])
+
+
 class TestGetTaskName(unittest.TestCase):
     def test__get_task_name(self):
         name = "mytask"
@@ -474,7 +603,9 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
         options = Mock()
         options.buildvariant = None
         options.run_buildvariant = None
+        options.repeat_tests_secs = 600
         options.distro = None
+        options.branch = "master"
         return options
 
     @staticmethod
@@ -485,12 +616,45 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
         return tests
 
     def test_create_generate_tasks_file_tasks(self):
+        evergreen_api = Mock()
+        evergreen_api.test_stats_by_project.return_value = [
+            Mock(
+                test_file="jstests/test1.js",
+                task_name="task1",
+                variant="variant1",
+                distro="distro1",
+                date=_DATE,
+                num_pass=1,
+                num_fail=0,
+                avg_duration_pass=10,
+            ),
+            Mock(
+                test_file="jstests/test2.js",
+                task_name="task1",
+                variant="variant1",
+                distro="distro1",
+                date=_DATE,
+                num_pass=1,
+                num_fail=0,
+                avg_duration_pass=10,
+            ),
+            Mock(
+                test_file="jstests/multi1.js",
+                task_name="task1",
+                variant="variant1",
+                distro="distro1",
+                date=_DATE,
+                num_pass=1,
+                num_fail=0,
+                avg_duration_pass=10,
+            )
+        ]
         options = self._options_mock()
         options.buildvariant = "myvariant"
         tests_by_task = TESTS_BY_TASK
         test_tasks = self._get_tests(tests_by_task)
         with patch(BURN_IN + "._write_json_file") as mock_write_json:
-            burn_in.create_generate_tasks_file(options, tests_by_task)
+            burn_in.create_generate_tasks_file(evergreen_api, options, tests_by_task)
             evg_config = mock_write_json.call_args_list[0][0][0]
             evg_tasks = evg_config["tasks"]
             self.assertEqual(len(evg_tasks), len(test_tasks))
@@ -499,10 +663,10 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
             self.assertEqual(task["name"], "burn_in:myvariant_task1_0")
             self.assertEqual(len(task["depends_on"]), 1)
             self.assertEqual(task["depends_on"][0]["name"], "compile")
-            self.assertEqual(len(task["commands"]), 2)
-            self.assertEqual(task["commands"][0]["func"], "do setup")
-            self.assertEqual(task["commands"][1]["func"], "run tests")
-            resmoke_args = task["commands"][1]["vars"]["resmoke_args"]
+            self.assertEqual(len(task["commands"]), 3)
+            self.assertEqual(task["commands"][1]["func"], "do setup")
+            self.assertEqual(task["commands"][2]["func"], "run tests")
+            resmoke_args = task["commands"][2]["vars"]["resmoke_args"]
             self.assertIn("--suites=suite1", resmoke_args)
             self.assertIn("jstests/test1.js", resmoke_args)
             # Check task1 - test2.js
@@ -510,10 +674,10 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
             self.assertEqual(task["name"], "burn_in:myvariant_task1_1")
             self.assertEqual(len(task["depends_on"]), 1)
             self.assertEqual(task["depends_on"][0]["name"], "compile")
-            self.assertEqual(len(task["commands"]), 2)
-            self.assertEqual(task["commands"][0]["func"], "do setup")
-            self.assertEqual(task["commands"][1]["func"], "run tests")
-            resmoke_args = task["commands"][1]["vars"]["resmoke_args"]
+            self.assertEqual(len(task["commands"]), 3)
+            self.assertEqual(task["commands"][1]["func"], "do setup")
+            self.assertEqual(task["commands"][2]["func"], "run tests")
+            resmoke_args = task["commands"][2]["vars"]["resmoke_args"]
             self.assertIn("--suites=suite1", resmoke_args)
             self.assertIn("jstests/test2.js", resmoke_args)
             # task[2] - task[5] are similar to task[0] & task[1]
@@ -522,21 +686,22 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
             self.assertEqual(taskmulti["name"], "burn_in:myvariant_taskmulti_0")
             self.assertEqual(len(taskmulti["depends_on"]), 1)
             self.assertEqual(taskmulti["depends_on"][0]["name"], "compile")
-            self.assertEqual(len(taskmulti["commands"]), 3)
-            self.assertEqual(taskmulti["commands"][0]["func"], "do setup")
-            self.assertEqual(taskmulti["commands"][1]["func"], "do multiversion setup")
-            self.assertEqual(taskmulti["commands"][2]["func"], "run tests")
-            resmoke_args = taskmulti["commands"][2]["vars"]["resmoke_args"]
+            self.assertEqual(len(taskmulti["commands"]), 4)
+            self.assertEqual(taskmulti["commands"][1]["func"], "do setup")
+            self.assertEqual(taskmulti["commands"][2]["func"], "do multiversion setup")
+            self.assertEqual(taskmulti["commands"][3]["func"], "run tests")
+            resmoke_args = taskmulti["commands"][3]["vars"]["resmoke_args"]
             self.assertIn("--suites=suite4", resmoke_args)
             self.assertIn("jstests/multi1.js", resmoke_args)
-            self.assertEqual(taskmulti["commands"][2]["vars"]["task_path_suffix"], "/data/multi")
+            self.assertEqual(taskmulti["commands"][3]["vars"]["task_path_suffix"], "/data/multi")
 
     def test_create_generate_tasks_file_variants(self):
+        evergreen_api = _mock_evergreen_api()
         options = self._options_mock()
         options.buildvariant = "myvariant"
         tests_by_task = TESTS_BY_TASK
         with patch(BURN_IN + "._write_json_file") as mock_write_json:
-            burn_in.create_generate_tasks_file(options, tests_by_task)
+            burn_in.create_generate_tasks_file(evergreen_api, options, tests_by_task)
             evg_config = mock_write_json.call_args_list[0][0][0]
             self.assertEqual(len(evg_config["buildvariants"]), 1)
             self.assertEqual(evg_config["buildvariants"][0]["name"], "myvariant")
@@ -556,12 +721,13 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
             self.assertEqual(execution_tasks[7], "burn_in:myvariant_taskmulti_0")
 
     def test_create_generate_tasks_file_run_variants(self):
+        evergreen_api = _mock_evergreen_api()
         options = self._options_mock()
         options.buildvariant = "myvariant"
         options.run_buildvariant = "run_variant"
         tests_by_task = TESTS_BY_TASK
         with patch(BURN_IN + "._write_json_file") as mock_write_json:
-            burn_in.create_generate_tasks_file(options, tests_by_task)
+            burn_in.create_generate_tasks_file(evergreen_api, options, tests_by_task)
             evg_config = mock_write_json.call_args_list[0][0][0]
             self.assertEqual(len(evg_config["buildvariants"]), 1)
             self.assertEqual(evg_config["buildvariants"][0]["name"], "run_variant")
@@ -581,13 +747,14 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
             self.assertEqual(execution_tasks[7], "burn_in:run_variant_taskmulti_0")
 
     def test_create_generate_tasks_file_distro(self):
+        evergreen_api = _mock_evergreen_api()
         options = self._options_mock()
         options.buildvariant = "myvariant"
         options.distro = "mydistro"
         tests_by_task = TESTS_BY_TASK
         test_tasks = self._get_tests(tests_by_task)
         with patch(BURN_IN + "._write_json_file") as mock_write_json:
-            burn_in.create_generate_tasks_file(options, tests_by_task)
+            burn_in.create_generate_tasks_file(evergreen_api, options, tests_by_task)
             evg_config = mock_write_json.call_args_list[0][0][0]
             self.assertEqual(len(evg_config["tasks"]), len(test_tasks))
             self.assertEqual(len(evg_config["buildvariants"]), 1)
@@ -597,12 +764,13 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
                     self.assertEqual(task["distros"][0], options.distro)
 
     def test_create_generate_tasks_file_no_tasks(self):
+        evergreen_api = _mock_evergreen_api()
         variant = "myvariant"
         options = self._options_mock()
         options.buildvariant = variant
         tests_by_task = {}
         with patch(BURN_IN + "._write_json_file") as mock_write_json:
-            burn_in.create_generate_tasks_file(options, tests_by_task)
+            burn_in.create_generate_tasks_file(evergreen_api, options, tests_by_task)
             evg_config = mock_write_json.call_args_list[0][0][0]
             self.assertEqual(len(evg_config), 1)
             self.assertEqual(len(evg_config["buildvariants"]), 1)

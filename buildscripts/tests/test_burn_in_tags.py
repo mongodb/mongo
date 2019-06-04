@@ -1,8 +1,11 @@
 """Unit tests for the burn_in_tags.py script."""
 
+import datetime
 import os
 import unittest
 import mock
+
+from mock import Mock
 
 from shrub.config import Configuration
 
@@ -33,6 +36,7 @@ def get_expansions_data():
             "repeat_tests_min": 2,
             "repeat_tests_secs": 600,
             "revision": "fake_sha",
+            "project": "fake_project",
     }  # yapf: disable
 
 def get_evergreen_config():
@@ -91,7 +95,10 @@ class TestGenerateEvgTasks(unittest.TestCase):
                 "enterprise-rhel-62-64-bit-majority-read-concern-off-required",
         }  # yapf: disable
         shrub_config = Configuration()
-        burn_in_tags._generate_evg_tasks(shrub_config, expansions_file_data, buildvariant_map)
+        evergreen_api = Mock()
+        burn_in_tags._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
+                                         buildvariant_map)
+
         self.assertEqual(shrub_config.to_map(), {})
 
     @mock.patch(ns("evergreen"))
@@ -113,7 +120,13 @@ class TestGenerateEvgTasks(unittest.TestCase):
                 "enterprise-rhel-62-64-bit-majority-read-concern-off-required",
         }  # yapf: disable
         shrub_config = Configuration()
-        burn_in_tags._generate_evg_tasks(shrub_config, expansions_file_data, buildvariant_map)
+        evergreen_api = Mock()
+        evergreen_api.test_stats_by_project.return_value = [
+            Mock(test_file="dir/test2.js", avg_duration_pass=10)
+        ]
+        burn_in_tags._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
+                                         buildvariant_map)
+
         generated_config = shrub_config.to_map()
         self.assertEqual(len(generated_config["buildvariants"]), 2)
         first_generated_build_variant = generated_config["buildvariants"][0]
