@@ -707,15 +707,13 @@ StatusWith<std::string> KVCatalog::newOrphanedIdent(OperationContext* opCtx, std
     return StatusWith<std::string>(std::move(ns));
 }
 
-void KVCatalog::initCollection(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               bool forRepair) {
+std::unique_ptr<CollectionCatalogEntry> KVCatalog::makeCollectionCatalogEntry(
+    OperationContext* opCtx, const NamespaceString& nss, bool forRepair) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, nss);
     uassert(ErrorCodes::MustDowngrade,
             str::stream() << "Collection does not have UUID in KVCatalog. Collection: " << nss,
             md.options.uuid);
 
-    auto uuid = md.options.uuid.get();
     auto ident = getCollectionIdent(nss);
 
     std::unique_ptr<RecordStore> rs;
@@ -729,16 +727,8 @@ void KVCatalog::initCollection(OperationContext* opCtx,
         invariant(rs);
     }
 
-    CollectionCatalog::get(getGlobalServiceContext())
-        .registerCatalogEntry(uuid,
-                              std::make_unique<KVCollectionCatalogEntry>(
-                                  _engine, this, nss.ns(), ident, std::move(rs)));
-}
-
-void KVCatalog::reinitCollectionAfterRepair(OperationContext* opCtx, const NamespaceString& nss) {
-    auto& catalog = CollectionCatalog::get(getGlobalServiceContext());
-    catalog.deregisterCatalogEntry(catalog.lookupUUIDByNSS(nss).get());
-    initCollection(opCtx, nss, false);
+    return std::make_unique<KVCollectionCatalogEntry>(
+        _engine, this, nss.ns(), ident, std::move(rs));
 }
 
 Status KVCatalog::createCollection(OperationContext* opCtx,

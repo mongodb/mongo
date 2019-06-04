@@ -200,21 +200,14 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
       _uuid(uuid),
       _details(details),
       _recordStore(recordStore),
-      _needCappedLock(supportsDocLocking() && _recordStore->isCapped() && _ns.db() != "local"),
+      _needCappedLock(supportsDocLocking() && _recordStore && _recordStore->isCapped() &&
+                      _ns.db() != "local"),
       _infoCache(std::make_unique<CollectionInfoCacheImpl>(this, _ns)),
       _indexCatalog(
           std::make_unique<IndexCatalogImpl>(this, getCatalogEntry()->getMaxAllowedIndexes())),
-      _collator(parseCollation(opCtx, _ns, _details->getCollectionOptions(opCtx).collation)),
-      _validatorDoc(_details->getCollectionOptions(opCtx).validator.getOwned()),
-      _validator(uassertStatusOK(
-          parseValidator(opCtx, _validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures))),
-      _validationAction(uassertStatusOK(
-          _parseValidationAction(_details->getCollectionOptions(opCtx).validationAction))),
-      _validationLevel(uassertStatusOK(
-          _parseValidationLevel(_details->getCollectionOptions(opCtx).validationLevel))),
-      _cappedNotifier(_recordStore->isCapped() ? stdx::make_unique<CappedInsertNotifier>()
-                                               : nullptr) {
-
+      _cappedNotifier(_recordStore && _recordStore->isCapped()
+                          ? stdx::make_unique<CappedInsertNotifier>()
+                          : nullptr) {
     if (isCapped())
         _recordStore->setCappedCallback(this);
 }
@@ -231,6 +224,33 @@ CollectionImpl::~CollectionImpl() {
     }
 
     _magic = 0;
+}
+
+std::unique_ptr<Collection> CollectionImpl::FactoryImpl::make(
+    OperationContext* opCtx, CollectionCatalogEntry* collectionCatalogEntry) const {
+    auto rs = collectionCatalogEntry->getRecordStore();
+    const auto uuid = collectionCatalogEntry->getCollectionOptions(opCtx).uuid;
+    const auto nss = collectionCatalogEntry->ns();
+    return std::make_unique<CollectionImpl>(opCtx, nss.ns(), uuid, collectionCatalogEntry, rs);
+}
+
+void CollectionImpl::init(OperationContext* opCtx) {
+    _collator = parseCollation(opCtx, _ns, _details->getCollectionOptions(opCtx).collation);
+    _validatorDoc = _details->getCollectionOptions(opCtx).validator.getOwned();
+    _validator = uassertStatusOK(
+        parseValidator(opCtx, _validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures));
+    _validationAction = uassertStatusOK(
+        _parseValidationAction(_details->getCollectionOptions(opCtx).validationAction));
+    _validationLevel = uassertStatusOK(
+        _parseValidationLevel(_details->getCollectionOptions(opCtx).validationLevel));
+
+    getIndexCatalog()->init(opCtx).transitional_ignore();
+    infoCache()->init(opCtx);
+    _initialized = true;
+}
+
+bool CollectionImpl::isInitialized() const {
+    return _initialized;
 }
 
 bool CollectionImpl::requiresIdIndex() const {

@@ -103,17 +103,6 @@ public:
      * Returns the set of existing database names that differ only in casing.
      */
     virtual std::set<std::string> getNamesWithConflictingCasing(const StringData name) = 0;
-
-    /**
-     * Returns a new Collection.
-     * This function supports rebuilding indexes during the repair process and should not be used
-     * for any other purpose.
-     */
-    virtual std::unique_ptr<Collection> makeCollection(OperationContext* const opCtx,
-                                                       const StringData fullNS,
-                                                       OptionalCollectionUUID uuid,
-                                                       CollectionCatalogEntry* const details,
-                                                       RecordStore* const recordStore) = 0;
 };
 
 }  // namespace mongo

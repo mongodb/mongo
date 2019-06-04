@@ -36,6 +36,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index/index_access_method_factory_impl.h"
@@ -81,7 +82,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
     IndexAccessMethodFactory::set(serviceContext, std::make_unique<IndexAccessMethodFactoryImpl>());
-
+    Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
 }
 

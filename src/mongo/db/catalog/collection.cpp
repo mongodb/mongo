@@ -73,6 +73,24 @@ bool CappedInsertNotifier::isDead() {
 
 // ----
 
+namespace {
+const auto getFactory = ServiceContext::declareDecoration<std::unique_ptr<Collection::Factory>>();
+}
+
+Collection::Factory* Collection::Factory::get(ServiceContext* service) {
+    return getFactory(service).get();
+}
+
+Collection::Factory* Collection::Factory::get(OperationContext* opCtx) {
+    return getFactory(opCtx->getServiceContext()).get();
+};
+
+void Collection::Factory::set(ServiceContext* service,
+                              std::unique_ptr<Collection::Factory> newFactory) {
+    auto& factory = getFactory(service);
+    factory = std::move(newFactory);
+}
+
 // static
 Status Collection::parseValidationLevel(StringData newLevel) {
     if (newLevel == "") {

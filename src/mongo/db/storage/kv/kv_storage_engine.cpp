@@ -184,8 +184,7 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
     }
 
     KVPrefix maxSeenPrefix = KVPrefix::kNotPrefixed;
-    for (const auto& coll : collectionsKnownToCatalog) {
-        NamespaceString nss(coll);
+    for (const auto& nss : collectionsKnownToCatalog) {
         std::string dbName = nss.db().toString();
 
         if (loadingFromUncleanShutdownOrRepair) {
@@ -193,7 +192,7 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
             // possible that there are collections in the catalog that are unknown to the storage
             // engine. If we can't find a table in the list of storage engine idents, either
             // attempt to recover the ident or drop it.
-            const auto collectionIdent = _catalog->getCollectionIdent(coll);
+            const auto collectionIdent = _catalog->getCollectionIdent(nss);
             bool orphan = !std::binary_search(identsKnownToStorageEngine.begin(),
                                               identsKnownToStorageEngine.end(),
                                               collectionIdent);
@@ -203,14 +202,14 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
             if (orphan) {
                 auto status = _recoverOrphanedCollection(opCtx, nss, collectionIdent);
                 if (!status.isOK()) {
-                    warning() << "Failed to recover orphaned data file for collection '" << coll
+                    warning() << "Failed to recover orphaned data file for collection '" << nss
                               << "': " << status;
                     WriteUnitOfWork wuow(opCtx);
-                    fassert(50716, _catalog->_removeEntry(opCtx, coll));
+                    fassert(50716, _catalog->_removeEntry(opCtx, nss));
 
                     if (_options.forRepair) {
                         StorageRepairObserver::get(getGlobalServiceContext())
-                            ->onModification(str::stream() << "Collection " << coll << " dropped: "
+                            ->onModification(str::stream() << "Collection " << nss << " dropped: "
                                                            << status.reason());
                     }
                     wuow.commit();
@@ -219,8 +218,8 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
             }
         }
 
-        _catalog->initCollection(opCtx, coll, _options.forRepair);
-        auto maxPrefixForCollection = _catalog->getMetaData(opCtx, coll).getMaxPrefix();
+        _initCollection(opCtx, nss, _options.forRepair);
+        auto maxPrefixForCollection = _catalog->getMetaData(opCtx, nss).getMaxPrefix();
         maxSeenPrefix = std::max(maxSeenPrefix, maxPrefixForCollection);
 
         if (nss.isOrphanCollection()) {
@@ -234,6 +233,20 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
     // Unset the unclean shutdown flag to avoid executing special behavior if this method is called
     // after startup.
     startingAfterUncleanShutdown(getGlobalServiceContext()) = false;
+}
+
+void KVStorageEngine::_initCollection(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      bool forRepair) {
+    auto catalogEntry = _catalog->makeCollectionCatalogEntry(opCtx, nss, forRepair);
+    auto uuid = catalogEntry->getCollectionOptions(opCtx).uuid.get();
+
+    auto collectionFactory = Collection::Factory::get(getGlobalServiceContext());
+    auto collection = collectionFactory->make(opCtx, catalogEntry.get());
+
+    auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
+    collectionCatalog.registerCatalogEntry(uuid, std::move(catalogEntry));
+    collectionCatalog.registerCollectionObject(uuid, std::move(collection));
 }
 
 void KVStorageEngine::closeCatalog(OperationContext* opCtx) {
@@ -651,8 +664,19 @@ Status KVStorageEngine::repairRecordStore(OperationContext* opCtx, const Namespa
         repairObserver->onModification(str::stream() << "Collection " << nss << ": "
                                                      << status.reason());
     }
-    _catalog->reinitCollectionAfterRepair(opCtx, nss);
 
+    auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
+    auto uuid = collectionCatalog.lookupUUIDByNSS(nss).get();
+
+    // It's possible the Collection may not already have been removed if the no DatabaseHolder was
+    // opened for a database.
+    if (collectionCatalog.lookupCollectionByUUID(uuid)) {
+        collectionCatalog.deregisterCollectionObject(uuid);
+    }
+    collectionCatalog.deregisterCatalogEntry(uuid);
+
+    // After repairing, initialize the collection with a valid RecordStore.
+    _initCollection(opCtx, nss, false);
     return Status::OK();
 }
 

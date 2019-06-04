@@ -38,6 +38,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
@@ -109,6 +110,7 @@ int runDbTests(int argc, char** argv) {
     DatabaseHolder::set(globalServiceContext, std::make_unique<DatabaseHolderImpl>());
     IndexAccessMethodFactory::set(globalServiceContext,
                                   std::make_unique<IndexAccessMethodFactoryImpl>());
+    Collection::Factory::set(globalServiceContext, std::make_unique<CollectionImpl::FactoryImpl>());
     IndexBuildsCoordinator::set(globalServiceContext,
                                 std::make_unique<IndexBuildsCoordinatorMongod>());
     auto registry = stdx::make_unique<OpObserverRegistry>();

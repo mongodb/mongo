@@ -336,12 +336,9 @@ void setReplSetMemberInStandaloneMode(OperationContext* opCtx) {
         return;
     }
 
-    Lock::DBLock dbLock(opCtx, NamespaceString::kSystemReplSetNamespace.db(), MODE_X);
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    databaseHolder->openDb(opCtx, NamespaceString::kSystemReplSetNamespace.db());
-
-    AutoGetCollectionForRead autoCollection(opCtx, NamespaceString::kSystemReplSetNamespace);
-    Collection* collection = autoCollection.getCollection();
+    invariant(opCtx->lockState()->isW());
+    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+        NamespaceString::kSystemReplSetNamespace);
     if (collection && collection->numRecords(opCtx) > 0) {
         setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), true);
         return;
@@ -394,18 +391,12 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
             invariant(dbNames.front() == NamespaceString::kLocalDb);
         }
 
-        stdx::function<void(const std::string& dbName)> onRecordStoreRepair =
-            [opCtx](const std::string& dbName) {
-                if (dbName == NamespaceString::kLocalDb) {
-                    setReplSetMemberInStandaloneMode(opCtx);
-                }
-            };
-
         for (const auto& dbName : dbNames) {
             LOG(1) << "    Repairing database: " << dbName;
-            fassertNoTrace(18506,
-                           repairDatabase(opCtx, storageEngine, dbName, onRecordStoreRepair));
+            fassertNoTrace(18506, repairDatabase(opCtx, storageEngine, dbName));
         }
+
+        setReplSetMemberInStandaloneMode(opCtx);
 
         // All collections must have UUIDs before restoring the FCV document to a version that
         // requires UUIDs.

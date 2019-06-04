@@ -117,9 +117,8 @@ public:
     /**
      * Sets up the in-memory and persisted state of the index build.
      *
-     * This function should only be called when in recovery mode, because we use the DatabaseHolder
-     * to create a temporary collection using the collection catalog entry to allow us to rebuild
-     * the indexes on the collection without initializing it fully.
+     * This function should only be called when in recovery mode, because we create new Collection
+     * objects and replace old ones after dropping existing indexes.
      *
      * Returns the number of records and the size of the data iterated over, if successful.
      */

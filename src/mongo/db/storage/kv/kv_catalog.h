@@ -110,9 +110,9 @@ public:
      */
     std::string newInternalIdent();
 
-    void initCollection(OperationContext* opCtx, const NamespaceString& nss, bool forRepair);
-
-    void reinitCollectionAfterRepair(OperationContext* opCtx, const NamespaceString& nss);
+    std::unique_ptr<CollectionCatalogEntry> makeCollectionCatalogEntry(OperationContext* opCtx,
+                                                                       const NamespaceString& nss,
+                                                                       bool forRepair);
 
     Status createCollection(OperationContext* opCtx,
                             const NamespaceString& nss,

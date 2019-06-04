@@ -170,44 +170,46 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
         indexNames.push_back(name);
     }
 
-    const auto& ns = cce->ns().ns();
-    auto rs = cce->getRecordStore();
+    const NamespaceString nss(cce->ns());
 
     ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
 
-    std::unique_ptr<Collection> collection;
+    auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
+    Collection* collection = collectionCatalog.lookupCollectionByNamespace(nss);
+    auto indexCatalog = collection->getIndexCatalog();
     std::unique_ptr<MultiIndexBlock> indexer;
     {
         // These steps are combined into a single WUOW to ensure there are no commits without
         // the indexes.
         // 1) Drop all indexes.
-        // 2) Open the Collection
+        // 2) Re-create the Collection.
         // 3) Start the index build process.
-
         WriteUnitOfWork wuow(opCtx);
 
-        {  // 1
+        // 1
+        {
             for (size_t i = 0; i < indexNames.size(); i++) {
-                Status s = cce->removeIndex(opCtx, indexNames[i]);
+                auto descriptor = indexCatalog->findIndexByName(opCtx, indexNames[i], false);
+                if (!descriptor) {
+                    // If it's unfinished index, drop it directly via removeIndex.
+                    Status status =
+                        collection->getCatalogEntry()->removeIndex(opCtx, indexNames[i]);
+                    continue;
+                }
+                Status s = indexCatalog->dropIndex(opCtx, descriptor);
                 if (!s.isOK()) {
                     return s;
                 }
             }
         }
 
-        // Indexes must be dropped before we open the Collection otherwise we could attempt to
-        // open a bad index and fail.
-        const auto uuid = cce->getCollectionOptions(opCtx).uuid;
-        auto databaseHolder = DatabaseHolder::get(opCtx);
-        collection = databaseHolder->makeCollection(opCtx, ns, uuid, cce, rs);
-        collection->getIndexCatalog()->init(opCtx).transitional_ignore();
-        collection->infoCache()->init(opCtx);
+        // We need to initialize the collection to drop and rebuild the indexes.
+        collection->init(opCtx);
 
         // Register the index build. During recovery, collections may not have UUIDs present yet to
         // due upgrading. We don't require collection UUIDs during recovery except to create a
         // ReplIndexBuildState object.
         auto collectionUUID = UUID::gen();
-        auto nss = collection->ns();
         auto dbName = nss.db().toString();
 
         // We run the index build using the single phase protocol as we already hold the global
@@ -230,12 +232,12 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
 
         // Setup the index build.
         indexCatalogStats.numIndexesBefore =
-            _getNumIndexesTotal(opCtx, collection.get()) + indexNames.size();
+            _getNumIndexesTotal(opCtx, collection) + indexNames.size();
 
         IndexBuildsManager::SetupOptions options;
         options.forRecovery = true;
         status = _indexBuildsManager.setUpIndexBuild(
-            opCtx, collection.get(), specs, buildUUID, MultiIndexBlock::kNoopOnInitFn, options);
+            opCtx, collection, specs, buildUUID, MultiIndexBlock::kNoopOnInitFn, options);
         if (!status.isOK()) {
             // An index build failure during recovery is fatal.
             logFailure(status, nss, replIndexBuildState);
@@ -245,7 +247,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
         wuow.commit();
     }
 
-    return _runIndexRebuildForRecovery(opCtx, collection.get(), indexCatalogStats, buildUUID);
+    return _runIndexRebuildForRecovery(opCtx, collection, indexCatalogStats, buildUUID);
 }
 
 Future<void> IndexBuildsCoordinator::joinIndexBuilds(const NamespaceString& nss,
