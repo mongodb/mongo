@@ -100,6 +100,11 @@ mongo_killproc()
   local -i duration=10
   local pid=`pidofproc -p "${pid_file}" ${procname}`
 
+  if [ ! -f "${pid_file}" ]; then
+     echo "No PID file detected, nothing to stop"
+     exit 0
+  fi
+
   # Per the man page the process name should always be the second
   # field. In our case mongod is wrapped in parens hence the parens in
   # the if condition below.
