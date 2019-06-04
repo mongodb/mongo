@@ -84,9 +84,9 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
         return status;
     }
 
-    for (auto& indexInfo : _indexConsistency->getIndexInfo()) {
+    for (auto& it : _indexConsistency->getIndexInfo()) {
+        IndexInfo& indexInfo = it.second;
         const IndexDescriptor* descriptor = indexInfo.descriptor;
-        const std::string indexName = descriptor->indexName();
         ValidateResults curRecordResults;
 
         const IndexAccessMethod* iam = _indexCatalog->getEntry(descriptor)->accessMethod();
@@ -94,7 +94,7 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
         if (descriptor->isPartial()) {
             const IndexCatalogEntry* ice = _indexCatalog->getEntry(descriptor);
             if (!ice->getFilterExpression()->matchesBSON(recordBson)) {
-                (*_indexNsResultsMap)[indexName] = curRecordResults;
+                (*_indexNsResultsMap)[descriptor->indexName()] = curRecordResults;
                 continue;
             }
         }
@@ -125,8 +125,6 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                                                        &indexInfo);
         }
 
-        const auto& pattern = descriptor->keyPattern();
-        const Ordering ord = Ordering::make(pattern);
         bool largeKeyDisallowed = isLargeKeyDisallowed();
 
         // We want to use the latest version of KeyString here.
@@ -139,10 +137,10 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                 continue;
             }
 
-            ks.resetToKey(key, ord, recordId);
+            ks.resetToKey(key, indexInfo.ord, recordId);
             _indexConsistency->addDocKey(ks, &indexInfo, recordId, key);
         }
-        (*_indexNsResultsMap)[indexName] = curRecordResults;
+        (*_indexNsResultsMap)[descriptor->indexName()] = curRecordResults;
     }
     return status;
 }

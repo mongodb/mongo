@@ -50,20 +50,19 @@ namespace mongo {
  * Contains all the index information and stats throughout the validation.
  */
 struct IndexInfo {
-    const IndexDescriptor* descriptor;
-    // Informs us if the index was ready or not for consumption during the start of validation.
-    bool isReady;
+    IndexInfo(const IndexDescriptor* descriptor);
+    const IndexDescriptor* const descriptor;
     // Contains the pre-computed hash of the index name.
-    uint32_t indexNameHash;
-    // True if the index has finished scanning from the index scan stage, otherwise false.
-    bool indexScanFinished;
+    const uint32_t indexNameHash;
+    // More efficient representation of the ordering of the descriptor's key pattern.
+    const Ordering ord;
     // The number of index entries belonging to the index.
-    int64_t numKeys;
+    int64_t numKeys = 0;
     // The number of long keys that are not indexed for the index.
-    int64_t numLongKeys;
-    // The number of records that have a key in their document that referenced back to the
-    // this index.
-    int64_t numRecords;
+    int64_t numLongKeys = 0;
+    // The number of records that have a key in their document that referenced back to the this
+    // index.
+    int64_t numRecords = 0;
     // A hashed set of indexed multikey paths (applies to $** indexes only).
     std::set<uint32_t> hashedMultikeyMetadataPaths;
 };
@@ -72,6 +71,8 @@ class IndexConsistency final {
     using ValidateResultsMap = std::map<std::string, ValidateResults>;
 
 public:
+    using IndexInfoMap = std::map<std::string, IndexInfo>;
+
     IndexConsistency(OperationContext* opCtx,
                      Collection* collection,
                      NamespaceString nss,
@@ -126,11 +127,11 @@ public:
     /**
      * Return info on all indexes tracked by this.
      */
-    std::vector<IndexInfo>& getIndexInfo() {
+    IndexInfoMap& getIndexInfo() {
         return _indexesInfo;
     }
     IndexInfo& getIndexInfo(const std::string& indexName) {
-        return _indexesInfo.at(_indexNumber.at(indexName));
+        return _indexesInfo.at(indexName);
     }
 
     /**
@@ -167,11 +168,8 @@ private:
 
     std::vector<uint32_t> _indexKeyCount;
 
-    // Contains the corresponding index number for each index namespace
-    std::map<std::string, int> _indexNumber;
-
     // A vector of IndexInfo indexes by index number
-    std::vector<IndexInfo> _indexesInfo;
+    IndexInfoMap _indexesInfo;
 
     // Whether we're in the first or second phase of index validation.
     bool _firstPhase;
