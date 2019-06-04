@@ -1,0 +1,46 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target='logv2',
+    source=[
+        'attributes.cpp',
+        'console.cpp',
+        'log.cpp',
+        'log_component.cpp',
+        'log_component_settings.cpp',
+        'log_domain.cpp',
+        'log_domain_global.cpp',
+        'log_manager.cpp',
+        'log_record.cpp',
+        'log_severity.cpp',
+        'log_tag.cpp',
+        'ramlog.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+    ],
+)
+
+env.CppUnitTest(
+    target='log_test_v2',
+    source=[
+        'log_test_v2.cpp',
+    ],
+    LIBDEPS=[
+        'logv2',
+    ]
+)
+
+env.Benchmark(
+    target='logv2_bm',
+    source='logv2_bm.cpp',
+    LIBDEPS=[
+        'logv2',
+    ],
+)

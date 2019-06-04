@@ -32,6 +32,7 @@ env.SConscript(
         'idl',
         'installer',
         'logger',
+        'logv2',
         'platform',
         'rpc',
         's',
