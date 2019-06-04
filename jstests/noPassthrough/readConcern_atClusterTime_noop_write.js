@@ -81,7 +81,7 @@
             assert.commandFailedWithCode(toRSSession.abortTransaction_forTesting(),
                                          ErrorCodes.NoSuchTransaction);
         } else {
-            toRSSession.commitTransaction();
+            assert.commandWorked(toRSSession.commitTransaction_forTesting());
         }
 
         const toRSOpTime = getLastOpTime(toRS.getPrimary()).ts;

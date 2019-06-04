@@ -96,7 +96,7 @@
         sessionColl
             .aggregate([{$_internalSplitPipeline: {mergeType: "primaryShard"}}, {$sort: {_id: 1}}])
             .toArray());
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Move all of the data to shard 1.
     assert.commandWorked(
@@ -111,7 +111,7 @@
     // chunks for the collection.
     session.startTransaction();
     assert.eq([{_id: -1}, {_id: 0}, {_id: 1}], sessionColl.aggregate(pipeline).toArray());
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     st.stop();
 })();

@@ -31,7 +31,7 @@
     // No database versioned requests have been sent to Shard0, so it is stale.
     assert.commandWorked(sessionDB.runCommand({distinct: collName, key: "_id", query: {_id: 0}}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     //
     // Stale database version on second command to a shard should fail.
@@ -88,7 +88,7 @@
     assert.commandWorked(
         sessionOtherDB.runCommand({distinct: otherCollName, key: "_id", query: {_id: 0}}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     //
     // The final StaleDbVersion error should be returned if the router exhausts its retries.

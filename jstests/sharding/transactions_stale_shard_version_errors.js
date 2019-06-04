@@ -76,7 +76,7 @@
     // Targets Shard1, which is stale.
     assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     //
     // Stale shard version on second command to a shard should fail.
@@ -128,7 +128,7 @@
     // Targets Shard0 for the other ns, which is stale.
     assert.commandWorked(sessionDB.runCommand({find: otherCollName, filter: {_id: 5}}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     //
     // Stale mongos aborts on old shard.
@@ -147,7 +147,7 @@
     // stale but should succeed.
     assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Verify there is no in-progress transaction on Shard1.
     res = assert.commandFailedWithCode(st.rs1.getPrimary().getDB(dbName).runCommand({
@@ -178,7 +178,7 @@
     // Targets all shards, two of which are stale.
     assert.commandWorked(sessionDB.runCommand({find: collName}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     //
     // Can retry a stale write on the first statement.
@@ -194,7 +194,7 @@
     // Targets Shard1, which is stale.
     assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: 6}]}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     //
     // Cannot retry a stale write past the first statement.

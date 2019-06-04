@@ -66,7 +66,7 @@
         secondSession.startTransaction({writeConcern: {w: "majority"}});
         assert.commandWorked(
             secondSession.getDatabase(dbName).getCollection(collName).insert({_id: "second-doc"}));
-        secondSession.commitTransaction();
+        assert.commandWorked(secondSession.commitTransaction_forTesting());
 
         // Unfreeze the original primary so that it can stand for election again for the next test.
         assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));

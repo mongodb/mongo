@@ -31,7 +31,7 @@
     res = sessionColl.find({});
     assert.sameMembers(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1}]);
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     jsTest.log("Do a single-result multi-delete.");
     session.startTransaction({writeConcern: {w: "majority"}});
@@ -42,7 +42,7 @@
     res = sessionColl.find({});
     assert.sameMembers(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}]);
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     jsTest.log("Do a multiple-result multi-delete.");
     session.startTransaction({writeConcern: {w: "majority"}});
@@ -53,7 +53,7 @@
     res = sessionColl.find({});
     assert.sameMembers(res.toArray(), []);
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Collection should be empty.
     assert.eq(0, testColl.find().itcount());

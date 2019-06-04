@@ -66,7 +66,7 @@
             session.startTransaction({readConcern: {level: "snapshot"}});
             assert.commandWorked(sessionDB.runCommand(commandBody));
 
-            session.commitTransaction();
+            assert.commandWorked(session.commitTransaction_forTesting());
 
             unsetFailCommandOnEachShard(st, numShardsToError);
 
@@ -84,7 +84,7 @@
             session.startTransaction({readConcern: {level: "snapshot"}});
             assert.commandWorked(sessionDB.runCommand(commandBody));
 
-            session.commitTransaction();
+            assert.commandWorked(session.commitTransaction_forTesting());
 
             unsetFailCommandOnEachShard(st, numShardsToError);
 

@@ -23,7 +23,7 @@
     assert(res.hasOwnProperty("cursor"), tojson(res));
     assert(res.cursor.hasOwnProperty("id"), tojson(res));
     assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     jsTest.log("Test that the killCursors cannot be the first operation in a transaction.");
     res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
@@ -69,7 +69,7 @@
     // killCursors does not block behind the pending MODE_X lock.
     assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Once the transaction has committed, the drop can proceed.
     awaitDrop();

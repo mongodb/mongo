@@ -20,7 +20,7 @@
     let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
     assert(res.hasOwnProperty("cursor"), tojson(res));
     assert(res.cursor.hasOwnProperty("id"), tojson(res));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
 
     jsTest.log("Test that cursors created in transactions may be kill outside of the session.");
@@ -28,7 +28,7 @@
     res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
     assert(res.hasOwnProperty("cursor"), tojson(res));
     assert(res.cursor.hasOwnProperty("id"), tojson(res));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     assert.commandWorked(testDB.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
 
     session.endSession();

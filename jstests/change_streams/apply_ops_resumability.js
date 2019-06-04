@@ -43,7 +43,7 @@
 
     assert.commandWorked(sessionColl.updateOne({_id: 1}, {$inc: {a: 1}}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Now insert another document, not part of a transaction.
     assert.commandWorked(coll.insert({_id: 3, a: 123}));

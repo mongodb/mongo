@@ -27,7 +27,7 @@
 
     assert.docEq({_id: "insert-1"}, sessionColl.findOne({_id: "insert-1"}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     session.endSession();
 }());

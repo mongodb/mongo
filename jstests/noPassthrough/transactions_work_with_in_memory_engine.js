@@ -33,7 +33,7 @@
     // Execute a transaction that should succeed.
     session.startTransaction();
     assert.commandWorked(sessionDb[collName].insert({x: 1}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     session.endSession();
     replTest.stopSet();

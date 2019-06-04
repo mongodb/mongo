@@ -27,7 +27,7 @@
 
     assert.eq(db.view.find().toArray().length, 1);
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     rst.stopSet();
 })();

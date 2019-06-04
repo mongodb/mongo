@@ -41,7 +41,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq({_id: 'updateMe'}, recipientColl.findOne({_id: 'updateMe'}));
     assert.eq({_id: 'deleteMe'}, recipientColl.findOne({_id: 'deleteMe'}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
     joinMoveChunk();

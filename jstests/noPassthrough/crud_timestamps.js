@@ -40,7 +40,7 @@
                 sessionDb.runCommand({find: collName, sort: sort, singleBatch: true}));
             assert.eq(expected, response.cursor.firstBatch);
         });
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
     }
 
     // insert

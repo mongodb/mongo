@@ -21,7 +21,7 @@
     session.startTransaction();
     assert.writeOK(sessionColl.update({}, {$set: {a: [1, 2, 3]}}));
     assert.eq(1, sessionColl.find({}, {_id: 0, a: 1}).sort({a: 1}).itcount());
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assert.eq(1,
               db.getSiblingDB(dbName)

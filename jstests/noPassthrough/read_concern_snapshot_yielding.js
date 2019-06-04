@@ -206,7 +206,7 @@
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(sessionDb.runCommand({find: "coll", filter: {x: 1}}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         assert.eq(res.cursor.firstBatch.length, TestData.numDocs, tojson(res));
     }, {"command.filter": {x: 1}});
 
@@ -226,7 +226,7 @@
             {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}));
         const res = assert.commandWorked(sessionDb.runCommand(
             {getMore: NumberLong(cursorId), collection: "coll", batchSize: TestData.numDocs}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         assert.eq(
             res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
     }, {"cursor.originatingCommand.filter": {x: 1}});
@@ -238,7 +238,7 @@
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(
             sessionDb.runCommand({aggregate: "coll", pipeline: [{$match: {x: 1}}], cursor: {}}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         assert.eq(res.cursor.firstBatch.length, TestData.numDocs, tojson(res));
     }, {"command.pipeline": [{$match: {x: 1}}]});
 
@@ -259,7 +259,7 @@
             {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}));
         const res = assert.commandWorked(
             sessionDb.runCommand({getMore: NumberLong(cursorId), collection: "coll"}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         assert.eq(
             res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
     }, {"cursor.originatingCommand.filter": {x: 1}});
@@ -270,7 +270,7 @@
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(sessionDb.runCommand({distinct: "coll", key: "_id"}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         assert(res.hasOwnProperty("values"));
         assert.eq(res.values.length, 4, tojson(res));
     }, {"command.distinct": "coll"});
@@ -285,7 +285,7 @@
             updates:
                 [{q: {}, u: {$set: {updated: true}}}, {q: {new: 1}, u: {$set: {updated: true}}}]
         }));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         // Only update one existing doc committed before the transaction.
         assert.eq(res.n, 1, tojson(res));
         assert.eq(res.nModified, 1, tojson(res));
@@ -298,7 +298,7 @@
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(sessionDb.runCommand(
             {delete: "coll", deletes: [{q: {}, limit: 1}, {q: {new: 1}, limit: 1}]}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         // Only remove one existing doc committed before the transaction.
         assert.eq(res.n, 1, tojson(res));
     }, {op: "remove"}, true);
@@ -310,7 +310,7 @@
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(sessionDb.runCommand(
             {findAndModify: "coll", query: {new: 1}, update: {$set: {findAndModify: 1}}}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         assert(res.hasOwnProperty("lastErrorObject"));
         assert.eq(res.lastErrorObject.n, 0, tojson(res));
         assert.eq(res.lastErrorObject.updatedExisting, false, tojson(res));
@@ -322,7 +322,7 @@
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(sessionDb.runCommand(
             {findAndModify: "coll", query: {new: 1}, update: {$set: {findAndModify: 1}}}));
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
         assert(res.hasOwnProperty("lastErrorObject"));
         assert.eq(res.lastErrorObject.n, 0, tojson(res));
         assert.eq(res.lastErrorObject.updatedExisting, false, tojson(res));

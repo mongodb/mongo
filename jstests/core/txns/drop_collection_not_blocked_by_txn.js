@@ -26,7 +26,7 @@
     // This only requires database IX lock.
     assert.commandWorked(db.runCommand({drop: "b"}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     rst.stopSet();
 })();

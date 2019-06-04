@@ -42,7 +42,7 @@
 
         assert.commandWorked(sessionColl.update({_id: 0}, {$set: {x: 1}}));
 
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
 
         // The document should be updated on the local snapshot.
         assert.eq(coll.findOne({_id: 0}), {_id: 0, x: 1});
@@ -67,7 +67,7 @@
         // Within the transaction, we should not see the out-of-transaction update.
         assert.eq(sessionColl.findOne({_id: 1}), {_id: 1});
 
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
 
         // The document should be updated on the local snapshot.
         assert.eq(coll.findOne({_id: 0}), {_id: 0, x: 2});
@@ -108,7 +108,7 @@
         // Update it one more time.
         assert.commandWorked(sessionColl.update({_id: 0}, {$inc: {x: 1}}));
 
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
 
         // The document should be updated on the local snapshot.
         assert.eq(coll.findOne({_id: 0}), {_id: 0, x: 3});

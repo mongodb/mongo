@@ -99,7 +99,7 @@
     // Make sure we read the updated data correctly.
     assert.docEq(sessionColl.find().sort({_id: 1}).toArray(),
                  [{_id: 0, syncSource: 0, inTxn: 1}, {_id: 2}]);
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Make sure data is visible after commit.
     assert.docEq(sessionColl.find().sort({_id: 1}).toArray(),
@@ -110,7 +110,7 @@
     session.startTransaction();
     assert.docEq(sessionColl.find().sort({_id: 1}).toArray(), [{_id: 0}]);
     assert.commandWorked(sessionColl.update({_id: 0}, {$set: {inTxn: 1}}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Make sure data is visible after commit.
     assert.docEq(sessionColl.find().sort({_id: 1}).toArray(), [{_id: 0, inTxn: 1}]);

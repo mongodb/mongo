@@ -62,7 +62,7 @@
     session.startTransaction({writeConcern: {w: "majority"}, readConcern: {level: "snapshot"}});
     assert.commandWorked(sessionDb.coll.insert({}));
     assert.commandWorked(sessionDb.runCommand({find: collName}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // readConcern 'snapshot' is allowed with 'afterClusterTime'.
     session.startTransaction();
@@ -73,7 +73,7 @@
         find: collName,
         readConcern: {level: "snapshot", afterClusterTime: pingRes.$clusterTime.clusterTime}
     }));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // readConcern 'snapshot' is not allowed with 'afterOpTime'.
     session.startTransaction(
@@ -90,7 +90,7 @@
     session.startTransaction(
         {readConcern: {level: "snapshot", afterClusterTime: pingRes.$clusterTime.clusterTime}});
     assert.commandWorked(sessionDb.runCommand({find: collName}));
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     session.endSession();
     rst.stopSet();

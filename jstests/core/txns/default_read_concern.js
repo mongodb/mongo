@@ -41,7 +41,7 @@
     assert.commandWorked(testColl.insert({_id: 2}, {writeConcern: {w: "majority"}}));
     assertSameMembers([{_id: 0}]);
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     assertSameMembers([{_id: 0}, {_id: 1}, {_id: 2}]);
     session.endSession();

@@ -84,7 +84,7 @@
         return true;
     }, () => "Failed to find create collection in currentOp() output: " + tojson(db.currentOp()));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     threadCaptruncCmd.join();
     threadDBHash.join();
 

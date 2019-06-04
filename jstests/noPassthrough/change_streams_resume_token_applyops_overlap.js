@@ -60,7 +60,7 @@
         sessionColl.insert([{shard: 0, _id: "txn1-doc-6"}, {shard: 1, _id: "txn1-doc-7"}]));
 
     // Commit the transaction.
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Read the stream of events, capture them in 'changeList', and confirm that all events occurred
     // at or later than the clusterTime of the first event. Unfortunately, we cannot guarantee that

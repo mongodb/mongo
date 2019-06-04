@@ -54,7 +54,7 @@ var WriteConflictHelpers = (function() {
         assert(!res.hasOwnProperty("writeErrors"));
         assert.commandFailedWithCode(res, ErrorCodes.WriteConflict);
 
-        session1.commitTransaction();
+        assert.commandWorked(session1.commitTransaction_forTesting());
         assert.commandFailedWithCode(session2.commitTransaction_forTesting(),
                                      ErrorCodes.NoSuchTransaction);
     }
@@ -83,7 +83,7 @@ var WriteConflictHelpers = (function() {
 
         assert.commandWorked(session1Coll.runCommand({find: collName}));  // Start T1 with a no-op.
         assert.commandWorked(session2Coll.runCommand(txn2Op));
-        session2.commitTransaction();
+        assert.commandWorked(session2.commitTransaction_forTesting());
 
         const res = session1Coll.runCommand(txn1Op);
         // Not a writeError but a total command failure

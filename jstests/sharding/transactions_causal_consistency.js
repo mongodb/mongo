@@ -65,7 +65,7 @@
                      "sharded transaction with read concern " + tojson(readConcern) +
                          " did not see expected document");
 
-        session.commitTransaction();
+        assert.commandWorked(session.commitTransaction_forTesting());
 
         // Clean up for the next iteration.
         assert.commandWorked(

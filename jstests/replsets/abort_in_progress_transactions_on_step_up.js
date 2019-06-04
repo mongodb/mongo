@@ -134,7 +134,7 @@
     newSession.startTransaction({writeConcern: {w: 3}});
     const secondDoc = {_id: "second-doc"};
     assert.commandWorked(newSession.getDatabase(dbName).getCollection(collName).insert(secondDoc));
-    newSession.commitTransaction();
+    assert.commandWorked(newSession.commitTransaction_forTesting());
     assert.docEq(testDB.getCollection(collName).find().toArray(), [secondDoc]);
     assert.docEq(newTestDB.getCollection(collName).find().toArray(), [secondDoc]);
 

@@ -108,22 +108,22 @@
     primarySession.startTransaction();
     assert.commandWorked(
         primarySessionDb.runCommand({find: collName, $readPreference: {mode: "primary"}}));
-    primarySession.commitTransaction();
+    assert.commandWorked(primarySession.commitTransaction_forTesting());
 
     primarySession.startTransaction();
     assert.commandWorked(
         primarySessionDb.runCommand({find: collName, $readPreference: {mode: "primaryPreferred"}}));
-    primarySession.commitTransaction();
+    assert.commandWorked(primarySession.commitTransaction_forTesting());
 
     primarySession.startTransaction();
     assert.commandWorked(primarySessionDb.runCommand(
         {find: collName, $readPreference: {mode: "secondaryPreferred"}}));
-    primarySession.commitTransaction();
+    assert.commandWorked(primarySession.commitTransaction_forTesting());
 
     primarySession.startTransaction();
     assert.commandWorked(
         primarySessionDb.runCommand({find: collName, $readPreference: {mode: "nearest"}}));
-    primarySession.commitTransaction();
+    assert.commandWorked(primarySession.commitTransaction_forTesting());
 
     primarySession.endSession();
 

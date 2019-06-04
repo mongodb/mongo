@@ -49,7 +49,7 @@
 
     assert.commandWorked(sessionColl.deleteOne({_id: kDeletedDocumentId}));
 
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Do applyOps on the collection that we care about. This is an "external" applyOps, though
     // (not run as part of a transaction) so its entries should be skipped in the change

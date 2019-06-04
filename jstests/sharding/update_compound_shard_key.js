@@ -158,7 +158,7 @@
     // The above upsert works with transactions.
     session.startTransaction();
     assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0}, updateDoc, true, true);
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     assert.eq(1, st.s.getDB(kDbName).coll.find(updateDoc).itcount());
 
     // Full shard key not specified in query.
@@ -259,7 +259,7 @@
     // The above upsert works with transactions.
     session.startTransaction();
     assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0, opStyle: true}, update, true, true);
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     assert.eq(1, st.s.getDB(kDbName).coll.find(update["$set"]).itcount());
 
     // Full shard key not specified in query.
@@ -392,7 +392,7 @@
                                            }
                                         }],
                                         true);
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
     assert.eq(
         1, st.s.getDB(kDbName).coll.find({x: 2111, y: 55, z: 3, pipelineUpdate: true}).itcount());
 

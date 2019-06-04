@@ -50,7 +50,7 @@
     assert.sameMembers(expectedDocs, sessionColl.find().toArray());
 
     jsTestLog("Committing the second transaction.");
-    session2.commitTransaction();
+    assert.commandWorked(session2.commitTransaction_forTesting());
 
     jsTestLog(
         "Committed changes from the second transaction should still not be visible to the first.");
@@ -65,7 +65,7 @@
     assert.sameMembers(expectedDocs, sessionColl.find().toArray());
 
     jsTestLog("Committing first transaction.");
-    session.commitTransaction();
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     // Make sure the correct documents exist after committing the second transaction.
     assert.sameMembers([{_id: 0}, {_id: 1, a: 1}, {_id: 3}, {_id: 4}],
