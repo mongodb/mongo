@@ -58,7 +58,10 @@ bool isLargeKeyDisallowed() {
 KeyString makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey) {
     const auto multikeyMetadataOrd = Ordering::make(BSON("" << 1 << "" << 1));
     const RecordId multikeyMetadataRecordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
-    return {KeyString::kLatestVersion, indexKey, multikeyMetadataOrd, multikeyMetadataRecordId};
+    return {KeyString::Version::kLatestVersion,
+            indexKey,
+            multikeyMetadataOrd,
+            multikeyMetadataRecordId};
 }
 }
 
@@ -124,9 +127,6 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
         }
 
         bool largeKeyDisallowed = isLargeKeyDisallowed();
-
-        // We want to use the latest version of KeyString here.
-        KeyString ks(KeyString::kLatestVersion);
         for (const auto& key : documentKeySet) {
             if (largeKeyDisallowed &&
                 key.objsize() >= static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
@@ -135,8 +135,8 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                 continue;
             }
 
-            ks.resetToKey(key, indexInfo.ord, recordId);
-            _indexConsistency->addDocKey(ks, &indexInfo, recordId, key);
+            indexInfo.ks->resetToKey(key, indexInfo.ord, recordId);
+            _indexConsistency->addDocKey(*indexInfo.ks, &indexInfo, recordId, key);
         }
     }
     return status;
@@ -152,11 +152,11 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
 
     const auto& key = descriptor->keyPattern();
     const Ordering ord = Ordering::make(key);
-    KeyString::Version version = KeyString::kLatestVersion;
     bool isFirstEntry = true;
 
     std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(_opCtx, true);
     // We want to use the latest version of KeyString here.
+    const KeyString::Version version = KeyString::Version::kLatestVersion;
     std::unique_ptr<KeyString> indexKeyString = std::make_unique<KeyString>(version);
     std::unique_ptr<KeyString> prevIndexKeyString = std::make_unique<KeyString>(version);
 

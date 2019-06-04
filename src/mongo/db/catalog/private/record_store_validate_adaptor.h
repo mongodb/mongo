@@ -95,10 +95,10 @@ public:
                                ValidateResults& results);
 
 private:
-    OperationContext* _opCtx;             // Not owned.
-    IndexConsistency* _indexConsistency;  // Not owned.
+    OperationContext* _opCtx;
+    IndexConsistency* _indexConsistency;
     ValidateCmdLevel _level;
-    IndexCatalog* _indexCatalog;             // Not owned.
-    ValidateResultsMap* _indexNsResultsMap;  // Not owned.
+    IndexCatalog* _indexCatalog;
+    ValidateResultsMap* _indexNsResultsMap;
 };
 }  // namespace

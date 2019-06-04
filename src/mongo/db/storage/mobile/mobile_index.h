@@ -136,7 +136,7 @@ protected:
 
     const bool _isUnique;
     const Ordering _ordering;
-    const KeyString::Version _keyStringVersion = KeyString::kLatestVersion;
+    const KeyString::Version _keyStringVersion = KeyString::Version::kLatestVersion;
     const std::string _ident;
     const NamespaceString _collectionNamespace;
     const std::string _indexName;
