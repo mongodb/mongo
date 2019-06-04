@@ -53,7 +53,7 @@ def _get_config_options(expansions_file_data, buildvariant, run_buildvariant):
     base_commit = expansions_file_data["revision"]
     max_revisions = int(expansions_file_data["max_revisions"])
     branch = expansions_file_data["branch_name"]
-    is_patch = expansions_file_data["is_patch"]
+    is_patch = expansions_file_data.get("is_patch", False)
     check_evergreen = is_patch != "true"
     distro = expansions_file_data["distro_id"]
     repeat_tests_min = int(expansions_file_data["repeat_tests_min"])
