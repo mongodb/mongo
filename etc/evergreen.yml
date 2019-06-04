@@ -1424,6 +1424,40 @@ functions:
         cd $target_dir
         tar xzf generate_tasks_config.tgz
 
+  "generate burn in tags":
+    - command: expansions.write
+      params:
+        file: expansions.yml
+    - command: shell.exec
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+          ${activate_virtualenv}
+          PATH=$PATH:$HOME $python buildscripts/burn_in_tags.py --expansion-file ../expansions.yml
+    - command: archive.targz_pack
+      params:
+        target: burn_in_tags_gen.tgz
+        source_dir: src/generated_burn_in_tags_config
+        include:
+          - "*"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: burn_in_tags_gen.tgz
+        remote_file: ${project}/${build_variant}/${revision}/burn_in_tags_gen/burn_in_tags_gen-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: Burn_in_tags Task Config - Execution ${execution}
+    - command: generate.tasks
+      params:
+        files:
+          - src/generated_burn_in_tags_config/burn_in_tags_gen.json
+
   "generate resmoke tasks":
     - command: manifest.load
     - *git_get_project
@@ -5556,6 +5590,22 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 4
 
+- name: burn_in_tags_gen
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "set task expansion macros"
+  - func: "set up virtualenv"
+    vars:
+      pip_dir: ${workdir}/src/etc/pip
+  - func: "generate burn in tags"
+    vars:
+      max_revisions: 25
+      repeat_tests_secs: 600
+      repeat_tests_min: 2
+      repeat_tests_max: 1000
+      base_variants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff
+
 - name: auth_audit_gen
   tags: ["auth", "audit"]
   commands:
@@ -8172,25 +8222,6 @@ buildvariants:
   - name: .jstestfuzz .common !.repl
   - name: sharding_jscore_passthrough
 
-- name: linux-64-required-duroff
-  display_name: "! Linux (No Journal)"
-  run_on:
-  - rhel62-small
-  expansions:
-    <<: *linux-64-required-duroff-expansions
-    burn_in_tests_build_variant: linux-64-duroff
-  tasks:
-  # This build variants exists specifically to test that newly added or modified JavaScript tests
-  # are correctly tagged with "requires_journaling" prior to the changes being pushed. It uses the
-  # task list from the linux-64-duroff build variant to determine the resmoke.py YAML suite
-  # configurations to run the tests under. Do not add more tasks to this list.
-  - name: compile_TG
-    requires:
-    - name: burn_in_tests_gen
-    distros:
-    - rhel62-large
-  - name: burn_in_tests_gen
-
 - name: linux-64-lsm
   stepback: false
   display_name: Linux LSM
@@ -10006,6 +10037,7 @@ buildvariants:
   - name: .aggregation
   - name: audit
   - name: .auth
+  - name: burn_in_tags_gen
   - name: .benchmarks
     distros:
     - centos6-perf
@@ -10330,29 +10362,6 @@ buildvariants:
   - name: .sharding .common
   - name: snmp
   - name: .updatefuzzer
-
-- name: enterprise-rhel-62-64-bit-required-majority-read-concern-off
-  display_name: "! Enterprise RHEL 6.2 (majority read concern off)"
-  modules:
-    - enterprise
-  run_on:
-    - rhel62-small
-  expansions:
-    <<: *enterprise-rhel-62-64-bit-majority-read-concern-off-expansions
-    burn_in_tests_build_variant: enterprise-rhel-62-64-bit-majority-read-concern-off
-  tasks:
-    # This build variants exists specifically to test that newly added or modified JavaScript tests
-    # are correctly tagged with "requires_majority_read_concern", "uses_change_streams",
-    # "uses_prepare_transaction", and "uses_multi_shard_transaction" prior to the changes being
-    # pushed. It uses the task list from the enterprise-rhel-62-64-bit-majority-read-concern-off
-    # build variant to determine the resmoke.py YAML suite configurations to run the tests under. Do
-    # not add more tasks to this list.
-    - name: compile_TG
-      requires:
-        - name: burn_in_tests_gen
-      distros:
-        - rhel62-large
-    - name: burn_in_tests_gen
 
 - name: enterprise-rhel-62-64-bit-coverage
   display_name: "~ Enterprise RHEL 6.2 DEBUG Code Coverage"
@@ -11488,41 +11497,6 @@ buildvariants:
   - name: snmp
   - name: .ssl
   - name: .updatefuzzer
-
-- name: enterprise-rhel-62-64-bit-required-inmem
-  display_name: "! Enterprise RHEL 6.2 (inMemory)"
-  modules:
-  - enterprise
-  run_on:
-  - rhel62-small
-  expansions:
-    <<: *enterprise-rhel-62-64-bit-inmem-expansions
-    burn_in_tests_build_variant: enterprise-rhel-62-64-bit-inmem
-  display_tasks:
-  - *dbtest
-  tasks:
-  # This build variant exists specifically to test that newly added or modified JavaScript tests
-  # properly tag non-persistent storage tests using "requires_persistence", "requires_journaling" or
-  # "uses_transactions".
-  #
-  # It uses the task list from the enterprise-rhel-62-64-bit-inmem build variant to
-  # determine the resmoke.py YAML suite configurations to run the tests under. Do not add more tasks
-  # to this list.
-  #
-  # It also runs dbtest, since at least one time we have broken the
-  # connection bewteen the in-mem storage engine and the dbtest, but
-  # didn't notice since no other required builders tested that
-  # combination.
-  - name: dbtest_TG
-    distros:
-    - rhel62-large
-  - name: compile_TG
-    requires:
-    - name: burn_in_tests_gen
-    distros:
-    - rhel62-large
-  - name: burn_in_tests_gen
-  - name: jsCore
 
 - name: rhel-62-64-bit-mobile
   display_name: RHEL 6.2 (mobile)

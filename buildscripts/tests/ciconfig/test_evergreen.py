@@ -399,6 +399,15 @@ class TestVariant(unittest.TestCase):
         variant_osx = self.conf.get_variant("osx-108")
         self.assertIsNone(variant_osx.batchtime)
 
+    def test_expansion(self):
+        variant_ubuntu = self.conf.get_variant("ubuntu")
+        self.assertEqual("--param=value --ubuntu", variant_ubuntu.expansion("test_flags"))
+        self.assertEqual(None, variant_ubuntu.expansion("not_a_valid_expansion_name"))
+
+    def test_expansions(self):
+        variant_ubuntu = self.conf.get_variant("ubuntu")
+        self.assertEqual({"test_flags": "--param=value --ubuntu"}, variant_ubuntu.expansions)
+
     def test_modules(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
         self.assertEqual(["render-module"], variant_ubuntu.modules)

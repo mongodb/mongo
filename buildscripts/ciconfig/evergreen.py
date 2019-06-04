@@ -307,6 +307,11 @@ class Variant(object):
         return self.raw.get("expansions", {}).get(name)
 
     @property
+    def expansions(self):
+        """Get the expansions."""
+        return self.raw.get("expansions", [])
+
+    @property
     def test_flags(self):
         """Get the value of the test_flags expansion or None if not found."""
         return self.expansion("test_flags")

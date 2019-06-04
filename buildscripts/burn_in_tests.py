@@ -461,12 +461,13 @@ def _get_run_buildvariant(options):
     return options.buildvariant
 
 
-def create_generate_tasks_file(options, tests_by_task):
-    """Create the Evergreen generate.tasks file."""
-
-    evg_config = Configuration()
+def create_generate_tasks_config(evg_config, options, tests_by_task, include_gen_task):
+    """Create the config for the Evergreen generate.tasks file."""
+    # pylint: disable=too-many-locals
     task_specs = []
-    task_names = [BURN_IN_TESTS_GEN_TASK]
+    task_names = []
+    if include_gen_task:
+        task_names.append(BURN_IN_TESTS_GEN_TASK)
     for task in sorted(tests_by_task):
         multiversion_path = tests_by_task[task].get("use_multiversion")
         for test_num, test in enumerate(tests_by_task[task]["tests"]):
@@ -493,7 +494,43 @@ def create_generate_tasks_file(options, tests_by_task):
 
     display_task = DisplayTaskDefinition(BURN_IN_TESTS_TASK).execution_tasks(task_names)
     evg_config.variant(_get_run_buildvariant(options)).tasks(task_specs).display_task(display_task)
+    return evg_config
 
+
+def create_tests_by_task(options):
+    """
+    Create a list of tests by task.
+
+    :param options: Options.
+    :return: Tests by task
+    """
+    # Parse the Evergreen project configuration file.
+    evergreen_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
+
+    changed_tests = find_changed_tests(options.branch, options.base_commit, options.max_revisions,
+                                       options.buildvariant, options.check_evergreen)
+    exclude_suites, exclude_tasks, exclude_tests = find_excludes(SELECTOR_FILE)
+    changed_tests = filter_tests(changed_tests, exclude_tests)
+
+    if changed_tests:
+        suites = resmokelib.suitesconfig.get_suites(suite_files=SUITE_FILES,
+                                                    test_files=changed_tests)
+        tests_by_executor = create_executor_list(suites, exclude_suites)
+        tests_by_task = create_task_list(evergreen_conf, options.buildvariant, tests_by_executor,
+                                         exclude_tasks)
+    else:
+        print("No new or modified tests found.")
+        tests_by_task = {}
+
+    return tests_by_task
+
+
+def create_generate_tasks_file(options, tests_by_task):
+    """Create the Evergreen generate.tasks file."""
+
+    evg_config = Configuration()
+    evg_config = create_generate_tasks_config(evg_config, options, tests_by_task,
+                                              include_gen_task=True)
     _write_json_file(evg_config.to_map(), options.generate_tasks_file)
 
 
@@ -542,24 +579,7 @@ def main():
 
     # Run the executor finder.
     else:
-        # Parse the Evergreen project configuration file.
-        evergreen_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
-
-        changed_tests = find_changed_tests(options.branch, options.base_commit,
-                                           options.max_revisions, options.buildvariant,
-                                           options.check_evergreen)
-        exclude_suites, exclude_tasks, exclude_tests = find_excludes(SELECTOR_FILE)
-        changed_tests = filter_tests(changed_tests, exclude_tests)
-
-        if changed_tests:
-            suites = resmokelib.suitesconfig.get_suites(suite_files=SUITE_FILES,
-                                                        test_files=changed_tests)
-            tests_by_executor = create_executor_list(suites, exclude_suites)
-            tests_by_task = create_task_list(evergreen_conf, options.buildvariant,
-                                             tests_by_executor, exclude_tasks)
-        else:
-            print("No new or modified tests found.")
-            tests_by_task = {}
+        tests_by_task = create_tests_by_task(options)
 
         if options.test_list_outfile:
             _write_json_file(tests_by_task, options.test_list_outfile)
