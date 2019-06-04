@@ -117,7 +117,31 @@ Status BalancerConfiguration::setBalancerMode(OperationContext* opCtx,
     }
 
     if (!updateStatus.isOK() && (getBalancerMode() != mode)) {
-        return updateStatus.getStatus().withContext("Failed to update balancer configuration");
+        return updateStatus.getStatus().withContext(str::stream()
+                                                    << "Failed to set the balancer mode to "
+                                                    << BalancerSettingsType::kBalancerModes[mode]);
+    }
+
+    return Status::OK();
+}
+
+Status BalancerConfiguration::enableAutoSplit(OperationContext* opCtx, bool enable) {
+    auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+        opCtx,
+        kSettingsNamespace,
+        BSON("_id" << AutoSplitSettingsType::kKey),
+        BSON("$set" << BSON(kEnabled << enable)),
+        true,
+        ShardingCatalogClient::kMajorityWriteConcern);
+
+    Status refreshStatus = refreshAndCheck(opCtx);
+    if (!refreshStatus.isOK()) {
+        return refreshStatus;
+    }
+
+    if (!updateStatus.isOK() && (getShouldAutoSplit() != enable)) {
+        return updateStatus.getStatus().withContext(
+            str::stream() << "Failed to " << (enable ? "enable" : "disable") << " auto split");
     }
 
     return Status::OK();

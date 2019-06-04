@@ -29,6 +29,21 @@
 
     s.startBalancer();
 
+    let confirmBalancerSettings = function(expectedBalancerOn, expectedAutoSplitOn) {
+        let configSettings = s.s.getDB('config').settings;
+
+        let balancerSettings = configSettings.findOne({_id: 'balancer'});
+        assert.neq(null, balancerSettings);
+        assert.eq(expectedBalancerOn, !balancerSettings.stopped);
+        assert.eq(expectedBalancerOn, balancerSettings.mode == 'full');
+
+        let autoSplitSettings = configSettings.findOne({_id: 'autosplit'});
+        assert.neq(null, autoSplitSettings);
+        assert.eq(expectedAutoSplitOn, autoSplitSettings.enabled);
+    };
+
+    confirmBalancerSettings(true, true);
+
     assert.eq(i, j * 100, "setup");
 
     // Until SERVER-9715 is fixed, the sync command must be run on a diff connection
@@ -122,6 +137,8 @@
 
     // Stop the balancer, otherwise it may grab some connections from the pool for itself
     s.stopBalancer();
+
+    confirmBalancerSettings(false, false);
 
     print("checkpoint E");
 

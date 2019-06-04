@@ -217,8 +217,12 @@ var ShardingTest = function(params) {
         if (!otherParams.enableBalancer) {
             self.stopBalancer();
         }
+
         if (!otherParams.enableAutoSplit) {
             self.disableAutoSplit();
+        } else if (!otherParams.enableBalancer) {
+            // Turn on autoSplit since disabling balancer also turns auto split off.
+            self.enableAutoSplit();
         }
     }
 
@@ -1564,6 +1568,8 @@ var ShardingTest = function(params) {
     // the instances and then log them out again.
     if (keyFile) {
         authutil.asCluster(this._mongos, keyFile, _configureCluster);
+    } else if (mongosOptions[0] && mongosOptions[0].keyFile) {
+        authutil.asCluster(this._mongos, mongosOptions[0].keyFile, _configureCluster);
     } else {
         _configureCluster();
     }

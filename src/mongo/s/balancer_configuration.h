@@ -242,6 +242,11 @@ public:
         return _maxChunkSizeBytes.loadRelaxed();
     }
 
+    /**
+     * Change the cluster wide auto split settings.
+     */
+    Status enableAutoSplit(OperationContext* opCtx, bool enable);
+
     bool getShouldAutoSplit() const {
         return _shouldAutoSplit.loadRelaxed();
     }
