@@ -432,6 +432,12 @@ void DBConnectionPool::release(const string& host, DBClientBase* c) {
     p.notifyWaiters();
 }
 
+void DBConnectionPool::decrementEgress(const string& host, DBClientBase* c) {
+    stdx::lock_guard L(_mutex);
+    PoolForHost& p = _pools[PoolKey(host, c->getSoTimeout())];
+    --p._checkedOut;
+}
+
 DBConnectionPool::~DBConnectionPool() {
     // Do not log in destruction, because global connection pools get
     // destroyed after the logging framework.
@@ -636,6 +642,12 @@ void ScopedDbConnection::done() {
     }
 
     globalConnPool.release(_host, _conn);
+    _conn = NULL;
+}
+
+void ScopedDbConnection::kill() {
+    globalConnPool.decrementEgress(_host, _conn);
+    delete _conn;
     _conn = NULL;
 }
 

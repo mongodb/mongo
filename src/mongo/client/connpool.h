@@ -332,6 +332,7 @@ public:
     int getNumBadConns(const std::string& host, double socketTimeout = 0) const;
 
     void release(const std::string& host, DBClientBase* c);
+    void decrementEgress(const std::string& host, DBClientBase* c);
 
     void addHook(DBConnectionHook* hook);  // we take ownership
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const;
@@ -497,10 +498,7 @@ public:
     /** Force closure of the connection.  You should call this if you leave it in
         a bad state.  Destructor will do this too, but it is verbose.
     */
-    void kill() {
-        delete _conn;
-        _conn = 0;
-    }
+    void kill();
 
     /** Call this when you are done with the connection.
 
