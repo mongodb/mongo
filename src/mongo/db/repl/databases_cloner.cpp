@@ -330,10 +330,6 @@ void DatabasesCloner::_onListDatabaseFinish(
                 LOG(1) << "Skipping 'system' collection: " << ns.ns();
                 return false;
             }
-            if (!ns.isNormal()) {
-                LOG(1) << "Skipping non-normal collection: " << ns.ns();
-                return false;
-            }
 
             LOG(2) << "Allowing cloning of collectionInfo: " << collInfo;
             return true;

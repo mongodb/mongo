@@ -99,11 +99,6 @@ public:
             return false;
         }
 
-        if (!nss.isNormal()) {
-            errmsg = "bad namespace name";
-            return false;
-        }
-
         if (nss.isSystem()) {
             // Items in system.* cannot be moved as there might be pointers to them.
             errmsg = "can't compact a system namespace";

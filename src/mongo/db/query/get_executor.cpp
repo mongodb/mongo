@@ -846,10 +846,6 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
         if (nss.isSystem() && opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
             uassert(12050, "cannot delete from system namespace", nss.isLegalClientSystemNS());
         }
-        if (nss.isVirtualized()) {
-            log() << "cannot delete from a virtual collection: " << nss;
-            uasserted(10100, "cannot delete from a virtual collection");
-        }
     }
 
     if (collection && collection->isCapped()) {
@@ -982,10 +978,6 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
         uassert(10156,
                 str::stream() << "cannot update a system namespace: " << nss.ns(),
                 nss.isLegalClientSystemNS());
-    }
-    if (nss.isVirtualized()) {
-        log() << "cannot update a virtual collection: " << nss;
-        uasserted(10155, "cannot update a virtual collection");
     }
 
     // If there is no collection and this is an upsert, callers are supposed to create

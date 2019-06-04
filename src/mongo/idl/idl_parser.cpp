@@ -252,9 +252,6 @@ NamespaceStringOrUUID IDLParserErrorContext::parseNsOrUUID(StringData dbname,
     } else {
         // Ensure collection identifier is not a Command
         const NamespaceString nss(parseNSCollectionRequired(dbname, element));
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid collection name specified '" << nss.ns() << "'",
-                nss.isNormal());
         return nss;
     }
 }

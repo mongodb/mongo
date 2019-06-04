@@ -86,10 +86,6 @@ public:
                            std::string& errmsg,
                            BSONObjBuilder& result) {
         const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
-        if (!nss.isNormal()) {
-            errmsg = "bad namespace name";
-            return false;
-        }
 
         bool touch_indexes(cmdObj["index"].trueValue());
         bool touch_data(cmdObj["data"].trueValue());

@@ -257,8 +257,8 @@ NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(StringData dbname, const BSO
         // Ensure collection identifier is not a Command
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid collection name specified '" << nss.ns() << "'",
-                nss.isNormal());
+                str::stream() << "Invalid collection name specified '" << nss.ns(),
+                !(nss.ns().find('$') != std::string::npos && nss.ns() != "local.oplog.$main"));
         return nss;
     }
 }

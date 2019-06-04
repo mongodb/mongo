@@ -36,20 +36,6 @@
 namespace mongo {
 namespace {
 
-TEST(NamespaceStringTest, Normal) {
-    ASSERT(NamespaceString::normal("a"));
-    ASSERT(NamespaceString::normal("a.b"));
-    ASSERT(NamespaceString::normal("a.b.c"));
-
-    ASSERT(!NamespaceString::normal("a.b.$c"));
-    ASSERT(!NamespaceString::normal("a.b.$.c"));
-    ASSERT(!NamespaceString::normal("a.b$.c"));
-    ASSERT(!NamespaceString::normal("a$.b.c"));
-
-    ASSERT(NamespaceString::normal("local.oplog.$main"));
-    ASSERT(NamespaceString::normal("local.oplog.rs"));
-}
-
 TEST(NamespaceStringTest, Oplog) {
     ASSERT(!NamespaceString::oplog("a"));
     ASSERT(!NamespaceString::oplog("a.b"));
@@ -58,28 +44,6 @@ TEST(NamespaceStringTest, Oplog) {
     ASSERT(NamespaceString::oplog("local.oplog.foo"));
     ASSERT(NamespaceString::oplog("local.oplog.$main"));
     ASSERT(NamespaceString::oplog("local.oplog.$foo"));
-}
-
-TEST(NamespaceStringTest, Special) {
-    ASSERT(NamespaceString::special("a.$.b"));
-    ASSERT(NamespaceString::special("a.system.foo"));
-    ASSERT(!NamespaceString::special("a.foo"));
-    ASSERT(!NamespaceString::special("a.foo.system.bar"));
-    ASSERT(!NamespaceString::special("a.systemfoo"));
-}
-
-TEST(NamespaceStringTest, Virtualized) {
-    ASSERT(!NamespaceString::virtualized("a"));
-    ASSERT(!NamespaceString::virtualized("a.b"));
-    ASSERT(!NamespaceString::virtualized("a.b.c"));
-
-    ASSERT(NamespaceString::virtualized("a.b.$c"));
-    ASSERT(NamespaceString::virtualized("a.b.$.c"));
-    ASSERT(NamespaceString::virtualized("a.b$.c"));
-    ASSERT(NamespaceString::virtualized("a$.b.c"));
-
-    ASSERT(!NamespaceString::virtualized("local.oplog.$main"));
-    ASSERT(!NamespaceString::virtualized("local.oplog.rs"));
 }
 
 TEST(NamespaceStringTest, DatabaseValidNames) {
@@ -133,10 +97,6 @@ TEST(NamespaceStringTest, DatabaseValidNames) {
         "ThisIsADatabaseNameThatBrokeAllRecordsForValidLengthForDBName63"));
     ASSERT(!NamespaceString::validDBName(
         "WhileThisDatabaseNameExceedsTheMaximumLengthForDatabaseNamesof63"));
-
-    ASSERT(NamespaceString::normal("asdads"));
-    ASSERT(!NamespaceString::normal("asda$ds"));
-    ASSERT(NamespaceString::normal("local.oplog.$main"));
 }
 
 TEST(NamespaceStringTest, ListCollectionsCursorNS) {

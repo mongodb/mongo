@@ -258,8 +258,8 @@ bool CollectionImpl::isInitialized() const {
 }
 
 bool CollectionImpl::requiresIdIndex() const {
-    if (_ns.isVirtualized() || _ns.isOplog()) {
-        // No indexes on virtual collections or the oplog.
+    if (_ns.isOplog()) {
+        // No indexes on the oplog.
         return false;
     }
 

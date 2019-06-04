@@ -558,10 +558,6 @@ StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
                 continue;
             }
         }
-        if (!ns.isNormal()) {
-            LOG(2) << "\t\t not cloning because has $ ";
-            continue;
-        }
 
         finalCollections.push_back(collection.getOwned());
     }

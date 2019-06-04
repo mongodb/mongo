@@ -199,36 +199,12 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsObjectWithEmptyCollectionNam
 
 TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsNotAValidUserCollection) {
     auto spec = BSON("$merge"
-                     << "$test");
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51180);
-
-    spec = BSON("$merge"
-                << "system.views");
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51180);
-
-    spec = BSON("$merge"
-                << ".test.");
+                     << ".test.");
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::InvalidNamespace);
-
-    spec = BSON("$merge" << BSON("into"
-                                 << "$test"));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51180);
-
-    spec = BSON("$merge" << BSON("into"
-                                 << "system.views"));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51180);
 
     spec = BSON("$merge" << BSON("into"
                                  << ".test."));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::InvalidNamespace);
-
-    spec = BSON("$merge" << BSON("into" << BSON("coll"
-                                                << "$test")));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51180);
-
-    spec = BSON("$merge" << BSON("into" << BSON("coll"
-                                                << "system.views")));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51180);
 
     spec = BSON("$merge" << BSON("into" << BSON("coll"
                                                 << ".test.")));
@@ -281,13 +257,7 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfDbIsNotAValidDatabaseName) {
     auto spec = BSON("$merge" << BSON("into" << BSON("coll"
                                                      << "target_collection"
                                                      << "db"
-                                                     << "$invalid")));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51180);
-
-    spec = BSON("$merge" << BSON("into" << BSON("coll"
-                                                << "target_collection"
-                                                << "db"
-                                                << ".test")));
+                                                     << ".test")));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::InvalidNamespace);
 }
 

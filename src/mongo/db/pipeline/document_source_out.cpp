@@ -197,7 +197,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
 
     uassert(17385,
             "Can't {} to special collection: {}"_format(kStageName, outputNs.coll()),
-            !outputNs.isSpecial());
+            !outputNs.isSystem());
 
     return new DocumentSourceOut(std::move(outputNs), expCtx);
 }

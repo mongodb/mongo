@@ -227,9 +227,6 @@ public:
     bool isOplog() const {
         return oplog(_ns);
     }
-    bool isSpecial() const {
-        return special(_ns);
-    }
     bool isOnInternalDb() const {
         if (db() == kAdminDb)
             return true;
@@ -239,19 +236,9 @@ public:
             return true;
         return false;
     }
-    bool isNormal() const {
-        return normal(_ns);
-    }
+
     bool isOrphanCollection() const {
         return db() == kOrphanCollectionDb && coll().startsWith(kOrphanCollectionPrefix);
-    }
-
-    /**
-     * Returns whether the NamespaceString references a special collection that cannot be used for
-     * generic data storage.
-     */
-    bool isVirtualized() const {
-        return virtualized(_ns);
     }
 
     /**
@@ -316,29 +303,10 @@ public:
     }
 
     /**
-     * @return true if ns is 'normal'.  A "$" is used for namespaces holding index data,
-     * which do not contain BSON objects in their records. ("oplog.$main" is the exception)
-     */
-    static bool normal(StringData ns) {
-        return !virtualized(ns);
-    }
-
-    /**
      * @return true if the ns is an oplog one, otherwise false.
      */
     static bool oplog(StringData ns) {
         return ns.startsWith("local.oplog.");
-    }
-
-    static bool special(StringData ns) {
-        return !normal(ns) || ns.substr(ns.find('.')).startsWith(".system.");
-    }
-
-    /**
-     * Check if `ns` references a special collection that cannot be used for generic data storage.
-     */
-    static bool virtualized(StringData ns) {
-        return ns.find('$') != std::string::npos && ns != "local.oplog.$main";
     }
 
     /**

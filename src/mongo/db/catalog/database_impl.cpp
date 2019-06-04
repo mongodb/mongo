@@ -98,12 +98,6 @@ Status validateDBNameForWindows(StringData dbname) {
 }
 }  // namespace
 
-void uassertNamespaceNotIndex(StringData ns, StringData caller) {
-    uassert(17320,
-            str::stream() << "cannot do " << caller << " on namespace with a $ in it: " << ns,
-            NamespaceString::normal(ns));
-}
-
 Status DatabaseImpl::validateDBName(StringData dbname) {
     if (dbname.size() <= 0)
         return Status(ErrorCodes::BadValue, "db name is empty");
@@ -365,8 +359,6 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     auto uuid = collection->uuid();
     auto uuidString = uuid ? uuid.get().toString() : "no UUID";
 
-    uassertNamespaceNotIndex(nss.toString(), "dropCollection");
-
     // Make sure no indexes builds are in progress.
     // Use massert() to be consistent with IndexCatalog::dropAllIndexes().
     auto numIndexesInProgress = collection->getIndexCatalog()->numIndexesInProgress(opCtx);
@@ -565,14 +557,15 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
     massert(17399,
             str::stream() << "Cannot create collection " << nss << " - collection already exists.",
             getCollection(opCtx, nss) == nullptr);
-    uassertNamespaceNotIndex(nss.ns(), "createCollection");
 
     uassert(14037,
             "can't create user databases on a --configsvr instance",
             serverGlobalParams.clusterRole != ClusterRole::ConfigServer || nss.isOnInternalDb());
+
     uassert(17316,
             str::stream() << "cannot create a collection with an empty name on db: " << nss.db(),
             !nss.coll().empty());
+
     uassert(28838, "cannot create a non-capped oplog collection", options.capped || !nss.isOplog());
     uassert(ErrorCodes::DatabaseDropPending,
             str::stream() << "Cannot create collection " << nss

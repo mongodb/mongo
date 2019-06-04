@@ -115,11 +115,6 @@ public:
             result.append("note", deprecationWarning);
         }
 
-        if (!nss.isNormal() && full) {
-            uasserted(ErrorCodes::CommandFailed,
-                      "Can only run full validate on a regular collection");
-        }
-
         if (!serverGlobalParams.quiet.load()) {
             LOG(0) << "CMD: validate " << nss.ns();
         }

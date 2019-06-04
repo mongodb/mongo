@@ -83,11 +83,6 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
                       str::stream() << "Cannot truncate a system collection: " << collectionName);
     }
 
-    if (collectionName.isVirtualized()) {
-        return Status(ErrorCodes::IllegalOperation,
-                      str::stream() << "Cannot truncate a virtual collection: " << collectionName);
-    }
-
     if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
          repl::ReplicationCoordinator::modeNone) &&
         collectionName.isOplog()) {

@@ -233,11 +233,6 @@ public:
                            BSONObjBuilder& result) {
         const NamespaceString nsToDrop(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
-        if (nsToDrop.isVirtualized()) {
-            errmsg = "can't drop a virtual collection";
-            return false;
-        }
-
         if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone) &&
             nsToDrop.isOplog()) {
