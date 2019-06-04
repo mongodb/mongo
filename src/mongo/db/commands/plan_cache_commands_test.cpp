@@ -63,7 +63,7 @@ static const NamespaceString nss("test.collection");
  */
 std::vector<BSONObj> getShapes(const PlanCache& planCache) {
     BSONObjBuilder bob;
-    ASSERT_OK(PlanCacheListQueryShapes::list(planCache, &bob));
+    ASSERT_OK(PlanCacheListQueryShapesDeprecated::list(planCache, &bob));
     BSONObj resultObj = bob.obj();
     BSONElement shapesElt = resultObj.getField("shapes");
     ASSERT_EQUALS(shapesElt.type(), mongo::Array);
@@ -499,7 +499,7 @@ BSONObj getCmdResult(const PlanCache& planCache,
         cmdObjBuilder.append("collation", collation);
     }
     BSONObj cmdObj = cmdObjBuilder.obj();
-    ASSERT_OK(PlanCacheListPlans::list(opCtx.get(), planCache, nss.ns(), cmdObj, &bob));
+    ASSERT_OK(PlanCacheListPlansDeprecated::list(opCtx.get(), planCache, nss.ns(), cmdObj, &bob));
     BSONObj resultObj = bob.obj();
 
     return resultObj;
@@ -532,11 +532,12 @@ TEST(PlanCacheCommandsTest, planCacheListPlansInvalidParameter) {
     OperationContextNoop opCtx;
 
     // Missing query field is not ok.
-    ASSERT_NOT_OK(PlanCacheListPlans::list(&opCtx, planCache, nss.ns(), BSONObj(), &ignored));
+    ASSERT_NOT_OK(
+        PlanCacheListPlansDeprecated::list(&opCtx, planCache, nss.ns(), BSONObj(), &ignored));
     // Query field type must be BSON object.
-    ASSERT_NOT_OK(PlanCacheListPlans::list(
+    ASSERT_NOT_OK(PlanCacheListPlansDeprecated::list(
         &opCtx, planCache, nss.ns(), fromjson("{query: 12345}"), &ignored));
-    ASSERT_NOT_OK(PlanCacheListPlans::list(
+    ASSERT_NOT_OK(PlanCacheListPlansDeprecated::list(
         &opCtx, planCache, nss.ns(), fromjson("{query: /keyisnotregex/}"), &ignored));
 }
 
@@ -546,7 +547,7 @@ TEST(PlanCacheCommandsTest, planCacheListPlansUnknownKey) {
     OperationContextNoop opCtx;
 
     BSONObjBuilder ignored;
-    ASSERT_OK(PlanCacheListPlans::list(
+    ASSERT_OK(PlanCacheListPlansDeprecated::list(
         &opCtx, planCache, nss.ns(), fromjson("{query: {a: 1}}"), &ignored));
 }
 

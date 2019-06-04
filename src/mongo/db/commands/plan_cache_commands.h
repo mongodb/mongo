@@ -31,6 +31,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 
@@ -101,24 +102,29 @@ private:
 };
 
 /**
+ * DEPRECATED. Clients should prefer the $planCacheStats aggregation metadata source.
+ *
  * planCacheListQueryShapes
  *
  * { planCacheListQueryShapes: <collection> }
  *
  */
-class PlanCacheListQueryShapes : public PlanCacheCommand {
+class PlanCacheListQueryShapesDeprecated : public PlanCacheCommand {
 public:
-    PlanCacheListQueryShapes();
+    PlanCacheListQueryShapesDeprecated();
     virtual Status runPlanCacheCommand(OperationContext* opCtx,
                                        const std::string& ns,
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder* bob);
 
     /**
-     * Looks up cache keys for collection's plan cache.
-     * Inserts keys for query into BSON builder.
+     * Looks up cache keys for collection's plan cache.  Inserts keys for query into BSON builder.
      */
     static Status list(const PlanCache& planCache, BSONObjBuilder* bob);
+
+private:
+    // Used to log occasional deprecation warnings when this command is invoked.
+    Rarely _sampler;
 };
 
 /**
@@ -151,6 +157,8 @@ public:
 };
 
 /**
+ * DEPRECATED. Clients should prefer the $planCacheStats aggregation metadata source.
+ *
  * planCacheListPlans
  *
  * {
@@ -161,9 +169,9 @@ public:
  * }
  *
  */
-class PlanCacheListPlans : public PlanCacheCommand {
+class PlanCacheListPlansDeprecated : public PlanCacheCommand {
 public:
-    PlanCacheListPlans();
+    PlanCacheListPlansDeprecated();
     virtual Status runPlanCacheCommand(OperationContext* opCtx,
                                        const std::string& ns,
                                        const BSONObj& cmdObj,
@@ -177,6 +185,10 @@ public:
                        const std::string& ns,
                        const BSONObj& cmdObj,
                        BSONObjBuilder* bob);
+
+private:
+    // Used to log occasional deprecation warnings when this command is invoked.
+    Rarely _sampler;
 };
 
 }  // namespace mongo
