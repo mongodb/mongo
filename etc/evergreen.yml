@@ -6053,13 +6053,13 @@ tasks:
       resmoke_args: --suites=core_txns --storageEngine=wiredTiger
 
 - <<: *task_template
-  name: jsCore_txns_multi_oplog_entries
+  name: jsCore_txns_large_txns_format
   tags: ["jscore", "txns"]
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core_txns_multi_oplog_entries --storageEngine=wiredTiger
+      resmoke_args: --suites=core_txns_large_txns_format --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharded_jscore_txns
@@ -6146,7 +6146,7 @@ tasks:
       fallback_num_sub_suites: 1
 
 - <<: *task_template
-  name: replica_sets_multi_oplog_txns_jscore_passthrough
+  name: replica_sets_large_txns_format_jscore_passthrough
   tags: ["replica_sets", "multi_oplog", "large", "non_maj_read", "san"]
   depends_on:
   - name: jsCore
@@ -6154,7 +6154,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=replica_sets_multi_oplog_txns_jscore_passthrough --storageEngine=wiredTiger
+      resmoke_args: --suites=replica_sets_large_txns_format_jscore_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_jscore_passthrough
@@ -6774,7 +6774,7 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
 
-- name: replica_sets_multi_oplog_txns_gen
+- name: replica_sets_large_txns_format_gen
   tags: ["replica_sets", "multi_oplog", "san"]
   commands:
   - func: "generate resmoke tasks"
@@ -8179,7 +8179,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: .integration !.audit
   - name: .jscore .common
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache
   - name: .multi_shard
@@ -9124,7 +9124,7 @@ buildvariants:
     distros:
     - windows-64-vs2017-compile
   - name: .jscore .common !.auth !.sharding
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache .one_sec
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
@@ -9187,7 +9187,7 @@ buildvariants:
   - name: .jscore .common !.compat !.sharding
   - name: jsCore_auth
   - name: jsCore_ese
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
@@ -9496,10 +9496,10 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: .jscore .common !.auth !.sharding
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: mongosTest
   - name: replica_sets
-  - name: replica_sets_multi_oplog_txns_gen
+  - name: replica_sets_large_txns_format_gen
   - name: .ssl
   - name: .stitch
   - name: tool
@@ -10084,7 +10084,7 @@ buildvariants:
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .jstestfuzz
   - name: .logical_session_cache
@@ -10124,8 +10124,8 @@ buildvariants:
     - ubuntu1604-packer
   - name: .publish
 
-- name: enterprise-rhel-62-64-bit-multi-txn-oplog-entries
-  display_name: "Enterprise RHEL 6.2 (Multiple oplog entries transaction format)"
+- name: enterprise-rhel-62-64-bit-large-txns-format
+  display_name: "Enterprise RHEL 6.2 (large transactions format)"
   modules:
   - enterprise
   run_on:
@@ -10361,7 +10361,7 @@ buildvariants:
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .jstestfuzz !.flow_control
   - name: .logical_session_cache
@@ -10430,7 +10430,7 @@ buildvariants:
     - name: initial_sync_fuzzer_gen
     - name: .integration !.audit
     - name: .jscore .common
-    - name: jsCore_txns_multi_oplog_entries
+    - name: jsCore_txns_large_txns_format
     - name: jsCore_minimum_batch_size
     - name: jsCore_op_query
     - name: .logical_session_cache .one_sec
@@ -10493,7 +10493,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: .jscore .common !.compat !.decimal !.sharding
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
@@ -10563,7 +10563,7 @@ buildvariants:
   - name: jsCore
   - name: .read_write_concern !.write !.aggregation
   - name: replica_sets_jscore_passthrough
-  - name: replica_sets_multi_oplog_txns_jscore_passthrough
+  - name: replica_sets_large_txns_format_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharding_gen
   - name: sharding_auth_gen
@@ -11500,7 +11500,7 @@ buildvariants:
     - rhel62-large
   - name: .jscore .common !.decimal
   - name: jsCore_op_query
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz !.initsync
   - name: .logical_session_cache
   - name: .multi_shard .common
@@ -11887,14 +11887,14 @@ buildvariants:
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache
   - name: .multi_shard .common
   - name: multiversion
   - name: .read_write_concern
-  - name: replica_sets_multi_oplog_txns_gen
-  - name: replica_sets_multi_oplog_txns_jscore_passthrough
+  - name: replica_sets_large_txns_format_gen
+  - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog
   - name: .retry
   - name: .read_only
@@ -11976,14 +11976,14 @@ buildvariants:
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache .one_sec
   - name: .multi_shard .common
   - name: multiversion
   - name: .read_write_concern
-  - name: replica_sets_multi_oplog_txns_gen
-  - name: replica_sets_multi_oplog_txns_jscore_passthrough
+  - name: replica_sets_large_txns_format_gen
+  - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog
   - name: .retry
   - name: .rollbackfuzzer
@@ -12023,7 +12023,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: jsCore
   - name: jsCore_txns
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: .logical_session_cache .one_sec
   - name: watchdog_wiredtiger
 
@@ -12068,7 +12068,7 @@ buildvariants:
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: .logical_session_cache .one_sec
   - name: multiversion
   - name: .read_write_concern

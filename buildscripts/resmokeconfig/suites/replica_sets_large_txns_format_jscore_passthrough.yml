@@ -1,5 +1,5 @@
 # This test suite is intended to exercise the primary and secondary behavior for transactions
-# using the multiple oplog entries format.
+# with the maximum number of transaction operations in a single oplog entry set to 1.
 
 test_kind: js_test
 
@@ -41,4 +41,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        maxNumberOfTransactionOperationsInSingleOplogEntry: 1
     num_nodes: 2
