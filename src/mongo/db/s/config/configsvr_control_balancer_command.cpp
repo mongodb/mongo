@@ -102,8 +102,9 @@ public:
 
 private:
     void _run(OperationContext* opCtx, BSONObjBuilder* result) override {
-        uassertStatusOK(Grid::get(opCtx)->getBalancerConfiguration()->setBalancerMode(
-            opCtx, BalancerSettingsType::kFull));
+        auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+        uassertStatusOK(balancerConfig->setBalancerMode(opCtx, BalancerSettingsType::kFull));
+        uassertStatusOK(balancerConfig->enableAutoSplit(opCtx, true));
         Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged();
     }
 };
@@ -119,8 +120,10 @@ private:
         repl::ReadConcernArgs::get(opCtx) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-        uassertStatusOK(Grid::get(opCtx)->getBalancerConfiguration()->setBalancerMode(
-            opCtx, BalancerSettingsType::kOff));
+        auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+        uassertStatusOK(balancerConfig->setBalancerMode(opCtx, BalancerSettingsType::kOff));
+        uassertStatusOK(balancerConfig->enableAutoSplit(opCtx, false));
+
         Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged();
         Balancer::get(opCtx)->joinCurrentRound(opCtx);
     }
