@@ -153,19 +153,6 @@ bool MultiIndexBlock::areHybridIndexBuildsEnabled() {
         return false;
     }
 
-    // Hybrid index builds must only be used when in FCV 4.2. This restriction is due to the case
-    // where an index build starts in FCV 4.0, then continues during an upgrade to FCV 4.2. Because
-    // prepared transactions yield locks on secondaries, hybrid index builds may miss prepared, but
-    // uncommitted writes, leading to data corruption. With two-phase index builds, an FCV 4.2-only
-    // feature, the hybrid build will not complete until the primary writes an oplog entry
-    // indicating the index build can finish, implying that there are no uncommitted prepared
-    // transactions.
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
-        serverGlobalParams.featureCompatibility.getVersion() !=
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
-        return false;
-    }
-
     return enableHybridIndexBuilds.load();
 }
 
