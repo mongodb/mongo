@@ -143,17 +143,22 @@ bool AbstractIndexAccessMethod::ignoreKeyTooLong() {
 
 // TODO SERVER-36385: Remove this when there is no KeyTooLong error.
 bool AbstractIndexAccessMethod::shouldCheckIndexKeySize(OperationContext* opCtx) {
-    // Don't check index key size if we cannot write to the collection. That indicates we are a
-    // secondary node and we should accept any index key.
-    const auto shouldRelaxConstraints =
-        repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx,
-                                                                              _btreeState->ns());
+    // The index key size ought to be checked for nodes in FCV 4.0.  However, it is possible for an
+    // index build to have begun on a secondary while in FCV 4.2 and then have FCV drop to 4.0.  For
+    // those builds, we should NOT check the index key length; instead of crashing, we are going to
+    // allow them.
 
-    // Don't check index key size if FCV hasn't been initialized.
-    return !shouldRelaxConstraints &&
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+    // The check for RSTL confirms that we are a primary, or a secondary that started a build while
+    // in FCV 4.0.  In FCV 4.2, secondary index builds unlock the RSTL, and thus are not allowed to
+    // call shouldRelaxIndexConstraints(), since that function checks replication state and that is
+    // not allowed unless you hold the RSTL.
+    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.getVersion() ==
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40;
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40 &&
+        opCtx->lockState()->isRSTLLocked() &&
+        !repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx,
+                                                                               _btreeState->ns());
+    ;
 }
 
 bool AbstractIndexAccessMethod::isFatalError(OperationContext* opCtx, Status status, BSONObj key) {
@@ -656,6 +661,8 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
     auto builder = std::unique_ptr<SortedDataBuilderInterface>(
         _newInterface->getBulkBuilder(opCtx, dupsAllowed));
 
+    // We need to check the index key size possibly on a primary-started index build; never on a
+    // replicated index build.
     bool checkIndexKeySize = shouldCheckIndexKeySize(opCtx);
 
     BSONObj previousKey;
