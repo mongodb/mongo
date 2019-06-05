@@ -1804,6 +1804,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_FALSE(selfStatus.hasField("pingMs"));
 
     ASSERT_EQUALS(2000, rsStatus["heartbeatIntervalMillis"].numberInt());
+    ASSERT_EQUALS(3, rsStatus["majorityVoteCount"].numberInt());
     ASSERT_BSONOBJ_EQ(initialSyncStatus, rsStatus["initialSyncStatus"].Obj());
 
     // Test no lastStableRecoveryTimestamp field.
