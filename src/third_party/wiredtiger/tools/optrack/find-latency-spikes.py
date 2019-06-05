@@ -39,6 +39,7 @@ import multiprocessing
 import numpy as np
 import os
 import pandas as pd
+import subprocess
 import sys
 import traceback
 import time
@@ -462,7 +463,7 @@ def createLegendFigure(legendDict):
 
     p = figure(title="TRACKED FUNCTIONS",
                plot_width=plotWidth,
-               plot_height = max((max_ycoord + 2) * pixelsForLegendItem, 90),
+               plot_height = int(max((max_ycoord + 2) * pixelsForLegendItem, 90)),
                tools = [], toolbar_location="above",
                x_range = (0, (FUNCS_PER_ROW + 1)* HSPACE_BETWEEN_FUNCS),
                y_range = (0, max_ycoord + 2),
@@ -1241,6 +1242,22 @@ def parseConfigFile(fname):
 
     return True;
 
+# With Python3 this script fails if the number of open files
+# is limited to 256, because the multiprocessing package does
+# not appear to properly clean up processes that exited.
+#
+def checkOpenFileLimit():
+
+    targetLimit = 512;
+    openFileLimit = int(subprocess.check_output("ulimit -n",
+                                            shell=True).decode());
+
+    if (openFileLimit < targetLimit):
+        print(color.BOLD + color.RED + "Open file limit is " +
+              str(openFileLimit) + ". Please increase to " + str(targetLimit) +
+              " by running `ulimit -n " + str(targetLimit) + "`." +
+              color.END);
+        sys.exit(-1);
 
 def main():
 
@@ -1274,6 +1291,8 @@ def main():
     if (len(args.files) == 0):
         parser.print_help();
         sys.exit(1);
+
+    checkOpenFileLimit();
 
     # Determine the target job parallelism
     if (args.jobParallelism > 0):

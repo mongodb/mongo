@@ -2639,6 +2639,23 @@ __verbose_dump_cache_single(WT_SESSION_IMPL *session,
 	leaf_bytes = leaf_bytes_max = leaf_dirty_bytes = 0;
 	leaf_dirty_bytes_max = leaf_dirty_pages = leaf_pages = 0;
 
+	dhandle = session->dhandle;
+	btree = dhandle->handle;
+	WT_RET(__wt_msg(session, "%s(%s%s)%s%s:",
+	    dhandle->name, dhandle->checkpoint != NULL ? "checkpoint=" : "",
+	    dhandle->checkpoint != NULL ? dhandle->checkpoint : "<live>",
+	    btree->evict_disabled != 0 ?  " eviction disabled" : "",
+	    btree->evict_disabled_open ? " at open" : ""));
+
+	/*
+	 * We cannot walk the tree of a dhandle held exclusively because
+	 * the owning thread could be manipulating it in a way that causes
+	 * us to dump core. So print out that we visited and skipped it.
+	 */
+	if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE))
+		return (__wt_msg(session,
+		    "  Opened exclusively. Cannot walk tree, skipping."));
+
 	next_walk = NULL;
 	while (__wt_tree_walk(session, &next_walk,
 	    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_WAIT) == 0 &&
@@ -2669,13 +2686,6 @@ __verbose_dump_cache_single(WT_SESSION_IMPL *session,
 		}
 	}
 
-	dhandle = session->dhandle;
-	btree = dhandle->handle;
-	WT_RET(__wt_msg(session, "%s(%s%s)%s%s:",
-	    dhandle->name, dhandle->checkpoint != NULL ? "checkpoint=" : "",
-	    dhandle->checkpoint != NULL ? dhandle->checkpoint : "<live>",
-	    btree->evict_disabled != 0 ?  "eviction disabled" : "",
-	    btree->evict_disabled_open ? " at open" : ""));
 	if (intl_pages == 0)
 		WT_RET(__wt_msg(session, "internal: 0 pages"));
 	else

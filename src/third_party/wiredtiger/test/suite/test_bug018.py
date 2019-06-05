@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from helper import copy_wiredtiger_home
+from suite_subprocess import suite_subprocess
 import os
 import wiredtiger, wttest
 
@@ -34,10 +35,14 @@ import wiredtiger, wttest
 #   JIRA WT-3590: if writing table data fails during close then tables
 # that were updated within the same transaction could get out of sync with
 # each other.
-class test_bug018(wttest.WiredTigerTestCase):
+class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
     '''Test closing/reopening/recovering tables when writes fail'''
 
     conn_config = 'log=(enabled)'
+    basename = 'bug018.'
+    baseuri = 'file:' + basename
+    uri1 = baseuri + '01.wt'
+    uri2 = baseuri + '02.wt'
 
     def setUp(self):
         # This test uses Linux-specific code so skip on any other system.
@@ -49,12 +54,10 @@ class test_bug018(wttest.WiredTigerTestCase):
         self.session.create(uri, 'key_format=S,value_format=S')
         return self.session.open_cursor(uri)
 
-    def test_bug018(self):
+    def subprocess_bug018(self):
         '''Test closing multiple tables'''
-        basename = 'bug018.'
-        baseuri = 'file:' + basename
-        c1 = self.create_table(baseuri + '01.wt')
-        c2 = self.create_table(baseuri + '02.wt')
+        c1 = self.create_table(self.uri1)
+        c2 = self.create_table(self.uri2)
 
         self.session.begin_transaction()
         c1['key'] = 'value'
@@ -70,7 +73,7 @@ class test_bug018(wttest.WiredTigerTestCase):
         # This is Linux-specific code to figure out the file descriptor.
         for f in os.listdir('/proc/self/fd'):
             try:
-                if os.readlink('/proc/self/fd/' + f).endswith(basename + '02.wt'):
+                if os.readlink('/proc/self/fd/' + f).endswith(self.basename + '02.wt'):
                     os.close(int(f))
             except OSError:
                 pass
@@ -82,17 +85,37 @@ class test_bug018(wttest.WiredTigerTestCase):
             except wiredtiger.WiredTigerError:
                 self.conn = None
 
+    def test_bug018(self):
+        '''Test closing multiple tables'''
+
+        self.close_conn()
+        subdir = 'SUBPROCESS'
+        [ignore_result, new_home_dir] = self.run_subprocess_function(subdir,
+            'test_bug018.test_bug018.subprocess_bug018')
+
         # Make a backup for forensics in case something goes wrong.
         backup_dir = 'BACKUP'
-        copy_wiredtiger_home('.', backup_dir, True)
+        copy_wiredtiger_home(new_home_dir, backup_dir, True)
 
         # After reopening and running recovery both tables should be in
         # sync even though table 1 was successfully written and table 2
         # had an error on close.
-        self.open_conn()
-        c1 = self.session.open_cursor(baseuri + '01.wt')
-        c2 = self.session.open_cursor(baseuri + '02.wt')
-        self.assertEqual(list(c1), list(c2))
+        self.open_conn(new_home_dir)
+
+        results1 = list(self.session.open_cursor(self.uri1))
+
+        # It's possible the second table can't even be opened.
+        # That can happen only if the root page was not pushed out.
+        # So if we get an error, make sure we're getting the right
+        # error message.
+
+        self.captureerr.check(self)     # check error messages until now
+        try:
+            results2 = list(self.session.open_cursor(self.uri2))
+        except:
+            self.captureerr.checkAdditionalPattern(self, 'unable to read root page')
+            results2 = []
+        self.assertEqual(results1, results2)
 
 if __name__ == '__main__':
     wttest.run()
