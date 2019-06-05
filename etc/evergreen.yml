@@ -3687,9 +3687,9 @@ tasks:
           # CMake doesn't seem to do the dSYM for us for the framework
           if [ -e $BUILD_PREFIX/Frameworks ]; then
               pushd $BUILD_PREFIX/Frameworks
-              xcrun dsymutil -o bson.framework.dSYM bson.framework/bson
+              xcrun dsymutil -num-threads=1 -o bson.framework.dSYM bson.framework/bson
               xcrun strip -Sx bson.framework/bson
-              xcrun dsymutil -o mongoc.framework.dSYM mongoc.framework/mongoc
+              xcrun dsymutil -num-threads=1 -o mongoc.framework.dSYM mongoc.framework/mongoc
               xcrun strip -Sx mongoc.framework/mongoc
               popd
           fi
