@@ -263,7 +263,11 @@ bool IndexBuildsManager::abortIndexBuild(const UUID& buildUUID, const std::strin
     if (builderIt == _builders.end()) {
         return false;
     }
-    builderIt->second->abort(reason);
+
+    std::shared_ptr<MultiIndexBlock> builder = builderIt->second;
+
+    lk.unlock();
+    builder->abort(reason);
     return true;
 }
 
@@ -278,7 +282,10 @@ bool IndexBuildsManager::interruptIndexBuild(OperationContext* opCtx,
     }
 
     log() << "Index build interrupted: " << buildUUID << ": " << reason;
-    builderIt->second->abortWithoutCleanup(opCtx);
+    std::shared_ptr<MultiIndexBlock> builder = builderIt->second;
+
+    lk.unlock();
+    builder->abortWithoutCleanup(opCtx);
 
     return true;
 }
