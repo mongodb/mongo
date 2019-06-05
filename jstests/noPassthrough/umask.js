@@ -68,7 +68,6 @@
     MongoRunner.stopMongod(conn);
     checkMask(conn.fullOptions.dbpath, defaultUmask, false);
 
-
     // Restart the mongod with honorSystemUmask, all files should have the mode 0666
     mongodOptions.setParameter = {honorSystemUmask: true};
     conn = MongoRunner.runMongod(mongodOptions);
