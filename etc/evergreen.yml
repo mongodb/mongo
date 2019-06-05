@@ -249,7 +249,7 @@ variables:
   - func: "clear OOM messages"
   - command: manifest.load
   - func: "git get project"
-  - func: "get modified patch files"
+  - func: "get all modified patch files"
   - func: "set task expansion macros"
   # The python virtual environment is installed in ${workdir}, which is created in
   # "set up virtualenv".
@@ -1008,7 +1008,7 @@ functions:
         mkdir -p ../../../../../../mongo-tools/distsrc
         cp THIRD-PARTY-NOTICES ../../../../../../mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools
 
-  "get modified patch files":
+  "get all modified patch files":
     command: shell.exec
     params:
       working_dir: src
@@ -1027,6 +1027,23 @@ functions:
             git diff HEAD --name-only >> ~1/patch_files.txt
             popd
           fi
+        fi
+
+  # This function should only be called from patch-build-only tasks.
+  "get added and modified patch files":
+    command: shell.exec
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        git diff HEAD --name-only --line-prefix="${workdir}/src/" --diff-filter=d >> modified_and_created_patch_files.txt
+        if [ -d src/mongo/db/modules/enterprise ]; then
+          pushd src/mongo/db/modules/enterprise
+          git diff HEAD --name-only --line-prefix="${workdir}/src/src/mongo/db/modules/enterprise/" --diff-filter=d >> ~1/modified_and_created_patch_files.txt
+          popd
         fi
 
   "determine resmoke jobs": &determine_resmoke_jobs
@@ -1853,7 +1870,7 @@ functions:
 
           # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
           # Grep returns 1 if it fails to find a match.
-          (grep "\.js$" patch_files.txt || true) | sed -e "s|^|$PWD/|" | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
+          (grep "\.js$" modified_and_created_patch_files.txt || true) | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
 
   "lint fuzzer sanity all":
     - command: shell.exec
@@ -5462,7 +5479,7 @@ tasks:
   - command: manifest.load
   - func: "git get project"
   - func: "set task expansion macros"
-  - func: "get modified patch files"
+  - func: "get added and modified patch files"
   - func: "setup jstestfuzz"
   - func: "lint fuzzer sanity patch"
 
