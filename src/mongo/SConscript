@@ -686,7 +686,7 @@ def installBinary( e, name ):
         debug_sym_name += '.debug'
     elif e.TargetOSIs('darwin'):
         debug_sym_name += '.dSYM'
-        debug_sym_cmd = 'dsymutil -o ${TARGET} ${SOURCE}'
+        debug_sym_cmd = 'dsymutil -num-threads=1 -o ${TARGET} ${SOURCE}'
     elif e.ToolchainIs('msvc'):
         debug_sym_name += '.pdb'
         distBinaries.append(debug_sym_name)

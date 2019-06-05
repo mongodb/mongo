@@ -53,12 +53,12 @@ def _update_builder(env, builder, bitcode):
         if bitcode:
             base_action.list.append(
                 SCons.Action.Action(
-                    "dsymutil $TARGET --symbol-map=${TARGET}.bcsymbolmap -o ${TARGET}.dSYM",
+                    "dsymutil -num-threads=1 $TARGET --symbol-map=${TARGET}.bcsymbolmap -o ${TARGET}.dSYM",
                     "Generating debug info for $TARGET into ${TARGET}.dSYM"))
 
         else:
             base_action.list.append(
-                SCons.Action.Action("dsymutil $TARGET -o ${TARGET}.dSYM",
+                SCons.Action.Action("dsymutil -num-threads=1 $TARGET -o ${TARGET}.dSYM",
                                     "Generating debug info for $TARGET into ${TARGET}.dSYM"))
         base_action.list.append(SCons.Action.Action("strip -Sx ${TARGET}", "Stripping ${TARGET}"))
     elif env.TargetOSIs('posix'):
