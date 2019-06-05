@@ -12,13 +12,14 @@ for (var i = 1; i <= 10; i++) {
 }
 
 // returns old
-out = t.findAndModify({update: {$set: {inprogress: true}, $inc: {value: 1}}});
+out = t.findAndModify({sort: {priority: 1}, update: {$set: {inprogress: true}, $inc: {value: 1}}});
 assert.eq(out.value, 0);
 assert.eq(out.inprogress, false);
 t.update({_id: out._id}, {$set: {inprogress: false}});
 
 // returns new
-out = t.findAndModify({update: {$set: {inprogress: true}, $inc: {value: 1}}, 'new': true});
+out = t.findAndModify(
+    {sort: {priority: 1}, update: {$set: {inprogress: true}, $inc: {value: 1}}, 'new': true});
 assert.eq(out.value, 2);
 assert.eq(out.inprogress, true);
 t.update({_id: out._id}, {$set: {inprogress: false}});
