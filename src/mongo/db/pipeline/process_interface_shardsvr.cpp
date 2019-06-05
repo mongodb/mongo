@@ -110,11 +110,11 @@ MongoInterfaceShardServer::collectDocumentKeyFieldsForHostedCollection(Operation
     return {_shardKeyToDocumentKeyFields(metadata->getKeyPatternFields()), true};
 }
 
-void MongoInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       const NamespaceString& ns,
-                                       std::vector<BSONObj>&& objs,
-                                       const WriteConcernOptions& wc,
-                                       boost::optional<OID> targetEpoch) {
+Status MongoInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         const NamespaceString& ns,
+                                         std::vector<BSONObj>&& objs,
+                                         const WriteConcernOptions& wc,
+                                         boost::optional<OID> targetEpoch) {
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
 
@@ -126,17 +126,17 @@ void MongoInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionCont
 
     ClusterWriter::write(expCtx->opCtx, insertCommand, &stats, &response, targetEpoch);
 
-    // TODO SERVER-35403: Add more context for which shard produced the error.
-    uassertStatusOKWithContext(response.toStatus(), "Insert failed: ");
+    return response.toStatus();
 }
 
-void MongoInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       const NamespaceString& ns,
-                                       BatchedObjects&& batch,
-                                       const WriteConcernOptions& wc,
-                                       bool upsert,
-                                       bool multi,
-                                       boost::optional<OID> targetEpoch) {
+StatusWith<MongoProcessInterface::UpdateResult> MongoInterfaceShardServer::update(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& ns,
+    BatchedObjects&& batch,
+    const WriteConcernOptions& wc,
+    bool upsert,
+    bool multi,
+    boost::optional<OID> targetEpoch) {
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
 
@@ -147,8 +147,10 @@ void MongoInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionCont
 
     ClusterWriter::write(expCtx->opCtx, updateCommand, &stats, &response, targetEpoch);
 
-    // TODO SERVER-35403: Add more context for which shard produced the error.
-    uassertStatusOKWithContext(response.toStatus(), "Update failed: ");
+    if (auto status = response.toStatus(); status != Status::OK()) {
+        return status;
+    }
+    return {{response.getN(), response.getNModified()}};
 }
 
 unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSourceToPipeline(

@@ -57,25 +57,18 @@ public:
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
         repl::OpTime time) const final;
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
-    void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                const NamespaceString& ns,
-                std::vector<BSONObj>&& objs,
-                const WriteConcernOptions& wc,
-                boost::optional<OID> targetEpoch) override;
-    void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                const NamespaceString& ns,
-                BatchedObjects&& batch,
-                const WriteConcernOptions& wc,
-                bool upsert,
-                bool multi,
-                boost::optional<OID> targetEpoch) override;
-    WriteResult updateWithResult(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                 const NamespaceString& ns,
-                                 BatchedObjects&& batch,
-                                 const WriteConcernOptions& wc,
-                                 bool upsert,
-                                 bool multi,
-                                 boost::optional<OID> targetEpoch) override;
+    Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                  const NamespaceString& ns,
+                  std::vector<BSONObj>&& objs,
+                  const WriteConcernOptions& wc,
+                  boost::optional<OID> targetEpoch) override;
+    StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    const NamespaceString& ns,
+                                    BatchedObjects&& batch,
+                                    const WriteConcernOptions& wc,
+                                    bool upsert,
+                                    bool multi,
+                                    boost::optional<OID> targetEpoch) override;
 
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx, const NamespaceString& ns) final;
     void appendLatencyStats(OperationContext* opCtx,

@@ -100,31 +100,21 @@ public:
 
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
 
-    void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                const NamespaceString& ns,
-                std::vector<BSONObj>&& objs,
-                const WriteConcernOptions& wc,
-                boost::optional<OID>) final {
+    Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                  const NamespaceString& ns,
+                  std::vector<BSONObj>&& objs,
+                  const WriteConcernOptions& wc,
+                  boost::optional<OID>) final {
         MONGO_UNREACHABLE;
     }
 
-    void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                const NamespaceString& ns,
-                BatchedObjects&& batch,
-                const WriteConcernOptions& wc,
-                bool upsert,
-                bool multi,
-                boost::optional<OID>) final {
-        MONGO_UNREACHABLE;
-    }
-
-    WriteResult updateWithResult(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                 const NamespaceString& ns,
-                                 BatchedObjects&& batch,
-                                 const WriteConcernOptions& wc,
-                                 bool upsert,
-                                 bool multi,
-                                 boost::optional<OID> targetEpoch) final override {
+    StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    const NamespaceString& ns,
+                                    BatchedObjects&& batch,
+                                    const WriteConcernOptions& wc,
+                                    bool upsert,
+                                    bool multi,
+                                    boost::optional<OID>) final {
         MONGO_UNREACHABLE;
     }
 
