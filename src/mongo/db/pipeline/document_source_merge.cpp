@@ -88,8 +88,8 @@ MergeStrategy makeUpdateStrategy(bool upsert, BatchTransform transform) {
         }
 
         constexpr auto multi = false;
-        expCtx->mongoProcessInterface->update(
-            expCtx, ns, std::move(batch), wc, upsert, multi, epoch);
+        uassertStatusOK(expCtx->mongoProcessInterface->update(
+            expCtx, ns, std::move(batch), wc, upsert, multi, epoch));
     };
 }
 
@@ -108,22 +108,14 @@ MergeStrategy makeStrictUpdateStrategy(bool upsert, BatchTransform transform) {
             transform(batch);
         }
 
-        const auto batchSize = batch.size();
+        const int64_t batchSize = batch.size();
         constexpr auto multi = false;
-        auto writeResult = expCtx->mongoProcessInterface->updateWithResult(
-            expCtx, ns, std::move(batch), wc, upsert, multi, epoch);
-        constexpr auto initValue = 0ULL;
-        auto nMatched =
-            std::accumulate(writeResult.results.begin(),
-                            writeResult.results.end(),
-                            initValue,
-                            [](auto total, const auto& opRes) {
-                                return total + (opRes.isOK() ? opRes.getValue().getN() : 0);
-                            });
+        auto updateResult = uassertStatusOK(expCtx->mongoProcessInterface->update(
+            expCtx, ns, std::move(batch), wc, upsert, multi, epoch));
         uassert(ErrorCodes::MergeStageNoMatchingDocument,
                 "{} could not find a matching document in the target collection "
                 "for at least one document in the source collection"_format(kStageName),
-                nMatched == batchSize);
+                updateResult.nMatched == batchSize);
     };
 }
 
@@ -138,7 +130,8 @@ MergeStrategy makeInsertStrategy() {
         std::transform(batch.begin(), batch.end(), objectsToInsert.begin(), [](const auto& obj) {
             return std::get<UpdateModification>(obj).getUpdateClassic();
         });
-        expCtx->mongoProcessInterface->insert(expCtx, ns, std::move(objectsToInsert), wc, epoch);
+        uassertStatusOK(expCtx->mongoProcessInterface->insert(
+            expCtx, ns, std::move(objectsToInsert), wc, epoch));
     };
 }
 

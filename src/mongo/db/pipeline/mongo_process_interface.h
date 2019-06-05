@@ -105,6 +105,16 @@ public:
         bool attachCursorSource = true;
     };
 
+    /**
+     * This structure holds the result of a batched update operation, such as the number of
+     * documents that matched the query predicate, and the number of documents modified by the
+     * update operation.
+     */
+    struct UpdateResult {
+        int64_t nMatched{0};
+        int64_t nModified{0};
+    };
+
     virtual ~MongoProcessInterface(){};
 
     /**
@@ -135,42 +145,29 @@ public:
     virtual bool isSharded(OperationContext* opCtx, const NamespaceString& ns) = 0;
 
     /**
-     * Inserts 'objs' into 'ns' and throws a UserException if the insert fails. If 'targetEpoch' is
+     * Inserts 'objs' into 'ns' and returns an error Status if the insert fails. If 'targetEpoch' is
      * set, throws ErrorCodes::StaleEpoch if the targeted collection does not have the same epoch or
      * the epoch changes during the course of the insert.
      */
-    virtual void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                        const NamespaceString& ns,
-                        std::vector<BSONObj>&& objs,
-                        const WriteConcernOptions& wc,
-                        boost::optional<OID> targetEpoch) = 0;
+    virtual Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          const NamespaceString& ns,
+                          std::vector<BSONObj>&& objs,
+                          const WriteConcernOptions& wc,
+                          boost::optional<OID> targetEpoch) = 0;
 
     /**
-     * Updates the documents matching 'queries' with the objects 'updates'. Throws a UserException
-     * if any of the updates fail. If 'targetEpoch' is set, throws ErrorCodes::StaleEpoch if the
-     * targeted collection does not have the same epoch, or if the epoch changes during the update.
+     * Updates the documents matching 'queries' with the objects 'updates'. Returns an error Status
+     * if any of the updates fail, otherwise returns an 'UpdateResult' objects with the details of
+     * the update operation.  If 'targetEpoch' is set, throws ErrorCodes::StaleEpoch if the targeted
+     * collection does not have the same epoch, or if the epoch changes during the update.
      */
-    virtual void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                        const NamespaceString& ns,
-                        BatchedObjects&& batch,
-                        const WriteConcernOptions& wc,
-                        bool upsert,
-                        bool multi,
-                        boost::optional<OID> targetEpoch) = 0;
-
-    /**
-     * Updates the documents matching 'queries' with the objects 'updates'. Throws a UserException
-     * if any of the updates fail. If 'targetEpoch' is set, throws ErrorCodes::StaleEpoch if the
-     * targeted collection does not have the same epoch, or if the epoch changes during the update.
-     * Returns a 'WriteResult' object with information about the write operation.
-     */
-    virtual WriteResult updateWithResult(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         const NamespaceString& ns,
-                                         BatchedObjects&& batch,
-                                         const WriteConcernOptions& wc,
-                                         bool upsert,
-                                         bool multi,
-                                         boost::optional<OID> targetEpoch) = 0;
+    virtual StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                            const NamespaceString& ns,
+                                            BatchedObjects&& batch,
+                                            const WriteConcernOptions& wc,
+                                            bool upsert,
+                                            bool multi,
+                                            boost::optional<OID> targetEpoch) = 0;
 
     virtual CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                                   const NamespaceString& ns) = 0;

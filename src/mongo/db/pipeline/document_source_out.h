@@ -105,8 +105,8 @@ private:
         DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
 
         auto targetEpoch = boost::none;
-        pExpCtx->mongoProcessInterface->insert(
-            pExpCtx, _tempNs, std::move(batch), _writeConcern, targetEpoch);
+        uassertStatusOK(pExpCtx->mongoProcessInterface->insert(
+            pExpCtx, _tempNs, std::move(batch), _writeConcern, targetEpoch));
     }
 
     std::pair<BSONObj, int> makeBatchObject(Document&& doc) const override {
