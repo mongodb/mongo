@@ -119,7 +119,7 @@ private:
     /**
      * Removes the oldest files if the directory is over quota
      */
-    void trimDirectory(std::vector<boost::filesystem::path>& files);
+    Status trimDirectory(std::vector<boost::filesystem::path>& files);
 
     /**
      * Open a new file for writing.
