@@ -247,6 +247,9 @@ class WiredTigerTestCase(unittest.TestCase):
         return "%s.%s.%s" %  (self.__module__,
                               self.className(), self._testMethodName)
 
+    def buildDirectory(self):
+        return self._builddir
+
     # Return the wiredtiger_open extension argument for
     # any needed shared library.
     def extensionsConfig(self):

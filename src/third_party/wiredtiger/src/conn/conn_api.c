@@ -1064,6 +1064,13 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 			F_SET(conn, WT_CONN_CLOSING_TIMESTAMP);
 	}
 
+	/*
+	 * Ramp the eviction dirty target down to encourage eviction threads to
+	 * clear dirty content out of cache.
+	 */
+	conn->cache->eviction_dirty_trigger = 1.0;
+	conn->cache->eviction_dirty_target = 0.1;
+
 err:	/*
 	 * Rollback all running transactions.
 	 * We do this as a separate pass because an active transaction in one

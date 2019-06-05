@@ -39,12 +39,23 @@ static int
 create_table(WT_SESSION *session, COOKIE *cookie)
 {
 	int ret;
-	char config[128];
+	char config[256];
 
-	testutil_check(__wt_snprintf(config, sizeof(config),
-	    "key_format=%s,value_format=S,%s",
-	    cookie->type == COL ? "r" : "q",
-	    cookie->type == LSM ? ",type=lsm" : ""));
+	/*
+	 * If we're using timestamps, turn off logging for the table.
+	 */
+	if (g.use_timestamps)
+		testutil_check(__wt_snprintf(config, sizeof(config),
+		    "key_format=%s,value_format=S,allocation_size=512,"	\
+		    "leaf_page_max=1KB,internal_page_max=1KB,"		\
+		    "memory_page_max=64KB,log=(enabled=false),%s",
+		    cookie->type == COL ? "r" : "q",
+		    cookie->type == LSM ? ",type=lsm" : ""));
+	else
+		testutil_check(__wt_snprintf(config, sizeof(config),
+		    "key_format=%s,value_format=S,%s",
+		    cookie->type == COL ? "r" : "q",
+		    cookie->type == LSM ? ",type=lsm" : ""));
 
 	if ((ret = session->create(session, cookie->uri, config)) != 0)
 		if (ret != EEXIST)
@@ -94,6 +105,8 @@ start_workers(table_type type)
 			goto err;
 	}
 
+	testutil_check(session->close(session, NULL));
+
 	(void)gettimeofday(&start, NULL);
 
 	/* Create threads. */
@@ -122,20 +135,55 @@ err:	free(tids);
 static inline int
 worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
 {
-	int ret;
+	int cmp, ret;
 	char valuebuf[64];
 
 	cursor->set_key(cursor, keyno);
-	/* Roughly 5% removes. */
-	if (new_val % 19 == 0) {
-		if ((ret = cursor->remove(cursor)) != 0) {
+	/* Roughly half inserts, then balanced inserts / range removes. */
+	if (new_val > g.nops / 2 && new_val % 39 == 0) {
+		if ((ret = cursor->search_near(cursor, &cmp)) != 0) {
+			if (ret == WT_NOTFOUND)
+				return (0);
 			if (ret == WT_ROLLBACK)
 				return (WT_ROLLBACK);
-			return (log_print_err("cursor.remove", ret, 1));
+			return (log_print_err("cursor.search_near", ret, 1));
 		}
+		if (cmp < 0) {
+			if ((ret = cursor->next(cursor)) != 0) {
+				if (ret == WT_NOTFOUND)
+					return (0);
+				if (ret == WT_ROLLBACK)
+					return (WT_ROLLBACK);
+				return (log_print_err("cursor.next", ret, 1));
+			}
+		}
+		for (int i = 10; i > 0; i--) {
+			if ((ret = cursor->remove(cursor)) != 0) {
+				if (ret == WT_ROLLBACK)
+					return (WT_ROLLBACK);
+				return (log_print_err("cursor.remove", ret, 1));
+			}
+			if ((ret = cursor->next(cursor)) != 0) {
+				if (ret == WT_NOTFOUND)
+					return (0);
+				if (ret == WT_ROLLBACK)
+					return (WT_ROLLBACK);
+				return (log_print_err("cursor.next", ret, 1));
+			}
+		}
+		if (g.sweep_stress)
+			testutil_check(cursor->reset(cursor));
+	} else if (new_val % 39 < 10) {
+		if ((ret = cursor->search(cursor)) != 0 && ret != WT_NOTFOUND) {
+			if (ret == WT_ROLLBACK)
+				return (WT_ROLLBACK);
+			return (log_print_err("cursor.search", ret, 1));
+		}
+		if (g.sweep_stress)
+			testutil_check(cursor->reset(cursor));
 	} else {
 		testutil_check(__wt_snprintf(
-		    valuebuf, sizeof(valuebuf), "%037u", new_val));
+		    valuebuf, sizeof(valuebuf), "%052u", new_val));
 		cursor->set_value(cursor, valuebuf);
 		if ((ret = cursor->insert(cursor)) != 0) {
 			if (ret == WT_ROLLBACK)
@@ -143,6 +191,7 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
 			return (log_print_err("cursor.insert", ret, 1));
 		}
 	}
+
 	return (0);
 }
 
@@ -177,10 +226,11 @@ real_worker(void)
 	WT_SESSION *session;
 	u_int i, keyno;
 	int j, ret, t_ret;
+	const char *begin_cfg;
+	char buf[128];
+	bool has_cursors;
 
 	ret = t_ret = 0;
-
-	__wt_random_init(&rnd);
 
 	if ((cursors = calloc(
 	    (size_t)(g.ntables), sizeof(WT_CURSOR *))) == NULL)
@@ -192,41 +242,80 @@ real_worker(void)
 		goto err;
 	}
 
+	__wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+
 	for (j = 0; j < g.ntables; j++)
 		if ((ret = session->open_cursor(session,
 		    g.cookies[j].uri, NULL, NULL, &cursors[j])) != 0) {
 			(void)log_print_err("session.open_cursor", ret, 1);
 			goto err;
 		}
+	has_cursors = true;
+
+	if (g.use_timestamps)
+		begin_cfg = "read_timestamp=1,roundup_timestamps=(read=true)";
+	else
+		begin_cfg = NULL;
 
 	for (i = 0; i < g.nops && g.running; ++i, __wt_yield()) {
-		if ((ret = session->begin_transaction(session, NULL)) != 0) {
+		if ((ret =
+		    session->begin_transaction(session, begin_cfg)) != 0) {
 			(void)log_print_err(
 			    "real_worker:begin_transaction", ret, 1);
 			goto err;
 		}
 		keyno = __wt_random(&rnd) % g.nkeys + 1;
-		for (j = 0; j < g.ntables; j++) {
-			if ((ret = worker_op(cursors[j], keyno, i)) != 0)
-				break;
+		if (g.use_timestamps && i % 23 == 0) {
+			if (__wt_try_readlock(
+			    (WT_SESSION_IMPL *)session, &g.clock_lock) != 0) {
+				testutil_check(
+				    session->commit_transaction(session, NULL));
+				for (j = 0; j < g.ntables; j++)
+					testutil_check(
+					    cursors[j]->close(cursors[j]));
+				has_cursors = false;
+				__wt_readlock(
+				    (WT_SESSION_IMPL *)session, &g.clock_lock);
+				testutil_check(session->begin_transaction(
+				    session, begin_cfg));
+			}
+			testutil_check(__wt_snprintf(
+			    buf, sizeof(buf), "commit_timestamp=%x", g.ts + 1));
+			testutil_check(
+			    session->timestamp_transaction(session, buf));
+			__wt_readunlock(
+			    (WT_SESSION_IMPL *)session, &g.clock_lock);
+
+			for (j = 0; !has_cursors && j < g.ntables; j++)
+				if ((ret = session->open_cursor(
+				    session, g.cookies[j].uri,
+				    NULL, NULL, &cursors[j])) != 0) {
+					(void)log_print_err(
+					    "session.open_cursor", ret, 1);
+					goto err;
+				}
+			has_cursors = true;
 		}
-		if (ret == 0) {
+		for (j = 0; ret == 0 && j < g.ntables; j++) {
+			ret = worker_op(cursors[j], keyno, i);
+		}
+		if (ret != 0 && ret != WT_ROLLBACK) {
+			(void)log_print_err("worker op failed", ret, 1);
+			goto err;
+		} else if (ret == 0 && __wt_random(&rnd) % 7 != 0) {
 			if ((ret = session->commit_transaction(
 			    session, NULL)) != 0) {
 				(void)log_print_err(
 				    "real_worker:commit_transaction", ret, 1);
 				goto err;
 			}
-		} else if (ret == WT_ROLLBACK) {
+		} else {
 			if ((ret = session->rollback_transaction(
 			    session, NULL)) != 0) {
 				(void)log_print_err(
 				    "real_worker:rollback_transaction", ret, 1);
 				goto err;
-			    }
-		} else {
-			(void)log_print_err("worker op failed", ret, 1);
-			goto err;
+			}
 		}
 	}
 
