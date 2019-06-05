@@ -151,7 +151,7 @@ public:
      * i.e. when the server is not accepting user requests and no internal operations are
      * concurrently starting new index builds.
      */
-    void interruptAllIndexBuilds(const std::string& reason);
+    void interruptAllIndexBuildsForShutdown(const std::string& reason);
 
     /**
      * Signals all of the index builds on the specified collection to abort and then waits until the
@@ -450,6 +450,7 @@ protected:
     IndexBuildsManager _indexBuildsManager;
 
     bool _sleepForTest = false;
+    bool _shuttingDown = false;
 };
 
 /**

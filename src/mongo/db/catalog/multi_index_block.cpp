@@ -122,6 +122,9 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
             // instead write a noop entry. A foreground `applyOps` index build may have a commit
             // timestamp already set.
             if (opCtx->recoveryUnit()->getCommitTimestamp().isNull() &&
+                // We need to avoid checking replication state if we do not hold the RSTL.  If we do
+                // not hold the RSTL, we must be a build started on a secondary via replication.
+                opCtx->lockState()->isRSTLLocked() &&
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
                 opCtx->getServiceContext()->getOpObserver()->onOpMessage(
                     opCtx,
