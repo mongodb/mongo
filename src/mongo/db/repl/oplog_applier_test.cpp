@@ -117,7 +117,7 @@ OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss) {
                       boost::none,                 // o2
                       {},                          // sessionInfo
                       boost::none,                 // upsert
-                      Date_t::min() + Seconds(t),  // wall clock time
+                      Date_t() + Seconds(t),       // wall clock time
                       boost::none,                 // statement id
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
@@ -145,7 +145,7 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare) {
                       boost::none,                 // o2
                       {},                          // sessionInfo
                       boost::none,                 // upsert
-                      Date_t::min() + Seconds(t),  // wall clock time
+                      Date_t() + Seconds(t),       // wall clock time
                       boost::none,                 // statement id
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
@@ -177,7 +177,7 @@ OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepar
                       boost::none,                 // o2
                       {},                          // sessionInfo
                       boost::none,                 // upsert
-                      Date_t::min() + Seconds(t),  // wall clock time
+                      Date_t() + Seconds(t),       // wall clock time
                       boost::none,                 // statement id
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime

@@ -1397,8 +1397,7 @@ void TopologyCoordinator::setCurrentPrimary_forTest(int primaryIndex,
             hbResponse.setState(MemberState::RS_PRIMARY);
             hbResponse.setElectionTime(electionTime);
             hbResponse.setAppliedOpTimeAndWallTime(
-                {_memberData.at(primaryIndex).getHeartbeatAppliedOpTime(),
-                 Date_t::min() + Seconds(1)});
+                {_memberData.at(primaryIndex).getHeartbeatAppliedOpTime(), Date_t() + Seconds(1)});
             hbResponse.setSyncingTo(HostAndPort());
             _memberData.at(primaryIndex)
                 .setUpValues(_memberData.at(primaryIndex).getLastHeartbeat(),
@@ -1611,9 +1610,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     BSONObjBuilder optimes;
     _lastCommittedOpTimeAndWallTime.opTime.append(&optimes, "lastCommittedOpTime");
 
-    if (_lastCommittedOpTimeAndWallTime.wallTime.isFormattable()) {
-        optimes.appendDate("lastCommittedWallTime", _lastCommittedOpTimeAndWallTime.wallTime);
-    }
+    optimes.appendDate("lastCommittedWallTime", _lastCommittedOpTimeAndWallTime.wallTime);
 
     if (!rsStatusArgs.readConcernMajorityOpTime.opTime.isNull()) {
         rsStatusArgs.readConcernMajorityOpTime.opTime.append(&optimes, "readConcernMajorityOpTime");
@@ -1624,14 +1621,8 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     appendOpTime(&optimes, "appliedOpTime", lastOpApplied);
     appendOpTime(&optimes, "durableOpTime", lastOpDurable);
 
-    // SERVER-40565 The python driver cannot parse Date_t::min() as a valid date. These dates should
-    // only be equal to Date_t::min() if their corresponding optimes are null.
-    if (lastOpAppliedWall.isFormattable()) {
-        optimes.appendDate("lastAppliedWallTime", lastOpAppliedWall);
-    }
-    if (lastOpDurableWall.isFormattable()) {
-        optimes.appendDate("lastDurableWallTime", lastOpDurableWall);
-    }
+    optimes.appendDate("lastAppliedWallTime", lastOpAppliedWall);
+    optimes.appendDate("lastDurableWallTime", lastOpDurableWall);
 
     response->append("optimes", optimes.obj());
     if (lastStableRecoveryTimestamp) {

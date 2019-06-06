@@ -124,7 +124,7 @@ public:
      * Sets the return value for subsequent calls to loadLastOpTimeApplied.
      */
     void setLastOpTimeAndWallTime(const StatusWith<OpTime>& lastApplied,
-                                  Date_t lastAppliedWall = Date_t::min());
+                                  Date_t lastAppliedWall = Date_t());
 
     /**
      * Sets the return value for subsequent calls to storeLocalConfigDocument().

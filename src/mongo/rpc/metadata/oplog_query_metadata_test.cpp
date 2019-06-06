@@ -41,7 +41,7 @@ using repl::OpTime;
 
 TEST(ReplResponseMetadataTest, OplogQueryMetadataRoundtrip) {
     OpTime opTime1(Timestamp(1234, 100), 5);
-    Date_t committedWall = Date_t::min() + Seconds(opTime1.getSecs());
+    Date_t committedWall = Date_t() + Seconds(opTime1.getSecs());
     OpTime opTime2(Timestamp(7777, 101), 6);
     OplogQueryMetadata metadata({opTime1, committedWall}, opTime2, 6, 12, -1);
 

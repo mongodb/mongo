@@ -117,8 +117,8 @@ protected:
         ASSERT_OK(getTopoCoord().completeTransitionToPrimary(dummyOpTime));
     }
 
-    void setMyOpTime(const OpTime& opTime, Date_t wallTime = Date_t::min()) {
-        if (wallTime == Date_t::min()) {
+    void setMyOpTime(const OpTime& opTime, Date_t wallTime = Date_t()) {
+        if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getTopoCoord().setMyLastAppliedOpTimeAndWallTime({opTime, wallTime}, now(), false);
@@ -127,8 +127,8 @@ protected:
     void topoCoordSetMyLastAppliedOpTime(const OpTime& opTime,
                                          Date_t now,
                                          bool isRollbackAllowed,
-                                         Date_t wallTime = Date_t::min()) {
-        if (wallTime == Date_t::min()) {
+                                         Date_t wallTime = Date_t()) {
+        if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getTopoCoord().setMyLastAppliedOpTimeAndWallTime(
@@ -138,8 +138,8 @@ protected:
     void topoCoordSetMyLastDurableOpTime(const OpTime& opTime,
                                          Date_t now,
                                          bool isRollbackAllowed,
-                                         Date_t wallTime = Date_t::min()) {
-        if (wallTime == Date_t::min()) {
+                                         Date_t wallTime = Date_t()) {
+        if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getTopoCoord().setMyLastDurableOpTimeAndWallTime(
@@ -147,9 +147,9 @@ protected:
     }
 
     void topoCoordAdvanceLastCommittedOpTime(const OpTime& opTime,
-                                             Date_t wallTime = Date_t::min(),
+                                             Date_t wallTime = Date_t(),
                                              const bool fromSyncSource = false) {
-        if (wallTime == Date_t::min()) {
+        if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getTopoCoord().advanceLastCommittedOpTimeAndWallTime({opTime, wallTime}, fromSyncSource);
@@ -221,7 +221,7 @@ protected:
     OplogQueryMetadata makeOplogQueryMetadata(OpTime lastAppliedOpTime = OpTime(),
                                               int primaryIndex = -1,
                                               int syncSourceIndex = -1,
-                                              Date_t lastCommittedWall = Date_t::min()) {
+                                              Date_t lastCommittedWall = Date_t()) {
         return OplogQueryMetadata(
             {OpTime(), lastCommittedWall}, lastAppliedOpTime, -1, primaryIndex, syncSourceIndex);
     }
@@ -283,12 +283,12 @@ private:
                                                     const OpTime& lastOpTimeSender,
                                                     Milliseconds roundTripTime,
                                                     const HostAndPort& syncingTo,
-                                                    Date_t lastDurableWallTime = Date_t::min(),
-                                                    Date_t lastAppliedWallTime = Date_t::min()) {
-        if (lastDurableWallTime == Date_t::min()) {
+                                                    Date_t lastDurableWallTime = Date_t(),
+                                                    Date_t lastAppliedWallTime = Date_t()) {
+        if (lastDurableWallTime == Date_t()) {
             lastDurableWallTime = Date_t() + Seconds(lastOpTimeSender.getSecs());
         }
-        if (lastAppliedWallTime == Date_t::min()) {
+        if (lastAppliedWallTime == Date_t()) {
             lastAppliedWallTime = Date_t() + Seconds(lastOpTimeSender.getSecs());
         }
         ReplSetHeartbeatResponse hb;
@@ -3706,7 +3706,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenMemberHasYetToHeart
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenMemberNotInConfig) {
     // In this test, the TopologyCoordinator should tell us to change sync sources away from
     // "host4" since "host4" is absent from the config of version 10.
-    ReplSetMetadata replMetadata(0, {OpTime(), Date_t::min()}, OpTime(), 10, OID(), -1, -1);
+    ReplSetMetadata replMetadata(0, {OpTime(), Date_t()}, OpTime(), 10, OID(), -1, -1);
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host4"), replMetadata, makeOplogQueryMetadata(), now()));
 }
@@ -3750,7 +3750,7 @@ TEST_F(HeartbeatResponseTestV1, ReconfigNodeRemovedBetweenHeartbeatRequestAndRep
                   /*requireWallTime*/ true)
         .transitional_ignore();
     hb.setDurableOpTimeAndWallTime(
-        {lastOpTimeApplied, Date_t::min() + Seconds(lastOpTimeApplied.getSecs())});
+        {lastOpTimeApplied, Date_t() + Seconds(lastOpTimeApplied.getSecs())});
     hb.setElectionTime(election.getTimestamp());
     StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
@@ -3797,11 +3797,11 @@ TEST_F(HeartbeatResponseTestV1, ReconfigBetweenHeartbeatRequestAndRepsonse) {
     ReplSetHeartbeatResponse hb;
     hb.initialize(BSON("ok" << 1 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON()
                             << "durableWallTime"
-                            << Date_t::min() + Seconds(100)
+                            << Date_t() + Seconds(100)
                             << "opTime"
                             << OpTime(Timestamp(100, 0), 0).toBSON()
                             << "wallTime"
-                            << Date_t::min() + Seconds(100)
+                            << Date_t() + Seconds(100)
                             << "v"
                             << 1
                             << "state"
@@ -3810,7 +3810,7 @@ TEST_F(HeartbeatResponseTestV1, ReconfigBetweenHeartbeatRequestAndRepsonse) {
                   /*requireWallTime*/ true)
         .transitional_ignore();
     hb.setDurableOpTimeAndWallTime(
-        {lastOpTimeApplied, Date_t::min() + Seconds(lastOpTimeApplied.getSecs())});
+        {lastOpTimeApplied, Date_t() + Seconds(lastOpTimeApplied.getSecs())});
     hb.setElectionTime(election.getTimestamp());
     StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
     topoCoordSetMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
@@ -3971,9 +3971,9 @@ TEST_F(TopoCoordTest, FreshestNodeDoesCatchupTakeover) {
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     OpTime currentOptime(Timestamp(200, 1), 0);
-    Date_t currentWallTime = Date_t::min() + Seconds(currentOptime.getSecs());
+    Date_t currentWallTime = Date_t() + Seconds(currentOptime.getSecs());
     OpTime behindOptime(Timestamp(100, 1), 0);
-    Date_t behindWallTime = Date_t::min() + Seconds(behindOptime.getSecs());
+    Date_t behindWallTime = Date_t() + Seconds(behindOptime.getSecs());
 
     // Create a mock heartbeat response to be able to compare who is the freshest node.
     // The latest heartbeat responses are looked at for determining the latest optime
@@ -4028,9 +4028,9 @@ TEST_F(TopoCoordTest, StaleNodeDoesntDoCatchupTakeover) {
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     OpTime currentOptime(Timestamp(200, 1), 0);
-    Date_t currentWallTime = Date_t::min() + Seconds(currentOptime.getSecs());
+    Date_t currentWallTime = Date_t() + Seconds(currentOptime.getSecs());
     OpTime behindOptime(Timestamp(100, 1), 0);
-    Date_t behindWallTime = Date_t::min() + Seconds(behindOptime.getSecs());
+    Date_t behindWallTime = Date_t() + Seconds(behindOptime.getSecs());
 
     // Create a mock heartbeat response to be able to compare who is the freshest node.
     ReplSetHeartbeatResponse hbResp = ReplSetHeartbeatResponse();
@@ -4087,7 +4087,7 @@ TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverHeartbeatSaysPrimaryCaughtUp) {
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     OpTime currentOptime(Timestamp(200, 1), 0);
-    Date_t currentWallTime = Date_t::min() + Seconds(currentOptime.getSecs());
+    Date_t currentWallTime = Date_t() + Seconds(currentOptime.getSecs());
 
     // Create a mock heartbeat response to be able to compare who is the freshest node.
     ReplSetHeartbeatResponse hbResp = ReplSetHeartbeatResponse();
@@ -4144,8 +4144,8 @@ TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverIfTermNumbersSayPrimaryCaughtUp
 
     OpTime currentOptime(Timestamp(200, 1), 1);
     OpTime behindOptime(Timestamp(100, 1), 0);
-    Date_t currentWallTime = Date_t::min() + Seconds(currentOptime.getSecs());
-    Date_t behindWallTime = Date_t::min() + Seconds(behindOptime.getSecs());
+    Date_t currentWallTime = Date_t() + Seconds(currentOptime.getSecs());
+    Date_t behindWallTime = Date_t() + Seconds(behindOptime.getSecs());
 
     // Create a mock heartbeat response to be able to compare who is the freshest node.
     ReplSetHeartbeatResponse hbResp = ReplSetHeartbeatResponse();

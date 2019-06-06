@@ -49,9 +49,9 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ReplSetHeartbeatResponse hbResponse;
     ReplSetHeartbeatResponse hbResponseObjRoundTripChecker;
     OpTime durableOpTime = OpTime(Timestamp(10), 0);
-    Date_t durableWallTime = Date_t::min() + Seconds(durableOpTime.getSecs());
+    Date_t durableWallTime = Date_t() + Seconds(durableOpTime.getSecs());
     OpTime appliedOpTime = OpTime(Timestamp(50), 0);
-    Date_t appliedWallTime = Date_t::min() + Seconds(appliedOpTime.getSecs());
+    Date_t appliedWallTime = Date_t() + Seconds(appliedOpTime.getSecs());
     ASSERT_EQUALS(false, hbResponse.hasState());
     ASSERT_EQUALS(false, hbResponse.hasElectionTime());
     ASSERT_EQUALS(false, hbResponse.hasDurableOpTime());
@@ -168,7 +168,7 @@ TEST(ReplSetHeartbeatResponse, InitializeWrongAppliedOpTimeType) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "opTime"
              << "hello");
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
@@ -177,7 +177,7 @@ TEST(ReplSetHeartbeatResponse, InitializeWrongAppliedOpTimeType) {
 
     initializerObj = BSON("ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON()
                                << "durableWallTime"
-                               << Date_t::min() + Seconds(100)
+                               << Date_t() + Seconds(100)
                                << "opTime"
                                << OpTime().getTimestamp());
     result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
@@ -190,7 +190,7 @@ TEST(ReplSetHeartbeatResponse, InitializeNoAppliedWallTime) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "opTime"
              << OpTime(Timestamp(100, 0), 0).toBSON());
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
@@ -202,11 +202,11 @@ TEST(ReplSetHeartbeatResponse, InitializeMemberStateWrongType) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "opTime"
              << OpTime(Timestamp(100, 0), 0).toBSON()
              << "wallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "state"
              << "hello");
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
@@ -221,11 +221,11 @@ TEST(ReplSetHeartbeatResponse, InitializeMemberStateTooLow) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "opTime"
              << OpTime(Timestamp(100, 0), 0).toBSON()
              << "wallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "state"
              << -1);
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
@@ -240,11 +240,11 @@ TEST(ReplSetHeartbeatResponse, InitializeMemberStateTooHigh) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "opTime"
              << OpTime(Timestamp(100, 0), 0).toBSON()
              << "wallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "state"
              << 11);
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
@@ -259,11 +259,11 @@ TEST(ReplSetHeartbeatResponse, InitializeVersionWrongType) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "opTime"
              << OpTime(Timestamp(100, 0), 0).toBSON()
              << "wallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "v"
              << "hello");
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
@@ -278,11 +278,11 @@ TEST(ReplSetHeartbeatResponse, InitializeReplSetNameWrongType) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "opTime"
              << OpTime(Timestamp(100, 0), 0).toBSON()
              << "wallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "v"
              << 2  // needs a version to get this far in initialize()
              << "set"
@@ -299,11 +299,11 @@ TEST(ReplSetHeartbeatResponse, InitializeSyncingToWrongType) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "opTime"
              << OpTime(Timestamp(100, 0), 0).toBSON()
              << "wallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "v"
              << 2  // needs a version to get this far in initialize()
              << "syncingTo"
@@ -320,11 +320,11 @@ TEST(ReplSetHeartbeatResponse, InitializeConfigWrongType) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "opTime"
              << OpTime(Timestamp(100, 0), 0).toBSON()
              << "wallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "v"
              << 2  // needs a version to get this far in initialize()
              << "config"
@@ -341,11 +341,11 @@ TEST(ReplSetHeartbeatResponse, InitializeBadConfig) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "opTime"
              << OpTime(Timestamp(100, 0), 0).toBSON()
              << "wallTime"
-             << Date_t::min() + Seconds(100)
+             << Date_t() + Seconds(100)
              << "v"
              << 2  // needs a version to get this far in initialize()
              << "config"
@@ -372,11 +372,11 @@ TEST(ReplSetHeartbeatResponse, InvalidResponseOpTimeMissesConfigVersion) {
     Status result = hbResp.initialize(BSON("ok" << 1.0 << "durableOpTime"
                                                 << OpTime(Timestamp(100, 0), 0).toBSON()
                                                 << "durableWallTime"
-                                                << Date_t::min() + Seconds(100)
+                                                << Date_t() + Seconds(100)
                                                 << "opTime"
                                                 << OpTime(Timestamp(100, 0), 0).toBSON()
                                                 << "wallTime"
-                                                << Date_t::min() + Seconds(100)),
+                                                << Date_t() + Seconds(100)),
                                       0,
                                       /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.code());

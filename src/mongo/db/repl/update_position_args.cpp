@@ -79,7 +79,7 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj, bool requireWallTi
         if (!status.isOK())
             return status;
 
-        Date_t appliedWallTime = Date_t::min();
+        Date_t appliedWallTime = Date_t();
         BSONElement appliedWallTimeElement;
         status = bsonExtractTypedField(
             entry, kAppliedWallTimeFieldName, BSONType::Date, &appliedWallTimeElement);
@@ -88,7 +88,7 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj, bool requireWallTi
         if (status.isOK())
             appliedWallTime = appliedWallTimeElement.Date();
 
-        Date_t durableWallTime = Date_t::min();
+        Date_t durableWallTime = Date_t();
         BSONElement durableWallTimeElement;
         status = bsonExtractTypedField(
             entry, kDurableWallTimeFieldName, BSONType::Date, &durableWallTimeElement);

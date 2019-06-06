@@ -162,7 +162,7 @@ private:
 
 struct OpTimeAndWallTime {
     OpTime opTime;
-    Date_t wallTime = Date_t::min();
+    Date_t wallTime = Date_t();
     inline bool operator==(const OpTimeAndWallTime& rhs) const {
         return opTime == rhs.opTime && wallTime == rhs.wallTime;
     }

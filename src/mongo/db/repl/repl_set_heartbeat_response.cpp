@@ -155,7 +155,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc,
     }
 
     BSONElement durableWallTimeElement;
-    _durableWallTime = Date_t::min();
+    _durableWallTime = Date_t();
     status = bsonExtractTypedField(
         doc, kDurableWallTimeFieldName, BSONType::Date, &durableWallTimeElement);
     if (!status.isOK() && (status != ErrorCodes::NoSuchKey || requireWallTime)) {
@@ -176,7 +176,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc,
     }
 
     BSONElement appliedWallTimeElement;
-    _appliedWallTime = Date_t::min();
+    _appliedWallTime = Date_t();
     status = bsonExtractTypedField(
         doc, kAppliedWallTimeFieldName, BSONType::Date, &appliedWallTimeElement);
     if (!status.isOK() && (status != ErrorCodes::NoSuchKey || requireWallTime)) {

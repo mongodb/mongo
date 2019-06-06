@@ -110,7 +110,7 @@ void OplogFetcherTest::setUp() {
 
     remoteNewerOpTime = {{124, 1}, 2};
     staleOpTime = {{1, 1}, 0};
-    staleWallTime = Date_t::min() + Seconds(staleOpTime.getSecs());
+    staleWallTime = Date_t() + Seconds(staleOpTime.getSecs());
     rbid = 2;
 
     dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();
@@ -297,8 +297,7 @@ DEATH_TEST_F(OplogFetcherTest,
 }
 
 TEST_F(OplogFetcherTest, ValidMetadataWithInResponseShouldBeForwardedToProcessMetadataFn) {
-    rpc::ReplSetMetadata replMetadata(
-        1, {OpTime(), Date_t::min()}, OpTime(), 1, OID::gen(), -1, -1);
+    rpc::ReplSetMetadata replMetadata(1, {OpTime(), Date_t()}, OpTime(), 1, OID::gen(), -1, -1);
     rpc::OplogQueryMetadata oqMetadata({staleOpTime, staleWallTime}, remoteNewerOpTime, rbid, 2, 2);
     BSONObjBuilder bob;
     ASSERT_OK(replMetadata.writeToMetadata(&bob));
@@ -317,8 +316,7 @@ TEST_F(OplogFetcherTest, ValidMetadataWithInResponseShouldBeForwardedToProcessMe
 }
 
 TEST_F(OplogFetcherTest, MetadataAndBatchAreNotProcessedWhenSyncSourceRollsBack) {
-    rpc::ReplSetMetadata replMetadata(
-        1, {OpTime(), Date_t::min()}, OpTime(), 1, OID::gen(), -1, -1);
+    rpc::ReplSetMetadata replMetadata(1, {OpTime(), Date_t()}, OpTime(), 1, OID::gen(), -1, -1);
     rpc::OplogQueryMetadata oqMetadata(
         {staleOpTime, staleWallTime}, remoteNewerOpTime, rbid + 1, 2, 2);
     BSONObjBuilder bob;
@@ -337,8 +335,7 @@ TEST_F(OplogFetcherTest, MetadataAndBatchAreNotProcessedWhenSyncSourceRollsBack)
 }
 
 TEST_F(OplogFetcherTest, MetadataAndBatchAreNotProcessedWhenSyncSourceIsBehind) {
-    rpc::ReplSetMetadata replMetadata(
-        1, {OpTime(), Date_t::min()}, OpTime(), 1, OID::gen(), -1, -1);
+    rpc::ReplSetMetadata replMetadata(1, {OpTime(), Date_t()}, OpTime(), 1, OID::gen(), -1, -1);
     rpc::OplogQueryMetadata oqMetadata({staleOpTime, staleWallTime}, staleOpTime, rbid, 2, 2);
     BSONObjBuilder bob;
     ASSERT_OK(replMetadata.writeToMetadata(&bob));
@@ -356,8 +353,7 @@ TEST_F(OplogFetcherTest, MetadataAndBatchAreNotProcessedWhenSyncSourceIsBehind) 
 }
 
 TEST_F(OplogFetcherTest, MetadataAndBatchAreNotProcessedWhenSyncSourceIsNotAhead) {
-    rpc::ReplSetMetadata replMetadata(
-        1, {OpTime(), Date_t::min()}, OpTime(), 1, OID::gen(), -1, -1);
+    rpc::ReplSetMetadata replMetadata(1, {OpTime(), Date_t()}, OpTime(), 1, OID::gen(), -1, -1);
     rpc::OplogQueryMetadata oqMetadata({staleOpTime, staleWallTime}, lastFetched, rbid, 2, 2);
     BSONObjBuilder bob;
     ASSERT_OK(replMetadata.writeToMetadata(&bob));
@@ -376,8 +372,7 @@ TEST_F(OplogFetcherTest, MetadataAndBatchAreNotProcessedWhenSyncSourceIsNotAhead
 
 TEST_F(OplogFetcherTest,
        MetadataAndBatchAreNotProcessedWhenSyncSourceIsBehindWithoutRequiringFresherSyncSource) {
-    rpc::ReplSetMetadata replMetadata(
-        1, {OpTime(), Date_t::min()}, OpTime(), 1, OID::gen(), -1, -1);
+    rpc::ReplSetMetadata replMetadata(1, {OpTime(), Date_t()}, OpTime(), 1, OID::gen(), -1, -1);
     rpc::OplogQueryMetadata oqMetadata({staleOpTime, staleWallTime}, staleOpTime, rbid, 2, 2);
     BSONObjBuilder bob;
     ASSERT_OK(replMetadata.writeToMetadata(&bob));
@@ -398,8 +393,7 @@ TEST_F(OplogFetcherTest, MetadataAndBatchAreProcessedWhenSyncSourceIsCurrentButM
     // This tests the case where the sync source metadata is behind us but we get a document which
     // is equal to us.  Since that means the metadata is stale and can be ignored, we should accept
     // this sync source.
-    rpc::ReplSetMetadata replMetadata(
-        1, {OpTime(), Date_t::min()}, OpTime(), 1, OID::gen(), -1, -1);
+    rpc::ReplSetMetadata replMetadata(1, {OpTime(), Date_t()}, OpTime(), 1, OID::gen(), -1, -1);
     rpc::OplogQueryMetadata oqMetadata({staleOpTime, staleWallTime}, staleOpTime, rbid, 2, 2);
     BSONObjBuilder bob;
     ASSERT_OK(replMetadata.writeToMetadata(&bob));
@@ -415,8 +409,7 @@ TEST_F(OplogFetcherTest, MetadataAndBatchAreProcessedWhenSyncSourceIsCurrentButM
 
 TEST_F(OplogFetcherTest,
        MetadataAndBatchAreProcessedWhenSyncSourceIsNotAheadWithoutRequiringFresherSyncSource) {
-    rpc::ReplSetMetadata replMetadata(
-        1, {OpTime(), Date_t::min()}, OpTime(), 1, OID::gen(), -1, -1);
+    rpc::ReplSetMetadata replMetadata(1, {OpTime(), Date_t()}, OpTime(), 1, OID::gen(), -1, -1);
     rpc::OplogQueryMetadata oqMetadata({staleOpTime, staleWallTime}, lastFetched, rbid, 2, 2);
     BSONObjBuilder bob;
     ASSERT_OK(replMetadata.writeToMetadata(&bob));
@@ -447,8 +440,7 @@ TEST_F(OplogFetcherTest,
 }
 
 TEST_F(OplogFetcherTest, MetadataIsNotProcessedOnBatchThatTriggersRollback) {
-    rpc::ReplSetMetadata replMetadata(
-        1, {OpTime(), Date_t::min()}, OpTime(), 1, OID::gen(), -1, -1);
+    rpc::ReplSetMetadata replMetadata(1, {OpTime(), Date_t()}, OpTime(), 1, OID::gen(), -1, -1);
     rpc::OplogQueryMetadata oqMetadata({staleOpTime, staleWallTime}, remoteNewerOpTime, rbid, 2, 2);
     BSONObjBuilder bob;
     ASSERT_OK(replMetadata.writeToMetadata(&bob));
@@ -769,10 +761,10 @@ TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithoutMetadataStopsTheOplogFetche
 
 TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithBothMetadatasStopsTheOplogFetcher) {
     rpc::ReplSetMetadata replMetadata(
-        lastFetched.getTerm(), {OpTime(), Date_t::min()}, OpTime(), 1, OID::gen(), -1, -1);
+        lastFetched.getTerm(), {OpTime(), Date_t()}, OpTime(), 1, OID::gen(), -1, -1);
     OpTime committedOpTime = {{Seconds(10000), 0}, 1};
     rpc::OplogQueryMetadata oqMetadata(
-        {committedOpTime, Date_t::min() + Seconds(committedOpTime.getSecs())},
+        {committedOpTime, Date_t() + Seconds(committedOpTime.getSecs())},
         {{Seconds(20000), 0}, 1},
         rbid,
         2,
@@ -791,14 +783,14 @@ TEST_F(OplogFetcherTest,
     OpTime committedOpTime = {{Seconds(10000), 0}, 1};
     rpc::ReplSetMetadata replMetadata(
         lastFetched.getTerm(),
-        {committedOpTime, Date_t::min() + Seconds(committedOpTime.getSecs())},
+        {committedOpTime, Date_t() + Seconds(committedOpTime.getSecs())},
         {{Seconds(20000), 0}, 1},
         1,
         OID::gen(),
         2,
         2);
     rpc::OplogQueryMetadata oqMetadata(
-        {committedOpTime, Date_t::min() + Seconds(committedOpTime.getSecs())},
+        {committedOpTime, Date_t() + Seconds(committedOpTime.getSecs())},
         {{Seconds(20000), 0}, 1},
         rbid,
         2,

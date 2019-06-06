@@ -240,7 +240,7 @@ executor::RemoteCommandResponse makeHeartbeatResponse(const ReplSetConfig& rsCon
     hbResp.setConfigVersion(configVersion);
     // The smallest valid optime in PV1.
     OpTime opTime(Timestamp(), 0);
-    Date_t wallTime = Date_t::min();
+    Date_t wallTime = Date_t();
     hbResp.setAppliedOpTimeAndWallTime({opTime, wallTime});
     hbResp.setDurableOpTimeAndWallTime({opTime, wallTime});
     auto bob = BSONObjBuilder(hbResp.toBSON());
@@ -471,7 +471,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
                                                         << request.target.toString();
         if (request.target == incompatibleHost) {
             OpTime opTime{Timestamp{10, 10}, 10};
-            Date_t wallTime = Date_t::min();
+            Date_t wallTime = Date_t();
             rpc::ReplSetMetadata metadata(opTime.getTerm(),
                                           {opTime, wallTime},
                                           opTime,

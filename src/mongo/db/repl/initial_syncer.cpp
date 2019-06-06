@@ -500,7 +500,7 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
 
     LOG(2) << "Resetting all optimes before starting this initial sync attempt.";
     _opts.resetOptimes();
-    _lastApplied = {OpTime(), Date_t::min()};
+    _lastApplied = {OpTime(), Date_t()};
     _lastFetched = {};
 
     LOG(2) << "Resetting feature compatibility version to last-stable. If the sync source is in "
@@ -1072,7 +1072,7 @@ void InitialSyncer::_databasesClonerCallback(const Status& databaseClonerFinishS
 void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
     const StatusWith<Fetcher::QueryResponse>& result,
     std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
-    OpTimeAndWallTime resultOpTimeAndWallTime = {OpTime(), Date_t::min()};
+    OpTimeAndWallTime resultOpTimeAndWallTime = {OpTime(), Date_t()};
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         auto status = _checkForShutdownAndConvertStatus_inlock(
