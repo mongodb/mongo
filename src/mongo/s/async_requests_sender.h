@@ -168,9 +168,6 @@ private:
      */
     class RemoteData {
     public:
-        using RemoteCommandOnAnyCallbackArgs =
-            executor::TaskExecutor::RemoteCommandOnAnyCallbackArgs;
-
         /**
          * Creates a new uninitialized remote state with a command to send.
          */
@@ -213,25 +210,24 @@ private:
          *
          * for the given shard.
          */
-        SemiFuture<RemoteCommandOnAnyCallbackArgs> scheduleRequest();
+        SemiFuture<executor::RemoteCommandResponse> scheduleRequest();
 
         /**
-         * Given a read preference, selects a lists of hosts on which the command can run.
+         * Given a read preference, selects a host on which the command should be run.
          */
-        SemiFuture<std::vector<HostAndPort>> resolveShardIdToHostAndPorts(
-            const ReadPreferenceSetting& readPref);
+        SemiFuture<HostAndPort> resolveShardIdToHostAndPort(const ReadPreferenceSetting& readPref);
 
         /**
          * Schedules the remote command on the ARS's TaskExecutor
          */
-        SemiFuture<RemoteCommandOnAnyCallbackArgs> scheduleRemoteCommand(
-            std::vector<HostAndPort>&& hostAndPort);
+        SemiFuture<executor::RemoteCommandResponse> scheduleRemoteCommand(
+            HostAndPort&& hostAndPort);
 
         /**
          * Handles the remote response
          */
-        SemiFuture<RemoteCommandOnAnyCallbackArgs> handleResponse(
-            RemoteCommandOnAnyCallbackArgs&& rcr);
+        SemiFuture<executor::RemoteCommandResponse> handleResponse(
+            executor::RemoteCommandResponse&& rcr);
 
     private:
         bool _done = false;
@@ -247,8 +243,6 @@ private:
         // The exact host on which the remote command was run. Is unset until a request has been
         // sent.
         boost::optional<HostAndPort> _shardHostAndPort;
-
-        std::vector<HostAndPort> _eligibleHosts;
 
         // The number of times we've retried sending the command to this remote.
         int _retryCount = 0;
