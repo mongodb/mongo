@@ -59,7 +59,6 @@ namespace mongo {
 
 constexpr std::size_t kEncryptedDBCacheSize = 50;
 
-constexpr int kAssociatedDataLength = 18;
 constexpr uint8_t kIntentToEncryptBit = 0x00;
 constexpr uint8_t kDeterministicEncryptionBit = 0x01;
 constexpr uint8_t kRandomEncryptionBit = 0x02;
@@ -155,11 +154,13 @@ protected:
 
     std::shared_ptr<SymmetricKey> getDataKey(const UUID& uuid);
 
-    std::vector<uint8_t> encryptWithKey(UUID uuid,
-                                        const std::shared_ptr<SymmetricKey>& key,
-                                        ConstDataRange plaintext,
-                                        BSONType bsonType,
-                                        int32_t algorithm);
+    FLEEncryptionFrame createEncryptionFrame(std::shared_ptr<SymmetricKey> key,
+                                             FleAlgorithmInt algorithm,
+                                             UUID uuid,
+                                             BSONType type,
+                                             ConstDataRange plaintext);
+
+    FLEDecryptionFrame createDecryptionFrame(ConstDataRange data);
 
 private:
     virtual void encryptMarking(const BSONObj& elem, BSONObjBuilder* builder, StringData elemName);

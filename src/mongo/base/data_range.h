@@ -117,8 +117,9 @@ public:
     ConstDataRange(const ByteLike (&arr)[N], std::ptrdiff_t debug_offset = 0)
         : ConstDataRange(arr, N, debug_offset) {}
 
-    const byte_type* data() const noexcept {
-        return _begin;
+    template <typename ByteLike = byte_type>
+    const ByteLike* data() const noexcept {
+        return reinterpret_cast<const ByteLike*>(_begin);
     }
 
     size_t length() const noexcept {
