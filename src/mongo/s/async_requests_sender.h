@@ -168,6 +168,9 @@ private:
      */
     class RemoteData {
     public:
+        using RemoteCommandOnAnyCallbackArgs =
+            executor::TaskExecutor::RemoteCommandOnAnyCallbackArgs;
+
         /**
          * Creates a new uninitialized remote state with a command to send.
          */
@@ -210,24 +213,25 @@ private:
          *
          * for the given shard.
          */
-        SemiFuture<executor::RemoteCommandResponse> scheduleRequest();
+        SemiFuture<RemoteCommandOnAnyCallbackArgs> scheduleRequest();
 
         /**
-         * Given a read preference, selects a host on which the command should be run.
+         * Given a read preference, selects a lists of hosts on which the command can run.
          */
-        SemiFuture<HostAndPort> resolveShardIdToHostAndPort(const ReadPreferenceSetting& readPref);
+        SemiFuture<std::vector<HostAndPort>> resolveShardIdToHostAndPorts(
+            const ReadPreferenceSetting& readPref);
 
         /**
          * Schedules the remote command on the ARS's TaskExecutor
          */
-        SemiFuture<executor::RemoteCommandResponse> scheduleRemoteCommand(
-            HostAndPort&& hostAndPort);
+        SemiFuture<RemoteCommandOnAnyCallbackArgs> scheduleRemoteCommand(
+            std::vector<HostAndPort>&& hostAndPort);
 
         /**
          * Handles the remote response
          */
-        SemiFuture<executor::RemoteCommandResponse> handleResponse(
-            executor::RemoteCommandResponse&& rcr);
+        SemiFuture<RemoteCommandOnAnyCallbackArgs> handleResponse(
+            RemoteCommandOnAnyCallbackArgs&& rcr);
 
     private:
         bool _done = false;
