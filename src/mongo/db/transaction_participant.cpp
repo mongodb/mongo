@@ -1035,9 +1035,9 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         // being prepared. When the OplogSlotReserver goes out of scope and is destroyed, the
         // storage-transaction it uses to keep the hole open will abort and the slot (and
         // corresponding oplog hole) will vanish.
-        if (!gUseMultipleOplogEntryFormatForTransactions ||
-            serverGlobalParams.featureCompatibility.getVersion() <
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
+        // TODO(SERVER-41470): Remove the if-clause here.
+        if (serverGlobalParams.featureCompatibility.getVersion() <
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
             oplogSlotReserver.emplace(opCtx);
         } else {
             // Even if the prepared transaction contained no statements, we always reserve at least
@@ -1130,8 +1130,7 @@ void TransactionParticipant::Participant::addTransactionOperation(
                           << BSONObjMaxInternalSize
                           << " when using featureCompatibilityVersion < 4.2. Actual size is "
                           << p().transactionOperationBytes,
-            (gUseMultipleOplogEntryFormatForTransactions && isFCV42) ||
-                p().transactionOperationBytes <= BSONObjMaxInternalSize);
+            isFCV42 || p().transactionOperationBytes <= BSONObjMaxInternalSize);
 }
 
 std::vector<repl::ReplOperation>&

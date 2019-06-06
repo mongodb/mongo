@@ -12,7 +12,3 @@ executor:
     shell_options:
       nodb: ''
       readMode: commands
-      global_vars:
-        TestData:
-          setParameters:
-            useMultipleOplogEntryFormatForTransactions: true

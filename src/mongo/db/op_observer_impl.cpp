@@ -1083,8 +1083,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
 // Log a single applyOps for transactions without any attempt to pack operations. If the given
 // statements would exceed the maximum BSON size limit of a single oplog entry, this will throw a
 // TransactionTooLarge error.
-// TODO (SERVER-39809): Consider removing this function once old transaction format is no longer
-// needed.
+// TODO(SERVER-41470): Remove this function once old transaction format is no longer needed.
 OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
                                        const std::vector<repl::ReplOperation>& statements,
                                        const OplogSlot& oplogSlot,
@@ -1293,8 +1292,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
     // a single call into the OpObserver. Therefore, we store the result here and pass it as an
     // argument.
     const auto fcv = serverGlobalParams.featureCompatibility.getVersion();
-    if (!gUseMultipleOplogEntryFormatForTransactions ||
-        fcv < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
+    if (fcv < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
         auto txnParticipant = TransactionParticipant::get(opCtx);
         const auto lastWriteOpTime = txnParticipant.getLastWriteOpTime();
         invariant(lastWriteOpTime.isNull());
@@ -1361,8 +1359,7 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
     // a single call into the OpObserver. Therefore, we store the result here and pass it as an
     // argument.
     const auto fcv = serverGlobalParams.featureCompatibility.getVersion();
-    if (!gUseMultipleOplogEntryFormatForTransactions ||
-        fcv < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
+    if (fcv < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
         // We write the oplog entry in a side transaction so that we do not commit the now-prepared
         // transaction.
         // We write an empty 'applyOps' entry if there were no writes to choose a prepare timestamp
