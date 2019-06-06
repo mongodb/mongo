@@ -32,6 +32,7 @@
 #include <algorithm>
 #include <numeric>
 
+#include "mongo/db/catalog/disable_index_spec_namespace_generation_gen.h"
 #include "mongo/db/field_ref.h"
 
 namespace mongo {
@@ -133,7 +134,15 @@ BSONObj BSONCollectionCatalogEntry::getIndexSpec(OperationContext* opCtx,
 
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
-    return md.indexes[offset].spec.getOwned();
+
+    BSONObj spec = md.indexes[offset].spec.getOwned();
+    if (spec.hasField("ns") || disableIndexSpecNamespaceGeneration.load()) {
+        return spec;
+    }
+
+    BSONObj nsObj = BSON("ns" << ns().ns());
+    spec = spec.addField(nsObj.firstElement());
+    return spec;
 }
 
 

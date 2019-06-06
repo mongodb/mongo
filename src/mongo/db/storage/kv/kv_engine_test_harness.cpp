@@ -29,6 +29,8 @@
 
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
+#include "mongo/db/catalog/collection_catalog_entry_mock.h"
+#include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
@@ -142,17 +144,40 @@ TEST(KVEngineTestHarness, Restart1) {
 
 
 TEST(KVEngineTestHarness, SimpleSorted1) {
+    setGlobalServiceContext(ServiceContext::make());
     unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
 
     string ident = "abc";
-    IndexDescriptor desc(nullptr,
-                         "",
-                         BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "ns"
-                                  << "mydb.mycoll"
-                                  << "key"
-                                  << BSON("a" << 1)));
+    string ns = "mydb.mycoll";
+
+    unique_ptr<RecordStore> rs;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(engine->createRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        rs = engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions());
+        uow.commit();
+    }
+
+
+    unique_ptr<CollectionCatalogEntryMock> catalogEntry =
+        std::make_unique<CollectionCatalogEntryMock>(ns);
+    unique_ptr<CollectionImpl> collection;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        collection =
+            std::make_unique<CollectionImpl>(&opCtx, ns, UUID::gen(), catalogEntry.get(), rs.get());
+        uow.commit();
+    }
+
+    IndexDescriptor desc(
+        collection.get(),
+        "",
+        BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "ns" << ns << "key"
+                 << BSON("a" << 1)));
     unique_ptr<SortedDataInterface> sorted;
     {
         MyOperationContext opCtx(engine);
@@ -660,17 +685,40 @@ TEST_F(KVCatalogTest, BackupImplemented) {
 }
 
 DEATH_TEST_F(KVCatalogTest, TerminateOnNonNumericIndexVersion, "Fatal Assertion 50942") {
+    setGlobalServiceContext(ServiceContext::make());
     unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
 
     string ident = "abc";
-    IndexDescriptor desc(nullptr,
+    string ns = "mydb.mycoll";
+
+    unique_ptr<RecordStore> rs;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(engine->createRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        rs = engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions());
+        uow.commit();
+    }
+
+    unique_ptr<CollectionCatalogEntryMock> catalogEntry =
+        std::make_unique<CollectionCatalogEntryMock>(ns);
+    unique_ptr<CollectionImpl> collection;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        collection =
+            std::make_unique<CollectionImpl>(&opCtx, ns, UUID::gen(), catalogEntry.get(), rs.get());
+        uow.commit();
+    }
+
+    IndexDescriptor desc(collection.get(),
                          "",
                          BSON("v"
                               << "1"
                               << "ns"
-                              << "mydb.mycoll"
+                              << ns
                               << "key"
                               << BSON("a" << 1)));
     unique_ptr<SortedDataInterface> sorted;

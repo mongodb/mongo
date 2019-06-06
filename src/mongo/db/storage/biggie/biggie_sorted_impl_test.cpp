@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
+#include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
@@ -69,7 +70,8 @@ public:
             spec = spec.addField(partialBSON.firstElement());
         }
 
-        IndexDescriptor desc(NULL, "", spec);
+        auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
+        IndexDescriptor desc(collection.get(), "", spec);
 
         return std::make_unique<SortedDataInterface>(&opCtx, "ident"_sd, &desc);
     }

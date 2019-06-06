@@ -1,6 +1,10 @@
 /**
  * Characterizes the actions (rebuilds or drops the index) taken upon unfinished indexes when
  * restarting mongod from (standalone -> standalone) and (replica set member -> standalone).
+ * Additionally, the primary will use the 'disableIndexSpecNamespaceGeneration' server test
+ * parameter to prevent index specs from having the 'ns' field to test the absence of the 'ns' field
+ * on a replica set with unfinished indexes during restart.
+ *
  * @tags: [requires_replication, requires_persistence, requires_majority_read_concern]
  */
 (function() {
@@ -42,20 +46,14 @@
     }
 
     function startReplSet() {
-        let replSet = new ReplSetTest({name: "indexBuilds", nodes: 3, nodeOptions: {syncdelay: 1}});
+        let replSet = new ReplSetTest({name: "indexBuilds", nodes: 2, nodeOptions: {syncdelay: 1}});
         let nodes = replSet.nodeList();
 
         // We need an arbiter to ensure that the primary doesn't step down when we restart the
         // secondary
         replSet.startSet({startClean: true});
-        replSet.initiate({
-            _id: "indexBuilds",
-            members: [
-                {_id: 0, host: nodes[0]},
-                {_id: 1, host: nodes[1]},
-                {_id: 2, host: nodes[2], arbiterOnly: true}
-            ]
-        });
+        replSet.initiate(
+            {_id: "indexBuilds", members: [{_id: 0, host: nodes[0]}, {_id: 1, host: nodes[1]}]});
 
         replSet.getPrimary().getDB(dbName).dropDatabase();
         return replSet;
@@ -80,6 +78,11 @@
 
         assert.commandWorked(secondaryDB.adminCommand(
             {configureFailPoint: "leaveIndexBuildUnfinishedForShutdown", mode: "alwaysOn"}));
+
+        // Do not generate the 'ns' field for index specs on the primary to test the absence of the
+        // field on restart.
+        assert.commandWorked(
+            primaryDB.adminCommand({setParameter: 1, disableIndexSpecNamespaceGeneration: 1}));
 
         try {
             let res = assert.commandWorked(primaryDB.runCommand({
@@ -142,6 +145,7 @@
 
         let foundIndexEntry = false;
         for (let index = 0; index < collIndexes.length; index++) {
+            assert.eq(true, collIndexes[index].hasOwnProperty('ns'));
             if (collIndexes[index].name == indexName) {
                 foundIndexEntry = true;
                 break;
@@ -208,9 +212,7 @@
 
         startIndexBuildOnSecondaryAndLeaveUnfinished(primaryDB, /*writeConcern=*/2, secondaryDB);
 
-        let secondaryId = replSet.getNodeId(secondary);
-        replSet.stop(secondaryId);
-        replSet.remove(secondaryId);
+        replSet.stopSet(/*signal=*/null, /*forRestart=*/true);
 
         let mongod = restartStandalone(secondary);
 
@@ -220,7 +222,15 @@
         checkForIndexRebuild(mongod, fourthIndex, /*shouldExist=*/true);
 
         shutdownStandalone(mongod);
-        stopReplSet(replSet);
+
+        mongod = restartStandalone(primary);
+        let specs = mongod.getDB(dbName).getCollection(collName).getIndexes();
+        assert.eq(specs.length, 5);
+        for (let index = 0; index < specs.length; index++) {
+            assert.eq(true, specs[index].hasOwnProperty('ns'));
+        }
+
+        shutdownStandalone(mongod);
     }
 
     /* Begin tests */
