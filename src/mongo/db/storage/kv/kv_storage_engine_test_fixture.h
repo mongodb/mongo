@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
@@ -122,7 +123,6 @@ public:
                            NamespaceString collNs,
                            std::string key,
                            bool isBackgroundSecondaryBuild) {
-        Collection* coll = nullptr;
         BSONObjBuilder builder;
         {
             BSONObjBuilder keyObj;
@@ -130,8 +130,9 @@ public:
         }
         BSONObj spec = builder.append("name", key).append("ns", collNs.ns()).append("v", 2).done();
 
-        auto descriptor =
-            std::make_unique<IndexDescriptor>(coll, IndexNames::findPluginName(spec), spec);
+        auto collection = std::make_unique<CollectionMock>(collNs);
+        auto descriptor = std::make_unique<IndexDescriptor>(
+            collection.get(), IndexNames::findPluginName(spec), spec);
 
         CollectionCatalogEntry* cce =
             CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);

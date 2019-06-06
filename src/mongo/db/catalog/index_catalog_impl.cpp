@@ -42,6 +42,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/disable_index_spec_namespace_generation_gen.h"
 #include "mongo/db/catalog/index_catalog_entry_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
@@ -530,18 +531,22 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
     if (nss.isOplog())
         return Status(ErrorCodes::CannotCreateIndex, "cannot have an index on the oplog");
 
-    const BSONElement specNamespace = spec["ns"];
-    if (specNamespace.type() != String)
-        return Status(ErrorCodes::CannotCreateIndex,
-                      "the index spec is missing a \"ns\" string field");
+    // If we stop generating the 'ns' field for index specs during testing, then we shouldn't
+    // validate that the 'ns' field is missing.
+    if (!disableIndexSpecNamespaceGeneration.load()) {
+        const BSONElement specNamespace = spec["ns"];
+        if (specNamespace.type() != String)
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "the index spec is missing a \"ns\" string field");
 
-    if (nss.ns() != specNamespace.valueStringData())
-        return Status(ErrorCodes::CannotCreateIndex,
-                      str::stream() << "the \"ns\" field of the index spec '"
-                                    << specNamespace.valueStringData()
-                                    << "' does not match the collection name '"
-                                    << nss
-                                    << "'");
+        if (nss.ns() != specNamespace.valueStringData())
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream() << "the \"ns\" field of the index spec '"
+                                        << specNamespace.valueStringData()
+                                        << "' does not match the collection name '"
+                                        << nss
+                                        << "'");
+    }
 
     // logical name of the index
     const BSONElement nameElem = spec["name"];
