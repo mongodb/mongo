@@ -1541,20 +1541,19 @@ rs.debug.getLastOpWritten = function(server) {
     return s.oplog.rs.find().sort({$natural: -1}).limit(1).next();
 };
 
+rs.isValidOpTime = function(opTime) {
+    let timestampIsValid = (opTime.hasOwnProperty("ts") && (opTime.ts !== Timestamp(0, 0)));
+    let termIsValid = (opTime.hasOwnProperty("t") && (opTime.t != -1));
+
+    return timestampIsValid && termIsValid;
+};
+
 /**
  * Compares OpTimes in the format {ts:Timestamp, t:NumberLong}.
  * Returns -1 if ot1 is 'earlier' than ot2, 1 if 'later' and 0 if equal.
  */
 rs.compareOpTimes = function(ot1, ot2) {
-
-    function _isValidOptime(opTime) {
-        let timestampIsValid = (opTime.hasOwnProperty("ts") && (opTime.ts !== Timestamp(0, 0)));
-        let termIsValid = (opTime.hasOwnProperty("t") && (opTime.t != -1));
-
-        return timestampIsValid && termIsValid;
-    }
-
-    if (!_isValidOptime(ot1) || !_isValidOptime(ot2)) {
+    if (!rs.isValidOpTime(ot1) || !rs.isValidOpTime(ot2)) {
         throw Error("invalid optimes, received: " + tojson(ot1) + " and " + tojson(ot2));
     }
 
