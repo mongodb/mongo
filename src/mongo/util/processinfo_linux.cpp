@@ -404,7 +404,7 @@ public:
             meminfo = meminfo.substr(lineOff);
 
             unsigned long long systemMem = 0;
-            if (mongo::parseNumberFromString(meminfo, &systemMem).isOK()) {
+            if (mongo::NumberParser{}(meminfo, &systemMem).isOK()) {
                 return systemMem * 1024;  // convert from kB to bytes
             } else
                 log() << "Unable to collect system memory information";
@@ -422,8 +422,7 @@ public:
         unsigned long long systemMemBytes = getSystemMemorySize();
         unsigned long long cgroupMemBytes = 0;
         std::string cgmemlimit = readLineFromFile("/sys/fs/cgroup/memory/memory.limit_in_bytes");
-        if (!cgmemlimit.empty() &&
-            mongo::parseNumberFromString(cgmemlimit, &cgroupMemBytes).isOK()) {
+        if (!cgmemlimit.empty() && mongo::NumberParser{}(cgmemlimit, &cgroupMemBytes).isOK()) {
             return std::min(systemMemBytes, cgroupMemBytes);
         }
         return systemMemBytes;

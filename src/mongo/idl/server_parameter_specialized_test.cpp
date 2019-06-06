@@ -144,7 +144,7 @@ void SpecializedWithValueServerParameter::append(OperationContext*,
 }
 
 Status SpecializedWithValueServerParameter::setFromString(const std::string& value) {
-    return parseNumberFromString(value, &_data);
+    return NumberParser{}(value, &_data);
 }
 
 TEST(SpecializedServerParameter, withValue) {
@@ -195,7 +195,7 @@ void SpecializedWithAtomicValueServerParameter::append(OperationContext*,
 Status SpecializedWithAtomicValueServerParameter::setFromString(const std::string& value) {
     std::uint32_t val;
 
-    auto status = parseNumberFromString(value, &val);
+    auto status = NumberParser{}(value, &val);
     if (!status.isOK()) {
         return status;
     }
@@ -275,7 +275,7 @@ void SpecializedWithCtorAndValueServerParameter::append(OperationContext*,
 }
 
 Status SpecializedWithCtorAndValueServerParameter::setFromString(const std::string& value) {
-    return parseNumberFromString(value, &_data);
+    return NumberParser{}(value, &_data);
 }
 
 TEST(SpecializedServerParameter, withCtorAndValue) {

@@ -263,7 +263,7 @@ Status parseProcStat(const std::vector<StringData>& keys,
 
                     uint64_t value;
 
-                    if (!parseNumberFromString(stringValue, &value).isOK()) {
+                    if (!NumberParser{}(stringValue, &value).isOK()) {
                         value = 0;
                     }
 
@@ -275,7 +275,7 @@ Status parseProcStat(const std::vector<StringData>& keys,
 
                 uint64_t value;
 
-                if (!parseNumberFromString(stringValue, &value).isOK()) {
+                if (!NumberParser{}(stringValue, &value).isOK()) {
                     value = 0;
                 }
 
@@ -368,7 +368,7 @@ Status parseProcMemInfo(const std::vector<StringData>& keys,
 
             uint64_t value;
 
-            if (!parseNumberFromString(stringValue, &value).isOK()) {
+            if (!NumberParser{}(stringValue, &value).isOK()) {
                 value = 0;
             }
 
@@ -478,7 +478,7 @@ Status parseProcNetstat(const std::vector<StringData>& keys,
                     StringData key((*keysIt).begin(), (*keysIt).end());
                     StringData stringValue((*valuesIt).begin(), (*valuesIt).end());
                     uint64_t value;
-                    if (parseNumberFromString(stringValue, &value).isOK()) {
+                    if (NumberParser{}(stringValue, &value).isOK()) {
                         builder->appendNumber(prefix.toString() + key.toString(),
                                               static_cast<long long>(value));
                         foundKeys = true;
@@ -600,7 +600,7 @@ Status parseProcDiskStats(const std::vector<StringData>& disks,
 
                 uint64_t value;
 
-                if (!parseNumberFromString(stringValue, &value).isOK()) {
+                if (!NumberParser{}(stringValue, &value).isOK()) {
                     value = 0;
                 }
 

@@ -594,7 +594,7 @@ Timestamp WiredTigerRecoveryUnit::_getTransactionReadTimestamp(WT_SESSION* sessi
     auto wtstatus = session->query_timestamp(session, buf, "get=read");
     invariantWTOK(wtstatus);
     uint64_t read_timestamp;
-    fassert(50949, parseNumberFromStringWithBase(buf, 16, &read_timestamp));
+    fassert(50949, NumberParser().base(16)(buf, &read_timestamp));
     return Timestamp(read_timestamp);
 }
 

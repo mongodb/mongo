@@ -29,6 +29,7 @@
 
 #include "mongo/bson/oid.h"
 
+#include "mongo/base/parse_number.h"
 #include "mongo/platform/endian.h"
 #include "mongo/unittest/unittest.h"
 
@@ -161,6 +162,8 @@ TEST(Basic, FromTerm) {
     auto oidTail = oidStr.substr(oidStr.length() - 1);
 
     ASSERT_EQUALS("7fffffff", oidHead);
-    ASSERT_EQUALS(term, std::stoi(oidTail));
+    int oidTailInt;
+    ASSERT_OK(mongo::NumberParser::strToAny()(oidTail, &oidTailInt));
+    ASSERT_EQUALS(term, oidTailInt);
 }
 }

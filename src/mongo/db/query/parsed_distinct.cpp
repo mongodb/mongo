@@ -119,7 +119,7 @@ std::string getProjectedDottedField(const std::string& field, bool* isIDOut) {
     // with a number, the number cannot be an array index.
     int arrayIndex = 0;
     for (size_t i = 1; i < res.size(); ++i) {
-        if (mongo::parseNumberFromStringWithBase(res[i], 10, &arrayIndex).isOK()) {
+        if (mongo::NumberParser().base(10)(res[i], &arrayIndex).isOK()) {
             // Array indices cannot be negative numbers (this is not $slice).
             // Negative numbers are allowed as field names.
             if (arrayIndex >= 0) {

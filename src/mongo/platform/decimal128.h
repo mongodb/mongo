@@ -198,11 +198,14 @@ public:
      * "200E9999999999" --> +Inf
      * "-200E9999999999" --> -Inf
      */
-    explicit Decimal128(std::string stringValue, RoundingMode roundMode = kRoundTiesToEven);
+    explicit Decimal128(std::string stringValue,
+                        RoundingMode roundMode = kRoundTiesToEven,
+                        size_t* charsConsumed = nullptr);
 
     Decimal128(std::string stringValue,
                std::uint32_t* signalingFlag,
-               RoundingMode roundMode = kRoundTiesToEven);
+               RoundingMode roundMode = kRoundTiesToEven,
+               size_t* charsConsumed = nullptr);
 
     /**
      * This function gets the inner Value struct storing a Decimal128 value.

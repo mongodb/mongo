@@ -263,7 +263,7 @@ uint64_t WiredTigerOplogManager::fetchAllCommittedValue(WT_CONNECTION* conn) {
     }
 
     uint64_t tmp;
-    fassert(38002, parseNumberFromStringWithBase(buf, 16, &tmp));
+    fassert(38002, NumberParser().base(16)(buf, &tmp));
     return tmp;
 }
 

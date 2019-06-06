@@ -2172,7 +2172,8 @@ TEST_F(ExpressionConvertTest, ConvertStringToLongFailsForFloats) {
                              AssertionException,
                              [](const AssertionException& exception) {
                                  ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
-                                 ASSERT_STRING_CONTAINS(exception.reason(), "Bad digit \".\"");
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Did not consume whole string");
                              });
 
     spec = fromjson("{$convert: {input: '5.0', to: 'long'}}");
@@ -2181,7 +2182,8 @@ TEST_F(ExpressionConvertTest, ConvertStringToLongFailsForFloats) {
                              AssertionException,
                              [](const AssertionException& exception) {
                                  ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
-                                 ASSERT_STRING_CONTAINS(exception.reason(), "Bad digit \".\"");
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Did not consume whole string");
                              });
 }
 
@@ -2274,7 +2276,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDoubleFailsForInvalidFloats) {
                              [](const AssertionException& exception) {
                                  ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
                                  ASSERT_STRING_CONTAINS(exception.reason(),
-                                                        "Did not consume whole number");
+                                                        "Did not consume whole string");
                              });
 
     spec = fromjson("{$convert: {input: '5.5f', to: 'double'}}");
@@ -2284,7 +2286,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToDoubleFailsForInvalidFloats) {
                              [](const AssertionException& exception) {
                                  ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
                                  ASSERT_STRING_CONTAINS(exception.reason(),
-                                                        "Did not consume whole number");
+                                                        "Did not consume whole string");
                              });
 }
 
@@ -2762,7 +2764,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToNumberFailsForHexStrings) {
                              [](const AssertionException& exception) {
                                  ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
                                  ASSERT_STRING_CONTAINS(exception.reason(),
-                                                        "Did not consume whole number");
+                                                        "Did not consume any digits");
                              });
 
     spec = fromjson("{$convert: {input: 'FF', to: 'decimal'}}");

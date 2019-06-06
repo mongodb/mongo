@@ -349,10 +349,10 @@ Status parseTimeZoneFromToken(StringData tzStr, int* tzAdjSecs) {
             }
 
             // Parse the hours component of the time zone offset.  Note that
-            // parseNumberFromStringWithBase correctly handles the sign bit, so leave that in.
+            // NumberParser correctly handles the sign bit, so leave that in.
             StringData tzHoursStr = tzStr.substr(0, 3);
             int tzAdjHours = 0;
-            Status status = parseNumberFromStringWithBase(tzHoursStr, 10, &tzAdjHours);
+            Status status = NumberParser().base(10)(tzHoursStr, &tzAdjHours);
             if (!status.isOK()) {
                 return status;
             }
@@ -365,7 +365,7 @@ Status parseTimeZoneFromToken(StringData tzStr, int* tzAdjSecs) {
 
             StringData tzMinutesStr = tzStr.substr(3, 2);
             int tzAdjMinutes = 0;
-            status = parseNumberFromStringWithBase(tzMinutesStr, 10, &tzAdjMinutes);
+            status = NumberParser().base(10)(tzMinutesStr, &tzAdjMinutes);
             if (!status.isOK()) {
                 return status;
             }
@@ -376,7 +376,7 @@ Status parseTimeZoneFromToken(StringData tzStr, int* tzAdjSecs) {
                 return Status(ErrorCodes::BadValue, sb.str());
             }
 
-            // Use the sign that parseNumberFromStringWithBase found to determine if we need to
+            // Use the sign that NumberParser::parse found to determine if we need to
             // flip the sign of our minutes component.  Also, we need to flip the sign of our
             // final result, because the offset passed in by the user represents how far off the
             // time they are giving us is from UTC, which means that we have to go the opposite
@@ -411,7 +411,7 @@ Status parseMillisFromToken(StringData millisStr, int* resultMillis) {
             return Status(ErrorCodes::BadValue, sb.str());
         }
 
-        Status status = parseNumberFromStringWithBase(millisStr, 10, resultMillis);
+        Status status = NumberParser().base(10)(millisStr, resultMillis);
         if (!status.isOK()) {
             return status;
         }
@@ -453,7 +453,7 @@ Status parseTmFromTokens(StringData yearStr,
         return Status(ErrorCodes::BadValue, sb.str());
     }
 
-    Status status = parseNumberFromStringWithBase(yearStr, 10, &resultTm->tm_year);
+    Status status = NumberParser().base(10)(yearStr, &resultTm->tm_year);
     if (!status.isOK()) {
         return status;
     }
@@ -473,7 +473,7 @@ Status parseTmFromTokens(StringData yearStr,
         return Status(ErrorCodes::BadValue, sb.str());
     }
 
-    status = parseNumberFromStringWithBase(monthStr, 10, &resultTm->tm_mon);
+    status = NumberParser().base(10)(monthStr, &resultTm->tm_mon);
     if (!status.isOK()) {
         return status;
     }
@@ -493,7 +493,7 @@ Status parseTmFromTokens(StringData yearStr,
         return Status(ErrorCodes::BadValue, sb.str());
     }
 
-    status = parseNumberFromStringWithBase(dayStr, 10, &resultTm->tm_mday);
+    status = NumberParser().base(10)(dayStr, &resultTm->tm_mday);
     if (!status.isOK()) {
         return status;
     }
@@ -511,7 +511,7 @@ Status parseTmFromTokens(StringData yearStr,
         return Status(ErrorCodes::BadValue, sb.str());
     }
 
-    status = parseNumberFromStringWithBase(hourStr, 10, &resultTm->tm_hour);
+    status = NumberParser().base(10)(hourStr, &resultTm->tm_hour);
     if (!status.isOK()) {
         return status;
     }
@@ -529,7 +529,7 @@ Status parseTmFromTokens(StringData yearStr,
         return Status(ErrorCodes::BadValue, sb.str());
     }
 
-    status = parseNumberFromStringWithBase(minStr, 10, &resultTm->tm_min);
+    status = NumberParser().base(10)(minStr, &resultTm->tm_min);
     if (!status.isOK()) {
         return status;
     }
@@ -551,7 +551,7 @@ Status parseTmFromTokens(StringData yearStr,
         return Status(ErrorCodes::BadValue, sb.str());
     }
 
-    status = parseNumberFromStringWithBase(secStr, 10, &resultTm->tm_sec);
+    status = NumberParser().base(10)(secStr, &resultTm->tm_sec);
     if (!status.isOK()) {
         return status;
     }

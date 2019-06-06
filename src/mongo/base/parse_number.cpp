@@ -32,6 +32,7 @@
 #include "mongo/base/parse_number.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
@@ -128,45 +129,69 @@ inline StringData _extractBase(StringData stringValue, int inputBase, int* outpu
 
 inline StatusWith<uint64_t> parseMagnitudeFromStringWithBase(uint64_t base,
                                                              StringData wholeString,
-                                                             StringData magnitudeStr) {
+                                                             StringData magnitudeStr,
+                                                             const char** end,
+                                                             bool allowTrailingText) {
     uint64_t n = 0;
+    size_t charsConsumed = 0;
     for (char digitChar : magnitudeStr) {
         const uint64_t digitValue = _digitValue(digitChar);
         if (digitValue >= base) {
-            return Status(ErrorCodes::FailedToParse,
-                          std::string("Bad digit \"") + digitChar + "\" while parsing " +
-                              wholeString);
+            break;
         }
 
         // This block is (n = (n * base) + digitValue) with overflow checking at each step.
         uint64_t multiplied;
         if (mongoUnsignedMultiplyOverflow64(n, base, &multiplied))
-            return Status(ErrorCodes::FailedToParse, "Overflow");
+            return Status(ErrorCodes::Overflow, "Overflow");
         if (mongoUnsignedAddOverflow64(multiplied, digitValue, &n))
-            return Status(ErrorCodes::FailedToParse, "Overflow");
+            return Status(ErrorCodes::Overflow, "Overflow");
+        ++charsConsumed;
     }
+    if (end)
+        *end = magnitudeStr.begin() + charsConsumed;
+    if (!allowTrailingText && charsConsumed != magnitudeStr.size())
+        return Status(ErrorCodes::FailedToParse, "Did not consume whole string.");
+    if (charsConsumed == 0)
+        return Status(ErrorCodes::FailedToParse, "Did not consume any digits");
     return n;
 }
 
-}  // namespace
+StringData removeLeadingWhitespace(StringData s) {
+    return s.substr(std::distance(
+        s.begin(),
+        std::find_if_not(s.begin(), s.end(), [](unsigned char c) { return isspace(c); })));
+}
 
 template <typename NumberType>
-Status parseNumberFromStringWithBase(StringData wholeString, int base, NumberType* result) {
+Status parseNumberFromStringHelper(StringData s,
+                                   NumberType* result,
+                                   const char** endptr,
+                                   const NumberParser& parser) {
     MONGO_STATIC_ASSERT(sizeof(NumberType) <= sizeof(uint64_t));
     typedef ::std::numeric_limits<NumberType> limits;
 
-    if (base == 1 || base < 0 || base > 36)
-        return Status(ErrorCodes::BadValue, "Invalid base");
+    if (endptr)
+        *endptr = s.begin();
 
-    // Separate the magnitude from modifiers such as sign and base prefixes such as "0x"
+    if (parser._base == 1 || parser._base < 0 || parser._base > 36)
+        return Status(ErrorCodes::BadValue, "Invalid parser._base");
+
+    if (parser._skipLeadingWhitespace) {
+        s = removeLeadingWhitespace(s);
+    }
+
+    // Separate the magnitude from modifiers such as sign and parser._base prefixes such as "0x"
     bool isNegative = false;
-    StringData magnitudeStr = _extractBase(_extractSign(wholeString, &isNegative), base, &base);
+    int base = 0;
+    StringData magnitudeStr = _extractBase(_extractSign(s, &isNegative), parser._base, &base);
     if (isNegative && !limits::is_signed)
         return Status(ErrorCodes::FailedToParse, "Negative value");
     if (magnitudeStr.empty())
         return Status(ErrorCodes::FailedToParse, "No digits");
 
-    auto status = parseMagnitudeFromStringWithBase(base, wholeString, magnitudeStr);
+    auto status =
+        parseMagnitudeFromStringWithBase(base, s, magnitudeStr, endptr, parser._allowTrailingText);
     if (!status.isOK())
         return status.getStatus();
     uint64_t magnitude = status.getValue();
@@ -174,7 +199,7 @@ Status parseNumberFromStringWithBase(StringData wholeString, int base, NumberTyp
     // The range of 2's complement integers is from -(max + 1) to +max.
     const uint64_t maxMagnitude = uint64_t(limits::max()) + (isNegative ? 1u : 0u);
     if (magnitude > maxMagnitude)
-        return Status(ErrorCodes::FailedToParse, "Overflow");
+        return Status(ErrorCodes::Overflow, "Overflow");
 
 #pragma warning(push)
 // C4146: unary minus operator applied to unsigned type, result still unsigned
@@ -184,23 +209,6 @@ Status parseNumberFromStringWithBase(StringData wholeString, int base, NumberTyp
 
     return Status::OK();
 }
-
-// Definition of the various supported implementations of parseNumberFromStringWithBase.
-
-#define DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(NUMBER_TYPE) \
-    template Status parseNumberFromStringWithBase<NUMBER_TYPE>(StringData, int, NUMBER_TYPE*);
-
-DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(long)
-DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(long long)
-DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(unsigned long)
-DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(unsigned long long)
-DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(short)
-DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(unsigned short)
-DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(int)
-DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(unsigned int)
-DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(int8_t);
-DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(uint8_t);
-#undef DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE
 
 #ifdef _WIN32
 
@@ -221,15 +229,19 @@ char toLowerAscii(char c) {
 #endif  // defined(_WIN32)
 
 template <>
-Status parseNumberFromStringWithBase<double>(StringData stringValue, int base, double* result) {
-    if (base != 0) {
-        return Status(ErrorCodes::BadValue,
-                      "Must pass 0 as base to parseNumberFromStringWithBase<double>.");
+Status parseNumberFromStringHelper<double>(StringData stringValue,
+                                           double* result,
+                                           const char** endptr,
+                                           const NumberParser& parser) {
+    if (endptr)
+        *endptr = stringValue.begin();
+    if (parser._base != 0) {
+        return Status(ErrorCodes::BadValue, "NumberParser::base must be 0 for a double.");
     }
     if (stringValue.empty())
         return Status(ErrorCodes::FailedToParse, "Empty string");
 
-    if (isspace(stringValue[0]))
+    if (!parser._skipLeadingWhitespace && isspace(stringValue[0]))
         return Status(ErrorCodes::FailedToParse, "Leading whitespace");
 
     std::string str = stringValue.toString();
@@ -238,38 +250,59 @@ Status parseNumberFromStringWithBase<double>(StringData stringValue, int base, d
     errno = 0;
     double d = strtod(cStr, &endp);
     int actualErrno = errno;
-    if (endp != stringValue.size() + cStr) {
+    if (endp == cStr) {
 #ifdef _WIN32
         // The Windows libc implementation of strtod cannot parse +/-infinity or nan,
         // so handle that here.
         std::transform(str.begin(), str.end(), str.begin(), toLowerAscii);
         if (str == "nan"_sd) {
             *result = std::numeric_limits<double>::quiet_NaN();
+            if (endptr)
+                *endptr = stringValue.end();
             return Status::OK();
         } else if (str == "+infinity"_sd || str == "infinity"_sd) {
             *result = std::numeric_limits<double>::infinity();
+            if (endptr)
+                *endptr = stringValue.end();
             return Status::OK();
         } else if (str == "-infinity"_sd) {
             *result = -std::numeric_limits<double>::infinity();
+            if (endptr)
+                *endptr = stringValue.end();
             return Status::OK();
         }
 #endif  // defined(_WIN32)
-
-        return Status(ErrorCodes::FailedToParse, "Did not consume whole number.");
+        return Status(ErrorCodes::FailedToParse, "Did not consume any digits");
     }
-    if (actualErrno == ERANGE)
-        return Status(ErrorCodes::FailedToParse, "Out of range");
+    if (actualErrno == ERANGE) {
+        return Status(ErrorCodes::Overflow, "Out of range");
+    }
+    if (endptr) {
+        size_t charsConsumed = endp - cStr;
+        *endptr = stringValue.begin() + charsConsumed;
+    }
+    if (!parser._allowTrailingText && endp != (cStr + str.size()))
+        return Status(ErrorCodes::FailedToParse, "Did not consume whole string.");
     *result = d;
     return Status::OK();
 }
 
 template <>
-Status parseNumberFromStringWithBase<Decimal128>(StringData stringValue,
-                                                 int base,
-                                                 Decimal128* result) {
-    if (base != 0) {
+Status parseNumberFromStringHelper<Decimal128>(StringData stringValue,
+                                               Decimal128* result,
+                                               const char** endptr,
+                                               const NumberParser& parser) {
+    if (endptr)
+        *endptr = stringValue.begin();  // same behavior as strtod: if unable to parse, set end to
+                                        // be the beginning of input str
+
+    if (parser._base != 0) {
         return Status(ErrorCodes::BadValue,
-                      "Must pass 0 as base to parseNumberFromStringWithBase<Decimal128>.");
+                      "NumberParser::parser._base must be 0 for a Decimal128.");
+    }
+
+    if (parser._skipLeadingWhitespace) {
+        stringValue = removeLeadingWhitespace(stringValue);
     }
 
     if (stringValue.empty()) {
@@ -277,21 +310,44 @@ Status parseNumberFromStringWithBase<Decimal128>(StringData stringValue,
     }
 
     std::uint32_t signalingFlags = 0;
-    auto parsedDecimal = Decimal128(
-        stringValue.toString(), &signalingFlags, Decimal128::RoundingMode::kRoundTowardZero);
+    size_t charsConsumed;
+    auto parsedDecimal =
+        Decimal128(stringValue.toString(), &signalingFlags, parser._roundingMode, &charsConsumed);
 
     if (Decimal128::hasFlag(signalingFlags, Decimal128::SignalingFlag::kOverflow)) {
-        return Status(ErrorCodes::FailedToParse,
-                      "Conversion from string to decimal would overflow");
+        return Status(ErrorCodes::Overflow, "Conversion from string to decimal would overflow");
     } else if (Decimal128::hasFlag(signalingFlags, Decimal128::SignalingFlag::kUnderflow)) {
-        return Status(ErrorCodes::FailedToParse,
-                      "Conversion from string to decimal would underflow");
+        return Status(ErrorCodes::Overflow, "Conversion from string to decimal would underflow");
     } else if (signalingFlags != Decimal128::SignalingFlag::kNoFlag &&
                signalingFlags != Decimal128::SignalingFlag::kInexact) {  // Ignore precision loss.
         return Status(ErrorCodes::FailedToParse, "Failed to parse string to decimal");
     }
+    if (endptr)
+        *endptr += charsConsumed;
+    if (!parser._allowTrailingText && charsConsumed != stringValue.size())
+        return Status(ErrorCodes::FailedToParse, "Did not consume whole string.");
 
     *result = parsedDecimal;
     return Status::OK();
 }
+}  // namespace
+
+#define DEFINE_NUMBER_PARSER_OPERATOR(type)                                                      \
+    Status NumberParser::operator()(StringData stringValue, type* result, char** endPtr) const { \
+        return parseNumberFromStringHelper(                                                      \
+            stringValue, result, const_cast<const char**>(endPtr), *this);                       \
+    }
+
+DEFINE_NUMBER_PARSER_OPERATOR(long)
+DEFINE_NUMBER_PARSER_OPERATOR(long long)
+DEFINE_NUMBER_PARSER_OPERATOR(unsigned long)
+DEFINE_NUMBER_PARSER_OPERATOR(unsigned long long)
+DEFINE_NUMBER_PARSER_OPERATOR(short)
+DEFINE_NUMBER_PARSER_OPERATOR(unsigned short)
+DEFINE_NUMBER_PARSER_OPERATOR(int)
+DEFINE_NUMBER_PARSER_OPERATOR(unsigned int)
+DEFINE_NUMBER_PARSER_OPERATOR(int8_t)
+DEFINE_NUMBER_PARSER_OPERATOR(uint8_t)
+DEFINE_NUMBER_PARSER_OPERATOR(double)
+DEFINE_NUMBER_PARSER_OPERATOR(Decimal128)
 }  // namespace mongo

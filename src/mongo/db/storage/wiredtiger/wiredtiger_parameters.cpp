@@ -124,7 +124,7 @@ Status WiredTigerMaxCacheOverflowSizeGBParameter::set(const BSONElement& element
 
 Status WiredTigerMaxCacheOverflowSizeGBParameter::setFromString(const std::string& str) {
     double value;
-    const auto status = parseNumberFromString(str, &value);
+    const auto status = NumberParser{}(str, &value);
     if (!status.isOK()) {
         return status;
     }

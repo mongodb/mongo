@@ -468,7 +468,7 @@ void OpenWriteTransactionParam::append(OperationContext* opCtx,
 
 Status OpenWriteTransactionParam::setFromString(const std::string& str) {
     int num = 0;
-    Status status = parseNumberFromString(str, &num);
+    Status status = NumberParser{}(str, &num);
     if (!status.isOK()) {
         return status;
     }
@@ -489,7 +489,7 @@ void OpenReadTransactionParam::append(OperationContext* opCtx,
 
 Status OpenReadTransactionParam::setFromString(const std::string& str) {
     int num = 0;
-    Status status = parseNumberFromString(str, &num);
+    Status status = NumberParser{}(str, &num);
     if (!status.isOK()) {
         return status;
     }
@@ -655,7 +655,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         invariantWTOK(_conn->query_timestamp(_conn, buf, "get=recovery"));
 
         std::uint64_t tmp;
-        fassert(50758, parseNumberFromStringWithBase(buf, 16, &tmp));
+        fassert(50758, NumberParser().base(16)(buf, &tmp));
         _recoveryTimestamp = Timestamp(tmp);
         LOG_FOR_RECOVERY(0) << "WiredTiger recoveryTimestamp. Ts: " << _recoveryTimestamp;
     }
@@ -1792,7 +1792,7 @@ Timestamp WiredTigerKVEngine::getOldestOpenReadTimestamp() const {
     }
 
     uint64_t tmp;
-    fassert(38802, parseNumberFromStringWithBase(buf, 16, &tmp));
+    fassert(38802, NumberParser().base(16)(buf, &tmp));
     return Timestamp(tmp);
 }
 
@@ -1963,7 +1963,7 @@ std::uint64_t WiredTigerKVEngine::_getCheckpointTimestamp() const {
     invariantWTOK(_conn->query_timestamp(_conn, buf, "get=last_checkpoint"));
 
     std::uint64_t tmp;
-    fassert(50963, parseNumberFromStringWithBase(buf, 16, &tmp));
+    fassert(50963, NumberParser().base(16)(buf, &tmp));
     return tmp;
 }
 

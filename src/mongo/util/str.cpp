@@ -229,7 +229,7 @@ boost::optional<size_t> parseUnsignedBase10Integer(StringData fieldName) {
         return boost::none;
     }
     unsigned int index;
-    auto status = parseNumberFromStringWithBase<unsigned int>(fieldName, 10, &index);
+    auto status = NumberParser().base(10)(fieldName, &index);
     if (status.isOK()) {
         return static_cast<size_t>(index);
     }

@@ -112,7 +112,7 @@ StatusWith<size_t> validateTCMallocValue(StringData name, const BSONElement& new
     }                                                                                \
     Status TCMalloc##cls##ServerParameter::setFromString(const std::string& str) {   \
         size_t value;                                                                \
-        Status status = parseNumberFromString(str, &value);                          \
+        Status status = NumberParser{}(str, &value);                                 \
         if (!status.isOK()) {                                                        \
             return status;                                                           \
         }                                                                            \

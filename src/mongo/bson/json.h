@@ -32,7 +32,9 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -472,6 +474,12 @@ private:
      * additional context information
      */
     Status parseError(StringData msg);
+
+    /**
+     * @returns a valid Date_t or FailedToParse status.
+     * Updates _input to past the end of the parsed date.
+     */
+    StatusWith<Date_t> parseDate();
 
 public:
     inline int offset() {

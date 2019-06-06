@@ -151,7 +151,7 @@ Status stringToValue(const std::string& stringVal,
                 return Status(ErrorCodes::BadValue, sb.str());
             }
         case Double:
-            ret = parseNumberFromString(stringVal, &doubleVal);
+            ret = NumberParser{}(stringVal, &doubleVal);
             if (!ret.isOK()) {
                 StringBuilder sb;
                 sb << "Error parsing option \"" << key << "\" as double in: " << ret.reason();
@@ -160,7 +160,7 @@ Status stringToValue(const std::string& stringVal,
             *value = Value(doubleVal);
             return Status::OK();
         case Int:
-            ret = parseNumberFromString(stringVal, &intVal);
+            ret = NumberParser{}(stringVal, &intVal);
             if (!ret.isOK()) {
                 StringBuilder sb;
                 sb << "Error parsing option \"" << key << "\" as int: " << ret.reason();
@@ -169,7 +169,7 @@ Status stringToValue(const std::string& stringVal,
             *value = Value(intVal);
             return Status::OK();
         case Long:
-            ret = parseNumberFromString(stringVal, &longVal);
+            ret = NumberParser{}(stringVal, &longVal);
             if (!ret.isOK()) {
                 StringBuilder sb;
                 sb << "Error parsing option \"" << key << "\" as long: " << ret.reason();
@@ -181,7 +181,7 @@ Status stringToValue(const std::string& stringVal,
             *value = Value(stringVal);
             return Status::OK();
         case UnsignedLongLong:
-            ret = parseNumberFromString(stringVal, &unsignedLongLongVal);
+            ret = NumberParser{}(stringVal, &unsignedLongLongVal);
             if (!ret.isOK()) {
                 StringBuilder sb;
                 sb << "Error parsing option \"" << key
@@ -191,7 +191,7 @@ Status stringToValue(const std::string& stringVal,
             *value = Value(unsignedLongLongVal);
             return Status::OK();
         case Unsigned:
-            ret = parseNumberFromString(stringVal, &unsignedVal);
+            ret = NumberParser{}(stringVal, &unsignedVal);
             if (!ret.isOK()) {
                 StringBuilder sb;
                 sb << "Error parsing option \"" << key << "\" as unsigned int: " << ret.reason();

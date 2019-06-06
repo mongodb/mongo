@@ -400,7 +400,7 @@ Status LogLevelServerParameter::set(const BSONElement& newValueElement) {
 
 Status LogLevelServerParameter::setFromString(const std::string& strLevel) {
     int newValue;
-    Status status = parseNumberFromString(strLevel, &newValue);
+    Status status = NumberParser{}(strLevel, &newValue);
     if (!status.isOK())
         return status;
     if (newValue < 0)

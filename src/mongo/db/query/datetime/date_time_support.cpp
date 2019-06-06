@@ -320,7 +320,7 @@ boost::optional<Seconds> TimeZoneDatabase::parseUtcOffset(StringData offsetSpec)
         // ±HH
         if (offsetSpec.size() == 3 && isdigit(offsetSpec[1]) && isdigit(offsetSpec[2])) {
             int offset;
-            if (parseNumberFromStringWithBase(offsetSpec.substr(1, 2), 10, &offset).isOK()) {
+            if (NumberParser().base(10)(offsetSpec.substr(1, 2), &offset).isOK()) {
                 return duration_cast<Seconds>(Hours(bias * offset));
             }
             return boost::none;
@@ -330,7 +330,7 @@ boost::optional<Seconds> TimeZoneDatabase::parseUtcOffset(StringData offsetSpec)
         if (offsetSpec.size() == 5 && isdigit(offsetSpec[1]) && isdigit(offsetSpec[2]) &&
             isdigit(offsetSpec[3]) && isdigit(offsetSpec[4])) {
             int offset;
-            if (parseNumberFromStringWithBase(offsetSpec.substr(1, 4), 10, &offset).isOK()) {
+            if (NumberParser().base(10)(offsetSpec.substr(1, 4), &offset).isOK()) {
                 return duration_cast<Seconds>(Hours(bias * (offset / 100L)) +
                                               Minutes(bias * (offset % 100)));
             }
@@ -341,10 +341,10 @@ boost::optional<Seconds> TimeZoneDatabase::parseUtcOffset(StringData offsetSpec)
         if (offsetSpec.size() == 6 && isdigit(offsetSpec[1]) && isdigit(offsetSpec[2]) &&
             offsetSpec[3] == ':' && isdigit(offsetSpec[4]) && isdigit(offsetSpec[5])) {
             int hourOffset, minuteOffset;
-            if (!parseNumberFromStringWithBase(offsetSpec.substr(1, 2), 10, &hourOffset).isOK()) {
+            if (!NumberParser().base(10)(offsetSpec.substr(1, 2), &hourOffset).isOK()) {
                 return boost::none;
             }
-            if (!parseNumberFromStringWithBase(offsetSpec.substr(4, 2), 10, &minuteOffset).isOK()) {
+            if (!NumberParser().base(10)(offsetSpec.substr(4, 2), &minuteOffset).isOK()) {
                 return boost::none;
             }
             return duration_cast<Seconds>(Hours(bias * hourOffset) + Minutes(bias * minuteOffset));

@@ -314,7 +314,8 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
             if (str == "--port") {
                 _port = -2;
             } else if (_port == -2) {
-                _port = strtol(str.c_str(), nullptr, 10);
+                if (!NumberParser::strToAny(10)(str, &_port).isOK())
+                    _port = 0;  // same behavior as strtol
             } else if (isMongodProgram && str == "--configsvr") {
                 _name = "c";
             }

@@ -57,7 +57,6 @@
     var badHost = /^Failed to parse mongodb/;
     var emptyHost = /^Empty host component/;
     var noPort = /^No digits/;
-    var badPort = /^Bad digit/;
     var invalidPort = /^Port number \d+ out of range/;
     var moreThanOneColon = /^More than one ':' detected/;
     var charBeforeSquareBracket = /^'\[' present, but not first character/;
@@ -79,8 +78,8 @@
         {s: "/test", r: badHost},
         {s: "localhost:/test", r: noPort},
         {s: "[::1]:/test", r: noPort},
-        {s: "[::1]:cat/test", r: badPort},
-        {s: "[::1]:1cat/test", r: badPort},
+        {s: "[::1]:cat/test", c: ErrorCodes.FailedToParse},
+        {s: "[::1]:1cat/test", c: ErrorCodes.FailedToParse},
         {s: "[::1]:123456/test", r: invalidPort},
         {s: "[::1]:65536/test", r: invalidPort},
         {s: "127.0.0.1:65536/test", r: invalidPort},
@@ -124,10 +123,11 @@
         doassert(message);
     };
 
-    var testBad = function(i, connectionString, errorRegex) {
+    var testBad = function(i, connectionString, errorRegex, errorCode) {
         print("\n---\nTesting bad connection string " + i + " (\"" + connectionString + "\") ...");
         var gotException = false;
         var gotCorrectErrorText = false;
+        var gotCorrectErrorCode = false;
         var exception;
         try {
             var connectDB = connect(connectionString);
@@ -135,11 +135,14 @@
         } catch (e) {
             gotException = true;
             exception = e;
-            if (errorRegex.test(e.message)) {
+            if (errorRegex && errorRegex.test(e.message)) {
                 gotCorrectErrorText = true;
             }
+            if (errorCode == e.code) {
+                gotCorrectErrorCode = true;
+            }
         }
-        if (gotCorrectErrorText) {
+        if (gotCorrectErrorText || gotCorrectErrorCode) {
             print("Bad connection string " + i + " (\"" + connectionString +
                   "\") correctly rejected:\n" + tojson(exception));
             return;
@@ -163,7 +166,7 @@
 
     jsTest.log("TESTING " + badStrings.length + " bad connection strings");
     for (i = 0; i < badStrings.length; ++i) {
-        testBad(i, substitutePort(badStrings[i].s), badStrings[i].r);
+        testBad(i, substitutePort(badStrings[i].s), badStrings[i].r, badStrings[i].c);
     }
 
     jsTest.log("SUCCESSFUL test completion");

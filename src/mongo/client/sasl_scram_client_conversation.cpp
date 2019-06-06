@@ -151,7 +151,7 @@ StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
                       str::stream() << "Incorrect SCRAM iteration count: " << input[2]);
     }
     size_t iterationCount;
-    Status status = parseNumberFromStringWithBase(input[2].substr(2), 10, &iterationCount);
+    Status status = NumberParser().base(10)(input[2].substr(2), &iterationCount);
     if (!status.isOK()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Failed to parse SCRAM iteration count: " << input[2]);

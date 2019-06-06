@@ -38,6 +38,7 @@
 #include <functional>
 #include <string>
 
+#include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -54,7 +55,7 @@ namespace idl_server_parameter_detail {
 template <typename T>
 inline StatusWith<T> coerceFromString(StringData str) {
     T value;
-    Status status = parseNumberFromString(str, &value);
+    Status status = NumberParser{}(str, &value);
     if (!status.isOK()) {
         return status;
     }

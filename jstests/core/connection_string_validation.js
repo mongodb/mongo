@@ -23,7 +23,6 @@ var emptyConnString = /^Empty connection string$/;
 var badHost = /^Failed to parse mongodb/;
 var emptyHost = /^Empty host component/;
 var noPort = /^No digits/;
-var badPort = /^Bad digit/;
 var invalidPort = /^Port number \d+ out of range/;
 var multipleColon = /^More than one ':' detected./;
 var noReplSet = /^connect failed to replica set/;
@@ -42,8 +41,8 @@ var badStrings = [
     {s: "mongodb://:" + port + "/test", r: emptyHost},
     {s: "mongodb://localhost:/test", r: noPort},
     {s: "mongodb://127.0.0.1:/test", r: noPort},
-    {s: "mongodb://127.0.0.1:cat/test", r: badPort},
-    {s: "mongodb://127.0.0.1:1cat/test", r: badPort},
+    {s: "mongodb://127.0.0.1:cat/test", c: ErrorCodes.FailedToParse},
+    {s: "mongodb://127.0.0.1:1cat/test", c: ErrorCodes.FailedToParse},
     {s: "mongodb://127.0.0.1:123456/test", r: invalidPort},
     {s: "mongodb://127.0.0.1:65536/test", r: invalidPort},
     {s: "mongodb://::1:65536/test", r: multipleColon},
@@ -72,10 +71,11 @@ function testGoodAsURI(i, uri) {
     doassert(message);
 }
 
-function testBad(i, connectionString, errorRegex) {
+function testBad(i, connectionString, errorRegex, errorCode) {
     print("\nTesting bad connection string " + i + " (\"" + connectionString + "\") ...");
     var gotException = false;
     var gotCorrectErrorText = false;
+    var gotCorrectErrorCode = false;
     var exception;
     try {
         var connectDB = connect(connectionString);
@@ -83,11 +83,14 @@ function testBad(i, connectionString, errorRegex) {
     } catch (e) {
         gotException = true;
         exception = e;
-        if (errorRegex.test(e.message)) {
+        if (errorRegex && errorRegex.test(e.message)) {
             gotCorrectErrorText = true;
         }
+        if (errorCode == e.code) {
+            gotCorrectErrorCode = true;
+        }
     }
-    if (gotCorrectErrorText) {
+    if (gotCorrectErrorText || gotCorrectErrorCode) {
         print("Bad connection string " + i + " (\"" + connectionString +
               "\") correctly rejected:\n" + tojson(exception));
         return;
@@ -111,7 +114,7 @@ for (i = 0; i < goodStrings.length; ++i) {
 
 jsTest.log("TESTING " + badStrings.length + " bad connection strings");
 for (i = 0; i < badStrings.length; ++i) {
-    testBad(i, badStrings[i].s, badStrings[i].r);
+    testBad(i, badStrings[i].s, badStrings[i].r, badStrings[i].c);
 }
 
 jsTest.log("SUCCESSFUL test completion");

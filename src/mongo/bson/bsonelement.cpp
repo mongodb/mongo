@@ -36,6 +36,7 @@
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_cursor.h"
+#include "mongo/base/parse_number.h"
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/strnlen.h"
@@ -160,9 +161,12 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
                             s << "  ";
                     }
 
-                    if (strtol(e.fieldName(), nullptr, 10) > count) {
+                    long index;
+                    if (NumberParser::strToAny(10)(e.fieldName(), &index).isOK() && index > count) {
                         s << "undefined";
                     } else {
+                        // print the element if its index is being printed or if the index it
+                        // belongs to could not be parsed
                         e.jsonStringStream(format, false, pretty ? pretty + 1 : 0, s);
                         e = i.next();
                     }
@@ -514,7 +518,7 @@ std::vector<BSONElement> BSONElement::Array() const {
         const char* f = e.fieldName();
 
         unsigned u;
-        Status status = parseNumberFromString(f, &u);
+        Status status = NumberParser{}(f, &u);
         if (status.isOK()) {
             verify(u < 1000000);
             if (u >= v.size())

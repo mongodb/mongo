@@ -1125,8 +1125,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_empty_line()
 
             # Check the array field names are integers
-            self._writer.write_line(
-                'Status status = parseNumberFromString(arrayFieldName, &fieldNumber);')
+            self._writer.write_line('Status status = NumberParser{}(arrayFieldName, &fieldNumber);')
             with self._predicate('status.isOK()'):
 
                 # Check that the array field names are sequential

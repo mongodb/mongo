@@ -195,7 +195,7 @@ Status HostAndPort::initialize(StringData s) {
     int port;
     if (colonPos != std::string::npos) {
         const StringData portPart = s.substr(colonPos + 1);
-        Status status = parseNumberFromStringWithBase(portPart, 10, &port);
+        Status status = NumberParser().base(10)(portPart, &port);
         if (!status.isOK()) {
             return status;
         }

@@ -103,7 +103,7 @@ private:
         auto shard = shardStatus.getValue();
 
         int opId;
-        uassertStatusOK(parseNumberFromStringWithBase(opToKill.substr(opSepPos + 1), 10, &opId));
+        uassertStatusOK(NumberParser().base(10)(opToKill.substr(opSepPos + 1), &opId));
 
         // shardid is actually the opid - keeping for backwards compatibility.
         result.append("shard", shardIdent);

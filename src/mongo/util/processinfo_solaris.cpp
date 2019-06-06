@@ -172,9 +172,9 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
 
         if (versionComponents.size() > 1) {
             unsigned majorInt, minorInt;
-            Status majorStatus = parseNumberFromString<unsigned>(versionComponents[0], &majorInt);
+            Status majorStatus = NumberParser{}(versionComponents[0], &majorInt);
 
-            Status minorStatus = parseNumberFromString<unsigned>(versionComponents[1], &minorInt);
+            Status minorStatus = NumberParser{}(versionComponents[1], &minorInt);
 
             if (!majorStatus.isOK() || !minorStatus.isOK()) {
                 warning() << "Could not parse OS version numbers from uname: " << osVersion;

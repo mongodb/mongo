@@ -35,32 +35,95 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/platform/decimal128.h"
 
 namespace mongo {
 
 /**
- * Parses a number out of a StringData.
- *
- * Parses "stringValue", interpreting it as a number of the given "base".  On success, stores
- * the parsed value into "*result" and returns Status::OK().
- *
- * Valid values for "base" are 2-36, with 0 meaning "choose the base by inspecting the prefix
- * on the number", as in strtol.  Returns Status::BadValue if an illegal value is supplied for
- * "base".
- *
- * The entirety of the std::string must consist of digits in the given base, except optionally the
- * first character may be "+" or "-", and hexadecimal numbers may begin "0x".  Same as strtol,
- * without the property of stripping whitespace at the beginning, and fails to parse if there
- * are non-digit characters at the end of the string.
- *
- * See parse_number.cpp for the available instantiations, and add any new instantiations there.
+ * Builder pattern for setting up a number parser. Intended usage:
+ *     long result;
+ *     char* end;
+ *     NumberParser()
+ *     .base(16)
+ *     .allowTrailingText()
+ *     .skipWhitespace()
+ *     ("\t\n    0x16hello, world", &result, &end);
+ *     //end points to 'h' and result holds 22
  */
-template <typename NumberType>
-Status parseNumberFromStringWithBase(StringData stringValue, int base, NumberType* result);
+struct NumberParser {
+public:
+    /**
+     * Behave like strtol/atoi and skip whitespace at the beginning of the string
+     */
+    NumberParser& skipWhitespace(bool skipws = true) {
+        _skipLeadingWhitespace = skipws;
+        return *this;
+    }
 
-template <typename NumberType>
-static Status parseNumberFromString(StringData stringValue, NumberType* result) {
-    return parseNumberFromStringWithBase(stringValue, 0, result);
-}
+    /**
+     * Set a base for the conversion. 0 means infer the base akin to strtol.
+     * Legal bases are [2-35]. If a base outside of this is selected, then operator()
+     * will return BadValue.
+     */
+    NumberParser& base(int b = 0) {
+        _base = b;
+        return *this;
+    }
+
+    /*
+     * Acts like atoi/strtol and will still parse even if there are non-numeric characters in the
+     * string after the number. Without this option, the parser will return FailedToParse if there
+     * are leftover characters in the parsed string.
+     */
+    NumberParser& allowTrailingText(bool allowTrailingText = true) {
+        _allowTrailingText = allowTrailingText;
+        return *this;
+    }
+
+    NumberParser& setDecimal128RoundingMode(
+        Decimal128::RoundingMode mode = Decimal128::RoundingMode::kRoundTiesToEven) {
+        _roundingMode = mode;
+        return *this;
+    }
+
+    /*
+     * returns a NumberParser configured like strtol/atoi
+     */
+    static NumberParser strToAny(int base = 0) {
+        return NumberParser().skipWhitespace().base(base).allowTrailingText();
+    }
+
+    /*
+     * Parsing overloads for different supported numerical types.
+     *
+     * On success, the parsed value is stored into *result and returns Status::OK().
+     * If endPtr is not nullptr, the end of the number portion of the string will be stored at
+     * *endPtr (like strtol).
+     * This will return with Status::FailedToParse if the string does not represent a number value.
+     * See skipWhitespace and allowTrailingText for ways to expand the parser's capabilities.
+     * Returns with Status::Overflow if the parsed number cannot be represented by the desired type.
+     * If the status is not OK, then there are no guarantees about what value will be stored in
+     * result.
+     */
+    Status operator()(StringData strData, long* result, char** endPtr = nullptr) const;
+    Status operator()(StringData strData, long long* result, char** endPtr = nullptr) const;
+    Status operator()(StringData strData, unsigned long* result, char** endPtr = nullptr) const;
+    Status operator()(StringData strData,
+                      unsigned long long* result,
+                      char** endPtr = nullptr) const;
+    Status operator()(StringData strData, short* result, char** endPtr = nullptr) const;
+    Status operator()(StringData strData, unsigned short* result, char** endPtr = nullptr) const;
+    Status operator()(StringData strData, int* result, char** endPtr = nullptr) const;
+    Status operator()(StringData strData, unsigned int* result, char** endPtr = nullptr) const;
+    Status operator()(StringData strData, int8_t* result, char** endPtr = nullptr) const;
+    Status operator()(StringData strData, uint8_t* result, char** endPtr = nullptr) const;
+    Status operator()(StringData strData, double* result, char** endPtr = nullptr) const;
+    Status operator()(StringData strData, Decimal128* result, char** endPtr = nullptr) const;
+
+    int _base = 0;
+    Decimal128::RoundingMode _roundingMode = Decimal128::RoundingMode::kRoundTowardZero;
+    bool _skipLeadingWhitespace = false;
+    bool _allowTrailingText = false;
+};
 
 }  // namespace mongo

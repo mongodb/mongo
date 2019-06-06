@@ -62,7 +62,9 @@ std::string toAsciiLowerCase(mongo::StringData input) {
     return res;
 }
 
-void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags) {
+// Returns the number of characters consumed from input string. If unable to parse,
+// it returns 0.
+size_t validateInputString(mongo::StringData input, std::uint32_t* signalingFlags) {
     // Input must be of these forms:
     // * Valid decimal (standard or scientific notation):
     //      /[-+]?\d*(.\d+)?([e][+\-]?\d+)?/
@@ -73,35 +75,36 @@ void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags)
 
     // Check for NaN and Infinity
     size_t start = (isSigned) ? 1 : 0;
+    size_t charsConsumed = start;
     mongo::StringData noSign = input.substr(start);
     bool isNanOrInf = noSign == "nan" || noSign == "inf" || noSign == "infinity";
     if (isNanOrInf)
-        return;
+        return start + noSign.size();
 
     // Input starting with non digit
     if (!std::isdigit(noSign[0])) {
         if (noSign[0] != '.') {
             *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
-            return;
+            return 0;
         } else if (noSign.size() == 1) {
             *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
-            return;
+            return 0;
         }
     }
     bool isZero = true;
     bool hasCoefficient = false;
 
     // Check coefficient, i.e. the part before the e
-    int dotCount = 0;
+    bool parsedDot = false;
     size_t i = 0;
     for (/*i = 0*/; i < noSign.size(); i++) {
         char c = noSign[i];
         if (c == '.') {
-            dotCount++;
-            if (dotCount > 1) {
+            if (parsedDot) {
                 *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
-                return;
+                return 0;
             }
+            parsedDot = true;
         } else if (!std::isdigit(c)) {
             break;
         } else {
@@ -111,6 +114,7 @@ void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags)
             }
         }
     }
+    charsConsumed += i;
 
     if (isZero) {
         // Override inexact/overflow flag set by the intel library
@@ -119,13 +123,13 @@ void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags)
 
     // Input is valid if we've parsed the entire string
     if (i == noSign.size()) {
-        return;
+        return charsConsumed;
     }
 
     // String with empty coefficient and non-empty exponent
     if (!hasCoefficient) {
         *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
-        return;
+        return 0;
     }
 
     // Check exponent
@@ -133,25 +137,29 @@ void validateInputString(mongo::StringData input, std::uint32_t* signalingFlags)
 
     if (exponent[0] != 'e' || exponent.size() < 2) {
         *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
-        return;
+        return 0;
     }
     if (exponent[1] == '-' || exponent[1] == '+') {
         exponent = exponent.substr(2);
         if (exponent.size() == 0) {
             *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
-            return;
+            return 0;
         }
+        charsConsumed += 2;
     } else {
         exponent = exponent.substr(1);
+        ++charsConsumed;
     }
 
     for (size_t j = 0; j < exponent.size(); j++) {
         char c = exponent[j];
         if (!std::isdigit(c)) {
             *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
-            return;
+            return 0;
         }
+        ++charsConsumed;
     }
+    return charsConsumed;
 }
 }  // namespace
 
@@ -307,20 +315,23 @@ Decimal128::Decimal128(double doubleValue,
     invariant(getCoefficientLow() <= kLargest15DigitInt);
 }
 
-Decimal128::Decimal128(std::string stringValue, RoundingMode roundMode) {
+Decimal128::Decimal128(std::string stringValue, RoundingMode roundMode, size_t* charsConsumed) {
     std::uint32_t throwAwayFlag = 0;
-    *this = Decimal128(stringValue, &throwAwayFlag, roundMode);
+    *this = Decimal128(stringValue, &throwAwayFlag, roundMode, charsConsumed);
 }
 
 Decimal128::Decimal128(std::string stringValue,
                        std::uint32_t* signalingFlags,
-                       RoundingMode roundMode) {
+                       RoundingMode roundMode,
+                       size_t* charsConsumed) {
     std::string lower = toAsciiLowerCase(stringValue);
     BID_UINT128 dec128;
     // The intel library function requires a char * while c_str() returns a const char*.
     // We're using const_cast here since the library function should not modify the input.
     dec128 = bid128_from_string(const_cast<char*>(lower.c_str()), roundMode, signalingFlags);
-    validateInputString(StringData(lower), signalingFlags);
+    size_t consumed = validateInputString(lower, signalingFlags);
+    if (charsConsumed)
+        *charsConsumed = consumed;
     _value = libraryTypeToValue(dec128);
 }
 
