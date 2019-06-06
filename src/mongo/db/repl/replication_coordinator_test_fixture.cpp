@@ -236,9 +236,9 @@ void ReplCoordTest::simulateEnoughHeartbeatsForAllNodesUp() {
             hbResp.setState(MemberState::RS_SECONDARY);
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             hbResp.setAppliedOpTimeAndWallTime(
-                {OpTime(Timestamp(100, 2), 0), Date_t::min() + Seconds(100)});
+                {OpTime(Timestamp(100, 2), 0), Date_t() + Seconds(100)});
             hbResp.setDurableOpTimeAndWallTime(
-                {OpTime(Timestamp(100, 2), 0), Date_t::min() + Seconds(100)});
+                {OpTime(Timestamp(100, 2), 0), Date_t() + Seconds(100)});
             BSONObjBuilder respObj;
             net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
         } else {
@@ -340,8 +340,8 @@ void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t e
             hbResp.setState(MemberState::RS_SECONDARY);
             // The smallest valid optime in PV1.
             OpTime opTime(Timestamp(), 0);
-            hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t::min() + Seconds(opTime.getSecs())});
-            hbResp.setDurableOpTimeAndWallTime({opTime, Date_t::min() + Seconds(opTime.getSecs())});
+            hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t() + Seconds(opTime.getSecs())});
+            hbResp.setDurableOpTimeAndWallTime({opTime, Date_t() + Seconds(opTime.getSecs())});
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
         } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
@@ -397,8 +397,8 @@ void ReplCoordTest::signalDrainComplete(OperationContext* opCtx) {
 }
 
 void ReplCoordTest::runSingleNodeElection(OperationContext* opCtx) {
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(1, 1), 0), Date_t::min() + Seconds(1));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(1, 1), 0), Date_t::min() + Seconds(1));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(1, 1), 0), Date_t() + Seconds(1));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(1, 1), 0), Date_t() + Seconds(1));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->waitForElectionFinish_forTest();
 
@@ -438,10 +438,8 @@ bool ReplCoordTest::consumeHeartbeatV1(const NetworkInterfaceMock::NetworkOperat
     hbResp.setSetName(rsConfig.getReplSetName());
     hbResp.setState(MemberState::RS_SECONDARY);
     hbResp.setConfigVersion(rsConfig.getConfigVersion());
-    hbResp.setAppliedOpTimeAndWallTime(
-        {lastApplied, Date_t::min() + Seconds(lastApplied.getSecs())});
-    hbResp.setDurableOpTimeAndWallTime(
-        {lastApplied, Date_t::min() + Seconds(lastApplied.getSecs())});
+    hbResp.setAppliedOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
+    hbResp.setDurableOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
     BSONObjBuilder respObj;
     net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
     return true;

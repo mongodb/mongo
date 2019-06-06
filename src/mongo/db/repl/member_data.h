@@ -266,11 +266,11 @@ private:
 
     // Last known OpTime that the replica has applied and journaled to.
     OpTime _lastDurableOpTime;
-    Date_t _lastDurableWallTime = Date_t::min();
+    Date_t _lastDurableWallTime = Date_t();
 
     // Last known OpTime that the replica has applied, whether journaled or unjournaled.
     OpTime _lastAppliedOpTime;
-    Date_t _lastAppliedWallTime = Date_t::min();
+    Date_t _lastAppliedWallTime = Date_t();
 
     // TODO(russotto): Since memberData is kept in config order, _configIndex
     // and _isSelf may not be necessary.

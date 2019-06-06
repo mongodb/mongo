@@ -190,7 +190,7 @@ void ApplyBatchFinalizerForJournal::_run() {
     Client::initThread("ApplyBatchFinalizerForJournal");
 
     while (true) {
-        OpTimeAndWallTime latestOpTimeAndWallTime = {OpTime(), Date_t::min()};
+        OpTimeAndWallTime latestOpTimeAndWallTime = {OpTime(), Date_t()};
 
         {
             stdx::unique_lock<stdx::mutex> lock(_mutex);
@@ -203,7 +203,7 @@ void ApplyBatchFinalizerForJournal::_run() {
             }
 
             latestOpTimeAndWallTime = _latestOpTimeAndWallTime;
-            _latestOpTimeAndWallTime = {OpTime(), Date_t::min()};
+            _latestOpTimeAndWallTime = {OpTime(), Date_t()};
         }
 
         auto opCtx = cc().makeOperationContext();

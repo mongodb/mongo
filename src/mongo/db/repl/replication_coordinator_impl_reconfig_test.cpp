@@ -83,8 +83,8 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigReceivedWhileSecondary) {
                        HostAndPort("node1", 12345));
 
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
 
     BSONObjBuilder result;
     ReplSetReconfigArgs args;
@@ -108,8 +108,8 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
                                                         << "node2:12345"))),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
 
     BSONObjBuilder result;
@@ -152,8 +152,8 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
                                                         << "node2:12345"))),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
 
     BSONObjBuilder result;
@@ -192,8 +192,8 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
                             << BSON("replicaSetId" << OID::gen())),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
 
     BSONObjBuilder result;
@@ -233,8 +233,8 @@ TEST_F(ReplCoordTest,
                                                         << "node2:12345"))),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
 
     BSONObjBuilder result;
@@ -314,8 +314,8 @@ TEST_F(ReplCoordTest,
                                                         << "node2:12345"))),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
 
     Status status(ErrorCodes::InternalError, "Not Set");
@@ -333,10 +333,8 @@ TEST_F(ReplCoordTest,
     hbResp.setState(MemberState::RS_SECONDARY);
     hbResp.setConfigVersion(5);
     BSONObjBuilder respObj;
-    hbResp.setAppliedOpTimeAndWallTime(
-        {OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100)});
-    hbResp.setDurableOpTimeAndWallTime(
-        {OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100)});
+    hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
     respObj << "ok" << 1;
     hbResp.addToBSON(&respObj);
     net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
@@ -359,8 +357,8 @@ TEST_F(ReplCoordTest, NodeReturnsOutOfDiskSpaceWhenSavingANewConfigFailsDuringRe
                                                         << "node2:12345"))),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
 
     Status status(ErrorCodes::InternalError, "Not Set");
@@ -388,8 +386,8 @@ TEST_F(ReplCoordTest,
                                                         << "node2:12345"))),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
 
     Status status(ErrorCodes::InternalError, "Not Set");
@@ -428,8 +426,8 @@ TEST_F(ReplCoordTest, NodeReturnsConfigurationInProgressWhenReceivingAReconfigWh
     init();
     start(HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
 
     // initiate
     Status status(ErrorCodes::InternalError, "Not Set");
@@ -477,8 +475,8 @@ TEST_F(ReplCoordTest, PrimaryNodeAcceptsNewConfigWhenReceivingAReconfigWithAComp
                             << BSON("replicaSetId" << OID::gen())),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
 
     Status status(ErrorCodes::InternalError, "Not Set");
@@ -495,10 +493,8 @@ TEST_F(ReplCoordTest, PrimaryNodeAcceptsNewConfigWhenReceivingAReconfigWithAComp
     hbResp.setSetName("mySet");
     hbResp.setState(MemberState::RS_SECONDARY);
     hbResp.setConfigVersion(2);
-    hbResp.setAppliedOpTimeAndWallTime(
-        {OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100)});
-    hbResp.setDurableOpTimeAndWallTime(
-        {OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100)});
+    hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
     BSONObjBuilder respObj;
     respObj << "ok" << 1;
     hbResp.addToBSON(&respObj);
@@ -525,8 +521,8 @@ TEST_F(
                                                         << "node2:12345"))),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
@@ -556,10 +552,8 @@ TEST_F(
     hbResp2.setConfigVersion(3);
     hbResp2.setSetName("mySet");
     hbResp2.setState(MemberState::RS_SECONDARY);
-    hbResp2.setAppliedOpTimeAndWallTime(
-        {OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100)});
-    hbResp2.setDurableOpTimeAndWallTime(
-        {OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100)});
+    hbResp2.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    hbResp2.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
     BSONObjBuilder respObj2;
     respObj2 << "ok" << 1;
     hbResp2.addToBSON(&respObj2);
@@ -596,8 +590,8 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
                                                         << "node2:12345"))),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
@@ -632,10 +626,8 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
     hbResp.setConfigVersion(4);
     hbResp.setSetName("mySet");
     hbResp.setState(MemberState::RS_SECONDARY);
-    hbResp.setAppliedOpTimeAndWallTime(
-        {OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100)});
-    hbResp.setDurableOpTimeAndWallTime(
-        {OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100)});
+    hbResp.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    hbResp.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
     BSONObjBuilder respObj2;
     respObj2 << "ok" << 1;
     hbResp.addToBSON(&respObj2);
@@ -669,8 +661,8 @@ TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary
                                                         << "node2:12345"))),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
 
     // fail before forced
     BSONObjBuilder result;

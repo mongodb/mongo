@@ -235,7 +235,7 @@ void ReplicationCoordinatorMock::setMyLastDurableOpTimeAndWallTimeForward(
 
 void ReplicationCoordinatorMock::resetMyLastOpTimes() {
     _myLastDurableOpTime = OpTime();
-    _myLastDurableWallTime = Date_t::min();
+    _myLastDurableWallTime = Date_t();
 }
 
 OpTimeAndWallTime ReplicationCoordinatorMock::getMyLastAppliedOpTimeAndWallTime() const {
@@ -461,7 +461,7 @@ OpTime ReplicationCoordinatorMock::getLastCommittedOpTime() const {
 }
 
 OpTimeAndWallTime ReplicationCoordinatorMock::getLastCommittedOpTimeAndWallTime() const {
-    return {OpTime(), Date_t::min()};
+    return {OpTime(), Date_t()};
 }
 
 Status ReplicationCoordinatorMock::processReplSetRequestVotes(

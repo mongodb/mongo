@@ -132,7 +132,7 @@ public:
             _myLastWallTime = opTimeAndWallTime.wallTime;
         };
         _myLastOpTime = OpTime();
-        _myLastWallTime = Date_t::min();
+        _myLastWallTime = Date_t();
         _syncSourceSelector = stdx::make_unique<SyncSourceSelectorMock>();
     }
 
@@ -518,7 +518,7 @@ RemoteCommandResponse makeCursorResponse(CursorId cursorId,
                                          bool isFirstBatch = true,
                                          int rbid = 1) {
     OpTime futureOpTime(Timestamp(1000, 1000), 1000);
-    Date_t futureWallTime = Date_t::min() + Seconds(futureOpTime.getSecs());
+    Date_t futureWallTime = Date_t() + Seconds(futureOpTime.getSecs());
     rpc::OplogQueryMetadata oqMetadata({futureOpTime, futureWallTime}, futureOpTime, rbid, 0, 0);
 
     BSONObjBuilder bob;
@@ -578,7 +578,7 @@ OplogEntry makeOplogEntry(int t,
                       boost::none,                 // o2
                       {},                          // sessionInfo
                       boost::none,                 // upsert
-                      Date_t::min() + Seconds(t),  // wall clock time
+                      Date_t() + Seconds(t),       // wall clock time
                       boost::none,                 // statement id
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
@@ -884,7 +884,7 @@ TEST_F(InitialSyncerTest, InitialSyncerResetsOptimesOnNewAttempt) {
 
     // Make sure the initial sync attempt reset optimes.
     ASSERT_EQUALS(OpTime(), _options.getMyLastOptime());
-    ASSERT_EQUALS(Date_t::min(), initialSyncer->getWallClockTime_forTest());
+    ASSERT_EQUALS(Date_t(), initialSyncer->getWallClockTime_forTest());
 }
 
 TEST_F(InitialSyncerTest,

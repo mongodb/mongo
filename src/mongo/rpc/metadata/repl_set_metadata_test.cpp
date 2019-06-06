@@ -48,7 +48,7 @@ TEST(ReplResponseMetadataTest, ReplicaSetIdNotSet) {
 TEST(ReplResponseMetadataTest, Roundtrip) {
     OpTime opTime(Timestamp(1234, 100), 5);
     OpTime opTime2(Timestamp(7777, 100), 6);
-    Date_t committedWallTime = Date_t::min() + Seconds(opTime.getSecs());
+    Date_t committedWallTime = Date_t() + Seconds(opTime.getSecs());
     ReplSetMetadata metadata(3, {opTime, committedWallTime}, opTime2, 6, OID::gen(), 12, -1);
 
     ASSERT_EQ(opTime, metadata.getLastOpCommitted().opTime);

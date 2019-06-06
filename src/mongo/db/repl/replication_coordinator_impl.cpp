@@ -591,7 +591,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     // Do not check optime, if this node is an arbiter.
     bool isArbiter =
         myIndex.getValue() != -1 && localConfig.getMemberAt(myIndex.getValue()).isArbiter();
-    OpTimeAndWallTime lastOpTimeAndWallTime = {OpTime(), Date_t::min()};
+    OpTimeAndWallTime lastOpTimeAndWallTime = {OpTime(), Date_t()};
     if (!isArbiter) {
         if (!lastOpTimeAndWallTimeStatus.isOK()) {
             warning() << "Failed to load timestamp and/or wall clock time of most recently applied "
@@ -1176,8 +1176,8 @@ void ReplicationCoordinatorImpl::_resetMyLastOpTimes(WithLock lk) {
     // Reset to uninitialized OpTime
     bool isRollbackAllowed = true;
     _setMyLastAppliedOpTimeAndWallTime(
-        lk, {OpTime(), Date_t::min()}, isRollbackAllowed, DataConsistency::Inconsistent);
-    _setMyLastDurableOpTimeAndWallTime(lk, {OpTime(), Date_t::min()}, isRollbackAllowed);
+        lk, {OpTime(), Date_t()}, isRollbackAllowed, DataConsistency::Inconsistent);
+    _setMyLastDurableOpTimeAndWallTime(lk, {OpTime(), Date_t()}, isRollbackAllowed);
     _stableOpTimeCandidates.clear();
 }
 
@@ -1550,12 +1550,12 @@ Status ReplicationCoordinatorImpl::setLastDurableOptime_forTest(long long cfgVer
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(getReplicationMode() == modeReplSet);
 
-    if (wallTime == Date_t::min()) {
+    if (wallTime == Date_t()) {
         wallTime = Date_t() + Seconds(opTime.getSecs());
     }
 
     const UpdatePositionArgs::UpdateInfo update(
-        OpTime(), Date_t::min(), opTime, wallTime, cfgVer, memberId);
+        OpTime(), Date_t(), opTime, wallTime, cfgVer, memberId);
     long long configVersion;
     const auto status = _setLastOptime(lock, update, &configVersion);
     _updateLastCommittedOpTimeAndWallTime(lock);
@@ -1569,12 +1569,12 @@ Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(getReplicationMode() == modeReplSet);
 
-    if (wallTime == Date_t::min()) {
+    if (wallTime == Date_t()) {
         wallTime = Date_t() + Seconds(opTime.getSecs());
     }
 
     const UpdatePositionArgs::UpdateInfo update(
-        opTime, wallTime, OpTime(), Date_t::min(), cfgVer, memberId);
+        opTime, wallTime, OpTime(), Date_t(), cfgVer, memberId);
     long long configVersion;
     const auto status = _setLastOptime(lock, update, &configVersion);
     _updateLastCommittedOpTimeAndWallTime(lock);
@@ -3387,7 +3387,7 @@ void ReplicationCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Da
 void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* opCtx,
                                                            DataConsistency consistency) {
     auto lastOpTimeAndWallTimeStatus = _externalState->loadLastOpTimeAndWallTime(opCtx);
-    OpTimeAndWallTime lastOpTimeAndWallTime = {OpTime(), Date_t::min()};
+    OpTimeAndWallTime lastOpTimeAndWallTime = {OpTime(), Date_t()};
     if (!lastOpTimeAndWallTimeStatus.getStatus().isOK()) {
         warning() << "Failed to load timestamp and/or wall clock time of most recently applied "
                      "operation; "
