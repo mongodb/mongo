@@ -676,48 +676,6 @@ private:
     TxnNumber _txnNum = 0;
 };
 
-/**
- * Test fixture with sessions and an extra-large oplog for testing large transactions.
- */
-class OpObserverLargeTransactionTest : public OpObserverTransactionTest {
-private:
-    repl::ReplSettings createReplSettings() override {
-        repl::ReplSettings settings;
-        // We need an oplog comfortably large enough to hold an oplog entry that exceeds the BSON
-        // size limit.  Otherwise we will get the wrong error code when trying to write one.
-        settings.setOplogSizeBytes(BSONObjMaxInternalSize + 2 * 1024 * 1024);
-        settings.setReplSetString("mySet/node1:12345");
-        return settings;
-    }
-};
-
-// Tests that a transaction aborts if it becomes too large only during the commit.
-TEST_F(OpObserverLargeTransactionTest, TransactionTooLargeWhileCommitting) {
-    const NamespaceString nss("testDB", "testColl");
-    auto uuid = CollectionUUID::gen();
-
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant.unstashTransactionResources(opCtx(), "insert");
-
-    // This size is crafted such that two operations of this size are not too big to fit in a single
-    // oplog entry, but two operations plus oplog overhead are too big to fit in a single oplog
-    // entry.
-    constexpr size_t kHalfTransactionSize = BSONObjMaxInternalSize / 2 - 175;
-    std::unique_ptr<uint8_t[]> halfTransactionData(new uint8_t[kHalfTransactionSize]());
-    auto operation = repl::OplogEntry::makeInsertOperation(
-        nss,
-        uuid,
-        BSON(
-            "_id" << 0 << "data"
-                  << BSONBinData(halfTransactionData.get(), kHalfTransactionSize, BinDataGeneral)));
-    txnParticipant.addTransactionOperation(opCtx(), operation);
-    txnParticipant.addTransactionOperation(opCtx(), operation);
-    ASSERT_THROWS_CODE(opObserver().onUnpreparedTransactionCommit(
-                           opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx())),
-                       AssertionException,
-                       ErrorCodes::TransactionTooLarge);
-}
-
 TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
@@ -758,11 +716,13 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        OplogSlot slot = repl::getNextOpTime(opCtx());
-        txnParticipant.transitionToPreparedforTest(opCtx(), slot);
-        opCtx()->recoveryUnit()->setPrepareTimestamp(slot.getTimestamp());
+        // One reserved slot for each statement, plus the prepare.
+        auto reservedSlots = repl::getNextOpTimes(opCtx(), 5);
+        auto prepareOpTime = reservedSlots.back();
+        txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
+        opCtx()->recoveryUnit()->setPrepareTimestamp(prepareOpTime.getTimestamp());
         opObserver().onTransactionPrepare(
-            opCtx(), {slot}, txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
+            opCtx(), reservedSlots, txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
     }
 
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
@@ -983,18 +943,21 @@ TEST_F(OpObserverTransactionTest, TransactionalUnpreparedAbortTest) {
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus());
 }
 
-TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsEmptyApplyOps) {
+TEST_F(OpObserverTransactionTest,
+       PreparingEmptyTransactionLogsEmptyApplyOpsAndWritesToTransactionTable) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
-
+    repl::OpTime prepareOpTime;
     {
         Lock::GlobalLock lk(opCtx(), MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        OplogSlot slot = repl::getNextOpTime(opCtx());
-        txnParticipant.transitionToPreparedforTest(opCtx(), slot);
-        opCtx()->recoveryUnit()->setPrepareTimestamp(slot.getTimestamp());
+        prepareOpTime = repl::getNextOpTime(opCtx());
+        txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
+        opCtx()->recoveryUnit()->setPrepareTimestamp(prepareOpTime.getTimestamp());
         opObserver().onTransactionPrepare(
-            opCtx(), {slot}, txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
+            opCtx(),
+            {prepareOpTime},
+            txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
     }
 
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
@@ -1004,7 +967,14 @@ TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsEmptyApplyOps) {
     auto oExpected = BSON("applyOps" << BSONArray() << "prepare" << true);
     ASSERT_BSONOBJ_EQ(oExpected, o);
     ASSERT(oplogEntry.shouldPrepare());
-    ASSERT_EQ(oplogEntry.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
+    const auto startOpTime = oplogEntry.getOpTime();
+    ASSERT_EQ(startOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
+    ASSERT_EQ(prepareOpTime, txnParticipant.getLastWriteOpTime());
+
+    txnParticipant.stashTransactionResources(opCtx());
+    assertTxnRecord(txnNum(), prepareOpTime, DurableTxnStateEnum::kPrepared);
+    assertTxnRecordStartOpTime(startOpTime);
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
 }
 
 TEST_F(OpObserverTransactionTest, PreparingTransactionWritesToTransactionTable) {
@@ -1098,7 +1068,7 @@ TEST_F(OpObserverTransactionTest, CommittingUnpreparedNonEmptyTransactionWritesT
 }
 
 TEST_F(OpObserverTransactionTest,
-       CommittingUnpreparedEmptyTransactionDoesNotWriteToTransactionTable) {
+       CommittingUnpreparedEmptyTransactionDoesNotWriteToTransactionTableOrOplog) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -1106,6 +1076,8 @@ TEST_F(OpObserverTransactionTest,
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
 
     txnParticipant.stashTransactionResources(opCtx());
+
+    getNOplogEntries(opCtx(), 0);
 
     // Abort the storage-transaction without calling the OpObserver.
     txnParticipant.shutdown(opCtx());
@@ -1336,7 +1308,6 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
 
 class OpObserverMultiEntryTransactionTest : public OpObserverTransactionTest {
     void setUp() override {
-        gUseMultipleOplogEntryFormatForTransactions = true;
         _prevPackingLimit = gMaxNumberOfTransactionOperationsInSingleOplogEntry;
         gMaxNumberOfTransactionOperationsInSingleOplogEntry = 1;
         OpObserverTransactionTest::setUp();
@@ -1344,31 +1315,12 @@ class OpObserverMultiEntryTransactionTest : public OpObserverTransactionTest {
 
     void tearDown() override {
         OpObserverTransactionTest::tearDown();
-        gUseMultipleOplogEntryFormatForTransactions = false;
         gMaxNumberOfTransactionOperationsInSingleOplogEntry = _prevPackingLimit;
     }
 
 private:
     int _prevPackingLimit;
 };
-
-TEST_F(OpObserverMultiEntryTransactionTest,
-       CommittingUnpreparedEmptyTransactionDoesNotWriteToTransactionTableOrOplog) {
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
-
-    opObserver().onUnpreparedTransactionCommit(
-        opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
-
-    txnParticipant.stashTransactionResources(opCtx());
-
-    getNOplogEntries(opCtx(), 0);
-
-    // Abort the storage-transaction without calling the OpObserver.
-    txnParticipant.shutdown(opCtx());
-
-    assertNoTxnRecord();
-}
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionSingleStatementTest) {
     const NamespaceString nss("testDB", "testColl");
@@ -1629,35 +1581,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
                                             << "count"
                                             << 2);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
-}
-
-TEST_F(OpObserverMultiEntryTransactionTest,
-       PreparingEmptyTransactionOnlyWritesPrepareOplogEntryAndToTransactionTable) {
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
-    repl::OpTime prepareOpTime;
-    auto reservedSlots = repl::getNextOpTimes(opCtx(), 1);
-    prepareOpTime = reservedSlots.back();
-    opCtx()->recoveryUnit()->setPrepareTimestamp(prepareOpTime.getTimestamp());
-    opObserver().onTransactionPrepare(
-        opCtx(), reservedSlots, txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
-
-    auto oplogEntryObjs = getNOplogEntries(opCtx(), 1);
-    auto prepareEntryObj = oplogEntryObjs.back();
-    const auto prepareOplogEntry = assertGet(OplogEntry::parse(prepareEntryObj));
-    checkSessionAndTransactionFields(prepareEntryObj);
-    // The startOpTime should refer to the prepare oplog entry for an empty transaction.
-    const auto startOpTime = prepareOplogEntry.getOpTime();
-
-    ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
-    ASSERT_BSONOBJ_EQ(BSON("applyOps" << BSONArray() << "prepare" << true),
-                      prepareOplogEntry.getObject());
-    txnParticipant.stashTransactionResources(opCtx());
-    assertTxnRecord(txnNum(), prepareOpTime, DurableTxnStateEnum::kPrepared);
-    assertTxnRecordStartOpTime(startOpTime);
-    txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
-
-    ASSERT_EQ(prepareOpTime, txnParticipant.getLastWriteOpTime());
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertPrepareTest) {
@@ -2322,22 +2245,25 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedPackingTest) {
     assertTxnRecordStartOpTime(boost::none);
 }
 
-class OpObserverLargeMultiEntryTransactionTest : public OpObserverLargeTransactionTest {
-    void setUp() override {
-        gUseMultipleOplogEntryFormatForTransactions = true;
-        OpObserverTransactionTest::setUp();
-    }
-
-    void tearDown() override {
-        OpObserverTransactionTest::tearDown();
-        gUseMultipleOplogEntryFormatForTransactions = false;
+/**
+ * Test fixture with sessions and an extra-large oplog for testing large transactions.
+ */
+class OpObserverLargeTransactionTest : public OpObserverTransactionTest {
+private:
+    repl::ReplSettings createReplSettings() override {
+        repl::ReplSettings settings;
+        // We need an oplog comfortably large enough to hold an oplog entry that exceeds the BSON
+        // size limit.  Otherwise we will get the wrong error code when trying to write one.
+        settings.setOplogSizeBytes(BSONObjMaxInternalSize + 2 * 1024 * 1024);
+        settings.setReplSetString("mySet/node1:12345");
+        return settings;
     }
 };
 
 // Tests that a large transaction may be committed.  This test creates a transaction with two
 // operations that together are just big enough to exceed the size limit, which should result in a
 // two oplog entry transaction.
-TEST_F(OpObserverLargeMultiEntryTransactionTest, LargeTransactionCreatesMultipleOplogEntries) {
+TEST_F(OpObserverLargeTransactionTest, LargeTransactionCreatesMultipleOplogEntries) {
     const NamespaceString nss("testDB", "testColl");
     auto uuid = CollectionUUID::gen();
 

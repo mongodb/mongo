@@ -57,14 +57,6 @@ server_parameters:
         on_update: std::ref(TransactionParticipant::observeTransactionLifetimeLimitSeconds)
         default: 60
 
-    useMultipleOplogEntryFormatForTransactions:
-        description: >-
-            Use multi oplog format for transactions to allow transactions > 16MB.
-        set_at: startup
-        cpp_vartype: bool
-        cpp_varname: gUseMultipleOplogEntryFormatForTransactions
-        default: true
-
     maxNumberOfTransactionOperationsInSingleOplogEntry:
         description: >-
             Maximum number of operations to pack into a single oplog entry, when multi-oplog

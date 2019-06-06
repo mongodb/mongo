@@ -552,7 +552,6 @@ protected:
     }
 
     void tearDown() override {
-        gUseMultipleOplogEntryFormatForTransactions = false;
         SyncTailTest::tearDown();
     }
 
