@@ -728,6 +728,29 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target='split_horizon',
+    source=[
+        'split_horizon.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
+env.CppUnitTest(
+    target='split_horizon_test',
+    source=[
+        'split_horizon_test.cpp',
+    ],
+    LIBDEPS=[
+        'split_horizon',
+    ],
+)
+
+
 env.Library('topology_coordinator',
             [
                 'heartbeat_response_action.cpp',
@@ -742,7 +765,10 @@ env.Library('topology_coordinator',
                 'repl_settings',
                 'rslog',
                 'repl_coordinator_interface',
-            ])
+            ],
+            LIBDEPS_PRIVATE=[
+                'split_horizon',
+            ],)
 
 env.CppUnitTest('repl_set_heartbeat_response_test',
                 'repl_set_heartbeat_response_test.cpp',
@@ -1034,7 +1060,8 @@ env.Library('replica_set_messages',
                 '$BUILD_DIR/mongo/util/net/network',
                 'optime',
                 'read_concern_args',
-            ])
+                'split_horizon',
+            ],)
 
 env.CppUnitTest('repl_set_config_test',
                 [
@@ -1570,6 +1597,7 @@ env.Library(
         'replication_process',
         'replication_recovery',
         'rollback_source_impl',
+        'split_horizon',
         'sync_tail',
     ],
 )

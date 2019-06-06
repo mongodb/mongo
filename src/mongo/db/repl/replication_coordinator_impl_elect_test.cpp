@@ -167,11 +167,11 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
 
     // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
     IsMasterResponse imResponse;
-    getReplCoord()->fillIsMasterForReplSet(&imResponse);
+    getReplCoord()->fillIsMasterForReplSet(&imResponse, {});
     ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
     getReplCoord()->signalDrainComplete(&opCtx, getReplCoord()->getTerm());
-    getReplCoord()->fillIsMasterForReplSet(&imResponse);
+    getReplCoord()->fillIsMasterForReplSet(&imResponse, {});
     ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
 }
@@ -201,11 +201,11 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
 
     // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
     IsMasterResponse imResponse;
-    getReplCoord()->fillIsMasterForReplSet(&imResponse);
+    getReplCoord()->fillIsMasterForReplSet(&imResponse, {});
     ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
     getReplCoord()->signalDrainComplete(&opCtx, getReplCoord()->getTerm());
-    getReplCoord()->fillIsMasterForReplSet(&imResponse);
+    getReplCoord()->fillIsMasterForReplSet(&imResponse, {});
     ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
 }

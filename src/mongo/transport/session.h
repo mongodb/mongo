@@ -120,6 +120,10 @@ public:
      */
     virtual const HostAndPort& local() const = 0;
 
+    virtual boost::optional<std::string> getSniName() const {
+        return boost::none;
+    }
+
     /**
      * Atomically set all of the session tags specified in the 'tagsToSet' bit field. If the
      * 'kPending' tag is set, indicating that no tags have yet been specified for the session, this

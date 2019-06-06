@@ -1150,7 +1150,8 @@ bool operator==(const MemberConfig& a, const MemberConfig& b) {
         a.getPriority() == b.getPriority() && a.getSlaveDelay() == b.getSlaveDelay() &&
         a.isVoter() == b.isVoter() && a.isArbiter() == b.isArbiter() &&
         a.isHidden() == b.isHidden() && a.shouldBuildIndexes() == b.shouldBuildIndexes() &&
-        a.getNumTags() == b.getNumTags();
+        a.getNumTags() == b.getNumTags() && a.getHorizonMappings() == b.getHorizonMappings() &&
+        a.getHorizonReverseHostMappings() == b.getHorizonReverseHostMappings();
 }
 
 bool operator==(const ReplSetConfig& a, const ReplSetConfig& b) {
@@ -1218,6 +1219,29 @@ TEST(ReplSetConfig, toBSONRoundTripAbility) {
         << "members"
         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                  << "localhost:12345"))
+        << "settings"
+        << BSON("heartbeatIntervalMillis" << 5000 << "heartbeatTimeoutSecs" << 20 << "replicaSetId"
+                                          << OID::gen()))));
+    ASSERT_OK(configB.initialize(configA.toBSON()));
+    ASSERT_TRUE(configA == configB);
+}
+
+TEST(ReplSetConfig, toBSONRoundTripAbilityWithHorizon) {
+    ReplSetConfig configA;
+    ReplSetConfig configB;
+    ASSERT_OK(configA.initialize(BSON(
+        "_id"
+        << "rs0"
+        << "version"
+        << 1
+        << "protocolVersion"
+        << 1
+        << "members"
+        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                 << "localhost:12345"
+                                 << "horizons"
+                                 << BSON("horizon"
+                                         << "example.com:42")))
         << "settings"
         << BSON("heartbeatIntervalMillis" << 5000 << "heartbeatTimeoutSecs" << 20 << "replicaSetId"
                                           << OID::gen()))));
@@ -1743,6 +1767,123 @@ TEST(ReplSetConfig, ConfirmDefaultValuesOfAndAbilityToSetWriteConcernMajorityJou
     ASSERT_OK(config.validate());
     ASSERT_FALSE(config.getWriteConcernMajorityShouldJournal());
     ASSERT_TRUE(config.toBSON().hasField("writeConcernMajorityJournalDefault"));
+}
+
+TEST(ReplSetConfig, HorizonConsistency) {
+    ReplSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "protocolVersion"
+                                     << 1
+                                     << "version"
+                                     << 1
+                                     << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345"
+                                                              << "horizons"
+                                                              << BSON("alpha"
+                                                                      << "a.host:42"
+                                                                      << "beta"
+                                                                      << "a.host2:43"
+                                                                      << "gamma"
+                                                                      << "a.host3:44"))
+                                                   << BSON("_id" << 1 << "host"
+                                                                 << "localhost:23456"
+                                                                 << "horizons"
+                                                                 << BSON("alpha"
+                                                                         << "b.host:42"
+                                                                         << "gamma"
+                                                                         << "b.host3:44"))
+                                                   << BSON("_id" << 2 << "host"
+                                                                 << "localhost:34567"
+                                                                 << "horizons"
+                                                                 << BSON("alpha"
+                                                                         << "c.host:42"
+                                                                         << "beta"
+                                                                         << "c.host1:42"
+                                                                         << "gamma"
+                                                                         << "c.host2:43"
+                                                                         << "delta"
+
+                                                                         << "c.host3:44")))
+                                     << "writeConcernMajorityJournalDefault"
+                                     << false)));
+
+    Status status = config.validate();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(status.reason().find("alpha"), std::string::npos);
+    ASSERT_EQUALS(status.reason().find("gamma"), std::string::npos);
+
+    ASSERT_NOT_EQUALS(status.reason().find("beta"), std::string::npos);
+    ASSERT_NOT_EQUALS(status.reason().find("delta"), std::string::npos);
+
+    // Within-member duplicates are detected by a different piece of code, first,
+    // in the member-config code path.
+    status = config.initialize(BSON("_id"
+                                    << "rs0"
+                                    << "protocolVersion"
+                                    << 1
+                                    << "version"
+                                    << 1
+                                    << "members"
+                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                             << "same1"
+                                                             << "horizons"
+                                                             << BSON("alpha"
+                                                                     << "a.host:44"
+                                                                     << "beta"
+                                                                     << "a.host2:44"
+                                                                     << "gamma"
+                                                                     << "a.host3:44"
+                                                                     << "delta"
+                                                                     << "a.host4:45"))
+                                                  << BSON("_id" << 1 << "host"
+                                                                << "localhost:1"
+                                                                << "horizons"
+                                                                << BSON("alpha"
+                                                                        << "same1"
+                                                                        << "beta"
+                                                                        << "b.host2:44"
+                                                                        << "gamma"
+                                                                        << "b.host3:44"
+                                                                        << "delta"
+                                                                        << "b.host4:44"))
+                                                  << BSON("_id" << 2 << "host"
+                                                                << "localhost:2"
+                                                                << "horizons"
+                                                                << BSON("alpha"
+                                                                        << "c.host1:44"
+                                                                        << "beta"
+                                                                        << "c.host2:44"
+                                                                        << "gamma"
+                                                                        << "c.host3:44"
+                                                                        << "delta"
+                                                                        << "same2"))
+                                                  << BSON("_id" << 3 << "host"
+                                                                << "localhost:3"
+                                                                << "horizons"
+                                                                << BSON("alpha"
+                                                                        << "same2"
+                                                                        << "beta"
+                                                                        << "d.host2:44"
+                                                                        << "gamma"
+                                                                        << "d.host3:44"
+                                                                        << "delta"
+                                                                        << "d.host4:44")))
+                                    << "writeConcernMajorityJournalDefault"
+                                    << false));
+    ASSERT_OK(status) << " failing status was: " << status.reason();
+
+    status = config.validate();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(status.reason().find("a.host"), std::string::npos);
+    ASSERT_EQUALS(status.reason().find("b.host"), std::string::npos);
+    ASSERT_EQUALS(status.reason().find("c.host"), std::string::npos);
+    ASSERT_EQUALS(status.reason().find("d.host"), std::string::npos);
+    ASSERT_EQUALS(status.reason().find("localhost"), std::string::npos);
+
+    ASSERT_NOT_EQUALS(status.reason().find("same1"), std::string::npos);
+    ASSERT_NOT_EQUALS(status.reason().find("same2"), std::string::npos);
 }
 
 TEST(ReplSetConfig, ReplSetId) {

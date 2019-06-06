@@ -135,6 +135,10 @@ SSLPeerInfo& SSLPeerInfo::forSession(const transport::SessionHandle& session) {
     return peerInfoForSession(session.get());
 }
 
+const SSLPeerInfo& SSLPeerInfo::forSession(const transport::ConstSessionHandle& session) {
+    return peerInfoForSession(session.get());
+}
+
 SSLParams sslGlobalParams;
 
 const SSLParams& getSSLGlobalParams() {
@@ -373,6 +377,14 @@ void free_ssl_context(SSL_CTX* ctx) {
         SSL_CTX_free(ctx);
     }
 }
+
+boost::optional<std::string> getRawSNIServerName(const SSL* const ssl) {
+    const char* const name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+    if (!name) {
+        return boost::none;
+    }
+    return std::string(name);
+}
 }  // namespace
 
 ////////////////////////////////////////////////////////////////
@@ -403,7 +415,7 @@ public:
                                                           const std::string& remoteHost,
                                                           const HostAndPort& hostForLogging) final;
 
-    StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
+    StatusWith<SSLPeerInfo> parseAndValidatePeerCertificate(
         SSL* conn, const std::string& remoteHost, const HostAndPort& hostForLogging) final;
 
     virtual const SSLConfiguration& getSSLConfiguration() const {
@@ -1524,8 +1536,9 @@ StatusWith<TLSVersion> mapTLSVersion(const SSL* conn) {
     }
 }
 
-StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertificate(
+StatusWith<SSLPeerInfo> SSLManager::parseAndValidatePeerCertificate(
     SSL* conn, const std::string& remoteHost, const HostAndPort& hostForLogging) {
+    auto sniName = getRawSNIServerName(conn);
 
     auto tlsVersionStatus = mapTLSVersion(conn);
     if (!tlsVersionStatus.isOK()) {
@@ -1535,7 +1548,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
     recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
 
     if (!_sslConfiguration.hasCA && isSSLServer)
-        return {boost::none};
+        return SSLPeerInfo(std::move(sniName));
 
     X509* peerCert = SSL_get_peer_certificate(conn);
 
@@ -1545,13 +1558,13 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
             if (!_suppressNoCertificateWarning) {
                 warning() << "no SSL certificate provided by peer";
             }
-            return {boost::none};
+            return SSLPeerInfo(std::move(sniName));
         } else {
             auto msg = "no SSL certificate provided by peer; connection rejected";
             error() << msg;
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }
-        return {boost::none};
+        return SSLPeerInfo(std::move(sniName));
     }
     ON_BLOCK_EXIT(X509_free, peerCert);
 
@@ -1561,7 +1574,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
         if (_allowInvalidCertificates) {
             warning() << "SSL peer certificate validation failed: "
                       << X509_verify_cert_error_string(result);
-            return {boost::none};
+            return SSLPeerInfo(std::move(sniName));
         } else {
             str::stream msg;
             msg << "SSL peer certificate validation failed: "
@@ -1583,8 +1596,8 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
     // If this is an SSL client context (on a MongoDB server or client)
     // perform hostname validation of the remote server
     if (remoteHost.empty()) {
-        return boost::make_optional(
-            SSLPeerInfo(peerSubject, std::move(swPeerCertificateRoles.getValue())));
+        return SSLPeerInfo(
+            peerSubject, std::move(sniName), std::move(swPeerCertificateRoles.getValue()));
     }
 
     // Try to match using the Subject Alternate Name, if it exists.
@@ -1642,7 +1655,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
         }
     }
 
-    return boost::make_optional(SSLPeerInfo(peerSubject, stdx::unordered_set<RoleName>()));
+    return SSLPeerInfo(peerSubject);
 }
 
 
@@ -1654,7 +1667,7 @@ SSLPeerInfo SSLManager::parseAndValidatePeerCertificateDeprecated(
         throw SocketException(SocketException::CONNECT_ERROR,
                               swPeerSubjectName.getStatus().reason());
     }
-    return swPeerSubjectName.getValue().get_value_or(SSLPeerInfo());
+    return swPeerSubjectName.getValue();
 }
 
 void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {

@@ -192,12 +192,13 @@ public:
 
     /**
      * Fetches a peer certificate and validates it if it exists. If validation fails, but weak
-     * validation is enabled, boost::none will be returned. If validation fails, and invalid
+     * validation is enabled, the `subjectName` will be empty. If validation fails, and invalid
      * certificates are not allowed, a non-OK status will be returned. If validation is successful,
-     * an engaged optional containing the certificate's subject name, and any roles acquired by
-     * X509 authorization will be returned.
+     * the `subjectName` will contain  the certificate's subject name, and any roles acquired by
+     * X509 authorization will be returned in `roles`.
+     * Further, the SNI Name will be captured into the `sniName` value, when available.
      */
-    virtual StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
+    virtual StatusWith<SSLPeerInfo> parseAndValidatePeerCertificate(
         SSL* ssl, const std::string& remoteHost, const HostAndPort& hostForLogging) = 0;
 };
 

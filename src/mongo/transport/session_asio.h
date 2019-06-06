@@ -272,6 +272,10 @@ private:
     }
 
 #ifdef MONGO_CONFIG_SSL
+    boost::optional<std::string> getSniName() const override {
+        return SSLPeerInfo::forSession(shared_from_this()).sniName;
+    }
+
     template <typename MutableBufferSequence, typename HandshakeCb>
     void maybeHandshakeSSL(bool sync, const MutableBufferSequence& buffer, HandshakeCb onComplete) {
         invariant(asio::buffer_size(buffer) >= sizeof(MSGHEADER::Value));
@@ -326,21 +330,7 @@ private:
                         _sslSocket->native_handle(), "", _remote);
 
                     if (swPeerInfo.isOK()) {
-                        // The value of swPeerInfo is a bit complicated:
-                        //
-                        // If !swPeerInfo.isOK(), then there was an error doing the SSL
-                        // handshake and we should reject the connection.
-                        //
-                        // If !sslPeerInfo.getValue(), then the SSL handshake was successful,
-                        // but the peer didn't provide a SSL certificate, and we do not require
-                        // one. sslPeerInfo should be empty.
-                        //
-                        // Otherwise the SSL handshake was successful and the peer did provide
-                        // a certificate that is valid, and we should store that info on the
-                        // session's SSLPeerInfo decoration.
-                        if (swPeerInfo.getValue()) {
-                            sslPeerInfo = *swPeerInfo.getValue();
-                        }
+                        sslPeerInfo = swPeerInfo.getValue();
                     } else {
                         return onComplete(swPeerInfo.getStatus(), false);
                     }

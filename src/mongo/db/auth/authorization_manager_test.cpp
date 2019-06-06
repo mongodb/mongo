@@ -261,9 +261,10 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
     ServiceContextNoop serviceContext;
     transport::TransportLayerMock transportLayer{};
     transport::SessionHandle session = transportLayer.createSession();
-    setX509PeerInfo(
-        session,
-        SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("readWrite", "test")}));
+    setX509PeerInfo(session,
+                    SSLPeerInfo(buildX509Name(),
+                                boost::none,
+                                {RoleName("read", "test"), RoleName("readWrite", "test")}));
     ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
     ServiceContext::UniqueOperationContext opCtx = client->makeOperationContext();
 
@@ -296,9 +297,10 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
     ServiceContextNoop serviceContext;
     transport::TransportLayerMock transportLayer{};
     transport::SessionHandle session = transportLayer.createSession();
-    setX509PeerInfo(
-        session,
-        SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("write", "test")}));
+    setX509PeerInfo(session,
+                    SSLPeerInfo(buildX509Name(),
+                                boost::none,
+                                {RoleName("read", "test"), RoleName("write", "test")}));
     ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
     ServiceContext::UniqueOperationContext opCtx = client->makeOperationContext();
 

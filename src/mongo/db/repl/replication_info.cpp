@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -69,12 +68,14 @@ using std::string;
 using std::stringstream;
 
 namespace repl {
+namespace {
 
 void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int level) {
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
     if (replCoord->getSettings().usingReplSets()) {
+        const auto& horizonParams = SplitHorizon::getParameters(opCtx->getClient());
         IsMasterResponse isMasterResponse;
-        replCoord->fillIsMasterForReplSet(&isMasterResponse);
+        replCoord->fillIsMasterForReplSet(&isMasterResponse, horizonParams);
         result.appendElements(isMasterResponse.toBSON());
         if (level) {
             replCoord->appendSlaveInfoData(&result);
@@ -255,6 +256,7 @@ public:
 
         auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
         bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
+
         if (!seenIsMaster) {
             clientMetadataIsMasterState.setSeenIsMaster();
         }
@@ -268,18 +270,24 @@ public:
                            "The client metadata document may only be sent in the first isMaster"));
             }
 
-            auto swParseClientMetadata = ClientMetadata::parse(element);
+            auto swParsedClientMetadata = ClientMetadata::parse(element);
 
-            if (!swParseClientMetadata.getStatus().isOK()) {
-                return Command::appendCommandStatus(result, swParseClientMetadata.getStatus());
+            if (!swParsedClientMetadata.getStatus().isOK()) {
+                return Command::appendCommandStatus(result, swParsedClientMetadata.getStatus());
             }
 
-            invariant(swParseClientMetadata.getValue());
+            auto &parsedClientMetadata= swParsedClientMetadata.getValue();
+            invariant(parsedClientMetadata);
 
-            swParseClientMetadata.getValue().get().logClientMetadata(opCtx->getClient());
+            parsedClientMetadata->logClientMetadata(opCtx->getClient());
 
-            clientMetadataIsMasterState.setClientMetadata(
-                opCtx->getClient(), std::move(swParseClientMetadata.getValue()));
+            clientMetadataIsMasterState.setClientMetadata(opCtx->getClient(),
+                                                          std::move(parsedClientMetadata));
+        }
+
+        if (!seenIsMaster) {
+            auto sniName = opCtx->getClient()->getSniNameForSession();
+            SplitHorizon::setParameters(opCtx->getClient(), std::move(sniName));
         }
 
         // Parse the optional 'internalClient' field. This is provided by incoming connections from
@@ -399,5 +407,6 @@ public:
 
 OpCounterServerStatusSection replOpCounterServerStatusSection("opcountersRepl", &replOpCounters);
 
+}  // namespace
 }  // namespace repl
 }  // namespace mongo

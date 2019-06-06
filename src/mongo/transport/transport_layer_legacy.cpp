@@ -266,7 +266,8 @@ Status TransportLayerLegacy::_runTicket(Ticket ticket) {
 
 #ifdef MONGO_CONFIG_SSL
     // If we didn't have an X509 subject name, see if we have one now
-    auto& sslPeerInfo = SSLPeerInfo::forSession(legacyTicket->getSession());
+    auto& sslPeerInfo =
+        SSLPeerInfo::forSession(transport::SessionHandle(legacyTicket->getSession()));
     if (sslPeerInfo.subjectName.empty()) {
         auto info = conn->amp->getX509PeerInfo();
         if (!info.subjectName.empty()) {

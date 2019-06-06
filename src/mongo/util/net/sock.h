@@ -110,7 +110,7 @@ std::string getHostNameCachedAndPort();
 std::string prettyHostName();
 
 /**
- * thin wrapped around file descriptor and system calls
+ * thin wrapper around file descriptor and system calls
  * todo: ssl
  */
 class Socket {
