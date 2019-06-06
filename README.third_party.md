@@ -23,7 +23,7 @@ a notice will be included in
 | ---------------------------| ----------------- | ---------------- | ------------------| :------------------: | :-----------------------------: |
 | Aladdin MD5                | Zlib              |                  | Unknown           |          ✗           |                ✗                |
 | [ASIO]                     | BSL-1.0           | 1.13.0           | 9229964dc1        |                      |                ✗                |
-| [benchmark]                | Apache-2.0        | 1.4.1            | 1.3.0             |                      |                                 |
+| [benchmark]                | Apache-2.0        | 1.5.0            | 1.3.0             |                      |                                 |
 | [Boost]                    | BSL-1.0           | 1.70.0           | 1.60.0            |                      |                ✗                |
 | [GPerfTools]               | BSD-3-Clause      | 2.7              | 2.5               |                      |                ✗                |
 | [ICU4]                     | ICU               | 64.2             | 57.1              |          ✗           |                ✗                |
@@ -31,7 +31,7 @@ a notice will be included in
 | [JSON-Schema-Test-Suite]   | MIT               |                  | 728066f9c5        |                      |                                 |
 | [libstemmer]               | BSD-3-Clause      |                  | Unknown           |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause      |                  | Unknown + changes |                      |                ✗                |
-| [MozJS]                    | MPL-2.0           | ESR 60.6.1       | ESR 45.9.0        |                      |                ✗                |
+| [MozJS]                    | MPL-2.0           | ESR 60.7         | ESR 45.9.0        |                      |                ✗                |
 | [MurmurHash3]              | Public Domain     |                  | Unknown + changes |          ✗           |                ✗                |
 | [Pcre]                     | BSD-3-Clause      | 8.43             | 8.42              |                      |                ✗                |
 | [S2]                       | Apache-2.0        |                  | Unknown           |          ✗           |                ✗                |
@@ -102,7 +102,6 @@ license notices are included in the `THIRD-PARTY-NOTICES.gotools` file.
 | [go-cache](https://github.com/patrickmn/go-cache)                   |
 | [go-flags](https://github.com/jessevdk/go-flags)                    |
 | [go-runewidth](https://github.com/mattn/go-runewidth)               |
-| [go-rootcerts](https://github.com/hashicorp/go-rootcerts)           |
 | [goconvey](https://github.com/smartystreets/goconvey)               |
 | [gopacket](https://github.com/google/gopacket)                      |
 | [gopass](https://github.com/howeyc/gopass)                          |
