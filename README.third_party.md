@@ -24,7 +24,7 @@ a notice will be included in
 | [abseil-cpp]               | Apache-2.0        |                  | 070f6e47b3        |                      |                ✗                |
 | Aladdin MD5                | Zlib              |                  | Unknown           |          ✗           |                ✗                |
 | [ASIO]                     | BSL-1.0           | 1.13.0           | b0926b61b0        |                      |                ✗                |
-| [benchmark]                | Apache-2.0        | 1.4.1            | 1.4.1             |                      |                                 |
+| [benchmark]                | Apache-2.0        | 1.5.0            | 1.4.1             |                      |                                 |
 | [Boost]                    | BSL-1.0           | 1.70.0           | 1.70.0            |                      |                ✗                |
 | [fmt]                      | BSD-2-Clause      |                  | 018d8b57f6        |                      |                ✗                |
 | [GPerfTools]               | BSD-3-Clause      | 2.7              | 2.7               |                      |                ✗                |
@@ -34,7 +34,7 @@ a notice will be included in
 | [kms-message]              |                   |                  | 75e391a037        |                      |                ✗                |
 | [libstemmer]               | BSD-3-Clause      |                  | Unknown           |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause      |                  | Unknown + changes |                      |                ✗                |
-| [MozJS]                    | MPL-2.0           | ESR 60.6.1       | ESR 60.3.0        |                      |                ✗                |
+| [MozJS]                    | MPL-2.0           | ESR 60.7         | ESR 60.3.0        |                      |                ✗                |
 | [MurmurHash3]              | Public Domain     |                  | Unknown + changes |          ✗           |                ✗                |
 | [Pcre]                     | BSD-3-Clause      | 8.43             | 8.42              |                      |                ✗                |
 | [S2]                       | Apache-2.0        |                  | Unknown           |          ✗           |                ✗                |
@@ -105,31 +105,32 @@ license notices are included in the `THIRD-PARTY-NOTICES.gotools` file.
 | Name                                                                |
 | :------------------------------------------------------------------ |
 | Go (language runtime and JSON/CSV codecs)                           |
-| [escaper](https://github.com/10gen/escaper)                         |
-| [llmgo](https://github.com/10gen/llmgo)                             |
-| [openssl](https://github.com/10gen/openssl)                         |
-| [mongo-lint](https://github.com/3rf/mongo-lint)                     |
-| [stack](https://github.com/go-stack/stack)                          |
-| [snappy](https://github.com/golang/snappy)                          |
-| [gopacket](https://github.com/google/gopacket)                      |
-| [gopherjs](https://github.com/gopherjs/gopherjs)                    |
-| [gopass](https://github.com/howeyc/gopass)                          |
-| [go-flags](https://github.com/jessevdk/go-flags)                    |
-| [gls](https://github.com/jtolds/gls)                                |
-| [go-runewidth](https://github.com/mattn/go-runewidth)               |
-| [mongo-go-driver](https://github.com/mongodb/mongo-go-driver)       |
-| [mongo-tools-common](https://github.com/mongodb/mongo-tools-common) |
-| [termbox-go](https://github.com/nsf/termbox-go)                     |
-| [go-cache](https://github.com/patrickmn/go-cache)                   |
 | [assertions](https://github.com/smartystreets/assertions)           |
-| [goconvey](https://github.com/smartystreets/goconvey)               |
-| [spacelog](https://github.com/spacemonkeygo/spacelog)               |
-| [scram](https://github.com/xdg/scram)                               |
-| [stringprep](https://github.com/xdg/stringprep)                     |
 | [crypto](https://golang.org/x/crypto)                               |
-| [sync](https://golang.org/x/sync)                                   |
-| [text](https://golang.org/x/text)                                   |
+| [escaper](https://github.com/10gen/escaper)                         |
+| [gls](https://github.com/jtolds/gls)                                |
+| [go-cache](https://github.com/patrickmn/go-cache)                   |
+| [go-flags](https://github.com/jessevdk/go-flags)                    |
+| [go-runewidth](https://github.com/mattn/go-runewidth)               |
+| [goconvey](https://github.com/smartystreets/goconvey)               |
+| [gopacket](https://github.com/google/gopacket)                      |
+| [gopass](https://github.com/howeyc/gopass)                          |
+| [gopherjs](https://github.com/gopherjs/gopherjs)                    |
+| [llmgo](https://github.com/10gen/llmgo)                             |
 | [mgo](https://github.com/10gen/mgo)                                 |
+| [mongo-go-driver](https://github.com/mongodb/mongo-go-driver)       |
+| [mongo-lint](https://github.com/3rf/mongo-lint)                     |
+| [mongo-tools-common](https://github.com/mongodb/mongo-tools-common) |
+| [openssl](https://github.com/10gen/openssl)                         |
+| [oglematchers](https://github.com/jacobsa/oglematchers)             |
+| [scram](https://github.com/xdg/scram)                               |
+| [snappy](https://github.com/golang/snappy)                          |
+| [spacelog](https://github.com/spacemonkeygo/spacelog)               |
+| [stack](https://github.com/go-stack/stack)                          |
+| [stringprep](https://github.com/xdg/stringprep)                     |
+| [sync](https://golang.org/x/sync)                                   |
+| [termbox-go](https://github.com/nsf/termbox-go)                     |
+| [text](https://golang.org/x/text)                                   |
 | [tomb](https://gopkg.in/tomb.v2)                                    |
 
 ## Dynamically Linked Libraries
