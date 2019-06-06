@@ -3,7 +3,7 @@
 (function() {
     'use strict';
 
-    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode.
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
@@ -48,7 +48,8 @@
         assert.commandWorked(st.s.adminCommand(
             {moveChunk: sourceColl.getFullName(), find: {shardKey: 0}, to: shard}));
     }
-    function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl, dropShard) {
+    function runMergeWithMode(
+        whenMatchedMode, whenNotMatchedMode, shardedColl, dropShard, expectFailCode) {
         // Set the failpoint to hang in the first call to DocumentSourceCursor's getNext().
         setAggHang("alwaysOn");
 
@@ -67,7 +68,12 @@
                 cursor: {},
                 comment: "${comment}"
             });
-            assert.commandWorked(cmdRes);
+            
+            if (${expectFailCode} !== undefined) {
+                assert.commandFailedWithCode(cmdRes, ${expectFailCode});
+            } else {
+                assert.commandWorked(cmdRes);
+            }
         `;
 
         // Start the $merge aggregation in a parallel shell.
@@ -94,11 +100,7 @@
         setAggHang("off");
         mergeShell();
 
-        // Verify that the $merge succeeded. For whenNotMatched "discard", the two documents will
-        // not get written to the target collection.
-        assert.eq(whenNotMatchedMode == "discard" ? 0 : 2, targetColl.find().itcount());
-
-        assert.commandWorked(targetColl.remove({}));
+        assert.eq(2, targetColl.find().itcount());
     }
 
     // Shard the source collection with shard key {shardKey: 1} and split into 2 chunks.
@@ -109,17 +111,25 @@
 
     // Write two documents in the source collection that should target the two chunks in the target
     // collection.
-    assert.commandWorked(sourceColl.insert({shardKey: -1}));
-    assert.commandWorked(sourceColl.insert({shardKey: 1}));
+    assert.commandWorked(sourceColl.insert({shardKey: -1, _id: 0}));
+    assert.commandWorked(sourceColl.insert({shardKey: 1, _id: 1}));
 
     withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
-        // Skip the combination of merge modes which will fail depending on the contents of the
-        // source and target collection, as this will cause the assertion below to trip.
-        if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail")
-            return;
+        assert.commandWorked(targetColl.remove({}));
 
-        runMergeWithMode(whenMatchedMode, whenNotMatchedMode, targetColl, true);
-        runMergeWithMode(whenMatchedMode, whenNotMatchedMode, targetColl, false);
+        // Match the data from source into target so that we don't fail the assertion for
+        // 'whenNotMatchedMode:fail/discard'.
+        if (whenNotMatchedMode == "fail" || whenNotMatchedMode == "discard") {
+            assert.commandWorked(targetColl.insert({shardKey: -1, _id: 0}));
+            assert.commandWorked(targetColl.insert({shardKey: 1, _id: 1}));
+        }
+
+        runMergeWithMode(whenMatchedMode, whenNotMatchedMode, targetColl, true, undefined);
+        runMergeWithMode(whenMatchedMode,
+                         whenNotMatchedMode,
+                         targetColl,
+                         false,
+                         whenMatchedMode == "fail" ? ErrorCodes.DuplicateKey : undefined);
     });
 
     st.stop();

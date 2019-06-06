@@ -6,7 +6,8 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+    // For assertMergeFailsForAllModesWithCode.
+    load("jstests/aggregation/extras/merge_helpers.js");
 
     const coll = db.name;
     coll.drop();
@@ -15,14 +16,5 @@
     for (let i = 0; i < nDocs; i++) {
         assert.commandWorked(coll.insert({_id: i, a: i}));
     }
-
-    assertErrorCode(
-        coll,
-        [{$merge: {into: coll.getName(), whenMatched: "replace", whenNotMatched: "insert"}}],
-        51188);
-
-    assertErrorCode(
-        coll,
-        [{$merge: {into: coll.getName(), whenMatched: "fail", whenNotMatched: "insert"}}],
-        51188);
+    assertMergeFailsForAllModesWithCode({source: coll, target: coll, errorCodes: 51188});
 }());

@@ -5,8 +5,8 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode.
-    load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
+    load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
 
     const coll = db.batch_writes;
     const outColl = db.batch_writes_out;
