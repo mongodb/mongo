@@ -41,7 +41,6 @@ namespace mongo {
 namespace crypto {
 
 namespace {
-constexpr size_t kHmacOutSize = 32;
 constexpr size_t kIVSize = 16;
 
 // AssociatedData can be 2^24 bytes but since there needs to be room for the ciphertext in the
@@ -183,23 +182,41 @@ size_t aeadCipherOutputLength(size_t plainTextLen) {
     return aesOutLen + kHmacOutSize;
 }
 
-StatusWith<size_t> aeadGetMaximumPlainTextLength(size_t cipherTextLen) {
-    if (cipherTextLen > (aesCBCIVSize + kHmacOutSize)) {
-        return cipherTextLen - aesCBCIVSize - kHmacOutSize;
+Status aeadEncryptLocalKMS(const SymmetricKey& key,
+                           const ConstDataRange in,
+                           uint8_t* out,
+                           size_t outLen) {
+    if (key.getKeySize() != kFieldLevelEncryptionKeySize) {
+        return Status(ErrorCodes::BadValue,
+                      "AEAD encryption key is the incorrect length. "
+                      "Must be 96 bytes.");
     }
 
-    return Status(ErrorCodes::BadValue, "Invalid cipher text length");
+    // According to the rfc on AES encryption, the associatedDataLength is defined as the
+    // number of bits in associatedData in BigEndian format. This is what the code segment
+    // below describes.
+    // RFC: (https://tools.ietf.org/html/draft-mcgrew-aead-aes-cbc-hmac-sha2-01#section-2.1)
+    std::array<uint8_t, sizeof(uint64_t)> dataLenBitsEncodedStorage;
+    DataRange dataLenBitsEncoded(dataLenBitsEncodedStorage);
+    dataLenBitsEncoded.write<BigEndian<uint64_t>>(static_cast<uint64_t>(0));
+
+    ConstDataRange keyCDR(key.getKey(), kAeadAesHmacKeySize);
+
+    return aeadEncryptWithIV(keyCDR,
+                             in.data<uint8_t>(),
+                             in.length(),
+                             nullptr,
+                             0,
+                             nullptr,
+                             0,
+                             dataLenBitsEncoded,
+                             out,
+                             outLen);
 }
 
-Status aeadEncrypt(const SymmetricKey& key,
-                   const uint8_t* in,
-                   const size_t inLen,
-                   const uint8_t* associatedData,
-                   const uint64_t associatedDataLen,
-                   uint8_t* out,
-                   size_t outLen) {
-
-    if (associatedDataLen >= kMaxAssociatedDataLength) {
+Status aeadEncryptDataFrame(FLEEncryptionFrame& dataframe) {
+    auto associatedData = dataframe.getAssociatedData();
+    if (associatedData.length() >= kMaxAssociatedDataLength) {
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "AssociatedData for encryption is too large. Cannot be larger than "
@@ -212,49 +229,51 @@ Status aeadEncrypt(const SymmetricKey& key,
     // RFC: (https://tools.ietf.org/html/draft-mcgrew-aead-aes-cbc-hmac-sha2-01#section-2.1)
     std::array<uint8_t, sizeof(uint64_t)> dataLenBitsEncodedStorage;
     DataRange dataLenBitsEncoded(dataLenBitsEncodedStorage);
-    dataLenBitsEncoded.write<BigEndian<uint64_t>>(associatedDataLen * 8);
+    dataLenBitsEncoded.write<BigEndian<uint64_t>>(static_cast<uint64_t>(associatedData.length()) *
+                                                  8);
 
-    ConstDataRange aeadKey(key.getKey(), kAeadAesHmacKeySize);
 
-    if (key.getKeySize() != kFieldLevelEncryptionKeySize) {
+    auto key = dataframe.getKey();
+
+    auto plaintext = dataframe.getPlaintext();
+
+    if (key->getKeySize() != kFieldLevelEncryptionKeySize) {
         return Status(ErrorCodes::BadValue, "Invalid key size.");
     }
 
-    if (in == nullptr || !in) {
+    if (plaintext.data() == nullptr) {
         return Status(ErrorCodes::BadValue, "Invalid AEAD plaintext input.");
     }
 
-    if (key.getAlgorithm() != aesAlgorithm) {
+    if (key->getAlgorithm() != aesAlgorithm) {
         return Status(ErrorCodes::BadValue, "Invalid algorithm for key.");
     }
 
-    ConstDataRange hmacCDR(nullptr, 0);
+    ConstDataRange iv(nullptr, 0);
     SHA512Block hmacOutput;
-    if (associatedData != nullptr &&
-        static_cast<int>(associatedData[0]) ==
-            FleAlgorithmInt_serializer(FleAlgorithmInt::kDeterministic)) {
-        const uint8_t* ivKey = key.getKey() + kAeadAesHmacKeySize;
-        hmacOutput = SHA512Block::computeHmac(ivKey,
-                                              sym256KeySize,
-                                              {ConstDataRange(associatedData, associatedDataLen),
-                                               dataLenBitsEncoded,
-                                               ConstDataRange(in, inLen)});
+
+    if (dataframe.getFLEAlgorithmType() == FleAlgorithmInt::kDeterministic) {
+        const uint8_t* ivKey = key->getKey() + kAeadAesHmacKeySize;
+        hmacOutput = SHA512Block::computeHmac(
+            ivKey, sym256KeySize, {associatedData, dataLenBitsEncoded, plaintext});
 
         static_assert(SHA512Block::kHashLength >= kIVSize,
                       "Invalid AEAD parameters. Generated IV too short.");
 
-        hmacCDR = ConstDataRange(hmacOutput.data(), kIVSize);
+        iv = ConstDataRange(hmacOutput.data(), kIVSize);
     }
+
+    ConstDataRange aeadKey(key->getKey(), kAeadAesHmacKeySize);
     return aeadEncryptWithIV(aeadKey,
-                             in,
-                             inLen,
-                             reinterpret_cast<const uint8_t*>(hmacCDR.data()),
-                             hmacCDR.length(),
-                             associatedData,
-                             associatedDataLen,
+                             plaintext.data<uint8_t>(),
+                             plaintext.length(),
+                             iv.data<uint8_t>(),
+                             iv.length(),
+                             associatedData.data<uint8_t>(),
+                             associatedData.length(),
                              dataLenBitsEncoded,
-                             out,
-                             outLen);
+                             dataframe.getCiphertextMutable(),
+                             dataframe.getDataLength());
 }
 
 Status aeadEncryptWithIV(ConstDataRange key,
@@ -320,8 +339,7 @@ Status aeadEncryptWithIV(ConstDataRange key,
 }
 
 Status aeadDecrypt(const SymmetricKey& key,
-                   const uint8_t* cipherText,
-                   const size_t cipherLen,
+                   ConstDataRange ciphertext,
                    const uint8_t* associatedData,
                    const uint64_t associatedDataLen,
                    uint8_t* out,
@@ -330,15 +348,16 @@ Status aeadDecrypt(const SymmetricKey& key,
         return Status(ErrorCodes::BadValue, "Invalid key size.");
     }
 
-    if (!(cipherText && out)) {
+    if (!out) {
         return Status(ErrorCodes::BadValue, "Invalid AEAD parameters.");
     }
 
-    if (cipherLen < kHmacOutSize) {
+    if (ciphertext.length() < kHmacOutSize) {
         return Status(ErrorCodes::BadValue, "Ciphertext is not long enough.");
     }
 
-    size_t expectedMaximumPlainTextSize = uassertStatusOK(aeadGetMaximumPlainTextLength(cipherLen));
+    size_t expectedMaximumPlainTextSize =
+        uassertStatusOK(aeadGetMaximumPlainTextLength(ciphertext.length()));
     if ((*outLen) != expectedMaximumPlainTextSize) {
         return Status(ErrorCodes::BadValue, "Output buffer must be as long as the cipherText.");
     }
@@ -353,7 +372,7 @@ Status aeadDecrypt(const SymmetricKey& key,
     const uint8_t* macKey = key.getKey();
     const uint8_t* encKey = key.getKey() + sym256KeySize;
 
-    size_t aesLen = cipherLen - kHmacOutSize;
+    size_t aesLen = ciphertext.length() - kHmacOutSize;
 
     // According to the rfc on AES encryption, the associatedDataLength is defined as the
     // number of bits in associatedData in BigEndian format. This is what the code segment
@@ -366,11 +385,11 @@ Status aeadDecrypt(const SymmetricKey& key,
         SHA512Block::computeHmac(macKey,
                                  sym256KeySize,
                                  {ConstDataRange(associatedData, associatedDataLen),
-                                  ConstDataRange(cipherText, aesLen),
+                                  ConstDataRange(ciphertext.data(), aesLen),
                                   dataLenBitsEncoded});
 
     if (consttimeMemEqual(reinterpret_cast<const unsigned char*>(hmacOutput.data()),
-                          reinterpret_cast<const unsigned char*>(cipherText + aesLen),
+                          ciphertext.data<const unsigned char>() + aesLen,
                           kHmacOutSize) == false) {
         return Status(ErrorCodes::BadValue, "HMAC data authentication failed.");
     }
@@ -378,12 +397,34 @@ Status aeadDecrypt(const SymmetricKey& key,
     SymmetricKey symEncKey(encKey, sym256KeySize, aesAlgorithm, key.getKeyId(), 1);
 
     auto sDecrypt =
-        _aesDecrypt(symEncKey, ConstDataRange(cipherText, aesLen), out, *outLen, outLen);
+        _aesDecrypt(symEncKey, ConstDataRange(ciphertext.data(), aesLen), out, aesLen, outLen);
     if (!sDecrypt.isOK()) {
         return sDecrypt;
     }
 
     return Status::OK();
+}
+
+Status aeadDecryptDataFrame(FLEDecryptionFrame& dataframe) {
+    auto ciphertext = dataframe.getCiphertext();
+    auto associatedData = dataframe.getAssociatedData();
+    auto& plaintext = dataframe.getPlaintextMutable();
+    size_t outLen = plaintext.size();
+    uassertStatusOK(aeadDecrypt(*dataframe.getKey(),
+                                ciphertext,
+                                associatedData.data<uint8_t>(),
+                                associatedData.length(),
+                                plaintext.data(),
+                                &outLen));
+    plaintext.resize(outLen);
+    return Status::OK();
+}
+
+Status aeadDecryptLocalKMS(const SymmetricKey& key,
+                           const ConstDataRange cipher,
+                           uint8_t* out,
+                           size_t* outLen) {
+    return aeadDecrypt(key, cipher, nullptr, 0, out, outLen);
 }
 
 }  // namespace crypto

@@ -36,6 +36,7 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -183,27 +184,15 @@ void EncryptedDBClientBase::encryptMarking(const BSONObj& elem,
 void EncryptedDBClientBase::decryptPayload(ConstDataRange data,
                                            BSONObjBuilder* builder,
                                            StringData elemName) {
+    invariant(builder);
     uassert(ErrorCodes::BadValue, "Invalid decryption blob", data.length() > kAssociatedDataLength);
-    ConstDataRange uuidCdr = ConstDataRange(data.data() + 1, 16);
-    UUID uuid = UUID::fromCDR(uuidCdr);
 
-    auto key = getDataKey(uuid);
-    std::vector<uint8_t> out(uassertStatusOK(
-        crypto::aeadGetMaximumPlainTextLength(data.length() - kAssociatedDataLength)));
-    size_t outLen = out.size();
-
-    uassertStatusOK(
-        crypto::aeadDecrypt(*key,
-                            reinterpret_cast<const uint8_t*>(data.data() + kAssociatedDataLength),
-                            data.length() - kAssociatedDataLength,
-                            reinterpret_cast<const uint8_t*>(data.data()),
-                            kAssociatedDataLength,
-                            out.data(),
-                            &outLen));
+    FLEDecryptionFrame dataFrame = createDecryptionFrame(data);
+    auto plaintext = dataFrame.getPlaintext();
 
     // extract type byte
-    const uint8_t bsonType = static_cast<const uint8_t>(*(data.data() + 17));
-    BSONObj decryptedObj = validateBSONElement(ConstDataRange(out.data(), outLen), bsonType);
+    const uint8_t bsonType = dataFrame.getBSONType();
+    BSONObj decryptedObj = validateBSONElement(plaintext, bsonType);
     if (bsonType == BSONType::Object) {
         builder->append(elemName, decryptedObj);
     } else {
@@ -361,7 +350,7 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
     UUID uuid = UUID::fromCDR(ConstDataRange(binData.data(), binData.size()));
     BSONType bsonType = BSONType::EOO;
 
-    BufBuilder plaintext;
+    BufBuilder plaintextBuilder;
     if (args.get(1).isObject()) {
         JS::RootedObject rootedObj(cx, &args.get(1).toObject());
         auto jsclass = JS_GetClass(rootedObj);
@@ -374,7 +363,7 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
             // If it is a JS Object, then we can extract all the information by simply calling
             // ValueWriter.toBSON and setting the type bit, which is what is happening below.
             BSONObj valueObj = mozjs::ValueWriter(cx, args.get(1)).toBSON();
-            plaintext.appendBuf(valueObj.objdata(), valueObj.objsize());
+            plaintextBuilder.appendBuf(valueObj.objdata(), valueObj.objsize());
             if (strcmp(jsclass->name, "Array") == 0) {
                 bsonType = BSONType::Array;
             } else {
@@ -408,11 +397,9 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
             // If it is one of our Mongo defined types, then we have to use the ValueWriter
             // writeThis function, which takes in a set of WriteFieldRecursionFrames (setting
             // a limit on how many times we can recursively dig into an object's nested
-            // structure)
-            // and writes the value out to a BSONObjBuilder. We can then extract that
-            // information
-            // from the object by building it and pulling out the first element, which is the
-            // object we are trying to get.
+            // structure) and writes the value out to a BSONObjBuilder. We can then extract
+            // that information from the object by building it and pulling out the first
+            // element, which is the object we are trying to get.
             mozjs::ObjectWrapper::WriteFieldRecursionFrames frames;
             frames.emplace(cx, rootedObj.get(), nullptr, StringData{});
             BSONObjBuilder builder;
@@ -421,7 +408,7 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
             BSONObj object = builder.obj();
             auto elem = object.getField("value"_sd);
 
-            plaintext.appendBuf(elem.value(), elem.valuesize());
+            plaintextBuilder.appendBuf(elem.value(), elem.valuesize());
             bsonType = elem.type();
         }
 
@@ -431,8 +418,8 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
             uasserted(ErrorCodes::BadValue, "Plaintext string to encrypt too long.");
         }
 
-        plaintext.appendNum(static_cast<uint32_t>(valueStr.size() + 1));
-        plaintext.appendStr(valueStr, true);
+        plaintextBuilder.appendNum(static_cast<uint32_t>(valueStr.size() + 1));
+        plaintextBuilder.appendStr(valueStr, true);
         bsonType = BSONType::String;
 
     } else if (args.get(1).isNumber()) {
@@ -441,7 +428,7 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
                 algorithm != FleAlgorithmInt::kDeterministic);
 
         double valueNum = mozjs::ValueWriter(cx, args.get(1)).toNumber();
-        plaintext.appendNum(valueNum);
+        plaintextBuilder.appendNum(valueNum);
         bsonType = BSONType::NumberDouble;
     } else if (args.get(1).isBoolean()) {
         uassert(ErrorCodes::BadValue,
@@ -450,22 +437,23 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
 
         bool boolean = mozjs::ValueWriter(cx, args.get(1)).toBoolean();
         if (boolean) {
-            plaintext.appendChar(0x01);
+            plaintextBuilder.appendChar(0x01);
         } else {
-            plaintext.appendChar(0x00);
+            plaintextBuilder.appendChar(0x00);
         }
         bsonType = BSONType::Bool;
     } else {
         uasserted(ErrorCodes::BadValue, "Cannot encrypt valuetype provided.");
     }
-    ConstDataRange plaintextRange(plaintext.buf(), plaintext.len());
 
-    auto key = getDataKey(uuid);
-    std::vector<uint8_t> fleBlob =
-        encryptWithKey(uuid, key, plaintextRange, bsonType, FleAlgorithmInt_serializer(algorithm));
+    ConstDataRange plaintext(plaintextBuilder.buf(), plaintextBuilder.len());
+
+    FLEEncryptionFrame encryptionFrame =
+        createEncryptionFrame(getDataKey(uuid), algorithm, uuid, bsonType, plaintext);
 
     // Prepare the return value
-    std::string blobStr = base64::encode(reinterpret_cast<char*>(fleBlob.data()), fleBlob.size());
+    ConstDataRange ciphertextBlob(encryptionFrame.get());
+    std::string blobStr = base64::encode(ciphertextBlob.data(), ciphertextBlob.length());
     JS::AutoValueArray<2> arr(cx);
 
     arr[0].setInt32(BinDataType::Encrypt);
@@ -481,43 +469,20 @@ void EncryptedDBClientBase::decrypt(mozjs::MozJSImplScope* scope,
             "decrypt argument must be a BinData subtype Encrypt object",
             args.get(0).isObject());
 
-    if (!scope->getProto<mozjs::BinDataInfo>().instanceOf(args.get(0))) {
-        uasserted(ErrorCodes::BadValue,
-                  "decrypt argument must be a BinData subtype Encrypt object");
-    }
+    uassert(ErrorCodes::BadValue,
+            "decrypt argument must be a BinData subtype Encrypt object",
+            scope->getProto<mozjs::BinDataInfo>().instanceOf(args.get(0)));
 
     JS::RootedObject obj(cx, &args.get(0).get().toObject());
-    std::vector<uint8_t> binData = getBinDataArg(scope, cx, args, 0, BinDataType::Encrypt);
+    std::vector<uint8_t> data = getBinDataArg(scope, cx, args, 0, BinDataType::Encrypt);
 
-    uassert(
-        ErrorCodes::BadValue, "Ciphertext blob too small", binData.size() > kAssociatedDataLength);
-    uassert(ErrorCodes::BadValue,
-            "Ciphertext blob algorithm unknown",
-            (FleAlgorithmInt(binData[0]) == FleAlgorithmInt::kDeterministic ||
-             FleAlgorithmInt(binData[0]) == FleAlgorithmInt::kRandom));
+    ConstDataRange ciphertextBlob(data);
 
-    ConstDataRange uuidCdr = ConstDataRange(&binData[1], UUID::kNumBytes);
-    UUID uuid = UUID::fromCDR(uuidCdr);
+    FLEDecryptionFrame dataFrame = createDecryptionFrame(ciphertextBlob);
 
-    auto key = getDataKey(uuid);
-    std::vector<uint8_t> out(uassertStatusOK(
-        crypto::aeadGetMaximumPlainTextLength(binData.size() - kAssociatedDataLength)));
-    size_t outLen = out.size();
-
-    auto decryptStatus = crypto::aeadDecrypt(*key,
-                                             &binData[kAssociatedDataLength],
-                                             binData.size() - kAssociatedDataLength,
-                                             &binData[0],
-                                             kAssociatedDataLength,
-                                             out.data(),
-                                             &outLen);
-    if (!decryptStatus.isOK()) {
-        uasserted(decryptStatus.code(), decryptStatus.reason());
-    }
-
-    uint8_t bsonType = binData[17];
+    const uint8_t bsonType = dataFrame.getBSONType();
     BSONObj parent;
-    BSONObj decryptedObj = validateBSONElement(ConstDataRange(out.data(), outLen), bsonType);
+    BSONObj decryptedObj = validateBSONElement(dataFrame.getPlaintext(), bsonType);
     if (bsonType == BSONType::Object) {
         mozjs::ValueReader(cx, args.rval()).fromBSON(decryptedObj, &parent, true);
     } else {
@@ -568,6 +533,26 @@ bool EncryptedDBClientBase::isReplicaSetMember() const {
 
 bool EncryptedDBClientBase::isMongos() const {
     return _conn->isMongos();
+}
+
+FLEEncryptionFrame EncryptedDBClientBase::createEncryptionFrame(std::shared_ptr<SymmetricKey> key,
+                                                                FleAlgorithmInt algorithm,
+                                                                UUID uuid,
+                                                                BSONType type,
+                                                                ConstDataRange plaintext) {
+
+    auto cipherLength = crypto::aeadCipherOutputLength(plaintext.length());
+    FLEEncryptionFrame dataframe(key, algorithm, uuid, type, plaintext, cipherLength);
+    uassertStatusOK(crypto::aeadEncryptDataFrame(dataframe));
+    return dataframe;
+}
+
+FLEDecryptionFrame EncryptedDBClientBase::createDecryptionFrame(ConstDataRange data) {
+    auto frame = FLEDecryptionFrame(data);
+    auto key = getDataKey(frame.getUUID());
+    frame.setKey(key);
+    uassertStatusOK(crypto::aeadDecryptDataFrame(frame));
+    return frame;
 }
 
 NamespaceString EncryptedDBClientBase::getCollectionNS() {
@@ -650,36 +635,6 @@ std::shared_ptr<SymmetricKey> EncryptedDBClientBase::getDataKeyFromDisk(const UU
         kmsService->decrypt(dataKey, keyStoreRecord.getMasterKey());
     return std::make_shared<SymmetricKey>(
         std::move(decryptedKey), crypto::aesAlgorithm, "kms_encryption");
-}
-
-std::vector<uint8_t> EncryptedDBClientBase::encryptWithKey(UUID uuid,
-                                                           const std::shared_ptr<SymmetricKey>& key,
-                                                           ConstDataRange plaintext,
-                                                           BSONType bsonType,
-                                                           int32_t algorithm) {
-    // As per the description of the encryption algorithm for FLE, the
-    // associated data is constructed of the following -
-    // associatedData[0] = the FleAlgorithmEnum
-    //      - either a 1 or a 2 depending on whether the iv is provided.
-    // associatedData[1-16] = the uuid in bytes
-    // associatedData[17] = the bson type
-
-    ConstDataRange uuidCdr = uuid.toCDR();
-    uint64_t outputLength = crypto::aeadCipherOutputLength(plaintext.length());
-    std::vector<uint8_t> outputBuffer(kAssociatedDataLength + outputLength);
-    outputBuffer[0] = static_cast<uint8_t>(algorithm);
-    std::memcpy(&outputBuffer[1], uuidCdr.data(), uuidCdr.length());
-    outputBuffer[17] = static_cast<uint8_t>(bsonType);
-    uassertStatusOK(crypto::aeadEncrypt(*key,
-                                        reinterpret_cast<const uint8_t*>(plaintext.data()),
-                                        plaintext.length(),
-                                        outputBuffer.data(),
-                                        18,
-                                        // The ciphertext starts 18 bytes into the output
-                                        // buffer, as described above.
-                                        outputBuffer.data() + 18,
-                                        outputLength));
-    return outputBuffer;
 }
 
 namespace {

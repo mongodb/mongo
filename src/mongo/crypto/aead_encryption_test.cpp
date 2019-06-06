@@ -29,6 +29,8 @@
 
 #include <algorithm>
 
+#include "mongo/base/data_range.h"
+
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -139,8 +141,7 @@ TEST(AEAD, EncryptAndDecrypt) {
     std::array<uint8_t, 144> plainText = {};
     size_t plainTextDecryptLen = 144;
     ASSERT_OK(crypto::aeadDecrypt(key,
-                                  cryptoBuffer.data(),
-                                  cryptoBuffer.size(),
+                                  ConstDataRange(cryptoBuffer),
                                   associatedData.data(),
                                   dataLen,
                                   plainText.data(),
@@ -152,8 +153,7 @@ TEST(AEAD, EncryptAndDecrypt) {
     (*aesVector)[0] ^= 1;
     key = SymmetricKey(aesVector, aesAlgorithm, "aeadEncryptDecryptTest");
     ASSERT_NOT_OK(crypto::aeadDecrypt(key,
-                                      cryptoBuffer.data(),
-                                      cryptoBuffer.size(),
+                                      ConstDataRange(cryptoBuffer),
                                       associatedData.data(),
                                       dataLen,
                                       plainText.data(),

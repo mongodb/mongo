@@ -32,6 +32,9 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "mongo/crypto/fle_data_frames.h"
+#include "mongo/shell/kms_gen.h"
+
 #include "mongo/base/data_view.h"
 #include "mongo/base/status.h"
 #include "mongo/crypto/symmetric_key.h"
@@ -51,25 +54,26 @@ constexpr size_t kAeadAesHmacKeySize = 64;
  */
 size_t aeadCipherOutputLength(size_t plainTextLen);
 
+/**
+ * Encrypts a dataframe object following the AEAD_AES_256_CBC_HMAC_SHA_512 encryption
+ * algorithm. Used for field level encryption.
+ */
+Status aeadEncryptDataFrame(FLEEncryptionFrame& dataframe);
 
 /**
- * Returns the length of the plaintext output given the ciphertext length. Only for AEAD.
+ * Decrypts a dataframe object following the AEAD_AES_256_CBC_HMAC_SHA_512 decryption
+ * algorithm. Used for field level encryption.
  */
-StatusWith<size_t> aeadGetMaximumPlainTextLength(size_t cipherTextLen);
-
+Status aeadDecryptDataFrame(FLEDecryptionFrame& dataframe);
 
 /**
- * Encrypts the plaintext using following the AEAD_AES_256_CBC_HMAC_SHA_512 encryption
- * algorithm. Writes output to out.
+ * Uses AEAD_AES_256_CBC_HMAC_SHA_512 encryption to encrypt a local datakey.
+ * Writes output to out.
  */
-Status aeadEncrypt(const SymmetricKey& key,
-                   const uint8_t* in,
-                   const size_t inLen,
-                   const uint8_t* associatedData,
-                   const uint64_t associatedDataLen,
-                   uint8_t* out,
-                   size_t outLen);
-
+Status aeadEncryptLocalKMS(const SymmetricKey& key,
+                           const ConstDataRange in,
+                           uint8_t* out,
+                           size_t outLen);
 /**
  * Internal calls for the aeadEncryption algorithm. Only used for testing.
  */
@@ -85,16 +89,23 @@ Status aeadEncryptWithIV(ConstDataRange key,
                          size_t outLen);
 
 /**
- * Decrypts the cipherText using AEAD_AES_256_CBC_HMAC_SHA_512 decryption. Writes output
- * to out.
+ * Internal call for the aeadDecryption algorithm. Only used for testing.
  */
 Status aeadDecrypt(const SymmetricKey& key,
-                   const uint8_t* cipherText,
-                   const size_t cipherLen,
+                   ConstDataRange ciphertext,
                    const uint8_t* associatedData,
                    const uint64_t associatedDataLen,
                    uint8_t* out,
                    size_t* outLen);
+
+/**
+ * Decrypts the cipherText using AEAD_AES_256_CBC_HMAC_SHA_512 decryption. Writes output
+ * to out.
+ */
+Status aeadDecryptLocalKMS(const SymmetricKey& key,
+                           const ConstDataRange cipher,
+                           uint8_t* out,
+                           size_t* outLen);
 
 }  // namespace crypto
 }  // namespace mongo
