@@ -1372,7 +1372,8 @@ var ReplSetTest = function(opts) {
     };
 
     // Wait until the optime of the specified type reaches the primary's last applied optime. Blocks
-    // on all secondary nodes or just 'slaves', if specified.
+    // on all secondary nodes or just 'slaves', if specified. The timeout will reset if any of the
+    // secondaries makes progress.
     this.awaitReplication = function(timeout, secondaryOpTimeType, slaves) {
         if (slaves !== undefined && slaves !== self._slaves) {
             print("ReplSetTest awaitReplication: going to check only " + slaves.map(s => s.host));
@@ -1410,100 +1411,156 @@ var ReplSetTest = function(opts) {
         assert.retryNoExcept(() => {
             master = this.getPrimary();
             masterConfigVersion = this.getReplSetConfigFromNode().version;
-            masterName = master.toString().substr(14);  // strip "connection to "
+            masterName = master.host;
             return true;
         }, "ReplSetTest awaitReplication: couldnt get repl set config.", num_attempts, 1000);
 
         print("ReplSetTest awaitReplication: starting: optime for primary, " + masterName +
               ", is " + tojson(masterLatestOpTime));
 
-        assert.soonNoExcept(function() {
-            try {
-                print("ReplSetTest awaitReplication: checking secondaries " +
-                      "against latest primary optime " + tojson(masterLatestOpTime));
-                var secondaryCount = 0;
+        let nodesCaughtUp = false;
+        let slavesToCheck = slaves || self._slaves;
+        let nodeProgress = Array(slavesToCheck.length);
 
-                var slavesToCheck = slaves || self._slaves;
-                for (var i = 0; i < slavesToCheck.length; i++) {
-                    var slave = slavesToCheck[i];
-                    var slaveName = slave.toString().substr(14);  // strip "connection to "
+        const Progress = Object.freeze({
+            Skip: 'Skip',
+            CaughtUp: 'CaughtUp',
+            InProgress: 'InProgress',
+            Stuck: 'Stuck',
+            ConfigMismatch: 'ConfigMismatch'
+        });
 
-                    var slaveConfigVersion =
-                        slave.getDB("local")['system.replset'].findOne().version;
+        function checkProgressSingleNode(index, secondaryCount) {
+            var slave = slavesToCheck[index];
+            var slaveName = slave.host;
 
-                    if (masterConfigVersion != slaveConfigVersion) {
-                        print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
-                              slaveName + ", has config version #" + slaveConfigVersion +
-                              ", but expected config version #" + masterConfigVersion);
+            var slaveConfigVersion = slave.getDB("local")['system.replset'].findOne().version;
 
-                        if (slaveConfigVersion > masterConfigVersion) {
-                            master = self.getPrimary();
-                            masterConfigVersion =
-                                master.getDB("local")['system.replset'].findOne().version;
-                            masterName = master.toString().substr(14);  // strip "connection to "
+            if (masterConfigVersion != slaveConfigVersion) {
+                print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
+                      slaveName + ", has config version #" + slaveConfigVersion +
+                      ", but expected config version #" + masterConfigVersion);
 
-                            print("ReplSetTest awaitReplication: optime for primary, " +
-                                  masterName + ", is " + tojson(masterLatestOpTime));
-                        }
+                if (slaveConfigVersion > masterConfigVersion) {
+                    master = self.getPrimary();
+                    masterConfigVersion = master.getDB("local")['system.replset'].findOne().version;
+                    masterName = master.host;
 
-                        return false;
-                    }
-
-                    // Continue if we're connected to an arbiter
-                    var res = assert.commandWorked(slave.adminCommand({replSetGetStatus: 1}));
-                    if (res.myState == ReplSetTest.State.ARBITER) {
-                        continue;
-                    }
-
-                    ++secondaryCount;
-                    print("ReplSetTest awaitReplication: checking secondary #" + secondaryCount +
-                          ": " + slaveName);
-
-                    slave.getDB("admin").getMongo().setSlaveOk();
-
-                    var slaveOpTime;
-                    if (secondaryOpTimeType == ReplSetTest.OpTimeType.LAST_DURABLE) {
-                        slaveOpTime = _getDurableOpTime(slave);
-                    } else {
-                        slaveOpTime = _getLastOpTime(slave);
-                    }
-
-                    if (rs.compareOpTimes(masterLatestOpTime, slaveOpTime) < 0) {
-                        masterLatestOpTime = _getLastOpTime(master);
-                        print("ReplSetTest awaitReplication: optime for " + slaveName +
-                              " is newer, resetting latest primary optime to " +
-                              tojson(masterLatestOpTime));
-                        return false;
-                    }
-
-                    if (!friendlyEqual(masterLatestOpTime, slaveOpTime)) {
-                        print("ReplSetTest awaitReplication: optime for secondary #" +
-                              secondaryCount + ", " + slaveName + ", is " + tojson(slaveOpTime) +
-                              " but latest is " + tojson(masterLatestOpTime));
-                        print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
-                              slaveName + ", is NOT synced");
-                        return false;
-                    }
-
-                    print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
-                          slaveName + ", is synced");
+                    print("ReplSetTest awaitReplication: optime for primary, " + masterName +
+                          ", is " + tojson(masterLatestOpTime));
                 }
 
-                print("ReplSetTest awaitReplication: finished: all " + secondaryCount +
-                      " secondaries synced at optime " + tojson(masterLatestOpTime));
-                return true;
-            } catch (e) {
-                print("ReplSetTest awaitReplication: caught exception " + e);
-
-                // We might have a new master now
-                awaitLastOpTimeWrittenFn();
-
-                print("ReplSetTest awaitReplication: resetting: optime for primary " +
-                      self._master + " is " + tojson(masterLatestOpTime));
-
-                return false;
+                return Progress.ConfigMismatch;
             }
-        }, "awaiting replication", timeout);
+
+            // Skip this node if we're connected to an arbiter
+            var res = assert.commandWorked(slave.adminCommand({replSetGetStatus: 1}));
+            if (res.myState == ReplSetTest.State.ARBITER) {
+                return Progress.Skip;
+            }
+
+            print("ReplSetTest awaitReplication: checking secondary #" + secondaryCount + ": " +
+                  slaveName);
+
+            slave.getDB("admin").getMongo().setSlaveOk();
+
+            var slaveOpTime;
+            if (secondaryOpTimeType == ReplSetTest.OpTimeType.LAST_DURABLE) {
+                slaveOpTime = _getDurableOpTime(slave);
+            } else {
+                slaveOpTime = _getLastOpTime(slave);
+            }
+
+            // If the node doesn't have a valid opTime, it likely hasn't received any writes from
+            // the primary yet.
+            if (!rs.isValidOpTime(slaveOpTime)) {
+                print("ReplSetTest awaitReplication: optime for secondary #" + secondaryCount +
+                      ", " + slaveName + ", is " + tojson(slaveOpTime) + ", which is NOT valid.");
+                return Progress.Stuck;
+            }
+
+            // See if the node made progress. We count it as progress even if the node's last optime
+            // went backwards because that means the node is in rollback.
+            let madeProgress =
+                (nodeProgress[index] && (rs.compareOpTimes(nodeProgress[index], slaveOpTime) != 0));
+            nodeProgress[index] = slaveOpTime;
+
+            if (rs.compareOpTimes(masterLatestOpTime, slaveOpTime) < 0) {
+                masterLatestOpTime = _getLastOpTime(master);
+                print("ReplSetTest awaitReplication: optime for " + slaveName +
+                      " is newer, resetting latest primary optime to " +
+                      tojson(masterLatestOpTime) + ". Also resetting awaitReplication timeout");
+                return Progress.InProgress;
+            }
+
+            if (!friendlyEqual(masterLatestOpTime, slaveOpTime)) {
+                print("ReplSetTest awaitReplication: optime for secondary #" + secondaryCount +
+                      ", " + slaveName + ", is " + tojson(slaveOpTime) + " but latest is " +
+                      tojson(masterLatestOpTime));
+                print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
+                      slaveName + ", is NOT synced");
+
+                // Reset the timeout if a node makes progress, but isn't caught up yet.
+                if (madeProgress) {
+                    print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
+                          slaveName + ", has made progress. Resetting awaitReplication timeout");
+                    return Progress.InProgress;
+                }
+                return Progress.Stuck;
+            }
+
+            print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " + slaveName +
+                  ", is synced");
+            return Progress.CaughtUp;
+        }
+
+        // We will reset the timeout if a nodes makes progress, but still isn't caught up yet.
+        while (!nodesCaughtUp) {
+            assert.soonNoExcept(function() {
+                try {
+                    print("ReplSetTest awaitReplication: checking secondaries against latest " +
+                          "primary optime " + tojson(masterLatestOpTime));
+                    var secondaryCount = 0;
+
+                    for (var i = 0; i < slavesToCheck.length; i++) {
+                        const action = checkProgressSingleNode(i, secondaryCount);
+
+                        switch (action) {
+                            case Progress.CaughtUp:
+                                // We only need to increment the secondaryCount if this node is
+                                // caught up.
+                                secondaryCount++;
+                                continue;
+                            case Progress.Skip:
+                                // Don't increment secondaryCount because this node is an arbiter.
+                                continue;
+                            case Progress.InProgress:
+                                return true;
+                            case Progress.Stuck:
+                            case Progress.ConfigMismatch:
+                                return false;
+                            default:
+                                throw Error("invalid action: " + tojson(action));
+                        }
+                    }
+
+                    print("ReplSetTest awaitReplication: finished: all " + secondaryCount +
+                          " secondaries synced at optime " + tojson(masterLatestOpTime));
+                    nodesCaughtUp = true;
+                    return true;
+                } catch (e) {
+                    print("ReplSetTest awaitReplication: caught exception " + e);
+
+                    // We might have a new master now
+                    awaitLastOpTimeWrittenFn();
+
+                    print("ReplSetTest awaitReplication: resetting: optime for primary " +
+                          self._master + " is " + tojson(masterLatestOpTime));
+
+                    return false;
+                }
+            }, "awaiting replication", timeout);
+        }
     };
 
     // TODO: SERVER-38961 Remove when simultaneous index builds complete.
