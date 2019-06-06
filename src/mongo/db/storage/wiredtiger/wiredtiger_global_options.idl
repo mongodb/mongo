@@ -43,6 +43,8 @@ configs:
         arg_vartype: Double
         cpp_varname: 'wiredTigerGlobalOptions.cacheSizeGB'
         short_name: wiredTigerCacheSizeGB
+        validator:
+            lte: 10000
     "storage.wiredTiger.engineConfig.statisticsLogDelaySecs":
         # FTDC supercedes WiredTiger's statistics logging.
         description: >-
