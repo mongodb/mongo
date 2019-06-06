@@ -10,6 +10,8 @@
 (function() {
     "use strict";
 
+    // For assertMergeFailsForAllModesWithCode.
+    load("jstests/aggregation/extras/merge_helpers.js");
     load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
     const kFailPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
@@ -117,13 +119,13 @@
         // before the $merge. Without the $group we won't use the exchange optimization and instead
         // will send the $merge to each shard.
         st.shardColl(mongosDB.target, {_id: 1}, {_id: 0}, {_id: 1}, kDBName, false);
-        assertErrorCode(
-            coll,
-            [
-              {$group: {_id: "$fakeShardKey"}},
-              {$merge: {into: "target", whenMatched: "replace", whenNotMatched: "insert"}}
-            ],
-            ErrorCodes.FailPointEnabled);
+
+        assertMergeFailsForAllModesWithCode({
+            source: coll,
+            target: mongosDB.target,
+            prevStages: [{$group: {_id: "$fakeShardKey"}}],
+            errorCodes: ErrorCodes.FailPointEnabled
+        });
 
         // Neither mongos or the shards should leave cursors open.
         assert.eq(mongosDB.serverStatus().metrics.cursor.open.total, 0);

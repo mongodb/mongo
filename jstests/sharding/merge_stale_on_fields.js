@@ -3,6 +3,8 @@
 (function() {
     "use strict";
 
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode,
+
     const st = new ShardingTest({shards: 2, mongos: 2});
 
     const dbName = "merge_stale_unique_key";
@@ -151,31 +153,36 @@
     }
     assert.commandWorked(bulk.execute());
 
-    testEpochChangeDuringAgg({
-        mergeSpec: {into: target.getName(), whenMatched: "fail", whenNotMatched: "insert"},
-        failpoint: "setYieldAllLocksHang",
-        failpointData: {namespace: source.getFullName()}
-    });
-    testEpochChangeDuringAgg({
-        mergeSpec:
-            {into: target.getName(), whenMatched: "fail", whenNotMatched: "insert", on: "sk"},
-        failpoint: "setYieldAllLocksHang",
-        failpointData: {namespace: source.getFullName()}
-    });
-    testEpochChangeDuringAgg({
-        mergeSpec: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert"},
-        failpoint: "setYieldAllLocksHang",
-        failpointData: {namespace: source.getFullName()}
-    });
-    testEpochChangeDuringAgg({
-        mergeSpec:
-            {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: "sk"},
-        failpoint: "setYieldAllLocksHang",
-        failpointData: {namespace: source.getFullName()}
-    });
+    withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+        // Skip the combination of merge modes which will fail depending on the contents of the
+        // source and target collection, as this will cause a different assertion error from the one
+        // expected.
+        if (whenNotMatchedMode == "fail")
+            return;
 
-    // Test with some different failpoints to prove we will detect an epoch change in the middle of
-    // the inserts or updates.
+        testEpochChangeDuringAgg({
+            mergeSpec: {
+                into: target.getName(),
+                whenMatched: whenMatchedMode,
+                whenNotMatched: whenNotMatchedMode
+            },
+            failpoint: "setYieldAllLocksHang",
+            failpointData: {namespace: source.getFullName()}
+        });
+        testEpochChangeDuringAgg({
+            mergeSpec: {
+                into: target.getName(),
+                whenMatched: whenMatchedMode,
+                whenNotMatched: whenNotMatchedMode,
+                on: "sk"
+            },
+            failpoint: "setYieldAllLocksHang",
+            failpointData: {namespace: source.getFullName()}
+        });
+
+    });
+    // Test with some different failpoints to prove we will detect an epoch change in the middle
+    // of the inserts or updates.
     testEpochChangeDuringAgg({
         mergeSpec: {into: target.getName(), whenMatched: "fail", whenNotMatched: "insert"},
         failpoint: "hangDuringBatchInsert",

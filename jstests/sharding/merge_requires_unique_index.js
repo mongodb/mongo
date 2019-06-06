@@ -5,10 +5,10 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
-    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode,
-                                                        // assertFailsWithoutUniqueIndex,
-                                                        // assertSucceedsWithExpectedUniqueIndex.
+    load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode,
+                                                          // assertMergeFailsWithoutUniqueIndex,
+    // assertMergeSucceedsWithExpectedUniqueIndex.
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1});
 
@@ -48,11 +48,11 @@
         resetTargetColl(targetShardKey, targetSplit);
 
         // Not specifying "on" fields should always pass.
-        assertSucceedsWithExpectedUniqueIndex({source: sourceColl, target: targetColl});
+        assertMergeSucceedsWithExpectedUniqueIndex({source: sourceColl, target: targetColl});
 
         // Since the target collection is sharded with a unique shard key, specifying "on" fields
         // that is equal to the shard key should be valid.
-        assertSucceedsWithExpectedUniqueIndex(
+        assertMergeSucceedsWithExpectedUniqueIndex(
             {source: sourceColl, target: targetColl, onFields: Object.keys(targetShardKey)});
 
         // Create a compound "on" fields consisting of the shard key and one additional field.
@@ -61,7 +61,7 @@
 
         // Expect the $merge to fail since we haven't created a unique index on the compound
         // "on" fields.
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: sourceColl,
             onFields: Object.keys(indexSpec),
             target: targetColl,
@@ -70,7 +70,7 @@
 
         // Create the unique index and verify that the "on" fields is now valid.
         assert.commandWorked(targetColl.createIndex(indexSpec, {unique: true}));
-        assertSucceedsWithExpectedUniqueIndex({
+        assertMergeSucceedsWithExpectedUniqueIndex({
             source: sourceColl,
             target: targetColl,
             onFields: Object.keys(indexSpec),
@@ -80,7 +80,7 @@
         // Create a non-unique index and make sure that doesn't work.
         assert.commandWorked(targetColl.dropIndex(indexSpec));
         assert.commandWorked(targetColl.createIndex(indexSpec));
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: sourceColl,
             onFields: Object.keys(indexSpec),
             target: targetColl,
@@ -92,7 +92,7 @@
         resetTargetColl(targetShardKey, targetSplit);
         assert.commandWorked(targetColl.createIndex(
             indexSpec, {unique: true, partialFilterExpression: {a: {$gte: 2}}}));
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: sourceColl,
             onFields: Object.keys(indexSpec),
             target: targetColl,
@@ -104,34 +104,34 @@
         resetTargetColl(targetShardKey, targetSplit);
         assert.commandWorked(
             targetColl.createIndex(indexSpec, {unique: true, collation: {locale: "en_US"}}));
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: sourceColl,
             onFields: Object.keys(indexSpec),
             target: targetColl,
             prevStages: prefixPipeline
         });
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: sourceColl,
             onFields: Object.keys(indexSpec),
             target: targetColl,
             options: {collation: {locale: "en"}},
             prevStages: prefixPipeline
         });
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: sourceColl,
             onFields: Object.keys(indexSpec),
             target: targetColl,
             options: {collation: {locale: "simple"}},
             prevStages: prefixPipeline
         });
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: sourceColl,
             onFields: Object.keys(indexSpec),
             target: targetColl,
             options: {collation: {locale: "en_US", strength: 1}},
             prevStages: prefixPipeline
         });
-        assertSucceedsWithExpectedUniqueIndex({
+        assertMergeSucceedsWithExpectedUniqueIndex({
             source: sourceColl,
             target: targetColl,
             onFields: Object.keys(indexSpec),
@@ -145,7 +145,7 @@
         assert.commandWorked(targetColl.createIndex(dottedPathIndexSpec, {unique: true}));
 
         // No longer a supporting index on the original compound "on" fields.
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: sourceColl,
             onFields: Object.keys(indexSpec),
             target: targetColl,
@@ -154,7 +154,7 @@
 
         // Test that an embedded object matching the "on" fields is valid.
         prefixPipeline = [{$addFields: {"newField.subField": 5}}];
-        assertSucceedsWithExpectedUniqueIndex({
+        assertMergeSucceedsWithExpectedUniqueIndex({
             source: sourceColl,
             target: targetColl,
             onFields: Object.keys(dottedPathIndexSpec),

@@ -2,8 +2,8 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode.
-    load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
+    load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1});
     const sourceDB = st.s0.getDB("source_db");

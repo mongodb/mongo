@@ -4,9 +4,9 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode,
-                                                        // assertFailsWithoutUniqueIndex,
-                                                        // assertSucceedsWithExpectedUniqueIndex.
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode,
+                                                          // assertMergeFailsWithoutUniqueIndex,
+    // assertMergeSucceedsWithExpectedUniqueIndex.
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1});
 
@@ -24,12 +24,12 @@
         st.shardColl(target, shardKey, spec);
 
         // Test that $merge passes without specifying an "on" field.
-        assertSucceedsWithExpectedUniqueIndex(
+        assertMergeSucceedsWithExpectedUniqueIndex(
             {source: source, target: target, prevStages: prefixPipeline});
 
         // Test that $merge fails even if the "on" fields matches the shardKey, since it isn't
         // unique.
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: source,
             target: target,
             onFields: Object.keys(shardKey),
@@ -41,9 +41,9 @@
         const prefixedUniqueKey = Object.merge(shardKey, {extraField: 1});
         prefixPipeline = prefixPipeline.concat([{$addFields: {extraField: 1}}]);
         assert.commandWorked(target.createIndex(prefixedUniqueKey, {unique: true}));
-        assertSucceedsWithExpectedUniqueIndex(
+        assertMergeSucceedsWithExpectedUniqueIndex(
             {source: source, target: target, prevStages: prefixPipeline});
-        assertSucceedsWithExpectedUniqueIndex({
+        assertMergeSucceedsWithExpectedUniqueIndex({
             source: source,
             target: target,
             onFields: Object.keys(prefixedUniqueKey),
@@ -78,12 +78,13 @@
     st.shardColl(target, {_id: 1}, {_id: "hashed"});
 
     // Test that $merge passes without specifying an "on" field.
-    assertSucceedsWithExpectedUniqueIndex({source: source, target: target});
+    assertMergeSucceedsWithExpectedUniqueIndex({source: source, target: target});
 
     // Test that $merge passes when the uniqueKey matches the shard key. Note that the _id index is
     // always create with {unique: true} regardless of whether the shard key was marked as unique
     // when the collection was sharded.
-    assertSucceedsWithExpectedUniqueIndex({source: source, target: target, uniqueKey: {_id: 1}});
+    assertMergeSucceedsWithExpectedUniqueIndex(
+        {source: source, target: target, uniqueKey: {_id: 1}});
 
     st.stop();
 })();
