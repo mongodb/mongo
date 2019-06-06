@@ -71,7 +71,7 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOG(1) << "createIndexes: " << nss << " cmd:" << redact(cmdObj);
 
-        uassertStatusOK(createShardDatabase(opCtx, dbName));
+        createShardDatabase(opCtx, dbName);
 
         auto shardResponses = scatterGatherOnlyVersionIfUnsharded(
             opCtx,

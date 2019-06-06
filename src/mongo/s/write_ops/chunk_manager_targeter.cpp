@@ -348,9 +348,10 @@ ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss,
 
 
 Status ChunkManagerTargeter::init(OperationContext* opCtx) {
-    auto shardDbStatus = createShardDatabase(opCtx, _nss.db());
-    if (!shardDbStatus.isOK()) {
-        return shardDbStatus.getStatus();
+    try {
+        createShardDatabase(opCtx, _nss.db());
+    } catch (const DBException& e) {
+        return e.toStatus();
     }
 
     const auto routingInfoStatus = getCollectionRoutingInfoForTxnCmd(opCtx, _nss);

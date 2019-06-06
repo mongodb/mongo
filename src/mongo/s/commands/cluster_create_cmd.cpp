@@ -73,7 +73,7 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        uassertStatusOK(createShardDatabase(opCtx, dbName));
+        createShardDatabase(opCtx, dbName);
 
         uassert(ErrorCodes::InvalidOptions,
                 "specify size:<n> when capped is true",
