@@ -302,10 +302,11 @@ void MozJSProxyScope::runOnImplThread(unique_function<void()> f) {
     try {
         interruptible->waitForConditionOrInterrupt(_proxyCondvar, lk, pred);
     } catch (const DBException& ex) {
-        _status = ex.toStatus();
-
         _implScope->kill();
         _proxyCondvar.wait(lk, pred);
+
+        // update _status after the wait, otherwise it would get overwritten in implThread
+        _status = ex.toStatus();
     }
 
     _state = State::Idle;
