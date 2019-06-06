@@ -102,7 +102,7 @@ mongo_killproc()
 
   if [ ! -f "${pid_file}" ]; then
      echo "No PID file detected, nothing to stop"
-     exit 0
+     return 0
   fi
 
   # Per the man page the process name should always be the second
@@ -115,7 +115,7 @@ mongo_killproc()
   if [ "($binary_name)" != "$stat_procname" ]; then
      echo "PID file may have been tampered with, refusing to kill process"
      echo "Expected (${binary_name}) but found ${stat_procname}"
-     exit 1
+     return 1
   fi
 
   # This doesn't actually "daemonize" this process. All this function
