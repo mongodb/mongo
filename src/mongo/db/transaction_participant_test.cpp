@@ -41,9 +41,7 @@
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -63,9 +61,6 @@
 
 namespace mongo {
 namespace {
-
-using repl::OplogEntry;
-using unittest::assertGet;
 
 const NamespaceString kNss("TestDB", "TestColl");
 
@@ -1085,27 +1080,6 @@ TEST_F(TxnParticipantTest, CannotContinueNonExistentTransaction) {
         txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), false, boost::none),
         AssertionException,
         ErrorCodes::NoSuchTransaction);
-}
-
-// Tests that a transaction aborts if it becomes too large before trying to commit it.
-TEST_F(TxnParticipantTest, TransactionTooLargeWhileBuilding) {
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    txnParticipant.unstashTransactionResources(opCtx(), "insert");
-
-    // Two 6MB operations should succeed; three 6MB operations should fail.
-    constexpr size_t kBigDataSize = 6 * 1024 * 1024;
-    std::unique_ptr<uint8_t[]> bigData(new uint8_t[kBigDataSize]());
-    auto operation = repl::OplogEntry::makeInsertOperation(
-        kNss,
-        _uuid,
-        BSON("_id" << 0 << "data" << BSONBinData(bigData.get(), kBigDataSize, BinDataGeneral)));
-    txnParticipant.addTransactionOperation(opCtx(), operation);
-    txnParticipant.addTransactionOperation(opCtx(), operation);
-    ASSERT_THROWS_CODE(txnParticipant.addTransactionOperation(opCtx(), operation),
-                       AssertionException,
-                       ErrorCodes::TransactionTooLarge);
 }
 
 // Tests that a transaction aborts if it becomes too large based on the server parameter
@@ -3828,87 +3802,6 @@ TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnAbortPreparedTransacti
     // Once the promise has been fulfilled, new callers of onExitPrepare should immediately be
     // ready.
     ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
-}
-
-class MultiEntryOplogTxnParticipantTest : public TxnParticipantTest {
-    void setUp() override {
-        gUseMultipleOplogEntryFormatForTransactions = true;
-        TxnParticipantTest::setUp();
-        // Set up ReplicationCoordinator and create oplog.
-        auto service = opCtx()->getServiceContext();
-        repl::ReplicationCoordinator::set(
-            service,
-            stdx::make_unique<repl::ReplicationCoordinatorMock>(service, createReplSettings()));
-        repl::setOplogCollectionName(service);
-        repl::createOplog(opCtx());
-
-        // Ensure that we are primary.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx());
-        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-    }
-
-    void tearDown() override {
-        TxnParticipantTest::tearDown();
-        gUseMultipleOplogEntryFormatForTransactions = false;
-    }
-
-protected:
-    // Assert that the oplog has the expected number of entries, and return them
-    std::vector<BSONObj> getNOplogEntries(OperationContext* opCtx, int n) {
-        std::vector<BSONObj> result(n);
-        repl::OplogInterfaceLocal oplogInterface(opCtx);
-        auto oplogIter = oplogInterface.makeIterator();
-        for (int i = n - 1; i >= 0; i--) {
-            // The oplogIterator returns the entries in reverse order.
-            auto opEntry = unittest::assertGet(oplogIter->next());
-            result[i] = opEntry.first;
-        }
-        ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus());
-        return result;
-    }
-
-    // Assert that oplog only has a single entry and return that oplog entry.
-    BSONObj getSingleOplogEntry(OperationContext* opCtx) {
-        return getNOplogEntries(opCtx, 1).back();
-    }
-
-private:
-    // Creates a reasonable set of ReplSettings for most tests.
-    virtual repl::ReplSettings createReplSettings() {
-        repl::ReplSettings settings;
-        settings.setOplogSizeBytes(1 * 1024 * 1024);
-        settings.setReplSetString("mySet/node1:12345");
-        return settings;
-    }
-};
-
-TEST_F(MultiEntryOplogTxnParticipantTest, ErrorOnUnpreparedCommitAbortsTransaction) {
-    OpObserverImpl opObserver;
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
-
-    // We expect to trigger 'onTransactionAbort' on failure of the unprepared commit.
-    _opObserver->onTransactionAbortFn = [&]() {
-        auto abortSlot = repl::getNextOpTime(opCtx());
-        opObserver.onTransactionAbort(opCtx(), abortSlot);
-    };
-
-    _opObserver->onUnpreparedTransactionCommitThrowsException = true;
-    ASSERT_THROWS_CODE(txnParticipant.commitUnpreparedTransaction(opCtx()),
-                       AssertionException,
-                       ErrorCodes::OperationFailed);
-
-    auto oplogEntry = getSingleOplogEntry(opCtx());
-
-    auto abortEntry = assertGet(OplogEntry::parse(oplogEntry));
-    auto o = abortEntry.getObject();
-
-    const auto oExpected = BSON("abortTransaction" << 1);
-    ASSERT_BSONOBJ_EQ(oExpected, o);
-
-    ASSERT_FALSE(_opObserver->unpreparedTransactionCommitted);
-    ASSERT_TRUE(txnParticipant.transactionIsAborted());
 }
 
 }  // namespace

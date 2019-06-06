@@ -1174,20 +1174,6 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
 
-    auto abortGuard = makeGuard([&] {
-        if (gUseMultipleOplogEntryFormatForTransactions &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
-            // We should already be holding the RSTL if we have performed a read or write
-            // as part of this unprepared transaction.
-            invariant(opCtx->lockState()->isRSTLLocked());
-            opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
-                _abortActiveTransaction(
-                    opCtx, TransactionState::kInProgress, true /* writeOplog */);
-            });
-        }
-    });
-
     opObserver->onUnpreparedTransactionCommit(opCtx, txnOps);
 
     // Read-only transactions with all read concerns must wait for any data they read to be majority
@@ -1209,8 +1195,6 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
         // before this point in the function, entry point will abort the transaction.
         o(lk).txnState.transitionTo(TransactionState::kCommittingWithoutPrepare);
     }
-
-    abortGuard.dismiss();
 
     try {
         // Once entering "committing without prepare" we cannot throw an exception.
