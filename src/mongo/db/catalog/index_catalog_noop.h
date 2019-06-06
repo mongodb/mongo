@@ -128,10 +128,6 @@ public:
         return {};
     }
 
-    Status checkUnfinished() const override {
-        return Status::OK();
-    }
-
     std::unique_ptr<IndexIterator> getIndexIterator(
         OperationContext* const opCtx, const bool includeUnfinishedIndexes) const override {
         return {};

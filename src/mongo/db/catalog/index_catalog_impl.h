@@ -168,12 +168,6 @@ public:
 
     std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared() const override;
 
-    /**
-     * Returns a not-ok Status if there are any unfinished index builds. No new indexes should
-     * be built when in this state.
-     */
-    Status checkUnfinished() const override;
-
     using IndexIterator = IndexCatalog::IndexIterator;
     std::unique_ptr<IndexIterator> getIndexIterator(
         OperationContext* const opCtx, const bool includeUnfinishedIndexes) const override;
@@ -216,13 +210,6 @@ public:
      * collection.
      */
     Status dropIndex(OperationContext* opCtx, const IndexDescriptor* desc) override;
-
-    /**
-     * will drop all incompleted indexes and return specs
-     * after this, the indexes can be rebuilt
-     */
-    std::vector<BSONObj> getAndClearUnfinishedIndexes(OperationContext* opCtx) override;
-
 
     struct IndexKillCriteria {
         std::string ns;
@@ -474,11 +461,5 @@ private:
 
     IndexCatalogEntryContainer _readyIndexes;
     IndexCatalogEntryContainer _buildingIndexes;
-
-    // These are the index specs of indexes that were "leftover".
-    // "Leftover" means they were unfinished when a mongod shut down.
-    // Certain operations are prohibited until someone fixes.
-    // Retrieve by calling getAndClearUnfinishedIndexes().
-    std::vector<BSONObj> _unfinishedIndexes;
 };
 }  // namespace mongo

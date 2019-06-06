@@ -330,12 +330,6 @@ public:
         const = 0;
 
     /**
-     * Returns a not-ok Status if there are any unfinished index builds. No new indexes should
-     * be built when in this state.
-     */
-    virtual Status checkUnfinished() const = 0;
-
-    /**
      * Returns an iterator for the index descriptors in this IndexCatalog.
      */
     virtual std::unique_ptr<IndexIterator> getIndexIterator(
@@ -411,11 +405,6 @@ public:
      * collection.
      */
     virtual Status dropIndex(OperationContext* const opCtx, const IndexDescriptor* const desc) = 0;
-
-    /**
-     * Drops all incomplete indexes and returns specs. After this, the indexes can be rebuilt.
-     */
-    virtual std::vector<BSONObj> getAndClearUnfinishedIndexes(OperationContext* const opCtx) = 0;
 
     // ---- modify single index
 

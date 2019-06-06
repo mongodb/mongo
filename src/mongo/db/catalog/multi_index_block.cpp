@@ -245,9 +245,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
     const auto idxCat = collection->getIndexCatalog();
     invariant(idxCat);
     invariant(idxCat->ok());
-    Status status = idxCat->checkUnfinished();
-    if (!status.isOK())
-        return status;
 
     const bool enableHybrid = areHybridIndexBuildsEnabled();
 
@@ -350,7 +347,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
     if (isBackgroundBuilding())
         _backgroundOperation.reset(new BackgroundOperation(ns));
 
-    status = onInit(indexInfoObjs);
+    Status status = onInit(indexInfoObjs);
     if (!status.isOK()) {
         return status;
     }

@@ -109,10 +109,7 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
         const string& indexName = indexNames[i];
         BSONObj spec = _collection->getCatalogEntry()->getIndexSpec(opCtx, indexName).getOwned();
 
-        if (!_collection->getCatalogEntry()->isIndexReady(opCtx, indexName)) {
-            _unfinishedIndexes.push_back(spec);
-            continue;
-        }
+        invariant(_collection->getCatalogEntry()->isIndexReady(opCtx, indexName));
 
         BSONObj keyPattern = spec.getObjectField("key");
         auto descriptor =
@@ -123,13 +120,6 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
             _setupInMemoryStructures(opCtx, std::move(descriptor), initFromDisk, isReadyIndex);
 
         fassert(17340, entry->isReady(opCtx));
-    }
-
-    if (_unfinishedIndexes.size()) {
-        // if there are left over indexes, we don't let anyone add/drop indexes
-        // until someone goes and fixes them
-        log() << "found " << _unfinishedIndexes.size()
-              << " index(es) that wasn't finished before shutdown";
     }
 
     _magic = INDEX_CATALOG_INIT;
@@ -204,16 +194,6 @@ void IndexCatalogImpl::_checkMagic() const {
     }
     log() << "IndexCatalog::_magic wrong, is : " << _magic;
     fassertFailed(17198);
-}
-
-Status IndexCatalogImpl::checkUnfinished() const {
-    if (_unfinishedIndexes.size() == 0)
-        return Status::OK();
-
-    return Status(ErrorCodes::InternalError,
-                  str::stream() << "IndexCatalog has left over indexes that must be cleared"
-                                << " ns: "
-                                << _collection->ns());
 }
 
 std::unique_ptr<IndexCatalog::IndexIterator> IndexCatalogImpl::getIndexIterator(
@@ -442,12 +422,9 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
                             << _collection->numRecords(opCtx));
 
     _checkMagic();
-    Status status = checkUnfinished();
-    if (!status.isOK())
-        return status;
 
     StatusWith<BSONObj> statusWithSpec = prepareSpecForCreate(opCtx, spec);
-    status = statusWithSpec.getStatus();
+    Status status = statusWithSpec.getStatus();
     if (!status.isOK())
         return status;
     spec = statusWithSpec.getValue();
@@ -998,9 +975,6 @@ Status IndexCatalogImpl::_dropIndex(OperationContext* opCtx, IndexCatalogEntry* 
         return Status(ErrorCodes::BadValue, "IndexCatalog::_dropIndex passed NULL");
 
     _checkMagic();
-    Status status = checkUnfinished();
-    if (!status.isOK())
-        return status;
 
     // Pulling indexName/indexNamespace out as they are needed post descriptor release.
     string indexName = entry->descriptor()->indexName();
@@ -1042,20 +1016,6 @@ void IndexCatalogImpl::_deleteIndexFromDisk(OperationContext* opCtx,
     }
 }
 
-vector<BSONObj> IndexCatalogImpl::getAndClearUnfinishedIndexes(OperationContext* opCtx) {
-    vector<BSONObj> toReturn = _unfinishedIndexes;
-    _unfinishedIndexes.clear();
-    for (size_t i = 0; i < toReturn.size(); i++) {
-        BSONObj spec = toReturn[i];
-
-        BSONObj keyPattern = spec.getObjectField("key");
-        IndexDescriptor desc(_collection, _getAccessMethodName(keyPattern), spec);
-
-        _deleteIndexFromDisk(opCtx, desc.indexName(), desc.indexNamespace());
-    }
-    return toReturn;
-}
-
 bool IndexCatalogImpl::isMultikey(OperationContext* opCtx, const IndexDescriptor* idx) {
     IndexCatalogEntry* entry = _readyIndexes.find(idx);
     invariant(entry);
@@ -1091,7 +1051,7 @@ bool IndexCatalogImpl::haveAnyIndexesInProgress() const {
 }
 
 int IndexCatalogImpl::numIndexesTotal(OperationContext* opCtx) const {
-    int count = _readyIndexes.size() + _buildingIndexes.size() + _unfinishedIndexes.size();
+    int count = _readyIndexes.size() + _buildingIndexes.size();
     dassert(_collection->getCatalogEntry()->getTotalIndexCount(opCtx) == count);
     return count;
 }
@@ -1642,11 +1602,5 @@ void IndexCatalogImpl::setNs(NamespaceString ns) {
     for (auto&& ice : _buildingIndexes) {
         ice->setNs(ns);
     }
-
-    std::vector<BSONObj> newUnfinishedIndexes;
-    for (auto&& indexSpec : _unfinishedIndexes) {
-        newUnfinishedIndexes.push_back(IndexDescriptor::renameNsInIndexSpec(indexSpec, ns));
-    }
-    _unfinishedIndexes.swap(newUnfinishedIndexes);
 }
 }  // namespace mongo
