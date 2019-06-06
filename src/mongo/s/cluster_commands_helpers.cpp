@@ -507,36 +507,34 @@ bool appendEmptyResultSet(OperationContext* opCtx,
     return true;
 }
 
-StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, StringData dbName) {
+void createShardDatabase(OperationContext* opCtx, StringData dbName) {
     auto dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
+
     if (dbStatus == ErrorCodes::NamespaceNotFound) {
         ConfigsvrCreateDatabase configCreateDatabaseRequest(dbName.toString());
         configCreateDatabaseRequest.setDbName(NamespaceString::kAdminDb);
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-        auto createDbStatus =
-            uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-                                opCtx,
-                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                "admin",
-                                CommandHelpers::appendMajorityWriteConcern(
-                                    configCreateDatabaseRequest.toBSON({})),
-                                Shard::RetryPolicy::kIdempotent))
-                .commandStatus;
+        auto createDbResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            "admin",
+            CommandHelpers::appendMajorityWriteConcern(configCreateDatabaseRequest.toBSON({})),
+            Shard::RetryPolicy::kIdempotent));
 
-        if (createDbStatus.isOK() || createDbStatus == ErrorCodes::NamespaceExists) {
-            dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
-        } else {
-            dbStatus = createDbStatus;
+        uassertStatusOK(createDbResponse.writeConcernStatus);
+
+        if (createDbResponse.commandStatus != ErrorCodes::NamespaceExists) {
+            uassertStatusOKWithContext(createDbResponse.commandStatus,
+                                       str::stream() << "Database " << dbName
+                                                     << " could not be created");
         }
+
+        dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
     }
 
-    if (dbStatus.isOK()) {
-        return dbStatus;
-    }
-
-    return dbStatus.getStatus().withContext(str::stream() << "Database " << dbName << " not found");
+    uassertStatusOKWithContext(dbStatus, str::stream() << "Database " << dbName << " not found");
 }
 
 std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,

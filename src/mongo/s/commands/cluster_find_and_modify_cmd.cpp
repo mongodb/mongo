@@ -228,7 +228,7 @@ public:
 
         // findAndModify should only be creating database if upsert is true, but this would require
         // that the parsing be pulled into this function.
-        uassertStatusOK(createShardDatabase(opCtx, nss.db()));
+        createShardDatabase(opCtx, nss.db());
 
         // Append mongoS' runtime constants to the command object before forwarding it to the shard.
         auto cmdObjForShard = appendRuntimeConstantsToCommandObject(opCtx, cmdObj);

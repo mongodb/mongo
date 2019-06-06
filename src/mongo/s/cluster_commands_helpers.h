@@ -198,10 +198,10 @@ bool appendEmptyResultSet(OperationContext* opCtx,
                           const std::string& ns);
 
 /**
- * If the specified database exists already, loads it in the cache (if not already there) and
- * returns it. Otherwise, if it does not exist, this call will implicitly create it as non-sharded.
+ * If the specified database exists already, loads it in the cache (if not already there).
+ * Otherwise, if it does not exist, this call will implicitly create it as non-sharded.
  */
-StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, StringData dbName);
+void createShardDatabase(OperationContext* opCtx, StringData dbName);
 
 /**
  * Returns the shards that would be targeted for the given query according to the given routing

@@ -244,7 +244,7 @@ public:
 
         // Create the output database implicitly if we have a custom output requested
         if (customOutDB) {
-            uassertStatusOK(createShardDatabase(opCtx, outDB));
+            createShardDatabase(opCtx, outDB);
         }
 
         // Ensure that the output database doesn't reside on the config server
