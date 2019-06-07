@@ -8238,13 +8238,12 @@ buildvariants:
   - name: aggregation_auth
   - name: auth_gen
   - name: bulk_gle_passthrough
-  - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: concurrency
   - name: concurrency_simultaneous
   - name: disk_wiredtiger
   - name: failpoints_auth
-  - name: .jscore .common !.decimal
+  - name: .jscore .common !.decimal !.txns
   - name: .jstestfuzz .common !.repl
   - name: sharding_jscore_passthrough
 
