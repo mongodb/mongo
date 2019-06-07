@@ -32,9 +32,13 @@
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
+namespace {
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(allowRolesFromX509Certificates, bool, true);
+}
 
 stdx::function<std::unique_ptr<AuthzManagerExternalState>()> AuthzManagerExternalState::create;
 
@@ -45,6 +49,10 @@ bool AuthzManagerExternalState::shouldUseRolesFromConnection(OperationContext* t
                                                              const UserName& userName) {
 #ifdef MONGO_CONFIG_SSL
     if (!txn || !txn->getClient() || !txn->getClient()->session()) {
+        return false;
+    }
+
+    if (!allowRolesFromX509Certificates) {
         return false;
     }
 
