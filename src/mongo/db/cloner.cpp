@@ -156,8 +156,7 @@ struct Cloner::Fun {
 
                 WriteUnitOfWork wunit(opCtx);
                 const bool createDefaultIndexes = true;
-                CollectionOptions collectionOptions;
-                uassertStatusOK(collectionOptions.parse(
+                CollectionOptions collectionOptions = uassertStatusOK(CollectionOptions::parse(
                     from_options, CollectionOptions::ParseKind::parseForCommand));
                 auto indexSpec = fixIndexSpec(to_collection.db().toString(), from_id_index);
                 invariant(
@@ -372,9 +371,8 @@ void Cloner::copyIndexes(OperationContext* opCtx,
             opCtx->checkForInterrupt();
 
             WriteUnitOfWork wunit(opCtx);
-            CollectionOptions collectionOptions;
-            uassertStatusOK(
-                collectionOptions.parse(from_opts, CollectionOptions::ParseKind::parseForCommand));
+            CollectionOptions collectionOptions = uassertStatusOK(
+                CollectionOptions::parse(from_opts, CollectionOptions::ParseKind::parseForCommand));
             const bool createDefaultIndexes = true;
             invariant(db->userCreateNS(opCtx,
                                        to_collection,
@@ -492,8 +490,8 @@ bool Cloner::copyCollection(OperationContext* opCtx,
             opCtx->checkForInterrupt();
 
             WriteUnitOfWork wunit(opCtx);
-            CollectionOptions collectionOptions;
-            uassertStatusOK(collectionOptions.parse(options, optionsParser));
+            CollectionOptions collectionOptions =
+                uassertStatusOK(CollectionOptions::parse(options, optionsParser));
             const bool createDefaultIndexes = true;
             Status status =
                 db->userCreateNS(opCtx, nss, collectionOptions, createDefaultIndexes, idIndexSpec);
@@ -539,10 +537,10 @@ StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
 
         BSONElement collectionOptions = collection["options"];
         if (collectionOptions.isABSONObj()) {
-            auto parseOptionsStatus = CollectionOptions().parse(
+            auto statusWithCollectionOptions = CollectionOptions::parse(
                 collectionOptions.Obj(), CollectionOptions::ParseKind::parseForCommand);
-            if (!parseOptionsStatus.isOK()) {
-                return parseOptionsStatus;
+            if (!statusWithCollectionOptions.isOK()) {
+                return statusWithCollectionOptions.getStatus();
             }
         }
 
@@ -644,8 +642,7 @@ Status Cloner::createCollectionsForDb(
                 const bool createDefaultIndexes = true;
                 auto options = optionsBuilder.obj();
 
-                CollectionOptions collectionOptions;
-                uassertStatusOK(collectionOptions.parse(
+                CollectionOptions collectionOptions = uassertStatusOK(CollectionOptions::parse(
                     options, CollectionOptions::ParseKind::parseForStorage));
                 auto indexSpec = fixIndexSpec(nss.db().toString(), params.idIndexSpec);
                 Status createStatus = db->userCreateNS(

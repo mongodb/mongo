@@ -166,10 +166,11 @@ Status createCollection(OperationContext* opCtx,
 
     CollectionOptions collectionOptions;
     {
-        Status status = collectionOptions.parse(options, kind);
-        if (!status.isOK()) {
-            return status;
+        StatusWith<CollectionOptions> statusWith = CollectionOptions::parse(options, kind);
+        if (!statusWith.isOK()) {
+            return statusWith.getStatus();
         }
+        collectionOptions = statusWith.getValue();
     }
 
     if (collectionOptions.isView()) {

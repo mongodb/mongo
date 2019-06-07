@@ -60,8 +60,9 @@ void CollectionTest::makeCapped(NamespaceString nss, long long cappedSize) {
 }
 
 void CollectionTest::makeUncapped(NamespaceString nss) {
-    CollectionOptions options;
-    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
+    CollectionOptions defaultCollectionOptions;
+    ASSERT_OK(
+        storageInterface()->createCollection(operationContext(), nss, defaultCollectionOptions));
 }
 
 // Call validate with different validation levels and verify the results.

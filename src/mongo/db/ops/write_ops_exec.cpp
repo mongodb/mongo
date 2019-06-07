@@ -215,10 +215,8 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
         if (!db.getDb()->getCollection(opCtx, ns)) {  // someone else may have beat us to it.
             uassertStatusOK(userAllowedCreateNS(ns.db(), ns.coll()));
             WriteUnitOfWork wuow(opCtx);
-            CollectionOptions collectionOptions;
-            uassertStatusOK(
-                collectionOptions.parse(BSONObj(), CollectionOptions::ParseKind::parseForCommand));
-            uassertStatusOK(db.getDb()->userCreateNS(opCtx, ns, collectionOptions));
+            CollectionOptions defaultCollectionOptions;
+            uassertStatusOK(db.getDb()->userCreateNS(opCtx, ns, defaultCollectionOptions));
             wuow.commit();
         }
     });

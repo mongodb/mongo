@@ -359,11 +359,13 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
         }
         const BSONObj optionsObj = optionsElement.Obj();
         CollectionOptions options;
-        auto parseStatus = options.parse(optionsObj, CollectionOptions::parseForStorage);
-        if (!parseStatus.isOK()) {
-            _finishCallback_inlock(lk, parseStatus);
+        auto statusWithCollectionOptions =
+            CollectionOptions::parse(optionsObj, CollectionOptions::parseForStorage);
+        if (!statusWithCollectionOptions.isOK()) {
+            _finishCallback_inlock(lk, statusWithCollectionOptions.getStatus());
             return;
         }
+        options = statusWithCollectionOptions.getValue();
 
         BSONElement infoElement = info.getField(kInfoFieldName);
         if (infoElement.isABSONObj()) {
