@@ -295,9 +295,6 @@ selector:
   - jstests/core/find_and_modify2.js
   - jstests/core/find_and_modify_server6865.js
 
-    # TODO SERVER-31245: Inserts to "system.indexes" bypass the check for retryability.
-  - jstests/core/batch_write_command_insert.js
-
   # Does not support tojson of command objects.
   - jstests/core/SERVER-23626.js
 

@@ -35,9 +35,6 @@ selector:
   - jstests/core/find_and_modify_pipeline_update.js
   - jstests/core/find_and_modify_server6865.js
 
-  # TODO SERVER-31245: Inserts to "system.indexes" bypass the check for retryability.
-  - jstests/core/batch_write_command_insert.js
-
   # TODO SERVER-31198: Remove once retry attempts are always decremented.
   - jstests/core/write_result.js
 
