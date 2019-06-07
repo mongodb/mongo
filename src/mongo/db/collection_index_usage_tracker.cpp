@@ -31,12 +31,23 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/counter.h"
 #include "mongo/db/collection_index_usage_tracker.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace {
+Counter64 collectionScansCounter;
+Counter64 collectionScansNonTailableCounter;
+
+ServerStatusMetricField<Counter64> displayCollectionScans("queryExecutor.collectionScans.total",
+                                                          &collectionScansCounter);
+ServerStatusMetricField<Counter64> displayCollectionScansNonTailable(
+    "queryExecutor.collectionScans.nonTailable", &collectionScansNonTailableCounter);
+}
 
 CollectionIndexUsageTracker::CollectionIndexUsageTracker(ClockSource* clockSource)
     : _clockSource(clockSource) {
@@ -48,6 +59,17 @@ void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) {
     dassert(_indexUsageMap.find(indexName) != _indexUsageMap.end());
 
     _indexUsageMap[indexName].accesses.fetchAndAdd(1);
+}
+
+void CollectionIndexUsageTracker::recordCollectionScans(unsigned long long collectionScans) {
+    _collectionScans.fetchAndAdd(collectionScans);
+    collectionScansCounter.increment(collectionScans);
+}
+
+void CollectionIndexUsageTracker::recordCollectionScansNonTailable(
+    unsigned long long collectionScansNonTailable) {
+    _collectionScansNonTailable.fetchAndAdd(collectionScansNonTailable);
+    collectionScansNonTailableCounter.increment(collectionScansNonTailable);
 }
 
 void CollectionIndexUsageTracker::registerIndex(StringData indexName, const BSONObj& indexKey) {
@@ -68,4 +90,8 @@ CollectionIndexUsageMap CollectionIndexUsageTracker::getUsageStats() const {
     return _indexUsageMap;
 }
 
+CollectionIndexUsageTracker::CollectionScanStats
+CollectionIndexUsageTracker::getCollectionScanStats() const {
+    return {_collectionScans.load(), _collectionScansNonTailable.load()};
+}
 }  // namespace mongo

@@ -651,7 +651,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     PlanSummaryStats summary;
     Explain::getSummaryStats(*exec, &summary);
     if (collection->getCollection()) {
-        collection->getCollection()->infoCache()->notifyOfQuery(opCtx, summary.indexesUsed);
+        collection->getCollection()->infoCache()->notifyOfQuery(opCtx, summary);
     }
 
     if (curOp.shouldDBProfile()) {
@@ -892,7 +892,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     PlanSummaryStats summary;
     Explain::getSummaryStats(*exec, &summary);
     if (collection.getCollection()) {
-        collection.getCollection()->infoCache()->notifyOfQuery(opCtx, summary.indexesUsed);
+        collection.getCollection()->infoCache()->notifyOfQuery(opCtx, summary);
     }
     curOp.debug().setPlanSummaryMetrics(summary);
 

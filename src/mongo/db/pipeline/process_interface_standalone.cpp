@@ -282,6 +282,39 @@ Status MongoInterfaceStandalone::appendRecordCount(OperationContext* opCtx,
     return appendCollectionRecordCount(opCtx, nss, builder);
 }
 
+Status MongoInterfaceStandalone::appendQueryExecStats(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      BSONObjBuilder* builder) const {
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+
+    if (!autoColl.getDb()) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Database [" << nss.db().toString() << "] not found."};
+    }
+
+    Collection* collection = autoColl.getCollection();
+
+    if (!collection) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection [" << nss.toString() << "] not found."};
+    }
+
+    auto collectionScanStats = collection->infoCache()->getCollectionScanStats();
+
+    dassert(collectionScanStats.collectionScans <=
+            static_cast<unsigned long long>(std::numeric_limits<long long>::max()));
+    dassert(collectionScanStats.collectionScansNonTailable <=
+            static_cast<unsigned long long>(std::numeric_limits<long long>::max()));
+    builder->append("queryExecStats",
+                    BSON("collectionScans" << BSON(
+                             "total" << static_cast<long long>(collectionScanStats.collectionScans)
+                                     << "nonTailable"
+                                     << static_cast<long long>(
+                                            collectionScanStats.collectionScansNonTailable))));
+
+    return Status::OK();
+}
+
 BSONObj MongoInterfaceStandalone::getCollectionOptions(const NamespaceString& nss) {
     const auto infos = _client.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
     if (infos.empty()) {

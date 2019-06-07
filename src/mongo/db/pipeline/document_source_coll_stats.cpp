@@ -85,6 +85,17 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
                                   << " of type "
                                   << typeName(elem.type()),
                     elem.type() == BSONType::Object);
+        } else if ("queryExecStats" == fieldName) {
+            uassert(31141,
+                    str::stream() << "queryExecStats argument must be an empty object, but got "
+                                  << elem
+                                  << " of type "
+                                  << typeName(elem.type()),
+                    elem.type() == BSONType::Object);
+            uassert(31170,
+                    str::stream() << "queryExecStats argument must be an empty object, but got "
+                                  << elem,
+                    elem.embeddedObject().isEmpty());
         } else {
             uasserted(40168, str::stream() << "unrecognized option to $collStats: " << fieldName);
         }
@@ -145,6 +156,16 @@ DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
         if (!status.isOK()) {
             uasserted(40481,
                       str::stream() << "Unable to retrieve count in $collStats stage: "
+                                    << status.reason());
+        }
+    }
+
+    if (_collStatsSpec.hasField("queryExecStats")) {
+        Status status = pExpCtx->mongoProcessInterface->appendQueryExecStats(
+            pExpCtx->opCtx, pExpCtx->ns, &builder);
+        if (!status.isOK()) {
+            uasserted(31142,
+                      str::stream() << "Unable to retrieve queryExecStats in $collStats stage: "
                                     << status.reason());
         }
     }

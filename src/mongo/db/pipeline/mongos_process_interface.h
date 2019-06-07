@@ -144,6 +144,12 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    Status appendQueryExecStats(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                BSONObjBuilder* builder) const final {
+        MONGO_UNREACHABLE;
+    }
+
     BSONObj getCollectionOptions(const NamespaceString& nss) final {
         MONGO_UNREACHABLE;
     }
