@@ -49,6 +49,7 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+
 using boost::intrusive_ptr;
 using std::min;
 using std::numeric_limits;
@@ -472,18 +473,40 @@ bool Value::coerceToBool() const {
     verify(false);
 }
 
+namespace {
+
+template <typename T>
+void assertValueInRangeInt(const T& val) {
+    uassert(31108,
+            str::stream() << "Can't coerce out of range value " << val << " to int",
+            val >= std::numeric_limits<int32_t>::min() &&
+                val <= std::numeric_limits<int32_t>::max());
+}
+
+template <typename T>
+void assertValueInRangeLong(const T& val) {
+    uassert(31109,
+            str::stream() << "Can't coerce out of range value " << val << " to long",
+            val >= std::numeric_limits<long long>::min() &&
+                val < BSONElement::kLongLongMaxPlusOneAsDouble);
+}
+}  // namespace
+
 int Value::coerceToInt() const {
     switch (getType()) {
         case NumberInt:
             return _storage.intValue;
 
         case NumberLong:
+            assertValueInRangeInt(_storage.longValue);
             return static_cast<int>(_storage.longValue);
 
         case NumberDouble:
+            assertValueInRangeInt(_storage.doubleValue);
             return static_cast<int>(_storage.doubleValue);
 
         case NumberDecimal:
+            assertValueInRangeInt(_storage.getDecimal().toDouble());
             return (_storage.getDecimal()).toInt();
 
         default:
@@ -503,9 +526,11 @@ long long Value::coerceToLong() const {
             return static_cast<long long>(_storage.intValue);
 
         case NumberDouble:
+            assertValueInRangeLong(_storage.doubleValue);
             return static_cast<long long>(_storage.doubleValue);
 
         case NumberDecimal:
+            assertValueInRangeLong(_storage.doubleValue);
             return (_storage.getDecimal()).toLong();
 
         default:
