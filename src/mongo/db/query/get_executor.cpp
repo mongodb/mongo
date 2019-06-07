@@ -668,7 +668,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
     OperationContext* opCtx,
     Collection* collection,
     unique_ptr<CanonicalQuery> cq,
-    size_t plannerOptions) {
+    size_t plannerOptions,
+    PlanExecutor::YieldPolicy yieldPolicy) {
     invariant(collection);
     invariant(cq.get());
 
@@ -725,7 +726,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
     auto ws = make_unique<WorkingSet>();
     auto cs = make_unique<CollectionScan>(opCtx, collection, params, ws.get(), cq->root());
     return PlanExecutor::make(
-        opCtx, std::move(ws), std::move(cs), std::move(cq), collection, PlanExecutor::YIELD_AUTO);
+        opCtx, std::move(ws), std::move(cs), std::move(cq), collection, yieldPolicy);
 }
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getExecutorFind(
@@ -735,7 +736,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getExecutorFind(
     PlanExecutor::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
     if (NULL != collection && canonicalQuery->getQueryRequest().isOplogReplay()) {
-        return getOplogStartHack(opCtx, collection, std::move(canonicalQuery), plannerOptions);
+        return getOplogStartHack(
+            opCtx, collection, std::move(canonicalQuery), plannerOptions, yieldPolicy);
     }
 
     if (OperationShardingState::isOperationVersioned(opCtx)) {
