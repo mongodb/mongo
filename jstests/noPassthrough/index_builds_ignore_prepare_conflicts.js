@@ -28,11 +28,11 @@
     const primary = replSetTest.getPrimary();
     const primaryDB = primary.getDB('test');
 
-    const docsToInsert = 10;
+    let numDocs = 10;
     let setUp = function(coll) {
         coll.drop();
         let bulk = coll.initializeUnorderedBulkOp();
-        for (let i = 0; i < docsToInsert; i++) {
+        for (let i = 0; i < numDocs; i++) {
             bulk.insert({i: i});
         }
         assert.commandWorked(bulk.execute());
@@ -53,6 +53,11 @@
         IndexBuildTest.pauseIndexBuilds(conn);
         const awaitBuild = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1});
         const opId = IndexBuildTest.waitForIndexBuildToStart(testDB, collName, "i_1");
+
+        // This insert will block until the index build pauses and releases its exclusive lock.
+        // This guarantees that the subsequent transaction can immediately acquire a lock and not
+        // fail with a LockTimeout error.
+        assert.commandWorked(coll.insert({i: numDocs++}));
 
         // Start a session and introduce a document that is in a prepared state, but should be
         // ignored by the index build, at least until the transaction commits.
@@ -95,8 +100,8 @@
         awaitBuild();
         IndexBuildTest.waitForIndexBuildToStop(testDB, collName, "i_1");
 
-        assert.eq(docsToInsert, coll.count());
-        assert.eq(docsToInsert, coll.find().itcount());
+        assert.eq(numDocs, coll.count());
+        assert.eq(numDocs, coll.find().itcount());
     };
 
     runTest(replSetTest.getPrimary());
