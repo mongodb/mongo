@@ -172,6 +172,18 @@ void RouterTransactionsMetrics::incrementCommitSuccessful(
     }
 }
 
+void RouterTransactionsMetrics::incrementAbortCauseMap(std::string abortCause) {
+    invariant(!abortCause.empty());
+
+    stdx::lock_guard<stdx::mutex> lock(_abortCauseMutex);
+    auto it = _abortCauseMap.find(abortCause);
+    if (it == _abortCauseMap.end()) {
+        _abortCauseMap.emplace(std::pair<std::string, std::int64_t>(std::move(abortCause), 1));
+    } else {
+        it->second++;
+    }
+}
+
 CommitTypeStats RouterTransactionsMetrics::_constructCommitTypeStats(const CommitStats& stats) {
     CommitTypeStats commitStats;
     commitStats.setInitiated(stats.initiated.load());
@@ -195,6 +207,15 @@ void RouterTransactionsMetrics::updateStats(RouterTransactionsStats* stats) {
     commitTypes.setTwoPhaseCommit(_constructCommitTypeStats(_twoPhaseCommitStats));
     commitTypes.setRecoverWithToken(_constructCommitTypeStats(_recoverWithTokenCommitStats));
     stats->setCommitTypes(commitTypes);
+
+    BSONObjBuilder bob;
+    {
+        stdx::lock_guard<stdx::mutex> lock(_abortCauseMutex);
+        for (auto const& abortCauseEntry : _abortCauseMap) {
+            bob.append(abortCauseEntry.first, abortCauseEntry.second);
+        }
+    }
+    stats->setAbortCause(bob.obj());
 }
 
 }  // namespace mongo

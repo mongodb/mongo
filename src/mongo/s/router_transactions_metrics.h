@@ -80,6 +80,8 @@ public:
     void incrementCommitInitiated(TransactionRouter::CommitType commitType);
     void incrementCommitSuccessful(TransactionRouter::CommitType commitType);
 
+    void incrementAbortCauseMap(std::string abortCause);
+
     /**
      * Appends the accumulated stats to a sharded transactions stats object for reporting.
      */
@@ -118,6 +120,13 @@ private:
     CommitStats _readOnlyCommitStats;
     CommitStats _twoPhaseCommitStats;
     CommitStats _recoverWithTokenCommitStats;
+
+    // Mutual exclusion for _abortCauseMap
+    stdx::mutex _abortCauseMutex;
+
+    // Map tracking the total number of each abort cause for any multi-statement transaction that
+    // was aborted through this router.
+    std::map<std::string, std::int64_t> _abortCauseMap;
 };
 
 }  // namespace mongo
