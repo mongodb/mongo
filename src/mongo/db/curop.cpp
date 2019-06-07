@@ -422,12 +422,12 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                 if (lk.isLocked()) {
                     _debug.storageStats = opCtx->recoveryUnit()->getOperationStatistics();
                 } else {
-                    log(component) << "Timed out obtaining lock while trying to gather storage "
-                                      "statistics for a slow operation";
+                    warning(component) << "Unable to gather storage statistics for a slow "
+                                          "operation due to lock aquire timeout";
                 }
             } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-                log(component)
-                    << "Interrupted while trying to gather storage statistics for a slow operation";
+                warning(component) << "Unable to gather storage statistics for a slow "
+                                      "operation due to interrupt";
             }
         }
         log(component) << _debug.report(client,
