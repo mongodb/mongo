@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#include <math.h>
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bson_depth.h"
@@ -1065,8 +1067,8 @@ class LongToInt : public ToIntBase {
     Value value() {
         return Value(0xff00000007LL);
     }
-    int expected() {
-        return 7;
+    bool asserts() {
+        return true;
     }
 };
 
@@ -1105,6 +1107,46 @@ class StringToInt {
 public:
     void run() {
         ASSERT_THROWS(Value(StringData()).coerceToInt(), AssertionException);
+    }
+};
+
+/** Coerce maxInt to int */
+class MaxIntToInt : public ToIntBase {
+    Value value() {
+        return Value((double)std::numeric_limits<int>::max());
+    }
+    int expected() {
+        return std::numeric_limits<int>::max();
+    }
+};
+
+/** Coerce minInt to int */
+class MinIntToInt : public ToIntBase {
+    Value value() {
+        return Value((double)std::numeric_limits<int>::min());
+    }
+    int expected() {
+        return std::numeric_limits<int>::min();
+    }
+};
+
+/** Coerce maxInt + 1 to int */
+class TooLargeToInt : public ToIntBase {
+    Value value() {
+        return Value((double)std::numeric_limits<int>::max() + 1);
+    }
+    bool asserts() {
+        return true;
+    }
+};
+
+/** Coerce minInt - 1 to int */
+class TooLargeNegativeToInt : public ToIntBase {
+    Value value() {
+        return Value((double)std::numeric_limits<int>::min() - 1);
+    }
+    bool asserts() {
+        return true;
     }
 };
 
@@ -1155,6 +1197,57 @@ class DoubleToLong : public ToLongBase {
     }
     long long expected() {
         return 9;
+    }
+};
+
+/** Coerce infinity to long. */
+class InfToLong : public ToLongBase {
+    Value value() {
+        return Value(std::numeric_limits<double>::infinity());
+    }
+    bool asserts() {
+        return true;
+    }
+};
+
+/** Coerce negative infinity to long. **/
+class NegInfToLong : public ToLongBase {
+    Value value() {
+        return Value(std::numeric_limits<double>::infinity() * -1);
+    }
+    bool asserts() {
+        return true;
+    }
+};
+
+/** Coerce large to long. **/
+class InvalidLargeToLong : public ToLongBase {
+    Value value() {
+        return Value(pow(2, 63));
+    }
+    bool asserts() {
+        return true;
+    }
+};
+
+/** Coerce lowest double to long. **/
+class LowestDoubleToLong : public ToLongBase {
+    Value value() {
+        return Value(static_cast<double>(std::numeric_limits<long long>::lowest()));
+    }
+    long long expected() {
+        return std::numeric_limits<long long>::lowest();
+    }
+};
+
+/** Coerce 'towards infinity' to long **/
+class TowardsInfinityToLong : public ToLongBase {
+    Value value() {
+        return Value(static_cast<double>(std::nextafter(std::numeric_limits<long long>::lowest(),
+                                                        std::numeric_limits<double>::lowest())));
+    }
+    bool asserts() {
+        return true;
     }
 };
 
@@ -1846,12 +1939,21 @@ public:
         add<Value::Coerce::NullToInt>();
         add<Value::Coerce::UndefinedToInt>();
         add<Value::Coerce::StringToInt>();
+        add<Value::Coerce::MaxIntToInt>();
+        add<Value::Coerce::MinIntToInt>();
+        add<Value::Coerce::TooLargeToInt>();
+        add<Value::Coerce::TooLargeNegativeToInt>();
         add<Value::Coerce::IntToLong>();
         add<Value::Coerce::LongToLong>();
         add<Value::Coerce::DoubleToLong>();
         add<Value::Coerce::NullToLong>();
         add<Value::Coerce::UndefinedToLong>();
         add<Value::Coerce::StringToLong>();
+        add<Value::Coerce::InfToLong>();
+        add<Value::Coerce::NegInfToLong>();
+        add<Value::Coerce::InvalidLargeToLong>();
+        add<Value::Coerce::LowestDoubleToLong>();
+        add<Value::Coerce::TowardsInfinityToLong>();
         add<Value::Coerce::IntToDouble>();
         add<Value::Coerce::LongToDouble>();
         add<Value::Coerce::DoubleToDouble>();
