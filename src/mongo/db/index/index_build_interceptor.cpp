@@ -338,12 +338,15 @@ bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {
     // The table is empty only when all writes are applied.
     if (!record) {
         auto writesRecorded = _sideWritesCounter.load();
-        invariant(writesRecorded == _numApplied,
-                  str::stream() << "The number of side writes recorded does not match the number "
-                                   "applied, despite the table appearing empty. Writes recorded: "
-                                << writesRecorded
-                                << ", applied: "
-                                << _numApplied);
+        if (writesRecorded != _numApplied) {
+            const std::string message = str::stream()
+                << "The number of side writes recorded does not match the number "
+                   "applied, despite the table appearing empty. Writes recorded: "
+                << writesRecorded << ", applied: " << _numApplied;
+
+            dassert(writesRecorded == _numApplied, message);
+            warning() << message;
+        }
         return true;
     }
 
