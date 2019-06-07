@@ -85,7 +85,6 @@
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
@@ -599,11 +598,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery,
                       logger::LogSeverity::Debug(3))) {
             ss << "verbose=(recovery),";
-        }
-
-        // Enable debug write-ahead logging for all tables under debug build.
-        if (kDebugBuild) {
-            ss << "debug_mode=(table_logging=true),";
         }
     }
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
