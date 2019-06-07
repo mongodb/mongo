@@ -607,21 +607,22 @@ public:
         return appendCodeWScope(fieldName, cws.code, cws.scope);
     }
 
-    void appendUndefined(StringData fieldName) {
+    BSONObjBuilder& appendUndefined(StringData fieldName) {
         _b.appendNum((char)Undefined);
         _b.appendStr(fieldName);
+        return *this;
     }
 
     /* helper function -- see Query::where() for primary way to do this. */
-    void appendWhere(StringData code, const BSONObj& scope) {
-        appendCodeWScope("$where", code, scope);
+    BSONObjBuilder& appendWhere(StringData code, const BSONObj& scope) {
+        return appendCodeWScope("$where", code, scope);
     }
 
     /**
        these are the min/max when comparing, not strict min/max elements for a given type
     */
-    void appendMinForType(StringData fieldName, int type);
-    void appendMaxForType(StringData fieldName, int type);
+    BSONObjBuilder& appendMinForType(StringData fieldName, int type);
+    BSONObjBuilder& appendMaxForType(StringData fieldName, int type);
 
     /** Append an array of values. */
     template <class T>
@@ -832,14 +833,16 @@ public:
         return *this;
     }
 
-    void appendNull() {
+    BSONArrayBuilder& appendNull() {
         _b.appendNull(_fieldCount);
         ++_fieldCount;
+        return *this;
     }
 
-    void appendUndefined() {
+    BSONArrayBuilder& appendUndefined() {
         _b.appendUndefined(_fieldCount);
         ++_fieldCount;
+        return *this;
     }
 
     /**
