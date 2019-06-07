@@ -379,7 +379,7 @@ protected:
                      Collection* collection,
                      const NamespaceString& nss,
                      std::shared_ptr<ReplIndexBuildState> replState,
-                     boost::optional<Lock::CollectionLock>* collLock);
+                     Lock::DBLock* dbLock);
     /**
      * Returns total number of indexes in collection, including unfinished/in-progress indexes.
      *
