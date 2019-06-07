@@ -54,6 +54,25 @@ using namespace fmt::literals;
 // ourselves to operations over the connection).
 
 namespace mongo {
+
+namespace {
+
+template <typename Map, typename Key>
+auto& getOrInvariant(Map&& map, const Key& key) noexcept {
+    auto it = std::forward<Map>(map).find(key);
+    invariant(it != std::forward<Map>(map).end(), "Unable to find key in map");
+
+    return it->second;
+}
+
+template <typename Map, typename... Args>
+void emplaceOrInvariant(Map&& map, Args&&... args) noexcept {
+    auto ret = std::forward<Map>(map).emplace(std::forward<Args>(args)...);
+    invariant(ret.second, "Element already existed in map/set");
+}
+
+}  // anonymous
+
 namespace executor {
 
 void ConnectionPool::ConnectionInterface::indicateUsed() {
@@ -109,11 +128,16 @@ std::string ConnectionPool::HostState::toString() const {
  */
 class ConnectionPool::LimitController final : public ConnectionPool::ControllerInterface {
 public:
-    HostGroup updateHost(const SpecificPool* pool,
-                         const HostAndPort& host,
-                         const HostState& stats) override {
+    void addHost(PoolId id, const HostAndPort& host) override {
         stdx::lock_guard lk(_mutex);
-        auto& data = _poolData[pool];
+        PoolData poolData;
+        poolData.host = host;
+
+        emplaceOrInvariant(_poolData, id, std::move(poolData));
+    }
+    HostGroupState updateHost(PoolId id, const HostState& stats) override {
+        stdx::lock_guard lk(_mutex);
+        auto& data = getOrInvariant(_poolData, id);
 
         const auto minConns = getPool()->_options.minConnections;
         const auto maxConns = getPool()->_options.maxConnections;
@@ -125,16 +149,16 @@ public:
             data.target = maxConns;
         }
 
-        return {{host}, stats.health.isExpired};
+        return {{data.host}, stats.health.isExpired};
     }
-    void removeHost(const SpecificPool* pool) override {
+    void removeHost(PoolId id) override {
         stdx::lock_guard lk(_mutex);
-        _poolData.erase(pool);
+        invariant(_poolData.erase(id));
     }
 
-    ConnectionControls getControls(const SpecificPool* pool) override {
+    ConnectionControls getControls(PoolId id) override {
         stdx::lock_guard lk(_mutex);
-        const auto& data = _poolData[pool];
+        const auto& data = getOrInvariant(_poolData, id);
 
         return {
             getPool()->_options.maxConnecting, data.target,
@@ -156,12 +180,13 @@ public:
     }
 
 protected:
-    struct Data {
+    struct PoolData {
+        HostAndPort host;
         size_t target = 0;
     };
 
     stdx::mutex _mutex;
-    stdx::unordered_map<const SpecificPool*, Data> _poolData;
+    stdx::unordered_map<PoolId, PoolData> _poolData;
 };
 
 /**
@@ -361,6 +386,8 @@ private:
     const transport::ConnectSSLMode _sslMode;
     const HostAndPort _hostAndPort;
 
+    const PoolId _id;
+
     LRUOwnershipPool _readyPool;
     OwnershipPool _processingPool;
     OwnershipPool _droppedProcessingPool;
@@ -391,7 +418,14 @@ private:
 auto ConnectionPool::SpecificPool::make(std::shared_ptr<ConnectionPool> parent,
                                         const HostAndPort& hostAndPort,
                                         transport::ConnectSSLMode sslMode) {
+    auto& controller = *parent->_controller;
+
     auto pool = std::make_shared<SpecificPool>(std::move(parent), hostAndPort, sslMode);
+
+    // Inform the controller that we exist
+    controller.addHost(pool->_id, hostAndPort);
+
+    // Set our timers and health
     pool->updateEventTimer();
     pool->updateHealth();
     return pool;
@@ -553,6 +587,7 @@ ConnectionPool::SpecificPool::SpecificPool(std::shared_ptr<ConnectionPool> paren
     : _parent(std::move(parent)),
       _sslMode(sslMode),
       _hostAndPort(hostAndPort),
+      _id(_parent->_nextPoolId++),
       _readyPool(std::numeric_limits<size_t>::max()) {
     invariant(_parent);
     _eventTimer = _parent->_factory->makeTimer();
@@ -716,6 +751,11 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
     auto conn = takeFromPool(_checkedOutPool, connPtr);
     invariant(conn);
 
+    if (_health.isShutdown) {
+        // If we're in shutdown, then we don't care
+        return;
+    }
+
     if (conn->getGeneration() != _generation) {
         // If the connection is from an older generation, just return.
         return;
@@ -733,7 +773,7 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
     if (needsRefreshTP <= now) {
         // If we need to refresh this connection
 
-        auto controls = _parent->_controller->getControls(this);
+        auto controls = _parent->_controller->getControls(_id);
         if (_readyPool.size() + _processingPool.size() + _checkedOutPool.size() >=
             controls.targetConnections) {
             // If we already have minConnections, just let the connection lapse
@@ -797,7 +837,7 @@ void ConnectionPool::SpecificPool::triggerShutdown(const Status& status) {
     _health.isShutdown = true;
 
     LOG(2) << "Delisting connection pool for " << _hostAndPort;
-    _parent->_controller->removeHost(this);
+    _parent->_controller->removeHost(_id);
     _parent->_pools.erase(_hostAndPort);
 
     processFailure(status);
@@ -881,6 +921,11 @@ void ConnectionPool::SpecificPool::fulfillRequests() {
 
 // spawn enough connections to satisfy open requests and minpool, while honoring maxpool
 void ConnectionPool::SpecificPool::spawnConnections() {
+    if (_health.isShutdown) {
+        // Dead pools spawn no conns
+        return;
+    }
+
     if (_health.isFailed) {
         LOG(kDiagnosticLogLevel)
             << "Pool for " << _hostAndPort
@@ -888,7 +933,7 @@ void ConnectionPool::SpecificPool::spawnConnections() {
         return;
     }
 
-    auto controls = _parent->_controller->getControls(this);
+    auto controls = _parent->_controller->getControls(_id);
     LOG(kDiagnosticLogLevel) << "Comparing connection state for " << _hostAndPort
                              << " to Controls: " << controls;
 
@@ -1035,7 +1080,7 @@ void ConnectionPool::SpecificPool::updateController() {
     };
     LOG(kDiagnosticLogLevel) << "Updating controller for " << _hostAndPort
                              << " with State: " << state;
-    auto hostGroup = controller.updateHost(this, _hostAndPort, std::move(state));
+    auto hostGroup = controller.updateHost(_id, std::move(state));
 
     // If we can shutdown, then do so
     if (hostGroup.canShutdown) {

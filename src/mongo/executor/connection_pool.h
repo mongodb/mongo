@@ -78,6 +78,8 @@ public:
 
     using GetConnectionCallback = unique_function<void(StatusWith<ConnectionHandle>)>;
 
+    using PoolId = uint64_t;
+
     static constexpr size_t kDefaultMaxConns = std::numeric_limits<size_t>::max();
     static constexpr size_t kDefaultMinConns = 1;
     static constexpr size_t kDefaultMaxConnecting = 2;
@@ -212,7 +214,7 @@ public:
      *
      * This should only be constructed by a ControllerInterface
      */
-    struct HostGroup {
+    struct HostGroupState {
         std::vector<HostAndPort> hosts;
         bool canShutdown = false;
     };
@@ -254,6 +256,7 @@ private:
 
     // The global mutex for specific pool access and the generation counter
     mutable stdx::mutex _mutex;
+    PoolId _nextPoolId = 0;
     stdx::unordered_map<HostAndPort, std::shared_ptr<SpecificPool>> _pools;
 
     EgressTagCloserManager* _manager;
@@ -409,7 +412,8 @@ public:
     using SpecificPool = typename ConnectionPool::SpecificPool;
     using HostState = typename ConnectionPool::HostState;
     using ConnectionControls = typename ConnectionPool::ConnectionControls;
-    using HostGroup = typename ConnectionPool::HostGroup;
+    using HostGroupState = typename ConnectionPool::HostGroupState;
+    using PoolId = typename ConnectionPool::PoolId;
 
     virtual ~ControllerInterface() = default;
 
@@ -421,24 +425,26 @@ public:
     virtual void init(ConnectionPool* parent);
 
     /**
-     * Inform this Controller of a new State for a pool/host
-     *
-     * This function returns information about all hosts tied to this one. This function is also
-     * expected to handle never-before-seen pools.
+     * Inform this Controller that a pool should be tracked
      */
-    virtual HostGroup updateHost(const SpecificPool* pool,
-                                 const HostAndPort& host,
-                                 const HostState& stats) = 0;
+    virtual void addHost(PoolId id, const HostAndPort& host) = 0;
+
+    /**
+     * Inform this Controller of a new State for a pool
+     *
+     * This function returns the state of the group of hosts to which this host belongs.
+     */
+    virtual HostGroupState updateHost(PoolId id, const HostState& stats) = 0;
 
     /**
      * Inform this Controller that a pool is no longer tracked
      */
-    virtual void removeHost(const SpecificPool* pool) = 0;
+    virtual void removeHost(PoolId id) = 0;
 
     /**
      * Get controls for the given pool
      */
-    virtual ConnectionControls getControls(const SpecificPool* pool) = 0;
+    virtual ConnectionControls getControls(PoolId id) = 0;
 
     /**
      * Get the various timeouts that this controller suggests
