@@ -10146,7 +10146,7 @@ buildvariants:
     build_mongoreplay: true
     large_distro_name: rhel62-large
     test_flags: >-
-        --mongodSetParameters="{useMultipleOplogEntryFormatForTransactions: true, maxNumberOfTransactionOperationsInSingleOplogEntry: 2}"
+        --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2}"
         --excludeWithAnyTags=exclude_from_large_txns
         --excludeWithAnyTags=exclude_from_large_txns_due_to_change_streams
   tasks:
