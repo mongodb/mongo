@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/config.h"
+#include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
@@ -46,6 +47,10 @@ bool AuthzManagerExternalState::shouldUseRolesFromConnection(OperationContext* o
                                                              const UserName& userName) {
 #ifdef MONGO_CONFIG_SSL
     if (!opCtx || !opCtx->getClient() || !opCtx->getClient()->session()) {
+        return false;
+    }
+
+    if (!allowRolesFromX509Certificates) {
         return false;
     }
 
