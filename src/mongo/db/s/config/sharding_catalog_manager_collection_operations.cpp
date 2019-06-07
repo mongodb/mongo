@@ -108,9 +108,8 @@ boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
             collIter.more());
 
     auto collectionDetails = collIter.next();
-    CollectionOptions actualOptions;
-
-    uassertStatusOK(actualOptions.parse(collectionDetails["options"].Obj()));
+    CollectionOptions actualOptions =
+        uassertStatusOK(CollectionOptions::parse(collectionDetails["options"].Obj()));
     // TODO: SERVER-33048 check idIndex field
 
     uassert(ErrorCodes::NamespaceExists,

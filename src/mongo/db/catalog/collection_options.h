@@ -71,9 +71,16 @@ struct CollectionOptions {
     Status validateForStorage() const;
 
     /**
-     * Parses the "options" subfield of the collection info object.
+     * Parses the collection 'options' into the appropriate struct fields.
+     *
+     * When 'kind' is set to ParseKind::parseForStorage, the 'uuid' field is parsed,
+     * otherwise the 'uuid' field is not parsed.
+     *
+     * When 'kind' is set to ParseKind::parseForCommand, the 'idIndex' field is parsed,
+     * otherwise the 'idIndex' field is not parsed.
      */
-    Status parse(const BSONObj& obj, ParseKind kind = parseForCommand);
+    static StatusWith<CollectionOptions> parse(const BSONObj& options,
+                                               ParseKind kind = parseForCommand);
 
     void appendBSON(BSONObjBuilder* builder) const;
     BSONObj toBSON() const;
@@ -93,8 +100,6 @@ struct CollectionOptions {
      */
     bool matchesStorageOptions(const CollectionOptions& other,
                                CollatorFactoryInterface* collatorFactory) const;
-
-    // ----
 
     // Collection UUID. Present for all CollectionOptions parsed for storage.
     OptionalCollectionUUID uuid;

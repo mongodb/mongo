@@ -1253,20 +1253,14 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                                                          << typeName(optionsField.type()));
                 }
 
-                // Removes the option.uuid field. We do not allow the options.uuid field
-                // to be parsed while in parseForCommand mode in order to ensure that the
-                // user cannot set the UUID of a collection.
-                BSONObj optionsFieldObj = optionsField.Obj();
-                optionsFieldObj = optionsFieldObj.removeField("uuid");
-
-                auto status = options.parse(optionsFieldObj, CollectionOptions::parseForCommand);
-                if (!status.isOK()) {
-                    throw RSFatalException(str::stream() << "Failed to parse options " << info
-                                                         << ": "
-                                                         << status.toString());
+                auto statusWithCollectionOptions = CollectionOptions::parse(
+                    optionsField.Obj(), CollectionOptions::parseForCommand);
+                if (!statusWithCollectionOptions.isOK()) {
+                    throw RSFatalException(
+                        str::stream() << "Failed to parse options " << info << ": "
+                                      << statusWithCollectionOptions.getStatus().toString());
                 }
-                // TODO(SERVER-27992): Set options.uuid.
-
+                options = statusWithCollectionOptions.getValue();
             } else {
                 // Use default options.
             }
