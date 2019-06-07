@@ -276,7 +276,7 @@ public:
                 return Command::appendCommandStatus(result, swParsedClientMetadata.getStatus());
             }
 
-            auto &parsedClientMetadata= swParsedClientMetadata.getValue();
+            auto& parsedClientMetadata = swParsedClientMetadata.getValue();
             invariant(parsedClientMetadata);
 
             parsedClientMetadata->logClientMetadata(opCtx->getClient());
