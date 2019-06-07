@@ -32,6 +32,8 @@
 
 #include "mongo/db/auth/sasl_options.h"
 
+#include <boost/algorithm/string.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
@@ -193,11 +195,6 @@ MONGO_STARTUP_OPTIONS_STORE(SASLOptions)(InitializerContext* context) {
 
 // SASL Startup Parameters, making them settable via setParameter on the command line or in the
 // legacy INI config file.  None of these parameters are modifiable at runtime.
-ExportedServerParameter<std::vector<std::string>, ServerParameterType::kStartupOnly>
-    SASLAuthenticationMechanismsSetting(ServerParameterSet::getGlobal(),
-                                        "authenticationMechanisms",
-                                        &saslGlobalParams.authenticationMechanisms);
-
 ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> SASLHostNameSetting(
     ServerParameterSet::getGlobal(), "saslHostName", &saslGlobalParams.hostName);
 
@@ -231,6 +228,30 @@ private:
     int _minimum;
 };
 
+class ExportedAuthenticationMechanismParameter
+    : public ExportedServerParameter<std::vector<std::string>, ServerParameterType::kStartupOnly> {
+public:
+    ExportedAuthenticationMechanismParameter(StringData name, std::vector<std::string>* value)
+        : ExportedServerParameter<std::vector<std::string>, ServerParameterType::kStartupOnly>(
+              ServerParameterSet::getGlobal(), name.toString(), value) {}
+
+    Status setFromString(const std::string& str) final {
+
+        std::vector<std::string> v;
+        splitStringDelim(str, &v, ',');
+
+        // Strip white space for authentication mechanisms
+        for (auto& mechanism : v) {
+            boost::trim(mechanism);
+        }
+
+        std::string joinedString = boost::algorithm::join(v, ",");
+        return ExportedServerParameter<
+            std::vector<std::string>,
+            ServerParameterType::kStartupOnly>::setFromString(joinedString);
+    }
+};
+
 ExportedScramIterationCountParameter scramSHA1IterationCountParam(
     scramSHA1IterationCountServerParameter,
     &saslGlobalParams.scramSHA1IterationCount,
@@ -239,5 +260,9 @@ ExportedScramIterationCountParameter scramSHA256IterationCountParam(
     scramSHA256IterationCountServerParameter,
     &saslGlobalParams.scramSHA256IterationCount,
     minimumScramSHA256IterationCount);
+
+// modify the input to remove leading and trailing white space
+ExportedAuthenticationMechanismParameter authMechanismsParam(
+    "authenticationMechanisms", &saslGlobalParams.authenticationMechanisms);
 
 }  // namespace mongo
