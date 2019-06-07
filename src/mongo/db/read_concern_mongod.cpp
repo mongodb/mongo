@@ -137,6 +137,12 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
         }
 
         bool isConfig = (serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
+        if (!isConfig && !ShardingState::get(opCtx)->enabled()) {
+            return {ErrorCodes::ShardingStateNotInitialized,
+                    "Failed noop write because sharding state has not been initialized"};
+        }
+
         auto myShard = isConfig ? Grid::get(opCtx)->shardRegistry()->getConfigShard()
                                 : Grid::get(opCtx)->shardRegistry()->getShard(
                                       opCtx, ShardingState::get(opCtx)->shardId());
