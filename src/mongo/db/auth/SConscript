@@ -84,6 +84,7 @@ env.Library(
              '$BUILD_DIR/mongo/db/mongod_options',
              '$BUILD_DIR/mongo/db/namespace_string',
              '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
+             '$BUILD_DIR/mongo/db/server_parameters',
              '$BUILD_DIR/mongo/db/service_context',
              '$BUILD_DIR/mongo/db/update/update_driver',
              '$BUILD_DIR/mongo/util/md5',
