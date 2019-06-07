@@ -1445,7 +1445,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
         // We're REMOVED or have an invalid config
         response->append("state", static_cast<int>(myState.s));
         response->append("stateStr", myState.toString());
-        response->append("uptime", rsStatusArgs.selfUptime);
+        response->append("uptime", static_cast<int>(rsStatusArgs.selfUptime));
 
         appendOpTime(response, "optime", lastOpApplied);
 
@@ -1477,7 +1477,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
             bb.append("health", 1.0);
             bb.append("state", static_cast<int>(myState.s));
             bb.append("stateStr", myState.toString());
-            bb.append("uptime", rsStatusArgs.selfUptime);
+            bb.append("uptime", static_cast<int>(rsStatusArgs.selfUptime));
             if (!_selfConfig().isArbiter()) {
                 appendOpTime(&bb, "optime", lastOpApplied);
                 bb.appendDate("optimeDate",
@@ -1529,7 +1529,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                 bb.append("stateStr", it->getState().toString());
             }
 
-            const unsigned int uptime = static_cast<unsigned int>((
+            const int uptime = static_cast<int>((
                 it->getUpSince() != Date_t() ? durationCount<Seconds>(now - it->getUpSince()) : 0));
             bb.append("uptime", uptime);
             if (!itConfig.isArbiter()) {

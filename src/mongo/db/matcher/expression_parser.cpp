@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -528,7 +529,7 @@ Status parseInExpression(InMatchExpression* inExpression,
 
 template <class T>
 StatusWithMatchExpression parseType(StringData name, BSONElement elt) {
-    auto typeSet = MatcherTypeSet::parse(elt, kTypeAliasMap);
+    auto typeSet = MatcherTypeSet::parse(elt);
     if (!typeSet.isOK()) {
         return typeSet.getStatus();
     }

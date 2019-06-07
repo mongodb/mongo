@@ -120,7 +120,7 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
                 BSONElement e = s["syncedTo"];
                 BSONObjBuilder t(bb.subobjStart("syncedTo"));
                 t.appendDate("time", e.timestampTime());
-                t.append("inc", e.timestampInc());
+                t.append("inc", static_cast<int>(e.timestampInc()));
                 t.done();
             }
 

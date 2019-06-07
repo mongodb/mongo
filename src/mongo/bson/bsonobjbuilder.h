@@ -39,6 +39,7 @@
 #include <cstdint>
 #include <limits>
 #include <map>
+#include <type_traits>
 
 #include "mongo/base/data_view.h"
 #include "mongo/base/parse_number.h"
@@ -48,8 +49,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/util/decimal_counter.h"
+#include "mongo/util/if_constexpr.h"
 
 namespace mongo {
 
@@ -268,56 +269,28 @@ public:
         return *this;
     }
 
-    /** Append a boolean element */
-    BSONObjBuilder& append(StringData fieldName, bool val) {
-        _b.appendNum((char)Bool);
+    /** Append elements that have the BSONObjAppendFormat trait */
+    template <typename T, typename = std::enable_if_t<IsBSONObjAppendable<T>::value>>
+    BSONObjBuilder& append(StringData fieldName, const T& n) {
+        constexpr BSONType type = BSONObjAppendFormat<T>::value;
+        _b.appendNum(static_cast<char>(type));
         _b.appendStr(fieldName);
-        _b.appendNum((char)(val ? 1 : 0));
+        IF_CONSTEXPR(type == Bool) {
+            _b.appendNum(static_cast<char>(n));
+        }
+        else IF_CONSTEXPR(type == NumberInt) {
+            _b.appendNum(static_cast<int>(n));
+        }
+        else {
+            _b.appendNum(n);
+        }
         return *this;
     }
 
-    /** Append a 32 bit integer element */
-    BSONObjBuilder& append(StringData fieldName, int n) {
-        _b.appendNum((char)NumberInt);
-        _b.appendStr(fieldName);
-        _b.appendNum(n);
-        return *this;
-    }
-
-    /** Append a 32 bit unsigned element - cast to a signed int. */
-    BSONObjBuilder& append(StringData fieldName, unsigned n) {
-        return append(fieldName, (int)n);
-    }
-
-    /** Append a NumberDecimal */
-    BSONObjBuilder& append(StringData fieldName, Decimal128 n) {
-        _b.appendNum(static_cast<char>(NumberDecimal));
-        _b.appendStr(fieldName);
-        // Make sure we write data in a Little Endian conforming manner
-        _b.appendNum(n);
-        return *this;
-    }
-
-    /** Append a NumberLong */
-    BSONObjBuilder& append(StringData fieldName, long long n) {
-        _b.appendNum((char)NumberLong);
-        _b.appendStr(fieldName);
-        _b.appendNum(n);
-        return *this;
-    }
-
-    /**
-     * Append a NumberLong (if int64_t isn't the same as long long)
-     */
-    template <typename Int64_t,
-              typename = stdx::enable_if_t<std::is_same<Int64_t, int64_t>::value &&
-                                           !std::is_same<int64_t, long long>::value>>
-    BSONObjBuilder& append(StringData fieldName, Int64_t n) {
-        _b.appendNum((char)NumberLong);
-        _b.appendStr(fieldName);
-        _b.appendNum(n);
-        return *this;
-    }
+    template <typename T,
+              typename = std::enable_if_t<!IsBSONObjAppendable<T>::value && std::is_integral_v<T>>,
+              typename = void>
+    BSONObjBuilder& append(StringData fieldName, const T& n) = delete;
 
     /** appends a number.  if n < max(int)/2 then uses int, otherwise long long */
     BSONObjBuilder& appendIntOrLL(StringData fieldName, long long n) {
@@ -371,14 +344,6 @@ public:
             append(fieldName, llNumber);
         }
 
-        return *this;
-    }
-
-    /** Append a double element */
-    BSONObjBuilder& append(StringData fieldName, double n) {
-        _b.appendNum((char)NumberDouble);
-        _b.appendStr(fieldName);
-        _b.appendNum(n);
         return *this;
     }
 

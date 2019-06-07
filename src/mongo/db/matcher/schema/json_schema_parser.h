@@ -92,11 +92,12 @@ public:
                                            bool ignoreUnknownKeywords = false);
 
     /**
-     * Builds a set of type aliases from the given type element using 'aliasMap'. Returns a non-OK
-     * status if 'typeElt' is invalid or does not contain an entry in the 'aliasMap'.
+     * Builds a set of type aliases from the given type element using 'aliasMapFind'. Returns a
+     * non-OK status if 'typeElt' is invalid or does not contain an entry in the 'aliasMap' by
+     * calling 'aliasMapFind'.
      */
     static StatusWith<MatcherTypeSet> parseTypeSet(BSONElement typeElt,
-                                                   const StringMap<BSONType>& aliasMap);
+                                                   const findBSONTypeAliasFun& aliasMapFind);
 };
 
 }  // namespace mongo

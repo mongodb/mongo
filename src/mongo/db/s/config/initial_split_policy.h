@@ -40,6 +40,7 @@
 #include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 

@@ -703,7 +703,7 @@ void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
     settings.append("target available snapshots window size in seconds",
                     snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load());
     settings.append("current available snapshots window size in seconds",
-                    currentAvailableSnapshotWindow);
+                    static_cast<int>(currentAvailableSnapshotWindow));
     settings.append("latest majority snapshot timestamp available",
                     stableTimestamp.toStringPretty());
     settings.append("oldest majority snapshot timestamp available",

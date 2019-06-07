@@ -49,6 +49,7 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

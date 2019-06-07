@@ -88,7 +88,7 @@ public:
 
             // Include the number of cpus to simplify client calculations
             ProcessInfo p;
-            subObjBuilder.append("num_cpus", p.getNumCores());
+            subObjBuilder.append("num_cpus", static_cast<int>(p.getNumCores()));
 
             processStatusErrors(
                 procparser::parseProcStatFile("/proc/stat"_sd, kCpuKeys, &subObjBuilder),

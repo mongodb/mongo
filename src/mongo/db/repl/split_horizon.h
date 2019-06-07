@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace repl {

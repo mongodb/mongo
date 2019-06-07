@@ -330,8 +330,9 @@ public:
             members.append("0", BSON("_id" << 0 << "host" << me.toString()));
             result.append("me", me.toString());
             for (unsigned i = 0; i < seeds.size(); i++) {
-                members.append(BSONObjBuilder::numStr(i + 1),
-                               BSON("_id" << i + 1 << "host" << seeds[i].toString()));
+                members.append(
+                    BSONObjBuilder::numStr(i + 1),
+                    BSON("_id" << static_cast<int>(i + 1) << "host" << seeds[i].toString()));
             }
             b.appendArray("members", members.obj());
             configObj = b.obj();

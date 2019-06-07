@@ -95,7 +95,7 @@ public:
                 // The client information
                 client->reportState(infoBuilder);
 
-                infoBuilder.append("opid", clientOpCtx->getOpID());
+                infoBuilder.append("opid", static_cast<int>(clientOpCtx->getOpID()));
                 LockerId lockerId = clientOpCtx->lockState()->getId();
                 lockToClientMap.insert({lockerId, infoBuilder.obj()});
             }

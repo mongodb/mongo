@@ -30,6 +30,7 @@
 #include "mongo/db/index_names.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 

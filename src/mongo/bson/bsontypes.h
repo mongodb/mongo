@@ -29,12 +29,16 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <cstdint>
 #include <iosfwd>
+#include <type_traits>
 
+#include "mongo/base/counter.h"
+#include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -113,7 +117,7 @@ enum BSONType {
  * Maps from the set of type aliases accepted by the $type query operator to the corresponding BSON
  * types. Excludes "number", since this alias maps to a set of BSON types.
  */
-extern const StringMap<BSONType> kTypeAliasMap;
+boost::optional<BSONType> findBSONTypeAlias(StringData key);
 
 /**
  * returns the name of the argument's type
@@ -223,4 +227,80 @@ inline int canonicalizeBSONType(BSONType type) {
             return -1;
     }
 }
-}
+
+template <BSONType value>
+struct FormatKind : std::integral_constant<BSONType, value> {};
+
+template <typename T>
+struct BSONObjAppendFormat;
+
+namespace bsontype_detail {
+
+/* BSONObjFallbackFormat is the trait that BSONObjAppendFormat falls back to in case there is
+   no explicit specialization for a type. It has a second templated parameter so it can be enabled
+   for groups of types, e.g. enums. */
+template <typename T, typename = void>
+struct BSONObjFallbackFormat {};
+
+template <typename T>
+struct BSONObjFallbackFormat<T, std::enable_if_t<std::is_enum_v<T>>> : FormatKind<NumberInt> {};
+
+/** This is a special case because long long and int64_t are the same on some platforms but
+ * different on others. If they are the same, the long long partial specialization of
+ * BSONObjAppendFormat is accepted, otherwise the int64_t partial specialization of
+ * BSONObjFallbackFormat is chosen. */
+template <>
+struct BSONObjFallbackFormat<std::int64_t> : FormatKind<NumberLong> {};
+
+/** Determine if T is appendable based on whether or not BSONOBjAppendFormat<T> has a value. */
+template <typename T, typename = void>
+struct IsBSONObjAppendable : std::false_type {};
+
+template <typename T>
+struct IsBSONObjAppendable<T, std::void_t<decltype(BSONObjAppendFormat<T>::value)>>
+    : std::true_type {};
+
+}  // namespace bsontype_detail
+
+template <typename T>
+using IsBSONObjAppendable = bsontype_detail::IsBSONObjAppendable<T>;
+
+template <typename T>
+struct BSONObjAppendFormat : bsontype_detail::BSONObjFallbackFormat<T> {};
+
+template <>
+struct BSONObjAppendFormat<bool> : FormatKind<Bool> {};
+
+template <>
+struct BSONObjAppendFormat<char> : FormatKind<NumberInt> {};
+
+template <>
+struct BSONObjAppendFormat<unsigned char> : FormatKind<NumberInt> {};
+
+template <>
+struct BSONObjAppendFormat<short> : FormatKind<NumberInt> {};
+
+template <>
+struct BSONObjAppendFormat<unsigned short> : FormatKind<NumberInt> {};
+
+template <>
+struct BSONObjAppendFormat<int> : FormatKind<NumberInt> {};
+
+/* For platforms where long long and int64_t are the same, this partial specialization will be
+   used for both. Otherwise, int64_t will use the specialization above. */
+template <>
+struct BSONObjAppendFormat<long long> : FormatKind<NumberLong> {};
+
+template <>
+struct BSONObjAppendFormat<Counter64> : FormatKind<NumberLong> {};
+
+template <>
+struct BSONObjAppendFormat<Decimal128> : FormatKind<NumberDecimal> {};
+
+template <>
+struct BSONObjAppendFormat<double> : FormatKind<NumberDouble> {};
+
+template <>
+struct BSONObjAppendFormat<float> : FormatKind<NumberDouble> {};
+
+}  // namespace mongo

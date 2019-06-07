@@ -355,7 +355,7 @@ BSONObj HttpClient::getServerStatus() {
 
         BSONObjBuilder v(info.subobjStart("running"));
         v.append("version", curl_info->version);
-        v.append("version_num", curl_info->version_num);
+        v.append("version_num", static_cast<int>(curl_info->version_num));
     }
 
     return info.obj();

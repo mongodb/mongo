@@ -81,10 +81,10 @@ public:
             bb.done();
         }
         if (cmdObj["oidReset"].trueValue()) {
-            result.append("oidMachineOld", OID::getMachineId());
+            result.append("oidMachineOld", static_cast<int>(OID::getMachineId()));
             OID::regenMachineId();
         }
-        result.append("oidMachine", OID::getMachineId());
+        result.append("oidMachine", static_cast<int>(OID::getMachineId()));
         return true;
     }
 
@@ -121,10 +121,10 @@ public:
 
         bSys.appendDate("currentTime", jsTime());
         bSys.append("hostname", prettyHostName());
-        bSys.append("cpuAddrSize", p.getAddrSize());
-        bSys.append("memSizeMB", static_cast<unsigned>(p.getSystemMemSizeMB()));
-        bSys.append("memLimitMB", static_cast<unsigned>(p.getMemSizeMB()));
-        bSys.append("numCores", p.getNumCores());
+        bSys.append("cpuAddrSize", static_cast<int>(p.getAddrSize()));
+        bSys.append("memSizeMB", static_cast<long long>(p.getSystemMemSizeMB()));
+        bSys.append("memLimitMB", static_cast<long long>(p.getMemSizeMB()));
+        bSys.append("numCores", static_cast<int>(p.getNumCores()));
         bSys.append("cpuArch", p.getArch());
         bSys.append("numaEnabled", p.hasNumaEnabled());
         bOs.append("type", p.getOsType());

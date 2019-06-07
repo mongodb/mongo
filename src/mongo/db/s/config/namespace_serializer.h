@@ -38,6 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 

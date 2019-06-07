@@ -31,6 +31,7 @@
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
+#include <forward_list>
 #include <type_traits>
 
 #include "mongo/base/checked_cast.h"

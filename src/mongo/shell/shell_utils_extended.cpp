@@ -351,7 +351,7 @@ BSONObj changeUmask(const BSONObj& a, void* data) {
             "umask takes 1 argument, the octal mode of the umask",
             a.nFields() == 1 && isNumericBSONType(a.firstElementType()));
     auto val = a.firstElement().Number();
-    return BSON("" << umask(static_cast<mode_t>(val)));
+    return BSON("" << static_cast<int>(umask(static_cast<mode_t>(val))));
 #endif
 }
 

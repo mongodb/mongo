@@ -785,7 +785,7 @@ BSONObj BitTestMatchExpression::getSerializedRightHandSide() const {
 
     BSONArrayBuilder arrBob;
     for (auto bitPosition : _bitPositions) {
-        arrBob.append(bitPosition);
+        arrBob.append(static_cast<int32_t>(bitPosition));
     }
     arrBob.doneFast();
 

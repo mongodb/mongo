@@ -142,7 +142,7 @@ class FTDCMetricsCollectorMock2 : public FTDCMetricsCollectorMockTee {
 public:
     void generateDocument(BSONObjBuilder& builder, std::uint32_t counter) final {
         builder.append("name", "joe");
-        builder.append("key1", (counter * 37));
+        builder.append("key1", static_cast<int32_t>(counter * 37));
         builder.append("key2", static_cast<double>(counter * static_cast<int>(log10f(counter))));
     }
 };

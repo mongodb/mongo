@@ -697,9 +697,9 @@ public:
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
-        const std::uint32_t docsToInsert = 10;
+        const std::int32_t docsToInsert = 10;
         const LogicalTime firstInsertTime = _clock->reserveTicks(docsToInsert);
-        for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
+        for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
             BSONObjBuilder result;
             ASSERT_OK(applyOps(
                 _opCtx,
@@ -727,7 +727,7 @@ public:
                 &result));
         }
 
-        for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
+        for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
             OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());
 
             BSONObj result;
@@ -750,28 +750,28 @@ public:
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
-        const std::uint32_t docsToInsert = 10;
+        const std::int32_t docsToInsert = 10;
         const LogicalTime firstInsertTime = _clock->reserveTicks(docsToInsert);
 
         BSONObjBuilder oplogEntryBuilder;
 
         // Populate the "ts" field with an array of all the grouped inserts' timestamps.
         BSONArrayBuilder tsArrayBuilder(oplogEntryBuilder.subarrayStart("ts"));
-        for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
+        for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
             tsArrayBuilder.append(firstInsertTime.addTicks(idx).asTimestamp());
         }
         tsArrayBuilder.done();
 
         // Populate the "t" (term) field with an array of all the grouped inserts' terms.
         BSONArrayBuilder tArrayBuilder(oplogEntryBuilder.subarrayStart("t"));
-        for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
+        for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
             tArrayBuilder.append(1LL);
         }
         tArrayBuilder.done();
 
         // Populate the "o" field with an array of all the grouped inserts.
         BSONArrayBuilder oArrayBuilder(oplogEntryBuilder.subarrayStart("o"));
-        for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
+        for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
             oArrayBuilder.append(BSON("_id" << idx));
         }
         oArrayBuilder.done();
@@ -784,7 +784,7 @@ public:
         ASSERT_OK(repl::SyncTail::syncApply(
             _opCtx, oplogEntry, repl::OplogApplication::Mode::kSecondary, boost::none));
 
-        for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
+        for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
             OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());
 
             BSONObj result;

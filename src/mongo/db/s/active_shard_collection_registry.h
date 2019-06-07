@@ -35,6 +35,7 @@
 #include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 

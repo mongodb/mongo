@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <type_traits>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
@@ -73,35 +75,18 @@ TEST(BSONObjBuilderTest, AppendInt64T) {
     ASSERT_EQ(obj["b"].Long(), 1ll << 40);
 }
 
-/**
- * current conversion ranges in append(unsigned n)
- * dbl/int max/min in comments refer to max/min encodable constants
- *                  0 <= n <= uint_max          -----> int
- */
+template <typename T, typename = void>
+struct isUnsignedAppendable : std::false_type {};
 
-TEST(BSONObjBuilderTest, AppendUnsignedInt) {
-    struct {
-        unsigned int v;
-        BSONType t;
-    } data[] = {{0, mongo::NumberInt},
-                {100, mongo::NumberInt},
-                {maxEncodableInt, mongo::NumberInt},
-                {maxEncodableInt + 1, mongo::NumberInt},
-                {static_cast<unsigned int>(maxInt), mongo::NumberInt},
-                {static_cast<unsigned int>(maxInt) + 1U, mongo::NumberInt},
-                {(std::numeric_limits<unsigned int>::max)(), mongo::NumberInt},
-                {0, mongo::Undefined}};
-    for (int i = 0; data[i].t != mongo::Undefined; i++) {
-        unsigned int v = data[i].v;
-        BSONObjBuilder b;
-        b.append("a", v);
-        BSONObj o = b.obj();
-        ASSERT_EQUALS(o.nFields(), 1);
-        BSONElement e = o.getField("a");
-        unsigned int n = e.numberLong();
-        ASSERT_EQUALS(n, v);
-        assertBSONTypeEquals(e.type(), data[i].t, v, i);
-    }
+template <typename T>
+struct isUnsignedAppendable<T, std::void_t<decltype(BSONObjAppendFormat<T>::value)>>
+    : std::true_type {};
+
+TEST(BSONObjBuilderTest, AppendUnsignedIsForbidden) {
+    MONGO_STATIC_ASSERT(!isUnsignedAppendable<unsigned>::value);
+    MONGO_STATIC_ASSERT(!isUnsignedAppendable<unsigned long>::value);
+    MONGO_STATIC_ASSERT(!isUnsignedAppendable<unsigned long long>::value);
+    MONGO_STATIC_ASSERT(!isUnsignedAppendable<uint64_t>::value);
 }
 
 /**

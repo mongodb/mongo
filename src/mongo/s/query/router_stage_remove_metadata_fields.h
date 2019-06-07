@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/s/query/router_exec_stage.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 

@@ -37,6 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 class BSONObj;

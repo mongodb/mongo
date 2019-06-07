@@ -502,7 +502,7 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
         } else {
             continue;
         }
-        soInfo << "machType" << header->filetype;
+        soInfo << "machType" << static_cast<int32_t>(header->filetype);
         soInfo << "b" << integerToHex(reinterpret_cast<intptr_t>(header));
         const char* const loadCommandsBegin = reinterpret_cast<const char*>(header) + headerSize;
         const char* const loadCommandsEnd = loadCommandsBegin + header->sizeofcmds;

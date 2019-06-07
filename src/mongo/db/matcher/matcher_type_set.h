@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <set>
 #include <string>
 
@@ -37,8 +38,11 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
+
+using findBSONTypeAliasFun = std::function<boost::optional<BSONType>(StringData)>;
 
 /**
  * Represents a set of types or of type aliases in the match language. The set consists of the BSON
@@ -53,6 +57,8 @@ struct MatcherTypeSet {
     // supported.
     static const StringMap<BSONType> kJsonSchemaTypeAliasMap;
 
+    static boost::optional<BSONType> findJsonSchemaTypeAlias(StringData key);
+
     /**
      * Given a mapping from string alias to BSON type, creates a MatcherTypeSet from a
      * BSONElement. This BSON alias may either represent a single type (via numerical type code or
@@ -60,7 +66,7 @@ struct MatcherTypeSet {
      *
      * Returns an error if the element cannot be parsed to a set of types.
      */
-    static StatusWith<MatcherTypeSet> parse(BSONElement, const StringMap<BSONType>& aliasMap);
+    static StatusWith<MatcherTypeSet> parse(BSONElement);
 
     /**
      * Given a set of string type alias and a mapping from string alias to BSON type, returns the
@@ -69,7 +75,7 @@ struct MatcherTypeSet {
      * Returns an error if any of the string aliases are unknown.
      */
     static StatusWith<MatcherTypeSet> fromStringAliases(std::set<StringData> typeAliases,
-                                                        const StringMap<BSONType>& aliasMap);
+                                                        const findBSONTypeAliasFun& aliasMapFind);
 
     /**
      * Constructs an empty type set.

@@ -27,12 +27,16 @@
  *    it in the license file.
  */
 
+#include <fmt/format.h>
+
 #include "mongo/bson/bsontypes.h"
 
 #include "mongo/config.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
+using namespace fmt::literals;
 
 const char kMaxKeyData[] = {7, 0, 0, 0, static_cast<char>(MaxKey), 0, 0};
 const BSONObj kMaxBSONKey(kMaxKeyData);
@@ -93,35 +97,41 @@ const char* typeName(BSONType type) {
     }
 }
 
-const StringMap<BSONType> kTypeAliasMap = {
-    {typeName(BSONType::NumberDouble), BSONType::NumberDouble},
-    {typeName(BSONType::String), BSONType::String},
-    {typeName(BSONType::Object), BSONType::Object},
-    {typeName(BSONType::Array), BSONType::Array},
-    {typeName(BSONType::BinData), BSONType::BinData},
-    {typeName(BSONType::Undefined), BSONType::Undefined},
-    {typeName(BSONType::jstOID), BSONType::jstOID},
-    {typeName(BSONType::Bool), BSONType::Bool},
-    {typeName(BSONType::Date), BSONType::Date},
-    {typeName(BSONType::jstNULL), BSONType::jstNULL},
-    {typeName(BSONType::RegEx), BSONType::RegEx},
-    {typeName(BSONType::DBRef), BSONType::DBRef},
-    {typeName(BSONType::Code), BSONType::Code},
-    {typeName(BSONType::Symbol), BSONType::Symbol},
-    {typeName(BSONType::CodeWScope), BSONType::CodeWScope},
-    {typeName(BSONType::NumberInt), BSONType::NumberInt},
-    {typeName(BSONType::bsonTimestamp), BSONType::bsonTimestamp},
-    {typeName(BSONType::NumberLong), BSONType::NumberLong},
-    {typeName(BSONType::NumberDecimal), BSONType::NumberDecimal},
-    {typeName(BSONType::MaxKey), BSONType::MaxKey},
-    {typeName(BSONType::MinKey), BSONType::MinKey}};
+boost::optional<BSONType> findBSONTypeAlias(StringData key) {
+    // intentionally leaked
+    static const auto& typeAliasMap =
+        *new StringMap<BSONType>{{typeName(BSONType::NumberDouble), BSONType::NumberDouble},
+                                 {typeName(BSONType::String), BSONType::String},
+                                 {typeName(BSONType::Object), BSONType::Object},
+                                 {typeName(BSONType::Array), BSONType::Array},
+                                 {typeName(BSONType::BinData), BSONType::BinData},
+                                 {typeName(BSONType::Undefined), BSONType::Undefined},
+                                 {typeName(BSONType::jstOID), BSONType::jstOID},
+                                 {typeName(BSONType::Bool), BSONType::Bool},
+                                 {typeName(BSONType::Date), BSONType::Date},
+                                 {typeName(BSONType::jstNULL), BSONType::jstNULL},
+                                 {typeName(BSONType::RegEx), BSONType::RegEx},
+                                 {typeName(BSONType::DBRef), BSONType::DBRef},
+                                 {typeName(BSONType::Code), BSONType::Code},
+                                 {typeName(BSONType::Symbol), BSONType::Symbol},
+                                 {typeName(BSONType::CodeWScope), BSONType::CodeWScope},
+                                 {typeName(BSONType::NumberInt), BSONType::NumberInt},
+                                 {typeName(BSONType::bsonTimestamp), BSONType::bsonTimestamp},
+                                 {typeName(BSONType::NumberLong), BSONType::NumberLong},
+                                 {typeName(BSONType::NumberDecimal), BSONType::NumberDecimal},
+                                 {typeName(BSONType::MaxKey), BSONType::MaxKey},
+                                 {typeName(BSONType::MinKey), BSONType::MinKey}};
+
+    auto it = typeAliasMap.find(key);
+    if (it == typeAliasMap.end())
+        return boost::none;
+    return it->second;
+}
 
 BSONType typeFromName(StringData name) {
-    auto typeIt = kTypeAliasMap.find(name);
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "Unknown type name: " << name,
-            typeIt != kTypeAliasMap.end());
-    return typeIt->second;
+    auto typeAlias = findBSONTypeAlias(name);
+    uassert(ErrorCodes::BadValue, "Unknown type name: {}"_format(name), typeAlias);
+    return *typeAlias;
 }
 
 std::ostream& operator<<(std::ostream& stream, BSONType type) {

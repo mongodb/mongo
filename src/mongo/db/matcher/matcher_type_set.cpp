@@ -44,7 +44,7 @@ namespace {
  * Returns a non-OK status if 'typeAlias' does not represent a valid type.
  */
 Status addAliasToTypeSet(StringData typeAlias,
-                         const StringMap<BSONType>& aliasMap,
+                         const findBSONTypeAliasFun& aliasMapFind,
                          MatcherTypeSet* typeSet) {
     invariant(typeSet);
 
@@ -53,8 +53,8 @@ Status addAliasToTypeSet(StringData typeAlias,
         return Status::OK();
     }
 
-    auto it = aliasMap.find(typeAlias.toString());
-    if (it == aliasMap.end()) {
+    auto optValue = aliasMapFind(typeAlias.toString());
+    if (!optValue) {
         // The string "missing" can be returned from the $type agg expression, but is not valid for
         // use in the $type match expression predicate. Return a special error message for this
         // case.
@@ -68,25 +68,25 @@ Status addAliasToTypeSet(StringData typeAlias,
                       str::stream() << "Unknown type name alias: " << typeAlias);
     }
 
-    typeSet->bsonTypes.insert(it->second);
+    typeSet->bsonTypes.insert(*optValue);
     return Status::OK();
 }
 
 /**
  * Parses an element containing either a numerical type code or a string type alias and adds the
- * resulting type to 'typeSet'. The 'aliasMap' is used to map strings to BSON types.
+ * resulting type to 'typeSet'. The 'aliasMapFind' function is used to map strings to BSON types.
  *
  * Returns a non-OK status if 'elt' does not represent a valid type.
  */
 Status parseSingleType(BSONElement elt,
-                       const StringMap<BSONType>& aliasMap,
+                       const findBSONTypeAliasFun& aliasMapFind,
                        MatcherTypeSet* typeSet) {
     if (!elt.isNumber() && elt.type() != BSONType::String) {
         return Status(ErrorCodes::TypeMismatch, "type must be represented as a number or a string");
     }
 
     if (elt.type() == BSONType::String) {
-        return addAliasToTypeSet(elt.valueStringData(), aliasMap, typeSet);
+        return addAliasToTypeSet(elt.valueStringData(), aliasMapFind, typeSet);
     }
 
     auto valueAsInt = elt.parseIntegerElementToInt();
@@ -122,11 +122,19 @@ const StringMap<BSONType> MatcherTypeSet::kJsonSchemaTypeAliasMap = {
     {std::string(JSONSchemaParser::kSchemaTypeString), BSONType::String},
 };
 
-StatusWith<MatcherTypeSet> MatcherTypeSet::fromStringAliases(std::set<StringData> typeAliases,
-                                                             const StringMap<BSONType>& aliasMap) {
+boost::optional<BSONType> MatcherTypeSet::findJsonSchemaTypeAlias(StringData key) {
+    const auto& aliasMap = kJsonSchemaTypeAliasMap;
+    auto it = aliasMap.find(key);
+    if (it == aliasMap.end())
+        return boost::none;
+    return it->second;
+}
+
+StatusWith<MatcherTypeSet> MatcherTypeSet::fromStringAliases(
+    std::set<StringData> typeAliases, const findBSONTypeAliasFun& aliasMapFind) {
     MatcherTypeSet typeSet;
     for (auto&& alias : typeAliases) {
-        auto status = addAliasToTypeSet(alias, aliasMap, &typeSet);
+        auto status = addAliasToTypeSet(alias, aliasMapFind, &typeSet);
         if (!status.isOK()) {
             return status;
         }
@@ -134,12 +142,11 @@ StatusWith<MatcherTypeSet> MatcherTypeSet::fromStringAliases(std::set<StringData
     return typeSet;
 }
 
-StatusWith<MatcherTypeSet> MatcherTypeSet::parse(BSONElement elt,
-                                                 const StringMap<BSONType>& aliasMap) {
+StatusWith<MatcherTypeSet> MatcherTypeSet::parse(BSONElement elt) {
     MatcherTypeSet typeSet;
 
     if (elt.type() != BSONType::Array) {
-        auto status = parseSingleType(elt, aliasMap, &typeSet);
+        auto status = parseSingleType(elt, findBSONTypeAlias, &typeSet);
         if (!status.isOK()) {
             return status;
         }
@@ -147,7 +154,7 @@ StatusWith<MatcherTypeSet> MatcherTypeSet::parse(BSONElement elt,
     }
 
     for (auto&& typeArrayElt : elt.embeddedObject()) {
-        auto status = parseSingleType(typeArrayElt, aliasMap, &typeSet);
+        auto status = parseSingleType(typeArrayElt, findBSONTypeAlias, &typeSet);
         if (!status.isOK()) {
             return status;
         }
@@ -168,7 +175,7 @@ void MatcherTypeSet::toBSONArray(BSONArrayBuilder* builder) const {
 
 BSONTypeSet BSONTypeSet::parseFromBSON(const BSONElement& element) {
     // BSON type can be specified with a type alias, other values will be rejected.
-    auto typeSet = uassertStatusOK(JSONSchemaParser::parseTypeSet(element, kTypeAliasMap));
+    auto typeSet = uassertStatusOK(JSONSchemaParser::parseTypeSet(element, findBSONTypeAlias));
     return BSONTypeSet(typeSet);
 }
 
