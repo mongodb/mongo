@@ -1,7 +1,6 @@
 // Tests that a resume token from FCV 4.0 cannot be used with the new 'startAfter' option, because
 // the old version of the resume token doesn't contain enough information to distinguish an
 // invalidate event from the event which generated the invalidate.
-// @tags: [exclude_from_large_txns_due_to_change_streams]
 (function() {
     "use strict";
 
