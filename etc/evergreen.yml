@@ -10096,7 +10096,6 @@ buildvariants:
     test_flags: >-
         --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2}"
         --excludeWithAnyTags=exclude_from_large_txns
-        --excludeWithAnyTags=exclude_from_large_txns_due_to_change_streams
   tasks:
   - name: compile_TG
     distros:
