@@ -1508,6 +1508,18 @@ TEST_F(ConnectionPoolTest, AsyncGet) {
     }
 }
 
+TEST_F(ConnectionPoolTest, ReturnAfterShutdown) {
+    auto pool = makePool();
+
+    // Grab a connection and hold it to end of scope
+    auto connFuture = pool->get(HostAndPort(), transport::kGlobalSSLMode, Seconds(1));
+    ConnectionImpl::pushSetup(Status::OK());
+    auto conn = std::move(connFuture).get();
+    doneWith(conn);
+
+    pool->shutdown();
+}
+
 }  // namespace connection_pool_test_details
 }  // namespace executor
 }  // namespace mongo

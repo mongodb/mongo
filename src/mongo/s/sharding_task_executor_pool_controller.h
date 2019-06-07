@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/executor/connection_pool.h"
@@ -113,12 +115,11 @@ public:
 
     void init(ConnectionPool* parent) override;
 
-    HostGroup updateHost(const SpecificPool* pool,
-                         const HostAndPort& host,
-                         const HostState& stats) override;
-    void removeHost(const SpecificPool* pool) override;
+    void addHost(PoolId id, const HostAndPort& host) override;
+    HostGroupState updateHost(PoolId id, const HostState& stats) override;
+    void removeHost(PoolId id) override;
 
-    ConnectionControls getControls(const SpecificPool* pool) override;
+    ConnectionControls getControls(PoolId id) override;
 
     Milliseconds hostTimeout() const override;
     Milliseconds pendingTimeout() const override;
@@ -133,40 +134,44 @@ private:
     void _removeGroup(WithLock, const std::string& key);
 
     /**
-     * HostGroup is a shared state for a set of hosts (a replica set).
+     * GroupData is a shared state for a set of hosts (a replica set).
      *
      * When the ReplicaSetChangeListener is informed of a change to a replica set,
-     * it creates a new HostGroup and fills it into _hostGroups[setName] and
-     * _hostGroupsByHost[memberHost]. This does not immediately affect the results of getControls.
+     * it creates a new GroupData and fills it into _groupDatas[setName] and
+     * _groupAndIds[memberHost].
      *
-     * When a SpecificPool calls updateHost, it checks _hostGroupsByHost to see if it belongs to
-     * any group and pushes itself into hostData for that group. It then will update target for its
-     * group according to the MatchingStrategy. It will also set shouldShutdown to true if every
-     * member of the group has shouldShutdown at true.
+     * When a SpecificPool calls updateHost, it then will update target for its group according to
+     * the MatchingStrategy. It will also postpone shutdown until all members of its group are ready
+     * to shutdown.
      *
-     * Note that a HostData can find itself orphaned from its HostGroup during a reconfig.
+     * Note that a PoolData can find itself orphaned from its GroupData during a reconfig.
      */
-    struct HostGroupData {
+    struct GroupData {
+        explicit GroupData(const ReplicaSetChangeNotifier::State& state_) : state{state_} {}
+
         // The ReplicaSet state for this set
         ReplicaSetChangeNotifier::State state;
 
-        // Pointer index for each pool in the set
-        stdx::unordered_set<const SpecificPool*> pools;
+        // Id for each pool in the set
+        stdx::unordered_set<PoolId> poolIds;
 
-        // The number of connections that all hosts in the group should maintain
+        // The number of connections that all pools in the group should maintain
         size_t target = 0;
     };
 
     /**
-     * HostData represents the current state for a specific HostAndPort/SpecificPool.
+     * PoolData represents the current state for a SpecificPool.
      *
-     * It is mutated by updateHost/removeHost and used along with Parameters to form Controls
-     * for getControls.
+     * It is mutated by addHost/updateHost/removeHost and used along with Parameters to form
+     * Controls for getControls.
      */
-    struct HostData {
-        // The HostGroup associated with this pool.
+    struct PoolData {
+        // The host associated with this pool
+        HostAndPort host;
+
+        // The GroupData associated with this pool.
         // Note that this will be invalid if there was a replica set change
-        std::weak_ptr<HostGroupData> hostGroup;
+        std::weak_ptr<GroupData> groupData;
 
         // The number of connections the host should maintain
         size_t target = 0;
@@ -175,12 +180,32 @@ private:
         bool isAbleToShutdown = false;
     };
 
+    /**
+     * A GroupAndId allows incoming GroupData and PoolData to find each other
+     *
+     * Note that each side of the pair initializes independently. The side that is ctor'd last adds
+     * the id to the GroupData's poolIds and a GroupData ptr to the PoolData for maybeId. Likewise,
+     * the side that is dtor'd last removes the GroupAndId.
+     */
+    struct GroupAndId {
+        std::shared_ptr<GroupData> groupData;
+        boost::optional<PoolId> maybeId;
+    };
+
     ReplicaSetChangeListenerHandle _listener;
 
     stdx::mutex _mutex;
 
-    stdx::unordered_map<const SpecificPool*, HostData> _poolData;
-    stdx::unordered_map<std::string, std::shared_ptr<HostGroupData>> _hostGroups;
-    stdx::unordered_map<HostAndPort, std::shared_ptr<HostGroupData>> _hostGroupsByHost;
+    // Entires to _poolDatas are added by addHost() and removed by removeHost()
+    stdx::unordered_map<PoolId, PoolData> _poolDatas;
+
+    // Entries to _groupData are added by _addGroup() and removed by _removeGroup()
+    stdx::unordered_map<std::string, std::shared_ptr<GroupData>> _groupDatas;
+
+    // Entries to _groupAndIds are added by the first caller of either addHost() or _addGroup() and
+    // removed by the last caller either removeHost() or _removeGroup(). This map exists to tie
+    // together a pool and a group based on a HostAndPort. It is hopefully used once, because a
+    // PoolId is much cheaper to index than a HostAndPort.
+    stdx::unordered_map<HostAndPort, GroupAndId> _groupAndIds;
 };
 }  // namespace mongo
