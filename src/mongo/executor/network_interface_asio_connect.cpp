@@ -81,13 +81,23 @@ void NetworkInterfaceASIO::_connect(AsyncOp* op) {
 
     tcp::resolver::query query(op->request().target.host(),
                                std::to_string(op->request().target.port()));
+
+    Date_t timeBefore = Date_t::now();
     // TODO: Investigate how we might hint or use shortcuts to resolve when possible.
-    const auto thenConnect = [this, op](std::error_code ec, tcp::resolver::iterator endpoints) {
+    const auto thenConnect = [this, op, timeBefore](std::error_code ec,
+                                                    tcp::resolver::iterator endpoints) {
         if (endpoints == tcp::resolver::iterator()) {
             // Workaround a bug in ASIO returning an invalid resolver iterator (with a non-error
             // std::error_code) when file descriptors are exhausted.
             ec = make_error_code(ErrorCodes::HostUnreachable);
         }
+
+        Date_t timeAfter = Date_t::now();
+        if (timeAfter - timeBefore > Seconds(1)) {
+            warning() << "DNS resolution while connecting to " << op->request().target.toString()
+                      << " took " << timeAfter - timeBefore;
+        }
+
         _validateAndRun(
             op, ec, [this, op, endpoints]() { _setupSocket(op, std::move(endpoints)); });
     };
