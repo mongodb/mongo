@@ -190,7 +190,7 @@ inline auto makeStage(
     const DocumentSource& source,
     const std::function<T(const T&, const std::vector<T>&, const DocumentSource&)>& propagator) {
     auto contents = (previous) ? reshapeContents(previous.get().contents)
-                               : findStageContents(source.getContext().ns, initialStageContents);
+                               : findStageContents(source.getContext()->ns, initialStageContents);
 
     auto[additionalChildren, offTheEndContents] =
         makeAdditionalChildren(std::move(initialStageContents), source, propagator, contents);
