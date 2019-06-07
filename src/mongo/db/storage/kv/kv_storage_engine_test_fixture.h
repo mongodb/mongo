@@ -55,10 +55,10 @@ public:
         AutoGetDb db(opCtx, ns.db(), LockMode::MODE_X);
         CollectionOptions options;
         options.uuid = UUID::gen();
-        auto ret = _storageEngine->getCatalog()->createCollection(opCtx, ns, options, true);
-        if (!ret.isOK()) {
-            return ret;
-        }
+        auto catalogEntry = unittest::assertGet(
+            _storageEngine->getCatalog()->createCollection(opCtx, ns, options, true));
+        CollectionCatalog::get(opCtx).registerCollection(
+            options.uuid.get(), std::move(catalogEntry), std::make_unique<CollectionMock>(ns));
 
         return _storageEngine->getCatalog()->getCollectionIdent(ns);
     }

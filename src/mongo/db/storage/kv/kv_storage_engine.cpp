@@ -245,8 +245,7 @@ void KVStorageEngine::_initCollection(OperationContext* opCtx,
     auto collection = collectionFactory->make(opCtx, catalogEntry.get());
 
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
-    collectionCatalog.registerCatalogEntry(uuid, std::move(catalogEntry));
-    collectionCatalog.registerCollectionObject(uuid, std::move(collection));
+    collectionCatalog.registerCollection(uuid, std::move(catalogEntry), std::move(collection));
 }
 
 void KVStorageEngine::closeCatalog(OperationContext* opCtx) {
@@ -594,10 +593,18 @@ Status KVStorageEngine::_dropCollectionsNoTimestamp(OperationContext* opCtx,
     WriteUnitOfWork untimestampedDropWuow(opCtx);
     for (auto& nss : toDrop) {
         invariant(getCatalog());
+        auto uuid = CollectionCatalog::get(opCtx).lookupUUIDByNSS(nss).get();
         Status result = getCatalog()->dropCollection(opCtx, nss);
+
         if (!result.isOK() && firstError.isOK()) {
             firstError = result;
         }
+
+        auto[removedColl, removedCatalogEntry] =
+            CollectionCatalog::get(opCtx).deregisterCollection(uuid);
+        opCtx->recoveryUnit()->registerChange(
+            CollectionCatalog::get(opCtx).makeFinishDropCollectionChange(
+                std::move(removedColl), std::move(removedCatalogEntry), uuid));
     }
 
     untimestampedDropWuow.commit();
@@ -665,17 +672,10 @@ Status KVStorageEngine::repairRecordStore(OperationContext* opCtx, const Namespa
                                                      << status.reason());
     }
 
+    // After repairing, re-initialize the collection with a valid RecordStore.
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
     auto uuid = collectionCatalog.lookupUUIDByNSS(nss).get();
-
-    // It's possible the Collection may not already have been removed if the no DatabaseHolder was
-    // opened for a database.
-    if (collectionCatalog.lookupCollectionByUUID(uuid)) {
-        collectionCatalog.deregisterCollectionObject(uuid);
-    }
-    collectionCatalog.deregisterCatalogEntry(uuid);
-
-    // After repairing, initialize the collection with a valid RecordStore.
+    collectionCatalog.deregisterCollection(uuid);
     _initCollection(opCtx, nss, false);
     return Status::OK();
 }

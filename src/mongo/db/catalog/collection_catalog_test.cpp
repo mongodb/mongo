@@ -66,8 +66,7 @@ public:
         auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
         col = collection.get();
         // Register dummy collection in catalog.
-        catalog.registerCatalogEntry(colUUID, std::move(catalogEntry));
-        catalog.onCreateCollection(&opCtx, std::move(collection), colUUID);
+        catalog.registerCollection(colUUID, std::move(catalogEntry), std::move(collection));
     }
 
 protected:
@@ -97,17 +96,15 @@ public:
 
             dbMap["foo"].insert(std::make_pair(fooUuid, fooColl.get()));
             dbMap["bar"].insert(std::make_pair(barUuid, barColl.get()));
-            catalog.registerCatalogEntry(fooUuid, std::move(fooCatalogEntry));
-            catalog.registerCatalogEntry(barUuid, std::move(barCatalogEntry));
-            catalog.onCreateCollection(&opCtx, std::move(fooColl), fooUuid);
-            catalog.onCreateCollection(&opCtx, std::move(barColl), barUuid);
+            catalog.registerCollection(fooUuid, std::move(fooCatalogEntry), std::move(fooColl));
+            catalog.registerCollection(barUuid, std::move(barCatalogEntry), std::move(barColl));
         }
     }
 
     void tearDown() {
         for (auto& it : dbMap) {
             for (auto& kv : it.second) {
-                catalog.onDropCollection(&opCtx, kv.first);
+                catalog.deregisterCollection(kv.first);
             }
         }
     }
@@ -278,8 +275,7 @@ public:
             auto newCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
             auto uuid = coll->uuid();
 
-            catalog.registerCatalogEntry(uuid.get(), std::move(newCatalogEntry));
-            catalog.onCreateCollection(&opCtx, std::move(coll), uuid.get());
+            catalog.registerCollection(uuid.get(), std::move(newCatalogEntry), std::move(coll));
         }
 
         int numEntries = 0;
@@ -302,8 +298,7 @@ public:
                 break;
             }
 
-            catalog.deregisterCollectionObject(uuid);
-            catalog.deregisterCatalogEntry(uuid);
+            catalog.deregisterCollection(uuid);
         }
 
         int numEntries = 0;
@@ -367,8 +362,7 @@ TEST_F(CollectionCatalogResourceTest, LookupMissingCollectionResource) {
 TEST_F(CollectionCatalogResourceTest, RemoveCollection) {
     const std::string collNs = "resourceDb.coll1";
     auto coll = catalog.lookupCollectionByNamespace(NamespaceString(collNs));
-    auto uniqueColl = catalog.deregisterCollectionObject(coll->uuid().get());
-    catalog.deregisterCatalogEntry(uniqueColl->uuid().get());
+    catalog.deregisterCollection(coll->uuid().get());
     auto rid = ResourceId(RESOURCE_COLLECTION, collNs);
     ASSERT(!catalog.lookupResourceName(rid));
 }
@@ -393,13 +387,13 @@ TEST_F(CollectionCatalogIterationTest, InvalidateEntry) {
     // Invalidate bar.coll1.
     for (auto collsIt = collsIterator("bar"); collsIt != collsIteratorEnd("bar"); ++collsIt) {
         if (collsIt->second->ns().ns() == "bar.coll1") {
-            catalog.onDropCollection(&opCtx, collsIt->first);
+            catalog.deregisterCollection(collsIt->first);
             dropColl("bar", collsIt->first);
             break;
         }
     }
 
-    // Ensure bar.coll1 is not returned by the iterator.
+
     for (; it != catalog.end(); ++it) {
         auto coll = *it;
         ASSERT(coll && coll->ns().ns() != "bar.coll1");
@@ -411,7 +405,7 @@ TEST_F(CollectionCatalogIterationTest, InvalidateAndDereference) {
     auto it = catalog.begin("bar");
     auto collsIt = collsIterator("bar");
     auto uuid = collsIt->first;
-    catalog.onDropCollection(&opCtx, uuid);
+    catalog.deregisterCollection(uuid);
     ++collsIt;
 
     ASSERT(it != catalog.end());
@@ -441,7 +435,7 @@ TEST_F(CollectionCatalogIterationTest, InvalidateLastEntryAndDereference) {
         }
     }
 
-    catalog.onDropCollection(&opCtx, *uuid);
+    catalog.deregisterCollection(*uuid);
     dropColl("bar", *uuid);
     ASSERT(*it == nullptr);
 }
@@ -465,60 +459,16 @@ TEST_F(CollectionCatalogIterationTest, InvalidateLastEntryInMapAndDereference) {
         }
     }
 
-    catalog.onDropCollection(&opCtx, *uuid);
+    catalog.deregisterCollection(*uuid);
     dropColl("foo", *uuid);
     ASSERT(*it == nullptr);
-}
-
-TEST_F(CollectionCatalogIterationTest, BeginSkipsOverEmptyCollectionObject) {
-    NamespaceString a1("a", "coll1");
-    NamespaceString a2("a", "coll2");
-
-    auto a1Uuid = CollectionUUID::gen();
-    auto a1CatalogEntry = std::make_unique<CollectionCatalogEntryMock>(a1.ns());
-
-    auto a2Uuid = CollectionUUID::gen();
-    if (a2Uuid < a1Uuid)
-        std::swap(a1Uuid, a2Uuid);
-    auto a2Coll = std::make_unique<CollectionMock>(a2);
-    auto a2CatalogEntry = std::make_unique<CollectionCatalogEntryMock>(a2.ns());
-
-    catalog.registerCatalogEntry(a1Uuid, std::move(a1CatalogEntry));
-    catalog.registerCatalogEntry(a2Uuid, std::move(a2CatalogEntry));
-    catalog.onCreateCollection(&opCtx, std::move(a2Coll), a2Uuid);
-
-    auto it = catalog.begin("a");
-    ASSERT(it != catalog.end());
-    auto coll = *it;
-    // Skips a.coll1 due to empty collection object.
-    ASSERT(coll->ns().ns() == a2.ns());
-}
-
-TEST_F(CollectionCatalogIterationTest, BeginSkipsOverEmptyCollectionObjectButStopsAtDbBoundary) {
-    NamespaceString a("a", "coll1");
-    NamespaceString b("b", "coll1");
-
-    auto aUuid = CollectionUUID::gen();
-    auto aCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(a.ns());
-
-    auto bUuid = CollectionUUID::gen();
-
-    auto bColl = std::make_unique<CollectionMock>(b);
-    auto bCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(b.ns());
-
-    catalog.registerCatalogEntry(aUuid, std::move(aCatalogEntry));
-    catalog.registerCatalogEntry(bUuid, std::move(bCatalogEntry));
-    catalog.onCreateCollection(&opCtx, std::move(bColl), bUuid);
-
-    auto it = catalog.begin("a");
-    ASSERT(it == catalog.end());
 }
 
 TEST_F(CollectionCatalogIterationTest, GetUUIDWontRepositionEvenIfEntryIsDropped) {
     auto it = catalog.begin("bar");
     auto collsIt = collsIterator("bar");
     auto uuid = collsIt->first;
-    catalog.onDropCollection(&opCtx, uuid);
+    catalog.deregisterCollection(uuid);
     dropColl("bar", uuid);
 
     ASSERT_EQUALS(uuid, it.uuid());
@@ -553,14 +503,13 @@ TEST_F(CollectionCatalogTest, InsertAfterLookup) {
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
     ASSERT(catalog.lookupCollectionByUUID(newUUID) == nullptr);
     ASSERT_EQUALS(catalog.lookupNSSByUUID(newUUID), boost::none);
-    catalog.registerCatalogEntry(newUUID, std::move(newCatalogEntry));
-    catalog.onCreateCollection(&opCtx, std::move(newCollUnique), newUUID);
+    catalog.registerCollection(newUUID, std::move(newCatalogEntry), std::move(newCollUnique));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(newUUID), newCol);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
 }
 
 TEST_F(CollectionCatalogTest, OnDropCollection) {
-    catalog.onDropCollection(&opCtx, colUUID);
+    catalog.deregisterCollection(colUUID);
     // Ensure the lookup returns a null pointer upon removing the colUUID entry.
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == nullptr);
 }
@@ -571,8 +520,7 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
     auto collUnique = std::make_unique<CollectionMock>(oldNss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(oldNss.ns());
     auto collection = collUnique.get();
-    catalog.registerCatalogEntry(uuid, std::move(catalogEntry));
-    catalog.onCreateCollection(&opCtx, std::move(collUnique), uuid);
+    catalog.registerCollection(uuid, std::move(catalogEntry), std::move(collUnique));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(uuid), collection);
 
     NamespaceString newNss(nss.db(), "newcol");
@@ -583,8 +531,7 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDropped) {
     catalog.onCloseCatalog(&opCtx);
-    catalog.onDropCollection(&opCtx, colUUID);
-    catalog.deregisterCatalogEntry(colUUID);
+    catalog.deregisterCollection(colUUID);
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == nullptr);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
     catalog.onOpenCatalog(&opCtx);
@@ -602,8 +549,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreated
     catalog.onCloseCatalog(&opCtx);
     ASSERT(catalog.lookupCollectionByUUID(newUUID) == nullptr);
     ASSERT_EQUALS(catalog.lookupNSSByUUID(newUUID), boost::none);
-    catalog.registerCatalogEntry(newUUID, std::move(newCatalogEntry));
-    catalog.onCreateCollection(&opCtx, std::move(newCollUnique), newUUID);
+    catalog.registerCollection(newUUID, std::move(newCatalogEntry), std::move(newCollUnique));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(newUUID), newCol);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
 
@@ -620,12 +566,10 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS)
     auto newCol = newCollUnique.get();
 
     catalog.onCloseCatalog(&opCtx);
-    catalog.onDropCollection(&opCtx, colUUID);
-    catalog.deregisterCatalogEntry(colUUID);
+    catalog.deregisterCollection(colUUID);
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == nullptr);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
-    catalog.registerCatalogEntry(colUUID, std::move(newCatalogEntry));
-    catalog.onCreateCollection(&opCtx, std::move(newCollUnique), colUUID);
+    catalog.registerCollection(colUUID, std::move(newCatalogEntry), std::move(newCollUnique));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(colUUID), newCol);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), newNss);
 
@@ -654,8 +598,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
         auto newColl = std::make_unique<CollectionMock>(nss);
         auto newCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
         auto uuid = CollectionUUID::gen();
-        catalog.registerCatalogEntry(uuid, std::move(newCatalogEntry));
-        catalog.registerCollectionObject(uuid, std::move(newColl));
+        catalog.registerCollection(uuid, std::move(newCatalogEntry), std::move(newColl));
     }
 
     std::vector<NamespaceString> dCollList = {d1Coll, d2Coll, d3Coll};
