@@ -111,11 +111,10 @@ Status KVEngine::createSortedDataInterface(OperationContext* opCtx,
     return Status::OK();  // I don't think we actually need to do anything here
 }
 
-mongo::SortedDataInterface* KVEngine::getSortedDataInterface(OperationContext* opCtx,
-                                                             StringData ident,
-                                                             const IndexDescriptor* desc) {
+std::unique_ptr<mongo::SortedDataInterface> KVEngine::getSortedDataInterface(
+    OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
     _idents[ident.toString()] = false;
-    return new SortedDataInterface(opCtx, ident, desc);
+    return std::make_unique<SortedDataInterface>(opCtx, ident, desc);
 }
 
 Status KVEngine::dropIdent(OperationContext* opCtx, StringData ident) {

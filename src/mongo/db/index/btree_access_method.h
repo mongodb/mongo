@@ -45,7 +45,7 @@ class IndexDescriptor;
  */
 class BtreeAccessMethod : public AbstractIndexAccessMethod {
 public:
-    BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
+    BtreeAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 
 private:
     void doGetKeys(const BSONObj& obj,

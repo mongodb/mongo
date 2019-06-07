@@ -182,7 +182,7 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
     {
         MyOperationContext opCtx(engine);
         ASSERT_OK(engine->createSortedDataInterface(&opCtx, ident, &desc));
-        sorted.reset(engine->getSortedDataInterface(&opCtx, ident, &desc));
+        sorted = engine->getSortedDataInterface(&opCtx, ident, &desc);
         ASSERT(sorted);
     }
 
@@ -725,7 +725,7 @@ DEATH_TEST_F(KVCatalogTest, TerminateOnNonNumericIndexVersion, "Fatal Assertion 
     {
         MyOperationContext opCtx(engine);
         ASSERT_OK(engine->createSortedDataInterface(&opCtx, ident, &desc));
-        sorted.reset(engine->getSortedDataInterface(&opCtx, ident, &desc));
+        sorted = engine->getSortedDataInterface(&opCtx, ident, &desc);
         ASSERT(sorted);
     }
 }

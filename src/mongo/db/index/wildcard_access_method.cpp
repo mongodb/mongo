@@ -38,8 +38,8 @@
 namespace mongo {
 
 WildcardAccessMethod::WildcardAccessMethod(IndexCatalogEntry* wildcardState,
-                                           SortedDataInterface* btree)
-    : AbstractIndexAccessMethod(wildcardState, btree),
+                                           std::unique_ptr<SortedDataInterface> btree)
+    : AbstractIndexAccessMethod(wildcardState, std::move(btree)),
       _keyGen(
           _descriptor->keyPattern(), _descriptor->pathProjection(), _btreeState->getCollator()) {}
 

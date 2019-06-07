@@ -70,9 +70,8 @@ public:
         return Status::OK();
     }
 
-    virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
-                                                        StringData ident,
-                                                        const IndexDescriptor* desc);
+    virtual std::unique_ptr<SortedDataInterface> getSortedDataInterface(
+        OperationContext* opCtx, StringData ident, const IndexDescriptor* desc);
 
     virtual Status dropIdent(OperationContext* opCtx, StringData ident) {
         return Status::OK();

@@ -521,21 +521,22 @@ private:
 
 // IndexCatalogEntry argument taken by non-const pointer for consistency with other Btree
 // factories. We don't actually modify it.
-SortedDataInterface* getEphemeralForTestBtreeImpl(const Ordering& ordering,
-                                                  bool isUnique,
-                                                  const NamespaceString& collectionNamespace,
-                                                  const std::string& indexName,
-                                                  const BSONObj& keyPattern,
-                                                  std::shared_ptr<void>* dataInOut) {
+std::unique_ptr<SortedDataInterface> getEphemeralForTestBtreeImpl(
+    const Ordering& ordering,
+    bool isUnique,
+    const NamespaceString& collectionNamespace,
+    const std::string& indexName,
+    const BSONObj& keyPattern,
+    std::shared_ptr<void>* dataInOut) {
     invariant(dataInOut);
     if (!*dataInOut) {
         *dataInOut = std::make_shared<IndexSet>(IndexEntryComparison(ordering));
     }
-    return new EphemeralForTestBtreeImpl(static_cast<IndexSet*>(dataInOut->get()),
-                                         isUnique,
-                                         collectionNamespace,
-                                         indexName,
-                                         keyPattern);
+    return std::make_unique<EphemeralForTestBtreeImpl>(static_cast<IndexSet*>(dataInOut->get()),
+                                                       isUnique,
+                                                       collectionNamespace,
+                                                       indexName,
+                                                       keyPattern);
 }
 
 }  // namespace mongo
