@@ -9522,7 +9522,7 @@ buildvariants:
     enable_embedded_tests: android_emulator
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "armeabi-v7a"
-    android_system_image_version: "21"
+    android_system_image_version: "24"
     android_toolchain_target_arch: "arm"
     android_toolchain_api_version: "21"
     dump_scons_config_on_failure: true
@@ -9605,7 +9605,7 @@ buildvariants:
     enable_embedded_tests: android_emulator
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "x86_64"
-    android_system_image_version: "21"
+    android_system_image_version: "24"
     android_toolchain_target_arch: "x86_64"
     android_toolchain_api_version: "21"
     dump_scons_config_on_failure: true
@@ -9621,7 +9621,7 @@ buildvariants:
     compile_env: JAVA_HOME=/opt/java/jdk8/
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "x86_64"
-    android_system_image_version: 21
+    android_system_image_version: 24
     android_toolchain_target_arch: "x86_64"
     android_toolchain_api_version: "21"
   tasks:
@@ -9636,7 +9636,7 @@ buildvariants:
     compile_env: JAVA_HOME=/opt/java/jdk8/
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "x86_64"
-    android_system_image_version: 21
+    android_system_image_version: 24
     android_toolchain_target_arch: "x86_64"
     android_toolchain_api_version: "21"
   tasks:
