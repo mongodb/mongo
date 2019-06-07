@@ -99,6 +99,8 @@ public:
     GetNextResult getNext() final;
     const char* getSourceName() const final;
     GetModPathsReturn getModifiedPaths() const final;
+    StringMap<boost::intrusive_ptr<Expression>> getIdFields() const;
+    const std::vector<AccumulationStatement>& getAccumulatedFields() const;
 
     /**
      * Convenience method for creating a new $group stage. If maxMemoryUsageBytes is boost::none,

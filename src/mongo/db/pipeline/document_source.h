@@ -433,8 +433,8 @@ public:
     /**
      * Returns the expression context from the stage's context.
      */
-    const ExpressionContext& getContext() const {
-        return *pExpCtx;
+    const boost::intrusive_ptr<ExpressionContext>& getContext() const {
+        return pExpCtx;
     }
 
     /**
