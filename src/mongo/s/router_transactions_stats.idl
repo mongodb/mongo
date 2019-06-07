@@ -81,6 +81,8 @@ structs:
       totalAborted:
         type: long
         default: 0
+      abortCause:
+        type: object
       totalContactedParticipants:
         type: long
         default: 0

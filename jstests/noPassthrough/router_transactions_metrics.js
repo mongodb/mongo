@@ -11,6 +11,7 @@
         const expectedFields = [
             "totalStarted",
             "totalAborted",
+            "abortCause",
             "totalCommitted",
             "totalContactedParticipants",
             "totalParticipantsAtCommit",
@@ -76,10 +77,16 @@
         }
     }
 
+    class ExpectedAbortCause {
+        constructor() {
+        }
+    }
+
     class ExpectedTransactionServerStatus {
         constructor() {
             this.totalStarted = 0;
             this.totalAborted = 0;
+            this.abortCause = new ExpectedAbortCause();
             this.totalCommitted = 0;
             this.totalContactedParticipants = 0;
             this.totalParticipantsAtCommit = 0;
@@ -145,6 +152,18 @@
                               ", commit types: " + tojson(commitTypes));
             }
         });
+
+        const abortCause = res.transactions.abortCause;
+        Object.keys(abortCause).forEach((cause) => {
+            assert.eq(expectedStats.abortCause[cause],
+                      abortCause[cause],
+                      "unexpected abortCause for " + cause + ", res: " + tojson(stats));
+        });
+
+        assert.eq(Object.keys(abortCause).length,
+                  Object.keys(expectedStats.abortCause).length,
+                  "the 'transactions' field had an unexpected number of abort causes, res: " +
+                      tojson(stats));
     }
 
     function abortFromUnderneath(st, session) {
@@ -311,6 +330,7 @@
                                      ErrorCodes.NoSuchTransaction);
 
         expectedStats.totalAborted += 1;
+        expectedStats.abortCause["NoSuchTransaction"] = 1;
         expectedStats.commitTypes.singleShard.initiated += 1;
         expectedStats.totalParticipantsAtCommit += 1;
         // The one shard is targeted for the commit then the implicit abort.
@@ -341,6 +361,7 @@
                                      ErrorCodes.NoSuchTransaction);
 
         expectedStats.totalAborted += 1;
+        expectedStats.abortCause["NoSuchTransaction"] += 1;
         expectedStats.commitTypes.singleWriteShard.initiated += 1;
         expectedStats.totalParticipantsAtCommit += 2;
         // In a single write shard commit, all read shards are committed first, then the
@@ -373,6 +394,7 @@
                                      ErrorCodes.NoSuchTransaction);
 
         expectedStats.totalAborted += 1;
+        expectedStats.abortCause["NoSuchTransaction"] += 1;
         expectedStats.commitTypes.readOnly.initiated += 1;
         expectedStats.totalParticipantsAtCommit += 2;
         // Both shards are targeted for the commit then the implicit abort.
@@ -406,6 +428,7 @@
                                      ErrorCodes.NoSuchTransaction);
 
         expectedStats.totalAborted += 1;
+        expectedStats.abortCause["NoSuchTransaction"] += 1;
         expectedStats.commitTypes.twoPhaseCommit.initiated += 1;
         expectedStats.totalParticipantsAtCommit += 2;
         // There are no implicit aborts after two phase commit, so the coordinator is targeted once.
@@ -447,6 +470,7 @@
 
         expectedStats.totalStarted += 1;
         expectedStats.totalAborted += 1;
+        expectedStats.abortCause["NoSuchTransaction"] += 1;
         expectedStats.commitTypes.recoverWithToken.initiated += 1;
         // The participant stats shouldn't increase if we're recovering commit.
         // There are no implicit aborts during commit recovery, so the recovery shard is targeted
@@ -494,6 +518,7 @@
         assert.commandWorked(session.abortTransaction_forTesting());
 
         expectedStats.totalAborted += 1;
+        expectedStats.abortCause["abort"] = 1;
         expectedStats.totalRequestsTargeted += 1;
         verifyServerStatusValues(st, expectedStats);
     })();
@@ -505,6 +530,7 @@
 
         expectedStats.totalStarted += 1;
         expectedStats.totalAborted += 1;
+        expectedStats.abortCause["DuplicateKey"] = 1;
         expectedStats.totalContactedParticipants += 1;
         expectedStats.totalRequestsTargeted += 2;  // Plus one for the implicit abort.
         verifyServerStatusValues(st, expectedStats);
@@ -541,6 +567,7 @@
         assert.commandWorked(session.abortTransaction_forTesting());
 
         expectedStats.totalAborted += 1;
+        expectedStats.abortCause["abort"] += 1;
         expectedStats.totalRequestsTargeted += 1;
         verifyServerStatusValues(st, expectedStats);
     })();
