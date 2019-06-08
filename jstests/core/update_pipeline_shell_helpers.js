@@ -23,6 +23,7 @@
     assert.commandWorked(testColl.update({_id: 1}, [{$set: {update: true}}]));
     assert.commandWorked(testColl.update({}, [{$set: {updateMulti: true}}], {multi: true}));
     assert.commandWorked(testColl.updateOne({_id: 1}, [{$set: {updateOne: true}}]));
+    assert.commandWorked(testColl.updateMany({}, [{$set: {updateMany: true}}]));
     assert.commandWorked(testColl.bulkWrite([
         {updateOne: {filter: {_id: 1}, update: [{$set: {bulkWriteUpdateOne: true}}]}},
         {updateMany: {filter: {}, update: [{$set: {bulkWriteUpdateMany: true}}]}}
@@ -49,6 +50,7 @@
           update: true,
           updateMulti: true,
           updateOne: true,
+          updateMany: true,
           bulkWriteUpdateOne: true,
           bulkWriteUpdateMany: true,
           unorderedBulkOpUpdateOne: true,
@@ -61,6 +63,7 @@
           a: 2,
           b: 3,
           updateMulti: true,
+          updateMany: true,
           bulkWriteUpdateMany: true,
           unorderedBulkOpUpdateMulti: true,
           orderedBulkOpUpdateMulti: true

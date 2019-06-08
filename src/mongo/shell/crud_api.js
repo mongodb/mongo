@@ -622,15 +622,18 @@ DBCollection.prototype.updateOne = function(filter, update, options) {
 DBCollection.prototype.updateMany = function(filter, update, options) {
     var opts = Object.extend({}, options || {});
 
-    // Check if first key in update statement contains a $
-    var keys = Object.keys(update);
-    if (keys.length == 0) {
-        throw new Error("the update operation document must contain at least one atomic operator");
-    }
-
-    // Check if first key does not have the $
-    if (keys[0][0] != "$") {
-        throw new Error('the update operation document must contain atomic operators');
+    // Pipeline updates are always permitted. Otherwise, we validate the update object.
+    if (!Array.isArray(update)) {
+        // Check if first key in update statement contains a $
+        var keys = Object.keys(update);
+        if (keys.length == 0) {
+            throw new Error(
+                "the update operation document must contain at least one atomic operator");
+        }
+        // Check if first key does not have the $
+        if (keys[0][0] != "$") {
+            throw new Error('the update operation document must contain atomic operators');
+        }
     }
 
     // Get the write concern
