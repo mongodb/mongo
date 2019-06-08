@@ -142,6 +142,7 @@ env.CppUnitTest(
         'shell_utils_test.cpp'
     ],
     LIBDEPS=[
-        'shell_utils'
+        'shell_utils',
+        '$BUILD_DIR/mongo/util/signal_handlers',
     ]
 )
