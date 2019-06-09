@@ -2625,6 +2625,84 @@ buildvariants:
   - name: tool_WT
   - name: push
 
+- name: ubuntu1604
+  display_name: SSL Ubuntu 1604 64-bit
+  modules:
+  - mongo-tools
+  run_on:
+  - ubuntu1604-test
+  expansions:
+    tooltags: "-tags ssl"
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-ubuntu1604
+    compile_flags: --ssl --distmod=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    test_flags: --continue-on-failure
+    has_packages: true
+    packager_script: packager.py
+    packager_distro: ubuntu1604
+    repo_edition: org
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1604-build
+  - name: aggregation
+  - name: aggregation_WT
+  - name: aggregation_auth
+  - name: auth
+  - name: auth_WT
+  - name: dbtest
+  - name: dbtest_WT
+  - name: disk
+  - name: durability
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth
+  - name: gle_auth_WT
+  - name: gle_auth_write_cmd
+  - name: gle_auth_write_cmd_WT
+  - name: jsCore
+  - name: jsCore_WT
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_compatibility_WT
+  - name: jsCore_small_oplog
+  - name: jsCore_small_oplog_WT
+  - name: mmap
+  - name: mongosTest
+  - name: multiversion
+  - name: noPassthrough
+  - name: noPassthrough_WT
+  - name: noPassthroughWithMongod
+  - name: noPassthroughWithMongod_WT
+  - name: parallel
+  - name: parallel_WT
+  - name: parallel_compatibility
+  - name: parallel_compatibility_WT
+  - name: concurrency
+  - name: concurrency_WT
+  - name: concurrency_compatibility
+  - name: concurrency_compatibility_WT
+  - name: replicasets
+  - name: replicasets_WT
+  - name: replicasets_auth
+  - name: replication
+  - name: replication_WT
+  - name: replication_auth
+  - name: sharding
+  - name: sharding_WT
+  - name: sharding_auth
+  - name: slow1
+  - name: slow1_WT
+  - name: slow2
+  - name: slow2_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool
+  - name: tool_WT
+  - name: push
+
 - name: enterprise-linux-64-amazon-ami
   display_name: Enterprise Linux 64-bit Amazon AMI
   modules:
@@ -3721,6 +3799,43 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1404-build
+  - name: audit
+  - name: audit_WT
+  - name: jsCore_auth
+  - name: mmap
+  - name: replicasets_auth
+  - name: sasl
+  - name: sharding_auth
+  - name: snmp
+  - name: snmp_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: push
+
+- name: enterprise-ubuntu1604-64
+  display_name: Enterprise Ubuntu 1604 64-bit
+  modules:
+  - enterprise
+  - mongo-tools
+  run_on:
+  - ubuntu1604-test
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-ubuntu1604
+    compile_flags: --ssl --distmod=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_distro: ubuntu1604
+    repo_edition: enterprise
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1604-build
   - name: audit
   - name: audit_WT
   - name: jsCore_auth
