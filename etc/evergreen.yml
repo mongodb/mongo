@@ -9631,7 +9631,7 @@ buildvariants:
 - name: macos
   display_name: macOS
   run_on:
-  - macos-1014
+  - macos-1014-i7
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
@@ -9641,7 +9641,7 @@ buildvariants:
     push_arch: x86_64
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ --variables-files=etc/scons/xcode_macosx.vars
-    resmoke_jobs_max: 4
+    resmoke_jobs_max: 6
     tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
@@ -9684,9 +9684,9 @@ buildvariants:
 - name: macos-debug
   display_name: "* macOS DEBUG"
   run_on:
-  - macos-1014
+  - macos-1014-i7
   expansions:
-    resmoke_jobs_max: 4
+    resmoke_jobs_max: 6
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     tooltags: ""
@@ -9715,7 +9715,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - macos-1014
+  - macos-1014-i7
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
@@ -9726,7 +9726,7 @@ buildvariants:
     mh_target: dist-mh
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ --variables-files=etc/scons/xcode_macosx.vars
-    resmoke_jobs_max: 4
+    resmoke_jobs_max: 6
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
   display_tasks:
@@ -9753,7 +9753,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - macos-1014
+  - macos-1014-i7
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
@@ -9764,7 +9764,7 @@ buildvariants:
     tooltags: "ssl sasl gssapi"
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --release --libc++ LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include" --variables-files=etc/scons/xcode_macosx.vars
-    resmoke_jobs_max: 4
+    resmoke_jobs_max: 6
     build_mongoreplay: true
     build_openssl: true
     openssl_config_flags: "-mmacosx-version-min=10.12"
@@ -9791,7 +9791,7 @@ buildvariants:
 - name: embedded-sdk-macos
   display_name: "Embedded SDK - macOS"
   run_on:
-  - macos-1014
+  - macos-1014-i7
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
@@ -9821,7 +9821,7 @@ buildvariants:
 - name: embedded-sdk-iphoneos
   display_name: "Embedded SDK - iOS"
   run_on:
-  - macos-1014
+  - macos-1014-i7
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
@@ -9853,7 +9853,7 @@ buildvariants:
 - name: embedded-sdk-iphonesimulator
   display_name: "Embedded SDK - iOS Simulator"
   run_on:
-  - macos-1014
+  - macos-1014-i7
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
@@ -9888,7 +9888,7 @@ buildvariants:
 - name: embedded-sdk-appletvos
   display_name: "Embedded SDK - tvOS"
   run_on:
-  - macos-1014
+  - macos-1014-i7
   batchtime: 1440 # 1 day
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -9920,7 +9920,7 @@ buildvariants:
 - name: embedded-sdk-appletvsimulator
   display_name: "Embedded SDK - tvOS Simulator"
   run_on:
-  - macos-1014
+  - macos-1014-i7
   batchtime: 1440 # 1 day
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -9955,7 +9955,7 @@ buildvariants:
 - name: embedded-sdk-watchos
   display_name: "Embedded SDK - watchOS"
   run_on:
-  - macos-1014
+  - macos-1014-i7
   batchtime: 1440 # 1 day
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -9987,7 +9987,7 @@ buildvariants:
 - name: embedded-sdk-watchsimulator
   display_name: "Embedded SDK - watchOS Simulator"
   run_on:
-  - macos-1014
+  - macos-1014-i7
   batchtime: 1440 # 1 day
   expansions:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -10022,7 +10022,7 @@ buildvariants:
 - name: embedded-sdk-apple-multiarch
   display_name: "Embedded SDK - Apple Multiarch"
   run_on:
-  - macos-1014
+  - macos-1014-i7
   batchtime: 1440 # 1 day
   expansions:
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
@@ -11896,7 +11896,7 @@ buildvariants:
 - name: macos-mobile
   display_name: macOS (mobile)
   run_on:
-  - macos-1014
+  - macos-1014-i7
   batchtime: 1440 # 1 day
   expansions:
     push_path: osx
