@@ -9,9 +9,9 @@ To build MongoDB, you will need:
     * Visual Studio 2017 version 15.9 or newer (See Windows section below for details)
 * On Linux and macOS, the libcurl library and header is required. MacOS includes libcurl.
     * Fedora/RHEL - `dnf install libcurl-devel`
-    * Ubuntu/Debian - `apt-get install libcurl-dev`
+    * Ubuntu/Debian - `apt-get install libcurl-dev    `
 * Python 3.7.x and Pip modules:
-  * See the section "Python Prerequisites" below.
+    * See the section "Python Prerequisites" below.
 
 MongoDB supports the following architectures: arm64, ppc64le, s390x, and x86-64.
 More detailed platform instructions can be found below.
@@ -35,6 +35,11 @@ the required Python modules, run:
 
 Note: If the `pip3` command is not available, `pip` without a suffix may be the pip command
 associated with Python 3.7.x.
+
+Note: In order to compile C-based Python modules, you'll also need the Python C headers. Run:
+* Fedora/RHEL - `dnf install python3-devel openssl-devel`
+* Ubuntu/Debian - `apt-get install python3.7-dev`
+
 
 SCons
 ---------------
