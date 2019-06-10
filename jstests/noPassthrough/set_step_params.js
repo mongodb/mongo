@@ -43,7 +43,7 @@ load("jstests/libs/parallelTester.js");
                 data: {shouldCheckForInterrupt: true},
             }));
         });
-    };
+    }
 
     var threads = [];
     function launchFinds({times, readPref, shouldFail}) {
@@ -63,7 +63,7 @@ load("jstests/libs/parallelTester.js");
             thread.start();
             threads.push(thread);
         }
-    };
+    }
 
     var currentCheckNum = 0;
     function hasConnPoolStats(args) {

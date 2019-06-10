@@ -28,7 +28,7 @@ load("jstests/libs/parallelTester.js");
                 data: {shouldCheckForInterrupt: true},
             }));
         });
-    };
+    }
 
     var threads = [];
 
@@ -49,7 +49,7 @@ load("jstests/libs/parallelTester.js");
             thread.start();
             threads.push(thread);
         }
-    };
+    }
 
     function updateSetParameters(params) {
         var cmd = Object.assign({"setParameter": 1}, params);
