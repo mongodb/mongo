@@ -337,7 +337,8 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opC
                                                            const BSONObj& original) const {
     auto swValidatedAndFixed = _validateAndFixIndexSpec(opCtx, original);
     if (!swValidatedAndFixed.isOK()) {
-        return swValidatedAndFixed.getStatus();
+        return swValidatedAndFixed.getStatus().withContext(
+            str::stream() << "Error in specification " << original.toString());
     }
 
     // Check whether this is a non-_id index and there are any settings disallowing this server

@@ -50,11 +50,13 @@
     // will accept the fatal assertion code from either component.
     const msgIndexBuilder = "Fatal Assertion 50769";
     const msgIndexBuildsCoordinator = "Fatal assertion 34437";
-    const msgIndexError = "InvalidIndexSpecificationOption: The field 'invalidOption2'";
+    const msgIndexErrorType = "InvalidIndexSpecificationOption";
+    const msgIndexError = "The field 'invalidOption2'";
 
     assert((rawMongoProgramOutput().match(msgIndexBuilder) ||
             rawMongoProgramOutput().match(msgIndexBuildsCoordinator)) &&
-               rawMongoProgramOutput().match(msgIndexError),
+               (rawMongoProgramOutput().match(msgIndexErrorType) &&
+                rawMongoProgramOutput().match(msgIndexError)),
            "Replication should have aborted on invalid index specification");
 
     replTest.stopSet();
