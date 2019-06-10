@@ -1540,6 +1540,10 @@ public:
         return visitor->visit(this);
     }
 
+    auto getVariableId() const {
+        return _variable;
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
