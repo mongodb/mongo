@@ -1,10 +1,11 @@
 // When enableMajorityReadConcern=false, a node transitions from ROLLBACK to RECOVERING with an
 // unstable checkpoint with appliedThrough set to the common point. Test that if the node crashes
-// and restarts with 4.0 before its next stable checkpoint, then oplog entries after the common
-// point are replayed.
+// and restarts with the last-stable version before its next stable checkpoint, then oplog entries
+// after the common point are replayed.
 (function() {
     "use strict";
 
+    load("jstests/libs/feature_compatibility_version.js");
     load("jstests/replsets/libs/rollback_test.js");
 
     TestData.rollbackShutdowns = true;
@@ -26,9 +27,10 @@
         replTest.initiate(config);
         let rollbackTest = new RollbackTest(name, replTest);
 
-        // Set the featureCompatibilityVersion to 4.0, so that we can downgrade the rollback node.
-        assert.commandWorked(
-            rollbackTest.getPrimary().adminCommand({setFeatureCompatibilityVersion: "4.0"}));
+        // Set the featureCompatibilityVersion to the last-stable version, so that we can downgrade
+        // the rollback node.
+        assert.commandWorked(rollbackTest.getPrimary().adminCommand(
+            {setFeatureCompatibilityVersion: lastStableFCV}));
 
         let rollbackNode = rollbackTest.transitionToRollbackOperations();
 
@@ -48,9 +50,11 @@
             {_id: 0}, {writeConcern: {w: "majority"}}));
         assert.eq(rollbackNode.getDB(dbName)[sourceCollName].find({_id: 0}).itcount(), 1);
 
-        // Kill and restart the rollback node on 4.0.
+        // Kill the rollback node and restart it on the last-stable version.
         rollbackTest.restartNode(
-            0, 9, {binVersion: "4.0", enableMajorityReadConcern: enableMajorityReadConcern});
+            0,
+            9,
+            {binVersion: "last-stable", enableMajorityReadConcern: enableMajorityReadConcern});
         replTest.awaitSecondaryNodes();
 
         // The rollback node should replay the new operation.
