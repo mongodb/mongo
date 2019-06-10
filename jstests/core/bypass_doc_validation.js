@@ -1,8 +1,6 @@
 // TODO SERVER-40402: Remove 'assumes_write_concern_unchanged' tag.
 // @tags: [
 //   assumes_write_concern_unchanged,
-//   # mapReduce does not support afterClusterTime.
-//   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
 //   requires_fastcount,
 //   requires_non_retryable_commands,
