@@ -763,7 +763,7 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
-  branch: master
+  branch: v4.2
 
 #######################################
 #         Buildvariants               #

@@ -47,7 +47,7 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
-  branch: master
+  branch: v4.2
 - name: genny
   repo: git@github.com:mongodb/genny.git
   branch: master
