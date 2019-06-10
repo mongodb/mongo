@@ -81,7 +81,7 @@
             }
             const uri = new MongoURI(db.getMongo().host);
             assert(uri.servers.some((server) => {
-                return result[0].host.toLowerCase() == getHostName() + ":" + server.port;
+                return result[0].host == getHostName() + ":" + server.port;
             }));
             const idleCursor = result[0].cursor;
             assert.eq(idleCursor.nDocsReturned, 2, result);
