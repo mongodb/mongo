@@ -205,10 +205,10 @@ StatusWith<OplogEntry> OplogEntry::parse(const BSONObj& object) {
     MONGO_UNREACHABLE;
 }
 
-OplogEntry::OplogEntry(BSONObj rawInput) : raw(std::move(rawInput)) {
-    raw = raw.getOwned();
+OplogEntry::OplogEntry(BSONObj rawInput) : _raw(std::move(rawInput)) {
+    _raw = _raw.getOwned();
 
-    parseProtected(IDLParserErrorContext("OplogEntryBase"), raw);
+    parseProtected(IDLParserErrorContext("OplogEntryBase"), _raw);
 
     // Parse command type from 'o' and 'o2' fields.
     if (isCommand()) {
@@ -307,7 +307,7 @@ OplogEntry::CommandType OplogEntry::getCommandType() const {
 }
 
 int OplogEntry::getRawObjSizeBytes() const {
-    return raw.objsize();
+    return _raw.objsize();
 }
 
 OpTime OplogEntry::getOpTime() const {
@@ -319,7 +319,7 @@ OpTime OplogEntry::getOpTime() const {
 }
 
 std::string OplogEntry::toString() const {
-    return raw.toString();
+    return _raw.toString();
 }
 
 std::ostream& operator<<(std::ostream& s, const OplogEntry& o) {
