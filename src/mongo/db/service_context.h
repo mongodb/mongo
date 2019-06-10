@@ -31,6 +31,7 @@
 
 #include <boost/optional.hpp>
 #include <functional>
+#include <list>
 #include <memory>
 #include <vector>
 
@@ -39,7 +40,6 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/service_executor.h"
@@ -271,7 +271,7 @@ public:
                                     DestructorAction destructor = {});
 
     private:
-        using ConstructorActionListIterator = stdx::list<ConstructorDestructorActions>::iterator;
+        using ConstructorActionListIterator = std::list<ConstructorDestructorActions>::iterator;
         ConstructorActionListIterator _iter;
         boost::optional<GlobalInitializerRegisterer> _registerer;
     };

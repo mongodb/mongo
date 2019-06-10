@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include <list>
 #include <map>
 
 #include "mongo/client/dbclient_connection.h"
-#include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
@@ -67,7 +67,7 @@ public:
         const Date_t creationDate;
     };
 
-    typedef stdx::list<ConnectionInfo> ConnectionList;
+    typedef std::list<ConnectionInfo> ConnectionList;
     typedef stdx::unordered_map<HostAndPort, ConnectionList> HostConnectionMap;
     typedef std::map<HostAndPort, Date_t> HostLastUsedMap;
 

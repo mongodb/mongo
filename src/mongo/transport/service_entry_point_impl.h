@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include <list>
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/transport/service_entry_point.h"
@@ -75,7 +75,7 @@ public:
     }
 
 private:
-    using SSMList = stdx::list<std::shared_ptr<ServiceStateMachine>>;
+    using SSMList = std::list<std::shared_ptr<ServiceStateMachine>>;
     using SSMListIterator = SSMList::iterator;
 
     ServiceContext* const _svcCtx;
