@@ -15,8 +15,6 @@
         "distinct",
         "find",
         "geoSearch",
-        "mapReduce",
-        "mapreduce",
     ]);
     const kDatabasesOnConfigServers = new Set(["config", "admin"]);
 
