@@ -59,7 +59,7 @@ public:
     SetElementNode(mutablebson::Element elemToSet) : _elemToSet(elemToSet) {}
 
     std::unique_ptr<UpdateNode> clone() const final {
-        return stdx::make_unique<SetElementNode>(*this);
+        return std::make_unique<SetElementNode>(*this);
     }
 
     void setCollator(const CollatorInterface* collator) final {}

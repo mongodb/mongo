@@ -37,7 +37,6 @@
 #include "mongo/base/status.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/tee.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"  // TODO: remove apple dep for this in threadlocal.h
 #include "mongo/util/time_support.h"
 
@@ -120,7 +119,7 @@ void LogstreamBuilder::makeStream() {
         if (_shouldCache && isThreadOstreamCacheInitialized && threadOstreamCache) {
             _os = std::move(threadOstreamCache);
         } else {
-            _os = stdx::make_unique<std::ostringstream>();
+            _os = std::make_unique<std::ostringstream>();
         }
     }
 }

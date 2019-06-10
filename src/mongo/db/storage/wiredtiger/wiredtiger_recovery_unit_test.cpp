@@ -103,7 +103,7 @@ public:
         params.sizeStorer = nullptr;
         params.isReadOnly = false;
 
-        auto ret = stdx::make_unique<StandardWiredTigerRecordStore>(&_engine, opCtx, params);
+        auto ret = std::make_unique<StandardWiredTigerRecordStore>(&_engine, opCtx, params);
         ret->postConstructorInit(opCtx);
         return std::move(ret);
     }

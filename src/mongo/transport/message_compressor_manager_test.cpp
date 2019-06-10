@@ -31,9 +31,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/rpc/message.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/message_compressor_noop.h"
 #include "mongo/transport/message_compressor_registry.h"
@@ -42,9 +45,6 @@
 #include "mongo/transport/message_compressor_zstd.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
-
-#include <string>
-#include <vector>
 
 namespace mongo {
 namespace {
@@ -56,7 +56,7 @@ const auto assertOk = [](auto&& sw) {
 
 MessageCompressorRegistry buildRegistry() {
     MessageCompressorRegistry ret;
-    auto compressor = stdx::make_unique<NoopMessageCompressor>();
+    auto compressor = std::make_unique<NoopMessageCompressor>();
 
     std::vector<std::string> compressorList = {compressor->getName()};
     ret.setSupportedCompressors(std::move(compressorList));
@@ -222,34 +222,34 @@ TEST(MessageCompressorManager, FullNormalCompression) {
 
 TEST(NoopMessageCompressor, Fidelity) {
     auto testMessage = buildMessage();
-    checkFidelity(testMessage, stdx::make_unique<NoopMessageCompressor>());
+    checkFidelity(testMessage, std::make_unique<NoopMessageCompressor>());
 }
 
 TEST(SnappyMessageCompressor, Fidelity) {
     auto testMessage = buildMessage();
-    checkFidelity(testMessage, stdx::make_unique<SnappyMessageCompressor>());
+    checkFidelity(testMessage, std::make_unique<SnappyMessageCompressor>());
 }
 
 TEST(ZlibMessageCompressor, Fidelity) {
     auto testMessage = buildMessage();
-    checkFidelity(testMessage, stdx::make_unique<ZlibMessageCompressor>());
+    checkFidelity(testMessage, std::make_unique<ZlibMessageCompressor>());
 }
 
 TEST(ZstdMessageCompressor, Fidelity) {
     auto testMessage = buildMessage();
-    checkFidelity(testMessage, stdx::make_unique<ZstdMessageCompressor>());
+    checkFidelity(testMessage, std::make_unique<ZstdMessageCompressor>());
 }
 
 TEST(SnappyMessageCompressor, Overflow) {
-    checkOverflow(stdx::make_unique<SnappyMessageCompressor>());
+    checkOverflow(std::make_unique<SnappyMessageCompressor>());
 }
 
 TEST(ZlibMessageCompressor, Overflow) {
-    checkOverflow(stdx::make_unique<ZlibMessageCompressor>());
+    checkOverflow(std::make_unique<ZlibMessageCompressor>());
 }
 
 TEST(ZstdMessageCompressor, Overflow) {
-    checkOverflow(stdx::make_unique<ZstdMessageCompressor>());
+    checkOverflow(std::make_unique<ZstdMessageCompressor>());
 }
 
 TEST(MessageCompressorManager, SERVER_28008) {
@@ -258,15 +258,15 @@ TEST(MessageCompressorManager, SERVER_28008) {
     // but with a different ordering for the preferred compressor.
 
     std::unique_ptr<MessageCompressorBase> zstdCompressor =
-        stdx::make_unique<ZstdMessageCompressor>();
+        std::make_unique<ZstdMessageCompressor>();
     const auto zstdId = zstdCompressor->getId();
 
     std::unique_ptr<MessageCompressorBase> zlibCompressor =
-        stdx::make_unique<ZlibMessageCompressor>();
+        std::make_unique<ZlibMessageCompressor>();
     const auto zlibId = zlibCompressor->getId();
 
     std::unique_ptr<MessageCompressorBase> snappyCompressor =
-        stdx::make_unique<SnappyMessageCompressor>();
+        std::make_unique<SnappyMessageCompressor>();
     const auto snappyId = snappyCompressor->getId();
 
     MessageCompressorRegistry registry;

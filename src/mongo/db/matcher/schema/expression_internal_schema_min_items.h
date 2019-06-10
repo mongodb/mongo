@@ -50,7 +50,7 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<InternalSchemaMinItemsMatchExpression> minItems =
-            stdx::make_unique<InternalSchemaMinItemsMatchExpression>(path(), numItems());
+            std::make_unique<InternalSchemaMinItemsMatchExpression>(path(), numItems());
         if (getTag()) {
             minItems->setTag(getTag()->clone());
         }

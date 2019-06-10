@@ -29,16 +29,16 @@
 
 #include "mongo/db/exec/limit.h"
 
+#include <memory>
+
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 // static
 const char* LimitStage::kStageType = "LIMIT";
@@ -81,8 +81,8 @@ PlanStage::StageState LimitStage::doWork(WorkingSetID* out) {
 
 unique_ptr<PlanStageStats> LimitStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_LIMIT);
-    ret->specific = make_unique<LimitStats>(_specificStats);
+    unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_LIMIT);
+    ret->specific = std::make_unique<LimitStats>(_specificStats);
     ret->children.emplace_back(child()->getStats());
     return ret;
 }

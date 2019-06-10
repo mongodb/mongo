@@ -120,7 +120,7 @@ void attachNode(MatchExpression* node,
         AndMatchExpression* andNode = static_cast<AndMatchExpression*>(target);
         andNode->add(clone.release());
     } else {
-        std::unique_ptr<AndMatchExpression> andNode = stdx::make_unique<AndMatchExpression>();
+        std::unique_ptr<AndMatchExpression> andNode = std::make_unique<AndMatchExpression>();
         IndexTag* indexTag = static_cast<IndexTag*>(clone->getTag());
         andNode->setTag(new IndexTag(indexTag->index));
         andNode->add(target);

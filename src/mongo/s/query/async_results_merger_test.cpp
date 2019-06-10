@@ -31,6 +31,8 @@
 
 #include "mongo/s/query/async_results_merger.h"
 
+#include <memory>
+
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/resume_token.h"
@@ -40,7 +42,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/query/results_merger_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -1362,7 +1363,7 @@ DEATH_TEST_F(AsyncResultsMergerTest,
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
     auto arm =
-        stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
@@ -1394,7 +1395,7 @@ DEATH_TEST_F(AsyncResultsMergerTest,
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
     auto arm =
-        stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_TRUE(arm->ready());
@@ -1429,7 +1430,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfRemoteHasLowerPostB
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
     auto arm =
-        stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -1465,7 +1466,7 @@ DEATH_TEST_F(AsyncResultsMergerTest,
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
     auto arm =
-        stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_TRUE(arm->ready());
@@ -1505,7 +1506,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorIgnoresOplogTimestamp) {
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
     auto arm =
-        stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -1531,7 +1532,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting)
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
     auto arm =
-        stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -1613,7 +1614,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
     auto arm =
-        stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -1708,7 +1709,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorReturnsHighWaterMarkSortKey) 
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
     auto arm =
-        stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
 
     // We have no results to return, so the ARM is not ready.
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -1943,7 +1944,7 @@ DEATH_TEST_F(AsyncResultsMergerTest,
 
     // This should trigger an invariant.
     ASSERT_FALSE(
-        stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params)));
+        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params)));
 }
 
 DEATH_TEST_F(AsyncResultsMergerTest,

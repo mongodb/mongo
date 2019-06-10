@@ -50,7 +50,7 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<InternalSchemaMaxLengthMatchExpression> maxLen =
-            stdx::make_unique<InternalSchemaMaxLengthMatchExpression>(path(), strLen());
+            std::make_unique<InternalSchemaMaxLengthMatchExpression>(path(), strLen());
         if (getTag()) {
             maxLen->setTag(getTag()->clone());
         }

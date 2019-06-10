@@ -92,7 +92,7 @@ void DocumentSourceMergeCursors::populateMerger() {
 
 std::unique_ptr<RouterStageMerge> DocumentSourceMergeCursors::convertToRouterStage() {
     invariant(!_blockingResultsMerger, "Expected conversion to happen before execution");
-    return stdx::make_unique<RouterStageMerge>(pExpCtx->opCtx, _executor, std::move(*_armParams));
+    return std::make_unique<RouterStageMerge>(pExpCtx->opCtx, _executor, std::move(*_armParams));
 }
 
 DocumentSource::GetNextResult DocumentSourceMergeCursors::getNext() {

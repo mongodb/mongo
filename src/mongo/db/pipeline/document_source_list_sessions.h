@@ -53,7 +53,7 @@ public:
     public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec) {
-            return stdx::make_unique<LiteParsed>(listSessionsParseSpec(kStageName, spec));
+            return std::make_unique<LiteParsed>(listSessionsParseSpec(kStageName, spec));
         }
 
         explicit LiteParsed(const ListSessionsSpec& spec) : _spec(spec) {}

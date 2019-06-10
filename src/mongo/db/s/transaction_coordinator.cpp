@@ -58,7 +58,7 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
       _scheduler(std::move(scheduler)),
       _sendPrepareScheduler(_scheduler->makeChildScheduler()),
       _transactionCoordinatorMetricsObserver(
-          stdx::make_unique<TransactionCoordinatorMetricsObserver>()) {
+          std::make_unique<TransactionCoordinatorMetricsObserver>()) {
 
     auto kickOffCommitPF = makePromiseFuture<void>();
     _kickOffCommitPromise = std::move(kickOffCommitPF.promise);

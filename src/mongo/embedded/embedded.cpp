@@ -115,7 +115,7 @@ ServiceContext::ConstructorActionRegisterer replicationManagerInitializer(
     [](ServiceContext* serviceContext) {
         repl::StorageInterface::set(serviceContext, std::make_unique<repl::StorageInterfaceImpl>());
 
-        auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext);
+        auto logicalClock = std::make_unique<LogicalClock>(serviceContext);
         LogicalClock::set(serviceContext, std::move(logicalClock));
 
         auto replCoord = std::make_unique<ReplicationCoordinatorEmbedded>(serviceContext);
@@ -313,7 +313,7 @@ ServiceContext* initialize(const char* yaml_config) {
 
     // Set up the logical session cache
     LogicalSessionCache::set(serviceContext,
-                             stdx::make_unique<LogicalSessionCacheImpl>(
+                             std::make_unique<LogicalSessionCacheImpl>(
                                  std::make_unique<ServiceLiaisonMongod>(),
                                  std::make_shared<SessionsCollectionStandalone>(),
                                  [](OperationContext*, SessionsCollection&, Date_t) {

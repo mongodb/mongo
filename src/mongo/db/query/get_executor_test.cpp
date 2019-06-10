@@ -61,7 +61,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson(queryStr));
     qr->setSort(fromjson(sortStr));
     qr->setProj(fromjson(projStr));

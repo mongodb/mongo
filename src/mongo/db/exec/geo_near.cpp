@@ -49,7 +49,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs_gen.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 #include <algorithm>

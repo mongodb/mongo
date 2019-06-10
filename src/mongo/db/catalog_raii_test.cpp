@@ -56,7 +56,7 @@ public:
     ClientAndCtx makeClientWithLocker(const std::string& clientName) {
         auto client = getServiceContext()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
-        opCtx->swapLockState(stdx::make_unique<LockerImpl>());
+        opCtx->swapLockState(std::make_unique<LockerImpl>());
         return std::make_pair(std::move(client), std::move(opCtx));
     }
 
@@ -249,7 +249,7 @@ protected:
 
 void ReadSourceScopeTest::setUp() {
     _opCtx = getClient()->makeOperationContext();
-    _opCtx->setRecoveryUnit(stdx::make_unique<RecoveryUnitMock>(),
+    _opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitMock>(),
                             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 }
 

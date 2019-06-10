@@ -44,7 +44,6 @@
 #include "mongo/db/storage/biggie/store.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/shared_buffer.h"

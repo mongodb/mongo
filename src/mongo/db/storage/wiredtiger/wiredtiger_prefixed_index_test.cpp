@@ -44,7 +44,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/system_clock_source.h"
@@ -61,7 +60,7 @@ public:
         int ret = wiredtiger_open(_dbpath.path().c_str(), NULL, config, &_conn);
         invariantWTOK(ret);
 
-        _fastClockSource = stdx::make_unique<SystemClockSource>();
+        _fastClockSource = std::make_unique<SystemClockSource>();
         _sessionCache = new WiredTigerSessionCache(_conn, _fastClockSource.get());
     }
 
@@ -101,12 +100,12 @@ public:
         invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
         if (unique)
-            return stdx::make_unique<WiredTigerIndexUnique>(&opCtx, uri, &desc, prefix);
-        return stdx::make_unique<WiredTigerIndexStandard>(&opCtx, uri, &desc, prefix);
+            return std::make_unique<WiredTigerIndexUnique>(&opCtx, uri, &desc, prefix);
+        return std::make_unique<WiredTigerIndexStandard>(&opCtx, uri, &desc, prefix);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return stdx::make_unique<WiredTigerRecoveryUnit>(_sessionCache, &_oplogManager);
+        return std::make_unique<WiredTigerRecoveryUnit>(_sessionCache, &_oplogManager);
     }
 
 private:
@@ -118,7 +117,7 @@ private:
 };
 
 std::unique_ptr<HarnessHelper> makeHarnessHelper() {
-    return stdx::make_unique<MyHarnessHelper>();
+    return std::make_unique<MyHarnessHelper>();
 }
 
 MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {

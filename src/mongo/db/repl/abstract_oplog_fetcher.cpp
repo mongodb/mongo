@@ -33,12 +33,13 @@
 
 #include "mongo/db/repl/abstract_oplog_fetcher.h"
 
+#include <memory>
+
 #include "mongo/base/counter.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -308,7 +309,7 @@ void AbstractOplogFetcher::_finishCallback(Status status) {
 std::unique_ptr<Fetcher> AbstractOplogFetcher::_makeFetcher(const BSONObj& findCommandObj,
                                                             const BSONObj& metadataObj,
                                                             Milliseconds findMaxTime) {
-    return stdx::make_unique<Fetcher>(
+    return std::make_unique<Fetcher>(
         _getExecutor(),
         _source,
         _nss.db().toString(),

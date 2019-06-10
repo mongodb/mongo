@@ -42,7 +42,7 @@ StatusWithMatchExpression ExtensionsCallbackNoop::parseText(BSONElement text) co
         return textParams.getStatus();
     }
 
-    auto expr = stdx::make_unique<TextNoOpMatchExpression>(std::move(textParams.getValue()));
+    auto expr = std::make_unique<TextNoOpMatchExpression>(std::move(textParams.getValue()));
 
     return {std::move(expr)};
 }
@@ -53,7 +53,7 @@ StatusWithMatchExpression ExtensionsCallbackNoop::parseWhere(BSONElement where) 
         return whereParams.getStatus();
     }
 
-    return {stdx::make_unique<WhereNoOpMatchExpression>(std::move(whereParams.getValue()))};
+    return {std::make_unique<WhereNoOpMatchExpression>(std::move(whereParams.getValue()))};
 }
 
 }  // namespace mongo

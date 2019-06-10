@@ -206,7 +206,7 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
       _indexCatalog(
           std::make_unique<IndexCatalogImpl>(this, getCatalogEntry()->getMaxAllowedIndexes())),
       _cappedNotifier(_recordStore && _recordStore->isCapped()
-                          ? stdx::make_unique<CappedInsertNotifier>()
+                          ? std::make_unique<CappedInsertNotifier>()
                           : nullptr) {
     if (isCapped())
         _recordStore->setCappedCallback(this);
@@ -1229,7 +1229,7 @@ void _reportValidationResults(OperationContext* opCtx,
 
     std::unique_ptr<BSONObjBuilder> indexDetails;
     if (level == kValidateFull) {
-        indexDetails = stdx::make_unique<BSONObjBuilder>();
+        indexDetails = std::make_unique<BSONObjBuilder>();
     }
 
     // Report index validation results.

@@ -58,9 +58,9 @@ const NamespaceString kTestNss{"test.collection"};
 class CursorManagerTest : public unittest::Test {
 public:
     CursorManagerTest()
-        : _queryServiceContext(stdx::make_unique<QueryTestServiceContext>()),
+        : _queryServiceContext(std::make_unique<QueryTestServiceContext>()),
           _opCtx(_queryServiceContext->makeOperationContext()) {
-        _opCtx->getServiceContext()->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
+        _opCtx->getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
         _clock =
             static_cast<ClockSourceMock*>(_opCtx->getServiceContext()->getPreciseClockSource());
     }
@@ -71,8 +71,8 @@ public:
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor(
         OperationContext* opCtx) {
-        auto workingSet = stdx::make_unique<WorkingSet>();
-        auto queuedDataStage = stdx::make_unique<QueuedDataStage>(opCtx, workingSet.get());
+        auto workingSet = std::make_unique<WorkingSet>();
+        auto queuedDataStage = std::make_unique<QueuedDataStage>(opCtx, workingSet.get());
         return unittest::assertGet(PlanExecutor::make(opCtx,
                                                       std::move(workingSet),
                                                       std::move(queuedDataStage),

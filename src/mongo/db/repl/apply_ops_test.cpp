@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
@@ -40,7 +42,6 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/logger/logger.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace repl {
@@ -91,7 +92,7 @@ void ApplyOpsTest::setUp() {
     auto opCtx = cc().makeOperationContext();
 
     // Set up ReplicationCoordinator and create oplog.
-    ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
+    ReplicationCoordinator::set(service, std::make_unique<ReplicationCoordinatorMock>(service));
     setOplogCollectionName(service);
     createOplog(opCtx.get());
 
@@ -100,13 +101,13 @@ void ApplyOpsTest::setUp() {
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_PRIMARY));
 
     // Use OpObserverMock to track notifications for applyOps().
-    auto opObserver = stdx::make_unique<OpObserverMock>();
+    auto opObserver = std::make_unique<OpObserverMock>();
     _opObserver = opObserver.get();
     service->setOpObserver(std::move(opObserver));
 
     // This test uses StorageInterface to create collections and inspect documents inside
     // collections.
-    _storage = stdx::make_unique<StorageInterfaceImpl>();
+    _storage = std::make_unique<StorageInterfaceImpl>();
 }
 
 void ApplyOpsTest::tearDown() {

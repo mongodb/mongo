@@ -613,7 +613,7 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
     BSONObjBuilder bob;
 
     Lock::DBLock lk(_opCtx.get(), nss.db(), MODE_IX);
-    auto lock = stdx::make_unique<Lock::CollectionLock>(_opCtx.get(), nss, MODE_X);
+    auto lock = std::make_unique<Lock::CollectionLock>(_opCtx.get(), nss, MODE_X);
     ASSERT_OK(collection->validate(_opCtx.get(), kValidateFull, false, &validateResults, &bob));
     ASSERT_TRUE(validateResults.valid);
 

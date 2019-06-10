@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
 #include <set>
 #include <string>
 
@@ -39,7 +40,6 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/config_server_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point_service.h"
@@ -57,16 +57,16 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        auto clockSource = stdx::make_unique<ClockSourceMock>();
+        auto clockSource = std::make_unique<ClockSourceMock>();
         // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
         // real second.
         clockSource->advance(Seconds(1));
 
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
-        auto catalogClient = stdx::make_unique<KeysCollectionClientSharded>(
+        auto catalogClient = std::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
         _keyManager =
-            stdx::make_unique<KeysCollectionManager>("dummy", std::move(catalogClient), Seconds(1));
+            std::make_unique<KeysCollectionManager>("dummy", std::move(catalogClient), Seconds(1));
     }
 
     void tearDown() override {
@@ -81,7 +81,7 @@ protected:
      */
     std::unique_ptr<DistLockManager> makeDistLockManager(
         std::unique_ptr<DistLockCatalog> distLockCatalog) override {
-        return stdx::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
+        return std::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
     }
 
 private:

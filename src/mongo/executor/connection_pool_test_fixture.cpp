@@ -31,7 +31,8 @@
 
 #include "mongo/executor/connection_pool_test_fixture.h"
 
-#include "mongo/stdx/memory.h"
+#include <memory>
+
 
 namespace mongo {
 namespace executor {
@@ -226,7 +227,7 @@ std::shared_ptr<ConnectionPool::ConnectionInterface> PoolImpl::makeConnection(
 }
 
 std::shared_ptr<ConnectionPool::TimerInterface> PoolImpl::makeTimer() {
-    return stdx::make_unique<TimerImpl>(this);
+    return std::make_unique<TimerImpl>(this);
 }
 
 const std::shared_ptr<OutOfLineExecutor>& PoolImpl::getExecutor() {

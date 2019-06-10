@@ -123,10 +123,10 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeInitialSyncOpl
         invariant(initialSyncOplogBufferPeekCacheSize >= 0);
         OplogBufferCollection::Options options;
         options.peekCacheSize = std::size_t(initialSyncOplogBufferPeekCacheSize);
-        return stdx::make_unique<OplogBufferProxy>(
-            stdx::make_unique<OplogBufferCollection>(StorageInterface::get(opCtx), options));
+        return std::make_unique<OplogBufferProxy>(
+            std::make_unique<OplogBufferCollection>(StorageInterface::get(opCtx), options));
     } else {
-        return stdx::make_unique<OplogBufferBlockingQueue>();
+        return std::make_unique<OplogBufferBlockingQueue>();
     }
 }
 

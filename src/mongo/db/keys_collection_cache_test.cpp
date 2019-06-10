@@ -48,7 +48,7 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        _catalogClient = stdx::make_unique<KeysCollectionClientSharded>(
+        _catalogClient = std::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
     }
 

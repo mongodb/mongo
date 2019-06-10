@@ -31,9 +31,9 @@
 
 #include <algorithm>
 #include <array>
+#include <memory>
 
 #include "mongo/db/matcher/expression.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -123,7 +123,7 @@ public:
                            return orig ? orig->shallowClone()
                                        : std::unique_ptr<MatchExpression>(nullptr);
                        });
-        std::unique_ptr<T> clone = stdx::make_unique<T>(std::move(clonedExpressions));
+        std::unique_ptr<T> clone = std::make_unique<T>(std::move(clonedExpressions));
 
         if (getTag()) {
             clone->setTag(getTag()->clone());

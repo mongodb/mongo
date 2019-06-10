@@ -100,8 +100,8 @@ struct ThrowingObserver : public TestObserver {
 
 struct OpObserverRegistryTest : public unittest::Test {
     NamespaceString testNss = {"test", "coll"};
-    std::unique_ptr<TestObserver> unique1 = stdx::make_unique<TestObserver>();
-    std::unique_ptr<TestObserver> unique2 = stdx::make_unique<TestObserver>();
+    std::unique_ptr<TestObserver> unique1 = std::make_unique<TestObserver>();
+    std::unique_ptr<TestObserver> unique2 = std::make_unique<TestObserver>();
     TestObserver* observer1 = unique1.get();
     TestObserver* observer2 = unique2.get();
     OpObserverRegistry registry;
@@ -149,7 +149,7 @@ TEST_F(OpObserverRegistryTest, TwoObservers) {
 
 TEST_F(OpObserverRegistryTest, ThrowingObserver1) {
     OperationContextNoop opCtx;
-    unique1 = stdx::make_unique<ThrowingObserver>();
+    unique1 = std::make_unique<ThrowingObserver>();
     observer1 = unique1.get();
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));
@@ -160,7 +160,7 @@ TEST_F(OpObserverRegistryTest, ThrowingObserver1) {
 
 TEST_F(OpObserverRegistryTest, ThrowingObserver2) {
     OperationContextNoop opCtx;
-    unique2 = stdx::make_unique<ThrowingObserver>();
+    unique2 = std::make_unique<ThrowingObserver>();
     observer2 = unique1.get();
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));

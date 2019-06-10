@@ -60,7 +60,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const final {
         auto maxProperties =
-            stdx::make_unique<InternalSchemaMaxPropertiesMatchExpression>(numProperties());
+            std::make_unique<InternalSchemaMaxPropertiesMatchExpression>(numProperties());
         if (getTag()) {
             maxProperties->setTag(getTag()->clone());
         }

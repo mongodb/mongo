@@ -129,7 +129,7 @@ void BaseClonerTest::setUp() {
     options.minThreads = 1U;
     options.maxThreads = 1U;
     options.onCreateThread = [](StringData threadName) { Client::initThread(threadName); };
-    dbWorkThreadPool = stdx::make_unique<ThreadPool>(options);
+    dbWorkThreadPool = std::make_unique<ThreadPool>(options);
     dbWorkThreadPool->startup();
 
     storageInterface.reset(new StorageInterfaceMock());

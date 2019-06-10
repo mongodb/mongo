@@ -155,7 +155,7 @@ public:
               << " query: " << redact(query) << " " << (copyIndexes ? "" : ", not copying indexes");
 
         Cloner cloner;
-        auto myconn = stdx::make_unique<DBClientConnection>();
+        auto myconn = std::make_unique<DBClientConnection>();
         if (!myconn->connect(HostAndPort(fromhost), StringData(), errmsg))
             return false;
 

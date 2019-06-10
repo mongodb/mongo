@@ -44,6 +44,7 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <signal.h>
 #include <vector>
 
@@ -64,7 +65,6 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -587,7 +587,7 @@ void ProgramRunner::launchProcess(int child_stdout) {
     // Reserve space for the final NULL character which terminates the environment block
     environmentBlockSize += 1;
 
-    auto lpEnvironment = stdx::make_unique<wchar_t[]>(environmentBlockSize);
+    auto lpEnvironment = std::make_unique<wchar_t[]>(environmentBlockSize);
     size_t environmentOffset = 0;
     for (const std::wstring& envKeyValue : nativeEnvStrings) {
         // Ensure there is enough room to write the string, the string's NULL byte, and the block's

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -40,7 +41,6 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/strategy.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 

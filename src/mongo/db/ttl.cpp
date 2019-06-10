@@ -255,7 +255,7 @@ private:
         const char* keyFieldName = key.firstElement().fieldName();
         BSONObj query =
             BSON(keyFieldName << BSON("$gte" << kDawnOfTime << "$lte" << expirationTime));
-        auto qr = stdx::make_unique<QueryRequest>(collectionNSS);
+        auto qr = std::make_unique<QueryRequest>(collectionNSS);
         qr->setFilter(query);
         auto canonicalQuery = CanonicalQuery::canonicalize(opCtx, std::move(qr));
         invariant(canonicalQuery.getStatus());

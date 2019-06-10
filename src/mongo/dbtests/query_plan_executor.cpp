@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -52,7 +54,6 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace {
@@ -60,7 +61,6 @@ namespace {
 using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
-using stdx::make_unique;
 
 static const NamespaceString nss("unittests.QueryPlanExecutor");
 
@@ -106,7 +106,7 @@ public:
         unique_ptr<WorkingSet> ws(new WorkingSet());
 
         // Canonicalize the query.
-        auto qr = stdx::make_unique<QueryRequest>(nss);
+        auto qr = std::make_unique<QueryRequest>(nss);
         qr->setFilter(filterObj);
         qr->setTailableMode(tailableMode);
         auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
@@ -154,7 +154,7 @@ public:
         IndexScan* ix = new IndexScan(&_opCtx, ixparams, ws.get(), NULL);
         unique_ptr<PlanStage> root(new FetchStage(&_opCtx, ws.get(), ix, NULL, coll));
 
-        auto qr = stdx::make_unique<QueryRequest>(nss);
+        auto qr = std::make_unique<QueryRequest>(nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
@@ -218,8 +218,8 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
     auto pipeline = assertGet(Pipeline::create({cursorSource}, expCtx));
 
     // Create the output PlanExecutor that pulls results from the pipeline.
-    auto ws = make_unique<WorkingSet>();
-    auto proxy = make_unique<PipelineProxyStage>(&_opCtx, std::move(pipeline), ws.get());
+    auto ws = std::make_unique<WorkingSet>();
+    auto proxy = std::make_unique<PipelineProxyStage>(&_opCtx, std::move(pipeline), ws.get());
 
     auto statusWithPlanExecutor = PlanExecutor::make(
         &_opCtx, std::move(ws), std::move(proxy), collection, PlanExecutor::NO_YIELD);

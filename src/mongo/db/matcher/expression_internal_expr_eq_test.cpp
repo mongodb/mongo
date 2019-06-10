@@ -291,7 +291,7 @@ TEST(InternalExprEqMatchExpression, EquivalentToClone) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     Matcher eq(query, expCtx);
     eq.getMatchExpression()->setCollator(&collator);
-    auto relevantTag = stdx::make_unique<RelevantTag>();
+    auto relevantTag = std::make_unique<RelevantTag>();
     relevantTag->first.push_back(0u);
     relevantTag->notFirst.push_back(1u);
     eq.getMatchExpression()->setTag(relevantTag.release());

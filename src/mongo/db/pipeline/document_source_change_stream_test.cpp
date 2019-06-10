@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
+#include <memory>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
@@ -54,7 +55,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/transaction_history_iterator.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
@@ -116,7 +116,7 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
     // For tests of transactions that involve multiple oplog entries.
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
         repl::OpTime time) const {
-        auto iterator = stdx::make_unique<MockTransactionHistoryIterator>();
+        auto iterator = std::make_unique<MockTransactionHistoryIterator>();
 
         // Simulate a lookup on the oplog timestamp by manually advancing the iterator until we
         // reach the desired timestamp.
@@ -161,7 +161,7 @@ public:
     explicit ChangeStreamStageTest(NamespaceString nsString)
         : ChangeStreamStageTestNoSetup(nsString) {
         repl::ReplicationCoordinator::set(getExpCtx()->opCtx->getServiceContext(),
-                                          stdx::make_unique<repl::ReplicationCoordinatorMock>(
+                                          std::make_unique<repl::ReplicationCoordinatorMock>(
                                               getExpCtx()->opCtx->getServiceContext()));
     }
 
@@ -175,7 +175,7 @@ public:
         auto closeCursor = stages.back();
 
         getExpCtx()->mongoProcessInterface =
-            stdx::make_unique<MockMongoInterface>(docKeyFields, transactionEntries);
+            std::make_unique<MockMongoInterface>(docKeyFields, transactionEntries);
 
         auto next = closeCursor->getNext();
         // Match stage should pass the doc down if expectedDoc is given.
@@ -202,7 +202,7 @@ public:
             DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
         vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
         getExpCtx()->mongoProcessInterface =
-            stdx::make_unique<MockMongoInterface>(std::vector<FieldPath>{});
+            std::make_unique<MockMongoInterface>(std::vector<FieldPath>{});
 
         // This match stage is a DocumentSourceOplogMatch, which we explicitly disallow from
         // executing as a safety mechanism, since it needs to use the collection-default collation,
@@ -1120,7 +1120,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->mongoProcessInterface = stdx::make_unique<MockMongoInterface>(
+    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
         std::vector<FieldPath>{},
         std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1});
 
@@ -1249,7 +1249,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->mongoProcessInterface = stdx::make_unique<MockMongoInterface>(
+    getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
         std::vector<FieldPath>{},
         std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1});
 

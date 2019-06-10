@@ -58,7 +58,7 @@ bool InternalExprEqMatchExpression::matchesSingleElement(const BSONElement& elem
 }
 
 std::unique_ptr<MatchExpression> InternalExprEqMatchExpression::shallowClone() const {
-    auto clone = stdx::make_unique<InternalExprEqMatchExpression>(path(), _rhs);
+    auto clone = std::make_unique<InternalExprEqMatchExpression>(path(), _rhs);
     clone->setCollator(_collator);
     if (getTag()) {
         clone->setTag(getTag()->clone());

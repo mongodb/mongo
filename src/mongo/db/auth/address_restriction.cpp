@@ -29,10 +29,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/address_restriction_gen.h"
 #include "mongo/db/server_options.h"
-#include "mongo/stdx/memory.h"
 
 constexpr mongo::StringData mongo::address_restriction_detail::ClientSource::label;
 constexpr mongo::StringData mongo::address_restriction_detail::ClientSource::field;
@@ -48,12 +49,12 @@ mongo::StatusWith<mongo::RestrictionSet<>> mongo::parseAddressRestrictionSet(
 
     const boost::optional<std::vector<StringData>>& client = ar.getClientSource();
     if (client) {
-        vec.push_back(stdx::make_unique<ClientSourceRestriction>(client.get()));
+        vec.push_back(std::make_unique<ClientSourceRestriction>(client.get()));
     }
 
     const boost::optional<std::vector<StringData>>& server = ar.getServerAddress();
     if (server) {
-        vec.push_back(stdx::make_unique<ServerAddressRestriction>(server.get()));
+        vec.push_back(std::make_unique<ServerAddressRestriction>(server.get()));
     }
 
     if (vec.empty()) {
@@ -88,7 +89,7 @@ mongo::StatusWith<mongo::SharedRestrictionDocument> mongo::parseAuthenticationRe
         }
 
         doc.emplace_back(
-            stdx::make_unique<document_type::element_type>(std::move(restriction.getValue())));
+            std::make_unique<document_type::element_type>(std::move(restriction.getValue())));
     }
 
     return std::make_shared<document_type>(std::move(doc));

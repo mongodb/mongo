@@ -34,6 +34,7 @@
 #include "mongo/db/exec/update_stage.h"
 
 #include <algorithm>
+#include <memory>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
@@ -53,7 +54,6 @@
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -67,7 +67,6 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeThrowWouldChangeOwningShard);
 using std::string;
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 namespace mb = mutablebson;
 
@@ -878,8 +877,8 @@ void UpdateStage::doRestoreStateRequiresCollection() {
 
 unique_ptr<PlanStageStats> UpdateStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_UPDATE);
-    ret->specific = make_unique<UpdateStats>(_specificStats);
+    unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_UPDATE);
+    ret->specific = std::make_unique<UpdateStats>(_specificStats);
     ret->children.emplace_back(child()->getStats());
     return ret;
 }

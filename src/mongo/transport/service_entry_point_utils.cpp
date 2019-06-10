@@ -34,8 +34,8 @@
 #include "mongo/transport/service_entry_point_utils.h"
 
 #include <functional>
+#include <memory>
 
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
@@ -91,7 +91,7 @@ Status launchServiceWorkerThread(std::function<void()> task) {
         }
 
         pthread_t thread;
-        auto ctx = stdx::make_unique<std::function<void()>>(std::move(task));
+        auto ctx = std::make_unique<std::function<void()>>(std::move(task));
         int failed = pthread_create(&thread, &attrs, runFunc, ctx.get());
 
         pthread_attr_destroy(&attrs);

@@ -34,6 +34,7 @@
 #include <boost/filesystem.hpp>
 #include <fstream>
 #include <memory>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -45,7 +46,6 @@
 #include "mongo/db/ftdc/ftdc_system_stats.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {
@@ -211,7 +211,7 @@ void startFTDC(boost::filesystem::path& path,
 
     ftdcDirectoryPathParameter = path;
 
-    auto controller = stdx::make_unique<FTDCController>(path, config);
+    auto controller = std::make_unique<FTDCController>(path, config);
 
     // Install periodic collectors
     // These are collected on the period interval in FTDCConfig.
@@ -225,7 +225,7 @@ void startFTDC(boost::filesystem::path& path,
     // migrations.
     // "timing" is filtered out because it triggers frequent schema changes.
     // TODO: do we need to enable "sharding" on MongoS?
-    controller->addPeriodicCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+    controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
         "serverStatus",
         "serverStatus",
         "",
@@ -241,15 +241,15 @@ void startFTDC(boost::filesystem::path& path,
     // These are collected on each file rotation.
 
     // CmdBuildInfo
-    controller->addOnRotateCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+    controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
         "buildInfo", "buildInfo", "", BSON("buildInfo" << 1)));
 
     // CmdGetCmdLineOpts
-    controller->addOnRotateCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+    controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
         "getCmdLineOpts", "getCmdLineOpts", "", BSON("getCmdLineOpts" << 1)));
 
     // HostInfoCmd
-    controller->addOnRotateCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+    controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
         "hostInfo", "hostInfo", "", BSON("hostInfo" << 1)));
 
     // Install the new controller

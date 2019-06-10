@@ -32,6 +32,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 
 #include <cmath>
+#include <memory>
 #include <pcrecpp.h>
 
 #include "mongo/bson/bsonelement_comparator.h"
@@ -43,7 +44,6 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/regex_util.h"
 #include "mongo/util/str.h"
 
@@ -367,7 +367,7 @@ InMatchExpression::InMatchExpression(StringData path)
       _eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, _collator) {}
 
 std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
-    auto next = stdx::make_unique<InMatchExpression>(path());
+    auto next = std::make_unique<InMatchExpression>(path());
     next->setCollator(_collator);
     if (getTag()) {
         next->setTag(getTag()->clone());
@@ -551,7 +551,7 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
             auto& childRe = regexList.front();
             invariant(!childRe->getTag());
 
-            auto simplifiedExpression = stdx::make_unique<RegexMatchExpression>(
+            auto simplifiedExpression = std::make_unique<RegexMatchExpression>(
                 expression->path(), childRe->getString(), childRe->getFlags());
             if (expression->getTag()) {
                 simplifiedExpression->setTag(expression->getTag()->clone());
@@ -559,7 +559,7 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
             return std::move(simplifiedExpression);
         } else if (equalitySet.size() == 1 && regexList.empty()) {
             // Simplify IN of exactly one equality to be an EqualityMatchExpression.
-            auto simplifiedExpression = stdx::make_unique<EqualityMatchExpression>(
+            auto simplifiedExpression = std::make_unique<EqualityMatchExpression>(
                 expression->path(), *(equalitySet.begin()));
             simplifiedExpression->setCollator(collator);
             if (expression->getTag()) {

@@ -56,7 +56,7 @@ std::unique_ptr<InternalSchemaCondMatchExpression> createCondMatchExpression(BSO
          std::move(thenBranchExpr.getValue()),
          std::move(elseBranchExpr.getValue())}};
 
-    auto cond = stdx::make_unique<InternalSchemaCondMatchExpression>(std::move(expressions));
+    auto cond = std::make_unique<InternalSchemaCondMatchExpression>(std::move(expressions));
 
     return cond;
 }

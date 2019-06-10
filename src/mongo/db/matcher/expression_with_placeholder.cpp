@@ -111,7 +111,7 @@ StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> ExpressionWithPlaceholder
     }
 
     auto exprWithPlaceholder =
-        stdx::make_unique<ExpressionWithPlaceholder>(std::move(placeholder), std::move(filter));
+        std::make_unique<ExpressionWithPlaceholder>(std::move(placeholder), std::move(filter));
     return {std::move(exprWithPlaceholder)};
 }
 

@@ -33,6 +33,8 @@
 
 #include "mongo/db/exec/index_scan.h"
 
+#include <memory>
+
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/filter.h"
@@ -41,7 +43,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace {
@@ -276,8 +277,8 @@ std::unique_ptr<PlanStageStats> IndexScan::getStats() {
     }
 
     std::unique_ptr<PlanStageStats> ret =
-        stdx::make_unique<PlanStageStats>(_commonStats, STAGE_IXSCAN);
-    ret->specific = stdx::make_unique<IndexScanStats>(_specificStats);
+        std::make_unique<PlanStageStats>(_commonStats, STAGE_IXSCAN);
+    ret->specific = std::make_unique<IndexScanStats>(_specificStats);
     return ret;
 }
 

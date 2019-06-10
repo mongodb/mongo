@@ -33,6 +33,8 @@
 
 #include "mongo/db/cursor_manager.h"
 
+#include <memory>
+
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/init.h"
 #include "mongo/db/audit.h"
@@ -51,7 +53,6 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
@@ -66,7 +67,7 @@ const auto serviceCursorManager =
 
 ServiceContext::ConstructorActionRegisterer cursorManagerRegisterer{
     "CursorManagerRegisterer", [](ServiceContext* svcCtx) {
-        auto cursorManager = stdx::make_unique<CursorManager>();
+        auto cursorManager = std::make_unique<CursorManager>();
         CursorManager::set(svcCtx, std::move(cursorManager));
     }};
 }  // namespace
@@ -99,8 +100,8 @@ std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(
 }
 
 CursorManager::CursorManager()
-    : _random(stdx::make_unique<PseudoRandom>(SecureRandom::create()->nextInt64())),
-      _cursorMap(stdx::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>()) {}
+    : _random(std::make_unique<PseudoRandom>(SecureRandom::create()->nextInt64())),
+      _cursorMap(std::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>()) {}
 
 CursorManager::~CursorManager() {
     auto allPartitions = _cursorMap->lockAllPartitions();

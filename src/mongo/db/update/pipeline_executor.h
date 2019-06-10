@@ -30,6 +30,7 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -37,7 +38,6 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/update/update_executor.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 

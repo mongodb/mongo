@@ -40,7 +40,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
@@ -93,20 +92,20 @@ public:
     }
 };
 
-#define COMMON_EXECUTOR_TEST(TEST_NAME)                                         \
-    class CET_##TEST_NAME : public CommonTaskExecutorTestFixture {              \
-    public:                                                                     \
-        CET_##TEST_NAME(ExecutorFactory makeExecutor)                           \
-            : CommonTaskExecutorTestFixture(std::move(makeExecutor)) {}         \
-                                                                                \
-    private:                                                                    \
-        void _doTest() override;                                                \
-        static const CetRegistrationAgent _agent;                               \
-    };                                                                          \
-    const CetRegistrationAgent CET_##TEST_NAME::_agent(                         \
-        #TEST_NAME, [](ExecutorFactory makeExecutor) {                          \
-            return stdx::make_unique<CET_##TEST_NAME>(std::move(makeExecutor)); \
-        });                                                                     \
+#define COMMON_EXECUTOR_TEST(TEST_NAME)                                        \
+    class CET_##TEST_NAME : public CommonTaskExecutorTestFixture {             \
+    public:                                                                    \
+        CET_##TEST_NAME(ExecutorFactory makeExecutor)                          \
+            : CommonTaskExecutorTestFixture(std::move(makeExecutor)) {}        \
+                                                                               \
+    private:                                                                   \
+        void _doTest() override;                                               \
+        static const CetRegistrationAgent _agent;                              \
+    };                                                                         \
+    const CetRegistrationAgent CET_##TEST_NAME::_agent(                        \
+        #TEST_NAME, [](ExecutorFactory makeExecutor) {                         \
+            return std::make_unique<CET_##TEST_NAME>(std::move(makeExecutor)); \
+        });                                                                    \
     void CET_##TEST_NAME::_doTest()
 
 auto makeSetStatusClosure(Status* target) {
@@ -336,7 +335,7 @@ COMMON_EXECUTOR_TEST(EventWaitingWithTimeoutTest) {
 
     auto serviceContext = ServiceContext::make();
 
-    serviceContext->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+    serviceContext->setFastClockSource(std::make_unique<ClockSourceMock>());
     auto mockClock = static_cast<ClockSourceMock*>(serviceContext->getFastClockSource());
 
     auto client = serviceContext->makeClient("for testing");
@@ -358,7 +357,7 @@ COMMON_EXECUTOR_TEST(EventSignalWithTimeoutTest) {
 
     auto serviceContext = ServiceContext::make();
 
-    serviceContext->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+    serviceContext->setFastClockSource(std::make_unique<ClockSourceMock>());
     auto mockClock = static_cast<ClockSourceMock*>(serviceContext->getFastClockSource());
 
     auto client = serviceContext->makeClient("for testing");

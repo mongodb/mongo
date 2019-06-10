@@ -33,6 +33,8 @@
 
 #include "mongo/scripting/mozjs/implscope.h"
 
+#include <memory>
+
 #include <js/CharacterEncoding.h>
 #include <jscustomallocator.h>
 #include <jsfriendapi.h>
@@ -45,7 +47,6 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"

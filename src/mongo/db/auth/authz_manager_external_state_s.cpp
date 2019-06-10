@@ -44,7 +44,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
 
@@ -94,7 +93,7 @@ Status AuthzManagerExternalStateMongos::initialize(OperationContext* opCtx) {
 
 std::unique_ptr<AuthzSessionExternalState>
 AuthzManagerExternalStateMongos::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
-    return stdx::make_unique<AuthzSessionExternalStateMongos>(authzManager);
+    return std::make_unique<AuthzSessionExternalStateMongos>(authzManager);
 }
 
 Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationContext* opCtx,

@@ -32,7 +32,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 /**
@@ -108,7 +107,7 @@ public:
 
     template <typename... Args>
     DeathTest(Args&&... args)
-        : DeathTestImpl([args...]() { return stdx::make_unique<T>(args...); }) {}
+        : DeathTestImpl([args...]() { return std::make_unique<T>(args...); }) {}
 
 private:
     std::string getPattern() override {

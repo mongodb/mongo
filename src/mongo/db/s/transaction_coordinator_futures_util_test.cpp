@@ -315,7 +315,7 @@ protected:
             }
         };
 
-        return stdx::make_unique<StaticCatalogClient>();
+        return std::make_unique<StaticCatalogClient>();
     }
 
     static std::vector<ShardId> makeThreeShardIdsList() {

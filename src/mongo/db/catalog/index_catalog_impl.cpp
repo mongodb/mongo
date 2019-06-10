@@ -113,7 +113,7 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
 
         BSONObj keyPattern = spec.getObjectField("key");
         auto descriptor =
-            stdx::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
+            std::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
         const bool initFromDisk = true;
         const bool isReadyIndex = true;
         IndexCatalogEntry* entry =
@@ -1232,7 +1232,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
     // Re-register this index in the index catalog with the new spec.
     auto newDesc =
-        stdx::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
+        std::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
     const bool initFromDisk = false;
     const bool isReadyIndex = true;
     const IndexCatalogEntry* newEntry =

@@ -48,7 +48,7 @@ class PeriodicRunnerImplTestNoSetup : public ServiceContextTest {
 public:
     void setUp() override {
         _clockSource = std::make_unique<ClockSourceMock>();
-        _runner = stdx::make_unique<PeriodicRunnerImpl>(getServiceContext(), _clockSource.get());
+        _runner = std::make_unique<PeriodicRunnerImpl>(getServiceContext(), _clockSource.get());
     }
 
     void tearDown() override {

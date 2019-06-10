@@ -131,7 +131,7 @@ public:
         BSONObj spec = builder.append("name", key).append("ns", collNs.ns()).append("v", 2).done();
 
         auto descriptor =
-            stdx::make_unique<IndexDescriptor>(coll, IndexNames::findPluginName(spec), spec);
+            std::make_unique<IndexDescriptor>(coll, IndexNames::findPluginName(spec), spec);
 
         CollectionCatalogEntry* cce =
             CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);

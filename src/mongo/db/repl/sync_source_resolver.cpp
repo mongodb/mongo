@@ -33,12 +33,13 @@
 
 #include "mongo/db/repl/sync_source_resolver.h"
 
+#include <memory>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
@@ -165,7 +166,7 @@ StatusWith<HostAndPort> SyncSourceResolver::_chooseNewSyncSource() {
 
 std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
     HostAndPort candidate, OpTime earliestOpTimeSeen) {
-    return stdx::make_unique<Fetcher>(
+    return std::make_unique<Fetcher>(
         _taskExecutor,
         candidate,
         kLocalOplogNss.db().toString(),
@@ -189,7 +190,7 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
                                                                         int rbid) {
     // This query is structured so that it is executed on the sync source using the oplog
     // start hack (oplogReplay=true and $gt/$gte predicate over "ts").
-    return stdx::make_unique<Fetcher>(
+    return std::make_unique<Fetcher>(
         _taskExecutor,
         candidate,
         kLocalOplogNss.db().toString(),

@@ -163,7 +163,7 @@ private:
             loosestBounds = IndexBoundsBuilder::EXACT;
 
             if (MatchExpression::OR == root->matchType()) {
-                curOr = stdx::make_unique<OrMatchExpression>();
+                curOr = std::make_unique<OrMatchExpression>();
             }
         }
 

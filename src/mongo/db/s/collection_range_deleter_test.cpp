@@ -113,7 +113,7 @@ protected:
     }
 
     std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration() override {
-        return stdx::make_unique<BalancerConfiguration>();
+        return std::make_unique<BalancerConfiguration>();
     }
 
 private:

@@ -34,6 +34,7 @@
 #include "mongo/db/repl/oplog.h"
 
 #include <deque>
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -88,7 +89,6 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/fail_point_service.h"
@@ -594,7 +594,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         oplogLink.prevOpTime = txnParticipant.getLastWriteOpTime();
     }
 
-    auto timestamps = stdx::make_unique<Timestamp[]>(count);
+    auto timestamps = std::make_unique<Timestamp[]>(count);
     std::vector<OpTime> opTimes;
     for (size_t i = 0; i < count; i++) {
         // Make a mutable copy.

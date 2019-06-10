@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/index_catalog_entry_impl.h"
 
 #include <algorithm>
+#include <memory>
 
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -49,7 +50,6 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_participant.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 

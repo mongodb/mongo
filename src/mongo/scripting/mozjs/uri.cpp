@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <memory>
 
 #include "mongo/client/mongo_uri.h"
 #include "mongo/scripting/mozjs/implscope.h"
@@ -40,7 +41,6 @@
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

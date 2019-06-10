@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
@@ -40,7 +42,6 @@
 #include "mongo/db/time_proof_service.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/config_server_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
@@ -57,9 +58,9 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        auto clockSource = stdx::make_unique<ClockSourceMock>();
+        auto clockSource = std::make_unique<ClockSourceMock>();
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
-        auto catalogClient = stdx::make_unique<KeysCollectionClientSharded>(
+        auto catalogClient = std::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
 
         const LogicalTime currentTime(LogicalTime(Timestamp(1, 0)));
@@ -67,7 +68,7 @@ protected:
 
         _keyManager = std::make_shared<KeysCollectionManager>(
             "dummy", std::move(catalogClient), Seconds(1000));
-        _validator = stdx::make_unique<LogicalTimeValidator>(_keyManager);
+        _validator = std::make_unique<LogicalTimeValidator>(_keyManager);
         _validator->init(operationContext()->getServiceContext());
     }
 
@@ -82,7 +83,7 @@ protected:
      */
     std::unique_ptr<DistLockManager> makeDistLockManager(
         std::unique_ptr<DistLockCatalog> distLockCatalog) override {
-        return stdx::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
+        return std::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
     }
 
     /**

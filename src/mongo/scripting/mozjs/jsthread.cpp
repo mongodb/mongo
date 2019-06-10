@@ -33,15 +33,15 @@
 
 #include "mongo/scripting/mozjs/jsthread.h"
 
-#include "vm/PosixNSPR.h"
 #include <cstdio>
+#include <memory>
+#include <vm/PosixNSPR.h>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"

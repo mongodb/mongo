@@ -29,9 +29,10 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/db/update/modifier_node.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 

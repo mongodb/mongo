@@ -76,7 +76,7 @@ void batchErrorToLastError(const BatchedCommandRequest& request,
 
     if (!response.getOk()) {
         // Command-level error, all writes failed
-        commandError = stdx::make_unique<WriteErrorDetail>();
+        commandError = std::make_unique<WriteErrorDetail>();
         commandError->setStatus(response.getTopLevelStatus());
         lastBatchError = commandError.get();
     } else if (response.isErrDetailsSet()) {
@@ -257,7 +257,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             }
 
             if (!response->isErrDetailsSet() || !response->getErrDetails().back()) {
-                auto error = stdx::make_unique<WriteErrorDetail>();
+                auto error = std::make_unique<WriteErrorDetail>();
                 error->setIndex(0);
                 response->addToErrDetails(error.release());
             }
@@ -300,7 +300,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
         response->setN(response->getN() + 1);
 
         if (upsertedId) {
-            auto upsertDetail = stdx::make_unique<BatchedUpsertDetail>();
+            auto upsertDetail = std::make_unique<BatchedUpsertDetail>();
             upsertDetail->setIndex(0);
             upsertDetail->setUpsertedID(upsertedId.get());
             response->addToUpsertDetails(upsertDetail.release());
@@ -589,7 +589,7 @@ private:
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) final {
-        return stdx::make_unique<Invocation>(
+        return std::make_unique<Invocation>(
             this,
             request,
             BatchedCommandRequest::cloneInsertWithIds(BatchedCommandRequest::parseInsert(request)));
@@ -627,7 +627,7 @@ private:
                 "Cannot specify runtime constants option to a mongos",
                 !parsedRequest.hasRuntimeConstants());
         parsedRequest.setRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-        return stdx::make_unique<Invocation>(this, request, std::move(parsedRequest));
+        return std::make_unique<Invocation>(this, request, std::move(parsedRequest));
     }
 
     std::string help() const override {
@@ -657,7 +657,7 @@ private:
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) final {
-        return stdx::make_unique<Invocation>(
+        return std::make_unique<Invocation>(
             this, request, BatchedCommandRequest::parseDelete(request));
     }
 

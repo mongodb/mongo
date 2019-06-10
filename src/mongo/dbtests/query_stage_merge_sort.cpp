@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -45,7 +47,6 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/memory.h"
 
 /**
  * This file tests db/exec/merge_sort.cpp
@@ -56,7 +57,7 @@ namespace QueryStageMergeSortTests {
 using std::set;
 using std::string;
 using std::unique_ptr;
-using stdx::make_unique;
+using std::make_unique;
 
 class QueryStageMergeSortTestBase {
 public:
@@ -661,14 +662,14 @@ public:
         WorkingSetMember* member;
         MergeSortStageParams msparams;
         msparams.pattern = BSON("a" << 1);
-        auto ms = stdx::make_unique<MergeSortStage>(&_opCtx, msparams, &ws);
+        auto ms = std::make_unique<MergeSortStage>(&_opCtx, msparams, &ws);
 
         // First child scans [5, 10].
         {
             auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("a" << 1), coll));
             params.bounds.startKey = BSON("" << 5);
             params.bounds.endKey = BSON("" << 10);
-            auto fetchStage = stdx::make_unique<FetchStage>(
+            auto fetchStage = std::make_unique<FetchStage>(
                 &_opCtx, &ws, new IndexScan(&_opCtx, params, &ws, nullptr), nullptr, coll);
             ms->addChild(fetchStage.release());
         }
@@ -678,7 +679,7 @@ public:
             auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("a" << 1), coll));
             params.bounds.startKey = BSON("" << 4);
             params.bounds.endKey = BSON("" << 10);
-            auto fetchStage = stdx::make_unique<FetchStage>(
+            auto fetchStage = std::make_unique<FetchStage>(
                 &_opCtx, &ws, new IndexScan(&_opCtx, params, &ws, nullptr), nullptr, coll);
             ms->addChild(fetchStage.release());
         }

@@ -175,7 +175,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
 }
 
 std::unique_ptr<AsyncWorkScheduler> AsyncWorkScheduler::makeChildScheduler() {
-    auto child = stdx::make_unique<AsyncWorkScheduler>(_serviceContext);
+    auto child = std::make_unique<AsyncWorkScheduler>(_serviceContext);
 
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     if (!_shutdownStatus.isOK())

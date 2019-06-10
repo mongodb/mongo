@@ -751,7 +751,7 @@ Status TransportLayerASIO::setup() {
     const auto& sslParams = getSSLGlobalParams();
 
     if (_sslMode() != SSLParams::SSLMode_disabled && _listenerOptions.isIngress()) {
-        _ingressSSLContext = stdx::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
+        _ingressSSLContext = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
 
         Status status =
             getSSLManager()->initSSLContext(_ingressSSLContext->native_handle(),
@@ -763,7 +763,7 @@ Status TransportLayerASIO::setup() {
     }
 
     if (_listenerOptions.isEgress() && getSSLManager()) {
-        _egressSSLContext = stdx::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
+        _egressSSLContext = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
         Status status =
             getSSLManager()->initSSLContext(_egressSSLContext->native_handle(),
                                             sslParams,

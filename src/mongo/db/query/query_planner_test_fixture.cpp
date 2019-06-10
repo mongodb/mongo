@@ -308,7 +308,7 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
                                     const BSONObj& maxObj) {
     clearState();
 
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
     qr->setSort(sort);
     qr->setProj(proj);
@@ -389,7 +389,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                            const BSONObj& maxObj) {
     clearState();
 
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
     qr->setSort(sort);
     qr->setProj(proj);

@@ -344,7 +344,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _rsConfigState(kConfigPreStart),
       _selfIndex(-1),
       _sleptLastElection(false),
-      _readWriteAbility(stdx::make_unique<ReadWriteAbility>(!settings.usingReplSets())),
+      _readWriteAbility(std::make_unique<ReadWriteAbility>(!settings.usingReplSets())),
       _replicationProcess(replicationProcess),
       _storage(storage),
       _random(prngSeed) {
@@ -754,8 +754,8 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
             stdx::lock_guard<stdx::mutex> lock(_mutex);
             initialSyncerCopy = std::make_shared<InitialSyncer>(
                 createInitialSyncerOptions(this, _externalState.get()),
-                stdx::make_unique<DataReplicatorExternalStateInitialSync>(this,
-                                                                          _externalState.get()),
+                std::make_unique<DataReplicatorExternalStateInitialSync>(this,
+                                                                         _externalState.get()),
                 _externalState->getDbWorkThreadPool(),
                 _storage,
                 _replicationProcess,
@@ -1867,7 +1867,7 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
 
 void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_startKillOpThread() {
     invariant(!_killOpThread);
-    _killOpThread = stdx::make_unique<stdx::thread>([this] { _killOpThreadFn(); });
+    _killOpThread = std::make_unique<stdx::thread>([this] { _killOpThreadFn(); });
 }
 
 void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_killOpThreadFn() {
@@ -2965,7 +2965,7 @@ void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) 
     // Notify all secondaries of the election win.
     _restartHeartbeats_inlock();
     invariant(!_catchupState);
-    _catchupState = stdx::make_unique<CatchupState>(this);
+    _catchupState = std::make_unique<CatchupState>(this);
     _catchupState->start_inlock();
 }
 
@@ -3080,7 +3080,7 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
             abort_inlock();
         }
     };
-    _waiter = stdx::make_unique<CallbackWaiter>(*targetOpTime, targetOpTimeCB);
+    _waiter = std::make_unique<CallbackWaiter>(*targetOpTime, targetOpTimeCB);
     _repl->_opTimeWaiterList.add_inlock(_waiter.get());
 }
 

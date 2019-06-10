@@ -34,6 +34,7 @@
 #include "mongo/db/s/balancer/balancer.h"
 
 #include <algorithm>
+#include <memory>
 #include <string>
 
 #include "mongo/base/status_with.h"
@@ -51,7 +52,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -154,9 +154,9 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
 Balancer::Balancer(ServiceContext* serviceContext)
     : _balancedLastTime(0),
       _random(std::random_device{}()),
-      _clusterStats(stdx::make_unique<ClusterStatisticsImpl>(_random)),
+      _clusterStats(std::make_unique<ClusterStatisticsImpl>(_random)),
       _chunkSelectionPolicy(
-          stdx::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)),
+          std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)),
       _migrationManager(serviceContext) {}
 
 Balancer::~Balancer() {
@@ -167,7 +167,7 @@ Balancer::~Balancer() {
 
 void Balancer::create(ServiceContext* serviceContext) {
     invariant(!getBalancer(serviceContext));
-    getBalancer(serviceContext) = stdx::make_unique<Balancer>(serviceContext);
+    getBalancer(serviceContext) = std::make_unique<Balancer>(serviceContext);
 }
 
 Balancer* Balancer::get(ServiceContext* serviceContext) {

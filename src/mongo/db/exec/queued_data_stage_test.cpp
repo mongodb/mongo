@@ -34,11 +34,11 @@
 #include "mongo/db/exec/queued_data_stage.h"
 
 #include <boost/optional.hpp>
+#include <memory>
 
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
@@ -47,12 +47,11 @@ using namespace mongo;
 namespace {
 
 using std::unique_ptr;
-using stdx::make_unique;
 
 class QueuedDataStageTest : public ServiceContextMongoDTest {
 public:
     QueuedDataStageTest() {
-        getServiceContext()->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+        getServiceContext()->setFastClockSource(std::make_unique<ClockSourceMock>());
         _opCtx = makeOperationContext();
     }
 
@@ -70,7 +69,7 @@ private:
 //
 TEST_F(QueuedDataStageTest, getValidStats) {
     WorkingSet ws;
-    auto mock = make_unique<QueuedDataStage>(getOpCtx(), &ws);
+    auto mock = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
     const CommonStats* commonStats = mock->getCommonStats();
     ASSERT_EQUALS(commonStats->works, static_cast<size_t>(0));
     const SpecificStats* specificStats = mock->getSpecificStats();
@@ -85,7 +84,7 @@ TEST_F(QueuedDataStageTest, getValidStats) {
 TEST_F(QueuedDataStageTest, validateStats) {
     WorkingSet ws;
     WorkingSetID wsID;
-    auto mock = make_unique<QueuedDataStage>(getOpCtx(), &ws);
+    auto mock = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
 
     // make sure that we're at all zero
     const CommonStats* stats = mock->getCommonStats();

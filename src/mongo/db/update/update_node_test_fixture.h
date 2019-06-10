@@ -47,7 +47,7 @@ protected:
 
         // Set up the logical clock needed by CurrentDateNode and ObjectReplaceExecutor.
         auto service = mongo::getGlobalServiceContext();
-        auto logicalClock = mongo::stdx::make_unique<mongo::LogicalClock>(service);
+        auto logicalClock = std::make_unique<mongo::LogicalClock>(service);
         mongo::LogicalClock::set(service, std::move(logicalClock));
     }
 
@@ -62,7 +62,7 @@ protected:
         _validateForStorage = true;
         _indexData.reset();
         _logDoc.reset();
-        _logBuilder = stdx::make_unique<LogBuilder>(_logDoc.root());
+        _logBuilder = std::make_unique<LogBuilder>(_logDoc.root());
         _modifiedPaths.clear();
     }
 
@@ -86,7 +86,7 @@ protected:
     }
 
     void addImmutablePath(StringData path) {
-        auto fieldRef = stdx::make_unique<FieldRef>(path);
+        auto fieldRef = std::make_unique<FieldRef>(path);
         _immutablePathsVector.push_back(std::move(fieldRef));
         _immutablePaths.insert(_immutablePathsVector.back().get());
     }
@@ -119,7 +119,7 @@ protected:
 
     void addIndexedPath(StringData path) {
         if (!_indexData) {
-            _indexData = stdx::make_unique<UpdateIndexData>();
+            _indexData = std::make_unique<UpdateIndexData>();
         }
         _indexData->addPath(FieldRef(path));
     }

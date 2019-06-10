@@ -45,11 +45,11 @@ public:
     ObjectMatcher(BSONObj matchCondition, const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : _matchExpr(matchCondition,
                      expCtx,
-                     stdx::make_unique<ExtensionsCallbackNoop>(),
+                     std::make_unique<ExtensionsCallbackNoop>(),
                      MatchExpressionParser::kBanAllSpecialFeatures) {}
 
     std::unique_ptr<ElementMatcher> clone() const final {
-        return stdx::make_unique<ObjectMatcher>(*this);
+        return std::make_unique<ObjectMatcher>(*this);
     }
 
     bool match(const mutablebson::ConstElement& element) final {
@@ -85,11 +85,11 @@ public:
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : _matchExpr(matchCondition.wrap(""),
                      expCtx,
-                     stdx::make_unique<ExtensionsCallbackNoop>(),
+                     std::make_unique<ExtensionsCallbackNoop>(),
                      MatchExpressionParser::kBanAllSpecialFeatures) {}
 
     std::unique_ptr<ElementMatcher> clone() const final {
-        return stdx::make_unique<WrappedObjectMatcher>(*this);
+        return std::make_unique<WrappedObjectMatcher>(*this);
     }
 
     bool match(const mutablebson::ConstElement& element) final {
@@ -119,7 +119,7 @@ public:
         : _modExpr(modExpr), _collator(collator) {}
 
     std::unique_ptr<ElementMatcher> clone() const final {
-        return stdx::make_unique<EqualityMatcher>(*this);
+        return std::make_unique<EqualityMatcher>(*this);
     }
 
     bool match(const mutablebson::ConstElement& element) final {
@@ -146,11 +146,11 @@ Status PullNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
         if (modExpr.type() == mongo::Object &&
             !MatchExpressionParser::parsePathAcceptingKeyword(
                 modExpr.embeddedObject().firstElement())) {
-            _matcher = stdx::make_unique<ObjectMatcher>(modExpr.embeddedObject(), expCtx);
+            _matcher = std::make_unique<ObjectMatcher>(modExpr.embeddedObject(), expCtx);
         } else if (modExpr.type() == mongo::Object || modExpr.type() == mongo::RegEx) {
-            _matcher = stdx::make_unique<WrappedObjectMatcher>(modExpr, expCtx);
+            _matcher = std::make_unique<WrappedObjectMatcher>(modExpr, expCtx);
         } else {
-            _matcher = stdx::make_unique<EqualityMatcher>(modExpr, expCtx->getCollator());
+            _matcher = std::make_unique<EqualityMatcher>(modExpr, expCtx->getCollator());
         }
     } catch (AssertionException& exception) {
         return exception.toStatus();

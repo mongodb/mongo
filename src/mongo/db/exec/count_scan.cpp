@@ -29,11 +29,12 @@
 
 #include "mongo/db/exec/count_scan.h"
 
+#include <memory>
+
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -65,7 +66,6 @@ BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames)
 
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 // static
 const char* CountScan::kStageType = "COUNT_SCAN";
@@ -172,9 +172,10 @@ void CountScan::doReattachToOperationContext() {
 }
 
 unique_ptr<PlanStageStats> CountScan::getStats() {
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_COUNT_SCAN);
+    unique_ptr<PlanStageStats> ret =
+        std::make_unique<PlanStageStats>(_commonStats, STAGE_COUNT_SCAN);
 
-    unique_ptr<CountScanStats> countStats = make_unique<CountScanStats>(_specificStats);
+    unique_ptr<CountScanStats> countStats = std::make_unique<CountScanStats>(_specificStats);
     countStats->keyPattern = _specificStats.keyPattern.getOwned();
 
     countStats->startKey = replaceBSONFieldNames(_startKey, countStats->keyPattern);

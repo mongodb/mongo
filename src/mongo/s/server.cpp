@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/optional.hpp>
+#include <memory>
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
@@ -90,7 +91,6 @@
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_uptime_reporter.h"
 #include "mongo/s/version_mongos.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/admin_access.h"
@@ -277,20 +277,18 @@ void cleanupTask(ServiceContext* serviceContext) {
 }
 
 Status initializeSharding(OperationContext* opCtx) {
-    auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryImpl>();
+    auto targeterFactory = std::make_unique<RemoteCommandTargeterFactoryImpl>();
     auto targeterFactoryPtr = targeterFactory.get();
 
-    ShardFactory::BuilderCallable setBuilder =
-        [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-            return stdx::make_unique<ShardRemote>(
-                shardId, connStr, targeterFactoryPtr->create(connStr));
-        };
+    ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr](
+        const ShardId& shardId, const ConnectionString& connStr) {
+        return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
+    };
 
-    ShardFactory::BuilderCallable masterBuilder =
-        [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-            return stdx::make_unique<ShardRemote>(
-                shardId, connStr, targeterFactoryPtr->create(connStr));
-        };
+    ShardFactory::BuilderCallable masterBuilder = [targeterFactoryPtr](
+        const ShardId& shardId, const ConnectionString& connStr) {
+        return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
+    };
 
     ShardFactory::BuildersMap buildersMap{
         {ConnectionString::SET, std::move(setBuilder)},
@@ -298,24 +296,24 @@ Status initializeSharding(OperationContext* opCtx) {
     };
 
     auto shardFactory =
-        stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
+        std::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     CatalogCacheLoader::set(opCtx->getServiceContext(),
-                            stdx::make_unique<ConfigServerCatalogCacheLoader>());
+                            std::make_unique<ConfigServerCatalogCacheLoader>());
 
     Status status = initializeGlobalShardingState(
         opCtx,
         mongosGlobalParams.configdbs,
         generateDistLockProcessId(opCtx),
         std::move(shardFactory),
-        stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(opCtx)),
+        std::make_unique<CatalogCache>(CatalogCacheLoader::get(opCtx)),
         [opCtx]() {
-            auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+            auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
             hookList->addHook(
-                stdx::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
+                std::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
             hookList->addHook(
-                stdx::make_unique<rpc::CommittedOpTimeMetadataHook>(opCtx->getServiceContext()));
-            hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(
+                std::make_unique<rpc::CommittedOpTimeMetadataHook>(opCtx->getServiceContext()));
+            hookList->addHook(std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(
                 opCtx->getServiceContext()));
             return hookList;
         },
@@ -403,8 +401,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     initWireSpec();
 
-    serviceContext->setServiceEntryPoint(
-        stdx::make_unique<ServiceEntryPointMongos>(serviceContext));
+    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>(serviceContext));
 
     auto tl =
         transport::TransportLayerManager::createWithConfig(&serverGlobalParams, serviceContext);
@@ -415,23 +412,23 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     }
     serviceContext->setTransportLayer(std::move(tl));
 
-    auto unshardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    unshardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
+    auto unshardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
+    unshardedHookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
     unshardedHookList->addHook(
-        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));
+        std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));
     // TODO SERVER-33053: readReplyMetadata is not called on hooks added through
     // ShardingConnectionHook with _shardedConnections=false, so this hook will not run for
     // connections using globalConnPool.
-    unshardedHookList->addHook(stdx::make_unique<rpc::CommittedOpTimeMetadataHook>(serviceContext));
+    unshardedHookList->addHook(std::make_unique<rpc::CommittedOpTimeMetadataHook>(serviceContext));
 
     // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
     globalConnPool.addHook(new ShardingConnectionHook(false, std::move(unshardedHookList)));
 
-    auto shardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    shardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
+    auto shardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
+    shardedHookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
     shardedHookList->addHook(
-        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));
-    shardedHookList->addHook(stdx::make_unique<rpc::CommittedOpTimeMetadataHook>(serviceContext));
+        std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));
+    shardedHookList->addHook(std::make_unique<rpc::CommittedOpTimeMetadataHook>(serviceContext));
 
     shardConnectionPool.addHook(new ShardingConnectionHook(true, std::move(shardedHookList)));
 
@@ -449,7 +446,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         quickExit(EXIT_BADOPTIONS);
     }
 
-    LogicalClock::set(serviceContext, stdx::make_unique<LogicalClock>(serviceContext));
+    LogicalClock::set(serviceContext, std::make_unique<LogicalClock>(serviceContext));
 
     auto opCtxHolder = tc->makeOperationContext();
     auto const opCtx = opCtxHolder.get();
@@ -505,9 +502,9 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     LogicalSessionCache::set(
         serviceContext,
-        stdx::make_unique<LogicalSessionCacheImpl>(stdx::make_unique<ServiceLiaisonMongos>(),
-                                                   stdx::make_unique<SessionsCollectionSharded>(),
-                                                   RouterSessionCatalog::reapSessionsOlderThan));
+        std::make_unique<LogicalSessionCacheImpl>(std::make_unique<ServiceLiaisonMongos>(),
+                                                  std::make_unique<SessionsCollectionSharded>(),
+                                                  RouterSessionCatalog::reapSessionsOlderThan));
 
     status = serviceContext->getServiceExecutor()->start();
     if (!status.isOK()) {
@@ -563,7 +560,7 @@ void startupConfigActions(const std::vector<std::string>& argv) {
 }
 
 std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongos() {
-    return stdx::make_unique<AuthzManagerExternalStateMongos>();
+    return std::make_unique<AuthzManagerExternalStateMongos>();
 }
 
 ExitCode main(ServiceContext* serviceContext) {

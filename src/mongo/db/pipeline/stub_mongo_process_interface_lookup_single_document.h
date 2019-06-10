@@ -89,7 +89,7 @@ public:
         if (expCtx->inMongos) {
             return nullptr;
         } else {
-            return stdx::make_unique<StubShardFilterer>();
+            return std::make_unique<StubShardFilterer>();
         }
     }
 

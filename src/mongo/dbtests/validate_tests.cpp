@@ -86,7 +86,7 @@ protected:
         lockDb(MODE_IX);
         invariant(_opCtx.lockState()->isDbLockedForMode(_nss.db(), MODE_IX));
         std::unique_ptr<Lock::CollectionLock> lock =
-            stdx::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
+            std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
         invariant(_opCtx.lockState()->isCollectionLockedForMode(_nss, MODE_X));
 
         Database* db = _autoDb.get()->getDb();
@@ -1214,7 +1214,7 @@ public:
 
             lockDb(MODE_IX);
             std::unique_ptr<Lock::CollectionLock> lock =
-                stdx::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
+                std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
 
             Database* db = _autoDb.get()->getDb();
             ASSERT_OK(db->getCollection(&_opCtx, _nss)
@@ -1310,7 +1310,7 @@ public:
 
             lockDb(MODE_IX);
             std::unique_ptr<Lock::CollectionLock> lock =
-                stdx::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
+                std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
 
             Database* db = _autoDb.get()->getDb();
             ASSERT_OK(db->getCollection(&_opCtx, _nss)
@@ -1394,7 +1394,7 @@ public:
 
             lockDb(MODE_IX);
             std::unique_ptr<Lock::CollectionLock> lock =
-                stdx::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
+                std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
 
             Database* db = _autoDb.get()->getDb();
             ASSERT_OK(db->getCollection(&_opCtx, _nss)

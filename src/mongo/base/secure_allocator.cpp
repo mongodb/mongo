@@ -44,7 +44,6 @@
 #endif
 
 #include "mongo/base/init.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"

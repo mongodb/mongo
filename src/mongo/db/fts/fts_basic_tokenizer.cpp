@@ -31,12 +31,13 @@
 
 #include "mongo/db/fts/fts_basic_tokenizer.h"
 
+#include <memory>
+
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/stemmer.h"
 #include "mongo/db/fts/stop_words.h"
 #include "mongo/db/fts/tokenizer.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -50,7 +51,7 @@ BasicFTSTokenizer::BasicFTSTokenizer(const FTSLanguage* language)
 void BasicFTSTokenizer::reset(StringData document, Options options) {
     _options = options;
     _document = document.toString();
-    _tokenizer = stdx::make_unique<Tokenizer>(_language, _document);
+    _tokenizer = std::make_unique<Tokenizer>(_language, _document);
 }
 
 bool BasicFTSTokenizer::moveNext() {

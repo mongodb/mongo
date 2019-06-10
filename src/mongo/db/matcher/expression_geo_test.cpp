@@ -31,11 +31,12 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include <memory>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -74,7 +75,7 @@ std::unique_ptr<GeoMatchExpression> makeGeoMatchExpression(const BSONObj& locQue
     ASSERT_OK(gq->parseFrom(locQuery));
 
     std::unique_ptr<GeoMatchExpression> ge =
-        stdx::make_unique<GeoMatchExpression>("a", gq.release(), locQuery);
+        std::make_unique<GeoMatchExpression>("a", gq.release(), locQuery);
 
     return ge;
 }
@@ -84,7 +85,7 @@ std::unique_ptr<GeoNearMatchExpression> makeGeoNearMatchExpression(const BSONObj
     ASSERT_OK(nq->parseFrom(locQuery));
 
     std::unique_ptr<GeoNearMatchExpression> gne =
-        stdx::make_unique<GeoNearMatchExpression>("a", nq.release(), locQuery);
+        std::make_unique<GeoNearMatchExpression>("a", nq.release(), locQuery);
 
     return gne;
 }

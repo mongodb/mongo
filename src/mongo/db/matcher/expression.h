@@ -30,6 +30,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
@@ -37,7 +38,6 @@
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matchable.h"
 #include "mongo/db/pipeline/dependencies.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {

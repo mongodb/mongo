@@ -86,7 +86,7 @@ public:
 
 void registerMongoSCollectors(FTDCController* controller) {
     // PoolStats
-    controller->addPeriodicCollector(stdx::make_unique<ConnPoolStatsCollector>());
+    controller->addPeriodicCollector(std::make_unique<ConnPoolStatsCollector>());
 }
 
 void startMongoSFTDC() {

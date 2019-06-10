@@ -826,9 +826,9 @@ public:
     void setUp() override {
         TransactionCoordinatorTestBase::setUp();
 
-        getServiceContext()->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
+        getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
 
-        auto tickSource = stdx::make_unique<TickSourceMock<Microseconds>>();
+        auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
         tickSource->reset(1);
         getServiceContext()->setTickSource(std::move(tickSource));
     }

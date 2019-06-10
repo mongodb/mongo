@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
 #include <vector>
 
 #include "mongo/base/checked_cast.h"
@@ -59,7 +60,6 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view_catalog.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -67,7 +67,6 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 namespace {
 
@@ -294,8 +293,8 @@ public:
                                                              false,
                                                              cursorNss);
 
-            auto ws = make_unique<WorkingSet>();
-            auto root = make_unique<QueuedDataStage>(opCtx, ws.get());
+            auto ws = std::make_unique<WorkingSet>();
+            auto root = std::make_unique<QueuedDataStage>(opCtx, ws.get());
 
             if (db) {
                 if (auto collNames = _getExactNameMatches(matcher.get())) {

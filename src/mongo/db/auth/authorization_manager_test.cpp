@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 /**
  * Unit tests of the AuthorizationManager type.
  */
@@ -51,7 +53,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -270,10 +271,10 @@ class AuthorizationManagerWithExplicitUserPrivilegesTest : public ::mongo::unitt
 public:
     virtual void setUp() {
         auto localExternalState =
-            stdx::make_unique<AuthzManagerExternalStateMockWithExplicitUserPrivileges>();
+            std::make_unique<AuthzManagerExternalStateMockWithExplicitUserPrivileges>();
         externalState = localExternalState.get();
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-        authzManager = stdx::make_unique<AuthorizationManagerImpl>(
+        authzManager = std::make_unique<AuthorizationManagerImpl>(
             std::move(localExternalState),
             AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{});
         externalState->setAuthorizationManager(authzManager.get());

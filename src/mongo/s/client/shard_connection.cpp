@@ -109,7 +109,7 @@ public:
 
     static ClientConnections* threadInstance() {
         if (!_perThread) {
-            _perThread = stdx::make_unique<ClientConnections>();
+            _perThread = std::make_unique<ClientConnections>();
         }
         return _perThread.get();
     }

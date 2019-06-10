@@ -39,7 +39,6 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
@@ -210,7 +209,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
                 "Loop must have at least 3 different vertices: " << coordinateElt.toString(false));
         }
 
-        loops.push_back(stdx::make_unique<S2Loop>(points));
+        loops.push_back(std::make_unique<S2Loop>(points));
         S2Loop* loop = loops.back().get();
 
         // Check whether this loop is valid.

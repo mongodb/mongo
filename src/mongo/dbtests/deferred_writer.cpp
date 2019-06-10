@@ -135,7 +135,7 @@ public:
      */
     RaiiWrapper getWriter(CollectionOptions options = CollectionOptions(),
                           int64_t maxSize = 200'000) {
-        return RaiiWrapper(stdx::make_unique<DeferredWriter>(kTestNamespace, options, maxSize));
+        return RaiiWrapper(std::make_unique<DeferredWriter>(kTestNamespace, options, maxSize));
     }
 
     virtual void run(void) = 0;

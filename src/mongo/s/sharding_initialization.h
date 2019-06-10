@@ -31,10 +31,10 @@
 
 #include <boost/optional.hpp>
 #include <functional>
+#include <memory>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 

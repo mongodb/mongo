@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/json.h"
@@ -37,7 +39,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/sharding_router_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -73,7 +74,7 @@ public:
             shards.push_back(shardType);
 
             std::unique_ptr<RemoteCommandTargeterMock> targeter(
-                stdx::make_unique<RemoteCommandTargeterMock>());
+                std::make_unique<RemoteCommandTargeterMock>());
             targeter->setConnectionStringReturnValue(ConnectionString(kTestShardHosts[i]));
             targeter->setFindHostReturnValue(kTestShardHosts[i]);
 

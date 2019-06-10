@@ -122,7 +122,7 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const NamespaceString& nss
                                                       const std::string& msg,
                                                       OplogEntriesEnum operation,
                                                       const BSONObj& data) {
-    auto entry = stdx::make_unique<HealthLogEntry>();
+    auto entry = std::make_unique<HealthLogEntry>();
     entry->setNss(nss);
     entry->setTimestamp(Date_t::now());
     entry->setSeverity(severity);
@@ -384,7 +384,7 @@ std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, Collection* co
         result.push_back(cce->getIndexSpec(opCtx, name));
     }
 
-    auto comp = stdx::make_unique<SimpleBSONObjComparator>();
+    auto comp = std::make_unique<SimpleBSONObjComparator>();
 
     std::sort(result.begin(), result.end(), SimpleBSONObjComparator::LessThan());
 

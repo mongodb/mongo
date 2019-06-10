@@ -32,6 +32,8 @@
 
 #include "mongo/db/keys_collection_manager.h"
 
+#include <memory>
+
 #include "mongo/db/key_generator.h"
 #include "mongo/db/keys_collection_cache.h"
 #include "mongo/db/keys_collection_client.h"
@@ -39,7 +41,6 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"

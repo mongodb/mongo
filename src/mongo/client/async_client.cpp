@@ -33,6 +33,8 @@
 
 #include "mongo/client/async_client.h"
 
+#include <memory>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/config.h"
@@ -45,7 +47,6 @@
 #include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"

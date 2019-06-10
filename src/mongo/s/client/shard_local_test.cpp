@@ -31,6 +31,8 @@
 
 #include "mongo/s/client/shard_local.h"
 
+#include <memory>
+
 #include "mongo/client/read_preference.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -41,7 +43,6 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace {
@@ -83,7 +84,7 @@ void ShardLocalTest::setUp() {
     ServiceContextMongoDTest::setUp();
     _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-    _shardLocal = stdx::make_unique<ShardLocal>(ShardRegistry::kConfigServerShardId);
+    _shardLocal = std::make_unique<ShardLocal>(ShardRegistry::kConfigServerShardId);
     const repl::ReplSettings replSettings = {};
     repl::ReplicationCoordinator::set(
         getGlobalServiceContext(),

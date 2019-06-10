@@ -115,7 +115,7 @@ protected:
         boost::optional<BSONObj> findCmd = boost::none,
         boost::optional<std::int64_t> getMoreBatchSize = boost::none) {
 
-        return stdx::make_unique<AsyncResultsMerger>(
+        return std::make_unique<AsyncResultsMerger>(
             operationContext(),
             executor(),
             makeARMParamsFromExistingCursors(std::move(remoteCursors), findCmd, getMoreBatchSize));

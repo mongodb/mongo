@@ -39,7 +39,6 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -498,7 +497,7 @@ public:
 TEST_F(RemoteCommandRetrySchedulerTest,
        SchedulerReturnsCallbackCanceledIfShutdownBeforeSendingRetryCommand) {
     CallbackResponseSaver callback;
-    auto policy = stdx::make_unique<ShutdownSchedulerRetryPolicy>();
+    auto policy = std::make_unique<ShutdownSchedulerRetryPolicy>();
     auto policyPtr = policy.get();
     TaskExecutorWithFailureInScheduleRemoteCommand badExecutor(&getExecutor());
     RemoteCommandRetryScheduler scheduler(

@@ -34,6 +34,7 @@
 #include "initial_syncer.h"
 
 #include <algorithm>
+#include <memory>
 #include <utility>
 
 #include "mongo/base/counter.h"
@@ -63,7 +64,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point_service.h"
@@ -607,7 +607,7 @@ void InitialSyncer::_chooseSyncSourceCallback(
     _syncSource = syncSource.getValue();
 
     // Schedule rollback ID checker.
-    _rollbackChecker = stdx::make_unique<RollbackChecker>(_exec, _syncSource);
+    _rollbackChecker = std::make_unique<RollbackChecker>(_exec, _syncSource);
     auto scheduleResult = _rollbackChecker->reset([=](const RollbackChecker::Result& result) {
         return _rollbackCheckerResetCallback(result, onCompletionGuard);
     });
@@ -666,7 +666,7 @@ Status InitialSyncer::_scheduleGetBeginFetchingOpTime_inlock(
                     << "local"));
     cmd.append("limit", 1);
 
-    _beginFetchingOpTimeFetcher = stdx::make_unique<Fetcher>(
+    _beginFetchingOpTimeFetcher = std::make_unique<Fetcher>(
         _exec,
         _syncSource,
         NamespaceString::kSessionTransactionsTableNamespace.db().toString(),
@@ -793,7 +793,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
     readConcernBob.append("afterClusterTime", lastOpTime.getTimestamp());
     readConcernBob.done();
 
-    _fCVFetcher = stdx::make_unique<Fetcher>(
+    _fCVFetcher = std::make_unique<Fetcher>(
         _exec,
         _syncSource,
         NamespaceString::kServerConfigurationNamespace.db().toString(),
@@ -885,7 +885,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         }
         return (name != "local");
     };
-    _initialSyncState = stdx::make_unique<InitialSyncState>(stdx::make_unique<DatabasesCloner>(
+    _initialSyncState = std::make_unique<InitialSyncState>(std::make_unique<DatabasesCloner>(
         _storage, _exec, _writerPool, _syncSource, listDatabasesFilter, [=](const Status& status) {
             _databasesClonerCallback(status, onCompletionGuard);
         }));
@@ -936,7 +936,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     }
 
     const auto& config = configResult.getValue();
-    _oplogFetcher = stdx::make_unique<OplogFetcher>(
+    _oplogFetcher = std::make_unique<OplogFetcher>(
         _exec,
         beginFetchingOpTime,
         _syncSource,
@@ -1189,7 +1189,7 @@ void InitialSyncer::_getNextApplierBatchCallback(
                 s, {lastApplied, lastAppliedWall}, numApplied, onCompletionGuard);
         };
 
-        _applier = stdx::make_unique<MultiApplier>(
+        _applier = std::make_unique<MultiApplier>(
             _exec, ops, std::move(applyBatchOfOperationsFn), std::move(onCompletionFn));
         status = _startupComponent_inlock(_applier);
         if (!status.isOK()) {
@@ -1485,18 +1485,18 @@ Status InitialSyncer::_scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn 
         "find" << _opts.remoteOplogNS.coll() << "sort" << BSON("$natural" << -1) << "limit" << 1);
 
     _lastOplogEntryFetcher =
-        stdx::make_unique<Fetcher>(_exec,
-                                   _syncSource,
-                                   _opts.remoteOplogNS.db().toString(),
-                                   query,
-                                   callback,
-                                   ReadPreferenceSetting::secondaryPreferredMetadata(),
-                                   RemoteCommandRequest::kNoTimeout /* find network timeout */,
-                                   RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
-                                   RemoteCommandRetryScheduler::makeRetryPolicy(
-                                       numInitialSyncOplogFindAttempts.load(),
-                                       executor::RemoteCommandRequest::kNoTimeout,
-                                       RemoteCommandRetryScheduler::kAllRetriableErrors));
+        std::make_unique<Fetcher>(_exec,
+                                  _syncSource,
+                                  _opts.remoteOplogNS.db().toString(),
+                                  query,
+                                  callback,
+                                  ReadPreferenceSetting::secondaryPreferredMetadata(),
+                                  RemoteCommandRequest::kNoTimeout /* find network timeout */,
+                                  RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
+                                  RemoteCommandRetryScheduler::makeRetryPolicy(
+                                      numInitialSyncOplogFindAttempts.load(),
+                                      executor::RemoteCommandRequest::kNoTimeout,
+                                      RemoteCommandRetryScheduler::kAllRetriableErrors));
     Status scheduleStatus = _lastOplogEntryFetcher->schedule();
     if (!scheduleStatus.isOK()) {
         _lastOplogEntryFetcher.reset();

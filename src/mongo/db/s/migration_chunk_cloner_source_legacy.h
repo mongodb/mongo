@@ -30,6 +30,7 @@
 #pragma once
 
 #include <list>
+#include <memory>
 #include <set>
 
 #include "mongo/bson/bsonobj.h"
@@ -42,7 +43,6 @@
 #include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 

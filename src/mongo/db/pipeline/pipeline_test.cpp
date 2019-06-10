@@ -75,7 +75,7 @@ const NamespaceString kTestNss = NamespaceString("a.collection");
 void setMockReplicationCoordinatorOnOpCtx(OperationContext* opCtx) {
     repl::ReplicationCoordinator::set(
         opCtx->getServiceContext(),
-        stdx::make_unique<repl::ReplicationCoordinatorMock>(opCtx->getServiceContext()));
+        std::make_unique<repl::ReplicationCoordinatorMock>(opCtx->getServiceContext()));
 }
 
 namespace Optimizations {

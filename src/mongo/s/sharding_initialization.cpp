@@ -33,6 +33,7 @@
 
 #include "mongo/s/sharding_initialization.h"
 
+#include <memory>
 #include <string>
 
 #include "mongo/base/status.h"
@@ -65,7 +66,6 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/sharding_task_executor.h"
 #include "mongo/s/sharding_task_executor_pool_gen.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -86,30 +86,30 @@ static constexpr auto kRetryInterval = Seconds{2};
 
 std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service,
                                                          StringData distLockProcessId) {
-    auto distLockCatalog = stdx::make_unique<DistLockCatalogImpl>();
+    auto distLockCatalog = std::make_unique<DistLockCatalogImpl>();
     auto distLockManager =
-        stdx::make_unique<ReplSetDistLockManager>(service,
-                                                  distLockProcessId,
-                                                  std::move(distLockCatalog),
-                                                  ReplSetDistLockManager::kDistLockPingInterval,
-                                                  ReplSetDistLockManager::kDistLockExpirationTime);
+        std::make_unique<ReplSetDistLockManager>(service,
+                                                 distLockProcessId,
+                                                 std::move(distLockCatalog),
+                                                 ReplSetDistLockManager::kDistLockPingInterval,
+                                                 ReplSetDistLockManager::kDistLockExpirationTime);
 
-    return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
+    return std::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
 }
 
 std::unique_ptr<executor::TaskExecutor> makeShardingFixedTaskExecutor(
     std::unique_ptr<NetworkInterface> net) {
     auto executor =
-        stdx::make_unique<ThreadPoolTaskExecutor>(stdx::make_unique<ThreadPool>([] {
-                                                      ThreadPool::Options opts;
-                                                      opts.poolName = "Sharding-Fixed";
-                                                      opts.maxThreads =
-                                                          ThreadPool::Options::kUnlimited;
-                                                      return opts;
-                                                  }()),
-                                                  std::move(net));
+        std::make_unique<ThreadPoolTaskExecutor>(std::make_unique<ThreadPool>([] {
+                                                     ThreadPool::Options opts;
+                                                     opts.poolName = "Sharding-Fixed";
+                                                     opts.maxThreads =
+                                                         ThreadPool::Options::kUnlimited;
+                                                     return opts;
+                                                 }()),
+                                                 std::move(net));
 
-    return stdx::make_unique<executor::ShardingTaskExecutor>(std::move(executor));
+    return std::make_unique<executor::ShardingTaskExecutor>(std::move(executor));
 }
 
 std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
@@ -124,7 +124,7 @@ std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
     for (size_t i = 0; i < poolSize; ++i) {
         auto exec = makeShardingTaskExecutor(
             executor::makeNetworkInterface("TaskExecutorPool-" + std::to_string(i),
-                                           stdx::make_unique<ShardingNetworkConnectionHook>(),
+                                           std::make_unique<ShardingNetworkConnectionHook>(),
                                            metadataHookBuilder(),
                                            connPoolOptions));
 
@@ -134,7 +134,7 @@ std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
     // Add executor used to perform non-performance critical work.
     auto fixedExec = makeShardingFixedTaskExecutor(std::move(fixedNet));
 
-    auto executorPool = stdx::make_unique<TaskExecutorPool>();
+    auto executorPool = std::make_unique<TaskExecutorPool>();
     executorPool->addExecutors(std::move(executors), std::move(fixedExec));
     return executorPool;
 }
@@ -144,10 +144,10 @@ std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
 std::unique_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
     std::unique_ptr<NetworkInterface> net) {
     auto netPtr = net.get();
-    auto executor = stdx::make_unique<ThreadPoolTaskExecutor>(
-        stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
+    auto executor = std::make_unique<ThreadPoolTaskExecutor>(
+        std::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
 
-    return stdx::make_unique<executor::ShardingTaskExecutor>(std::move(executor));
+    return std::make_unique<executor::ShardingTaskExecutor>(std::move(executor));
 }
 
 std::string generateDistLockProcessId(OperationContext* opCtx) {
@@ -213,11 +213,10 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
         connPoolOptions.hostTimeout = newHostTimeout;
     }
 
-    auto network =
-        executor::makeNetworkInterface("ShardRegistry",
-                                       stdx::make_unique<ShardingNetworkConnectionHook>(),
-                                       hookBuilder(),
-                                       connPoolOptions);
+    auto network = executor::makeNetworkInterface("ShardRegistry",
+                                                  std::make_unique<ShardingNetworkConnectionHook>(),
+                                                  hookBuilder(),
+                                                  connPoolOptions);
     auto networkPtr = network.get();
     auto executorPool = makeShardingTaskExecutorPool(
         std::move(network), hookBuilder, connPoolOptions, taskExecutorPoolSize);
@@ -228,9 +227,9 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
 
     grid->init(makeCatalogClient(service, distLockProcessId),
                std::move(catalogCache),
-               stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS),
-               stdx::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),
-               stdx::make_unique<BalancerConfiguration>(),
+               std::make_unique<ShardRegistry>(std::move(shardFactory), configCS),
+               std::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),
+               std::make_unique<BalancerConfiguration>(),
                std::move(executorPool),
                networkPtr);
 
@@ -241,14 +240,14 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     grid->catalogClient()->startup();
 
     auto keysCollectionClient =
-        stdx::make_unique<KeysCollectionClientSharded>(grid->catalogClient());
+        std::make_unique<KeysCollectionClientSharded>(grid->catalogClient());
     auto keyManager =
         std::make_shared<KeysCollectionManager>(KeysCollectionManager::kKeyManagerPurposeString,
                                                 std::move(keysCollectionClient),
                                                 Seconds(KeysRotationIntervalSec));
     keyManager->startMonitoring(service);
 
-    LogicalTimeValidator::set(service, stdx::make_unique<LogicalTimeValidator>(keyManager));
+    LogicalTimeValidator::set(service, std::make_unique<LogicalTimeValidator>(keyManager));
 
     return Status::OK();
 }

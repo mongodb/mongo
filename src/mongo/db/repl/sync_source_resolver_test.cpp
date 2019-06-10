@@ -40,7 +40,6 @@
 #include "mongo/db/repl/sync_source_selector_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -95,7 +94,7 @@ void SyncSourceResolverTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
 
     _shouldFailRequest = [](const executor::RemoteCommandRequest&) { return false; };
-    _executorProxy = stdx::make_unique<TaskExecutorWithFailureInScheduleRemoteCommand>(
+    _executorProxy = std::make_unique<TaskExecutorWithFailureInScheduleRemoteCommand>(
         &getExecutor(), [this](const executor::RemoteCommandRequest& request) {
             return _shouldFailRequest(request);
         });
@@ -103,7 +102,7 @@ void SyncSourceResolverTest::setUp() {
     _response.syncSourceStatus = getDetectableErrorStatus();
     _onCompletion = [this](const SyncSourceResolverResponse& response) { _response = response; };
 
-    _selector = stdx::make_unique<SyncSourceSelectorMock>();
+    _selector = std::make_unique<SyncSourceSelectorMock>();
     _resolver = _makeResolver(lastOpTimeFetched, OpTime());
 
     launchExecutorThread();
@@ -120,7 +119,7 @@ void SyncSourceResolverTest::tearDown() {
 
 std::unique_ptr<SyncSourceResolver> SyncSourceResolverTest::_makeResolver(
     const OpTime& lastOpTimeFetched, const OpTime& requiredOpTime) {
-    return stdx::make_unique<SyncSourceResolver>(
+    return std::make_unique<SyncSourceResolver>(
         _executorProxy.get(),
         _selector.get(),
         lastOpTimeFetched,

@@ -32,6 +32,7 @@
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -40,7 +41,6 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/ops/write_ops.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

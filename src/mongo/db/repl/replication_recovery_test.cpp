@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
@@ -46,7 +48,6 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -168,15 +169,15 @@ private:
         ServiceContextMongoDTest::setUp();
 
         auto service = getServiceContext();
-        StorageInterface::set(service, stdx::make_unique<StorageInterfaceRecovery>());
+        StorageInterface::set(service, std::make_unique<StorageInterfaceRecovery>());
         _storageInterface = static_cast<StorageInterfaceRecovery*>(StorageInterface::get(service));
 
         _createOpCtx();
-        _consistencyMarkers = stdx::make_unique<ReplicationConsistencyMarkersMock>();
+        _consistencyMarkers = std::make_unique<ReplicationConsistencyMarkersMock>();
 
 
         ReplicationCoordinator::set(
-            service, stdx::make_unique<ReplicationCoordinatorMock>(service, getStorageInterface()));
+            service, std::make_unique<ReplicationCoordinatorMock>(service, getStorageInterface()));
 
         ASSERT_OK(
             ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
@@ -190,7 +191,7 @@ private:
         observerRegistry->addObserver(std::make_unique<ReplicationRecoveryTestObObserver>());
 
         repl::DropPendingCollectionReaper::set(
-            service, stdx::make_unique<repl::DropPendingCollectionReaper>(_storageInterface));
+            service, std::make_unique<repl::DropPendingCollectionReaper>(_storageInterface));
     }
 
     void tearDown() override {

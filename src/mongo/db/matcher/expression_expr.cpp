@@ -102,7 +102,7 @@ std::unique_ptr<MatchExpression> ExprMatchExpression::shallowClone() const {
     boost::intrusive_ptr<Expression> clonedExpr =
         Expression::parseOperand(_expCtx, bob.obj().firstElement(), _expCtx->variablesParseState);
 
-    auto clone = stdx::make_unique<ExprMatchExpression>(std::move(clonedExpr), _expCtx);
+    auto clone = std::make_unique<ExprMatchExpression>(std::move(clonedExpr), _expCtx);
     if (_rewriteResult) {
         clone->_rewriteResult = _rewriteResult->clone();
     }
@@ -126,7 +126,7 @@ MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() con
             RewriteExpr::rewrite(exprMatchExpr._expression, exprMatchExpr._expCtx->getCollator());
 
         if (exprMatchExpr._rewriteResult->matchExpression()) {
-            auto andMatch = stdx::make_unique<AndMatchExpression>();
+            auto andMatch = std::make_unique<AndMatchExpression>();
             andMatch->add(exprMatchExpr._rewriteResult->releaseMatchExpression().release());
             andMatch->add(expression.release());
             // Re-optimize the new AND in order to make sure that any AND children are absorbed.

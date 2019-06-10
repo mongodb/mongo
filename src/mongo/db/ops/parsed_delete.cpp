@@ -74,7 +74,7 @@ Status ParsedDelete::parseQueryToCQ() {
 
     // The projection needs to be applied after the delete operation, so we do not specify a
     // projection during canonicalization.
-    auto qr = stdx::make_unique<QueryRequest>(_request->getNamespaceString());
+    auto qr = std::make_unique<QueryRequest>(_request->getNamespaceString());
     qr->setFilter(_request->getQuery());
     qr->setSort(_request->getSort());
     qr->setCollation(_request->getCollation());

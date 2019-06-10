@@ -29,15 +29,15 @@
 
 #include "mongo/db/exec/queued_data_stage.h"
 
+#include <memory>
+
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 const char* QueuedDataStage::kStageType = "QUEUED_DATA";
 
@@ -76,8 +76,9 @@ bool QueuedDataStage::isEOF() {
 
 unique_ptr<PlanStageStats> QueuedDataStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_QUEUED_DATA);
-    ret->specific = make_unique<MockStats>(_specificStats);
+    unique_ptr<PlanStageStats> ret =
+        std::make_unique<PlanStageStats>(_commonStats, STAGE_QUEUED_DATA);
+    ret->specific = std::make_unique<MockStats>(_specificStats);
     return ret;
 }
 

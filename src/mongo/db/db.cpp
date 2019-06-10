@@ -36,6 +36,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <signal.h>
 #include <string>
 
@@ -153,7 +154,6 @@
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
@@ -271,14 +271,14 @@ ExitCode _initAndListen(int listenPort) {
     auto serviceContext = getGlobalServiceContext();
 
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
-    auto opObserverRegistry = stdx::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(stdx::make_unique<OpObserverShardingImpl>());
-    opObserverRegistry->addObserver(stdx::make_unique<AuthOpObserver>());
+    auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
+    opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>());
+    opObserverRegistry->addObserver(std::make_unique<AuthOpObserver>());
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        opObserverRegistry->addObserver(stdx::make_unique<ShardServerOpObserver>());
+        opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
     } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        opObserverRegistry->addObserver(stdx::make_unique<ConfigServerOpObserver>());
+        opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
     }
     setupFreeMonitoringOpObserver(opObserverRegistry.get());
 
@@ -310,8 +310,7 @@ ExitCode _initAndListen(int listenPort) {
 
     logProcessDetails();
 
-    serviceContext->setServiceEntryPoint(
-        stdx::make_unique<ServiceEntryPointMongod>(serviceContext));
+    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
 
     if (!storageGlobalParams.repair) {
         auto tl =
@@ -330,7 +329,7 @@ ExitCode _initAndListen(int listenPort) {
     runner->startup();
     serviceContext->setPeriodicRunner(std::move(runner));
     FlowControl::set(serviceContext,
-                     stdx::make_unique<FlowControl>(
+                     std::make_unique<FlowControl>(
                          serviceContext, repl::ReplicationCoordinator::get(serviceContext)));
 
     initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
@@ -551,7 +550,7 @@ ExitCode _initAndListen(int listenPort) {
 
             Grid::get(startupOpCtx.get())->setShardingInitialized();
         } else if (replSettings.usingReplSets()) {  // standalone replica set
-            auto keysCollectionClient = stdx::make_unique<KeysCollectionClientDirect>();
+            auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>();
             auto keyManager = std::make_shared<KeysCollectionManager>(
                 KeysCollectionManager::kKeyManagerPurposeString,
                 std::move(keysCollectionClient),
@@ -559,7 +558,7 @@ ExitCode _initAndListen(int listenPort) {
             keyManager->startMonitoring(startupOpCtx->getServiceContext());
 
             LogicalTimeValidator::set(startupOpCtx->getServiceContext(),
-                                      stdx::make_unique<LogicalTimeValidator>(keyManager));
+                                      std::make_unique<LogicalTimeValidator>(keyManager));
         }
 
         replCoord->startup(startupOpCtx.get());
@@ -795,45 +794,45 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
     tpOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
     };
-    auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
-    return stdx::make_unique<executor::ThreadPoolTaskExecutor>(
-        stdx::make_unique<ThreadPool>(tpOptions),
+    auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
+    hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
+    return std::make_unique<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(tpOptions),
         executor::makeNetworkInterface("Replication", nullptr, std::move(hookList)));
 }
 
 void setUpReplication(ServiceContext* serviceContext) {
-    repl::StorageInterface::set(serviceContext, stdx::make_unique<repl::StorageInterfaceImpl>());
+    repl::StorageInterface::set(serviceContext, std::make_unique<repl::StorageInterfaceImpl>());
     auto storageInterface = repl::StorageInterface::get(serviceContext);
 
     auto consistencyMarkers =
-        stdx::make_unique<repl::ReplicationConsistencyMarkersImpl>(storageInterface);
-    auto recovery = stdx::make_unique<repl::ReplicationRecoveryImpl>(storageInterface,
-                                                                     consistencyMarkers.get());
+        std::make_unique<repl::ReplicationConsistencyMarkersImpl>(storageInterface);
+    auto recovery =
+        std::make_unique<repl::ReplicationRecoveryImpl>(storageInterface, consistencyMarkers.get());
     repl::ReplicationProcess::set(
         serviceContext,
-        stdx::make_unique<repl::ReplicationProcess>(
+        std::make_unique<repl::ReplicationProcess>(
             storageInterface, std::move(consistencyMarkers), std::move(recovery)));
     auto replicationProcess = repl::ReplicationProcess::get(serviceContext);
 
     repl::DropPendingCollectionReaper::set(
-        serviceContext, stdx::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
+        serviceContext, std::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
     auto dropPendingCollectionReaper = repl::DropPendingCollectionReaper::get(serviceContext);
 
     repl::TopologyCoordinator::Options topoCoordOptions;
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
     topoCoordOptions.clusterRole = serverGlobalParams.clusterRole;
 
-    auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext);
+    auto logicalClock = std::make_unique<LogicalClock>(serviceContext);
     LogicalClock::set(serviceContext, std::move(logicalClock));
 
-    auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
+    auto replCoord = std::make_unique<repl::ReplicationCoordinatorImpl>(
         serviceContext,
         getGlobalReplSettings(),
-        stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
+        std::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
             serviceContext, dropPendingCollectionReaper, storageInterface, replicationProcess),
         makeReplicationExecutor(serviceContext),
-        stdx::make_unique<repl::TopologyCoordinator>(topoCoordOptions),
+        std::make_unique<repl::TopologyCoordinator>(topoCoordOptions),
         replicationProcess,
         storageInterface,
         SecureRandom::create()->nextInt64());

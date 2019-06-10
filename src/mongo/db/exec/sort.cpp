@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sort.h"
 
 #include <algorithm>
+#include <memory>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/scoped_timer.h"
@@ -42,7 +43,6 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -50,7 +50,6 @@ namespace mongo {
 using std::endl;
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 // static
 const char* SortStage::kStageType = "SORT";
@@ -82,7 +81,7 @@ SortStage::SortStage(OperationContext* opCtx,
     _children.emplace_back(child);
 
     BSONObj sortComparator = FindCommon::transformSortSpec(_pattern);
-    _sortKeyComparator = stdx::make_unique<WorkingSetComparator>(sortComparator);
+    _sortKeyComparator = std::make_unique<WorkingSetComparator>(sortComparator);
 
     // If limit > 1, we need to initialize _dataSet here to maintain ordered set of data items while
     // fetching from the child stage.
@@ -177,8 +176,8 @@ unique_ptr<PlanStageStats> SortStage::getStats() {
     _specificStats.limit = _limit;
     _specificStats.sortPattern = _pattern.getOwned();
 
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_SORT);
-    ret->specific = make_unique<SortStats>(_specificStats);
+    unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_SORT);
+    ret->specific = std::make_unique<SortStats>(_specificStats);
     ret->children.emplace_back(child()->getStats());
     return ret;
 }

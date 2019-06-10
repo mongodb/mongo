@@ -44,7 +44,6 @@
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"

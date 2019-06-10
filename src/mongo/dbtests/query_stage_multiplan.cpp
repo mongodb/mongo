@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -53,12 +55,11 @@
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 
-const std::unique_ptr<ClockSource> clockSource = stdx::make_unique<ClockSourceMock>();
+const std::unique_ptr<ClockSource> clockSource = std::make_unique<ClockSourceMock>();
 
 // How we access the external setParameter testing bool.
 extern AtomicWord<bool> internalQueryForceIntersectionPlans;
@@ -67,15 +68,14 @@ namespace {
 
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 static const NamespaceString nss("unittests.QueryStageMultiPlan");
 
 std::unique_ptr<QuerySolution> createQuerySolution() {
-    auto soln = stdx::make_unique<QuerySolution>();
-    soln->cacheData = stdx::make_unique<SolutionCacheData>();
+    auto soln = std::make_unique<QuerySolution>();
+    soln->cacheData = std::make_unique<SolutionCacheData>();
     soln->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
-    soln->cacheData->tree = stdx::make_unique<PlanCacheIndexTree>();
+    soln->cacheData->tree = std::make_unique<PlanCacheIndexTree>();
     return soln;
 }
 
@@ -123,7 +123,7 @@ protected:
 std::unique_ptr<CanonicalQuery> makeCanonicalQuery(OperationContext* opCtx,
                                                    NamespaceString nss,
                                                    BSONObj filter) {
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(filter);
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -195,7 +195,7 @@ std::unique_ptr<MultiPlanStage> runMultiPlanner(OperationContext* opCtx,
     // Hand the plans off to the MPS.
     auto cq = makeCanonicalQuery(opCtx, nss, BSON("foo" << desiredFooValue));
 
-    unique_ptr<MultiPlanStage> mps = make_unique<MultiPlanStage>(opCtx, coll, cq.get());
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(opCtx, coll, cq.get());
     mps->addPlan(createQuerySolution(), ixScanRoot.release(), sharedWs.get());
     mps->addPlan(createQuerySolution(), collScanRoot.release(), sharedWs.get());
 
@@ -243,7 +243,7 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
     auto cq = makeCanonicalQuery(_opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps =
-        make_unique<MultiPlanStage>(_opCtx.get(), ctx.getCollection(), cq.get());
+        std::make_unique<MultiPlanStage>(_opCtx.get(), ctx.getCollection(), cq.get());
     mps->addPlan(createQuerySolution(), ixScanRoot.release(), sharedWs.get());
     mps->addPlan(createQuerySolution(), collScanRoot.release(), sharedWs.get());
 
@@ -372,7 +372,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     Collection* collection = ctx.getCollection();
 
     // Query for both 'a' and 'b' and sort on 'b'.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(BSON("a" << 1 << "b" << 1));
     qr->setSort(BSON("b" << 1));
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
@@ -470,9 +470,9 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
 
     const int nDocs = 500;
 
-    auto ws = stdx::make_unique<WorkingSet>();
-    auto firstPlan = stdx::make_unique<QueuedDataStage>(_opCtx.get(), ws.get());
-    auto secondPlan = stdx::make_unique<QueuedDataStage>(_opCtx.get(), ws.get());
+    auto ws = std::make_unique<WorkingSet>();
+    auto firstPlan = std::make_unique<QueuedDataStage>(_opCtx.get(), ws.get());
+    auto secondPlan = std::make_unique<QueuedDataStage>(_opCtx.get(), ws.get());
 
     for (int i = 0; i < nDocs; ++i) {
         addMember(firstPlan.get(), ws.get(), BSON("x" << 1));
@@ -484,15 +484,15 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
 
     AutoGetCollectionForReadCommand ctx(_opCtx.get(), nss);
 
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(BSON("x" << 1));
     auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
     unique_ptr<MultiPlanStage> mps =
-        make_unique<MultiPlanStage>(_opCtx.get(), ctx.getCollection(), cq.get());
+        std::make_unique<MultiPlanStage>(_opCtx.get(), ctx.getCollection(), cq.get());
 
     // Put each plan into the MultiPlanStage. Takes ownership of 'firstPlan' and 'secondPlan'.
-    mps->addPlan(stdx::make_unique<QuerySolution>(), firstPlan.release(), ws.get());
-    mps->addPlan(stdx::make_unique<QuerySolution>(), secondPlan.release(), ws.get());
+    mps->addPlan(std::make_unique<QuerySolution>(), firstPlan.release(), ws.get());
+    mps->addPlan(std::make_unique<QuerySolution>(), secondPlan.release(), ws.get());
 
     // Making a PlanExecutor chooses the best plan.
     auto exec = uassertStatusOK(PlanExecutor::make(
@@ -542,7 +542,7 @@ TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
     Collection* coll = ctx.getCollection();
 
     // Create the executor (Matching all documents).
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(BSON("foo" << BSON("$gte" << 0)));
     auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
     auto exec =
@@ -586,7 +586,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlannin
         getCollScanPlan(_opCtx.get(), coll, sharedWs.get(), filter.get());
 
 
-    auto queryRequest = stdx::make_unique<QueryRequest>(nss);
+    auto queryRequest = std::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filterObj);
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));
@@ -626,7 +626,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfKilledDuringPlanning) {
     unique_ptr<PlanStage> collScanRoot =
         getCollScanPlan(_opCtx.get(), coll, sharedWs.get(), filter.get());
 
-    auto queryRequest = stdx::make_unique<QueryRequest>(nss);
+    auto queryRequest = std::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(BSON("foo" << BSON("$gte" << 0)));
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));

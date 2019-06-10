@@ -43,7 +43,7 @@ std::unique_ptr<ParsedAddFields> ParsedAddFields::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec) {
     // Verify that we don't have conflicting field paths, etc.
     ProjectionSpecValidator::uassertValid(spec, "$addFields");
-    std::unique_ptr<ParsedAddFields> parsedAddFields = stdx::make_unique<ParsedAddFields>(expCtx);
+    std::unique_ptr<ParsedAddFields> parsedAddFields = std::make_unique<ParsedAddFields>(expCtx);
 
     // Actually parse the specification.
     parsedAddFields->parse(spec);

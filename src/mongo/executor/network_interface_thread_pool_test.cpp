@@ -31,11 +31,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/base/init.h"
 #include "mongo/executor/async_timer_mock.h"
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/executor/network_interface_thread_pool.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool_test_common.h"
 #include "mongo/util/concurrency/thread_pool_test_fixture.h"
@@ -47,9 +48,9 @@ class NetworkInterfaceThreadPoolWithASIO : public ThreadPoolInterface {
 public:
     NetworkInterfaceThreadPoolWithASIO() {
         executor::NetworkInterfaceASIO::Options options;
-        options.timerFactory = stdx::make_unique<executor::AsyncTimerFactoryMock>();
-        _asio = stdx::make_unique<executor::NetworkInterfaceASIO>(std::move(options));
-        _pool = stdx::make_unique<executor::NetworkInterfaceThreadPool>(_asio.get());
+        options.timerFactory = std::make_unique<executor::AsyncTimerFactoryMock>();
+        _asio = std::make_unique<executor::NetworkInterfaceASIO>(std::move(options));
+        _pool = std::make_unique<executor::NetworkInterfaceThreadPool>(_asio.get());
         _asio->startup();
     }
 
@@ -80,7 +81,7 @@ private:
 
 MONGO_INITIALIZER(ThreadPoolCommonTests)(InitializerContext*) {
     addTestsForThreadPool("ThreadPoolCommon",
-                          []() { return stdx::make_unique<NetworkInterfaceThreadPoolWithASIO>(); });
+                          []() { return std::make_unique<NetworkInterfaceThreadPoolWithASIO>(); });
     return Status::OK();
 }
 

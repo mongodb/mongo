@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
 #include <set>
 
 #include "mongo/db/catalog/create_collection.h"
@@ -50,7 +51,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -138,13 +138,13 @@ void DropDatabaseTest::setUp() {
     auto service = getServiceContext();
     _opCtx = cc().makeOperationContext();
 
-    repl::StorageInterface::set(service, stdx::make_unique<repl::StorageInterfaceMock>());
+    repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
     repl::DropPendingCollectionReaper::set(
         service,
-        stdx::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
+        std::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
 
     // Set up ReplicationCoordinator and create oplog.
-    auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorMock>(service);
+    auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
     _replCoord = replCoord.get();
     repl::ReplicationCoordinator::set(service, std::move(replCoord));
     repl::setOplogCollectionName(service);
@@ -156,7 +156,7 @@ void DropDatabaseTest::setUp() {
     // Use OpObserverMock to track notifications for collection and database drops.
     OpObserverRegistry* opObserverRegistry =
         dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
-    auto mockObserver = stdx::make_unique<OpObserverMock>();
+    auto mockObserver = std::make_unique<OpObserverMock>();
     _opObserver = mockObserver.get();
     opObserverRegistry->addObserver(std::move(mockObserver));
 

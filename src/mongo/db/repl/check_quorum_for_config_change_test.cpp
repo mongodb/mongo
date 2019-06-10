@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <functional>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
@@ -42,7 +43,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"

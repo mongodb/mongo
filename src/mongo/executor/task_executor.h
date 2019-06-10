@@ -30,6 +30,7 @@
 #pragma once
 
 #include <functional>
+#include <functional>
 #include <memory>
 #include <string>
 

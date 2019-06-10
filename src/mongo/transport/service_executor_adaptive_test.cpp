@@ -140,9 +140,9 @@ protected:
 
     template <class Options>
     std::unique_ptr<ServiceExecutorAdaptive> makeAndStartExecutor() {
-        auto configOwned = stdx::make_unique<Options>();
+        auto configOwned = std::make_unique<Options>();
         config = configOwned.get();
-        auto exec = stdx::make_unique<ServiceExecutorAdaptive>(
+        auto exec = std::make_unique<ServiceExecutorAdaptive>(
             getGlobalServiceContext(), asioIoCtx, std::move(configOwned));
 
         ASSERT_OK(exec->start());

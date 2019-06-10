@@ -57,7 +57,7 @@ public:
     MyOperationContext(KVEngine* engine) : OperationContextNoop(engine->newRecoveryUnit()) {}
 };
 
-const std::unique_ptr<ClockSource> clock = stdx::make_unique<ClockSourceMock>();
+const std::unique_ptr<ClockSource> clock = std::make_unique<ClockSourceMock>();
 
 TEST(KVEngineTestHarness, SimpleRS1) {
     unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
@@ -636,7 +636,7 @@ TEST_F(KVCatalogTest, RestartForPrefixes) {
         unique_ptr<RecordStore> rs =
             engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions());
         unique_ptr<KVCatalog> catalog =
-            stdx::make_unique<KVCatalog>(rs.get(), false, false, nullptr);
+            std::make_unique<KVCatalog>(rs.get(), false, false, nullptr);
         catalog->init(&opCtx);
 
         const BSONCollectionCatalogEntry::MetaData md =

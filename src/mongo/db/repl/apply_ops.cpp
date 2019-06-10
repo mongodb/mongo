@@ -422,7 +422,7 @@ Status applyOps(OperationContext* opCtx,
             BSONObjBuilder intermediateResult;
             std::unique_ptr<BSONArrayBuilder> opsBuilder;
             if (opCtx->writesAreReplicated()) {
-                opsBuilder = stdx::make_unique<BSONArrayBuilder>();
+                opsBuilder = std::make_unique<BSONArrayBuilder>();
             }
             WriteUnitOfWork wunit(opCtx);
             numApplied = 0;

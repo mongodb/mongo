@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 
+#include <memory>
 #include <string>
 
 #include "mongo/base/status.h"
@@ -44,7 +45,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/update/update_driver.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/str.h"
 
@@ -110,7 +110,7 @@ void AuthzManagerExternalStateMock::setAuthzVersion(int version) {
 
 std::unique_ptr<AuthzSessionExternalState>
 AuthzManagerExternalStateMock::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
-    return stdx::make_unique<AuthzSessionExternalStateMock>(authzManager);
+    return std::make_unique<AuthzSessionExternalStateMock>(authzManager);
 }
 
 Status AuthzManagerExternalStateMock::findOne(OperationContext* opCtx,

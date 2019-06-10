@@ -31,9 +31,10 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 
+#include <memory>
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 

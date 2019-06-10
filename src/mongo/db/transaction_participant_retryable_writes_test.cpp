@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -45,7 +47,6 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/socket_utils.h"
@@ -172,7 +173,7 @@ protected:
         const auto service = opCtx()->getServiceContext();
 
         const auto opObserverRegistry = dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
-        opObserverRegistry->addObserver(stdx::make_unique<OpObserverMock>());
+        opObserverRegistry->addObserver(std::make_unique<OpObserverMock>());
 
         opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
         _opContextSession.emplace(opCtx());

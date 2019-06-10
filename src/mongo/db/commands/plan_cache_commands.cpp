@@ -200,7 +200,7 @@ StatusWith<unique_ptr<CanonicalQuery>> PlanCacheCommand::canonicalize(OperationC
 
     // Create canonical query
     const NamespaceString nss(ns);
-    auto qr = stdx::make_unique<QueryRequest>(std::move(nss));
+    auto qr = std::make_unique<QueryRequest>(std::move(nss));
     qr->setFilter(queryObj);
     qr->setSort(sortObj);
     qr->setProj(projObj);

@@ -133,7 +133,7 @@ public:
         };
         _myLastOpTime = OpTime();
         _myLastWallTime = Date_t::min();
-        _syncSourceSelector = stdx::make_unique<SyncSourceSelectorMock>();
+        _syncSourceSelector = std::make_unique<SyncSourceSelectorMock>();
     }
 
     // SyncSourceSelector
@@ -251,7 +251,7 @@ protected:
 
     void setUp() override {
         executor::ThreadPoolExecutorTest::setUp();
-        _storageInterface = stdx::make_unique<StorageInterfaceMock>();
+        _storageInterface = std::make_unique<StorageInterfaceMock>();
         _storageInterface->createOplogFn = [this](OperationContext* opCtx,
                                                   const NamespaceString& nss) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
@@ -326,23 +326,23 @@ protected:
             }
         };
 
-        _dbWorkThreadPool = stdx::make_unique<ThreadPool>(ThreadPool::Options());
+        _dbWorkThreadPool = std::make_unique<ThreadPool>(ThreadPool::Options());
         _dbWorkThreadPool->startup();
 
         _target = HostAndPort{"localhost:12346"};
-        _mockServer = stdx::make_unique<MockRemoteDBServer>(_target.toString());
+        _mockServer = std::make_unique<MockRemoteDBServer>(_target.toString());
         _options1.uuid = UUID::gen();
 
         reset();
 
         launchExecutorThread();
 
-        _replicationProcess = stdx::make_unique<ReplicationProcess>(
+        _replicationProcess = std::make_unique<ReplicationProcess>(
             _storageInterface.get(),
-            stdx::make_unique<ReplicationConsistencyMarkersMock>(),
-            stdx::make_unique<ReplicationRecoveryMock>());
+            std::make_unique<ReplicationConsistencyMarkersMock>(),
+            std::make_unique<ReplicationRecoveryMock>());
 
-        _executorProxy = stdx::make_unique<TaskExecutorMock>(&getExecutor());
+        _executorProxy = std::make_unique<TaskExecutorMock>(&getExecutor());
 
         _myLastOpTime = OpTime({3, 0}, 1);
 
@@ -366,7 +366,7 @@ protected:
             Client::initThread(threadName.c_str());
         };
 
-        auto dataReplicatorExternalState = stdx::make_unique<DataReplicatorExternalStateMock>();
+        auto dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();
         dataReplicatorExternalState->taskExecutor = _executorProxy.get();
         dataReplicatorExternalState->currentTerm = 1LL;
         dataReplicatorExternalState->lastCommittedOpTime = _myLastOpTime;
@@ -396,7 +396,7 @@ protected:
             // When creating InitialSyncer, we wrap _onCompletion so that we can override the
             // InitialSyncer's callback behavior post-construction.
             // See InitialSyncerTransitionsToCompleteWhenFinishCallbackThrowsException.
-            _initialSyncer = stdx::make_unique<InitialSyncer>(
+            _initialSyncer = std::make_unique<InitialSyncer>(
                 options,
                 std::move(dataReplicatorExternalState),
                 _dbWorkThreadPool.get(),
@@ -639,7 +639,7 @@ TEST_F(InitialSyncerTest, InvalidConstruction) {
 
     // Null task executor in external state.
     {
-        auto dataReplicatorExternalState = stdx::make_unique<DataReplicatorExternalStateMock>();
+        auto dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();
         ASSERT_THROWS_CODE_AND_WHAT(InitialSyncer(options,
                                                   std::move(dataReplicatorExternalState),
                                                   _dbWorkThreadPool.get(),
@@ -653,7 +653,7 @@ TEST_F(InitialSyncerTest, InvalidConstruction) {
 
     // Null callback function.
     {
-        auto dataReplicatorExternalState = stdx::make_unique<DataReplicatorExternalStateMock>();
+        auto dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();
         dataReplicatorExternalState->taskExecutor = &getExecutor();
         ASSERT_THROWS_CODE_AND_WHAT(InitialSyncer(options,
                                                   std::move(dataReplicatorExternalState),
@@ -993,9 +993,9 @@ TEST_F(InitialSyncerTest, InitialSyncerResetsOnCompletionCallbackFunctionPointer
     auto sharedCallbackData = std::make_shared<SharedCallbackState>(&sharedCallbackStateDestroyed);
     decltype(_lastApplied) lastApplied = getDetectableErrorStatus();
 
-    auto dataReplicatorExternalState = stdx::make_unique<DataReplicatorExternalStateMock>();
+    auto dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();
     dataReplicatorExternalState->taskExecutor = &getExecutor();
-    auto initialSyncer = stdx::make_unique<InitialSyncer>(
+    auto initialSyncer = std::make_unique<InitialSyncer>(
         _options,
         std::move(dataReplicatorExternalState),
         _dbWorkThreadPool.get(),

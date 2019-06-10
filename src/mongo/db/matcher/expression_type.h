@@ -67,7 +67,7 @@ public:
     virtual StringData name() const = 0;
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
-        auto expr = stdx::make_unique<T>(path(), _typeSet);
+        auto expr = std::make_unique<T>(path(), _typeSet);
         if (getTag()) {
             expr->setTag(getTag()->clone());
         }
@@ -189,7 +189,7 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
         auto expr =
-            stdx::make_unique<InternalSchemaBinDataSubTypeExpression>(path(), _binDataSubType);
+            std::make_unique<InternalSchemaBinDataSubTypeExpression>(path(), _binDataSubType);
         if (getTag()) {
             expr->setTag(getTag()->clone());
         }

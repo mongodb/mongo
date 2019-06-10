@@ -31,8 +31,9 @@
 
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 
+#include <memory>
+
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace repl {
@@ -105,7 +106,7 @@ bool DataReplicatorExternalStateMock::shouldStopFetching(
 
 std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeInitialSyncOplogBuffer(
     OperationContext* opCtx) const {
-    return stdx::make_unique<OplogBufferBlockingQueue>();
+    return std::make_unique<OplogBufferBlockingQueue>();
 }
 
 std::unique_ptr<OplogApplier> DataReplicatorExternalStateMock::makeOplogApplier(

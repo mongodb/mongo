@@ -33,12 +33,13 @@
 
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 
+#include <memory>
+
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"

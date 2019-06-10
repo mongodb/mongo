@@ -96,7 +96,7 @@ std::unique_ptr<WriteConcernErrorDetail> getWriteConcernErrorDetailFromBSONObj(c
         }
     }
 
-    return stdx::make_unique<WriteConcernErrorDetail>(getWriteConcernErrorDetail(wcErrorElem));
+    return std::make_unique<WriteConcernErrorDetail>(getWriteConcernErrorDetail(wcErrorElem));
 }
 
 namespace {

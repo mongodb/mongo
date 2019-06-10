@@ -29,17 +29,17 @@
 
 #include "mongo/db/exec/or.h"
 
+#include <memory>
+
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 // static
 const char* OrStage::kStageType = "OR";
@@ -131,8 +131,8 @@ unique_ptr<PlanStageStats> OrStage::getStats() {
         _commonStats.filter = bob.obj();
     }
 
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_OR);
-    ret->specific = make_unique<OrStats>(_specificStats);
+    unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_OR);
+    ret->specific = std::make_unique<OrStats>(_specificStats);
     for (size_t i = 0; i < _children.size(); ++i) {
         ret->children.emplace_back(_children[i]->getStats());
     }

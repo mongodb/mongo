@@ -76,7 +76,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteExpression(
 std::unique_ptr<MatchExpression> RewriteExpr::_rewriteAndExpression(
     const boost::intrusive_ptr<ExpressionAnd>& currExprNode) {
 
-    auto andMatch = stdx::make_unique<AndMatchExpression>();
+    auto andMatch = std::make_unique<AndMatchExpression>();
 
     for (auto&& child : currExprNode->getOperandList()) {
         if (auto childMatch = _rewriteExpression(child)) {
@@ -94,7 +94,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteAndExpression(
 std::unique_ptr<MatchExpression> RewriteExpr::_rewriteOrExpression(
     const boost::intrusive_ptr<ExpressionOr>& currExprNode) {
 
-    auto orMatch = stdx::make_unique<OrMatchExpression>();
+    auto orMatch = std::make_unique<OrMatchExpression>();
     for (auto&& child : currExprNode->getOperandList()) {
         if (auto childExpr = _rewriteExpression(child)) {
             orMatch->add(childExpr.release());
@@ -151,7 +151,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
     invariant(comparisonOp == ExpressionCompare::EQ);
 
     auto eqMatchExpr =
-        stdx::make_unique<InternalExprEqMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
+        std::make_unique<InternalExprEqMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
     eqMatchExpr->setCollator(_collator);
 
     return std::move(eqMatchExpr);

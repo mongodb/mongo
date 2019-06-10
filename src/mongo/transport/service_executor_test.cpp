@@ -153,9 +153,9 @@ protected:
         auto scOwned = ServiceContext::make();
         setGlobalServiceContext(std::move(scOwned));
 
-        auto configOwned = stdx::make_unique<TestOptions>();
+        auto configOwned = std::make_unique<TestOptions>();
         executorConfig = configOwned.get();
-        executor = stdx::make_unique<ServiceExecutorAdaptive>(
+        executor = std::make_unique<ServiceExecutorAdaptive>(
             getGlobalServiceContext(), std::make_shared<ASIOReactor>(), std::move(configOwned));
     }
 
@@ -170,7 +170,7 @@ protected:
         auto scOwned = ServiceContext::make();
         setGlobalServiceContext(std::move(scOwned));
 
-        executor = stdx::make_unique<ServiceExecutorSynchronous>(getGlobalServiceContext());
+        executor = std::make_unique<ServiceExecutorSynchronous>(getGlobalServiceContext());
     }
 
     std::unique_ptr<ServiceExecutorSynchronous> executor;

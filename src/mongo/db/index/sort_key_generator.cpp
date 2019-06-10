@@ -79,7 +79,7 @@ SortKeyGenerator::SortKeyGenerator(const BSONObj& sortSpec, const CollatorInterf
     }
 
     constexpr bool isSparse = false;
-    _indexKeyGen = stdx::make_unique<BtreeKeyGenerator>(fieldNames, fixed, isSparse, _collator);
+    _indexKeyGen = std::make_unique<BtreeKeyGenerator>(fieldNames, fixed, isSparse, _collator);
 }
 
 StatusWith<BSONObj> SortKeyGenerator::getSortKey(const BSONObj& obj,

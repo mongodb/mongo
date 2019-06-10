@@ -81,7 +81,7 @@ void MockConnRegistry::clear() {
 std::unique_ptr<MockDBClientConnection> MockConnRegistry::connect(const std::string& connStr) {
     stdx::lock_guard<stdx::mutex> sl(_registryMutex);
     fassert(16534, _registry.count(connStr) == 1);
-    return stdx::make_unique<MockDBClientConnection>(_registry[connStr], true);
+    return std::make_unique<MockDBClientConnection>(_registry[connStr], true);
 }
 
 MockConnRegistry::MockConnHook::MockConnHook(MockConnRegistry* registry) : _registry(registry) {}

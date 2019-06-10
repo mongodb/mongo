@@ -159,7 +159,7 @@ void UpdateDriver::parse(
                 "arrayFilters may not be specified for pipeline-syle updates",
                 arrayFilters.empty());
         _updateExecutor =
-            stdx::make_unique<PipelineExecutor>(_expCtx, updateMod.getUpdatePipeline(), constants);
+            std::make_unique<PipelineExecutor>(_expCtx, updateMod.getUpdatePipeline(), constants);
         _updateType = UpdateType::kPipeline;
         return;
     }
@@ -172,7 +172,7 @@ void UpdateDriver::parse(
                 "multi update is not supported for replacement-style update",
                 !multi);
 
-        _updateExecutor = stdx::make_unique<ObjectReplaceExecutor>(updateMod.getUpdateClassic());
+        _updateExecutor = std::make_unique<ObjectReplaceExecutor>(updateMod.getUpdateClassic());
 
         // Register the fact that this driver will only do full object replacements.
         _updateType = UpdateType::kReplacement;
@@ -195,9 +195,9 @@ void UpdateDriver::parse(
         uassertStatusOK(updateSemanticsFromElement(updateSemanticsElement));
     }
 
-    auto root = stdx::make_unique<UpdateObjectNode>();
+    auto root = std::make_unique<UpdateObjectNode>();
     _positional = parseUpdateExpression(updateExpr, root.get(), _expCtx, arrayFilters);
-    _updateExecutor = stdx::make_unique<UpdateTreeExecutor>(std::move(root));
+    _updateExecutor = std::make_unique<UpdateTreeExecutor>(std::move(root));
 }
 
 Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
@@ -207,7 +207,7 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
     // We canonicalize the query to collapse $and/$or, and the namespace is not needed.  Also,
     // because this is for the upsert case, where we insert a new document if one was not found, the
     // $where/$text clauses do not make sense, hence empty ExtensionsCallback.
-    auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
+    auto qr = std::make_unique<QueryRequest>(NamespaceString(""));
     qr->setFilter(query);
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     // $expr is not allowed in the query for an upsert, since it is not clear what the equality

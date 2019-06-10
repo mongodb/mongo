@@ -115,7 +115,7 @@ public:
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<AndMatchExpression> self = stdx::make_unique<AndMatchExpression>();
+        std::unique_ptr<AndMatchExpression> self = std::make_unique<AndMatchExpression>();
         for (size_t i = 0; i < numChildren(); ++i) {
             self->add(getChild(i)->shallowClone().release());
         }
@@ -144,7 +144,7 @@ public:
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<OrMatchExpression> self = stdx::make_unique<OrMatchExpression>();
+        std::unique_ptr<OrMatchExpression> self = std::make_unique<OrMatchExpression>();
         for (size_t i = 0; i < numChildren(); ++i) {
             self->add(getChild(i)->shallowClone().release());
         }
@@ -173,7 +173,7 @@ public:
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<NorMatchExpression> self = stdx::make_unique<NorMatchExpression>();
+        std::unique_ptr<NorMatchExpression> self = std::make_unique<NorMatchExpression>();
         for (size_t i = 0; i < numChildren(); ++i) {
             self->add(getChild(i)->shallowClone().release());
         }
@@ -194,7 +194,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<NotMatchExpression> self =
-            stdx::make_unique<NotMatchExpression>(_exp->shallowClone().release());
+            std::make_unique<NotMatchExpression>(_exp->shallowClone().release());
         if (getTag()) {
             self->setTag(getTag()->clone());
         }

@@ -386,14 +386,14 @@ public:
           _startPosition(index.getKeyStringVersion()) {
         MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
 
-        _stmt = stdx::make_unique<SqliteStatement>(*session,
-                                                   "SELECT key, value FROM \"",
-                                                   _index.getIdent(),
-                                                   "\" WHERE key ",
-                                                   (_isForward ? ">=" : "<="),
-                                                   " ? ORDER BY key ",
-                                                   (_isForward ? "ASC" : "DESC"),
-                                                   ";");
+        _stmt = std::make_unique<SqliteStatement>(*session,
+                                                  "SELECT key, value FROM \"",
+                                                  _index.getIdent(),
+                                                  "\" WHERE key ",
+                                                  (_isForward ? ">=" : "<="),
+                                                  " ? ORDER BY key ",
+                                                  (_isForward ? "ASC" : "DESC"),
+                                                  ";");
     }
 
     virtual ~CursorBase() {}
@@ -420,7 +420,7 @@ public:
         // key if inclusive and before if exclusive.
         const auto discriminator =
             _isForward == inclusive ? KeyString::kExclusiveAfter : KeyString::kExclusiveBefore;
-        _endPosition = stdx::make_unique<KeyString>(_index.getKeyStringVersion());
+        _endPosition = std::make_unique<KeyString>(_index.getKeyStringVersion());
         _endPosition->resetToKey(stripFieldNames(key), _index.getOrdering(), discriminator);
     }
 
@@ -660,7 +660,7 @@ SortedDataBuilderInterface* MobileIndexStandard::getBulkBuilder(OperationContext
 
 std::unique_ptr<SortedDataInterface::Cursor> MobileIndexStandard::newCursor(OperationContext* opCtx,
                                                                             bool isForward) const {
-    return stdx::make_unique<CursorStandard>(*this, opCtx, isForward);
+    return std::make_unique<CursorStandard>(*this, opCtx, isForward);
 }
 
 StatusWith<SpecialFormatInserted> MobileIndexStandard::_insert(OperationContext* opCtx,
@@ -699,7 +699,7 @@ SortedDataBuilderInterface* MobileIndexUnique::getBulkBuilder(OperationContext* 
 
 std::unique_ptr<SortedDataInterface::Cursor> MobileIndexUnique::newCursor(OperationContext* opCtx,
                                                                           bool isForward) const {
-    return stdx::make_unique<CursorUnique>(*this, opCtx, isForward);
+    return std::make_unique<CursorUnique>(*this, opCtx, isForward);
 }
 
 StatusWith<SpecialFormatInserted> MobileIndexUnique::_insert(OperationContext* opCtx,

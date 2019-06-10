@@ -101,7 +101,7 @@ public:
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
-        return stdx::make_unique<AlwaysFalseMatchExpression>();
+        return std::make_unique<AlwaysFalseMatchExpression>();
     }
 
     bool isTriviallyFalse() const final {
@@ -120,7 +120,7 @@ public:
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
-        return stdx::make_unique<AlwaysTrueMatchExpression>();
+        return std::make_unique<AlwaysTrueMatchExpression>();
     }
 
     bool isTriviallyTrue() const final {

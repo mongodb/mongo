@@ -162,7 +162,7 @@ std::unique_ptr<MatchExpression> InternalSchemaAllowedPropertiesMatchExpression:
                                              constraint.second->shallowClone());
     }
 
-    auto clone = stdx::make_unique<InternalSchemaAllowedPropertiesMatchExpression>(
+    auto clone = std::make_unique<InternalSchemaAllowedPropertiesMatchExpression>(
         _properties,
         _namePlaceholder,
         std::move(clonedPatternProperties),

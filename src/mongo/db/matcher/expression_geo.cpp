@@ -403,7 +403,7 @@ bool GeoMatchExpression::equivalent(const MatchExpression* other) const {
 
 std::unique_ptr<MatchExpression> GeoMatchExpression::shallowClone() const {
     std::unique_ptr<GeoMatchExpression> next =
-        stdx::make_unique<GeoMatchExpression>(path(), _query, _rawObj);
+        std::make_unique<GeoMatchExpression>(path(), _query, _rawObj);
     next->_canSkipValidation = _canSkipValidation;
     if (getTag()) {
         next->setTag(getTag()->clone());
@@ -461,7 +461,7 @@ bool GeoNearMatchExpression::equivalent(const MatchExpression* other) const {
 
 std::unique_ptr<MatchExpression> GeoNearMatchExpression::shallowClone() const {
     std::unique_ptr<GeoNearMatchExpression> next =
-        stdx::make_unique<GeoNearMatchExpression>(path(), _query, _rawObj);
+        std::make_unique<GeoNearMatchExpression>(path(), _query, _rawObj);
     if (getTag()) {
         next->setTag(getTag()->clone());
     }

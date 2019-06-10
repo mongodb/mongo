@@ -37,6 +37,8 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
+#include <memory>
+
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/util/builder.h"
@@ -58,7 +60,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/fail_point.h"
@@ -2051,12 +2052,12 @@ std::unique_ptr<SeekableRecordCursor> StandardWiredTigerRecordStore::getCursor(
         wru->setIsOplogReader();
     }
 
-    return stdx::make_unique<WiredTigerRecordStoreStandardCursor>(opCtx, *this, forward);
+    return std::make_unique<WiredTigerRecordStoreStandardCursor>(opCtx, *this, forward);
 }
 
 std::unique_ptr<RecordCursor> StandardWiredTigerRecordStore::getRandomCursorWithOptions(
     OperationContext* opCtx, StringData extraConfig) const {
-    return stdx::make_unique<RandomCursor>(opCtx, *this, extraConfig);
+    return std::make_unique<RandomCursor>(opCtx, *this, extraConfig);
 }
 
 WiredTigerRecordStoreStandardCursor::WiredTigerRecordStoreStandardCursor(
@@ -2102,7 +2103,7 @@ std::unique_ptr<SeekableRecordCursor> PrefixedWiredTigerRecordStore::getCursor(
         wru->setIsOplogReader();
     }
 
-    return stdx::make_unique<WiredTigerRecordStorePrefixedCursor>(opCtx, *this, _prefix, forward);
+    return std::make_unique<WiredTigerRecordStorePrefixedCursor>(opCtx, *this, _prefix, forward);
 }
 
 std::unique_ptr<RecordCursor> PrefixedWiredTigerRecordStore::getRandomCursorWithOptions(

@@ -33,11 +33,12 @@
 
 #include "mongo/db/s/collection_metadata.h"
 
+#include <memory>
+
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 

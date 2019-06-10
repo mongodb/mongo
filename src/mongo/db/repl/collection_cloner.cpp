@@ -160,7 +160,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
           _dbWorkTaskRunner.schedule(std::move(task));
           return executor::TaskExecutor::CallbackHandle();
       }),
-      _createClientFn([] { return stdx::make_unique<DBClientConnection>(); }),
+      _createClientFn([] { return std::make_unique<DBClientConnection>(); }),
       _progressMeter(1U,  // total will be replaced with count command result.
                      kProgressMeterSecondsBetween,
                      kProgressMeterCheckInterval,
@@ -644,7 +644,7 @@ void CollectionCloner::_verifyCollectionWasDropped(
     BSONObjBuilder cmdObj;
     _options.uuid->appendToBuilder(&cmdObj, "find");
     cmdObj.append("batchSize", 0);
-    _verifyCollectionDroppedScheduler = stdx::make_unique<RemoteCommandRetryScheduler>(
+    _verifyCollectionDroppedScheduler = std::make_unique<RemoteCommandRetryScheduler>(
         _executor,
         RemoteCommandRequest(_source,
                              _sourceNss.db().toString(),

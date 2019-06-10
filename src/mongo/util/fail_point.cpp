@@ -31,9 +31,10 @@
 
 #include "mongo/util/fail_point.h"
 
+#include <memory>
+
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -60,7 +61,7 @@ public:
 
     static FailPointPRNG* current() {
         if (!_failPointPrng)
-            _failPointPrng = stdx::make_unique<FailPointPRNG>();
+            _failPointPrng = std::make_unique<FailPointPRNG>();
         return _failPointPrng.get();
     }
 

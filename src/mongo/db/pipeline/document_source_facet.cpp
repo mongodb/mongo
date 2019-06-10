@@ -45,7 +45,6 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/tee_buffer.h"
 #include "mongo/db/pipeline/value.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -142,8 +141,8 @@ std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed
                                                   pipeline.requiredPrivileges(unusedIsMongosFlag));
     }
 
-    return stdx::make_unique<DocumentSourceFacet::LiteParsed>(std::move(liteParsedPipelines),
-                                                              std::move(requiredPrivileges));
+    return std::make_unique<DocumentSourceFacet::LiteParsed>(std::move(liteParsedPipelines),
+                                                             std::move(requiredPrivileges));
 }
 
 stdx::unordered_set<NamespaceString> DocumentSourceFacet::LiteParsed::getInvolvedNamespaces()

@@ -31,6 +31,7 @@
 
 #include "mongo/db/ftdc/ftdc_system_stats.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -39,7 +40,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/controller.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/procparser.h"
 
@@ -137,7 +137,7 @@ private:
 }  // namespace
 
 void installSystemMetricsCollector(FTDCController* controller) {
-    controller->addPeriodicCollector(stdx::make_unique<LinuxSystemMetricsCollector>());
+    controller->addPeriodicCollector(std::make_unique<LinuxSystemMetricsCollector>());
 }
 
 }  // namespace mongo

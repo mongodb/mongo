@@ -30,6 +30,8 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/optional/optional_io.hpp>
+#include <memory>
+
 #include <pcrecpp.h>
 
 #include "mongo/bson/util/builder.h"
@@ -55,7 +57,6 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
@@ -84,14 +85,14 @@ void DatabaseTest::setUp() {
     auto service = getServiceContext();
     _opCtx = cc().makeOperationContext();
 
-    repl::StorageInterface::set(service, stdx::make_unique<repl::StorageInterfaceMock>());
+    repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
     repl::DropPendingCollectionReaper::set(
         service,
-        stdx::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
+        std::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
 
     // Set up ReplicationCoordinator and create oplog.
     repl::ReplicationCoordinator::set(service,
-                                      stdx::make_unique<repl::ReplicationCoordinatorMock>(service));
+                                      std::make_unique<repl::ReplicationCoordinatorMock>(service));
     repl::setOplogCollectionName(service);
     repl::createOplog(_opCtx.get());
 
@@ -103,7 +104,7 @@ void DatabaseTest::setUp() {
     // repl::logOp(). repl::logOp() will also store the oplog entry's optime in ReplClientInfo.
     OpObserverRegistry* opObserverRegistry =
         dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
-    opObserverRegistry->addObserver(stdx::make_unique<OpObserverShardingImpl>());
+    opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>());
 
     _nss = NamespaceString("test.foo");
 }

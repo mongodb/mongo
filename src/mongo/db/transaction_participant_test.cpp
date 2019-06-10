@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/optional/optional_io.hpp>
+#include <memory>
 
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
@@ -48,7 +49,6 @@
 #include "mongo/db/transaction_participant_gen.h"
 #include "mongo/logger/logger.h"
 #include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -230,7 +230,7 @@ protected:
         const auto service = opCtx()->getServiceContext();
         OpObserverRegistry* opObserverRegistry =
             dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
-        auto mockObserver = stdx::make_unique<OpObserverMock>();
+        auto mockObserver = std::make_unique<OpObserverMock>();
         _opObserver = mockObserver.get();
         opObserverRegistry->addObserver(std::move(mockObserver));
 
@@ -1434,7 +1434,7 @@ protected:
      * Set up and return a mock clock source.
      */
     ClockSourceMock* initMockPreciseClockSource() {
-        getServiceContext()->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
+        getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
         return dynamic_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
     }
 
@@ -1442,7 +1442,7 @@ protected:
      * Set up and return a mock tick source.
      */
     TickSourceMicrosecondMock* initMockTickSource() {
-        getServiceContext()->setTickSource(stdx::make_unique<TickSourceMicrosecondMock>());
+        getServiceContext()->setTickSource(std::make_unique<TickSourceMicrosecondMock>());
         auto tickSource =
             dynamic_cast<TickSourceMicrosecondMock*>(getServiceContext()->getTickSource());
         // Ensure that the tick source is not initialized to zero.

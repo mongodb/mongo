@@ -55,7 +55,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -125,7 +124,7 @@ public:
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
 
-        auto ret = stdx::make_unique<PrefixedWiredTigerRecordStore>(
+        auto ret = std::make_unique<PrefixedWiredTigerRecordStore>(
             _engine.get(), &opCtx, params, KVPrefix::generateNextPrefix());
         ret->postConstructorInit(&opCtx);
         return std::move(ret);
@@ -173,7 +172,7 @@ public:
         params.sizeStorer = nullptr;
 
         auto ret =
-            stdx::make_unique<PrefixedWiredTigerRecordStore>(_engine.get(), &opCtx, params, prefix);
+            std::make_unique<PrefixedWiredTigerRecordStore>(_engine.get(), &opCtx, params, prefix);
         ret->postConstructorInit(&opCtx);
         return std::move(ret);
     }
@@ -193,13 +192,13 @@ public:
 
 private:
     unittest::TempDir _dbpath;
-    const std::unique_ptr<ClockSource> _cs = stdx::make_unique<ClockSourceMock>();
+    const std::unique_ptr<ClockSource> _cs = std::make_unique<ClockSourceMock>();
 
     std::unique_ptr<WiredTigerKVEngine> _engine;
 };
 
 std::unique_ptr<HarnessHelper> makeHarnessHelper() {
-    return stdx::make_unique<PrefixedWiredTigerHarnessHelper>();
+    return std::make_unique<PrefixedWiredTigerHarnessHelper>();
 }
 
 MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {

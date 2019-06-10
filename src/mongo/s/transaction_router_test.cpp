@@ -114,16 +114,16 @@ protected:
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
         // Set up a logical clock with an initial time.
-        auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
+        auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
         logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
 
         // Set up a tick source for transaction metrics.
-        auto tickSource = stdx::make_unique<TickSourceMock<Microseconds>>();
+        auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
         tickSource->reset(1);
         getServiceContext()->setTickSource(std::move(tickSource));
 
-        _staleVersionAndSnapshotRetriesBlock = stdx::make_unique<FailPointEnableBlock>(
+        _staleVersionAndSnapshotRetriesBlock = std::make_unique<FailPointEnableBlock>(
             "enableStaleVersionAndSnapshotRetriesWithinTransactions");
     }
 

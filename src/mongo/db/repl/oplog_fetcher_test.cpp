@@ -37,7 +37,6 @@
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/task_executor_proxy.h"
@@ -114,7 +113,7 @@ void OplogFetcherTest::setUp() {
     staleWallTime = Date_t::min() + Seconds(staleOpTime.getSecs());
     rbid = 2;
 
-    dataReplicatorExternalState = stdx::make_unique<DataReplicatorExternalStateMock>();
+    dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();
     dataReplicatorExternalState->currentTerm = lastFetched.getTerm();
     dataReplicatorExternalState->lastCommittedOpTime = {{9999, 0}, lastFetched.getTerm()};
 
@@ -164,7 +163,7 @@ ReplSetConfig _createConfig() {
 
 std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(RemoteCommandResponse response,
                                                                     bool requireFresherSyncSource) {
-    auto shutdownState = stdx::make_unique<ShutdownState>();
+    auto shutdownState = std::make_unique<ShutdownState>();
 
     OplogFetcher oplogFetcher(&getExecutor(),
                               lastFetched,
@@ -208,18 +207,18 @@ void _checkDefaultCommandObjectFields(BSONObj cmdObj) {
 }
 
 std::unique_ptr<OplogFetcher> OplogFetcherTest::makeOplogFetcher(ReplSetConfig config) {
-    return stdx::make_unique<OplogFetcher>(&getExecutor(),
-                                           lastFetched,
-                                           source,
-                                           nss,
-                                           config,
-                                           0,
-                                           -1,
-                                           true,
-                                           dataReplicatorExternalState.get(),
-                                           enqueueDocumentsFn,
-                                           [](Status) {},
-                                           defaultBatchSize);
+    return std::make_unique<OplogFetcher>(&getExecutor(),
+                                          lastFetched,
+                                          source,
+                                          nss,
+                                          config,
+                                          0,
+                                          -1,
+                                          true,
+                                          dataReplicatorExternalState.get(),
+                                          enqueueDocumentsFn,
+                                          [](Status) {},
+                                          defaultBatchSize);
 }
 
 BSONObj concatenate(BSONObj a, const BSONObj& b) {
@@ -579,7 +578,7 @@ TEST_F(OplogFetcherTest,
         return Status::OK();
     };
 
-    auto shutdownState = stdx::make_unique<ShutdownState>();
+    auto shutdownState = std::make_unique<ShutdownState>();
     OplogFetcher oplogFetcher(&getExecutor(),
                               lastFetched,
                               source,
@@ -655,7 +654,7 @@ TEST_F(OplogFetcherTest,
         return Status::OK();
     };
 
-    auto shutdownState = stdx::make_unique<ShutdownState>();
+    auto shutdownState = std::make_unique<ShutdownState>();
     OplogFetcher oplogFetcher(&getExecutor(),
                               lastFetched,
                               source,

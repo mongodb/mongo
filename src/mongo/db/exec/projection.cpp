@@ -31,7 +31,8 @@
 
 #include "mongo/db/exec/projection.h"
 
-#include "boost/optional.hpp"
+#include <boost/optional.hpp>
+#include <memory>
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/scoped_timer.h"
@@ -40,7 +41,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 

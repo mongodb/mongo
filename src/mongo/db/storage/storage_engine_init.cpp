@@ -34,6 +34,7 @@
 #include "mongo/db/storage/storage_engine_init.h"
 
 #include <map>
+#include <memory>
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -44,7 +45,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/unclean_shutdown.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -347,7 +347,7 @@ public:
         if (!storageEngine) {
             return;
         }
-        opCtx->setLockState(stdx::make_unique<LockerImpl>());
+        opCtx->setLockState(std::make_unique<LockerImpl>());
         opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(storageEngine->newRecoveryUnit()),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }

@@ -37,6 +37,8 @@
 
 #include "mongo/client/dbclient_cursor.h"
 
+#include <memory>
+
 #include "mongo/client/connpool.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
@@ -49,7 +51,6 @@
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/destructor_guard.h"

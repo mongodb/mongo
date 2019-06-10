@@ -38,7 +38,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/views/view.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -58,7 +57,7 @@ TEST(ViewDefinitionTest, ViewDefinitionCreationCorrectlyBuildsNamespaceStrings) 
 
 TEST(ViewDefinitionTest, CopyConstructorProperlyClonesAllFields) {
     auto collator =
-        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     ViewDefinition originalView(
         viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, std::move(collator));
     ViewDefinition copiedView(originalView);
@@ -75,7 +74,7 @@ TEST(ViewDefinitionTest, CopyConstructorProperlyClonesAllFields) {
 
 TEST(ViewDefinitionTest, CopyAssignmentOperatorProperlyClonesAllFields) {
     auto collator =
-        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     ViewDefinition originalView(
         viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, std::move(collator));
     ViewDefinition copiedView = originalView;

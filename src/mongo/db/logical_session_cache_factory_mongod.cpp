@@ -33,6 +33,8 @@
 
 #include "mongo/db/logical_session_cache_factory_mongod.h"
 
+#include <memory>
+
 #include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/service_liaison_mongod.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -40,7 +42,6 @@
 #include "mongo/db/sessions_collection_rs.h"
 #include "mongo/db/sessions_collection_sharded.h"
 #include "mongo/db/sessions_collection_standalone.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

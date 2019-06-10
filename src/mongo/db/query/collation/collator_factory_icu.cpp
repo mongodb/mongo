@@ -31,6 +31,8 @@
 
 #include "mongo/db/query/collation/collator_factory_icu.h"
 
+#include <memory>
+
 #include <unicode/coll.h>
 #include <unicode/errorcode.h>
 #include <unicode/ucol.h>
@@ -39,7 +41,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/query/collation/collator_interface_icu.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -754,8 +755,8 @@ StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
         return validateSpecStatus;
     }
 
-    auto mongoCollator = stdx::make_unique<CollatorInterfaceICU>(std::move(parsedSpec.getValue()),
-                                                                 std::move(icuCollator));
+    auto mongoCollator = std::make_unique<CollatorInterfaceICU>(std::move(parsedSpec.getValue()),
+                                                                std::move(icuCollator));
     return {std::move(mongoCollator)};
 }
 

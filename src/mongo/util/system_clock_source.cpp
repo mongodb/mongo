@@ -31,7 +31,8 @@
 
 #include "mongo/util/system_clock_source.h"
 
-#include "mongo/stdx/memory.h"
+#include <memory>
+
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -41,7 +42,7 @@ Date_t SystemClockSource::now() {
 }
 
 SystemClockSource* SystemClockSource::get() {
-    static const auto globalSystemClockSource = stdx::make_unique<SystemClockSource>();
+    static const auto globalSystemClockSource = std::make_unique<SystemClockSource>();
     return globalSystemClockSource.get();
 }
 

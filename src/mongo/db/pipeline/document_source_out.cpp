@@ -96,8 +96,8 @@ std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::pa
 
     PrivilegeVector privileges{Privilege(ResourcePattern::forExactNamespace(targetNss), actions)};
 
-    return stdx::make_unique<DocumentSourceOut::LiteParsed>(std::move(targetNss),
-                                                            std::move(privileges));
+    return std::make_unique<DocumentSourceOut::LiteParsed>(std::move(targetNss),
+                                                           std::move(privileges));
 }
 
 void DocumentSourceOut::initialize() {

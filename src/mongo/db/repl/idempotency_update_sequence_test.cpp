@@ -31,12 +31,12 @@
 
 #include <algorithm>
 #include <cctype>
+#include <memory>
 
 #include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/repl/idempotency_document_structure.h"
 #include "mongo/db/repl/idempotency_update_sequence.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -170,7 +170,7 @@ TEST(UpdateGenTest, UpdatesAreNotAmbiguous) {
     std::vector<std::unique_ptr<FieldRef>> argPathsRefVec;
     FieldRefSet pathRefSet;
     for (auto path : argPathsSet) {
-        argPathsRefVec.push_back(stdx::make_unique<FieldRef>(path));
+        argPathsRefVec.push_back(std::make_unique<FieldRef>(path));
         const FieldRef* conflict;
         if (!pathRefSet.insert(argPathsRefVec.back().get(), &conflict)) {
             StringBuilder sb;

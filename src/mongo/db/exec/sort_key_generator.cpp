@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/sort_key_generator.h"
 
+#include <memory>
 #include <vector>
 
 #include "mongo/bson/bsonobj_comparator.h"
@@ -44,7 +45,6 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -66,7 +66,7 @@ bool SortKeyGeneratorStage::isEOF() {
 
 PlanStage::StageState SortKeyGeneratorStage::doWork(WorkingSetID* out) {
     if (!_sortKeyGen) {
-        _sortKeyGen = stdx::make_unique<SortKeyGenerator>(_sortSpec, _collator);
+        _sortKeyGen = std::make_unique<SortKeyGenerator>(_sortSpec, _collator);
         return PlanStage::NEED_TIME;
     }
 
@@ -106,7 +106,7 @@ PlanStage::StageState SortKeyGeneratorStage::doWork(WorkingSetID* out) {
 }
 
 std::unique_ptr<PlanStageStats> SortKeyGeneratorStage::getStats() {
-    auto ret = stdx::make_unique<PlanStageStats>(_commonStats, STAGE_SORT_KEY_GENERATOR);
+    auto ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_SORT_KEY_GENERATOR);
     ret->children.emplace_back(child()->getStats());
     return ret;
 }

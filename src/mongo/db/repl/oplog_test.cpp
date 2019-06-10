@@ -67,7 +67,7 @@ void OplogTest::setUp() {
     auto opCtx = cc().makeOperationContext();
 
     // Set up ReplicationCoordinator and create oplog.
-    ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
+    ReplicationCoordinator::set(service, std::make_unique<ReplicationCoordinatorMock>(service));
     setOplogCollectionName(service);
     createOplog(opCtx.get());
 

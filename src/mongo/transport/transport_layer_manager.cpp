@@ -31,19 +31,19 @@
 
 #include "mongo/transport/transport_layer_manager.h"
 
+#include <iostream>
+#include <limits>
+#include <memory>
+
 #include "mongo/base/status.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/transport/service_executor_adaptive.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"
-#include <limits>
-
-#include <iostream>
 
 namespace mongo {
 namespace transport {
@@ -122,7 +122,7 @@ std::unique_ptr<TransportLayer> TransportLayerManager::makeAndStartDefaultEgress
     opts.mode = transport::TransportLayerASIO::Options::kEgress;
     opts.ipList.clear();
 
-    auto ret = stdx::make_unique<transport::TransportLayerASIO>(opts, nullptr);
+    auto ret = std::make_unique<transport::TransportLayerASIO>(opts, nullptr);
     uassertStatusOK(ret->setup());
     uassertStatusOK(ret->start());
     return std::unique_ptr<TransportLayer>(std::move(ret));
@@ -142,20 +142,19 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
         MONGO_UNREACHABLE;
     }
 
-    auto transportLayerASIO = stdx::make_unique<transport::TransportLayerASIO>(opts, sep);
+    auto transportLayerASIO = std::make_unique<transport::TransportLayerASIO>(opts, sep);
 
     if (config->serviceExecutor == "adaptive") {
         auto reactor = transportLayerASIO->getReactor(TransportLayer::kIngress);
-        ctx->setServiceExecutor(
-            stdx::make_unique<ServiceExecutorAdaptive>(ctx, std::move(reactor)));
+        ctx->setServiceExecutor(std::make_unique<ServiceExecutorAdaptive>(ctx, std::move(reactor)));
     } else if (config->serviceExecutor == "synchronous") {
-        ctx->setServiceExecutor(stdx::make_unique<ServiceExecutorSynchronous>(ctx));
+        ctx->setServiceExecutor(std::make_unique<ServiceExecutorSynchronous>(ctx));
     }
     transportLayer = std::move(transportLayerASIO);
 
     std::vector<std::unique_ptr<TransportLayer>> retVector;
     retVector.emplace_back(std::move(transportLayer));
-    return stdx::make_unique<TransportLayerManager>(std::move(retVector));
+    return std::make_unique<TransportLayerManager>(std::move(retVector));
 }
 
 }  // namespace transport

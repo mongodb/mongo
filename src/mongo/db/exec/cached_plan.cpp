@@ -33,6 +33,8 @@
 
 #include "mongo/db/exec/cached_plan.h"
 
+#include <memory>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/multi_plan.h"
@@ -45,7 +47,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
@@ -287,8 +288,8 @@ std::unique_ptr<PlanStageStats> CachedPlanStage::getStats() {
     _commonStats.isEOF = isEOF();
 
     std::unique_ptr<PlanStageStats> ret =
-        stdx::make_unique<PlanStageStats>(_commonStats, STAGE_CACHED_PLAN);
-    ret->specific = stdx::make_unique<CachedPlanStats>(_specificStats);
+        std::make_unique<PlanStageStats>(_commonStats, STAGE_CACHED_PLAN);
+    ret->specific = std::make_unique<CachedPlanStats>(_specificStats);
     ret->children.emplace_back(child()->getStats());
 
     return ret;

@@ -32,11 +32,11 @@
 #include "mongo/db/storage/encryption_hooks.h"
 
 #include <boost/filesystem/path.hpp>
+#include <memory>
 
 #include "mongo/base/init.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/data_protector.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 

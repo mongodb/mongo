@@ -38,7 +38,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/test_harness_helper.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/unowned_ptr.h"
 
 namespace mongo {

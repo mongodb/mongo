@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <memory>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
@@ -41,7 +42,6 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/value_comparator.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/destructor_guard.h"
 
 namespace mongo {

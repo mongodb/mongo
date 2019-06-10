@@ -31,6 +31,8 @@
 
 #include "mongo/executor/network_interface_factory.h"
 
+#include <memory>
+
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"
@@ -38,7 +40,6 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_tl.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace executor {

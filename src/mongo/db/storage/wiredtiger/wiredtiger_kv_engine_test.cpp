@@ -33,6 +33,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
+#include <memory>
 
 #include "mongo/base/init.h"
 #include "mongo/db/operation_context_noop.h"
@@ -44,7 +45,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/logger/logger.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -91,7 +91,7 @@ private:
                                       false);
     }
 
-    const std::unique_ptr<ClockSource> _cs = stdx::make_unique<ClockSourceMock>();
+    const std::unique_ptr<ClockSource> _cs = std::make_unique<ClockSourceMock>();
     unittest::TempDir _dbpath;
     std::unique_ptr<WiredTigerKVEngine> _engine;
     bool _forRepair;
@@ -318,7 +318,7 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
 }
 
 std::unique_ptr<KVHarnessHelper> makeHelper() {
-    return stdx::make_unique<WiredTigerKVHarnessHelper>();
+    return std::make_unique<WiredTigerKVHarnessHelper>();
 }
 
 MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {

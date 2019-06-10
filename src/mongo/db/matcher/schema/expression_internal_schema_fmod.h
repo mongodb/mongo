@@ -43,7 +43,7 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<InternalSchemaFmodMatchExpression> m =
-            stdx::make_unique<InternalSchemaFmodMatchExpression>(path(), _divisor, _remainder);
+            std::make_unique<InternalSchemaFmodMatchExpression>(path(), _divisor, _remainder);
         if (getTag()) {
             m->setTag(getTag()->clone());
         }

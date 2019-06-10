@@ -50,7 +50,7 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<InternalSchemaMinLengthMatchExpression> minLen =
-            stdx::make_unique<InternalSchemaMinLengthMatchExpression>(path(), strLen());
+            std::make_unique<InternalSchemaMinLengthMatchExpression>(path(), strLen());
         if (getTag()) {
             minLen->setTag(getTag()->clone());
         }

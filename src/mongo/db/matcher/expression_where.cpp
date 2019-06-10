@@ -31,6 +31,8 @@
 
 #include "mongo/db/matcher/expression_where.h"
 
+#include <memory>
+
 #include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
@@ -39,7 +41,6 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/scopeguard.h"
 
 
@@ -48,7 +49,6 @@ namespace mongo {
 using std::unique_ptr;
 using std::string;
 using std::stringstream;
-using stdx::make_unique;
 
 WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx,
                                            WhereParams params,
@@ -104,7 +104,7 @@ unique_ptr<MatchExpression> WhereMatchExpression::shallowClone() const {
     params.code = getCode();
     params.scope = getScope();
     unique_ptr<WhereMatchExpression> e =
-        make_unique<WhereMatchExpression>(_opCtx, std::move(params), _dbName);
+        std::make_unique<WhereMatchExpression>(_opCtx, std::move(params), _dbName);
     if (getTag()) {
         e->setTag(getTag()->clone());
     }

@@ -31,13 +31,14 @@
 
 #include "mongo/db/matcher/expression_text.h"
 
+#include <memory>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/fts_access_method.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -101,7 +102,7 @@ TextMatchExpression::TextMatchExpression(OperationContext* opCtx,
 }
 
 std::unique_ptr<MatchExpression> TextMatchExpression::shallowClone() const {
-    auto expr = stdx::make_unique<TextMatchExpression>(_ftsQuery);
+    auto expr = std::make_unique<TextMatchExpression>(_ftsQuery);
     // We use the query-only constructor here directly rather than using the full constructor, to
     // avoid needing to examine
     // the index catalog.

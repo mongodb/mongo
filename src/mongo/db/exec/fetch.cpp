@@ -31,12 +31,13 @@
 
 #include "mongo/db/exec/fetch.h"
 
+#include <memory>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/str.h"
 
@@ -44,7 +45,6 @@ namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 // static
 const char* FetchStage::kStageType = "FETCH";
@@ -192,8 +192,8 @@ unique_ptr<PlanStageStats> FetchStage::getStats() {
         _commonStats.filter = bob.obj();
     }
 
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_FETCH);
-    ret->specific = make_unique<FetchStats>(_specificStats);
+    unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_FETCH);
+    ret->specific = std::make_unique<FetchStats>(_specificStats);
     ret->children.emplace_back(child()->getStats());
     return ret;
 }

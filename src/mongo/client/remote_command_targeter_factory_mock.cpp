@@ -31,10 +31,11 @@
 
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 
+#include <memory>
+
 #include "mongo/base/status_with.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -85,10 +86,10 @@ std::unique_ptr<RemoteCommandTargeter> RemoteCommandTargeterFactoryMock::create(
     const ConnectionString& connStr) {
     auto it = _mockTargeters.find(connStr);
     if (it != _mockTargeters.end()) {
-        return stdx::make_unique<TargeterProxy>(it->second);
+        return std::make_unique<TargeterProxy>(it->second);
     }
 
-    return stdx::make_unique<RemoteCommandTargeterMock>();
+    return std::make_unique<RemoteCommandTargeterMock>();
 }
 
 void RemoteCommandTargeterFactoryMock::addTargeterToReturn(

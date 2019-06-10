@@ -31,12 +31,13 @@
 
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
 
+#include <memory>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/unowned_ptr.h"
@@ -545,8 +546,8 @@ StatusWith<RecordData> EphemeralForTestRecordStore::updateWithDamages(
 std::unique_ptr<SeekableRecordCursor> EphemeralForTestRecordStore::getCursor(
     OperationContext* opCtx, bool forward) const {
     if (forward)
-        return stdx::make_unique<Cursor>(opCtx, *this);
-    return stdx::make_unique<ReverseCursor>(opCtx, *this);
+        return std::make_unique<Cursor>(opCtx, *this);
+    return std::make_unique<ReverseCursor>(opCtx, *this);
 }
 
 Status EphemeralForTestRecordStore::truncate(OperationContext* opCtx) {

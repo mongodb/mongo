@@ -31,11 +31,12 @@
 
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
+#include <memory>
+
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -66,7 +67,7 @@ public:
     KVCatalogFeatureTrackerTest() : _helper(KVHarnessHelper::create()) {}
 
     std::unique_ptr<OperationContext> newOperationContext() {
-        return stdx::make_unique<OperationContextNoop>(_helper->getEngine()->newRecoveryUnit());
+        return std::make_unique<OperationContextNoop>(_helper->getEngine()->newRecoveryUnit());
     }
 
     void setUp() final {
@@ -80,7 +81,7 @@ public:
             wuow.commit();
         }
 
-        _catalog = stdx::make_unique<KVCatalog>(_rs.get(), false, false, nullptr);
+        _catalog = std::make_unique<KVCatalog>(_rs.get(), false, false, nullptr);
         _catalog->init(opCtx.get());
 
         {

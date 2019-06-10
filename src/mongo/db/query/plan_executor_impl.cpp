@@ -33,6 +33,8 @@
 
 #include "mongo/db/query/plan_executor_impl.h"
 
+#include <memory>
+
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -54,7 +56,6 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -91,13 +92,13 @@ std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(PlanExecutor* exec,
         case PlanExecutor::YieldPolicy::NO_YIELD:
         case PlanExecutor::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
         case PlanExecutor::YieldPolicy::INTERRUPT_ONLY: {
-            return stdx::make_unique<PlanYieldPolicy>(exec, policy);
+            return std::make_unique<PlanYieldPolicy>(exec, policy);
         }
         case PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT: {
-            return stdx::make_unique<AlwaysTimeOutYieldPolicy>(exec);
+            return std::make_unique<AlwaysTimeOutYieldPolicy>(exec);
         }
         case PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED: {
-            return stdx::make_unique<AlwaysPlanKilledYieldPolicy>(exec);
+            return std::make_unique<AlwaysPlanKilledYieldPolicy>(exec);
         }
         default:
             MONGO_UNREACHABLE;

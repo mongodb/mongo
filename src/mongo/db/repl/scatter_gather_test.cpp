@@ -30,11 +30,11 @@
 #include "mongo/platform/basic.h"
 
 #include <functional>
+#include <memory>
 
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
@@ -121,7 +121,7 @@ public:
     }
 
     void run() {
-        _thread = stdx::make_unique<stdx::thread>([this] { _run(_executor); });
+        _thread = std::make_unique<stdx::thread>([this] { _run(_executor); });
     }
 
 private:

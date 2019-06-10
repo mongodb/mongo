@@ -34,9 +34,9 @@
 #include "mongo/util/background_thread_clock_source.h"
 
 #include <chrono>
+#include <memory>
 #include <thread>
 
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"

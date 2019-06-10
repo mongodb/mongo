@@ -118,7 +118,7 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
     auto maxSize = invocation.getMaxSize();
     auto maxRate = invocation.getMaxCountPerSecond();
     auto info = DbCheckCollectionInfo{nss, start, end, maxCount, maxSize, maxRate};
-    auto result = stdx::make_unique<DbCheckRun>();
+    auto result = std::make_unique<DbCheckRun>();
     result->push_back(info);
     return result;
 }
@@ -132,7 +132,7 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
     // Read the list of collections in a database-level lock.
     AutoGetDb agd(opCtx, StringData(dbName), MODE_S);
     auto db = agd.getDb();
-    auto result = stdx::make_unique<DbCheckRun>();
+    auto result = std::make_unique<DbCheckRun>();
 
     uassert(ErrorCodes::NamespaceNotFound, "Database " + dbName + " not found", agd.getDb());
 

@@ -33,11 +33,12 @@
 
 #include "mongo/db/exec/shard_filter.h"
 
+#include <memory>
+
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -45,7 +46,6 @@ namespace mongo {
 using std::shared_ptr;
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 // static
 const char* ShardFilterStage::kStageType = "SHARDING_FILTER";
@@ -116,9 +116,9 @@ PlanStage::StageState ShardFilterStage::doWork(WorkingSetID* out) {
 unique_ptr<PlanStageStats> ShardFilterStage::getStats() {
     _commonStats.isEOF = isEOF();
     unique_ptr<PlanStageStats> ret =
-        make_unique<PlanStageStats>(_commonStats, STAGE_SHARDING_FILTER);
+        std::make_unique<PlanStageStats>(_commonStats, STAGE_SHARDING_FILTER);
     ret->children.emplace_back(child()->getStats());
-    ret->specific = make_unique<ShardingFilterStats>(_specificStats);
+    ret->specific = std::make_unique<ShardingFilterStats>(_specificStats);
     return ret;
 }
 

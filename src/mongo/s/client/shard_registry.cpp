@@ -33,6 +33,7 @@
 
 #include "mongo/s/client/shard_registry.h"
 
+#include <memory>
 #include <set>
 
 #include "mongo/bson/bsonobj.h"
@@ -55,7 +56,6 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/log.h"
@@ -217,14 +217,14 @@ void ShardRegistry::startup(OperationContext* opCtx) {
     // startup() must be called only once
     invariant(!_executor);
 
-    auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
+    auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
+    hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
 
     // construct task executor
     auto net = executor::makeNetworkInterface("ShardRegistryUpdater", nullptr, std::move(hookList));
     auto netPtr = net.get();
-    _executor = stdx::make_unique<ThreadPoolTaskExecutor>(
-        stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
+    _executor = std::make_unique<ThreadPoolTaskExecutor>(
+        std::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
     LOG(1) << "Starting up task executor for periodic reloading of ShardRegistry";
     _executor->startup();
 

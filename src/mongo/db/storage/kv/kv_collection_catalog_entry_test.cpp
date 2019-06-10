@@ -69,7 +69,7 @@ public:
     }
 
     std::unique_ptr<OperationContext> newOperationContext() {
-        auto opCtx = stdx::make_unique<OperationContextNoop>(&cc(), 0);
+        auto opCtx = std::make_unique<OperationContextNoop>(&cc(), 0);
         opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(_storageEngine.newRecoveryUnit()),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return opCtx;

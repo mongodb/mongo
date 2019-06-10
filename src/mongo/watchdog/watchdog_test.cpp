@@ -33,10 +33,11 @@
 
 #include "mongo/watchdog/watchdog.h"
 
+#include <memory>
+
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
@@ -242,7 +243,7 @@ class WatchdogCheckThreadTest : public ServiceContextTest {};
 
 // Positive: Make sure check thread runs at least N times and stops correctly
 TEST_F(WatchdogCheckThreadTest, Basic) {
-    auto counterCheck = stdx::make_unique<TestCounterCheck>();
+    auto counterCheck = std::make_unique<TestCounterCheck>();
     auto counterCheckPtr = counterCheck.get();
 
     std::vector<std::unique_ptr<WatchdogCheck>> checks;
@@ -303,7 +304,7 @@ TEST_F(WatchdogMonitorThreadTest, Basic) {
         deathEvent.set();
     };
 
-    auto counterCheck = stdx::make_unique<TestCounterCheck>();
+    auto counterCheck = std::make_unique<TestCounterCheck>();
 
     std::vector<std::unique_ptr<WatchdogCheck>> checks;
     checks.push_back(std::move(counterCheck));
@@ -348,7 +349,7 @@ TEST_F(WatchdogMonitorThreadTest, SleepyHungCheck) {
         deathEvent.set();
     };
 
-    auto sleepyCheck = stdx::make_unique<SleepyCheck>();
+    auto sleepyCheck = std::make_unique<SleepyCheck>();
 
     std::vector<std::unique_ptr<WatchdogCheck>> checks;
     checks.push_back(std::move(sleepyCheck));
@@ -381,7 +382,7 @@ TEST_F(WatchdogMonitorTest, SleepyHungCheck) {
         deathEvent.set();
     };
 
-    auto sleepyCheck = stdx::make_unique<SleepyCheck>();
+    auto sleepyCheck = std::make_unique<SleepyCheck>();
 
     std::vector<std::unique_ptr<WatchdogCheck>> checks;
     checks.push_back(std::move(sleepyCheck));
@@ -397,7 +398,7 @@ TEST_F(WatchdogMonitorTest, SleepyHungCheck) {
 
 // Positive: Make sure watchdog monitor terminates the process if a check is unresponsive
 DEATH_TEST(WatchdogMonitorTest, Death, "") {
-    auto sleepyCheck = stdx::make_unique<SleepyCheck>();
+    auto sleepyCheck = std::make_unique<SleepyCheck>();
 
     std::vector<std::unique_ptr<WatchdogCheck>> checks;
     checks.push_back(std::move(sleepyCheck));
@@ -418,7 +419,7 @@ TEST_F(WatchdogMonitorTest, PauseAndResume) {
         invariant(false);
     };
 
-    auto counterCheck = stdx::make_unique<TestCounterCheck>();
+    auto counterCheck = std::make_unique<TestCounterCheck>();
     auto counterCheckPtr = counterCheck.get();
 
     std::vector<std::unique_ptr<WatchdogCheck>> checks;

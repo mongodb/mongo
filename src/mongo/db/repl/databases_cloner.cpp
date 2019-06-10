@@ -205,7 +205,7 @@ Status DatabasesCloner::startup() noexcept {
                        BSON("listDatabases" << true << "nameOnly" << true),
                        ReadPreferenceSetting::secondaryPreferredMetadata(),
                        nullptr);
-    _listDBsScheduler = stdx::make_unique<RemoteCommandRetryScheduler>(
+    _listDBsScheduler = std::make_unique<RemoteCommandRetryScheduler>(
         _exec,
         listDBsReq,
         [this](const auto& x) { this->_onListDatabaseFinish(x); },

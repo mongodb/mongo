@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "mongo/base/status_with.h"
@@ -37,7 +38,6 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/uuid.h"
 

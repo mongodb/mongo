@@ -372,7 +372,7 @@ void checkFile(OperationContext* opCtx, const boost::filesystem::path& file) {
         }
 
         DWORD bytesRead;
-        auto readBuffer = stdx::make_unique<char[]>(nowStr.size());
+        auto readBuffer = std::make_unique<char[]>(nowStr.size());
         if (!ReadFile(hFile, readBuffer.get(), nowStr.size(), &bytesRead, NULL)) {
             std::uint32_t gle = ::GetLastError();
             severe() << "ReadFile failed for '" << file.generic_string()
@@ -458,7 +458,7 @@ void checkFile(OperationContext* opCtx, const boost::filesystem::path& file) {
         fassertNoTrace(4082, err == 0);
     }
 
-    auto readBuffer = stdx::make_unique<char[]>(nowStr.size());
+    auto readBuffer = std::make_unique<char[]>(nowStr.size());
     size_t bytesReadTotal = 0;
     while (bytesReadTotal < nowStr.size()) {
         ssize_t bytesReadInRead = pread(

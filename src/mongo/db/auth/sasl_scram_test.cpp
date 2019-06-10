@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/client/native_sasl_client_session.h"
 #include "mongo/client/scram_client_cache.h"
 #include "mongo/crypto/mechanism_scram.h"
@@ -45,7 +47,6 @@
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_scram_server_conversation.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/log.h"

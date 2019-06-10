@@ -70,8 +70,8 @@ protected:
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
         CatalogCacheLoader::set(getServiceContext(),
-                                stdx::make_unique<ShardServerCatalogCacheLoader>(
-                                    stdx::make_unique<ConfigServerCatalogCacheLoader>()));
+                                std::make_unique<ShardServerCatalogCacheLoader>(
+                                    std::make_unique<ConfigServerCatalogCacheLoader>()));
 
         ShardingInitializationMongoD::get(getServiceContext())
             ->setGlobalInitMethodForTest([&](OperationContext* opCtx,
@@ -92,7 +92,7 @@ protected:
                 return Status::OK();
             });
 
-        _dbDirectClient = stdx::make_unique<DBDirectClient>(operationContext());
+        _dbDirectClient = std::make_unique<DBDirectClient>(operationContext());
     }
 
     void tearDown() override {
@@ -110,13 +110,13 @@ protected:
 
     std::unique_ptr<DistLockManager> makeDistLockManager(
         std::unique_ptr<DistLockCatalog> distLockCatalog) override {
-        return stdx::make_unique<DistLockManagerMock>(nullptr);
+        return std::make_unique<DistLockManagerMock>(nullptr);
     }
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) override {
         invariant(distLockManager);
-        return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
+        return std::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
     }
 
     auto* shardingInitialization() {
@@ -136,16 +136,16 @@ class ScopedSetStandaloneMode {
 public:
     ScopedSetStandaloneMode(ServiceContext* serviceContext) : _serviceContext(serviceContext) {
         serverGlobalParams.clusterRole = ClusterRole::None;
-        _serviceContext->setOpObserver(stdx::make_unique<OpObserverRegistry>());
+        _serviceContext->setOpObserver(std::make_unique<OpObserverRegistry>());
     }
 
     ~ScopedSetStandaloneMode() {
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         auto makeOpObserver = [&] {
-            auto opObserver = stdx::make_unique<OpObserverRegistry>();
-            opObserver->addObserver(stdx::make_unique<OpObserverShardingImpl>());
-            opObserver->addObserver(stdx::make_unique<ConfigServerOpObserver>());
-            opObserver->addObserver(stdx::make_unique<ShardServerOpObserver>());
+            auto opObserver = std::make_unique<OpObserverRegistry>();
+            opObserver->addObserver(std::make_unique<OpObserverShardingImpl>());
+            opObserver->addObserver(std::make_unique<ConfigServerOpObserver>());
+            opObserver->addObserver(std::make_unique<ShardServerOpObserver>());
             return opObserver;
         };
 

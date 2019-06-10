@@ -45,7 +45,6 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -54,7 +53,6 @@ using namespace mongo;
 using std::shared_ptr;
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 const std::string kTestNamespace = "test.coll";
 const BSONObj kTestKeyPattern = BSON("testIndex" << 1);
@@ -105,7 +103,7 @@ public:
           _pos(0) {}
 
     void addInterval(vector<BSONObj> data, double min, double max) {
-        _intervals.push_back(stdx::make_unique<MockInterval>(data, min, max));
+        _intervals.push_back(std::make_unique<MockInterval>(data, min, max));
     }
 
     virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
@@ -118,7 +116,7 @@ public:
 
         bool lastInterval = _pos == static_cast<int>(_intervals.size());
 
-        auto queuedStage = make_unique<QueuedDataStage>(opCtx, workingSet);
+        auto queuedStage = std::make_unique<QueuedDataStage>(opCtx, workingSet);
 
         for (unsigned int i = 0; i < interval.data.size(); i++) {
             // Add all documents from the lastInterval into the QueuedDataStage.

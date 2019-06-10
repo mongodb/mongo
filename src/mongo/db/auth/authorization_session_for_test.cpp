@@ -38,7 +38,6 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_set.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 constexpr StringData AuthorizationSessionForTest::kTestDBName;

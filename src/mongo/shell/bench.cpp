@@ -290,7 +290,7 @@ void doNothing(const BSONObj&) {}
 Timestamp getLatestClusterTime(DBClientBase* conn) {
     // Sort by descending 'ts' in the query to the oplog collection. The first entry will have the
     // latest cluster time.
-    auto qr = stdx::make_unique<QueryRequest>(NamespaceString("local.oplog.rs"));
+    auto qr = std::make_unique<QueryRequest>(NamespaceString("local.oplog.rs"));
     qr->setSort(BSON("$natural" << -1));
     qr->setLimit(1LL);
     qr->setWantMore(false);
@@ -983,7 +983,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             BSONObj fixedQuery = fixQuery(this->query, *state->bsonTemplateEvaluator);
             BSONObj result;
             if (this->useReadCmd) {
-                auto qr = stdx::make_unique<QueryRequest>(NamespaceString(this->ns));
+                auto qr = std::make_unique<QueryRequest>(NamespaceString(this->ns));
                 qr->setFilter(fixedQuery);
                 qr->setProj(this->projection);
                 qr->setLimit(1LL);
@@ -1066,7 +1066,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                         "cannot use 'options' in combination with read commands",
                         !this->options);
 
-                auto qr = stdx::make_unique<QueryRequest>(NamespaceString(this->ns));
+                auto qr = std::make_unique<QueryRequest>(NamespaceString(this->ns));
                 qr->setFilter(fixedQuery);
                 qr->setProj(this->projection);
                 if (this->skip) {
@@ -1403,7 +1403,7 @@ void BenchRunner::start() {
             // Make a unique random seed for the worker.
             const int64_t seed = _config->randomSeed + i;
 
-            auto worker = stdx::make_unique<BenchRunWorker>(i, _config.get(), _brState, seed);
+            auto worker = std::make_unique<BenchRunWorker>(i, _config.get(), _brState, seed);
             worker->start();
 
             _workers.push_back(std::move(worker));

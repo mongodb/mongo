@@ -5100,7 +5100,7 @@ TEST(ExpressionTrimTest, DoesNotTrimAnyThingWithEmptyChars) {
 TEST(ExpressionTrimTest, TrimComparisonsShouldNotRespectCollation) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto caseInsensitive =
-        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
     expCtx->setCollator(caseInsensitive.get());
 
     auto trim = Expression::parseExpression(expCtx,

@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -38,7 +40,6 @@
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -737,7 +738,7 @@ auto createMatchExprAndParsedProjection(const BSONObj& query, const BSONObj& pro
 
 TEST(QuerySolutionTest, InclusionProjectionPreservesSort) {
     auto index = buildSimpleIndexEntry(BSON("a" << 1));
-    auto node = stdx::make_unique<IndexScanNode>(index);
+    auto node = std::make_unique<IndexScanNode>(index);
 
     BSONObj projection = BSON("a" << 1);
     BSONObj match;
@@ -756,7 +757,7 @@ TEST(QuerySolutionTest, InclusionProjectionPreservesSort) {
 
 TEST(QuerySolutionTest, ExclusionProjectionDoesNotPreserveSort) {
     auto index = buildSimpleIndexEntry(BSON("a" << 1));
-    auto node = stdx::make_unique<IndexScanNode>(index);
+    auto node = std::make_unique<IndexScanNode>(index);
 
     BSONObj projection = BSON("a" << 0);
     BSONObj match;
@@ -773,7 +774,7 @@ TEST(QuerySolutionTest, ExclusionProjectionDoesNotPreserveSort) {
 }
 
 TEST(QuerySolutionTest, InclusionProjectionTruncatesSort) {
-    auto node = stdx::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    auto node = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
 
     BSONObj projection = BSON("a" << 1);
     BSONObj match;
@@ -791,7 +792,7 @@ TEST(QuerySolutionTest, InclusionProjectionTruncatesSort) {
 }
 
 TEST(QuerySolutionTest, ExclusionProjectionTruncatesSort) {
-    auto node = stdx::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    auto node = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
 
     BSONObj projection = BSON("b" << 0);
     BSONObj match;
@@ -810,7 +811,7 @@ TEST(QuerySolutionTest, ExclusionProjectionTruncatesSort) {
 
 TEST(QuerySolutionTest, NonMultikeyIndexWithoutPathLevelInfoCanCoverItsFields) {
     auto node =
-        stdx::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
+        std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
     node->index.multikey = false;
     node->index.multikeyPaths = MultikeyPaths{};
     ASSERT_TRUE(node->hasField("a"));
@@ -822,7 +823,7 @@ TEST(QuerySolutionTest, NonMultikeyIndexWithoutPathLevelInfoCanCoverItsFields) {
 
 TEST(QuerySolutionTest, NonMultikeyIndexWithPathLevelInfoCanCoverItsFields) {
     auto node =
-        stdx::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
+        std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
     node->index.multikey = false;
     node->index.multikeyPaths = MultikeyPaths{{}, {}};
     ASSERT_TRUE(node->hasField("a"));
@@ -834,7 +835,7 @@ TEST(QuerySolutionTest, NonMultikeyIndexWithPathLevelInfoCanCoverItsFields) {
 
 TEST(QuerySolutionTest, MultikeyIndexWithoutPathLevelInfoCannotCoverAnyFields) {
     auto node =
-        stdx::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
+        std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
     node->index.multikey = true;
     node->index.multikeyPaths = MultikeyPaths{};
     ASSERT_FALSE(node->hasField("a"));
@@ -845,7 +846,7 @@ TEST(QuerySolutionTest, MultikeyIndexWithoutPathLevelInfoCannotCoverAnyFields) {
 }
 
 TEST(QuerySolutionTest, MultikeyIndexWithPathLevelInfoCanCoverNonMultikeyFields) {
-    auto node = stdx::make_unique<IndexScanNode>(
+    auto node = std::make_unique<IndexScanNode>(
         buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1)));
 
     // Add metadata indicating that "b" is multikey.
@@ -859,7 +860,7 @@ TEST(QuerySolutionTest, MultikeyIndexWithPathLevelInfoCanCoverNonMultikeyFields)
 }
 
 TEST(QuerySolutionTest, MultikeyIndexCannotCoverFieldWithAnyMultikeyPathComponent) {
-    auto node = stdx::make_unique<IndexScanNode>(
+    auto node = std::make_unique<IndexScanNode>(
         buildSimpleIndexEntry(BSON("a" << 1 << "b.c.d" << 1 << "e" << 1)));
 
     // Add metadata indicating that "b.c" is multikey.

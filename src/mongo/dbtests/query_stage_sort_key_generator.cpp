@@ -29,13 +29,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -70,7 +71,7 @@ BSONObj extractSortKey(const char* sortSpec, const char* doc, const CollatorInte
 
     WorkingSet workingSet;
 
-    auto mockStage = stdx::make_unique<QueuedDataStage>(opCtx.get(), &workingSet);
+    auto mockStage = std::make_unique<QueuedDataStage>(opCtx.get(), &workingSet);
     auto wsid = workingSet.allocate();
     auto wsm = workingSet.get(wsid);
     wsm->obj = Snapshotted<BSONObj>(SnapshotId(), fromjson(doc));
@@ -98,7 +99,7 @@ BSONObj extractSortKeyCovered(const char* sortSpec,
 
     WorkingSet workingSet;
 
-    auto mockStage = stdx::make_unique<QueuedDataStage>(opCtx.get(), &workingSet);
+    auto mockStage = std::make_unique<QueuedDataStage>(opCtx.get(), &workingSet);
     auto wsid = workingSet.allocate();
     auto wsm = workingSet.get(wsid);
     wsm->keyData.push_back(ikd);

@@ -31,11 +31,12 @@
 
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 
+#include <memory>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/query/router_stage_mock.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -50,7 +51,7 @@ protected:
 };
 
 TEST_F(ClusterClientCursorImplTest, NumReturnedSoFar) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(_opCtx.get());
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
     for (int i = 1; i < 10; ++i) {
         mockStage->queueResult(BSON("a" << i));
     }
@@ -76,7 +77,7 @@ TEST_F(ClusterClientCursorImplTest, NumReturnedSoFar) {
 }
 
 TEST_F(ClusterClientCursorImplTest, QueueResult) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(_opCtx.get());
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueResult(BSON("a" << 4));
 
@@ -116,7 +117,7 @@ TEST_F(ClusterClientCursorImplTest, QueueResult) {
 }
 
 TEST_F(ClusterClientCursorImplTest, RemotesExhausted) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(_opCtx.get());
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueResult(BSON("a" << 2));
     mockStage->markRemotesExhausted();
@@ -148,7 +149,7 @@ TEST_F(ClusterClientCursorImplTest, RemotesExhausted) {
 }
 
 TEST_F(ClusterClientCursorImplTest, ForwardsAwaitDataTimeout) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(_opCtx.get());
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
     auto mockStagePtr = mockStage.get();
     ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
 
@@ -164,7 +165,7 @@ TEST_F(ClusterClientCursorImplTest, ForwardsAwaitDataTimeout) {
 }
 
 TEST_F(ClusterClientCursorImplTest, ChecksForInterrupt) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(nullptr);
+    auto mockStage = std::make_unique<RouterStageMock>(nullptr);
     for (int i = 1; i < 2; ++i) {
         mockStage->queueResult(BSON("a" << i));
     }
@@ -193,14 +194,14 @@ TEST_F(ClusterClientCursorImplTest, ChecksForInterrupt) {
 
 TEST_F(ClusterClientCursorImplTest, LogicalSessionIdsOnCursors) {
     // Make a cursor with no lsid
-    auto mockStage = stdx::make_unique<RouterStageMock>(_opCtx.get());
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
     ClusterClientCursorParams params(NamespaceString("test"), {});
     ClusterClientCursorImpl cursor{
         _opCtx.get(), std::move(mockStage), std::move(params), boost::none};
     ASSERT(!cursor.getLsid());
 
     // Make a cursor with an lsid
-    auto mockStage2 = stdx::make_unique<RouterStageMock>(_opCtx.get());
+    auto mockStage2 = std::make_unique<RouterStageMock>(_opCtx.get());
     ClusterClientCursorParams params2(NamespaceString("test"), {});
     auto lsid = makeLogicalSessionIdForTest();
     ClusterClientCursorImpl cursor2{_opCtx.get(), std::move(mockStage2), std::move(params2), lsid};

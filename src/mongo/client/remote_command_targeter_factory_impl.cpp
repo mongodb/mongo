@@ -31,11 +31,12 @@
 
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 
+#include <memory>
+
 #include "mongo/base/status_with.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_rs.h"
 #include "mongo/client/remote_command_targeter_standalone.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -50,10 +51,10 @@ std::unique_ptr<RemoteCommandTargeter> RemoteCommandTargeterFactoryImpl::create(
         case ConnectionString::MASTER:
         case ConnectionString::CUSTOM:
             invariant(connStr.getServers().size() == 1);
-            return stdx::make_unique<RemoteCommandTargeterStandalone>(connStr.getServers().front());
+            return std::make_unique<RemoteCommandTargeterStandalone>(connStr.getServers().front());
         case ConnectionString::SET:
-            return stdx::make_unique<RemoteCommandTargeterRS>(connStr.getSetName(),
-                                                              connStr.getServers());
+            return std::make_unique<RemoteCommandTargeterRS>(connStr.getSetName(),
+                                                             connStr.getServers());
         // These connections should never be seen
         case ConnectionString::INVALID:
         case ConnectionString::LOCAL:

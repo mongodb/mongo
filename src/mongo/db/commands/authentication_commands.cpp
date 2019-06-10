@@ -33,6 +33,7 @@
 
 #include "mongo/db/commands/authentication_commands.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -54,7 +55,6 @@
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"

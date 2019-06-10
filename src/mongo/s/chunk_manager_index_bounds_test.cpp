@@ -56,7 +56,7 @@ protected:
     std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
         BSONObj queryObj = fromjson(queryStr);
         const NamespaceString nss("test.foo");
-        auto qr = stdx::make_unique<QueryRequest>(nss);
+        auto qr = std::make_unique<QueryRequest>(nss);
         qr->setFilter(queryObj);
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         auto statusWithCQ =
