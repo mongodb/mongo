@@ -38,6 +38,7 @@
 #include "mongo/client/dbclient_connection.h"
 
 #include <algorithm>
+#include <functional>
 #include <utility>
 
 #include "mongo/base/status.h"
@@ -63,7 +64,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -520,7 +520,7 @@ uint64_t DBClientConnection::getSockCreationMicroSec() const {
     }
 }
 
-unsigned long long DBClientConnection::query(stdx::function<void(DBClientCursorBatchIterator&)> f,
+unsigned long long DBClientConnection::query(std::function<void(DBClientCursorBatchIterator&)> f,
                                              const NamespaceStringOrUUID& nsOrUuid,
                                              Query query,
                                              const BSONObj* fieldsToReturn,

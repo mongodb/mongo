@@ -104,7 +104,7 @@ public:
     using Operations = std::vector<OplogEntry>;
 
     // Used by SyncTail to access batching logic.
-    using GetNextApplierBatchFn = stdx::function<StatusWith<OplogApplier::Operations>(
+    using GetNextApplierBatchFn = std::function<StatusWith<OplogApplier::Operations>(
         OperationContext* opCtx, const BatchLimits& batchLimits)>;
 
     /**

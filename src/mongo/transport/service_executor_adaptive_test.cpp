@@ -117,7 +117,7 @@ protected:
     stdx::mutex mutex;
     AtomicWord<int> waitFor{-1};
     stdx::condition_variable cond;
-    stdx::function<void()> notifyCallback = [this] {
+    std::function<void()> notifyCallback = [this] {
         stdx::unique_lock<stdx::mutex> lk(mutex);
         invariant(waitFor.load() != -1);
         waitFor.fetchAndSubtract(1);
@@ -267,7 +267,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStarvation) {
 
     bool scheduleNew{true};
 
-    stdx::function<void()> task;
+    std::function<void()> task;
     task = [this, &task, &exec, &scheduleMutex, &scheduleNew] {
 
         // This sleep needs to be larger than the sleep below to be able to limit the amount of
@@ -313,7 +313,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestRecursion) {
     AtomicWord<int> remainingTasks{config->recursionLimit() - 1};
     stdx::mutex mutex;
     stdx::condition_variable cv;
-    stdx::function<void()> task;
+    std::function<void()> task;
 
     auto guard = makeGuard([&] { ASSERT_OK(exec->shutdown(config->workerThreadRunTime() * 2)); });
 

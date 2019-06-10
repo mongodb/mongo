@@ -176,7 +176,7 @@ std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(RemoteComman
                               requireFresherSyncSource,
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
-                              stdx::ref(*shutdownState),
+                              std::ref(*shutdownState),
                               defaultBatchSize);
 
     ASSERT_FALSE(oplogFetcher.isActive());
@@ -590,7 +590,7 @@ TEST_F(OplogFetcherTest,
                               false /* requireFresherSyncSource */,
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
-                              stdx::ref(*shutdownState),
+                              std::ref(*shutdownState),
                               defaultBatchSize,
                               OplogFetcher::StartingPoint::kEnqueueFirstDoc);
 
@@ -666,7 +666,7 @@ TEST_F(OplogFetcherTest,
                               false /* requireFresherSyncSource */,
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
-                              stdx::ref(*shutdownState),
+                              std::ref(*shutdownState),
                               defaultBatchSize,
                               OplogFetcher::StartingPoint::kEnqueueFirstDoc);
 
@@ -826,7 +826,7 @@ RemoteCommandRequest OplogFetcherTest::testTwoBatchHandling() {
                               true,
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
-                              stdx::ref(shutdownState),
+                              std::ref(shutdownState),
                               defaultBatchSize);
     ASSERT_EQUALS(OplogFetcher::State::kPreStart, oplogFetcher.getState_forTest());
 

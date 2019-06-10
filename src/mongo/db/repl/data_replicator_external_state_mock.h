@@ -88,7 +88,7 @@ public:
     bool shouldStopFetchingResult = false;
 
     // Override to change multiApply behavior.
-    using MultiApplyFn = stdx::function<StatusWith<OpTime>(
+    using MultiApplyFn = std::function<StatusWith<OpTime>(
         OperationContext*, MultiApplier::Operations, OplogApplier::Observer*)>;
     MultiApplyFn multiApplyFn;
 

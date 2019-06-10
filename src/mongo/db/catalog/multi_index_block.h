@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <iosfwd>
 #include <memory>
 #include <set>
@@ -44,7 +45,6 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/record_id.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point_service.h"
 
@@ -111,7 +111,7 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
-    using OnInitFn = stdx::function<Status(std::vector<BSONObj>& specs)>;
+    using OnInitFn = std::function<Status(std::vector<BSONObj>& specs)>;
     StatusWith<std::vector<BSONObj>> init(OperationContext* opCtx,
                                           Collection* collection,
                                           const std::vector<BSONObj>& specs,
@@ -210,8 +210,8 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
-    using OnCommitFn = stdx::function<void()>;
-    using OnCreateEachFn = stdx::function<void(const BSONObj& spec)>;
+    using OnCommitFn = std::function<void()>;
+    using OnCreateEachFn = std::function<void(const BSONObj& spec)>;
     Status commit(OperationContext* opCtx,
                   Collection* collection,
                   OnCreateEachFn onCreateEach,

@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
+#include <functional>
 #include <map>
 #include <utility>
 #include <vector>
@@ -44,7 +45,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/util/concurrency/thread_pool.h"

@@ -34,10 +34,10 @@
 #include "mongo/db/repl/scatter_gather_runner.h"
 
 #include <algorithm>
+#include <functional>
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"

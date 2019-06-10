@@ -919,13 +919,12 @@ TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndTimesOutWhenItDoesNotFindD
     ASSERT_EQUALS(count, 0UL);
 }
 
-void _testPushSentinelsProperly(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    StorageInterface* storageInterface,
-    stdx::function<void(OperationContext* opCtx,
-                        OplogBufferCollection* oplogBuffer,
-                        const std::vector<BSONObj>& oplog)> pushDocsFn) {
+void _testPushSentinelsProperly(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                StorageInterface* storageInterface,
+                                std::function<void(OperationContext* opCtx,
+                                                   OplogBufferCollection* oplogBuffer,
+                                                   const std::vector<BSONObj>& oplog)> pushDocsFn) {
     OplogBufferCollection oplogBuffer(storageInterface, nss);
     oplogBuffer.startup(opCtx);
     const std::vector<BSONObj> oplog = {

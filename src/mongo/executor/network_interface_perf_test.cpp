@@ -72,7 +72,7 @@ int timeNetworkTestMillis(std::size_t operations, NetworkInterface* net) {
 
     // This lambda function is declared here since it is mutually recursive with another callback
     // function
-    stdx::function<void()> func;
+    std::function<void()> func;
 
     const auto bsonObjPing = BSON("ping" << 1);
 

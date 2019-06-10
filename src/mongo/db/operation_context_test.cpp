@@ -646,8 +646,8 @@ TEST_F(OperationDeadlineTests, DuringWaitMaxTimeExpirationDominatesUntilExpirati
 
 class ThreadedOperationDeadlineTests : public OperationDeadlineTests {
 public:
-    using CvPred = stdx::function<bool()>;
-    using WaitFn = stdx::function<bool(
+    using CvPred = std::function<bool()>;
+    using WaitFn = std::function<bool(
         OperationContext*, stdx::condition_variable&, stdx::unique_lock<stdx::mutex>&, CvPred)>;
 
     struct WaitTestState {

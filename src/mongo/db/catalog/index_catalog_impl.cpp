@@ -843,7 +843,7 @@ BSONObj IndexCatalogImpl::getDefaultIdIndexSpec() const {
 
 void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
                                       bool includingIdIndex,
-                                      stdx::function<void(const IndexDescriptor*)> onDropFn) {
+                                      std::function<void(const IndexDescriptor*)> onDropFn) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
 
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,

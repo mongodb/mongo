@@ -198,7 +198,7 @@ std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSin
 
 void ConfigServerCatalogCacheLoader::getDatabase(
     StringData dbName,
-    stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+    std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
     _threadPool.schedule([ name = dbName.toString(), callbackFn ](auto status) noexcept {
         invariant(status);
 

@@ -501,7 +501,7 @@ Status OpenReadTransactionParam::setFromString(const std::string& str) {
 
 namespace {
 
-stdx::function<bool(StringData)> initRsOplogBackgroundThreadCallback = [](StringData) -> bool {
+std::function<bool(StringData)> initRsOplogBackgroundThreadCallback = [](StringData) -> bool {
     fassertFailed(40358);
 };
 
@@ -1556,7 +1556,7 @@ void WiredTigerKVEngine::setJournalListener(JournalListener* jl) {
 }
 
 void WiredTigerKVEngine::setInitRsOplogBackgroundThreadCallback(
-    stdx::function<bool(StringData)> cb) {
+    std::function<bool(StringData)> cb) {
     initRsOplogBackgroundThreadCallback = std::move(cb);
 }
 

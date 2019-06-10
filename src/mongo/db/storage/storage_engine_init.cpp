@@ -283,7 +283,7 @@ StorageEngine::Factory* getFactoryForStorageEngine(ServiceContext* service, Stri
 Status validateStorageOptions(
     ServiceContext* service,
     const BSONObj& storageEngineOptions,
-    stdx::function<Status(const StorageEngine::Factory* const, const BSONObj&)> validateFunc) {
+    std::function<Status(const StorageEngine::Factory* const, const BSONObj&)> validateFunc) {
 
     BSONObjIterator storageIt(storageEngineOptions);
     while (storageIt.more()) {

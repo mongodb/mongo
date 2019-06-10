@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -52,7 +53,6 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -184,7 +184,7 @@ public:
     /**
      * Callback function for callers of insertDocumentForBulkLoader().
      */
-    using OnRecordInsertedFn = stdx::function<Status(const RecordId& loc)>;
+    using OnRecordInsertedFn = std::function<Status(const RecordId& loc)>;
 
     Collection() = default;
     virtual ~Collection() = default;

@@ -133,7 +133,7 @@ public:
     std::vector<std::string> droppedIdents;
 
     // Override to modify dropIdent() behavior.
-    using DropIdentFn = stdx::function<Status(OperationContext*, StringData)>;
+    using DropIdentFn = std::function<Status(OperationContext*, StringData)>;
     DropIdentFn dropIdentFn = [](OperationContext*, StringData) { return Status::OK(); };
 };
 

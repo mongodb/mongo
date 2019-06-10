@@ -139,7 +139,7 @@ class SCRAMMutators {
 public:
     SCRAMMutators() {}
 
-    void setMutator(SaslTestState state, stdx::function<void(std::string&)> fun) {
+    void setMutator(SaslTestState state, std::function<void(std::string&)> fun) {
         mutators.insert(std::make_pair(state, fun));
     }
 
@@ -151,7 +151,7 @@ public:
     }
 
 private:
-    std::map<SaslTestState, stdx::function<void(std::string&)>> mutators;
+    std::map<SaslTestState, std::function<void(std::string&)>> mutators;
 };
 
 struct SCRAMStepsResult {

@@ -125,7 +125,7 @@ void FailPoint::disableFailPoint() {
 }
 
 FailPoint::RetCode FailPoint::slowShouldFailOpenBlock(
-    stdx::function<bool(const BSONObj&)> cb) noexcept {
+    std::function<bool(const BSONObj&)> cb) noexcept {
     ValType localFpInfo = _fpInfo.addAndFetch(1);
 
     if ((localFpInfo & ACTIVE_BIT) == 0) {

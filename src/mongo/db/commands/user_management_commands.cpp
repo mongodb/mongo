@@ -33,6 +33,7 @@
 
 #include "mongo/db/commands/user_management_commands.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -68,7 +69,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/icu.h"
@@ -246,7 +246,7 @@ Status queryAuthzDocument(OperationContext* opCtx,
                           const NamespaceString& collectionName,
                           const BSONObj& query,
                           const BSONObj& projection,
-                          const stdx::function<void(const BSONObj&)>& resultProcessor) {
+                          const std::function<void(const BSONObj&)>& resultProcessor) {
     try {
         DBDirectClient client(opCtx);
         client.query(resultProcessor, collectionName, query, &projection);

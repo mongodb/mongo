@@ -79,7 +79,7 @@ public:
     }
 
     using MockDBClientConnection::query;  // This avoids warnings from -Woverloaded-virtual
-    unsigned long long query(stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
+    unsigned long long query(std::function<void(mongo::DBClientCursorBatchIterator&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,
                              mongo::Query query,
                              const mongo::BSONObj* fieldsToReturn,
@@ -502,7 +502,7 @@ TEST_F(CollectionClonerTest, CollectionClonerReturnsBadValueOnNegativeDocumentCo
 
 class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
 public:
-    using ShouldFailRequestFn = stdx::function<bool(const executor::RemoteCommandRequest&)>;
+    using ShouldFailRequestFn = std::function<bool(const executor::RemoteCommandRequest&)>;
 
     TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor,
                                                    ShouldFailRequestFn shouldFailRequest)

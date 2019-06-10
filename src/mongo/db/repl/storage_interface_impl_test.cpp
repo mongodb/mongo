@@ -592,7 +592,7 @@ void _testDestroyUncommitedCollectionBulkLoader(
     OperationContext* opCtx,
     const NamespaceString& nss,
     std::vector<BSONObj> secondaryIndexes,
-    stdx::function<void(std::unique_ptr<CollectionBulkLoader> loader)> destroyLoaderFn) {
+    std::function<void(std::unique_ptr<CollectionBulkLoader> loader)> destroyLoaderFn) {
     StorageInterfaceImpl storage;
     CollectionOptions opts = generateOptionsWithUuid();
     auto loaderStatus =

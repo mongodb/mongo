@@ -29,11 +29,12 @@
 
 #pragma once
 
+#include <functional>
+
 #include "mongo/base/status_with.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -69,26 +70,26 @@ public:
     DistLockCatalogMock();
     virtual ~DistLockCatalogMock();
 
-    using GrabLockFunc = stdx::function<void(StringData lockID,
-                                             const OID& lockSessionID,
-                                             StringData who,
-                                             StringData processId,
-                                             Date_t time,
-                                             StringData why)>;
-    using OvertakeLockFunc = stdx::function<void(StringData lockID,
-                                                 const OID& lockSessionID,
-                                                 const OID& currentHolderTS,
-                                                 StringData who,
-                                                 StringData processId,
-                                                 Date_t time,
-                                                 StringData why)>;
-    using UnlockFunc = stdx::function<void(const OID& lockSessionID)>;
-    using PingFunc = stdx::function<void(StringData processID, Date_t ping)>;
-    using StopPingFunc = stdx::function<void(StringData processID)>;
+    using GrabLockFunc = std::function<void(StringData lockID,
+                                            const OID& lockSessionID,
+                                            StringData who,
+                                            StringData processId,
+                                            Date_t time,
+                                            StringData why)>;
+    using OvertakeLockFunc = std::function<void(StringData lockID,
+                                                const OID& lockSessionID,
+                                                const OID& currentHolderTS,
+                                                StringData who,
+                                                StringData processId,
+                                                Date_t time,
+                                                StringData why)>;
+    using UnlockFunc = std::function<void(const OID& lockSessionID)>;
+    using PingFunc = std::function<void(StringData processID, Date_t ping)>;
+    using StopPingFunc = std::function<void(StringData processID)>;
     using GetPingFunc = StopPingFunc;
-    using GetLockByTSFunc = stdx::function<void(const OID& ts)>;
-    using GetLockByNameFunc = stdx::function<void(StringData name)>;
-    using GetServerInfoFunc = stdx::function<void()>;
+    using GetLockByTSFunc = std::function<void(const OID& ts)>;
+    using GetLockByNameFunc = std::function<void(StringData name)>;
+    using GetServerInfoFunc = std::function<void()>;
 
     virtual StatusWith<LockpingsType> getPing(OperationContext* opCtx,
                                               StringData processID) override;

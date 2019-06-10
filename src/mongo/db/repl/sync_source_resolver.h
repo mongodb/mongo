@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 
 #include "mongo/base/status.h"
@@ -38,7 +39,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -107,7 +107,7 @@ public:
     /**
      * Callback function to report final status of resolving sync source.
      */
-    typedef stdx::function<void(const SyncSourceResolverResponse&)> OnCompletionFn;
+    typedef std::function<void(const SyncSourceResolverResponse&)> OnCompletionFn;
 
     SyncSourceResolver(executor::TaskExecutor* taskExecutor,
                        SyncSourceSelector* syncSourceSelector,

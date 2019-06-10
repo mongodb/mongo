@@ -684,7 +684,7 @@ boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithName(StringData targe
 }
 
 boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithNameAndCriteria(
-    StringData targetStageName, stdx::function<bool(const DocumentSource* const)> predicate) {
+    StringData targetStageName, std::function<bool(const DocumentSource* const)> predicate) {
     if (_sources.empty() || _sources.front()->getSourceName() != targetStageName) {
         return nullptr;
     }

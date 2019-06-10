@@ -73,7 +73,7 @@ void CatalogRAIITestFixture::setUp() {
     DatabaseHolder::set(getServiceContext(), std::make_unique<DatabaseHolderMock>());
 }
 
-void failsWithLockTimeout(stdx::function<void()> func, Milliseconds timeoutMillis) {
+void failsWithLockTimeout(std::function<void()> func, Milliseconds timeoutMillis) {
     Date_t t1 = Date_t::now();
     try {
         func();

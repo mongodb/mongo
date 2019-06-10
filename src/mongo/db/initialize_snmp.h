@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "mongo/stdx/functional.h"
+#include <functional>
 
 namespace mongo {
 /**
@@ -40,7 +40,7 @@ namespace mongo {
  * NOTE: This function may only be called once.
  * NOTE: This function is not multithread safe.
  */
-void registerSNMPInitializer(stdx::function<void()> init);
+void registerSNMPInitializer(std::function<void()> init);
 
 /**
  * Performs initialization for SNMP enterprise modules, if present, otherwise does nothing.

@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <functional>
 #include <memory>
 
 #include "mongo/db/cursor_id.h"
@@ -39,7 +40,6 @@
 #include "mongo/db/repl/sync_source_selector_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
@@ -52,7 +52,7 @@ using namespace mongo::repl;
 
 class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
 public:
-    using ShouldFailRequestFn = stdx::function<bool(const executor::RemoteCommandRequest&)>;
+    using ShouldFailRequestFn = std::function<bool(const executor::RemoteCommandRequest&)>;
 
     TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor,
                                                    ShouldFailRequestFn shouldFailRequest)

@@ -104,7 +104,7 @@ public:
     // Unsupported methods (defined to get rid of virtual function was hidden error)
     //
 
-    unsigned long long query(stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
+    unsigned long long query(std::function<void(mongo::DBClientCursorBatchIterator&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,
                              mongo::Query query,
                              const mongo::BSONObj* fieldsToReturn = 0,

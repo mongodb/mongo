@@ -130,7 +130,7 @@ Status AuthzManagerExternalStateMock::query(
     const NamespaceString& collectionName,
     const BSONObj& query,
     const BSONObj&,
-    const stdx::function<void(const BSONObj&)>& resultProcessor) {
+    const std::function<void(const BSONObj&)>& resultProcessor) {
     std::vector<BSONObjCollection::iterator> iterVector;
     Status status = _queryVector(opCtx, collectionName, query, &iterVector);
     if (!status.isOK()) {

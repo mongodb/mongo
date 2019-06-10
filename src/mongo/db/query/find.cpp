@@ -353,7 +353,7 @@ Message getMore(OperationContext* opCtx,
     *isCursorAuthorized = true;
 
     // Only used by the failpoints.
-    stdx::function<void()> dropAndReaquireReadLock = [&] {
+    std::function<void()> dropAndReaquireReadLock = [&] {
         // Make sure an interrupted operation does not prevent us from reacquiring the lock.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 

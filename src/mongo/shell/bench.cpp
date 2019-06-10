@@ -1116,7 +1116,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 // Use special query function for exhaust query option.
                 if (this->options & QueryOption_Exhaust) {
                     BenchRunEventTrace _bret(&state->stats->queryCounter);
-                    stdx::function<void(const BSONObj&)> castedDoNothing(doNothing);
+                    std::function<void(const BSONObj&)> castedDoNothing(doNothing);
                     count =
                         conn->query(castedDoNothing,
                                     NamespaceString(this->ns),

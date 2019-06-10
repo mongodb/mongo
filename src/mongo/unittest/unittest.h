@@ -37,6 +37,7 @@
 
 #include <boost/preprocessor/cat.hpp>
 #include <cmath>
+#include <functional>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -46,7 +47,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/logger/message_log_domain.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest_helpers.h"
 #include "mongo/util/assert_util.h"
@@ -330,7 +330,7 @@ mongo::logger::LogstreamBuilder warning();
 /**
  * Type representing the function composing a test.
  */
-typedef stdx::function<void(void)> TestFunction;
+typedef std::function<void(void)> TestFunction;
 
 /**
  * Container holding a test function and its name.  Suites

@@ -64,10 +64,10 @@ public:
         void append(BSONObjBuilder* builder) const;
     };
 
-    using IncludeDbFilterFn = stdx::function<bool(const BSONObj& dbInfo)>;
-    using OnFinishFn = stdx::function<void(const Status&)>;
+    using IncludeDbFilterFn = std::function<bool(const BSONObj& dbInfo)>;
+    using OnFinishFn = std::function<void(const Status&)>;
     using StartCollectionClonerFn = DatabaseCloner::StartCollectionClonerFn;
-    using ScheduleDbWorkFn = stdx::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
+    using ScheduleDbWorkFn = std::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
         executor::TaskExecutor::CallbackFn)>;
 
     DatabasesCloner(StorageInterface* si,

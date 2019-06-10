@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <functional>
 
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
@@ -39,7 +40,6 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 

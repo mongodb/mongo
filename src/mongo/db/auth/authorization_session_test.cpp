@@ -1013,7 +1013,7 @@ TEST_F(AuthorizationSessionTest, CheckAuthForAggregateWithDeeplyNestedLookup) {
 
     // Recursively adds nested $lookup stages to 'pipelineBob', building a pipeline with
     // 'levelsToGo' deep $lookup stages.
-    stdx::function<void(BSONArrayBuilder*, int)> addNestedPipeline;
+    std::function<void(BSONArrayBuilder*, int)> addNestedPipeline;
     addNestedPipeline = [&addNestedPipeline](BSONArrayBuilder* pipelineBob, int levelsToGo) {
         if (levelsToGo == 0) {
             return;

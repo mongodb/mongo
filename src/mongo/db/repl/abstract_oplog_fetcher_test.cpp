@@ -158,7 +158,7 @@ TEST_F(AbstractOplogFetcherTest, StartupReturnsOperationFailedIfExecutorFailsToS
     taskExecutorMock.shouldFailScheduleWorkRequest = []() { return true; };
 
     MockOplogFetcher oplogFetcher(
-        &taskExecutorMock, lastFetched, source, nss, 0, stdx::ref(shutdownState));
+        &taskExecutorMock, lastFetched, source, nss, 0, std::ref(shutdownState));
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed, oplogFetcher.startup());
 }
@@ -171,7 +171,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherReturnsOperationFailedIfExecutorFai
         [](const executor::RemoteCommandRequestOnAny&) { return true; };
 
     MockOplogFetcher oplogFetcher(
-        &taskExecutorMock, lastFetched, source, nss, 0, stdx::ref(shutdownState));
+        &taskExecutorMock, lastFetched, source, nss, 0, std::ref(shutdownState));
 
     ASSERT_FALSE(oplogFetcher.isActive());
     ASSERT_OK(oplogFetcher.startup());
@@ -191,7 +191,7 @@ TEST_F(AbstractOplogFetcherTest, ShuttingExecutorDownAfterStartupStopsTheOplogFe
     taskExecutorMock.shouldDeferScheduleWorkRequestByOneSecond = []() { return true; };
 
     MockOplogFetcher oplogFetcher(
-        &taskExecutorMock, lastFetched, source, nss, 0, stdx::ref(shutdownState));
+        &taskExecutorMock, lastFetched, source, nss, 0, std::ref(shutdownState));
 
     ASSERT_FALSE(oplogFetcher.isActive());
     ASSERT_OK(oplogFetcher.startup());
@@ -211,7 +211,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownAf
     taskExecutorMock.shouldDeferScheduleWorkRequestByOneSecond = []() { return true; };
 
     MockOplogFetcher oplogFetcher(
-        &taskExecutorMock, lastFetched, source, nss, 0, stdx::ref(shutdownState));
+        &taskExecutorMock, lastFetched, source, nss, 0, std::ref(shutdownState));
 
     ASSERT_FALSE(oplogFetcher.isActive());
     ASSERT_OK(oplogFetcher.startup());
@@ -261,7 +261,7 @@ TEST_F(AbstractOplogFetcherTest,
                                   source,
                                   nss,
                                   maxFetcherRestarts,
-                                  stdx::ref(*shutdownState));
+                                  std::ref(*shutdownState));
 
     ON_BLOCK_EXIT([this] { getExecutor().shutdown(); });
 
@@ -293,7 +293,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherStopsRestartingFetcherIfRestartLimi
                                   source,
                                   nss,
                                   maxFetcherRestarts,
-                                  stdx::ref(*shutdownState));
+                                  std::ref(*shutdownState));
 
     ON_BLOCK_EXIT([this] { getExecutor().shutdown(); });
 
@@ -329,7 +329,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherResetsRestartCounterOnSuccessfulFet
                                   source,
                                   nss,
                                   maxFetcherRestarts,
-                                  stdx::ref(*shutdownState));
+                                  std::ref(*shutdownState));
     ON_BLOCK_EXIT([this] { getExecutor().shutdown(); });
 
     ASSERT_OK(oplogFetcher.startup());
@@ -365,7 +365,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherResetsRestartCounterOnSuccessfulFet
 
 class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
 public:
-    using ShouldFailRequestFn = stdx::function<bool(const executor::RemoteCommandRequest&)>;
+    using ShouldFailRequestFn = std::function<bool(const executor::RemoteCommandRequest&)>;
 
     TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor,
                                                    ShouldFailRequestFn shouldFailRequest)
@@ -399,7 +399,7 @@ TEST_F(AbstractOplogFetcherTest,
                                   source,
                                   nss,
                                   maxFetcherRestarts,
-                                  stdx::ref(*shutdownState));
+                                  std::ref(*shutdownState));
     ON_BLOCK_EXIT([this] { getExecutor().shutdown(); });
 
     ASSERT_OK(oplogFetcher.startup());
@@ -430,7 +430,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherTimesOutCorrectlyOnInitialFindReque
                                   source,
                                   nss,
                                   maxFetcherRestarts,
-                                  stdx::ref(*shutdownState));
+                                  std::ref(*shutdownState));
 
     // Set a finite network timeout for the initial find request.
     auto initialFindMaxTime = Milliseconds(10000);
@@ -468,7 +468,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherTimesOutCorrectlyOnRetriedFindReque
                                   source,
                                   nss,
                                   maxFetcherRestarts,
-                                  stdx::ref(*shutdownState));
+                                  std::ref(*shutdownState));
 
     // Set finite network timeouts for the initial and retried find requests.
     auto initialFindMaxTime = Milliseconds(10000);

@@ -39,7 +39,6 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -106,10 +105,9 @@ public:
      * the BSONObj returned by the command, with the "ok" field indicating the success of the
      * command in the usual way.
      */
-    using RemoteCommandCallbackFn = stdx::function<void(const RemoteCommandCallbackArgs&)>;
+    using RemoteCommandCallbackFn = std::function<void(const RemoteCommandCallbackArgs&)>;
 
-    using RemoteCommandOnAnyCallbackFn =
-        stdx::function<void(const RemoteCommandOnAnyCallbackArgs&)>;
+    using RemoteCommandOnAnyCallbackFn = std::function<void(const RemoteCommandOnAnyCallbackArgs&)>;
 
     /**
      * Destroys the task executor. Implicitly performs the equivalent of shutdown() and join()

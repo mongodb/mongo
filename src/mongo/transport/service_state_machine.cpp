@@ -608,7 +608,7 @@ void ServiceStateMachine::terminateIfTagsDontMatch(transport::Session::TagMask t
     terminate();
 }
 
-void ServiceStateMachine::setCleanupHook(stdx::function<void()> hook) {
+void ServiceStateMachine::setCleanupHook(std::function<void()> hook) {
     invariant(state() == State::Created);
     _cleanupHook = std::move(hook);
 }

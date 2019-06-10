@@ -2144,7 +2144,7 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
 class PrimaryCatchUpTest : public ReplCoordTest {
 protected:
     using NetworkOpIter = NetworkInterfaceMock::NetworkOperationIterator;
-    using NetworkRequestFn = stdx::function<void(const NetworkOpIter)>;
+    using NetworkRequestFn = std::function<void(const NetworkOpIter)>;
 
     const Timestamp smallTimestamp{1, 1};
 

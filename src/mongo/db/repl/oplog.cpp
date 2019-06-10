@@ -808,14 +808,14 @@ NamespaceString parseUUIDorNs(OperationContext* opCtx,
     return ui.ok() ? parseUUID(opCtx, ui) : parseNs(ns, cmd);
 }
 
-using OpApplyFn = stdx::function<Status(OperationContext* opCtx,
-                                        const char* ns,
-                                        const BSONElement& ui,
-                                        BSONObj& cmd,
-                                        const OpTime& opTime,
-                                        const OplogEntry& entry,
-                                        OplogApplication::Mode mode,
-                                        boost::optional<Timestamp> stableTimestampForRecovery)>;
+using OpApplyFn = std::function<Status(OperationContext* opCtx,
+                                       const char* ns,
+                                       const BSONElement& ui,
+                                       BSONObj& cmd,
+                                       const OpTime& opTime,
+                                       const OplogEntry& entry,
+                                       OplogApplication::Mode mode,
+                                       boost::optional<Timestamp> stableTimestampForRecovery)>;
 
 struct ApplyOpMetadata {
     OpApplyFn applyFunc;

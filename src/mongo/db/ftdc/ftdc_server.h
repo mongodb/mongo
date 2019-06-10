@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,14 +39,13 @@
 #include "mongo/db/ftdc/controller.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
 /**
  * Function that allows FTDC server components to register their own collectors as needed.
  */
-using RegisterCollectorsFunction = stdx::function<void(FTDCController*)>;
+using RegisterCollectorsFunction = std::function<void(FTDCController*)>;
 
 /**
  * An enum that decides whether FTDC will startup as part of startup or if its deferred to later.

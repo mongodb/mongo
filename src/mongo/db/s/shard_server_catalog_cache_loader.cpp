@@ -429,7 +429,7 @@ std::shared_ptr<Notification<void>> ShardServerCatalogCacheLoader::getChunksSinc
 
 void ShardServerCatalogCacheLoader::getDatabase(
     StringData dbName,
-    stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+    std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
     long long currentTerm;
     bool isPrimary;
 
@@ -584,7 +584,7 @@ void ShardServerCatalogCacheLoader::_runSecondaryGetChunksSince(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
-    stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
+    std::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
     std::shared_ptr<Notification<void>> notify) {
     forcePrimaryCollectionRefreshAndWaitForReplication(opCtx, nss);
 
@@ -600,7 +600,7 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
     long long termScheduled,
-    stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
+    std::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
     std::shared_ptr<Notification<void>> notify) {
 
     // Get the max version the loader has.
@@ -712,7 +712,7 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
 void ShardServerCatalogCacheLoader::_runSecondaryGetDatabase(
     OperationContext* opCtx,
     StringData dbName,
-    stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+    std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
 
     forcePrimaryDatabaseRefreshAndWaitForReplication(opCtx, dbName);
 
@@ -725,7 +725,7 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
     OperationContext* opCtx,
     StringData dbName,
     long long termScheduled,
-    stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+    std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
     auto remoteRefreshFn = [ this, name = dbName.toString(), termScheduled ](
         OperationContext * opCtx, StatusWith<DatabaseType> swDatabaseType) {
         if (swDatabaseType == ErrorCodes::NamespaceNotFound) {

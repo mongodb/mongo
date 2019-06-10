@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-using InspectionCallback = stdx::function<void(const executor::RemoteCommandRequest& request)>;
+using InspectionCallback = std::function<void(const executor::RemoteCommandRequest& request)>;
 
 class ClusterCommandTestFixture : public CatalogCacheTestFixture {
 protected:

@@ -710,10 +710,10 @@ struct DBClientFunConvertor {
             _f(i.nextSafe());
         }
     }
-    stdx::function<void(const BSONObj&)> _f;
+    std::function<void(const BSONObj&)> _f;
 };
 
-unsigned long long DBClientBase::query(stdx::function<void(const BSONObj&)> f,
+unsigned long long DBClientBase::query(std::function<void(const BSONObj&)> f,
                                        const NamespaceStringOrUUID& nsOrUuid,
                                        Query query,
                                        const BSONObj* fieldsToReturn,
@@ -721,11 +721,11 @@ unsigned long long DBClientBase::query(stdx::function<void(const BSONObj&)> f,
                                        int batchSize) {
     DBClientFunConvertor fun;
     fun._f = f;
-    stdx::function<void(DBClientCursorBatchIterator&)> ptr(fun);
+    std::function<void(DBClientCursorBatchIterator&)> ptr(fun);
     return this->query(ptr, nsOrUuid, query, fieldsToReturn, queryOptions, batchSize);
 }
 
-unsigned long long DBClientBase::query(stdx::function<void(DBClientCursorBatchIterator&)> f,
+unsigned long long DBClientBase::query(std::function<void(DBClientCursorBatchIterator&)> f,
                                        const NamespaceStringOrUUID& nsOrUuid,
                                        Query query,
                                        const BSONObj* fieldsToReturn,

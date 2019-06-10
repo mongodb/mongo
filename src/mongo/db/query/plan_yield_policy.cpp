@@ -81,7 +81,7 @@ void PlanYieldPolicy::resetTimer() {
     _elapsedTracker.resetLastTime();
 }
 
-Status PlanYieldPolicy::yieldOrInterrupt(stdx::function<void()> whileYieldingFn) {
+Status PlanYieldPolicy::yieldOrInterrupt(std::function<void()> whileYieldingFn) {
     invariant(_planYielding);
 
     if (_policy == PlanExecutor::INTERRUPT_ONLY) {
@@ -151,7 +151,7 @@ MONGO_FAIL_POINT_DEFINE(setYieldAllLocksWait);
 }  // namespace
 
 void PlanYieldPolicy::_yieldAllLocks(OperationContext* opCtx,
-                                     stdx::function<void()> whileYieldingFn,
+                                     std::function<void()> whileYieldingFn,
                                      const NamespaceString& planExecNS) {
     // Things have to happen here in a specific order:
     //   * Release lock mgr locks

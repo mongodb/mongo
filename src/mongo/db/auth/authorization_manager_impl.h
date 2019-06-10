@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/authorization_manager.h"
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -50,7 +51,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/invalidating_lru_cache.h"

@@ -317,7 +317,7 @@ void Cloner::copy(OperationContext* opCtx,
         QueryOption_Exhaust;
     {
         Lock::TempRelease tempRelease(opCtx->lockState());
-        _conn->query(stdx::function<void(DBClientCursorBatchIterator&)>(f),
+        _conn->query(std::function<void(DBClientCursorBatchIterator&)>(f),
                      from_collection,
                      query,
                      0,

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <list>
 #include <memory>
 #include <string>
@@ -43,7 +44,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/elapsed_tracker.h"
 
@@ -295,7 +295,7 @@ public:
      * background job, for example). Intended to be called from a MONGO_INITIALIZER and therefore in
      * a single threaded context.
      */
-    static void setInitRsOplogBackgroundThreadCallback(stdx::function<bool(StringData)> cb);
+    static void setInitRsOplogBackgroundThreadCallback(std::function<bool(StringData)> cb);
 
     /**
      * Initializes a background job to remove excess documents in the oplog collections.

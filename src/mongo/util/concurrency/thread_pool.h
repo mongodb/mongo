@@ -30,11 +30,11 @@
 #pragma once
 
 #include <deque>
+#include <functional>
 #include <string>
 #include <vector>
 
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
@@ -89,7 +89,7 @@ public:
         Milliseconds maxIdleThreadAge = Seconds{30};
 
         // This function is run before each worker thread begins consuming tasks.
-        using OnCreateThreadFn = stdx::function<void(const std::string& threadName)>;
+        using OnCreateThreadFn = std::function<void(const std::string& threadName)>;
         OnCreateThreadFn onCreateThread = [](const std::string&) {};
     };
 

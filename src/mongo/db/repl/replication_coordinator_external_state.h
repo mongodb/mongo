@@ -31,12 +31,12 @@
 
 #include <boost/optional.hpp>
 #include <cstddef>
+#include <functional>
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/time_support.h"
 

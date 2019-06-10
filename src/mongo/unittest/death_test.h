@@ -93,12 +93,12 @@ class DeathTestImpl : public Test {
     DeathTestImpl& operator=(const DeathTestImpl&) = delete;
 
 protected:
-    explicit DeathTestImpl(stdx::function<std::unique_ptr<Test>()> makeTest);
+    explicit DeathTestImpl(std::function<std::unique_ptr<Test>()> makeTest);
 
 private:
     void _doTest() final;
     virtual std::string getPattern() = 0;
-    const stdx::function<std::unique_ptr<Test>()> _makeTest;
+    const std::function<std::unique_ptr<Test>()> _makeTest;
 };
 
 template <typename T>

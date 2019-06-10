@@ -31,10 +31,10 @@
 
 #include <boost/optional/optional_io.hpp>
 #include <deque>
+#include <functional>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplog_buffer_proxy.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -231,7 +231,7 @@ void _testPushFunctionUpdatesCachedLastObjectPushed(
     OperationContext* opCtx,
     OplogBuffer* proxy,
     OplogBufferMock* mock,
-    stdx::function<std::size_t(
+    std::function<std::size_t(
         OperationContext* opCtx, OplogBuffer* proxy, const OplogBuffer::Value& value)> pushFn) {
     ASSERT_EQUALS(proxy->lastObjectPushed(opCtx), boost::none);
     ASSERT_FALSE(mock->lastObjectPushedCalled);

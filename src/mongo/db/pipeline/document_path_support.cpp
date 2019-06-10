@@ -49,8 +49,7 @@ namespace {
  * If 'value' is an array, invokes 'callback' once on each element of 'value'. Otherwise, if 'value'
  * is not missing, invokes 'callback' on 'value' itself.
  */
-void invokeCallbackOnTrailingValue(const Value& value,
-                                   stdx::function<void(const Value&)> callback) {
+void invokeCallbackOnTrailingValue(const Value& value, std::function<void(const Value&)> callback) {
     if (value.isArray()) {
         for (auto&& finalValue : value.getArray()) {
             if (!finalValue.missing()) {
@@ -65,7 +64,7 @@ void invokeCallbackOnTrailingValue(const Value& value,
 void visitAllValuesAtPathHelper(Document doc,
                                 const FieldPath& path,
                                 size_t fieldPathIndex,
-                                stdx::function<void(const Value&)> callback) {
+                                std::function<void(const Value&)> callback) {
     invariant(path.getPathLength() > 0 && fieldPathIndex < path.getPathLength());
 
     // The first field in the path must be treated as a field name, even if it is numeric as in
@@ -116,7 +115,7 @@ void visitAllValuesAtPathHelper(Document doc,
 
 void visitAllValuesAtPath(const Document& doc,
                           const FieldPath& path,
-                          stdx::function<void(const Value&)> callback) {
+                          std::function<void(const Value&)> callback) {
     visitAllValuesAtPathHelper(doc, path, 0, callback);
 }
 

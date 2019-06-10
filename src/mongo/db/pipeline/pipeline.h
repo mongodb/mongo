@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <list>
 #include <vector>
 
@@ -42,7 +43,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/async_results_merger_params_gen.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
 
@@ -315,7 +315,7 @@ public:
      * stage. Returns nullptr if there is no first stage which meets these criteria.
      */
     boost::intrusive_ptr<DocumentSource> popFrontWithNameAndCriteria(
-        StringData targetStageName, stdx::function<bool(const DocumentSource* const)> predicate);
+        StringData targetStageName, std::function<bool(const DocumentSource* const)> predicate);
 
     /**
      * PipelineD is a "sister" class that has additional functionality for the Pipeline. It exists

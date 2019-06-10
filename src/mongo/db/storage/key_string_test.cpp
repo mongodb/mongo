@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <random>
@@ -46,7 +47,6 @@
 #include "mongo/config.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"

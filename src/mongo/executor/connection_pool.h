@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <queue>
 
 #include "mongo/executor/egress_tag_closer.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
@@ -70,7 +70,7 @@ public:
     class DependentTypeFactoryInterface;
     class TimerInterface;
 
-    using ConnectionHandleDeleter = stdx::function<void(ConnectionInterface* connection)>;
+    using ConnectionHandleDeleter = std::function<void(ConnectionInterface* connection)>;
     using ConnectionHandle = std::unique_ptr<ConnectionInterface, ConnectionHandleDeleter>;
 
     using GetConnectionCallback = unique_function<void(StatusWith<ConnectionHandle>)>;
@@ -152,7 +152,7 @@ public:
     void dropConnections(transport::Session::TagMask tags) override;
 
     void mutateTags(const HostAndPort& hostAndPort,
-                    const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>&
+                    const std::function<transport::Session::TagMask(transport::Session::TagMask)>&
                         mutateFunc) override;
 
     SemiFuture<ConnectionHandle> get(const HostAndPort& hostAndPort,
@@ -194,7 +194,7 @@ class ConnectionPool::TimerInterface {
 public:
     TimerInterface() = default;
 
-    using TimeoutCallback = stdx::function<void()>;
+    using TimeoutCallback = std::function<void()>;
 
     virtual ~TimerInterface() = default;
 

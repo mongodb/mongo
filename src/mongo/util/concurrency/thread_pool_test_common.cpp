@@ -45,7 +45,7 @@
 namespace mongo {
 namespace {
 
-using ThreadPoolFactory = stdx::function<std::unique_ptr<ThreadPoolInterface>()>;
+using ThreadPoolFactory = std::function<std::unique_ptr<ThreadPoolInterface>()>;
 
 class CommonThreadPoolTestFixture : public ThreadPoolTest {
 public:
@@ -61,7 +61,7 @@ private:
 };
 
 using ThreadPoolTestCaseFactory =
-    stdx::function<std::unique_ptr<::mongo::unittest::Test>(ThreadPoolFactory)>;
+    std::function<std::unique_ptr<::mongo::unittest::Test>(ThreadPoolFactory)>;
 using ThreadPoolTestCaseMap = stdx::unordered_map<std::string, ThreadPoolTestCaseFactory>;
 
 static ThreadPoolTestCaseMap& threadPoolTestCaseRegistry() {
@@ -200,7 +200,7 @@ COMMON_THREAD_POOL_TEST(PoolJoinExecutesRemainingTasks) {
 COMMON_THREAD_POOL_TEST(RepeatedScheduleDoesntSmashStack) {
     const std::size_t depth = 10000ul;
     auto& pool = getThreadPool();
-    stdx::function<void()> func;
+    std::function<void()> func;
     std::size_t n = 0;
     stdx::mutex mutex;
     stdx::condition_variable condvar;

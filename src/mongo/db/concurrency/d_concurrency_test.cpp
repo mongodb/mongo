@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/optional/optional_io.hpp>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -41,7 +42,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
@@ -102,8 +102,8 @@ public:
     }
 
     stdx::future<void> runTaskAndKill(OperationContext* opCtx,
-                                      stdx::function<void()> fn,
-                                      stdx::function<void()> postKill = nullptr) {
+                                      std::function<void()> fn,
+                                      std::function<void()> postKill = nullptr) {
         auto task = stdx::packaged_task<void()>(fn);
         auto result = task.get_future();
         stdx::thread taskThread{std::move(task)};
@@ -181,7 +181,7 @@ TEST_F(DConcurrencyTestFixture, ResourceMutex) {
             auto actual = step.fetchAndAdd(1);
             ASSERT_EQ(actual, n);
         }
-        void waitFor(stdx::function<bool()> cond) {
+        void waitFor(std::function<bool()> cond) {
             while (!cond())
                 sleepmillis(0);
         }

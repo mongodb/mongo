@@ -33,6 +33,8 @@
 
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 
+#include <functional>
+
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
@@ -49,7 +51,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point_service.h"
@@ -252,7 +253,7 @@ void ReplCoordTest::simulateEnoughHeartbeatsForAllNodesUp() {
 }
 
 void ReplCoordTest::simulateSuccessfulDryRun(
-    stdx::function<void(const RemoteCommandRequest& request)> onDryRunRequest) {
+    std::function<void(const RemoteCommandRequest& request)> onDryRunRequest) {
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     ReplSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
     NetworkInterfaceMock* net = getNet();

@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include <functional>
+
 #include "mongo/db/sessions_collection_mock.h"
 #include "mongo/platform/basic.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 

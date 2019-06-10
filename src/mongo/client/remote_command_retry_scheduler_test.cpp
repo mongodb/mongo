@@ -321,7 +321,7 @@ TEST_F(RemoteCommandRetrySchedulerTest,
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy(
         10U, Milliseconds(1), {ErrorCodes::HostUnreachable});
     RemoteCommandRetryScheduler scheduler(
-        &getExecutor(), request, stdx::ref(callback), std::move(policy));
+        &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
 
     auto net = getNet();
@@ -343,7 +343,7 @@ TEST_F(RemoteCommandRetrySchedulerTest,
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy(
         10U, Milliseconds(1), {ErrorCodes::HostUnreachable});
     RemoteCommandRetryScheduler scheduler(
-        &getExecutor(), request, stdx::ref(callback), std::move(policy));
+        &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
 
     scheduler.shutdown();
@@ -358,7 +358,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerInvokesCallbackOnNonRetryableEr
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy(
         10U, Milliseconds(1), RemoteCommandRetryScheduler::kNotMasterErrors);
     RemoteCommandRetryScheduler scheduler(
-        &getExecutor(), request, stdx::ref(callback), std::move(policy));
+        &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
 
     // This should match one of the non-retryable error codes in the policy.
@@ -375,7 +375,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerInvokesCallbackOnFirstSuccessfu
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy(
         10U, Milliseconds(1), {ErrorCodes::HostUnreachable});
     RemoteCommandRetryScheduler scheduler(
-        &getExecutor(), request, stdx::ref(callback), std::move(policy));
+        &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
 
     // Elapsed time in response is ignored on successful responses.
@@ -394,7 +394,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerIgnoresEmbeddedErrorInSuccessfu
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy(
         10U, Milliseconds(1), {ErrorCodes::HostUnreachable});
     RemoteCommandRetryScheduler scheduler(
-        &getExecutor(), request, stdx::ref(callback), std::move(policy));
+        &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
 
     // Scheduler does not parse document in a successful response for embedded errors.
@@ -417,7 +417,7 @@ TEST_F(RemoteCommandRetrySchedulerTest,
         3U, executor::RemoteCommandRequest::kNoTimeout, {ErrorCodes::HostNotFound});
     TaskExecutorWithFailureInScheduleRemoteCommand badExecutor(&getExecutor());
     RemoteCommandRetryScheduler scheduler(
-        &badExecutor, request, stdx::ref(callback), std::move(policy));
+        &badExecutor, request, std::ref(callback), std::move(policy));
     start(&scheduler);
 
     processNetworkResponse({ErrorCodes::HostNotFound, "first", Milliseconds(0)});
@@ -439,7 +439,7 @@ TEST_F(RemoteCommandRetrySchedulerTest,
         executor::RemoteCommandRequest::kNoTimeout,
         RemoteCommandRetryScheduler::kAllRetriableErrors);
     RemoteCommandRetryScheduler scheduler(
-        &getExecutor(), request, stdx::ref(callback), std::move(policy));
+        &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
 
     processNetworkResponse({ErrorCodes::HostNotFound, "first", Milliseconds(0)});
@@ -455,7 +455,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerShouldRetryUntilSuccessfulRespo
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy(
         3U, executor::RemoteCommandRequest::kNoTimeout, {ErrorCodes::HostNotFound});
     RemoteCommandRetryScheduler scheduler(
-        &getExecutor(), request, stdx::ref(callback), std::move(policy));
+        &getExecutor(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
 
     processNetworkResponse({ErrorCodes::HostNotFound, "first", Milliseconds(0)});
@@ -502,7 +502,7 @@ TEST_F(RemoteCommandRetrySchedulerTest,
     auto policyPtr = policy.get();
     TaskExecutorWithFailureInScheduleRemoteCommand badExecutor(&getExecutor());
     RemoteCommandRetryScheduler scheduler(
-        &badExecutor, request, stdx::ref(callback), std::move(policy));
+        &badExecutor, request, std::ref(callback), std::move(policy));
     policyPtr->scheduler = &scheduler;
     start(&scheduler);
 

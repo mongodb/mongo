@@ -32,13 +32,13 @@
 #include "mongo/db/repl/repl_set_config.h"
 
 #include <algorithm>
+#include <functional>
 
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/server_options.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

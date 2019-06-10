@@ -246,7 +246,7 @@ protected:
      * Applicable to protocol version 1 only.
      */
     void simulateSuccessfulDryRun(
-        stdx::function<void(const executor::RemoteCommandRequest& request)> onDryRunRequest);
+        std::function<void(const executor::RemoteCommandRequest& request)> onDryRunRequest);
     void simulateSuccessfulDryRun();
 
     /**

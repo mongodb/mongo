@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <iosfwd>
 #include <string>
 
@@ -38,7 +39,6 @@
 #include "mongo/db/repl/split_horizon.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -531,7 +531,7 @@ public:
     void processLoseElection();
 
 
-    using StepDownAttemptAbortFn = stdx::function<void()>;
+    using StepDownAttemptAbortFn = std::function<void()>;
     /**
      * Readies the TopologyCoordinator for an attempt to stepdown that may fail.  This is used
      * when we receive a stepdown command (which can fail if not enough secondaries are caught up)

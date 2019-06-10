@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <boost/intrusive_ptr.hpp>
+#include <functional>
 #include <map>
 #include <pcre.h>
 #include <string>
@@ -49,7 +50,6 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/server_options.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
@@ -91,7 +91,7 @@ class DocumentSource;
 
 class Expression : public RefCountable {
 public:
-    using Parser = stdx::function<boost::intrusive_ptr<Expression>(
+    using Parser = std::function<boost::intrusive_ptr<Expression>(
         const boost::intrusive_ptr<ExpressionContext>&, BSONElement, const VariablesParseState&)>;
 
     /**

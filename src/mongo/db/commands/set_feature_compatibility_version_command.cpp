@@ -97,9 +97,8 @@ LogicalSessionIdSet getMatchingSessionIdsFromTransactionTable(OperationContext* 
 void forEachSessionWithCheckout(
     OperationContext* opCtx,
     LogicalSessionIdSet sessionIds,
-    stdx::function<bool(OperationContext* opCtx)> verifyTransactionParticipantFn,
-    stdx::function<void(DBDirectClient* client, LogicalSessionId sessionId)>
-        performModificationFn) {
+    std::function<bool(OperationContext* opCtx)> verifyTransactionParticipantFn,
+    std::function<void(DBDirectClient* client, LogicalSessionId sessionId)> performModificationFn) {
     // Construct a new operation context to check out the session with.
     auto clientForCheckout =
         opCtx->getServiceContext()->makeClient("setFCV-transaction-table-checkout");

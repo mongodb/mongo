@@ -378,8 +378,8 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
 
 void MigrationDestinationManager::cloneDocumentsFromDonor(
     OperationContext* opCtx,
-    stdx::function<void(OperationContext*, BSONObj)> insertBatchFn,
-    stdx::function<BSONObj(OperationContext*)> fetchBatchFn) {
+    std::function<void(OperationContext*, BSONObj)> insertBatchFn,
+    std::function<BSONObj(OperationContext*)> fetchBatchFn) {
 
     SingleProducerSingleConsumerQueue<BSONObj>::Options options;
     options.maxQueueDepth = 1;

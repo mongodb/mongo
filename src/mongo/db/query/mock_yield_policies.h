@@ -50,7 +50,7 @@ public:
         return true;
     }
 
-    Status yieldOrInterrupt(stdx::function<void()> whileYieldingFn) override {
+    Status yieldOrInterrupt(std::function<void()> whileYieldingFn) override {
         return {ErrorCodes::ExceededTimeLimit, "Using AlwaysTimeOutYieldPolicy"};
     }
 };
@@ -71,7 +71,7 @@ public:
         return true;
     }
 
-    Status yieldOrInterrupt(stdx::function<void()> whileYieldingFn) override {
+    Status yieldOrInterrupt(std::function<void()> whileYieldingFn) override {
         return {ErrorCodes::QueryPlanKilled, "Using AlwaysPlanKilledYieldPolicy"};
     }
 };

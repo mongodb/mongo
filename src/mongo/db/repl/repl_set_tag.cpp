@@ -32,10 +32,10 @@
 #include "mongo/db/repl/repl_set_tag.h"
 
 #include <algorithm>
+#include <functional>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
 

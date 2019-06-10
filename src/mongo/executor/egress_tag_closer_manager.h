@@ -29,9 +29,10 @@
 
 #pragma once
 
+#include <functional>
+
 #include "mongo/db/service_context.h"
 #include "mongo/executor/egress_tag_closer.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/session.h"
@@ -61,7 +62,7 @@ public:
 
     void mutateTags(
         const HostAndPort& hostAndPort,
-        const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc);
+        const std::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc);
 
 private:
     stdx::mutex _mutex;

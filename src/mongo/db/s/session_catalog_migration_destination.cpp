@@ -33,6 +33,8 @@
 
 #include "mongo/db/s/session_catalog_migration_destination.h"
 
+#include <functional>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -47,7 +49,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_id.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

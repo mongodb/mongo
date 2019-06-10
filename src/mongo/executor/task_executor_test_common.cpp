@@ -53,7 +53,7 @@ namespace executor {
 namespace {
 
 using ExecutorFactory =
-    stdx::function<std::unique_ptr<TaskExecutor>(std::unique_ptr<NetworkInterfaceMock>)>;
+    std::function<std::unique_ptr<TaskExecutor>(std::unique_ptr<NetworkInterfaceMock>)>;
 
 class CommonTaskExecutorTestFixture : public TaskExecutorTest {
 public:
@@ -70,7 +70,7 @@ private:
 };
 
 using ExecutorTestCaseFactory =
-    stdx::function<std::unique_ptr<CommonTaskExecutorTestFixture>(ExecutorFactory)>;
+    std::function<std::unique_ptr<CommonTaskExecutorTestFixture>(ExecutorFactory)>;
 using ExecutorTestCaseMap = stdx::unordered_map<std::string, ExecutorTestCaseFactory>;
 
 static ExecutorTestCaseMap& executorTestCaseRegistry() {

@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -36,7 +38,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
@@ -85,7 +86,7 @@ public:
      * Type of function to roll back an operation or process it for future use.
      * It can return any status except ErrorCodes::NoSuchKey. See onRemoteOperation().
      */
-    using RollbackOperationFn = stdx::function<Status(const BSONObj&)>;
+    using RollbackOperationFn = std::function<Status(const BSONObj&)>;
 
     /**
      * Initializes rollback processor with a valid local oplog.

@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -37,7 +38,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/unordered_set.h"
 
@@ -61,7 +61,7 @@ public:
      * which this aggregation is being performed, and the BSONElement will be the element whose
      * field name is the name of this stage (e.g. the first and only element in {$limit: 1}).
      */
-    using Parser = stdx::function<std::unique_ptr<LiteParsedDocumentSource>(
+    using Parser = std::function<std::unique_ptr<LiteParsedDocumentSource>(
         const AggregationRequest&, const BSONElement&)>;
 
     /**

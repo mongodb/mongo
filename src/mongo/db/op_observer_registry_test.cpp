@@ -109,7 +109,7 @@ struct OpObserverRegistryTest : public unittest::Test {
      * The 'op' function calls an observer method on the registry that returns an OpTime.
      * The method checks that the registry correctly returns only the first observer's `OpTime`.
      */
-    void checkConsistentOpTime(stdx::function<repl::OpTime()> op) {
+    void checkConsistentOpTime(std::function<repl::OpTime()> op) {
         const repl::OpTime myTime(Timestamp(1, 1), 1);
         ASSERT(op() == repl::OpTime());
         observer1->opTime = myTime;
@@ -124,7 +124,7 @@ struct OpObserverRegistryTest : public unittest::Test {
      * The 'op' function calls an observer method on the registry that returns an OpTime.
      * The method checks that the registry invariants if the observers return multiple times.
      */
-    void checkInconsistentOpTime(stdx::function<repl::OpTime()> op) {
+    void checkInconsistentOpTime(std::function<repl::OpTime()> op) {
         observer1->opTime = repl::OpTime(Timestamp(1, 1), 1);
         observer2->opTime = repl::OpTime(Timestamp(2, 2), 2);
         op();  // This will invariant because of inconsistent timestamps: for death test.

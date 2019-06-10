@@ -327,7 +327,7 @@ enum QueryOptions {
      * you want to pull it all down.  Note: it is not allowed to not read all the data unless you
      * close the connection.
 
-        Use the query( stdx::function<void(const BSONObj&)> f, ... ) version of the connection's
+        Use the query( std::function<void(const BSONObj&)> f, ... ) version of the connection's
         query()
         method, and it will take care of all the details for you.
     */

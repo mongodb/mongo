@@ -33,6 +33,7 @@
 
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 
+#include <functional>
 #include <string>
 
 #include "mongo/base/status_with.h"
@@ -93,7 +94,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"

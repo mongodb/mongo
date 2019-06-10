@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -43,7 +44,6 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_graph.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/string_map.h"
@@ -65,7 +65,7 @@ class ViewCatalog {
 
 public:
     using ViewMap = StringMap<std::shared_ptr<ViewDefinition>>;
-    using ViewIteratorCallback = stdx::function<void(const ViewDefinition& view)>;
+    using ViewIteratorCallback = std::function<void(const ViewDefinition& view)>;
 
     static ViewCatalog* get(const Database* db);
     static void set(Database* db, std::unique_ptr<ViewCatalog> catalog);

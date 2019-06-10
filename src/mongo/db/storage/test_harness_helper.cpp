@@ -36,12 +36,12 @@
 
 namespace mongo {
 namespace {
-stdx::function<std::unique_ptr<HarnessHelper>()> basicHarnessFactory;
+std::function<std::unique_ptr<HarnessHelper>()> basicHarnessFactory;
 }  // namespace
 
 HarnessHelper::HarnessHelper() : _threadClient(getGlobalServiceContext()) {}
 
-void registerHarnessHelperFactory(stdx::function<std::unique_ptr<HarnessHelper>()> factory) {
+void registerHarnessHelperFactory(std::function<std::unique_ptr<HarnessHelper>()> factory) {
     basicHarnessFactory = std::move(factory);
 }
 

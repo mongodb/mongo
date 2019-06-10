@@ -61,7 +61,7 @@
 namespace mongo {
 namespace unittest {
 
-DeathTestImpl::DeathTestImpl(stdx::function<std::unique_ptr<Test>()> makeTest)
+DeathTestImpl::DeathTestImpl(std::function<std::unique_ptr<Test>()> makeTest)
     : _makeTest(std::move(makeTest)) {}
 
 void DeathTestImpl::_doTest() {

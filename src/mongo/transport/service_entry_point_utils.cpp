@@ -33,7 +33,8 @@
 
 #include "mongo/transport/service_entry_point_utils.h"
 
-#include "mongo/stdx/functional.h"
+#include <functional>
+
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -52,14 +53,14 @@ namespace mongo {
 
 namespace {
 void* runFunc(void* ctx) {
-    std::unique_ptr<stdx::function<void()>> taskPtr(static_cast<stdx::function<void()>*>(ctx));
+    std::unique_ptr<std::function<void()>> taskPtr(static_cast<std::function<void()>*>(ctx));
     (*taskPtr)();
 
     return nullptr;
 }
 }  // namespace
 
-Status launchServiceWorkerThread(stdx::function<void()> task) {
+Status launchServiceWorkerThread(std::function<void()> task) {
 
     try {
 #if defined(_WIN32)
@@ -90,7 +91,7 @@ Status launchServiceWorkerThread(stdx::function<void()> task) {
         }
 
         pthread_t thread;
-        auto ctx = stdx::make_unique<stdx::function<void()>>(std::move(task));
+        auto ctx = stdx::make_unique<std::function<void()>>(std::move(task));
         int failed = pthread_create(&thread, &attrs, runFunc, ctx.get());
 
         pthread_attr_destroy(&attrs);

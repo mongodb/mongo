@@ -29,13 +29,12 @@
 
 #pragma once
 
-#include <queue>
-
 #include <boost/optional.hpp>
+#include <functional>
+#include <queue>
 
 #include "mongo/db/logical_session_id.h"
 #include "mongo/s/query/cluster_client_cursor.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -46,7 +45,7 @@ class ClusterClientCursorMock final : public ClusterClientCursor {
 public:
     ClusterClientCursorMock(boost::optional<LogicalSessionId> lsid,
                             boost::optional<TxnNumber> txnNumber,
-                            stdx::function<void(void)> killCallback = stdx::function<void(void)>());
+                            std::function<void(void)> killCallback = {});
 
     ~ClusterClientCursorMock();
 
@@ -118,7 +117,7 @@ private:
     bool _killed = false;
     bool _exhausted = false;
     std::queue<StatusWith<ClusterQueryResult>> _resultsQueue;
-    stdx::function<void(void)> _killCallback;
+    std::function<void(void)> _killCallback;
 
     // Originating command object.
     BSONObj _originatingCommand;

@@ -34,11 +34,9 @@
 #include <memory>
 #include <string>
 
-
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -51,7 +49,7 @@ class ShardFactory {
 
 public:
     using BuilderCallable =
-        stdx::function<std::unique_ptr<Shard>(const ShardId&, const ConnectionString&)>;
+        std::function<std::unique_ptr<Shard>(const ShardId&, const ConnectionString&)>;
     using BuildersMap = std::map<ConnectionString::ConnectionType, BuilderCallable>;
 
     ShardFactory(BuildersMap&&, std::unique_ptr<RemoteCommandTargeterFactory>);

@@ -127,12 +127,12 @@ Status parseSub(StringData name,
                 MatchExpressionParser::AllowedFeatureSet allowedFeatures,
                 DocumentParseLevel currentLevel);
 
-stdx::function<StatusWithMatchExpression(StringData,
-                                         BSONElement,
-                                         const boost::intrusive_ptr<ExpressionContext>&,
-                                         const ExtensionsCallback*,
-                                         MatchExpressionParser::AllowedFeatureSet,
-                                         DocumentParseLevel)>
+std::function<StatusWithMatchExpression(StringData,
+                                        BSONElement,
+                                        const boost::intrusive_ptr<ExpressionContext>&,
+                                        const ExtensionsCallback*,
+                                        MatchExpressionParser::AllowedFeatureSet,
+                                        DocumentParseLevel)>
 retrievePathlessParser(StringData name);
 
 StatusWithMatchExpression parseRegexElement(StringData name, BSONElement e) {
@@ -1748,29 +1748,29 @@ StatusWithMatchExpression MatchExpressionParser::parse(
 namespace {
 // Maps from query operator string name to function.
 std::unique_ptr<StringMap<
-    stdx::function<StatusWithMatchExpression(StringData,
-                                             BSONElement,
-                                             const boost::intrusive_ptr<ExpressionContext>&,
-                                             const ExtensionsCallback*,
-                                             MatchExpressionParser::AllowedFeatureSet,
-                                             DocumentParseLevel)>>>
+    std::function<StatusWithMatchExpression(StringData,
+                                            BSONElement,
+                                            const boost::intrusive_ptr<ExpressionContext>&,
+                                            const ExtensionsCallback*,
+                                            MatchExpressionParser::AllowedFeatureSet,
+                                            DocumentParseLevel)>>>
     pathlessOperatorMap;
 
 MONGO_INITIALIZER(PathlessOperatorMap)(InitializerContext* context) {
     pathlessOperatorMap = stdx::make_unique<StringMap<
-        stdx::function<StatusWithMatchExpression(StringData,
-                                                 BSONElement,
-                                                 const boost::intrusive_ptr<ExpressionContext>&,
-                                                 const ExtensionsCallback*,
-                                                 MatchExpressionParser::AllowedFeatureSet,
-                                                 DocumentParseLevel)>>>(
+        std::function<StatusWithMatchExpression(StringData,
+                                                BSONElement,
+                                                const boost::intrusive_ptr<ExpressionContext>&,
+                                                const ExtensionsCallback*,
+                                                MatchExpressionParser::AllowedFeatureSet,
+                                                DocumentParseLevel)>>>(
         StringMap<
-            stdx::function<StatusWithMatchExpression(StringData,
-                                                     BSONElement,
-                                                     const boost::intrusive_ptr<ExpressionContext>&,
-                                                     const ExtensionsCallback*,
-                                                     MatchExpressionParser::AllowedFeatureSet,
-                                                     DocumentParseLevel)>>{
+            std::function<StatusWithMatchExpression(StringData,
+                                                    BSONElement,
+                                                    const boost::intrusive_ptr<ExpressionContext>&,
+                                                    const ExtensionsCallback*,
+                                                    MatchExpressionParser::AllowedFeatureSet,
+                                                    DocumentParseLevel)>>{
             {"_internalSchemaAllowedProperties", &parseInternalSchemaAllowedProperties},
             {"_internalSchemaCond",
              &parseInternalSchemaFixedArityArgument<InternalSchemaCondMatchExpression>},
@@ -1858,12 +1858,12 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
  * Returns the proper parser for the indicated pathless operator. Returns 'null' if 'name'
  * doesn't represent a known type.
  */
-stdx::function<StatusWithMatchExpression(StringData,
-                                         BSONElement,
-                                         const boost::intrusive_ptr<ExpressionContext>&,
-                                         const ExtensionsCallback*,
-                                         MatchExpressionParser::AllowedFeatureSet,
-                                         DocumentParseLevel)>
+std::function<StatusWithMatchExpression(StringData,
+                                        BSONElement,
+                                        const boost::intrusive_ptr<ExpressionContext>&,
+                                        const ExtensionsCallback*,
+                                        MatchExpressionParser::AllowedFeatureSet,
+                                        DocumentParseLevel)>
 retrievePathlessParser(StringData name) {
     auto func = pathlessOperatorMap->find(name);
     if (func == pathlessOperatorMap->end()) {

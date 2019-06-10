@@ -80,7 +80,7 @@ public:
     vector<ChunkType> setUpChunkLoaderWithFiveChunks();
 
     const KeyPattern kKeyPattern = KeyPattern(BSON(kPattern << 1));
-    const stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)>
+    const std::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)>
         kDoNothingCallbackFn = [](
             OperationContext * opCtx,
             StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> swCollAndChunks) noexcept {};

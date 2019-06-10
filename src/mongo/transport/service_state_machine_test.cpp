@@ -210,7 +210,7 @@ public:
         return _ranSource;
     }
 
-    void setWaitHook(stdx::function<void()> hook) {
+    void setWaitHook(std::function<void()> hook) {
         _waitHook = std::move(hook);
     }
 
@@ -225,7 +225,7 @@ private:
     FailureMode _nextShouldFail = Nothing;
     Message _lastSunk;
     ServiceStateMachine* _ssm;
-    stdx::function<void()> _waitHook;
+    std::function<void()> _waitHook;
 
     // A custom message for this TransportLayer to source.
     Message _sourceMessage;
@@ -235,7 +235,7 @@ class MockServiceExecutor : public ServiceExecutor {
 public:
     explicit MockServiceExecutor(ServiceContext* ctx) {}
 
-    using ScheduleHook = stdx::function<bool(Task)>;
+    using ScheduleHook = std::function<bool(Task)>;
 
     Status start() override {
         return Status::OK();

@@ -29,7 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/stdx/functional.h"
+#include <functional>
+
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/spin_lock.h"

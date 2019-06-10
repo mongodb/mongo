@@ -33,11 +33,11 @@
 namespace mongo {
 namespace {
 bool initSet = false;
-stdx::function<void()> snmpInitializer = [] {};
+std::function<void()> snmpInitializer = [] {};
 }  // namespace
 }  // namespace mongo
 
-void mongo::registerSNMPInitializer(stdx::function<void()> init) {
+void mongo::registerSNMPInitializer(std::function<void()> init) {
     invariant(!initSet);
     snmpInitializer = std::move(init);
     initSet = true;

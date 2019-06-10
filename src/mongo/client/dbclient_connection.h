@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
@@ -48,7 +49,6 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/unique_message.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session.h"
@@ -83,7 +83,7 @@ public:
      * status.
      */
     using HandshakeValidationHook =
-        stdx::function<Status(const executor::RemoteCommandResponse& isMasterReply)>;
+        std::function<Status(const executor::RemoteCommandResponse& isMasterReply)>;
 
     /**
        @param _autoReconnect if true, automatically reconnect on a connection failure
@@ -162,7 +162,7 @@ public:
             nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
     }
 
-    unsigned long long query(stdx::function<void(DBClientCursorBatchIterator&)> f,
+    unsigned long long query(std::function<void(DBClientCursorBatchIterator&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,
                              Query query,
                              const BSONObj* fieldsToReturn,

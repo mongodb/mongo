@@ -67,7 +67,7 @@ public:
     // Rollback checker result - true if rollback occurred; false if rollback IDs
     // were the same; Otherwise, error status indicating why rollback check failed.
     using Result = StatusWith<bool>;
-    using CallbackFn = stdx::function<void(const Result& result)>;
+    using CallbackFn = std::function<void(const Result& result)>;
     using RemoteCommandCallbackFn = executor::TaskExecutor::RemoteCommandCallbackFn;
     using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 

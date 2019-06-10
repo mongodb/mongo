@@ -29,11 +29,12 @@
 
 #pragma once
 
+#include <functional>
+
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -196,7 +197,7 @@ private:
      * If a callable is passed, and returns false, this will return userIgnored and avoid altering
      * the mode in any way.  The argument is the fail point payload.
      */
-    RetCode slowShouldFailOpenBlock(stdx::function<bool(const BSONObj&)> cb) noexcept;
+    RetCode slowShouldFailOpenBlock(std::function<bool(const BSONObj&)> cb) noexcept;
 
     /**
      * @return the stored BSONObj in this fail point. Note that this cannot be safely
