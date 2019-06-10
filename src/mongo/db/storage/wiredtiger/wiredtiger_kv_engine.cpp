@@ -84,6 +84,7 @@
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
@@ -597,6 +598,11 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             ss << "verbose=[recovery_progress,checkpoint_progress,recovery],";
         } else {
             ss << "verbose=[recovery_progress,checkpoint_progress],";
+        }
+
+        // Enable debug write-ahead logging for all tables under debug build.
+        if (kDebugBuild) {
+            ss << "debug_mode=(table_logging=true),";
         }
     }
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
