@@ -79,10 +79,6 @@ TEST_F(ServiceContextTest, DetectsSameHostIPv6) {
 #endif
 }
 
-TEST_F(ServiceContextTest, DetectsSameHostDifferentCapitalization) {
-    ASSERT(isSelf(HostAndPort("LoCalHOST", serverGlobalParams.port), getGlobalServiceContext()));
-}
-
 }  // namespace
 
 }  // namespace repl
