@@ -47,10 +47,13 @@ struct ServerGlobalParams {
     std::string cwd;         // cwd of when process started
 
     int port = DefaultDBPort;  // --port
-    enum { DefaultDBPort = 27017, ConfigServerPort = 27019, ShardServerPort = 27018 };
-    bool isDefaultPort() const {
-        return port == DefaultDBPort;
-    }
+    enum {
+        ConfigServerPort = 27019,
+        CryptDServerPort = 27020,
+        DefaultDBPort = 27017,
+        ShardServerPort = 27018,
+    };
+
     static std::string getPortSettingHelpText();
 
     std::vector<std::string> bind_ips;  // --bind_ip

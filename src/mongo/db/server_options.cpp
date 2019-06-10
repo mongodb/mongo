@@ -42,7 +42,7 @@ namespace mongo {
 ServerGlobalParams serverGlobalParams;
 
 std::string ServerGlobalParams::getPortSettingHelpText() {
-    return str::stream() << "Specify port number - " << DefaultDBPort << " by default";
+    return str::stream() << "Specify port number - " << serverGlobalParams.port << " by default";
 }
 
 }  // namespace mongo
