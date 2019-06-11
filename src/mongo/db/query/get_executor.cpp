@@ -225,6 +225,27 @@ CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
             projExec};
 }
 
+/**
+ * If query supports index filters, filter params.indices according to any index filters that have
+ * been configured. In addition, sets that there were indeed index filters applied.
+ */
+void applyIndexFilters(Collection* collection,
+                       const CanonicalQuery& canonicalQuery,
+                       QueryPlannerParams* plannerParams) {
+    if (!IDHackStage::supportsQuery(collection, canonicalQuery)) {
+        QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
+        const auto key = canonicalQuery.encodeKey();
+
+        // Filter index catalog if index filters are specified for query.
+        // Also, signal to planner that application hint should be ignored.
+        if (boost::optional<AllowedIndicesFilter> allowedIndicesFilter =
+                querySettings->getAllowedIndicesFilter(key)) {
+            filterAllowedIndexEntries(*allowedIndicesFilter, &plannerParams->indices);
+            plannerParams->indexFiltersApplied = true;
+        }
+    }
+}
+
 void fillOutPlannerParams(OperationContext* opCtx,
                           Collection* collection,
                           CanonicalQuery* canonicalQuery,
@@ -241,18 +262,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
 
     // If query supports index filters, filter params.indices by indices in query settings.
     // Ignore index filters when it is possible to use the id-hack.
-    if (!IDHackStage::supportsQuery(collection, *canonicalQuery)) {
-        QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
-        const auto key = canonicalQuery->encodeKey();
-
-        // Filter index catalog if index filters are specified for query.
-        // Also, signal to planner that application hint should be ignored.
-        if (boost::optional<AllowedIndicesFilter> allowedIndicesFilter =
-                querySettings->getAllowedIndicesFilter(key)) {
-            filterAllowedIndexEntries(*allowedIndicesFilter, &plannerParams->indices);
-            plannerParams->indexFiltersApplied = true;
-        }
-    }
+    applyIndexFilters(collection, *canonicalQuery, plannerParams);
 
     // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
     // overrides this behavior by not outputting a collscan even if there are no indexed
@@ -1528,6 +1538,20 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
             // So, we will not distinct scan a wildcard index that's multikey on the distinct()
             // field, regardless of the value of 'mayUnwindArrays'.
         }
+    }
+
+    const CanonicalQuery* canonicalQuery = parsedDistinct.getQuery();
+    const BSONObj& hint = canonicalQuery->getQueryRequest().getHint();
+
+    applyIndexFilters(collection, *canonicalQuery, &plannerParams);
+
+    // If there exists an index filter, we ignore all hints. Else, we only keep the index specified
+    // by the hint. Since we cannot have an index with name $natural, that case will clear the
+    // plannerParams.indices.
+    if (!plannerParams.indexFiltersApplied && !hint.isEmpty()) {
+        std::vector<IndexEntry> temp =
+            QueryPlannerIXSelect::findIndexesByHint(hint, plannerParams.indices);
+        temp.swap(plannerParams.indices);
     }
 
     return plannerParams;
