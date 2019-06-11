@@ -478,10 +478,6 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     assert(clusterAdminDB.logout());
     assert(clusterAdminDB.auth("user_inprog", "pwd"));
 
-    const getPrimary = (rs) => {
-        return rs.getPrimary().host.toLowerCase();
-    };
-
     assert.eq(clusterAdminDB
                   .aggregate([
                       {$currentOp: {allUsers: true, idleConnections: true}},
@@ -490,9 +486,9 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
                   ])
                   .toArray(),
               [
-                {_id: {shard: "aggregation_currentop-rs0", host: getPrimary(st.rs0)}},
-                {_id: {shard: "aggregation_currentop-rs1", host: getPrimary(st.rs1)}},
-                {_id: {shard: "aggregation_currentop-rs2", host: getPrimary(st.rs2)}}
+                {_id: {shard: "aggregation_currentop-rs0", host: st.rs0.getPrimary().host}},
+                {_id: {shard: "aggregation_currentop-rs1", host: st.rs1.getPrimary().host}},
+                {_id: {shard: "aggregation_currentop-rs2", host: st.rs2.getPrimary().host}}
               ]);
 
     // Test that a $currentOp pipeline with {localOps:true} returns operations from the mongoS
@@ -873,7 +869,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
                   ])
                   .toArray(),
               [
-                {_id: {host: shardConn.host.toLowerCase()}},
+                {_id: {host: shardConn.host}},
               ]);
 
     // Test that attempting to 'spoof' a sharded request on non-shardsvr mongoD fails.
