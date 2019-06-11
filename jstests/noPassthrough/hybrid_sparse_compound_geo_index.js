@@ -45,10 +45,7 @@
     IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1_b_2dsphere']);
 
     let res = assert.commandWorked(coll.validate({full: true}));
-    assert(!res.valid, 'validation did not fail on primary: ' + tojson(res));
-
-    // Drop collection to avoid validation on shutdown.
-    coll.drop();
+    assert(res.valid, 'validation failed on primary: ' + tojson(res));
 
     rst.stopSet();
 })();
