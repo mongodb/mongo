@@ -110,8 +110,6 @@ load("jstests/libs/parallelTester.js");
         dropConnections();
         mongos.adminCommand({multicast: {ping: 0}});
         hasConnPoolStats({ready: 4});
-        dropConnections();
-        hasConnPoolStats({});
     }
 
     function runSubTest(name, fun) {
@@ -130,6 +128,8 @@ load("jstests/libs/parallelTester.js");
     st.rs0.awaitReplication();
 
     runSubTest("MinSize", function() {
+        dropConnections();
+
         // Launch an initial find to trigger to min
         launchFinds({times: 1, readPref: "primary"});
         hasConnPoolStats({ready: minConns});
@@ -148,6 +148,7 @@ load("jstests/libs/parallelTester.js");
 
     runSubTest("MaxSize", function() {
         configureReplSetFailpoint("waitInFindBeforeMakingBatch", "alwaysOn");
+        dropConnections();
 
         // Launch 10 blocked finds
         launchFinds({times: 10, readPref: "primary"});
@@ -179,6 +180,7 @@ load("jstests/libs/parallelTester.js");
 
         configureReplSetFailpoint("waitInIsMaster", "alwaysOn");
         configureReplSetFailpoint("waitInFindBeforeMakingBatch", "alwaysOn");
+        dropConnections();
 
         // Go to the limit of maxConnecting, so we're stuck here
         launchFinds({times: maxPending1, readPref: "primary"});
@@ -220,8 +222,10 @@ load("jstests/libs/parallelTester.js");
             ShardingTaskExecutorPoolHostTimeoutMS: idleTimeoutMS1,
         });
 
-        // Make ready connections
         configureReplSetFailpoint("waitInFindBeforeMakingBatch", "alwaysOn");
+        dropConnections();
+
+        // Make ready connections
         launchFinds({times: conns, readPref: "primary"});
         configureReplSetFailpoint("waitInFindBeforeMakingBatch", "off");
         hasConnPoolStats({ready: conns});
