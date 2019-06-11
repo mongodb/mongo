@@ -441,7 +441,6 @@ void ConnectionPool::shutdown() {
         stdx::lock_guard lk(_mutex);
         pair.second->triggerShutdown(
             Status(ErrorCodes::ShutdownInProgress, "Shutting down the connection pool"));
-        pair.second->updateState();
     }
 }
 
@@ -454,9 +453,8 @@ void ConnectionPool::dropConnections(const HostAndPort& hostAndPort) {
         return;
 
     auto pool = iter->second;
-    pool->processFailure(
+    pool->triggerShutdown(
         Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"));
-    pool->updateState();
 }
 
 void ConnectionPool::dropConnections(transport::Session::TagMask tags) {
@@ -473,9 +471,8 @@ void ConnectionPool::dropConnections(transport::Session::TagMask tags) {
         if (pool->matchesTags(tags))
             continue;
 
-        pool->processFailure(
+        pool->triggerShutdown(
             Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"));
-        pool->updateState();
     }
 }
 
@@ -948,7 +945,6 @@ ConnectionPool::SpecificPool::OwnedConnection ConnectionPool::SpecificPool::take
     ConnectionInterface* connPtr) {
     auto conn = takeFromPool(_processingPool, connPtr);
     if (conn) {
-        invariant(!_health.isShutdown);
         return conn;
     }
 
