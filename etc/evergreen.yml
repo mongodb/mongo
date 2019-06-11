@@ -5109,6 +5109,20 @@ tasks:
       resmoke_args: --suites=generational_fuzzer
       name: aggregation_wildcard_fuzzer
 
+## jstestfuzz standalone fuzzer for checking find and aggregate equivalence ##
+- <<: *jstestfuzz_template
+  name: query_fuzzer_gen
+  tags: ["query_fuzzer"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 5
+      num_tasks: 10
+      npm_command: query-fuzzer
+      resmoke_args: --suites=generational_fuzzer
+      name: query_fuzzer
+
 ## jstestfuzz standalone update generational fuzzer ##
 - <<: *jstestfuzz_template
   name: update_fuzzer_gen
@@ -9377,6 +9391,7 @@ buildvariants:
   - name: multiversion
   - name: multiversion_auth
   - name: .powercycle
+  - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets
   - name: replica_sets_jscore_passthrough
@@ -9461,6 +9476,7 @@ buildvariants:
   - name: .jstestfuzz .common
   - name: .jstestfuzz .session
   - name: .logical_session_cache .one_sec
+  - name: .query_fuzzer
   - name: .read_write_concern !.linearize
   - name: replica_sets
   - name: replica_sets_kill_secondaries_jscore_passthrough
@@ -10092,6 +10108,7 @@ buildvariants:
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion
+  - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:
     - rhel62-large
@@ -10437,6 +10454,7 @@ buildvariants:
     - name: .logical_session_cache .one_sec
     - name: .multi_shard .common
     - name: multiversion
+    - name: .query_fuzzer
     - name: .read_write_concern
     - name: .replica_sets
     - name: .read_only
@@ -11895,6 +11913,7 @@ buildvariants:
   - name: .logical_session_cache
   - name: .multi_shard .common
   - name: multiversion
+  - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_gen
   - name: replica_sets_large_txns_format_jscore_passthrough
