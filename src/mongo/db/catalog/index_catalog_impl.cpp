@@ -1450,6 +1450,16 @@ void IndexCatalogImpl::_unindexKeys(OperationContext* opCtx,
     options.logIfError = logIfError;
 
     if (index->isHybridBuilding()) {
+        // The side table interface accepts only records that meet the criteria for this partial
+        // index.
+        // For non-hybrid builds, the decision to use the filter for the partial index is left to
+        // the IndexAccessMethod. See SERVER-28975 for details.
+        if (auto filter = index->getFilterExpression()) {
+            if (!filter->matchesBSON(obj)) {
+                return;
+            }
+        }
+
         int64_t removed;
         fassert(31155,
                 index->indexBuildInterceptor()->sideWrite(
