@@ -181,7 +181,7 @@ private:
 
         BSONObjBuilder bob;
         for (auto && [ name, expr ] : *_letVariables) {
-            bob << name << expr->evaluate(doc, &pExpCtx->variables);
+            bob << name << expr->evaluate(doc);
         }
         return bob.obj();
     }

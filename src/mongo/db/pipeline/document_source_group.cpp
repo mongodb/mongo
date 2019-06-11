@@ -73,7 +73,7 @@ Document GroupFromFirstDocumentTransformation::applyTransformation(const Documen
     MutableDocument output(_accumulatorExprs.size());
 
     for (auto&& expr : _accumulatorExprs) {
-        auto value = expr.second->evaluate(input, &expr.second->getExpressionContext()->variables);
+        auto value = expr.second->evaluate(input);
         output.addField(expr.first, value.missing() ? Value(BSONNULL) : value);
     }
 
@@ -495,9 +495,8 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         dassert(numAccumulators == group.size());
 
         for (size_t i = 0; i < numAccumulators; i++) {
-            group[i]->process(
-                _accumulatedFields[i].expression->evaluate(rootDocument, &pExpCtx->variables),
-                _doingMerge);
+            group[i]->process(_accumulatedFields[i].expression->evaluate(rootDocument),
+                              _doingMerge);
 
             _memoryUsageBytes += group[i]->memUsageForSorter();
         }
@@ -612,7 +611,7 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
 Value DocumentSourceGroup::computeId(const Document& root) {
     // If only one expression, return result directly
     if (_idExpressions.size() == 1) {
-        Value retValue = _idExpressions[0]->evaluate(root, &pExpCtx->variables);
+        Value retValue = _idExpressions[0]->evaluate(root);
         return retValue.missing() ? Value(BSONNULL) : std::move(retValue);
     }
 
@@ -620,7 +619,7 @@ Value DocumentSourceGroup::computeId(const Document& root) {
     vector<Value> vals;
     vals.reserve(_idExpressions.size());
     for (size_t i = 0; i < _idExpressions.size(); i++) {
-        vals.push_back(_idExpressions[i]->evaluate(root, &pExpCtx->variables));
+        vals.push_back(_idExpressions[i]->evaluate(root));
     }
     return Value(std::move(vals));
 }

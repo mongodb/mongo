@@ -423,7 +423,7 @@ StatusWith<Value> DocumentSourceSort::extractKeyPart(const Document& doc,
         plainKey = key.getValue();
     } else {
         invariant(patternPart.expression);
-        plainKey = patternPart.expression->evaluate(doc, &pExpCtx->variables);
+        plainKey = patternPart.expression->evaluate(doc);
     }
 
     return getCollationComparisonKey(plainKey);

@@ -146,12 +146,9 @@ public:
     virtual Value serialize(bool explain) const = 0;
 
     /**
-     * Evaluate the expression with respect to the Document given by 'root' and the Variables given
-     * by 'variables'. It is an error to supply a Variables argument whose built-in variables (like
-     * $$NOW) are not set. This method is thread-safe, so long as the 'variables' passed in here is
-     * not shared between threads.
+     * Evaluate expression with respect to the Document given by 'root', and return the result.
      */
-    virtual Value evaluate(const Document& root, Variables* variables) const = 0;
+    virtual Value evaluate(const Document& root) const = 0;
 
     /**
      * Returns information about the paths computed by this expression. This only needs to be
@@ -251,10 +248,6 @@ public:
         return _children;
     }
 
-    const boost::intrusive_ptr<ExpressionContext>& getExpressionContext() const {
-        return _expCtx;
-    }
-
 protected:
     using ExpressionVector = std::vector<boost::intrusive_ptr<Expression>>;
 
@@ -266,6 +259,11 @@ protected:
         if (!varIds.empty()) {
             _boundaryVariableId = *std::prev(varIds.end());
         }
+    }
+
+
+    const boost::intrusive_ptr<ExpressionContext>& getExpressionContext() const {
+        return _expCtx;
     }
 
     virtual void _doAddDependencies(DepsTracker* deps) const = 0;
@@ -406,13 +404,13 @@ public:
     explicit ExpressionFromAccumulator(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionVariadic<ExpressionFromAccumulator<Accumulator>>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final {
+    Value evaluate(const Document& root) const final {
         Accumulator accum(this->getExpressionContext());
         const auto n = this->_children.size();
         // If a single array arg is given, loop through it passing each member to the accumulator.
         // If a single, non-array arg is given, pass it directly to the accumulator.
         if (n == 1) {
-            Value singleVal = this->_children[0]->evaluate(root, variables);
+            Value singleVal = this->_children[0]->evaluate(root);
             if (singleVal.getType() == Array) {
                 for (const Value& val : singleVal.getArray()) {
                     accum.process(val, false);
@@ -423,7 +421,7 @@ public:
         } else {
             // If multiple arguments are given, pass all arguments to the accumulator.
             for (auto&& argument : this->_children) {
-                accum.process(argument->evaluate(root, variables), false);
+                accum.process(argument->evaluate(root), false);
             }
         }
         return accum.getValue(false);
@@ -462,8 +460,8 @@ public:
 
     virtual ~ExpressionSingleNumericArg() = default;
 
-    Value evaluate(const Document& root, Variables* variables) const final {
-        Value arg = this->_children[0]->evaluate(root, variables);
+    Value evaluate(const Document& root) const final {
+        Value arg = this->_children[0]->evaluate(root);
         if (arg.nullish())
             return Value(BSONNULL);
 
@@ -496,15 +494,15 @@ public:
      * 2. If either input is not numeric, it throws an error.
      * 3. Call evaluateNumericArgs on the two numeric args.
      */
-    Value evaluate(const Document& root, Variables* variables) const final {
-        Value arg1 = this->_children[0]->evaluate(root, variables);
+    Value evaluate(const Document& root) const final {
+        Value arg1 = this->_children[0]->evaluate(root);
         if (arg1.nullish())
             return Value(BSONNULL);
         uassert(51044,
                 str::stream() << this->getOpName() << " only supports numeric types, not "
                               << typeName(arg1.getType()),
                 arg1.numeric());
-        Value arg2 = this->_children[1]->evaluate(root, variables);
+        Value arg2 = this->_children[1]->evaluate(root);
         if (arg2.nullish())
             return Value(BSONNULL);
         uassert(51045,
@@ -527,7 +525,7 @@ public:
 class ExpressionConstant final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     Value serialize(bool explain) const final;
 
     const char* getOpName() const;
@@ -595,8 +593,8 @@ class DateExpressionAcceptingTimeZone : public Expression {
 public:
     virtual ~DateExpressionAcceptingTimeZone() {}
 
-    Value evaluate(const Document& root, Variables* variables) const final {
-        auto dateVal = _date->evaluate(root, variables);
+    Value evaluate(const Document& root) const final {
+        auto dateVal = _date->evaluate(root);
         if (dateVal.nullish()) {
             return Value(BSONNULL);
         }
@@ -605,7 +603,7 @@ public:
         if (!_timeZone) {
             return evaluateDate(date, TimeZoneDatabase::utcZone());
         }
-        auto timeZoneId = _timeZone->evaluate(root, variables);
+        auto timeZoneId = _timeZone->evaluate(root);
         if (timeZoneId.nullish()) {
             return Value(BSONNULL);
         }
@@ -643,8 +641,7 @@ public:
         }
         if (ExpressionConstant::allNullOrConstant({_date, _timeZone})) {
             // Everything is a constant, so we can turn into a constant.
-            return ExpressionConstant::create(
-                getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
+            return ExpressionConstant::create(getExpressionContext(), evaluate(Document{}));
         }
         return this;
     }
@@ -757,7 +754,7 @@ public:
     explicit ExpressionAdd(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionVariadic<ExpressionAdd>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -779,7 +776,7 @@ public:
     explicit ExpressionAllElementsTrue(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionAllElementsTrue, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -794,7 +791,7 @@ public:
         : ExpressionVariadic<ExpressionAnd>(expCtx) {}
 
     boost::intrusive_ptr<Expression> optimize() final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -816,7 +813,7 @@ public:
     explicit ExpressionAnyElementTrue(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionAnyElementTrue, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -830,7 +827,7 @@ public:
     explicit ExpressionArray(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionVariadic<ExpressionArray>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     Value serialize(bool explain) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
@@ -846,7 +843,7 @@ public:
     explicit ExpressionArrayElemAt(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -859,7 +856,7 @@ public:
     explicit ExpressionObjectToArray(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionObjectToArray, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -872,7 +869,7 @@ public:
     explicit ExpressionArrayToObject(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionArrayToObject, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -897,7 +894,7 @@ public:
 class ExpressionCoerceToBool final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     Value serialize(bool explain) const final;
 
     static boost::intrusive_ptr<ExpressionCoerceToBool> create(
@@ -938,7 +935,7 @@ public:
     ExpressionCompare(const boost::intrusive_ptr<ExpressionContext>& expCtx, CmpOp cmpOp)
         : ExpressionFixedArity<ExpressionCompare, 2>(expCtx), cmpOp(cmpOp) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     CmpOp getOp() const {
@@ -971,7 +968,7 @@ public:
     explicit ExpressionConcat(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionVariadic<ExpressionConcat>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -989,7 +986,7 @@ public:
     explicit ExpressionConcatArrays(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionVariadic<ExpressionConcatArrays>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -1006,7 +1003,7 @@ class ExpressionCond final : public ExpressionFixedArity<ExpressionCond, 3> {
 public:
     explicit ExpressionCond(const boost::intrusive_ptr<ExpressionContext>& expCtx) : Base(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     static boost::intrusive_ptr<Expression> parse(
@@ -1026,7 +1023,7 @@ class ExpressionDateFromString final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document&) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1059,7 +1056,7 @@ class ExpressionDateFromParts final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1103,8 +1100,7 @@ private:
                                    boost::intrusive_ptr<Expression> field,
                                    StringData fieldName,
                                    long long defaultValue,
-                                   long long* returnValue,
-                                   Variables* variables) const;
+                                   long long* returnValue) const;
 
     boost::intrusive_ptr<Expression>& _year;
     boost::intrusive_ptr<Expression>& _month;
@@ -1123,7 +1119,7 @@ class ExpressionDateToParts final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1146,7 +1142,7 @@ private:
                           boost::intrusive_ptr<Expression> timeZone,
                           boost::intrusive_ptr<Expression> iso8601);
 
-    boost::optional<int> evaluateIso8601Flag(const Document& root, Variables* variables) const;
+    boost::optional<int> evaluateIso8601Flag(const Document& root) const;
 
     boost::intrusive_ptr<Expression>& _date;
     boost::intrusive_ptr<Expression>& _timeZone;
@@ -1157,7 +1153,7 @@ class ExpressionDateToString final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1243,7 +1239,7 @@ public:
     explicit ExpressionDivide(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionDivide, 2>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -1273,7 +1269,7 @@ public:
     }
 
     boost::intrusive_ptr<Expression> optimize() final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     Value serialize(bool explain) const final;
 
     /*
@@ -1354,7 +1350,7 @@ class ExpressionFilter final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1423,7 +1419,7 @@ public:
     explicit ExpressionIfNull(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionIfNull, 2>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -1437,7 +1433,7 @@ public:
     explicit ExpressionIn(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionIn, 2>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -1452,7 +1448,7 @@ public:
         : ExpressionRangedArity<ExpressionIndexOfArray, 2, 4>(expCtx) {}
 
 
-    Value evaluate(const Document& root, Variables* variables) const;
+    Value evaluate(const Document& root) const;
     boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
 
@@ -1479,8 +1475,7 @@ protected:
      */
     Arguments evaluateAndValidateArguments(const Document& root,
                                            const ExpressionVector& operands,
-                                           size_t arrayLength,
-                                           Variables* variables) const;
+                                           size_t arrayLength) const;
 
 private:
     class Optimized;
@@ -1492,7 +1487,7 @@ public:
     explicit ExpressionIndexOfBytes(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionRangedArity<ExpressionIndexOfBytes, 2, 4>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -1509,7 +1504,7 @@ public:
     explicit ExpressionIndexOfCP(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionRangedArity<ExpressionIndexOfCP, 2, 4>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -1522,7 +1517,7 @@ class ExpressionLet final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1570,7 +1565,7 @@ public:
     explicit ExpressionLog(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionLog, 2>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -1595,7 +1590,7 @@ class ExpressionMap final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1629,7 +1624,7 @@ private:
 class ExpressionMeta final : public Expression {
 public:
     Value serialize(bool explain) const final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
 
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1697,7 +1692,7 @@ public:
     explicit ExpressionMod(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionMod, 2>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -1711,7 +1706,7 @@ public:
     explicit ExpressionMultiply(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionVariadic<ExpressionMultiply>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -1751,7 +1746,7 @@ public:
     explicit ExpressionNot(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionNot, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -1771,7 +1766,7 @@ public:
 class ExpressionObject final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     Value serialize(bool explain) const final;
 
     static boost::intrusive_ptr<ExpressionObject> create(
@@ -1822,7 +1817,7 @@ public:
         : ExpressionVariadic<ExpressionOr>(expCtx) {}
 
     boost::intrusive_ptr<Expression> optimize() final;
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -1851,7 +1846,7 @@ public:
     }
 
 private:
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 };
 
@@ -1861,7 +1856,7 @@ public:
     explicit ExpressionRange(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionRangedArity<ExpressionRange, 2, 3>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -1885,7 +1880,7 @@ public:
           _thisVar(thisVar),
           _valueVar(valueVar) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1933,7 +1928,7 @@ public:
     explicit ExpressionSetDifference(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionSetDifference, 2>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -1947,7 +1942,7 @@ public:
     explicit ExpressionSetEquals(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionVariadic<ExpressionSetEquals>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
     void validateArguments(const ExpressionVector& args) const final;
 
@@ -1962,7 +1957,7 @@ public:
     explicit ExpressionSetIntersection(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionVariadic<ExpressionSetIntersection>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -1986,7 +1981,7 @@ public:
         : ExpressionFixedArity<ExpressionSetIsSubset, 2>(expCtx) {}
 
     boost::intrusive_ptr<Expression> optimize() override;
-    Value evaluate(const Document& root, Variables* variables) const override;
+    Value evaluate(const Document& root) const override;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2003,7 +1998,7 @@ public:
     explicit ExpressionSetUnion(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionVariadic<ExpressionSetUnion>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -2025,7 +2020,7 @@ public:
     explicit ExpressionSize(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionSize, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2039,7 +2034,7 @@ public:
     explicit ExpressionReverseArray(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionReverseArray, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2053,7 +2048,7 @@ public:
     explicit ExpressionSlice(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionRangedArity<ExpressionSlice, 2, 3>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2067,7 +2062,7 @@ public:
     explicit ExpressionIsArray(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionIsArray, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2080,7 +2075,7 @@ public:
     explicit ExpressionRound(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionRangedArity<ExpressionRound, 1, 2>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2093,7 +2088,7 @@ public:
     explicit ExpressionSplit(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionSplit, 2>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2121,7 +2116,7 @@ public:
     explicit ExpressionStrcasecmp(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionStrcasecmp, 2>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2135,7 +2130,7 @@ public:
     explicit ExpressionSubstrBytes(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2149,7 +2144,7 @@ public:
     explicit ExpressionSubstrCP(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionSubstrCP, 3>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2163,7 +2158,7 @@ public:
     explicit ExpressionStrLenBytes(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionStrLenBytes, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2177,7 +2172,7 @@ public:
     explicit ExpressionStrLenCP(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionStrLenCP, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2191,7 +2186,7 @@ public:
     explicit ExpressionSubtract(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2212,7 +2207,7 @@ public:
           _default(_children.back()),
           _branches(std::move(branches)) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -2238,7 +2233,7 @@ public:
     explicit ExpressionToLower(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionToLower, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2252,7 +2247,7 @@ public:
     explicit ExpressionToUpper(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionToUpper, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2284,7 +2279,7 @@ public:
           _input(_children[0]),
           _characters(_children[1]) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -2342,7 +2337,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement elem,
         const VariablesParseState& vps);
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2356,7 +2351,7 @@ public:
     explicit ExpressionType(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionType, 1>(expCtx) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -2468,7 +2463,7 @@ public:
           _inputs(std::move(inputs)),
           _defaults(std::move(defaults)) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -2504,7 +2499,7 @@ public:
         BSONElement expr,
         const VariablesParseState& vpsIn);
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
 
@@ -2572,7 +2567,7 @@ public:
      * Validates the structure of input passed in 'inputExpr'. If valid, generates an initial
      * execution state. This returned object can later be used for calling execute() or nextMatch().
      */
-    RegexExecutionState buildInitialState(const Document& root, Variables* variables) const;
+    RegexExecutionState buildInitialState(const Document& root) const;
 
     /**
      * Checks if there is a match for the given input and pattern that are part of 'executionState'.
@@ -2657,7 +2652,7 @@ public:
         BSONElement expr,
         const VariablesParseState& vpsIn);
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
@@ -2673,7 +2668,7 @@ public:
         BSONElement expr,
         const VariablesParseState& vpsIn);
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
     }
@@ -2688,7 +2683,7 @@ public:
         BSONElement expr,
         const VariablesParseState& vpsIn);
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root) const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);

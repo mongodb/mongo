@@ -58,7 +58,7 @@ static void assertEvaluates(const std::string& expressionName, Value input, Valu
     auto obj = BSON(expressionName << BSON_ARRAY(input));
     auto vps = expCtx->variablesParseState;
     auto expression = Expression::parseExpression(expCtx, obj, vps);
-    Value result = expression->evaluate({}, &expCtx->variables);
+    Value result = expression->evaluate(Document());
     ASSERT_EQUALS(result.getType(), output.getType());
     assertApproxEq(result, output);
 }
@@ -73,7 +73,7 @@ static void assertEvaluates(const std::string& expressionName,
     auto obj = BSON(expressionName << BSON_ARRAY(input1 << input2));
     auto vps = expCtx->variablesParseState;
     auto expression = Expression::parseExpression(expCtx, obj, vps);
-    Value result = expression->evaluate({}, &expCtx->variables);
+    Value result = expression->evaluate(Document());
     ASSERT_EQUALS(result.getType(), output.getType());
     assertApproxEq(result, output);
 }

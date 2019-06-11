@@ -81,8 +81,7 @@ Value GranularityRounderPowersOfTwo::roundUp(Value value) {
         exp = Value(63 - countLeadingZeros64(number) + 1);
     }
 
-    return ExpressionPow::create(getExpCtx(), Value(2), exp)
-        ->evaluate(Document(), &getExpCtx()->variables);
+    return ExpressionPow::create(getExpCtx(), Value(2), exp)->evaluate(Document());
 }
 
 Value GranularityRounderPowersOfTwo::roundDown(Value value) {
@@ -114,8 +113,7 @@ Value GranularityRounderPowersOfTwo::roundDown(Value value) {
         }
     }
 
-    return ExpressionPow::create(getExpCtx(), Value(2), exp)
-        ->evaluate(Document(), &getExpCtx()->variables);
+    return ExpressionPow::create(getExpCtx(), Value(2), exp)->evaluate(Document());
 }
 
 string GranularityRounderPowersOfTwo::getName() {

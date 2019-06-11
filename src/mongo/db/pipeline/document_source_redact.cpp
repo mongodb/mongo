@@ -135,7 +135,7 @@ Value DocumentSourceRedact::redactValue(const Value& in, const Document& root) {
 
 boost::optional<Document> DocumentSourceRedact::redactObject(const Document& root) {
     auto& variables = pExpCtx->variables;
-    const Value expressionResult = _expression->evaluate(root, &variables);
+    const Value expressionResult = _expression->evaluate(root);
 
     ValueComparator simpleValueCmp;
     if (simpleValueCmp.evaluate(expressionResult == keepVal)) {
