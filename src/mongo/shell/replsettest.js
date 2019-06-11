@@ -1115,6 +1115,16 @@ var ReplSetTest = function(opts) {
     };
 
     /**
+     * Modifies the election timeout to be 24 hours so that no unplanned elections happen. Then
+     * runs replSetInitiate on the replica set with the new config.
+     */
+    this.initiateWithHighElectionTimeout = function(timeout) {
+        let cfg = this.getReplSetConfig();
+        cfg.settings = {"electionTimeoutMillis": 24 * 60 * 60 * 1000};
+        this.initiate(cfg);
+    };
+
+    /**
      * Steps up 'node' as primary.
      * Waits for all nodes to reach the same optime before sending the replSetStepUp command
      * to 'node'.

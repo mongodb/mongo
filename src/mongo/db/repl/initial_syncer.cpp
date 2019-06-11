@@ -107,6 +107,9 @@ MONGO_FAIL_POINT_DEFINE(skipClearInitialSyncState);
 // Failpoint which causes the initial sync function to fail and hang before starting a new attempt.
 MONGO_FAIL_POINT_DEFINE(failAndHangInitialSync);
 
+// Failpoint which fails initial sync before it applies the next batch of oplog entries.
+MONGO_FAIL_POINT_DEFINE(failInitialSyncBeforeApplyingBatch);
+
 namespace {
 using namespace executor;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -116,6 +119,9 @@ using Operations = MultiApplier::Operations;
 using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 using LockGuard = stdx::lock_guard<stdx::mutex>;
+
+// Used to reset the oldest timestamp during initial sync to a non-null timestamp.
+const Timestamp kTimestampOne(0, 1);
 
 // The number of initial sync attempts that have failed since server startup. Each instance of
 // InitialSyncer may run multiple attempts to fulfill an initial sync request that is triggered
@@ -518,6 +524,16 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
     _opts.resetOptimes();
     _lastApplied = {OpTime(), Date_t()};
     _lastFetched = {};
+
+    LOG(2) << "Resetting the oldest timestamp before starting this initial sync attempt.";
+    auto storageEngine = getGlobalServiceContext()->getStorageEngine();
+    if (storageEngine) {
+        // Set the oldestTimestamp to one because WiredTiger does not allow us to set it to zero
+        // since that would also set the all committed point to zero. We specifically don't set
+        // the stable timestamp here because that will trigger taking a first stable checkpoint even
+        // though the initialDataTimestamp is still set to kAllowUnstableCheckpointsSentinel.
+        storageEngine->setOldestTimestamp(kTimestampOne);
+    }
 
     LOG(2) << "Resetting feature compatibility version to last-stable. If the sync source is in "
               "latest feature compatibility version, we will find out when we clone the "
@@ -1185,6 +1201,16 @@ void InitialSyncer::_getNextApplierBatchCallback(
     if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint2)) {
         log() << "initialSyncFuzzerSynchronizationPoint2 fail point enabled.";
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint2);
+    }
+
+    if (MONGO_FAIL_POINT(failInitialSyncBeforeApplyingBatch)) {
+        log() << "initial sync - failInitialSyncBeforeApplyingBatch fail point enabled. Pausing"
+              << "until fail point is disabled, then will fail initial sync.";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(failInitialSyncBeforeApplyingBatch);
+        status = Status(ErrorCodes::CallbackCanceled,
+                        "failInitialSyncBeforeApplyingBatch fail point enabled");
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
+        return;
     }
 
     // Schedule MultiApplier if we have operations to apply.
