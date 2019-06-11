@@ -34,6 +34,9 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeGettingNextCollection);
+
 namespace catalog {
 
 void forEachCollectionFromDb(OperationContext* opCtx,
@@ -57,6 +60,7 @@ void forEachCollectionFromDb(OperationContext* opCtx,
         }
 
         Lock::CollectionLock clk(opCtx, *nss, collLockMode);
+        opCtx->recoveryUnit()->abandonSnapshot();
 
         auto collection = catalog.lookupCollectionByUUID(uuid);
         auto catalogEntry = catalog.lookupCollectionCatalogEntryByUUID(uuid);
@@ -65,6 +69,8 @@ void forEachCollectionFromDb(OperationContext* opCtx,
 
         if (!callback(collection, catalogEntry))
             break;
+
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeGettingNextCollection);
     }
 }
 
