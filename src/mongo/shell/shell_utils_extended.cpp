@@ -188,7 +188,7 @@ BSONObj cat(const BSONObj& args, void* data) {
             break;
         ss << ch;
         sz += 1;
-        uassert(13301, "cat() : file to big to load as a variable", sz < 1024 * 1024 * 16);
+        uassert(13301, "cat() : file too big to load as a variable", sz < 1024 * 1024 * 16);
     }
     return BSON("" << ss.str());
 }
