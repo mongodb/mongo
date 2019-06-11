@@ -440,9 +440,10 @@ bool runCreateIndexes(OperationContext* opCtx,
     boost::optional<Lock::CollectionLock> exclusiveCollectionLock(
         boost::in_place_init, opCtx, ns, MODE_X);
 
-    // Index builds can safely ignore prepare conflicts. On primaries, an exclusive lock in the
-    // final drain phase conflicts with prepared transactions.
-    opCtx->recoveryUnit()->setIgnorePrepared(true);
+    // Index builds can safely ignore prepare conflicts and perform writes. On primaries, an
+    // exclusive lock in the final drain phase conflicts with prepared transactions.
+    opCtx->recoveryUnit()->setPrepareConflictBehavior(
+        PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
     auto collection = getOrCreateCollection(opCtx, db, ns, cmdObj, &errmsg, &result);
 

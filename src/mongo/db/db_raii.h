@@ -230,10 +230,11 @@ LockMode getLockModeForQuery(OperationContext* opCtx, const boost::optional<Name
 class EnforcePrepareConflictsBlock {
 public:
     explicit EnforcePrepareConflictsBlock(OperationContext* opCtx)
-        : _opCtx(opCtx), _originalValue(opCtx->recoveryUnit()->getIgnorePrepared()) {
-        // It is illegal to call setIgnorePrepared() while any storage transaction is active.
-        // setIgnorePrepared() invariants that there is no active storage transaction.
-        _opCtx->recoveryUnit()->setIgnorePrepared(false);
+        : _opCtx(opCtx), _originalValue(opCtx->recoveryUnit()->getPrepareConflictBehavior()) {
+        // It is illegal to call setPrepareConflictBehavior() while any storage transaction is
+        // active. setPrepareConflictBehavior() invariants that there is no active storage
+        // transaction.
+        _opCtx->recoveryUnit()->setPrepareConflictBehavior(PrepareConflictBehavior::kEnforce);
     }
 
     ~EnforcePrepareConflictsBlock() {
@@ -246,16 +247,16 @@ public:
         if (_opCtx->lockState()->isLocked()) {
             _opCtx->recoveryUnit()->abandonSnapshot();
         }
-        // It is illegal to call setIgnorePrepared() while any storage transaction is active. There
-        // should not be any active transaction if we are not holding locks. If locks are still
-        // being held, the above abandonSnapshot() call should have already closed all storage
-        // transactions.
-        _opCtx->recoveryUnit()->setIgnorePrepared(_originalValue);
+        // It is illegal to call setPrepareConflictBehavior() while any storage transaction is
+        // active. There should not be any active transaction if we are not holding locks. If locks
+        // are still being held, the above abandonSnapshot() call should have already closed all
+        // storage transactions.
+        _opCtx->recoveryUnit()->setPrepareConflictBehavior(_originalValue);
     }
 
 private:
     OperationContext* _opCtx;
-    bool _originalValue;
+    PrepareConflictBehavior _originalValue;
 };
 
 }  // namespace mongo

@@ -124,11 +124,11 @@ void BM_WiredTigerBeginTxnBlock(benchmark::State& state) {
 
 using mongo::WiredTigerBeginTxnBlock;
 
-template <IgnorePrepared ignore, RoundUpPreparedTimestamps round>
+template <PrepareConflictBehavior behavior, RoundUpPreparedTimestamps round>
 void BM_WiredTigerBeginTxnBlockWithArgs(benchmark::State& state) {
     WiredTigerTestHelper helper;
     for (auto _ : state) {
-        WiredTigerBeginTxnBlock beginTxn(helper.wtSession(), ignore, round);
+        WiredTigerBeginTxnBlock beginTxn(helper.wtSession(), behavior, round);
     }
 }
 
@@ -143,16 +143,22 @@ void BM_setTimestamp(benchmark::State& state) {
 
 BENCHMARK(BM_WiredTigerBeginTxnBlock);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
-                   IgnorePrepared::kNoIgnore,
+                   PrepareConflictBehavior::kEnforce,
                    RoundUpPreparedTimestamps::kNoRound);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
-                   IgnorePrepared::kNoIgnore,
+                   PrepareConflictBehavior::kEnforce,
                    RoundUpPreparedTimestamps::kRound);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
-                   IgnorePrepared::kIgnore,
+                   PrepareConflictBehavior::kIgnoreConflicts,
                    RoundUpPreparedTimestamps::kNoRound);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
-                   IgnorePrepared::kIgnore,
+                   PrepareConflictBehavior::kIgnoreConflicts,
+                   RoundUpPreparedTimestamps::kRound);
+BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
+                   PrepareConflictBehavior::kIgnoreConflictsAllowWrites,
+                   RoundUpPreparedTimestamps::kNoRound);
+BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
+                   PrepareConflictBehavior::kIgnoreConflictsAllowWrites,
                    RoundUpPreparedTimestamps::kRound);
 
 BENCHMARK(BM_setTimestamp);

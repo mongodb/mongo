@@ -524,7 +524,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             if (_isOplogReader) {
                 _oplogVisibleTs = static_cast<std::int64_t>(_oplogManager->getOplogReadTimestamp());
             }
-            WiredTigerBeginTxnBlock(session, _ignorePrepared, _roundUpPreparedTimestamps).done();
+            WiredTigerBeginTxnBlock(session, _prepareConflictBehavior, _roundUpPreparedTimestamps)
+                .done();
             break;
         }
         case ReadSource::kMajorityCommitted: {
@@ -532,15 +533,16 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             // transaction was started.
             _majorityCommittedSnapshot =
                 _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(
-                    session, _ignorePrepared, _roundUpPreparedTimestamps);
+                    session, _prepareConflictBehavior, _roundUpPreparedTimestamps);
             break;
         }
         case ReadSource::kLastApplied: {
             if (_sessionCache->snapshotManager().getLocalSnapshot()) {
                 _readAtTimestamp = _sessionCache->snapshotManager().beginTransactionOnLocalSnapshot(
-                    session, _ignorePrepared, _roundUpPreparedTimestamps);
+                    session, _prepareConflictBehavior, _roundUpPreparedTimestamps);
             } else {
-                WiredTigerBeginTxnBlock(session, _ignorePrepared, _roundUpPreparedTimestamps)
+                WiredTigerBeginTxnBlock(
+                    session, _prepareConflictBehavior, _roundUpPreparedTimestamps)
                     .done();
             }
             break;
@@ -557,7 +559,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             // Intentionally continue to the next case to read at the _readAtTimestamp.
         }
         case ReadSource::kProvided: {
-            WiredTigerBeginTxnBlock txnOpen(session, _ignorePrepared, _roundUpPreparedTimestamps);
+            WiredTigerBeginTxnBlock txnOpen(
+                session, _prepareConflictBehavior, _roundUpPreparedTimestamps);
             auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
 
             if (!status.isOK() && status.code() == ErrorCodes::BadValue) {
@@ -575,8 +578,10 @@ void WiredTigerRecoveryUnit::_txnOpen() {
 }
 
 Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllCommittedTimestamp(WT_SESSION* session) {
-    WiredTigerBeginTxnBlock txnOpen(
-        session, _ignorePrepared, _roundUpPreparedTimestamps, RoundUpReadTimestamp::kRound);
+    WiredTigerBeginTxnBlock txnOpen(session,
+                                    _prepareConflictBehavior,
+                                    _roundUpPreparedTimestamps,
+                                    RoundUpReadTimestamp::kRound);
     Timestamp txnTimestamp = Timestamp(_oplogManager->fetchAllCommittedValue(session->connection));
     auto status = txnOpen.setReadSnapshot(txnTimestamp);
     fassert(50948, status);
@@ -620,8 +625,10 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSI
     // should read afterward.
     Timestamp readTimestamp = (lastApplied) ? std::min(*lastApplied, allCommitted) : allCommitted;
 
-    WiredTigerBeginTxnBlock txnOpen(
-        session, _ignorePrepared, _roundUpPreparedTimestamps, RoundUpReadTimestamp::kRound);
+    WiredTigerBeginTxnBlock txnOpen(session,
+                                    _prepareConflictBehavior,
+                                    _roundUpPreparedTimestamps,
+                                    RoundUpReadTimestamp::kRound);
     auto status = txnOpen.setReadSnapshot(readTimestamp);
     fassert(51066, status);
 
@@ -751,21 +758,20 @@ Timestamp WiredTigerRecoveryUnit::getPrepareTimestamp() const {
     return _prepareTimestamp;
 }
 
-void WiredTigerRecoveryUnit::setIgnorePrepared(bool value) {
-    auto newValue = (value) ? IgnorePrepared::kIgnore : IgnorePrepared::kNoIgnore;
-
+void WiredTigerRecoveryUnit::setPrepareConflictBehavior(PrepareConflictBehavior behavior) {
     // If there is an open storage transaction, it is not valid to try to change the behavior of
     // ignoring prepare conflicts, since that behavior is applied when the transaction is opened.
-    invariant(!_isActive(),
-              str::stream() << "Current state: " << toString(_state)
-                            << ". Invalid internal state while setting ignore_prepare to: "
-                            << value);
+    invariant(
+        !_isActive(),
+        str::stream() << "Current state: " << toString(_state)
+                      << ". Invalid internal state while setting prepare conflict behavior to: "
+                      << static_cast<int>(behavior));
 
-    _ignorePrepared = newValue;
+    _prepareConflictBehavior = behavior;
 }
 
-bool WiredTigerRecoveryUnit::getIgnorePrepared() const {
-    return _ignorePrepared == IgnorePrepared::kIgnore;
+PrepareConflictBehavior WiredTigerRecoveryUnit::getPrepareConflictBehavior() const {
+    return _prepareConflictBehavior;
 }
 
 void WiredTigerRecoveryUnit::setRoundUpPreparedTimestamps(bool value) {

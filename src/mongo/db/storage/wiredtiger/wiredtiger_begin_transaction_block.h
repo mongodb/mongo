@@ -35,6 +35,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
 
@@ -44,13 +45,6 @@ namespace mongo {
  */
 class WiredTigerBeginTxnBlock {
 public:
-    // Whether or not to ignore prepared transactions.
-    enum class IgnorePrepared {
-        kNoIgnore,  // Enforce prepare conflicts when encountering updates from prepared
-                    // transactions.
-        kIgnore     // Ignore prepare conflicts, but don't show prepared data.
-    };
-
     // Whether or not to round up to the oldest timestamp when the read timestamp is behind it.
     enum class RoundUpReadTimestamp {
         kNoRound,  // Do not round to the oldest timestamp. BadValue error may be returned.
@@ -66,7 +60,7 @@ public:
 
     WiredTigerBeginTxnBlock(
         WT_SESSION* session,
-        IgnorePrepared ignorePrepared,
+        PrepareConflictBehavior prepareConflictBehavior,
         RoundUpPreparedTimestamps roundUpPreparedTimestamps,
         RoundUpReadTimestamp roundUpReadTimestamp = RoundUpReadTimestamp::kNoRound);
     WiredTigerBeginTxnBlock(WT_SESSION* session, const char* config);
