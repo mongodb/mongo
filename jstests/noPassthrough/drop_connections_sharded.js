@@ -23,7 +23,7 @@
         assert.commandWorked(ret);
         jsTestLog("Connection pool stats by host: " + tojson(ret.hosts));
         return ret.hosts;
-    };
+    }
 
     const cfg = primary.getDB('local').system.replset.findOne();
     const memberHost = cfg.members[2].host;
