@@ -224,28 +224,6 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
         inReplicationRecovery(serviceCtx) = false;
     });
 
-    const auto truncateAfterPoint = _consistencyMarkers->getOplogTruncateAfterPoint(opCtx);
-    if (!truncateAfterPoint.isNull()) {
-        log() << "Removing unapplied entries starting at: " << truncateAfterPoint.toBSON();
-        _truncateOplogTo(opCtx, truncateAfterPoint);
-
-        // Clear the truncateAfterPoint so that we don't truncate the next batch of oplog entries
-        // erroneously.
-        _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, {});
-        opCtx->recoveryUnit()->waitUntilDurable();
-    }
-
-    auto topOfOplogSW = _getTopOfOplog(opCtx);
-    if (topOfOplogSW.getStatus() == ErrorCodes::CollectionIsEmpty ||
-        topOfOplogSW.getStatus() == ErrorCodes::NamespaceNotFound) {
-        // Oplog is empty. There are no oplog entries to apply, so we exit recovery and go into
-        // initial sync.
-        log() << "No oplog entries to apply for recovery. Oplog is empty.";
-        return;
-    }
-    fassert(40290, topOfOplogSW);
-    const auto topOfOplog = topOfOplogSW.getValue();
-
     // If we were passed in a stable timestamp, we are in rollback recovery and should recover from
     // that stable timestamp. Otherwise, we're recovering at startup. If this storage engine
     // supports recover to stable timestamp or enableMajorityReadConcern=false, we ask it for the
@@ -264,6 +242,20 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
               str::stream() << "Stable timestamp " << stableTimestamp->toString()
                             << " does not equal appliedThrough timestamp "
                             << appliedThrough.toString());
+
+    // This may take an IS lock on the oplog collection.
+    _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, stableTimestamp);
+
+    auto topOfOplogSW = _getTopOfOplog(opCtx);
+    if (topOfOplogSW.getStatus() == ErrorCodes::CollectionIsEmpty ||
+        topOfOplogSW.getStatus() == ErrorCodes::NamespaceNotFound) {
+        // Oplog is empty. There are no oplog entries to apply, so we exit recovery and go into
+        // initial sync.
+        log() << "No oplog entries to apply for recovery. Oplog is empty.";
+        return;
+    }
+    fassert(40290, topOfOplogSW);
+    const auto topOfOplog = topOfOplogSW.getValue();
 
     if (stableTimestamp) {
         invariant(supportsRecoveryTimestamp);
@@ -447,7 +439,8 @@ StatusWith<OpTime> ReplicationRecoveryImpl::_getTopOfOplog(OperationContext* opC
 }
 
 void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
-                                               Timestamp truncateTimestamp) {
+                                               Timestamp truncateTimestamp,
+                                               bool inclusive) {
     Timer timer;
     const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
     AutoGetDb autoDb(opCtx, oplogNss.db(), MODE_IX);
@@ -483,7 +476,7 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
             // oplog is < truncateTimestamp.
             if (count != 1) {
                 invariant(!oldestIDToDelete.isNull());
-                oplogCollection->cappedTruncateAfter(opCtx, oldestIDToDelete, /*inclusive=*/true);
+                oplogCollection->cappedTruncateAfter(opCtx, oldestIDToDelete, inclusive);
             }
             log() << "Replication recovery oplog truncation finished in: " << timer.millis()
                   << "ms";
@@ -496,6 +489,41 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
     severe() << "Reached end of oplog looking for oplog entry before " << truncateTimestamp.toBSON()
              << " but couldn't find any after looking through " << count << " entries.";
     fassertFailedNoTrace(40296);
+}
+
+void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(
+    OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp) {
+
+    Timestamp truncatePoint = _consistencyMarkers->getOplogTruncateAfterPoint(opCtx);
+    if (truncatePoint.isNull()) {
+        // There are no holes in the oplog that necessitate truncation.
+        return;
+    }
+
+    // We want to delete oplog inclusive of the 'oplogTruncateAfterPoint', but not inclusive of the
+    // stable timestamp if we end up using that value instead.
+    bool inclusive = true;
+
+    if (stableTimestamp && !stableTimestamp->isNull() && truncatePoint <= stableTimestamp) {
+        AutoGetCollectionForRead oplog(opCtx, NamespaceString::kRsOplogNamespace);
+        invariant(oplog.getCollection());
+
+        log() << "The oplog truncation point (" << truncatePoint
+              << ") is equal to or earlier than the stable timestamp (" << stableTimestamp.get()
+              << "), so truncating after the stable timestamp instead";
+
+        inclusive = false;
+        truncatePoint = stableTimestamp.get();
+    }
+
+    log() << "Removing unapplied oplog entries starting at: " << truncatePoint.toBSON() << ", "
+          << (inclusive ? "inclusive" : "not inclusive");
+    _truncateOplogTo(opCtx, truncatePoint, inclusive);
+
+    // Clear the oplogTruncateAfterPoint now that we have removed any holes that might exist in the
+    // oplog -- and so that we do not truncate future entries erroneously.
+    _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, {});
+    opCtx->recoveryUnit()->waitUntilDurable();
 }
 
 }  // namespace repl

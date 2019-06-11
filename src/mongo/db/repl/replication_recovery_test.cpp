@@ -475,6 +475,79 @@ TEST_F(ReplicationRecoveryTest, RecoveryTruncatesOplogAtOplogTruncateAfterPoint)
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 3), 1));
 }
 
+TEST_F(ReplicationRecoveryTest, RecoveryDoesNotTruncateOplogAtOrBeforeStableTimestamp) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(2, 2));
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(4, 4));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(4, 4), 1));
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5, 6});
+
+    recovery.recoverFromOplog(opCtx, boost::none);
+
+    _assertDocsInOplog(opCtx, {1, 2, 3, 4});
+    _assertDocsInTestCollection(opCtx, {});
+
+    ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(4, 4), 1));
+}
+
+TEST_F(ReplicationRecoveryTest, RecoveryTruncatesNothingIfNothingIsAfterStableTimestamp) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(2, 2));
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(4, 4));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(4, 4), 1));
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4});
+
+    recovery.recoverFromOplog(opCtx, boost::none);
+
+    _assertDocsInOplog(opCtx, {1, 2, 3, 4});
+    _assertDocsInTestCollection(opCtx, {});
+
+    ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(4, 4), 1));
+}
+
+TEST_F(ReplicationRecoveryTest,
+       RecoveryTruncatesNothingIfTruncatePointEqualsStableWithNoLaterEntries) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(4, 4));
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(4, 4));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(4, 4), 1));
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4});
+
+    recovery.recoverFromOplog(opCtx, boost::none);
+
+    _assertDocsInOplog(opCtx, {1, 2, 3, 4});
+    _assertDocsInTestCollection(opCtx, {});
+
+    ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(4, 4), 1));
+}
+
+TEST_F(ReplicationRecoveryTest, RecoveryTruncatesAfterStableIfTruncatePointEqualsStable) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, Timestamp(4, 4));
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(4, 4));
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(4, 4), 1));
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5, 6});
+
+    recovery.recoverFromOplog(opCtx, boost::none);
+
+    _assertDocsInOplog(opCtx, {1, 2, 3, 4});
+    _assertDocsInTestCollection(opCtx, {});
+
+    ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(4, 4), 1));
+}
+
 TEST_F(ReplicationRecoveryTest, RecoverySucceedsWithOplogTruncatePointTooHigh) {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();

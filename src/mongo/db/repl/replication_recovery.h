@@ -101,9 +101,25 @@ private:
     StatusWith<OpTime> _getTopOfOplog(OperationContext* opCtx) const;
 
     /**
-     * Truncates the oplog after and including the "truncateTimestamp" entry.
+     * Truncates the oplog after the "truncateTimestamp" entry. Includes the "truncateTimestamp"
+     * entry if "inclusive" is set to true.
      */
-    void _truncateOplogTo(OperationContext* opCtx, Timestamp truncateTimestamp);
+    void _truncateOplogTo(OperationContext* opCtx, Timestamp truncateTimestamp, bool inclusive);
+
+    /**
+     * Uses the oplogTruncateAfterPoint, accessed via '_consistencyMarkers', to decide whether to
+     * truncate part of the oplog. If oplogTruncateAfterPoint has been set, then there may be holes
+     * in the oplog after that point. In that case, we will truncate the oplog entries starting at
+     * and including the entry associated with the oplogTruncateAfterPoint timestamp.
+     *
+     * If the oplogTruncateAfterPoint is earlier in time than or equal to the stable timestamp, we
+     * will truncate the oplog after the stable timestamp instead. There cannot be holes before a
+     * stable timestamp. The oplogTruncateAfterPoint can lag behind the stable timestamp because the
+     * oplogTruncateAfterPoint is updated on primaries by an asynchronously looping thread that can
+     * potentially be starved.
+     */
+    void _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(
+        OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp);
 
     StorageInterface* _storageInterface;
     ReplicationConsistencyMarkers* _consistencyMarkers;
