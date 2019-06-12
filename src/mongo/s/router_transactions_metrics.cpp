@@ -146,28 +146,40 @@ void RouterTransactionsMetrics::incrementCommitInitiated(TransactionRouter::Comm
     }
 }
 
-void RouterTransactionsMetrics::incrementCommitSuccessful(
-    TransactionRouter::CommitType commitType) {
+void RouterTransactionsMetrics::incrementCommitSuccessful(TransactionRouter::CommitType commitType,
+                                                          Microseconds durationMicros) {
     switch (commitType) {
         case TransactionRouter::CommitType::kNotInitiated:
             MONGO_UNREACHABLE;
         case TransactionRouter::CommitType::kNoShards:
             _noShardsCommitStats.successful.fetchAndAdd(1);
+            _noShardsCommitStats.successfulDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(durationMicros));
             break;
         case TransactionRouter::CommitType::kSingleShard:
             _singleShardCommitStats.successful.fetchAndAdd(1);
+            _singleShardCommitStats.successfulDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(durationMicros));
             break;
         case TransactionRouter::CommitType::kSingleWriteShard:
             _singleWriteShardCommitStats.successful.fetchAndAdd(1);
+            _singleWriteShardCommitStats.successfulDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(durationMicros));
             break;
         case TransactionRouter::CommitType::kReadOnly:
             _readOnlyCommitStats.successful.fetchAndAdd(1);
+            _readOnlyCommitStats.successfulDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(durationMicros));
             break;
         case TransactionRouter::CommitType::kTwoPhaseCommit:
             _twoPhaseCommitStats.successful.fetchAndAdd(1);
+            _twoPhaseCommitStats.successfulDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(durationMicros));
             break;
         case TransactionRouter::CommitType::kRecoverWithToken:
             _recoverWithTokenCommitStats.successful.fetchAndAdd(1);
+            _recoverWithTokenCommitStats.successfulDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(durationMicros));
             break;
     }
 }
@@ -176,6 +188,7 @@ CommitTypeStats RouterTransactionsMetrics::_constructCommitTypeStats(const Commi
     CommitTypeStats commitStats;
     commitStats.setInitiated(stats.initiated.load());
     commitStats.setSuccessful(stats.successful.load());
+    commitStats.setSuccessfulDurationMicros(stats.successfulDurationMicros.load());
     return commitStats;
 }
 

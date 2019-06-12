@@ -41,7 +41,7 @@
             "twoPhaseCommit",
             "recoverWithToken",
         ];
-        const commitTypeFields = ["initiated", "successful"];
+        const commitTypeFields = ["initiated", "successful", "successfulDurationMicros"];
 
         assert.hasFields(res.transactions.commitTypes,
                          commitTypes,
@@ -72,6 +72,7 @@
         constructor() {
             this.initiated = 0;
             this.successful = 0;
+            this.successfulDurationMicros = 0;
         }
     }
 
@@ -129,6 +130,20 @@
                       commitTypes[commitType].successful,
                       "unexpected successful for " + commitType + ", commit types: " +
                           tojson(commitTypes));
+
+            assert.lte(expectedStats.commitTypes[commitType].successfulDurationMicros,
+                       commitTypes[commitType].successfulDurationMicros,
+                       "unexpected successfulDurationMicros for " + commitType +
+                           ", commit types: " + tojson(commitTypes));
+            expectedStats.commitTypes[commitType].successfulDurationMicros =
+                commitTypes[commitType].successfulDurationMicros;
+
+            if (commitTypes[commitType].successful != 0) {
+                assert.gt(commitTypes[commitType].successfulDurationMicros,
+                          0,
+                          "unexpected successfulDurationMicros for " + commitType +
+                              ", commit types: " + tojson(commitTypes));
+            }
         });
     }
 

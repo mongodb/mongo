@@ -51,6 +51,9 @@ public:
 
         // Total number of times this commit completed successfully.
         AtomicWord<std::int64_t> successful{0};
+
+        // Total commit duration of successful transactions in microseconds.
+        AtomicWord<std::int64_t> successfulDurationMicros{0};
     };
 
     RouterTransactionsMetrics() = default;
@@ -78,7 +81,8 @@ public:
 
     const CommitStats& getCommitTypeStats_forTest(TransactionRouter::CommitType commitType);
     void incrementCommitInitiated(TransactionRouter::CommitType commitType);
-    void incrementCommitSuccessful(TransactionRouter::CommitType commitType);
+    void incrementCommitSuccessful(TransactionRouter::CommitType commitType,
+                                   Microseconds durationMicros);
 
     /**
      * Appends the accumulated stats to a sharded transactions stats object for reporting.
