@@ -34,6 +34,9 @@ selector:
 
   # Uses the profiler, which is not supported through mongos.
   - jstests/aggregation/sources/lookup/profile_lookup.js
+  # TODO SERVER-32309: Enable once $lookup with pipeline supports sharded foreign collections.
+  - jstests/aggregation/sources/graphLookup/variables.js
+
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop

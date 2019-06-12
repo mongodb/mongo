@@ -60,7 +60,7 @@ public:
 
     Document applyTransformation(const Document& input) final {
         // Extract subdocument in the form of a Value.
-        Value newRoot = _newRoot->evaluate(input);
+        Value newRoot = _newRoot->evaluate(input, &_expCtx->variables);
 
         // The newRoot expression, if it exists, must evaluate to an object.
         uassert(40228,

@@ -164,7 +164,10 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStreaming() {
         // Add to the current accumulator(s).
         for (size_t i = 0; i < _currentAccumulators.size(); i++) {
             _currentAccumulators[i]->process(
-                _accumulatedFields[i].expression->evaluate(*_firstDocOfNextGroup), _doingMerge);
+                _accumulatedFields[i].expression->evaluate(
+                    *_firstDocOfNextGroup,
+                    &(_accumulatedFields[i].expression->getExpressionContext()->variables)),
+                _doingMerge);
         }
 
         // Retrieve the next document.
@@ -555,8 +558,9 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         dassert(numAccumulators == group.size());
 
         for (size_t i = 0; i < numAccumulators; i++) {
-            group[i]->process(_accumulatedFields[i].expression->evaluate(rootDocument),
-                              _doingMerge);
+            group[i]->process(
+                _accumulatedFields[i].expression->evaluate(rootDocument, &pExpCtx->variables),
+                _doingMerge);
 
             _memoryUsageBytes += group[i]->memUsageForSorter();
         }
@@ -814,7 +818,7 @@ BSONObjSet DocumentSourceGroup::getOutputSorts() {
 Value DocumentSourceGroup::computeId(const Document& root) {
     // If only one expression, return result directly
     if (_idExpressions.size() == 1) {
-        Value retValue = _idExpressions[0]->evaluate(root);
+        Value retValue = _idExpressions[0]->evaluate(root, &pExpCtx->variables);
         return retValue.missing() ? Value(BSONNULL) : std::move(retValue);
     }
 
@@ -822,7 +826,7 @@ Value DocumentSourceGroup::computeId(const Document& root) {
     vector<Value> vals;
     vals.reserve(_idExpressions.size());
     for (size_t i = 0; i < _idExpressions.size(); i++) {
-        vals.push_back(_idExpressions[i]->evaluate(root));
+        vals.push_back(_idExpressions[i]->evaluate(root, &pExpCtx->variables));
     }
     return Value(std::move(vals));
 }

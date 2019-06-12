@@ -133,6 +133,7 @@ var blacklist = [
 
     // Use non retryable writes.
     'remove_and_bulk_insert.js',
+    'schema_validator_with_expr_variables.js',
     'update_and_bulk_insert.js',
     'update_check_index.js',
     'update_multifield_isolated_multiupdate.js',
