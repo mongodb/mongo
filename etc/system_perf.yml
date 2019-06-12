@@ -188,7 +188,7 @@ functions:
         set -o verbose
         if [ "${compile-variant|}" = "-wtdevelop" ]; then
           cd src/third_party
-          for wtdir in api dist examples ext lang src test tools ; do
+          for wtdir in dist examples ext lang src test tools ; do
             rm -rf wiredtiger/$wtdir
             mv wtdevelop/$wtdir wiredtiger/
           done
