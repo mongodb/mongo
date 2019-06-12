@@ -1338,48 +1338,6 @@ void WiredTigerRecordStore::notifyCappedWaitersIfNeeded() {
     }
 }
 
-Status WiredTigerRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
-                                                         const DocWriter* const* docs,
-                                                         const Timestamp* timestamps,
-                                                         size_t nDocs,
-                                                         RecordId* idsOut) {
-    dassert(opCtx->lockState()->isReadLocked());
-
-    std::unique_ptr<Record[]> records(new Record[nDocs]);
-
-    // First get all the sizes so we can allocate a single buffer for all documents. Eventually it
-    // would be nice if we could either hand off the buffers to WT without copying or write them
-    // in-place as we do with MMAPv1, but for now this is the best we can do.
-    size_t totalSize = 0;
-    for (size_t i = 0; i < nDocs; i++) {
-        const size_t docSize = docs[i]->documentSize();
-        records[i].data = RecordData(nullptr, docSize);  // We fill in the real ptr in next loop.
-        totalSize += docSize;
-    }
-
-    std::unique_ptr<char[]> buffer(new char[totalSize]);
-    char* pos = buffer.get();
-    for (size_t i = 0; i < nDocs; i++) {
-        docs[i]->writeDocument(pos);
-        const size_t size = records[i].data.size();
-        records[i].data = RecordData(pos, size);
-        pos += size;
-    }
-    invariant(pos == (buffer.get() + totalSize));
-
-    Status s = _insertRecords(opCtx, records.get(), timestamps, nDocs);
-    if (!s.isOK())
-        return s;
-
-    if (idsOut) {
-        for (size_t i = 0; i < nDocs; i++) {
-            idsOut[i] = records[i].id;
-        }
-    }
-
-    return s;
-}
-
 Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
                                            const RecordId& id,
                                            const char* data,

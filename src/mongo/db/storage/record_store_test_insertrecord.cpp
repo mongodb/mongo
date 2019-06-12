@@ -32,7 +32,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/record_store_test_docwriter.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
 
@@ -96,73 +95,6 @@ TEST(RecordStoreTestHarness, InsertMultipleRecords) {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
                 rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
-            ASSERT_OK(res.getStatus());
-            locs[i] = res.getValue();
-            uow.commit();
-        }
-    }
-
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
-    }
-}
-
-// Insert a record using a DocWriter and verify the number of entries
-// in the collection is 1.
-TEST(RecordStoreTestHarness, InsertRecordUsingDocWriter) {
-    const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
-
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
-
-    RecordId loc;
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            StringDocWriter docWriter("my record", false);
-
-            WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res =
-                rs->insertRecordWithDocWriter(opCtx.get(), &docWriter, Timestamp(1));
-            ASSERT_OK(res.getStatus());
-            loc = res.getValue();
-            uow.commit();
-        }
-    }
-
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
-    }
-}
-
-// Insert multiple records using a DocWriter and verify the number of entries
-// in the collection equals the number that were inserted.
-TEST(RecordStoreTestHarness, InsertMultipleRecordsUsingDocWriter) {
-    const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
-
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
-
-    const int nToInsert = 10;
-    RecordId locs[nToInsert];
-    for (int i = 0; i < nToInsert; i++) {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            stringstream ss;
-            ss << "record " << i;
-            StringDocWriter docWriter(ss.str(), false);
-
-            WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res =
-                rs->insertRecordWithDocWriter(opCtx.get(), &docWriter, Timestamp(1));
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             uow.commit();

@@ -201,25 +201,19 @@ protected:
                               TxnNumber txnNumber,
                               StmtId stmtId,
                               repl::OpTime prevOpTime) {
-        OperationSessionInfo osi;
-        osi.setSessionId(lsid);
-        osi.setTxnNumber(txnNumber);
-
-        repl::OplogLink link;
-        link.prevOpTime = prevOpTime;
-
-        return repl::logOp(opCtx,
-                           "n",
-                           nss,
-                           uuid,
-                           BSON("TestValue" << 0),
-                           nullptr,
-                           false,
-                           Date_t::now(),
-                           osi,
-                           stmtId,
-                           link,
-                           OplogSlot());
+        repl::MutableOplogEntry oplogEntry;
+        oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+        oplogEntry.setNss(nss);
+        oplogEntry.setUuid(uuid);
+        oplogEntry.setObject(BSON("TestValue" << 0));
+        oplogEntry.setWallClockTime(Date_t::now());
+        if (stmtId != kUninitializedStmtId) {
+            oplogEntry.setSessionId(lsid);
+            oplogEntry.setTxnNumber(txnNumber);
+            oplogEntry.setStatementId(stmtId);
+            oplogEntry.setPrevWriteOpTimeInTransaction(prevOpTime);
+        }
+        return repl::logOp(opCtx, &oplogEntry);
     }
 
     repl::OpTime writeTxnRecord(TxnNumber txnNum,
@@ -590,34 +584,32 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
     txnParticipant.beginOrContinue(opCtx(), txnNum, boost::none, boost::none);
 
-    OperationSessionInfo osi;
-    osi.setSessionId(sessionId);
-    osi.setTxnNumber(txnNum);
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setSessionId(sessionId);
+    oplogEntry.setTxnNumber(txnNum);
+    oplogEntry.setNss(kNss);
+    oplogEntry.setUuid(uuid);
 
     auto firstOpTime = ([&]() {
+        oplogEntry.setOpType(repl::OpTypeEnum::kInsert);
+        oplogEntry.setObject(BSON("x" << 1));
+        oplogEntry.setObject2(TransactionParticipant::kDeadEndSentinel);
+        oplogEntry.setPrevWriteOpTimeInTransaction(repl::OpTime());
+        oplogEntry.setStatementId(1);
+
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
 
         const auto wallClockTime = Date_t::now();
+        oplogEntry.setWallClockTime(wallClockTime);
 
-        auto opTime = repl::logOp(opCtx(),
-                                  "i",
-                                  kNss,
-                                  uuid,
-                                  BSON("x" << 1),
-                                  &TransactionParticipant::kDeadEndSentinel,
-                                  false,
-                                  wallClockTime,
-                                  osi,
-                                  1,
-                                  {},
-                                  OplogSlot());
+        auto opTime = repl::logOp(opCtx(), &oplogEntry);
 
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setSessionId(sessionId);
         sessionTxnRecord.setTxnNum(txnNum);
         sessionTxnRecord.setLastWriteOpTime(opTime);
-        sessionTxnRecord.setLastWriteDate(Date_t::now());
+        sessionTxnRecord.setLastWriteDate(wallClockTime);
         txnParticipant.onWriteOpCompletedOnPrimary(opCtx(), {1}, sessionTxnRecord);
         wuow.commit();
 
@@ -625,26 +617,19 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
     })();
 
     {
-        repl::OplogLink link;
-        link.prevOpTime = firstOpTime;
+        oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+        oplogEntry.setObject({});
+        oplogEntry.setObject2(TransactionParticipant::kDeadEndSentinel);
+        oplogEntry.setPrevWriteOpTimeInTransaction(firstOpTime);
+        oplogEntry.setStatementId(kIncompleteHistoryStmtId);
 
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
 
         const auto wallClockTime = Date_t::now();
+        oplogEntry.setWallClockTime(wallClockTime);
 
-        auto opTime = repl::logOp(opCtx(),
-                                  "n",
-                                  kNss,
-                                  uuid,
-                                  {},
-                                  &TransactionParticipant::kDeadEndSentinel,
-                                  false,
-                                  wallClockTime,
-                                  osi,
-                                  kIncompleteHistoryStmtId,
-                                  link,
-                                  OplogSlot());
+        auto opTime = repl::logOp(opCtx(), &oplogEntry);
 
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setSessionId(sessionId);

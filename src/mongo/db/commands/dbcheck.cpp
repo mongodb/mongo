@@ -467,24 +467,18 @@ private:
                         const NamespaceString& nss,
                         OptionalCollectionUUID uuid,
                         const BSONObj& obj) {
+        repl::MutableOplogEntry oplogEntry;
+        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+        oplogEntry.setNss(nss);
+        oplogEntry.setUuid(uuid);
+        oplogEntry.setObject(obj);
         return writeConflictRetry(
             opCtx, "dbCheck oplog entry", NamespaceString::kRsOplogNamespace.ns(), [&] {
                 auto const clockSource = opCtx->getServiceContext()->getFastClockSource();
-                const auto wallClockTime = clockSource->now();
+                oplogEntry.setWallClockTime(clockSource->now());
 
                 WriteUnitOfWork uow(opCtx);
-                repl::OpTime result = repl::logOp(opCtx,
-                                                  "c",
-                                                  nss,
-                                                  uuid,
-                                                  obj,
-                                                  nullptr,
-                                                  false,
-                                                  wallClockTime,
-                                                  {},
-                                                  kUninitializedStmtId,
-                                                  {},
-                                                  OplogSlot());
+                repl::OpTime result = repl::logOp(opCtx, &oplogEntry);
                 uow.commit();
                 return result;
             });

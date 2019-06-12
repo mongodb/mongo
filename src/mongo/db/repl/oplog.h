@@ -80,6 +80,22 @@ struct OplogLink {
 };
 
 /**
+ * Set the "lsid", "txnNumber", "stmtId", "prevOpTime", "preImageOpTime" and "postImageOpTime"
+ * fields of the oplogEntry based on the given oplogLink for retryable writes (i.e. when stmtId !=
+ * kUninitializedStmtId).
+ *
+ * If the given oplogLink.prevOpTime is a null OpTime, both the oplogLink.prevOpTime and the
+ * "prevOpTime" field of the oplogEntry will be set to the TransactionParticipant's lastWriteOpTime.
+ * The "preImageOpTime" field will only be set if the given oplogLink.preImageOpTime is not null.
+ * Similarly, the "postImageOpTime" field will only be set if the given oplogLink.postImageOpTime is
+ * not null.
+ */
+void appendRetryableWriteInfo(OperationContext* opCtx,
+                              MutableOplogEntry* oplogEntry,
+                              OplogLink* oplogLink,
+                              StmtId stmtId);
+
+/**
  * Create a new capped collection for the oplog if it doesn't yet exist.
  * If the collection already exists (and isReplSet is false),
  * set the 'last' Timestamp from the last entry of the oplog collection (side effect!)
@@ -96,53 +112,26 @@ void createOplog(OperationContext* opCtx);
 /**
  * Log insert(s) to the local oplog.
  * Returns the OpTime of every insert.
+ * @param oplogEntryTemplate: a template used to generate insert oplog entries. Callers must set the
+ * "ns", "ui", "fromMigrate" and "wall" fields before calling this function. This function will then
+ * augment the template with the "op" (which is set to kInsert), "lsid" and "txnNumber" fields if
+ * necessary.
+ * @param begin/end: first/last InsertStatement to be inserted. This function iterates from begin to
+ * end and generates insert oplog entries based on the augmented oplogEntryTemplate with the "ts",
+ * "t", "o", "prevOpTime" and "stmtId" fields replaced by the content of each InsertStatement
+ * defined by the begin-end range.
+ *
  */
 std::vector<OpTime> logInsertOps(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 OptionalCollectionUUID uuid,
+                                 MutableOplogEntry* oplogEntryTemplate,
                                  std::vector<InsertStatement>::const_iterator begin,
-                                 std::vector<InsertStatement>::const_iterator end,
-                                 bool fromMigrate,
-                                 Date_t wallClockTime);
+                                 std::vector<InsertStatement>::const_iterator end);
 
 /**
- * @param opstr
- *  "i" insert
- *  "u" update
- *  "d" delete
- *  "c" db cmd
- *  "n" no-op
- *  "db" declares presence of a database (ns is set to the db name + '.')
- *
- * For 'u' records, 'obj' captures the mutation made to the object but not
- * the object itself. 'o2' captures the the criteria for the object that will be modified.
- *
- * wallClockTime this specifies the wall-clock timestamp of then this oplog entry was generated. It
- *   is purely informational, may not be monotonically increasing and is not interpreted in any way
- *   by the replication subsystem.
- * stmtId specifies the statementId of an operation. For transaction operations, stmtId is always
- *   boost::none.
- * oplogLink this contains the timestamp that points to the previous write that will be
- *   linked via prevTs, and the timestamps of the oplog entry that contains the document
- *   before/after update was applied. The timestamps are ignored if isNull() is true.
- * prepare this specifies if the oplog entry should be put into a 'prepare' state.
- * oplogSlot If non-null, use this reserved oplog slot instead of a new one.
- *
  * Returns the optime of the oplog entry written to the oplog.
  * Returns a null optime if oplog was not modified.
  */
-OpTime logOp(OperationContext* opCtx,
-             const char* opstr,
-             const NamespaceString& ns,
-             OptionalCollectionUUID uuid,
-             const BSONObj& obj,
-             const BSONObj* o2,
-             bool fromMigrate,
-             Date_t wallClockTime,
-             const OperationSessionInfo& sessionInfo,
-             boost::optional<StmtId> stmtId,
-             const OplogLink& oplogLink,
-             const OplogSlot& oplogSlot);
+OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry);
 
 // Flush out the cached pointer to the oplog.
 void clearLocalOplogPtr();

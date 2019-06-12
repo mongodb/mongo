@@ -108,20 +108,6 @@ public:
         return Status::OK();
     }
 
-    virtual Status insertRecordsWithDocWriter(OperationContext* opCtx,
-                                              const DocWriter* const* docs,
-                                              const Timestamp*,
-                                              size_t nDocs,
-                                              RecordId* idsOut) {
-        _numInserts += nDocs;
-        if (idsOut) {
-            for (size_t i = 0; i < nDocs; i++) {
-                idsOut[i] = RecordId(6, 4);
-            }
-        }
-        return Status::OK();
-    }
-
     virtual Status updateRecord(OperationContext* opCtx,
                                 const RecordId& oldLocation,
                                 const char* data,

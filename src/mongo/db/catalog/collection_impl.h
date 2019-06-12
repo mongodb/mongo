@@ -167,9 +167,8 @@ public:
      * this method.
      */
     Status insertDocumentsForOplog(OperationContext* opCtx,
-                                   const DocWriter* const* docs,
-                                   Timestamp* timestamps,
-                                   size_t nDocs) final;
+                                   std::vector<Record>* records,
+                                   const std::vector<Timestamp>& timestamps) final;
 
     /**
      * Inserts a document into the record store for a bulk loader that manages the index building

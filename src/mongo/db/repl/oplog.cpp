@@ -120,44 +120,6 @@ void checkOplogInsert(Status result) {
     massert(17322, str::stream() << "write to oplog failed: " << result.toString(), result.isOK());
 }
 
-/**
- * This allows us to stream the oplog entry directly into data region
- * main goal is to avoid copying the o portion
- * which can be very large
- * TODO: can have this build the entire doc
- */
-class OplogDocWriter final : public DocWriter {
-public:
-    OplogDocWriter(BSONObj frame, BSONObj oField)
-        : _frame(std::move(frame)), _oField(std::move(oField)) {}
-
-    void writeDocument(char* start) const {
-        char* buf = start;
-
-        memcpy(buf, _frame.objdata(), _frame.objsize() - 1);  // don't copy final EOO
-
-        DataView(buf).write<LittleEndian<int>>(documentSize());
-
-        buf += (_frame.objsize() - 1);
-        buf[0] = (char)Object;
-        buf[1] = 'o';
-        buf[2] = 0;
-        memcpy(buf + 3, _oField.objdata(), _oField.objsize());
-        buf += 3 + _oField.objsize();
-        buf[0] = EOO;
-
-        verify(static_cast<size_t>((buf + 1) - start) == documentSize());  // DEV?
-    }
-
-    size_t documentSize() const {
-        return _frame.objsize() + _oField.objsize() + 1 /* type */ + 2 /* "o" */;
-    }
-
-private:
-    BSONObj _frame;
-    BSONObj _oField;
-};
-
 bool shouldBuildInForeground(OperationContext* opCtx,
                              const BSONObj& index,
                              const NamespaceString& indexNss,
@@ -328,88 +290,6 @@ void createIndexForApplyOps(OperationContext* opCtx,
     }
 }
 
-namespace {
-
-/**
- * Attaches the session information of a write to an oplog entry if it exists.
- */
-void appendSessionInfo(OperationContext* opCtx,
-                       BSONObjBuilder* builder,
-                       boost::optional<StmtId> statementId,
-                       const OperationSessionInfo& sessionInfo,
-                       const OplogLink& oplogLink) {
-    if (!sessionInfo.getTxnNumber()) {
-        return;
-    }
-
-    // Note: certain non-transaction operations, like implicit collection creation will have an
-    // uninitialized statementId.
-    if (statementId == kUninitializedStmtId) {
-        return;
-    }
-
-    sessionInfo.serialize(builder);
-
-    // Only non-transaction operations will have a statementId.
-    if (statementId) {
-        builder->append(OplogEntryBase::kStatementIdFieldName, *statementId);
-    }
-    oplogLink.prevOpTime.append(builder,
-                                OplogEntryBase::kPrevWriteOpTimeInTransactionFieldName.toString());
-
-    if (!oplogLink.preImageOpTime.isNull()) {
-        oplogLink.preImageOpTime.append(builder,
-                                        OplogEntryBase::kPreImageOpTimeFieldName.toString());
-    }
-
-    if (!oplogLink.postImageOpTime.isNull()) {
-        oplogLink.postImageOpTime.append(builder,
-                                         OplogEntryBase::kPostImageOpTimeFieldName.toString());
-    }
-}
-
-OplogDocWriter _logOpWriter(OperationContext* opCtx,
-                            const char* opstr,
-                            const NamespaceString& nss,
-                            OptionalCollectionUUID uuid,
-                            const BSONObj& obj,
-                            const BSONObj* o2,
-                            bool fromMigrate,
-                            OpTime optime,
-                            Date_t wallTime,
-                            const OperationSessionInfo& sessionInfo,
-                            boost::optional<StmtId> statementId,
-                            const OplogLink& oplogLink) {
-    BSONObjBuilder b(256);
-
-    b.append("ts", optime.getTimestamp());
-    if (optime.getTerm() != -1)
-        b.append("t", optime.getTerm());
-
-    // Always write zero hash instead of using FCV to gate this for retryable writes
-    // and change stream, who expect to be able to read oplog across FCV's.
-    b.append("h", 0LL);
-    b.append("v", OplogEntry::kOplogVersion);
-    b.append("op", opstr);
-    b.append("ns", nss.ns());
-    if (uuid)
-        uuid->appendToBuilder(&b, "ui");
-
-    if (fromMigrate)
-        b.appendBool("fromMigrate", true);
-
-    if (o2)
-        b.append("o2", *o2);
-
-    invariant(wallTime != Date_t{});
-    b.appendDate(OplogEntryBase::kWallClockTimeFieldName, wallTime);
-
-    appendSessionInfo(opCtx, &b, statementId, sessionInfo, oplogLink);
-
-    return OplogDocWriter(OplogDocWriter(b.obj(), obj));
-}
-}  // end anon namespace
-
 /* we write to local.oplog.rs:
      { ts : ..., h: ..., v: ..., op: ..., etc }
    ts: an OpTime timestamp
@@ -425,17 +305,16 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
 
 
 /*
- * writers - an array with size nDocs of DocWriter objects.
- * timestamps - an array with size nDocs of respective Timestamp objects for each DocWriter.
+ * records - a vector of oplog records to be written.
+ * timestamps - a vector of respective Timestamp objects for each oplog record.
  * oplogCollection - collection to be written to.
-  * finalOpTime - the OpTime of the last DocWriter object.
-  * wallTime - the wall clock time of the corresponding oplog entry.
+ * finalOpTime - the OpTime of the last oplog record.
+ * wallTime - the wall clock time of the last oplog record.
  */
 void _logOpsInner(OperationContext* opCtx,
                   const NamespaceString& nss,
-                  const DocWriter* const* writers,
-                  Timestamp* timestamps,
-                  size_t nDocs,
+                  std::vector<Record>* records,
+                  const std::vector<Timestamp>& timestamps,
                   Collection* oplogCollection,
                   OpTime finalOpTime,
                   Date_t wallTime) {
@@ -446,9 +325,7 @@ void _logOpsInner(OperationContext* opCtx,
                   str::stream() << "logOp() but can't accept write to collection " << nss.ns());
     }
 
-    // we jump through a bunch of hoops here to avoid copying the obj buffer twice --
-    // instead we do a single copy to the destination in the record store.
-    checkOplogInsert(oplogCollection->insertDocumentsForOplog(opCtx, writers, timestamps, nDocs));
+    checkOplogInsert(oplogCollection->insertDocumentsForOplog(opCtx, records, timestamps));
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
     opCtx->recoveryUnit()->onCommit(
@@ -479,42 +356,26 @@ void _logOpsInner(OperationContext* opCtx,
         });
 }
 
-OpTime logOp(OperationContext* opCtx,
-             const char* opstr,
-             const NamespaceString& nss,
-             OptionalCollectionUUID uuid,
-             const BSONObj& obj,
-             const BSONObj* o2,
-             bool fromMigrate,
-             Date_t wallClockTime,
-             const OperationSessionInfo& sessionInfo,
-             boost::optional<StmtId> statementId,
-             const OplogLink& oplogLink,
-             const OplogSlot& oplogSlot) {
+OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     // All collections should have UUIDs now, so all insert, update, and delete oplog entries should
     // also have uuids. Some no-op (n) and command (c) entries may still elide the uuid field.
-    invariant(uuid || 'n' == *opstr || 'c' == *opstr,
-              str::stream() << "Expected uuid for logOp with opstr: " << opstr << ", nss: "
-                            << nss.ns()
-                            << ", obj: "
-                            << obj
-                            << ", os: "
-                            << o2);
+    invariant(oplogEntry->getUuid() || oplogEntry->getOpType() == OpTypeEnum::kNoop ||
+                  oplogEntry->getOpType() == OpTypeEnum::kCommand,
+              str::stream() << "Expected uuid for logOp with oplog entry: "
+                            << redact(oplogEntry->toBSON()));
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
     // For commands, the test below is on the command ns and therefore does not check for
     // specific namespaces such as system.profile. This is the caller's responsibility.
-    if (replCoord->isOplogDisabledFor(opCtx, nss)) {
-        invariant(statementId);
+    if (replCoord->isOplogDisabledFor(opCtx, oplogEntry->getNss())) {
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "retryable writes is not supported for unreplicated ns: "
-                              << nss.ns(),
-                *statementId == kUninitializedStmtId);
+                              << oplogEntry->getNss().ns(),
+                !oplogEntry->getStatementId());
         return {};
     }
 
     auto oplogInfo = LocalOplogInfo::get(opCtx);
-
     // Obtain Collection exclusive intent write lock for non-document-locking storage engines.
     boost::optional<Lock::DBLock> dbWriteLock;
     boost::optional<Lock::CollectionLock> collWriteLock;
@@ -523,43 +384,47 @@ OpTime logOp(OperationContext* opCtx,
         collWriteLock.emplace(opCtx, oplogInfo->getOplogCollectionName(), MODE_IX);
     }
 
-    OplogSlot slot;
+    // If an OpTime is not specified (i.e. isNull), a new OpTime will be assigned to the oplog entry
+    // within the WUOW. If a new OpTime is assigned, it needs to be reset back to a null OpTime
+    // before exiting this function so that the same oplog entry instance can be reused for logOp()
+    // again. For example, if the WUOW gets aborted within a writeConflictRetry loop, we need to
+    // reset the OpTime to null so a new OpTime will be assigned on retry.
+    OplogSlot slot = oplogEntry->getOpTime();
+    auto resetOpTimeGuard = makeGuard([&, resetOpTimeOnExit = bool(slot.isNull()) ] {
+        if (resetOpTimeOnExit)
+            oplogEntry->setOpTime(OplogSlot());
+    });
+
     WriteUnitOfWork wuow(opCtx);
-    if (oplogSlot.isNull()) {
+    if (slot.isNull()) {
         slot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
-    } else {
-        slot = oplogSlot;
+        // TODO: make the oplogEntry a const reference instead of using the guard.
+        oplogEntry->setOpTime(slot);
     }
 
     auto oplog = oplogInfo->getCollection();
-    auto writer = _logOpWriter(opCtx,
-                               opstr,
-                               nss,
-                               uuid,
-                               obj,
-                               o2,
-                               fromMigrate,
-                               slot,
-                               wallClockTime,
-                               sessionInfo,
-                               statementId,
-                               oplogLink);
-    const DocWriter* basePtr = &writer;
-    auto timestamp = slot.getTimestamp();
-    _logOpsInner(opCtx, nss, &basePtr, &timestamp, 1, oplog, slot, wallClockTime);
+    auto wallClockTime = oplogEntry->getWallClockTime();
+    invariant(wallClockTime);
+
+    auto bsonOplogEntry = oplogEntry->toBSON();
+    // The storage engine will assign the RecordId based on the "ts" field of the oplog entry, see
+    // oploghack::extractKey.
+    std::vector<Record> records{
+        {RecordId(), RecordData(bsonOplogEntry.objdata(), bsonOplogEntry.objsize())}};
+    std::vector<Timestamp> timestamps{slot.getTimestamp()};
+    _logOpsInner(opCtx, oplogEntry->getNss(), &records, timestamps, oplog, slot, *wallClockTime);
     wuow.commit();
     return slot;
 }
 
 std::vector<OpTime> logInsertOps(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 OptionalCollectionUUID uuid,
+                                 MutableOplogEntry* oplogEntryTemplate,
                                  std::vector<InsertStatement>::const_iterator begin,
-                                 std::vector<InsertStatement>::const_iterator end,
-                                 bool fromMigrate,
-                                 Date_t wallClockTime) {
+                                 std::vector<InsertStatement>::const_iterator end) {
     invariant(begin != end);
+    oplogEntryTemplate->setOpType(repl::OpTypeEnum::kInsert);
 
+    auto nss = oplogEntryTemplate->getNss();
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
         uassert(ErrorCodes::IllegalOperation,
@@ -570,8 +435,6 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     }
 
     const size_t count = end - begin;
-    std::vector<OplogDocWriter> writers;
-    writers.reserve(count);
     auto oplogInfo = LocalOplogInfo::get(opCtx);
 
     // Obtain Collection exclusive intent write lock for non-document-locking storage engines.
@@ -584,40 +447,34 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
 
     WriteUnitOfWork wuow(opCtx);
 
-    OperationSessionInfo sessionInfo;
-    OplogLink oplogLink;
-
-    const auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (txnParticipant) {
-        sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
-        sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-        oplogLink.prevOpTime = txnParticipant.getLastWriteOpTime();
-    }
-
-    auto timestamps = std::make_unique<Timestamp[]>(count);
-    std::vector<OpTime> opTimes;
+    std::vector<OpTime> opTimes(count);
+    std::vector<Timestamp> timestamps(count);
+    std::vector<BSONObj> bsonOplogEntries(count);
+    std::vector<Record> records(count);
     for (size_t i = 0; i < count; i++) {
+        // Make a copy from the template for each insert oplog entry.
+        MutableOplogEntry oplogEntry = *oplogEntryTemplate;
         // Make a mutable copy.
         auto insertStatementOplogSlot = begin[i].oplogSlot;
         // Fetch optime now, if not already fetched.
         if (insertStatementOplogSlot.isNull()) {
             insertStatementOplogSlot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
         }
-        writers.emplace_back(_logOpWriter(opCtx,
-                                          "i",
-                                          nss,
-                                          uuid,
-                                          begin[i].doc,
-                                          nullptr,
-                                          fromMigrate,
-                                          insertStatementOplogSlot,
-                                          wallClockTime,
-                                          sessionInfo,
-                                          begin[i].stmtId,
-                                          oplogLink));
-        oplogLink.prevOpTime = insertStatementOplogSlot;
-        timestamps[i] = oplogLink.prevOpTime.getTimestamp();
-        opTimes.push_back(insertStatementOplogSlot);
+        oplogEntry.setObject(begin[i].doc);
+        oplogEntry.setOpTime(insertStatementOplogSlot);
+
+        OplogLink oplogLink;
+        if (i > 0)
+            oplogLink.prevOpTime = opTimes[i - 1];
+        appendRetryableWriteInfo(opCtx, &oplogEntry, &oplogLink, begin[i].stmtId);
+
+        opTimes[i] = insertStatementOplogSlot;
+        timestamps[i] = insertStatementOplogSlot.getTimestamp();
+        bsonOplogEntries[i] = oplogEntry.toBSON();
+        // The storage engine will assign the RecordId based on the "ts" field of the oplog entry,
+        // see oploghack::extractKey.
+        records[i] = Record{
+            RecordId(), RecordData(bsonOplogEntries[i].objdata(), bsonOplogEntries[i].objsize())};
     }
 
     MONGO_FAIL_POINT_BLOCK(sleepBetweenInsertOpTimeGenerationAndLogOp, customWait) {
@@ -628,19 +485,40 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         sleepmillis(numMillis);
     }
 
-    std::unique_ptr<DocWriter const* []> basePtrs(new DocWriter const*[count]);
-    for (size_t i = 0; i < count; i++) {
-        basePtrs[i] = &writers[i];
-    }
-
     invariant(!opTimes.empty());
     auto lastOpTime = opTimes.back();
     invariant(!lastOpTime.isNull());
     auto oplog = oplogInfo->getCollection();
-    _logOpsInner(
-        opCtx, nss, basePtrs.get(), timestamps.get(), count, oplog, lastOpTime, wallClockTime);
+    auto wallClockTime = oplogEntryTemplate->getWallClockTime();
+    invariant(wallClockTime);
+    _logOpsInner(opCtx, nss, &records, timestamps, oplog, lastOpTime, *wallClockTime);
     wuow.commit();
     return opTimes;
+}
+
+void appendRetryableWriteInfo(OperationContext* opCtx,
+                              MutableOplogEntry* oplogEntry,
+                              OplogLink* oplogLink,
+                              StmtId stmtId) {
+    // Not a retryable write.
+    if (stmtId == kUninitializedStmtId)
+        return;
+
+    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    invariant(txnParticipant);
+    oplogEntry->setSessionId(opCtx->getLogicalSessionId());
+    oplogEntry->setTxnNumber(opCtx->getTxnNumber());
+    oplogEntry->setStatementId(stmtId);
+    if (oplogLink->prevOpTime.isNull()) {
+        oplogLink->prevOpTime = txnParticipant.getLastWriteOpTime();
+    }
+    oplogEntry->setPrevWriteOpTimeInTransaction(oplogLink->prevOpTime);
+    if (!oplogLink->preImageOpTime.isNull()) {
+        oplogEntry->setPreImageOpTime(oplogLink->preImageOpTime);
+    }
+    if (!oplogLink->postImageOpTime.isNull()) {
+        oplogEntry->setPostImageOpTime(oplogLink->postImageOpTime);
+    }
 }
 
 namespace {

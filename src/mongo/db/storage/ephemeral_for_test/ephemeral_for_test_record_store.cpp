@@ -443,47 +443,6 @@ Status EphemeralForTestRecordStore::insertRecords(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
-                                                               const DocWriter* const* docs,
-                                                               const Timestamp*,
-                                                               size_t nDocs,
-                                                               RecordId* idsOut) {
-    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
-
-    for (size_t i = 0; i < nDocs; i++) {
-        const int len = docs[i]->documentSize();
-        if (_isCapped && len > _cappedMaxSize) {
-            // We use dataSize for capped rollover and we don't want to delete everything if we
-            // know this won't fit.
-            return Status(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
-        }
-
-        EphemeralForTestRecord rec(len);
-        docs[i]->writeDocument(rec.data.get());
-
-        RecordId loc;
-        if (_data->isOplog) {
-            StatusWith<RecordId> status = extractAndCheckLocForOplog(lock, rec.data.get(), len);
-            if (!status.isOK())
-                return status.getStatus();
-            loc = status.getValue();
-        } else {
-            loc = allocateLoc(lock);
-        }
-
-        opCtx->recoveryUnit()->registerChange(new InsertChange(opCtx, _data, loc));
-        _data->dataSize += len;
-        _data->records[loc] = rec;
-
-        cappedDeleteAsNeeded(lock, opCtx);
-
-        if (idsOut)
-            idsOut[i] = loc;
-    }
-
-    return Status::OK();
-}
-
 Status EphemeralForTestRecordStore::updateRecord(OperationContext* opCtx,
                                                  const RecordId& loc,
                                                  const char* data,

@@ -79,71 +79,60 @@ BSONObj buildMigrateSessionCmd(const MigrationSessionId& migrationSessionId) {
 }
 
 /**
- * Determines whether the oplog entry has a link to either preImage/postImage and return a new
- * oplogLink that contains the same link, but pointing to lastResult.oplogTime. For example, if
- * entry has link to preImageTs, this returns an oplogLink with preImageTs pointing to
+ * Determines whether the oplog entry has a link to either preImage/postImage and sets a new link
+ * to lastResult.oplogTime. For example, if entry has link to preImageTs, this sets preImageTs to
  * lastResult.oplogTime.
  *
  * It is an error to have both preImage and postImage as well as not having them at all.
  */
-repl::OplogLink extractPrePostImageTs(const ProcessOplogResult& lastResult,
-                                      const repl::OplogEntry& entry) {
-    repl::OplogLink oplogLink;
-
+void setPrePostImageTs(const ProcessOplogResult& lastResult, repl::MutableOplogEntry* entry) {
     if (!lastResult.isPrePostImage) {
         uassert(40628,
-                str::stream() << "expected oplog with ts: " << entry.getTimestamp().toString()
+                str::stream() << "expected oplog with ts: " << entry->getTimestamp().toString()
                               << " to not have "
                               << repl::OplogEntryBase::kPreImageOpTimeFieldName
                               << " or "
                               << repl::OplogEntryBase::kPostImageOpTimeFieldName,
-                !entry.getPreImageOpTime() && !entry.getPostImageOpTime());
-
-        return oplogLink;
+                !entry->getPreImageOpTime() && !entry->getPostImageOpTime());
+        return;
     }
 
     invariant(!lastResult.oplogTime.isNull());
 
-    const auto& sessionInfo = entry.getOperationSessionInfo();
-    const auto sessionId = *sessionInfo.getSessionId();
-    const auto txnNum = *sessionInfo.getTxnNumber();
-
     uassert(40629,
-            str::stream() << "expected oplog with ts: " << entry.getTimestamp().toString() << ": "
-                          << redact(entry.toBSON())
+            str::stream() << "expected oplog with ts: " << entry->getTimestamp().toString() << ": "
+                          << redact(entry->toBSON())
                           << " to have session: "
                           << lastResult.sessionId,
-            lastResult.sessionId == sessionId);
+            lastResult.sessionId == entry->getSessionId());
     uassert(40630,
-            str::stream() << "expected oplog with ts: " << entry.getTimestamp().toString() << ": "
-                          << redact(entry.toBSON())
+            str::stream() << "expected oplog with ts: " << entry->getTimestamp().toString() << ": "
+                          << redact(entry->toBSON())
                           << " to have txnNumber: "
                           << lastResult.txnNum,
-            lastResult.txnNum == txnNum);
+            lastResult.txnNum == entry->getTxnNumber());
 
-    if (entry.getPreImageOpTime()) {
-        oplogLink.preImageOpTime = lastResult.oplogTime;
-    } else if (entry.getPostImageOpTime()) {
-        oplogLink.postImageOpTime = lastResult.oplogTime;
+    if (entry->getPreImageOpTime()) {
+        entry->setPreImageOpTime(lastResult.oplogTime);
+    } else if (entry->getPostImageOpTime()) {
+        entry->setPostImageOpTime(lastResult.oplogTime);
     } else {
         uasserted(40631,
-                  str::stream() << "expected oplog with opTime: " << entry.getOpTime().toString()
+                  str::stream() << "expected oplog with opTime: " << entry->getOpTime().toString()
                                 << ": "
-                                << redact(entry.toBSON())
+                                << redact(entry->toBSON())
                                 << " to have either "
                                 << repl::OplogEntryBase::kPreImageOpTimeFieldName
                                 << " or "
                                 << repl::OplogEntryBase::kPostImageOpTimeFieldName);
     }
-
-    return oplogLink;
 }
 
 /**
  * Parses the oplog into an oplog entry and makes sure that it contains the expected fields.
  */
-repl::OplogEntry parseOplog(const BSONObj& oplogBSON) {
-    auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
+repl::MutableOplogEntry parseOplog(const BSONObj& oplogBSON) {
+    auto oplogEntry = uassertStatusOK(repl::MutableOplogEntry::parse(oplogBSON));
 
     // Session oplog entries must always contain wall clock time, because we will not be
     // transferring anything from a previous version of the server
@@ -208,13 +197,11 @@ BSONObj getNextSessionOplogBatch(OperationContext* opCtx,
 ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                                        const ProcessOplogResult& lastResult) {
     auto oplogEntry = parseOplog(oplogBSON);
-    const auto& sessionInfo = oplogEntry.getOperationSessionInfo();
 
     ProcessOplogResult result;
-    result.sessionId = *sessionInfo.getSessionId();
-    result.txnNum = *sessionInfo.getTxnNumber();
+    result.sessionId = *oplogEntry.getSessionId();
+    result.txnNum = *oplogEntry.getTxnNumber();
 
-    BSONObj object2;
     if (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) {
         // Note: Oplog is already no-op type, no need to nest.
         // There are two types of type 'n' oplog format expected here:
@@ -225,8 +212,11 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
         //     findAndModify operation. In this case, o field contains the relevant info
         //     and o2 will be empty.
 
+        BSONObj object2;
         if (oplogEntry.getObject2()) {
             object2 = *oplogEntry.getObject2();
+        } else {
+            oplogEntry.setObject2(object2);
         }
 
         if (object2.isEmpty()) {
@@ -242,7 +232,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                     !lastResult.isPrePostImage);
         }
     } else {
-        object2 = oplogBSON;  // TODO: strip redundant info?
+        oplogEntry.setObject2(oplogBSON);  // TODO: strip redundant info?
     }
 
     const auto stmtId = *oplogEntry.getStatementId();
@@ -275,11 +265,16 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
         throw;
     }
 
-    BSONObj object(result.isPrePostImage
-                       ? oplogEntry.getObject()
-                       : BSON(SessionCatalogMigrationDestination::kSessionMigrateOplogTag << 1));
-    auto oplogLink = extractPrePostImageTs(lastResult, oplogEntry);
-    oplogLink.prevOpTime = txnParticipant.getLastWriteOpTime();
+    if (!result.isPrePostImage)
+        oplogEntry.setObject(
+            BSON(SessionCatalogMigrationDestination::kSessionMigrateOplogTag << 1));
+    setPrePostImageTs(lastResult, &oplogEntry);
+    oplogEntry.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
+
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setFromMigrate(true);
+    // Reset OpTime so logOp() can assign a new one.
+    oplogEntry.setOpTime(OplogSlot());
 
     writeConflictRetry(
         opCtx,
@@ -295,18 +290,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                 opCtx, NamespaceString::kSessionTransactionsTableNamespace.db(), MODE_IX);
             WriteUnitOfWork wunit(opCtx);
 
-            result.oplogTime = repl::logOp(opCtx,
-                                           "n",
-                                           oplogEntry.getNss(),
-                                           oplogEntry.getUuid(),
-                                           object,
-                                           &object2,
-                                           true,
-                                           *oplogEntry.getWallClockTime(),
-                                           sessionInfo,
-                                           stmtId,
-                                           oplogLink,
-                                           OplogSlot());
+            result.oplogTime = repl::logOp(opCtx, &oplogEntry);
 
             const auto& oplogOpTime = result.oplogTime;
             uassert(40633,

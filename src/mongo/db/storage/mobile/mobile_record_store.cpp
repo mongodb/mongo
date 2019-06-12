@@ -325,30 +325,6 @@ Status MobileRecordStore::insertRecords(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status MobileRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
-                                                     const DocWriter* const* docs,
-                                                     const Timestamp* timestamps,
-                                                     size_t nDocs,
-                                                     RecordId* idsOut) {
-    // Calculates the total size of the data buffer.
-    size_t totalSize = 0;
-    for (size_t i = 0; i < nDocs; i++) {
-        totalSize += docs[i]->documentSize();
-    }
-
-    std::unique_ptr<char[]> buffer(new char[totalSize]);
-    char* pos = buffer.get();
-    for (size_t i = 0; i < nDocs; i++) {
-        docs[i]->writeDocument(pos);
-        size_t docLen = docs[i]->documentSize();
-        StatusWith<RecordId> res = insertRecord(opCtx, pos, docLen, timestamps[i]);
-        idsOut[i] = res.getValue();
-        pos += docLen;
-    }
-
-    return Status::OK();
-}
-
 Status MobileRecordStore::updateRecord(OperationContext* opCtx,
                                        const RecordId& recId,
                                        const char* data,

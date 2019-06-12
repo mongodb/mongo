@@ -143,12 +143,6 @@ public:
                                  std::vector<Record>* records,
                                  const std::vector<Timestamp>& timestamps);
 
-    virtual Status insertRecordsWithDocWriter(OperationContext* opCtx,
-                                              const DocWriter* const* docs,
-                                              const Timestamp* timestamps,
-                                              size_t nDocs,
-                                              RecordId* idsOut);
-
     virtual Status updateRecord(OperationContext* opCtx,
                                 const RecordId& recordId,
                                 const char* data,

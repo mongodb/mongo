@@ -62,22 +62,6 @@ struct CompactOptions {
 struct CompactStats {};
 
 /**
- * Allows inserting a Record "in-place" without creating a copy ahead of time.
- */
-class DocWriter {
-public:
-    virtual void writeDocument(char* buf) const = 0;
-    virtual size_t documentSize() const = 0;
-    virtual bool addPadding() const {
-        return true;
-    }
-
-protected:
-    // Can't delete through base pointer.
-    ~DocWriter() = default;
-};
-
-/**
  * The data items stored in a RecordStore.
  */
 struct Record {
@@ -356,34 +340,6 @@ public:
         if (!status.isOK())
             return status;
         return inOutRecords.front().id;
-    }
-
-    /**
-     * Inserts nDocs documents into this RecordStore using the DocWriter interface.
-     *
-     * This allows the storage engine to reserve space for a record and have it built in-place
-     * rather than building the record then copying it into its destination.
-     *
-     * On success, if idsOut is non-null the RecordIds of the inserted records will be written into
-     * it. It must have space for nDocs RecordIds.
-     */
-    virtual Status insertRecordsWithDocWriter(OperationContext* opCtx,
-                                              const DocWriter* const* docs,
-                                              const Timestamp* timestamps,
-                                              size_t nDocs,
-                                              RecordId* idsOut = nullptr) = 0;
-
-    /**
-     * A thin wrapper around insertRecordsWithDocWriter() to simplify handling of single DocWriters.
-     */
-    StatusWith<RecordId> insertRecordWithDocWriter(OperationContext* opCtx,
-                                                   const DocWriter* doc,
-                                                   Timestamp timestamp) {
-        RecordId out;
-        Status status = insertRecordsWithDocWriter(opCtx, &doc, &timestamp, 1, &out);
-        if (!status.isOK())
-            return status;
-        return out;
     }
 
     /**

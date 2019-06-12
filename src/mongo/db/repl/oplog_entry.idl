@@ -105,7 +105,7 @@ structs:
             v:
                 cpp_name: version
                 type: safeInt64
-                default: 1
+                default: 2
                 description: "The version of the oplog"
             fromMigrate:
                 type: bool

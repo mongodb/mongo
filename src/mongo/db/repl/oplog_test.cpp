@@ -99,20 +99,14 @@ TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
     // Write to the oplog.
     OpTime opTime;
     {
+        MutableOplogEntry oplogEntry;
+        oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+        oplogEntry.setNss(nss);
+        oplogEntry.setObject(msgObj);
+        oplogEntry.setWallClockTime(Date_t::now());
         AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opTime = logOp(opCtx.get(),
-                       "n",
-                       nss,
-                       {},
-                       msgObj,
-                       nullptr,
-                       false,
-                       Date_t::now(),
-                       {},
-                       kUninitializedStmtId,
-                       {},
-                       OplogSlot());
+        opTime = logOp(opCtx.get(), &oplogEntry);
         ASSERT_FALSE(opTime.isNull());
         wunit.commit();
     }
@@ -223,19 +217,12 @@ OpTime _logOpNoopWithMsg(OperationContext* opCtx,
 
     // logOp() must be called while holding lock because ephemeralForTest storage engine does not
     // support concurrent updates to its internal state.
-    const auto msgObj = BSON("msg" << nss.ns());
-    auto opTime = logOp(opCtx,
-                        "n",
-                        nss,
-                        {},
-                        msgObj,
-                        nullptr,
-                        false,
-                        Date_t::now(),
-                        {},
-                        kUninitializedStmtId,
-                        {},
-                        OplogSlot());
+    MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(nss);
+    oplogEntry.setObject(BSON("msg" << nss.ns()));
+    oplogEntry.setWallClockTime(Date_t::now());
+    auto opTime = logOp(opCtx, &oplogEntry);
     ASSERT_FALSE(opTime.isNull());
 
     ASSERT(opTimeNssMap->find(opTime) == opTimeNssMap->end())

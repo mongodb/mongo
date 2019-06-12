@@ -66,57 +66,140 @@ private:
 };
 
 /**
- * A parsed oplog entry that privately inherits from the OplogEntryBase parsed by the IDL.
+ * Mutable class used on primary to build up oplog entries progressively.
+ */
+class MutableOplogEntry : public OplogEntryBase {
+public:
+    // Current oplog version, should be the value of the v field in all oplog entries.
+    static const int kOplogVersion;
+
+    // Helpers to generate ReplOperation.
+    static ReplOperation makeInsertOperation(const NamespaceString& nss,
+                                             boost::optional<UUID> uuid,
+                                             const BSONObj& docToInsert);
+    static ReplOperation makeUpdateOperation(const NamespaceString nss,
+                                             boost::optional<UUID> uuid,
+                                             const BSONObj& update,
+                                             const BSONObj& criteria);
+    static ReplOperation makeDeleteOperation(const NamespaceString& nss,
+                                             boost::optional<UUID> uuid,
+                                             const BSONObj& docToDelete);
+
+    static StatusWith<MutableOplogEntry> parse(const BSONObj& object);
+
+    MutableOplogEntry() : OplogEntryBase() {}
+
+    void setSessionId(boost::optional<LogicalSessionId> value) & {
+        getOperationSessionInfo().setSessionId(std::move(value));
+    }
+
+    void setTxnNumber(boost::optional<std::int64_t> value) & {
+        getOperationSessionInfo().setTxnNumber(std::move(value));
+    }
+
+    void setOpType(OpTypeEnum value) & {
+        getDurableReplOperation().setOpType(std::move(value));
+    }
+
+    void setNss(NamespaceString value) & {
+        getDurableReplOperation().setNss(std::move(value));
+    }
+
+    void setUuid(boost::optional<UUID> value) & {
+        getDurableReplOperation().setUuid(std::move(value));
+    }
+
+    void setObject(BSONObj value) & {
+        getDurableReplOperation().setObject(std::move(value));
+    }
+
+    void setObject2(boost::optional<BSONObj> value) & {
+        getDurableReplOperation().setObject2(std::move(value));
+    }
+
+    void setUpsert(boost::optional<bool> value) & {
+        getDurableReplOperation().setUpsert(std::move(value));
+    }
+
+    /**
+     * Sets the OpTime of the oplog entry.
+     */
+    void setOpTime(const OpTime& opTime) &;
+
+    /**
+     * Returns the OpTime of the oplog entry.
+     */
+    OpTime getOpTime() const;
+
+    /**
+     * Same as setFromMigrate but only set when it is true.
+     */
+    void setFromMigrateIfTrue(bool value) & {
+        if (value)
+            setFromMigrate(value);
+    }
+};
+
+/**
+ * A parsed oplog entry that privately inherits from the MutableOplogEntry.
  * This class is immutable. All setters are hidden.
  */
-class OplogEntry : private OplogEntryBase {
+class OplogEntry : private MutableOplogEntry {
 public:
     // Make field names accessible.
-    using OplogEntryBase::kDurableReplOperationFieldName;
-    using OplogEntryBase::kOperationSessionInfoFieldName;
-    using OplogEntryBase::k_idFieldName;
-    using OplogEntryBase::kFromMigrateFieldName;
-    using OplogEntryBase::kHashFieldName;
-    using OplogEntryBase::kNssFieldName;
-    using OplogEntryBase::kObjectFieldName;
-    using OplogEntryBase::kObject2FieldName;
-    using OplogEntryBase::kOpTypeFieldName;
-    using OplogEntryBase::kPostImageOpTimeFieldName;
-    using OplogEntryBase::kPreImageOpTimeFieldName;
-    using OplogEntryBase::kPrevWriteOpTimeInTransactionFieldName;
-    using OplogEntryBase::kSessionIdFieldName;
-    using OplogEntryBase::kStatementIdFieldName;
-    using OplogEntryBase::kTermFieldName;
-    using OplogEntryBase::kTimestampFieldName;
-    using OplogEntryBase::kTxnNumberFieldName;
-    using OplogEntryBase::kUpsertFieldName;
-    using OplogEntryBase::kUuidFieldName;
-    using OplogEntryBase::kVersionFieldName;
-    using OplogEntryBase::kWallClockTimeFieldName;
+    using MutableOplogEntry::kDurableReplOperationFieldName;
+    using MutableOplogEntry::kOperationSessionInfoFieldName;
+    using MutableOplogEntry::k_idFieldName;
+    using MutableOplogEntry::kFromMigrateFieldName;
+    using MutableOplogEntry::kHashFieldName;
+    using MutableOplogEntry::kNssFieldName;
+    using MutableOplogEntry::kObjectFieldName;
+    using MutableOplogEntry::kObject2FieldName;
+    using MutableOplogEntry::kOpTypeFieldName;
+    using MutableOplogEntry::kPostImageOpTimeFieldName;
+    using MutableOplogEntry::kPreImageOpTimeFieldName;
+    using MutableOplogEntry::kPrevWriteOpTimeInTransactionFieldName;
+    using MutableOplogEntry::kSessionIdFieldName;
+    using MutableOplogEntry::kStatementIdFieldName;
+    using MutableOplogEntry::kTermFieldName;
+    using MutableOplogEntry::kTimestampFieldName;
+    using MutableOplogEntry::kTxnNumberFieldName;
+    using MutableOplogEntry::kUpsertFieldName;
+    using MutableOplogEntry::kUuidFieldName;
+    using MutableOplogEntry::kVersionFieldName;
+    using MutableOplogEntry::kWallClockTimeFieldName;
+    using MutableOplogEntry::kOplogVersion;
+
     // Make serialize(), toBSON() and getters accessible.
-    using OplogEntryBase::serialize;
-    using OplogEntryBase::toBSON;
-    using OplogEntryBase::getOperationSessionInfo;
-    using OplogEntryBase::getSessionId;
-    using OplogEntryBase::getTxnNumber;
-    using OplogEntryBase::getDurableReplOperation;
-    using OplogEntryBase::getOpType;
-    using OplogEntryBase::getNss;
-    using OplogEntryBase::getUuid;
-    using OplogEntryBase::getObject;
-    using OplogEntryBase::getObject2;
-    using OplogEntryBase::getUpsert;
-    using OplogEntryBase::getTimestamp;
-    using OplogEntryBase::getTerm;
-    using OplogEntryBase::getHash;
-    using OplogEntryBase::getVersion;
-    using OplogEntryBase::getFromMigrate;
-    using OplogEntryBase::get_id;
-    using OplogEntryBase::getWallClockTime;
-    using OplogEntryBase::getStatementId;
-    using OplogEntryBase::getPrevWriteOpTimeInTransaction;
-    using OplogEntryBase::getPreImageOpTime;
-    using OplogEntryBase::getPostImageOpTime;
+    using MutableOplogEntry::serialize;
+    using MutableOplogEntry::toBSON;
+    using MutableOplogEntry::getOperationSessionInfo;
+    using MutableOplogEntry::getSessionId;
+    using MutableOplogEntry::getTxnNumber;
+    using MutableOplogEntry::getDurableReplOperation;
+    using MutableOplogEntry::getOpType;
+    using MutableOplogEntry::getNss;
+    using MutableOplogEntry::getUuid;
+    using MutableOplogEntry::getObject;
+    using MutableOplogEntry::getObject2;
+    using MutableOplogEntry::getUpsert;
+    using MutableOplogEntry::getTimestamp;
+    using MutableOplogEntry::getTerm;
+    using MutableOplogEntry::getHash;
+    using MutableOplogEntry::getVersion;
+    using MutableOplogEntry::getFromMigrate;
+    using MutableOplogEntry::get_id;
+    using MutableOplogEntry::getWallClockTime;
+    using MutableOplogEntry::getStatementId;
+    using MutableOplogEntry::getPrevWriteOpTimeInTransaction;
+    using MutableOplogEntry::getPreImageOpTime;
+    using MutableOplogEntry::getPostImageOpTime;
+
+    // Make helper functions accessible.
+    using MutableOplogEntry::getOpTime;
+    using MutableOplogEntry::makeInsertOperation;
+    using MutableOplogEntry::makeUpdateOperation;
+    using MutableOplogEntry::makeDeleteOperation;
 
     enum class CommandType {
         kNotCommand,
@@ -137,21 +220,6 @@ public:
         kCommitTransaction,
         kAbortTransaction,
     };
-
-    // Current oplog version, should be the value of the v field in all oplog entries.
-    static const int kOplogVersion;
-
-    // Helpers to generate ReplOperation.
-    static ReplOperation makeInsertOperation(const NamespaceString& nss,
-                                             boost::optional<UUID> uuid,
-                                             const BSONObj& docToInsert);
-    static ReplOperation makeUpdateOperation(const NamespaceString nss,
-                                             boost::optional<UUID> uuid,
-                                             const BSONObj& update,
-                                             const BSONObj& criteria);
-    static ReplOperation makeDeleteOperation(const NamespaceString& nss,
-                                             boost::optional<UUID> uuid,
-                                             const BSONObj& docToDelete);
 
     // Get the in-memory size in bytes of a ReplOperation.
     static size_t getDurableReplOperationSize(const DurableReplOperation& op);
@@ -249,11 +317,6 @@ public:
     const BSONObj& getRaw() const {
         return _raw;
     }
-
-    /**
-     * Returns the OpTime of the oplog entry.
-     */
-    OpTime getOpTime() const;
 
     /**
      * Serializes the oplog entry to a string.
