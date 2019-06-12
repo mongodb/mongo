@@ -47,6 +47,9 @@ structs:
       successful:
         type: long
         default: 0
+      successfulDurationMicros:
+        type: long
+        default: 0
 
   CommitTypes:
     description: "Contains metrics for each type of commit"

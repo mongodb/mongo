@@ -1197,7 +1197,8 @@ void TransactionRouter::_endTransactionTrackingIfNecessary(OperationContext* opC
         routerTxnMetrics->incrementAbortCauseMap(_abortCause);
     } else {
         routerTxnMetrics->incrementTotalCommitted();
-        routerTxnMetrics->incrementCommitSuccessful(_commitType);
+        routerTxnMetrics->incrementCommitSuccessful(
+            _commitType, _timingStats.getCommitDuration(tickSource, curTicks));
     }
 }
 
