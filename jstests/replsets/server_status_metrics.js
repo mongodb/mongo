@@ -1,7 +1,7 @@
 /**
  * Test replication metrics
  */
-function testSecondaryMetrics(secondary, opCount, offset) {
+function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceived) {
     var ss = secondary.getDB("test").serverStatus();
     printjson(ss.metrics);
 
@@ -12,18 +12,22 @@ function testSecondaryMetrics(secondary, opCount, offset) {
     // n ops (initiate and new primary) before steady replication starts.
     // Sometimes, we disconnect from our sync source and since our find is a gte query, we may
     // double count an oplog entry, so we need some wiggle room for that.
-    assert.lte(ss.metrics.repl.network.ops, opCount + offset + 5, "wrong number of ops retrieved");
-    assert.gte(ss.metrics.repl.network.ops, opCount + offset, "wrong number of ops retrieved");
+    assert.lte(
+        ss.metrics.repl.network.ops, opCount + baseOpsApplied + 5, "wrong number of ops retrieved");
+    assert.gte(
+        ss.metrics.repl.network.ops, opCount + baseOpsApplied, "wrong number of ops retrieved");
     assert(ss.metrics.repl.network.bytes > 0, "zero or missing network bytes");
 
     assert(ss.metrics.repl.buffer.count >= 0, "buffer count missing");
     assert(ss.metrics.repl.buffer.sizeBytes >= 0, "size (bytes)] missing");
     assert(ss.metrics.repl.buffer.maxSizeBytes >= 0, "maxSize (bytes) missing");
 
-    assert.eq(ss.metrics.repl.apply.batchSize, opCount + offset, "apply ops batch size mismatch");
+    assert.eq(ss.metrics.repl.apply.batchSize,
+              opCount + baseOpsReceived,
+              "apply ops batch size mismatch");
     assert(ss.metrics.repl.apply.batches.num > 0, "no batches");
     assert(ss.metrics.repl.apply.batches.totalMillis >= 0, "missing batch time");
-    assert.eq(ss.metrics.repl.apply.ops, opCount + offset, "wrong number of applied ops");
+    assert.eq(ss.metrics.repl.apply.ops, opCount + baseOpsApplied, "wrong number of applied ops");
 }
 
 var rt = new ReplSetTest({name: "server_status_metrics", nodes: 2, oplogSize: 100});
@@ -40,7 +44,11 @@ assert.commandWorked(testDB.createCollection('a'));
 assert.writeOK(testDB.b.insert({}, {writeConcern: {w: 2}}));
 
 var ss = secondary.getDB("test").serverStatus();
-var secondaryBaseOplogInserts = ss.metrics.repl.apply.ops;
+// The number of ops received  and the number of ops applied are not guaranteed to be the same
+// during initial sync oplog application as we apply received operations only if the operation's
+// optime is greater than OplogApplier::Options::beginApplyingOpTime.
+var secondaryBaseOplogOpsApplied = ss.metrics.repl.apply.ops;
+var secondaryBaseOplogOpsReceived = ss.metrics.repl.apply.batchSize;
 
 // add test docs
 var bulk = testDB.a.initializeUnorderedBulkOp();
@@ -49,12 +57,12 @@ for (x = 0; x < 1000; x++) {
 }
 assert.writeOK(bulk.execute({w: 2}));
 
-testSecondaryMetrics(secondary, 1000, secondaryBaseOplogInserts);
+testSecondaryMetrics(secondary, 1000, secondaryBaseOplogOpsApplied, secondaryBaseOplogOpsReceived);
 
 var options = {writeConcern: {w: 2}, multi: true, upsert: true};
 assert.writeOK(testDB.a.update({}, {$set: {d: new Date()}}, options));
 
-testSecondaryMetrics(secondary, 2000, secondaryBaseOplogInserts);
+testSecondaryMetrics(secondary, 2000, secondaryBaseOplogOpsApplied, secondaryBaseOplogOpsReceived);
 
 // Test getLastError.wtime and that it only records stats for w > 1, see SERVER-9005
 var startMillis = testDB.serverStatus().metrics.getLastError.wtime.totalMillis;
