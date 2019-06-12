@@ -152,7 +152,10 @@ void InclusionNode::addComputedFields(MutableDocument* outputDoc, const Document
         } else {
             auto expressionIt = _expressions.find(field);
             invariant(expressionIt != _expressions.end());
-            outputDoc->setField(field, expressionIt->second->evaluate(root));
+            outputDoc->setField(
+                field,
+                expressionIt->second->evaluate(
+                    root, &(expressionIt->second->getExpressionContext()->variables)));
         }
     }
 }

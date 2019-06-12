@@ -23,6 +23,8 @@ selector:
   - jstests/aggregation/use_query_sort.js
   # TODO: Remove when SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
+  # TODO SERVER-32309: Enable once $lookup with pipeline supports sharded foreign collections.
+  - jstests/aggregation/sources/graphLookup/variables.js
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop

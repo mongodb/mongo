@@ -157,6 +157,7 @@ selector:
 
   # Uses non retryable writes.
   - jstests/concurrency/fsm_workloads/remove_and_bulk_insert.js
+  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
   - jstests/concurrency/fsm_workloads/update_and_bulk_insert.js
   - jstests/concurrency/fsm_workloads/update_check_index.js
   - jstests/concurrency/fsm_workloads/update_multifield_multiupdate.js
