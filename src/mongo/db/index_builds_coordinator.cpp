@@ -1011,6 +1011,9 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
         std::tie(numRecords, dataSize) = uassertStatusOK(
             _indexBuildsManager.startBuildingIndexForRecovery(opCtx, collection->ns(), buildUUID));
 
+        uassertStatusOK(
+            _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
+
         // Commit the index build.
         uassertStatusOK(_indexBuildsManager.commitIndexBuild(opCtx,
                                                              collection,

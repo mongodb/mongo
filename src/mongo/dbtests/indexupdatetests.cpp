@@ -149,6 +149,7 @@ public:
 
         ASSERT_OK(indexer.init(&_opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
         ASSERT_OK(indexer.insertAllDocumentsInCollection(&_opCtx, coll));
+        ASSERT_OK(indexer.checkConstraints(&_opCtx));
 
         WriteUnitOfWork wunit(&_opCtx);
         ASSERT_OK(indexer.commit(
@@ -307,6 +308,10 @@ Status IndexBuildBase::createIndex(const std::string& dbname, const BSONObj& ind
         return status;
     }
     status = indexer.insertAllDocumentsInCollection(&_opCtx, collection());
+    if (!status.isOK()) {
+        return status;
+    }
+    status = indexer.checkConstraints(&_opCtx);
     if (!status.isOK()) {
         return status;
     }

@@ -652,6 +652,8 @@ Status MultiIndexBlock::drainBackgroundWrites(OperationContext* opCtx,
 }
 
 Status MultiIndexBlock::checkConstraints(OperationContext* opCtx) {
+    _constraintsChecked = true;
+
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -715,6 +717,9 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
                           << collection->ns()
                           << (_collectionUUID ? (" (" + _collectionUUID->toString() + ")") : "")};
     }
+
+    // Ensure that duplicate key constraints were checked at least once.
+    invariant(_constraintsChecked);
 
     // Do not interfere with writing multikey information when committing index builds.
     auto restartTracker = makeGuard(

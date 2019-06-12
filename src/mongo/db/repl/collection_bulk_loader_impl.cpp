@@ -174,6 +174,10 @@ Status CollectionBulkLoaderImpl::commit() {
                 return status;
             }
 
+            // This should always return Status::OK() as secondary index builds ignore duplicate key
+            // constraints causing them to not be recorded.
+            invariant(_secondaryIndexesBlock->checkConstraints(_opCtx.get()));
+
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());

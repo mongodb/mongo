@@ -218,8 +218,8 @@ public:
             quickExit(EXIT_ABRUPT);
         }
 
-        auto status = indexer->insertAllDocumentsInCollection(opCtx, collection);
-        uassertStatusOK(status);
+        uassertStatusOK(indexer->insertAllDocumentsInCollection(opCtx, collection));
+        uassertStatusOK(indexer->checkConstraints(opCtx));
 
         {
             WriteUnitOfWork wunit(opCtx);

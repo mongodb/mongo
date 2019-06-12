@@ -269,6 +269,7 @@ public:
         }
 
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll));
+        ASSERT_OK(indexer.checkConstraints(_opCtx));
 
         {
             WriteUnitOfWork wuow(_opCtx);
@@ -1919,6 +1920,7 @@ public:
         // Inserting all the documents has the side-effect of setting internal state on the index
         // builder that the index is multikey.
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, autoColl.getCollection()));
+        ASSERT_OK(indexer.checkConstraints(_opCtx));
 
         {
             WriteUnitOfWork wuow(_opCtx);
@@ -2099,6 +2101,8 @@ public:
             OneOffRead oor(_opCtx, afterSecondInsert.asTimestamp());
             ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
         }
+
+        ASSERT_OK(indexer.checkConstraints(_opCtx));
 
         {
             WriteUnitOfWork wuow(_opCtx);
