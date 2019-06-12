@@ -8234,6 +8234,8 @@ buildvariants:
     push_name: linux-duroff
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
+    multiversion_platform: rhel62
+    multiversion_edition: targeted
     # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
     # does not include replica set tests. Since transactions are only supported on replica sets, we
     # exclude those tests as well.
@@ -8820,6 +8822,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
     compile_flags: --ssl MONGO_DISTMOD=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: amzn64
+    multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -8933,6 +8937,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -10975,6 +10981,8 @@ buildvariants:
     lang_environment: LANG=C
     push_arch: x86_64-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu1604
+    multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -11072,6 +11080,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: suse12
+    multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -11364,6 +11374,8 @@ buildvariants:
     push_arch: x86_64-enterprise-debian92
     mh_target: dist-mh
     compile_flags: --ssl MONGO_DISTMOD=debian92 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: debian92
+    multiversion_edition: enterprise
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -11726,6 +11738,8 @@ buildvariants:
     # Speculative majority reads are currently only allowed for change streams, which are only supported on WiredTiger.
     test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_wiredtiger,uses_transactions,requires_document_locking,uses_speculative_majority,requires_snapshot_read,requires_majority_read_concern
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: rhel62
+    multiversion_edition: targeted
     scons_cache_scope: shared
     tooltags: ""
     build_mongoreplay: true
@@ -11943,6 +11957,8 @@ buildvariants:
     lang_environment: LANG=C
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+    multiversion_platform: ubuntu1804
+    multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     tooltags: "ssl"
     build_mongoreplay: true
@@ -12063,6 +12079,8 @@ buildvariants:
     lang_environment: LANG=C
     san_options: UBSAN_OPTIONS="print_stacktrace=1" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+    multiversion_platform: ubuntu1804
+    multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     tooltags: "ssl"
     build_mongoreplay: false
