@@ -334,7 +334,7 @@ void DocumentSourceGraphLookUp::performSearch() {
     // Make sure _input is set before calling performSearch().
     invariant(_input);
 
-    Value startingValue = _startWith->evaluate(*_input);
+    Value startingValue = _startWith->evaluate(*_input, &pExpCtx->variables);
 
     // If _startWith evaluates to an array, treat each value as a separate starting point.
     if (startingValue.isArray()) {

@@ -65,7 +65,7 @@ static Value evaluateExpression(const string& expressionName,
     VariablesParseState vps = expCtx->variablesParseState;
     const BSONObj obj = BSON(expressionName << ImplicitValue::convertToValue(operands));
     auto expression = Expression::parseExpression(expCtx, obj, vps);
-    Value result = expression->evaluate(Document());
+    Value result = expression->evaluate({}, &expCtx->variables);
     return result;
 }
 
@@ -78,7 +78,7 @@ static Value evaluateNamedArgExpression(const string& expressionName, const Docu
     VariablesParseState vps = expCtx->variablesParseState;
     const BSONObj obj = BSON(expressionName << operand);
     auto expression = Expression::parseExpression(expCtx, obj, vps);
-    Value result = expression->evaluate(Document());
+    Value result = expression->evaluate({}, &expCtx->variables);
     return result;
 }
 
@@ -175,8 +175,9 @@ class ExpressionNaryTestOneArg : public ExpressionBaseTest {
 public:
     virtual void assertEvaluates(Value input, Value output) {
         addOperand(_expr, input);
-        ASSERT_VALUE_EQ(output, _expr->evaluate(Document()));
-        ASSERT_EQUALS(output.getType(), _expr->evaluate(Document()).getType());
+        ASSERT_VALUE_EQ(output, _expr->evaluate({}, &_expr->getExpressionContext()->variables));
+        ASSERT_EQUALS(output.getType(),
+                      _expr->evaluate({}, &_expr->getExpressionContext()->variables).getType());
     }
 
     intrusive_ptr<ExpressionNary> _expr;
@@ -187,8 +188,9 @@ public:
     virtual void assertEvaluates(Value input1, Value input2, Value output) {
         addOperand(_expr, input1);
         addOperand(_expr, input2);
-        ASSERT_VALUE_EQ(output, _expr->evaluate(Document()));
-        ASSERT_EQUALS(output.getType(), _expr->evaluate(Document()).getType());
+        ASSERT_VALUE_EQ(output, _expr->evaluate({}, &_expr->getExpressionContext()->variables));
+        ASSERT_EQUALS(output.getType(),
+                      _expr->evaluate({}, &_expr->getExpressionContext()->variables).getType());
     }
 
     intrusive_ptr<ExpressionNary> _expr;
@@ -199,13 +201,13 @@ public:
 /** A dummy child of ExpressionNary used for testing. */
 class Testable : public ExpressionNary {
 public:
-    virtual Value evaluate(const Document& root) const {
+    virtual Value evaluate(const Document& root, Variables* variables) const {
         // Just put all the values in a list.
         // By default, this is not associative/commutative so the results will change if
         // instantiated as commutative or associative and operations are reordered.
         vector<Value> values;
         for (auto&& child : _children)
-            values.push_back(child->evaluate(root));
+            values.push_back(child->evaluate(root, variables));
         return Value(values);
     }
 
@@ -1380,7 +1382,7 @@ public:
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<ExpressionNary> expression = new ExpressionAdd(expCtx);
         populateOperands(expression);
-        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(expression->evaluate({}, &expCtx->variables)));
     }
 
 protected:
@@ -1396,7 +1398,7 @@ public:
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<ExpressionNary> expression = new ExpressionAdd(expCtx);
         expression->addOperand(ExpressionConstant::create(expCtx, Value(2)));
-        ASSERT_BSONOBJ_EQ(BSON("" << 2), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(BSON("" << 2), toBson(expression->evaluate({}, &expCtx->variables)));
     }
 };
 
@@ -1415,7 +1417,7 @@ public:
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<ExpressionNary> expression = new ExpressionAdd(expCtx);
         expression->addOperand(ExpressionConstant::create(expCtx, Value("a"_sd)));
-        ASSERT_THROWS(expression->evaluate(Document()), AssertionException);
+        ASSERT_THROWS(expression->evaluate({}, &expCtx->variables), AssertionException);
     }
 };
 
@@ -1426,7 +1428,7 @@ public:
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<ExpressionNary> expression = new ExpressionAdd(expCtx);
         expression->addOperand(ExpressionConstant::create(expCtx, Value(true)));
-        ASSERT_THROWS(expression->evaluate(Document()), AssertionException);
+        ASSERT_THROWS(expression->evaluate({}, &expCtx->variables), AssertionException);
     }
 };
 
@@ -1665,11 +1667,13 @@ public:
         VariablesParseState vps = expCtx->variablesParseState;
         intrusive_ptr<Expression> expression = Expression::parseOperand(expCtx, specElement, vps);
         ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
-        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
-                          toBson(expression->evaluate(fromBson(BSON("a" << 1)))));
+        ASSERT_BSONOBJ_EQ(
+            BSON("" << expectedResult()),
+            toBson(expression->evaluate(fromBson(BSON("a" << 1)), &expCtx->variables)));
         intrusive_ptr<Expression> optimized = expression->optimize();
-        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
-                          toBson(optimized->evaluate(fromBson(BSON("a" << 1)))));
+        ASSERT_BSONOBJ_EQ(
+            BSON("" << expectedResult()),
+            toBson(optimized->evaluate(fromBson(BSON("a" << 1)), &expCtx->variables)));
     }
 
 protected:
@@ -1960,7 +1964,7 @@ public:
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> nested = ExpressionConstant::create(expCtx, Value(5));
         intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(expCtx, nested);
-        ASSERT(expression->evaluate(Document()).getBool());
+        ASSERT(expression->evaluate({}, &expCtx->variables).getBool());
     }
 };
 
@@ -1971,7 +1975,7 @@ public:
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> nested = ExpressionConstant::create(expCtx, Value(0));
         intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(expCtx, nested);
-        ASSERT(!expression->evaluate(Document()).getBool());
+        ASSERT(!expression->evaluate({}, &expCtx->variables).getBool());
     }
 };
 
@@ -2079,10 +2083,10 @@ public:
         // Check expression spec round trip.
         ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
         // Check evaluation result.
-        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(expression->evaluate({}, &expCtx->variables)));
         // Check that the result is the same after optimizing.
         intrusive_ptr<Expression> optimized = expression->optimize();
-        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(optimized->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(expectedResult(), toBson(optimized->evaluate({}, &expCtx->variables)));
     }
 
 protected:
@@ -2319,7 +2323,7 @@ public:
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         VariablesParseState vps = expCtx->variablesParseState;
         intrusive_ptr<Expression> expression = Expression::parseOperand(expCtx, specElement, vps);
-        ASSERT_VALUE_EQ(expression->evaluate(Document()), Value(true));
+        ASSERT_VALUE_EQ(expression->evaluate({}, &expCtx->variables), Value(true));
     }
 };
 
@@ -2452,7 +2456,7 @@ public:
     void run() {
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionConstant::create(expCtx, Value(5));
-        assertBinaryEqual(BSON("" << 5), toBson(expression->evaluate(Document())));
+        assertBinaryEqual(BSON("" << 5), toBson(expression->evaluate({}, &expCtx->variables)));
     }
 };
 
@@ -2468,7 +2472,7 @@ public:
         intrusive_ptr<Expression> expression = ExpressionConstant::parse(expCtx, specElement, vps);
         assertBinaryEqual(BSON(""
                                << "foo"),
-                          toBson(expression->evaluate(Document())));
+                          toBson(expression->evaluate({}, &expCtx->variables)));
     }
 };
 
@@ -2534,7 +2538,9 @@ private:
 TEST(ExpressionConstantTest, ConstantOfValueMissingRemovesField) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     intrusive_ptr<Expression> expression = ExpressionConstant::create(expCtx, Value());
-    assertBinaryEqual(BSONObj(), toBson(expression->evaluate(Document{{"foo", Value("bar"_sd)}})));
+    assertBinaryEqual(
+        BSONObj(),
+        toBson(expression->evaluate(Document{{"foo", Value("bar"_sd)}}, &expCtx->variables)));
 }
 
 TEST(ExpressionConstantTest, ConstantOfValueMissingSerializesToRemoveSystemVar) {
@@ -2637,11 +2643,11 @@ TEST(ExpressionPowTest, ThrowsWhenBaseZeroAndExpNegative) {
     VariablesParseState vps = expCtx->variablesParseState;
 
     const auto expr = Expression::parseExpression(expCtx, BSON("$pow" << BSON_ARRAY(0 << -5)), vps);
-    ASSERT_THROWS([&] { expr->evaluate(Document()); }(), AssertionException);
+    ASSERT_THROWS([&] { expr->evaluate({}, &expCtx->variables); }(), AssertionException);
 
     const auto exprWithLong =
         Expression::parseExpression(expCtx, BSON("$pow" << BSON_ARRAY(0LL << -5LL)), vps);
-    ASSERT_THROWS([&] { expr->evaluate(Document()); }(), AssertionException);
+    ASSERT_THROWS([&] { expr->evaluate({}, &expCtx->variables); }(), AssertionException);
 }
 
 TEST(ExpressionPowTest, LargeExponentValuesWithBaseOfOne) {
@@ -2792,21 +2798,35 @@ TEST(ExpressionIndexOfArray,
         fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5, 'val'] , '$x'] }"),
         expCtx->variablesParseState);
     auto optimizedIndexOfArray = expIndexOfArray->optimize();
-    ASSERT_VALUE_EQ(Value(0), optimizedIndexOfArray->evaluate(Document{{"x", 0}}));
-    ASSERT_VALUE_EQ(Value(1), optimizedIndexOfArray->evaluate(Document{{"x", 1}}));
-    ASSERT_VALUE_EQ(Value(2), optimizedIndexOfArray->evaluate(Document{{"x", 2}}));
-    ASSERT_VALUE_EQ(Value(3), optimizedIndexOfArray->evaluate(Document{{"x", 3}}));
-    ASSERT_VALUE_EQ(Value(4), optimizedIndexOfArray->evaluate(Document{{"x", 4}}));
-    ASSERT_VALUE_EQ(Value(5), optimizedIndexOfArray->evaluate(Document{{"x", 5}}));
-    ASSERT_VALUE_EQ(Value(6), optimizedIndexOfArray->evaluate(Document{{"x", string("val")}}));
+    ASSERT_VALUE_EQ(Value(0),
+                    optimizedIndexOfArray->evaluate(Document{{"x", 0}}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value(1),
+                    optimizedIndexOfArray->evaluate(Document{{"x", 1}}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value(2),
+                    optimizedIndexOfArray->evaluate(Document{{"x", 2}}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value(3),
+                    optimizedIndexOfArray->evaluate(Document{{"x", 3}}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value(4),
+                    optimizedIndexOfArray->evaluate(Document{{"x", 4}}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value(5),
+                    optimizedIndexOfArray->evaluate(Document{{"x", 5}}, &expCtx->variables));
+    ASSERT_VALUE_EQ(
+        Value(6),
+        optimizedIndexOfArray->evaluate(Document{{"x", string("val")}}, &expCtx->variables));
 
     auto optimizedIndexNotFound = optimizedIndexOfArray->optimize();
     // Should evaluate to -1 if not found.
-    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFound->evaluate(Document{{"x", 10}}));
-    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFound->evaluate(Document{{"x", 100}}));
-    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFound->evaluate(Document{{"x", 1000}}));
-    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFound->evaluate(Document{{"x", string("string")}}));
-    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFound->evaluate(Document{{"x", -1}}));
+    ASSERT_VALUE_EQ(Value(-1),
+                    optimizedIndexNotFound->evaluate(Document{{"x", 10}}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value(-1),
+                    optimizedIndexNotFound->evaluate(Document{{"x", 100}}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value(-1),
+                    optimizedIndexNotFound->evaluate(Document{{"x", 1000}}, &expCtx->variables));
+    ASSERT_VALUE_EQ(
+        Value(-1),
+        optimizedIndexNotFound->evaluate(Document{{"x", string("string")}}, &expCtx->variables));
+    ASSERT_VALUE_EQ(Value(-1),
+                    optimizedIndexNotFound->evaluate(Document{{"x", -1}}, &expCtx->variables));
 }
 
 TEST(ExpressionIndexOfArray,
@@ -2819,10 +2839,12 @@ TEST(ExpressionIndexOfArray,
         fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5] , '$x', 3, 5] }"),
         expCtx->variablesParseState);
     auto optimizedIndexOfArray = expIndexOfArray->optimize();
-    ASSERT_VALUE_EQ(Value(4), optimizedIndexOfArray->evaluate(Document{{"x", 4}}));
+    ASSERT_VALUE_EQ(Value(4),
+                    optimizedIndexOfArray->evaluate(Document{{"x", 4}}, &expCtx->variables));
 
     // Should evaluate to -1 if not found in range.
-    ASSERT_VALUE_EQ(Value(-1), optimizedIndexOfArray->evaluate(Document{{"x", 0}}));
+    ASSERT_VALUE_EQ(Value(-1),
+                    optimizedIndexOfArray->evaluate(Document{{"x", 0}}, &expCtx->variables));
 }
 
 TEST(ExpressionIndexOfArray,
@@ -2835,8 +2857,9 @@ TEST(ExpressionIndexOfArray,
                                     fromjson("{ $indexOfArray : [ [0, 1, 2, 2, 3, 4, 5] , '$x'] }"),
                                     expCtx->variablesParseState);
     auto optimizedIndexOfArrayWithDuplicateValues = expIndexOfArrayWithDuplicateValues->optimize();
-    ASSERT_VALUE_EQ(Value(2),
-                    optimizedIndexOfArrayWithDuplicateValues->evaluate(Document{{"x", 2}}));
+    ASSERT_VALUE_EQ(
+        Value(2),
+        optimizedIndexOfArrayWithDuplicateValues->evaluate(Document{{"x", 2}}, &expCtx->variables));
     // Duplicate Values in a range.
     auto expIndexInRangeWithhDuplicateValues = Expression::parseExpression(
         expCtx,
@@ -2845,8 +2868,9 @@ TEST(ExpressionIndexOfArray,
         expCtx->variablesParseState);
     auto optimizedIndexInRangeWithDuplcateValues = expIndexInRangeWithhDuplicateValues->optimize();
     // Should evaluate to 4.
-    ASSERT_VALUE_EQ(Value(4),
-                    optimizedIndexInRangeWithDuplcateValues->evaluate(Document{{"x", 2}}));
+    ASSERT_VALUE_EQ(
+        Value(4),
+        optimizedIndexInRangeWithDuplcateValues->evaluate(Document{{"x", 2}}, &expCtx->variables));
 }
 
 namespace FieldPath {
@@ -2885,7 +2909,9 @@ TEST(FieldPath, RemoveOptimizesToMissingValue) {
 
     auto optimizedExpr = expression->optimize();
 
-    ASSERT_VALUE_EQ(Value(), optimizedExpr->evaluate(Document(BSON("x" << BSON("y" << 123)))));
+    ASSERT_VALUE_EQ(
+        Value(),
+        optimizedExpr->evaluate(Document(BSON("x" << BSON("y" << 123))), &expCtx->variables));
 }
 
 TEST(FieldPath, NoOptimizationOnNormalPath) {
@@ -3007,7 +3033,7 @@ public:
     void run() {
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a");
-        assertBinaryEqual(fromjson("{}"), toBson(expression->evaluate(Document())));
+        assertBinaryEqual(fromjson("{}"), toBson(expression->evaluate({}, &expCtx->variables)));
     }
 };
 
@@ -3017,8 +3043,9 @@ public:
     void run() {
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a");
-        assertBinaryEqual(fromjson("{'':123}"),
-                          toBson(expression->evaluate(fromBson(BSON("a" << 123)))));
+        assertBinaryEqual(
+            fromjson("{'':123}"),
+            toBson(expression->evaluate(fromBson(BSON("a" << 123)), &expCtx->variables)));
     }
 };
 
@@ -3028,8 +3055,9 @@ public:
     void run() {
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a.b");
-        assertBinaryEqual(fromjson("{}"),
-                          toBson(expression->evaluate(fromBson(fromjson("{a:null}")))));
+        assertBinaryEqual(
+            fromjson("{}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:null}")), &expCtx->variables)));
     }
 };
 
@@ -3039,8 +3067,9 @@ public:
     void run() {
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a.b");
-        assertBinaryEqual(fromjson("{}"),
-                          toBson(expression->evaluate(fromBson(fromjson("{a:undefined}")))));
+        assertBinaryEqual(
+            fromjson("{}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:undefined}")), &expCtx->variables)));
     }
 };
 
@@ -3050,8 +3079,9 @@ public:
     void run() {
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a.b");
-        assertBinaryEqual(fromjson("{}"),
-                          toBson(expression->evaluate(fromBson(fromjson("{z:1}")))));
+        assertBinaryEqual(
+            fromjson("{}"),
+            toBson(expression->evaluate(fromBson(fromjson("{z:1}")), &expCtx->variables)));
     }
 };
 
@@ -3061,7 +3091,9 @@ public:
     void run() {
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a.b");
-        assertBinaryEqual(fromjson("{}"), toBson(expression->evaluate(fromBson(BSON("a" << 2)))));
+        assertBinaryEqual(
+            fromjson("{}"),
+            toBson(expression->evaluate(fromBson(BSON("a" << 2)), &expCtx->variables)));
     }
 };
 
@@ -3072,7 +3104,8 @@ public:
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a.b");
         assertBinaryEqual(BSON("" << 55),
-                          toBson(expression->evaluate(fromBson(BSON("a" << BSON("b" << 55))))));
+                          toBson(expression->evaluate(fromBson(BSON("a" << BSON("b" << 55))),
+                                                      &expCtx->variables)));
     }
 };
 
@@ -3082,8 +3115,9 @@ public:
     void run() {
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a.b");
-        assertBinaryEqual(fromjson("{}"),
-                          toBson(expression->evaluate(fromBson(BSON("a" << BSONObj())))));
+        assertBinaryEqual(
+            fromjson("{}"),
+            toBson(expression->evaluate(fromBson(BSON("a" << BSONObj())), &expCtx->variables)));
     }
 };
 
@@ -3093,8 +3127,9 @@ public:
     void run() {
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a.b");
-        assertBinaryEqual(BSON("" << BSONArray()),
-                          toBson(expression->evaluate(fromBson(BSON("a" << BSONArray())))));
+        assertBinaryEqual(
+            BSON("" << BSONArray()),
+            toBson(expression->evaluate(fromBson(BSON("a" << BSONArray())), &expCtx->variables)));
     }
 };
 
@@ -3104,8 +3139,9 @@ public:
     void run() {
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a.b");
-        assertBinaryEqual(fromjson("{'':[]}"),
-                          toBson(expression->evaluate(fromBson(fromjson("{a:[null]}")))));
+        assertBinaryEqual(
+            fromjson("{'':[]}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:[null]}")), &expCtx->variables)));
     }
 };
 
@@ -3116,7 +3152,8 @@ public:
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a.b");
         assertBinaryEqual(fromjson("{'':[]}"),
-                          toBson(expression->evaluate(fromBson(fromjson("{a:[undefined]}")))));
+                          toBson(expression->evaluate(fromBson(fromjson("{a:[undefined]}")),
+                                                      &expCtx->variables)));
     }
 };
 
@@ -3126,8 +3163,9 @@ public:
     void run() {
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a.b");
-        assertBinaryEqual(fromjson("{'':[]}"),
-                          toBson(expression->evaluate(fromBson(fromjson("{a:[1]}")))));
+        assertBinaryEqual(
+            fromjson("{'':[]}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:[1]}")), &expCtx->variables)));
     }
 };
 
@@ -3137,8 +3175,9 @@ public:
     void run() {
         intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a.b");
-        assertBinaryEqual(fromjson("{'':[9]}"),
-                          toBson(expression->evaluate(fromBson(fromjson("{a:[{b:9}]}")))));
+        assertBinaryEqual(
+            fromjson("{'':[9]}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:[{b:9}]}")), &expCtx->variables)));
     }
 };
 
@@ -3150,7 +3189,8 @@ public:
         intrusive_ptr<Expression> expression = ExpressionFieldPath::create(expCtx, "a.b");
         assertBinaryEqual(fromjson("{'':[9,20]}"),
                           toBson(expression->evaluate(
-                              fromBson(fromjson("{a:[{b:9},null,undefined,{g:4},{b:20},{}]}")))));
+                              fromBson(fromjson("{a:[{b:9},null,undefined,{g:4},{b:20},{}]}")),
+                              &expCtx->variables)));
     }
 };
 
@@ -3165,7 +3205,8 @@ public:
                                                                         "{b:{c:3}},"
                                                                         "{b:[{c:4}]},"
                                                                         "{b:[{c:[5]}]},"
-                                                                        "{b:{c:[6,7]}}]}")))));
+                                                                        "{b:{c:[6,7]}}]}")),
+                                                      &expCtx->variables)));
     }
 };
 
@@ -3359,19 +3400,22 @@ auto expressionObjectCreateHelper(
 TEST(ExpressionObjectEvaluate, EmptyObjectShouldEvaluateToEmptyDocument) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto object = expressionObjectCreateHelper(expCtx, {});
-    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document()));
-    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document{{"a", 1}}));
-    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document{{"_id", "ID"_sd}}));
+    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document(), &(expCtx->variables)));
+    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document{{"a", 1}}, &(expCtx->variables)));
+    ASSERT_VALUE_EQ(Value(Document()),
+                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx->variables)));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateEachField) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto object =
         expressionObjectCreateHelper(expCtx, {{"a", makeConstant(1)}, {"b", makeConstant(5)}});
-    ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}), object->evaluate(Document()));
-    ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}), object->evaluate(Document{{"a", 1}}));
     ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
-                    object->evaluate(Document{{"_id", "ID"_sd}}));
+                    object->evaluate(Document(), &(expCtx->variables)));
+    ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
+                    object->evaluate(Document{{"a", 1}}, &(expCtx->variables)));
+    ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
+                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx->variables)));
 }
 
 TEST(ExpressionObjectEvaluate, OrderOfFieldsInOutputShouldMatchOrderInSpecification) {
@@ -3382,7 +3426,8 @@ TEST(ExpressionObjectEvaluate, OrderOfFieldsInOutputShouldMatchOrderInSpecificat
                                                 {"c", ExpressionFieldPath::create(expCtx, "c")}});
     ASSERT_VALUE_EQ(
         Value(Document{{"a", "A"_sd}, {"b", "B"_sd}, {"c", "C"_sd}}),
-        object->evaluate(Document{{"c", "C"_sd}, {"a", "A"_sd}, {"b", "B"_sd}, {"_id", "ID"_sd}}));
+        object->evaluate(Document{{"c", "C"_sd}, {"a", "A"_sd}, {"b", "B"_sd}, {"_id", "ID"_sd}},
+                         &(expCtx->variables)));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldRemoveFieldsThatHaveMissingValues) {
@@ -3391,8 +3436,8 @@ TEST(ExpressionObjectEvaluate, ShouldRemoveFieldsThatHaveMissingValues) {
         expressionObjectCreateHelper(expCtx,
                                      {{"a", ExpressionFieldPath::create(expCtx, "a.b")},
                                       {"b", ExpressionFieldPath::create(expCtx, "missing")}});
-    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document()));
-    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document{{"a", 1}}));
+    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx->variables)));
+    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document{{"a", 1}}, &(expCtx->variables)));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateFieldsWithinNestedObject) {
@@ -3403,20 +3448,21 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateFieldsWithinNestedObject) {
           expressionObjectCreateHelper(
               expCtx,
               {{"b", makeConstant(1)}, {"c", ExpressionFieldPath::create(expCtx, "_id")}})}});
-    ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}}}}), object->evaluate(Document()));
+    ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}}}}),
+                    object->evaluate(Document(), &(expCtx->variables)));
     ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}, {"c", "ID"_sd}}}}),
-                    object->evaluate(Document{{"_id", "ID"_sd}}));
+                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx->variables)));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissing) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto object = expressionObjectCreateHelper(
         expCtx, {{"a", ExpressionFieldPath::create(expCtx, "missing")}});
-    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document()));
+    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx->variables)));
 
     auto objectWithNestedObject = expressionObjectCreateHelper(expCtx, {{"nested", object}});
     ASSERT_VALUE_EQ(Value(Document{{"nested", Document{}}}),
-                    objectWithNestedObject->evaluate(Document()));
+                    objectWithNestedObject->evaluate(Document(), &(expCtx->variables)));
 }
 
 //
@@ -3519,7 +3565,8 @@ TEST(ExpressionObjectOptimizations, OptimizingAnObjectShouldOptimizeSubExpressio
     auto optimized = object->optimize();
     auto optimizedObject = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(optimizedObject);
-    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document()), Value(BSON("a" << 3)));
+    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document(), &(expCtx->variables)),
+                    Value(BSON("a" << 3)));
 };
 
 TEST(ExpressionObjectOptimizations,
@@ -3552,7 +3599,7 @@ TEST(ExpressionObjectOptimizations,
     auto optimizedWithConstant = expressionWithConstantObject->optimize();
     auto optimizedObject = dynamic_cast<ExpressionConstant*>(optimizedWithConstant.get());
     ASSERT_TRUE(optimizedObject);
-    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document()),
+    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document(), &expCtx->variables),
                     Value(BSON("willBeConstant" << 3 << "alreadyConstant"
                                                 << "string")));
 };
@@ -3571,11 +3618,13 @@ public:
         VariablesParseState vps = expCtx->variablesParseState;
         intrusive_ptr<Expression> expression = Expression::parseOperand(expCtx, specElement, vps);
         ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
-        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
-                          toBson(expression->evaluate(fromBson(BSON("a" << 1)))));
+        ASSERT_BSONOBJ_EQ(
+            BSON("" << expectedResult()),
+            toBson(expression->evaluate(fromBson(BSON("a" << 1)), &expCtx->variables)));
         intrusive_ptr<Expression> optimized = expression->optimize();
-        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
-                          toBson(optimized->evaluate(fromBson(BSON("a" << 1)))));
+        ASSERT_BSONOBJ_EQ(
+            BSON("" << expectedResult()),
+            toBson(optimized->evaluate(fromBson(BSON("a" << 1)), &expCtx->variables)));
     }
 
 protected:
@@ -4083,7 +4132,7 @@ public:
                 VariablesParseState vps = expCtx->variablesParseState;
                 const intrusive_ptr<Expression> expr =
                     Expression::parseExpression(expCtx, obj, vps);
-                Value result = expr->evaluate(Document());
+                Value result = expr->evaluate({}, &expCtx->variables);
                 if (result.getType() == Array) {
                     result = sortSet(result);
                 }
@@ -4110,7 +4159,7 @@ public:
                         // same
                         const intrusive_ptr<Expression> expr =
                             Expression::parseExpression(expCtx, obj, vps);
-                        expr->evaluate(Document());
+                        expr->evaluate({}, &expCtx->variables);
                     }(),
                     AssertionException);
             }
@@ -4392,7 +4441,8 @@ private:
         VariablesParseState vps = expCtx->variablesParseState;
         intrusive_ptr<Expression> expression = Expression::parseOperand(expCtx, specElement, vps);
         ASSERT_BSONOBJ_EQ(constify(spec), expressionToBson(expression));
-        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult),
+                          toBson(expression->evaluate({}, &expCtx->variables)));
     }
 };
 
@@ -4518,7 +4568,8 @@ public:
         VariablesParseState vps = expCtx->variablesParseState;
         intrusive_ptr<Expression> expression = Expression::parseOperand(expCtx, specElement, vps);
         ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
-        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
+                          toBson(expression->evaluate({}, &expCtx->variables)));
     }
 
 protected:
@@ -4636,7 +4687,7 @@ TEST(ExpressionSubstrTest, ThrowsWithNegativeStart) {
     const auto str = "abcdef"_sd;
     const auto expr =
         Expression::parseExpression(expCtx, BSON("$substrCP" << BSON_ARRAY(str << -5 << 1)), vps);
-    ASSERT_THROWS([&] { expr->evaluate(Document()); }(), AssertionException);
+    ASSERT_THROWS([&] { expr->evaluate({}, &expCtx->variables); }(), AssertionException);
 }
 
 }  // namespace Substr
@@ -4650,7 +4701,7 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithBadContinuationByte) {
     const auto continuationByte = "\x80\x00"_sd;
     const auto expr = Expression::parseExpression(
         expCtx, BSON("$substrCP" << BSON_ARRAY(continuationByte << 0 << 1)), vps);
-    ASSERT_THROWS([&] { expr->evaluate(Document()); }(), AssertionException);
+    ASSERT_THROWS([&] { expr->evaluate({}, &expCtx->variables); }(), AssertionException);
 }
 
 TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
@@ -4660,7 +4711,7 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
     const auto leadingByte = "\xFF\x00"_sd;
     const auto expr = Expression::parseExpression(
         expCtx, BSON("$substrCP" << BSON_ARRAY(leadingByte << 0 << 1)), vps);
-    ASSERT_THROWS([&] { expr->evaluate(Document()); }(), AssertionException);
+    ASSERT_THROWS([&] { expr->evaluate({}, &expCtx->variables); }(), AssertionException);
 }
 
 TEST(ExpressionSubstrCPTest, WithStandardValue) {
@@ -5110,7 +5161,7 @@ TEST(ExpressionTrimTest, TrimComparisonsShouldNotRespectCollation) {
                                                                  << "x")),
                                             expCtx->variablesParseState);
 
-    ASSERT_VALUE_EQ(trim->evaluate(Document()), Value("XX"_sd));
+    ASSERT_VALUE_EQ(trim->evaluate({}, &expCtx->variables), Value("XX"_sd));
 }
 
 TEST(ExpressionTrimTest, ShouldRejectInvalidUTFInCharsArgument) {
@@ -5383,7 +5434,7 @@ TEST(ExpressionTrimTest, DoesSerializeCorrectly) {
     // Make sure we can re-parse it and evaluate it.
     auto reparsedTrim = Expression::parseExpression(
         expCtx, trim->serialize(false).getDocument().toBson(), expCtx->variablesParseState);
-    ASSERT_VALUE_EQ(reparsedTrim->evaluate(Document()), Value("abc"_sd));
+    ASSERT_VALUE_EQ(reparsedTrim->evaluate({}, &expCtx->variables), Value("abc"_sd));
 
     // Use $ltrim, and specify the 'chars' option.
     trim = Expression::parseExpression(expCtx,
@@ -5399,7 +5450,8 @@ TEST(ExpressionTrimTest, DoesSerializeCorrectly) {
     // Make sure we can re-parse it and evaluate it.
     reparsedTrim = Expression::parseExpression(
         expCtx, trim->serialize(false).getDocument().toBson(), expCtx->variablesParseState);
-    ASSERT_VALUE_EQ(reparsedTrim->evaluate(Document{{"inputField", " , 4"_sd}, {"a", " ,"_sd}}),
+    ASSERT_VALUE_EQ(reparsedTrim->evaluate(Document{{"inputField", " , 4"_sd}, {"a", " ,"_sd}},
+                                           &expCtx->variables),
                     Value("4"_sd));
 }
 }  // namespace Trim
@@ -5627,7 +5679,8 @@ public:
         VariablesParseState vps = expCtx->variablesParseState;
         intrusive_ptr<Expression> expression = Expression::parseOperand(expCtx, specElement, vps);
         ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
-        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
+                          toBson(expression->evaluate({}, &expCtx->variables)));
     }
 
 protected:
@@ -5684,7 +5737,8 @@ public:
         VariablesParseState vps = expCtx->variablesParseState;
         intrusive_ptr<Expression> expression = Expression::parseOperand(expCtx, specElement, vps);
         ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
-        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()), toBson(expression->evaluate(Document())));
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
+                          toBson(expression->evaluate({}, &expCtx->variables)));
     }
 
 protected:
@@ -5746,7 +5800,7 @@ public:
                 VariablesParseState vps = expCtx->variablesParseState;
                 const intrusive_ptr<Expression> expr =
                     Expression::parseExpression(expCtx, obj, vps);
-                const Value result = expr->evaluate(Document());
+                const Value result = expr->evaluate({}, &expCtx->variables);
                 if (ValueComparator().evaluate(result != expected)) {
                     string errMsg = str::stream()
                         << "for expression " << field.first.toString() << " with argument "
@@ -5770,7 +5824,7 @@ public:
                         // same
                         const intrusive_ptr<Expression> expr =
                             Expression::parseExpression(expCtx, obj, vps);
-                        expr->evaluate(Document());
+                        expr->evaluate({}, &expCtx->variables);
                     }(),
                     AssertionException);
             }
@@ -6014,7 +6068,7 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchScore) {
 
     MutableDocument doc;
     doc.setSearchScore(1.234);
-    Value val = expressionMeta->evaluate(doc.freeze());
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
     ASSERT_EQ(val.getDouble(), 1.234);
 }
 
@@ -6028,7 +6082,7 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchHighlights) {
     Document highlights = DOC("this part" << 1 << "is opaque to the server" << 1);
     doc.setSearchHighlights(Value(highlights));
 
-    Value val = expressionMeta->evaluate(doc.freeze());
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
     ASSERT_DOCUMENT_EQ(val.getDocument(), highlights);
 }
 }  // namespace expression_meta_test
@@ -6038,8 +6092,9 @@ namespace ExpressionRegexTest {
 class ExpressionRegexTest {
 public:
     template <typename ExpressionRegexSubClass>
-    static intrusive_ptr<Expression> generateOptimizedExpression(const BSONObj& input) {
-        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    static intrusive_ptr<Expression> generateOptimizedExpression(
+        const BSONObj& input, intrusive_ptr<ExpressionContextForTest> expCtx) {
+
         auto expression = ExpressionRegexSubClass::parse(
             expCtx, input.firstElement(), expCtx->variablesParseState);
         return expression->optimize();
@@ -6048,31 +6103,31 @@ public:
     static void testAllExpressions(const BSONObj& input,
                                    bool optimized,
                                    const std::vector<Value>& expectedFindAllOutput) {
+
+        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         {
             // For $regexFindAll.
-            auto expression = generateOptimizedExpression<ExpressionRegexFindAll>(input);
+            auto expression = generateOptimizedExpression<ExpressionRegexFindAll>(input, expCtx);
             auto regexFindAllExpr = dynamic_cast<ExpressionRegexFindAll*>(expression.get());
             ASSERT_EQ(regexFindAllExpr->hasConstantRegex(), optimized);
-            Value output = regexFindAllExpr->evaluate(Document());
+            Value output = expression->evaluate({}, &expCtx->variables);
             ASSERT_VALUE_EQ(output, Value(expectedFindAllOutput));
         }
-
         {
             // For $regexFind.
-            auto expression = generateOptimizedExpression<ExpressionRegexFind>(input);
+            auto expression = generateOptimizedExpression<ExpressionRegexFind>(input, expCtx);
             auto regexFindExpr = dynamic_cast<ExpressionRegexFind*>(expression.get());
             ASSERT_EQ(regexFindExpr->hasConstantRegex(), optimized);
-            Value output = regexFindExpr->evaluate(Document());
+            Value output = expression->evaluate({}, &expCtx->variables);
             ASSERT_VALUE_EQ(
                 output, expectedFindAllOutput.empty() ? Value(BSONNULL) : expectedFindAllOutput[0]);
         }
-
         {
             // For $regexMatch.
-            auto expression = generateOptimizedExpression<ExpressionRegexMatch>(input);
+            auto expression = generateOptimizedExpression<ExpressionRegexMatch>(input, expCtx);
             auto regexMatchExpr = dynamic_cast<ExpressionRegexMatch*>(expression.get());
             ASSERT_EQ(regexMatchExpr->hasConstantRegex(), optimized);
-            Value output = regexMatchExpr->evaluate(Document());
+            Value output = expression->evaluate({}, &expCtx->variables);
             ASSERT_VALUE_EQ(output, expectedFindAllOutput.empty() ? Value(false) : Value(true));
         }
     }
@@ -6380,14 +6435,14 @@ TEST(NowAndClusterTime, BasicTest) {
     // $$NOW is the Date type.
     {
         auto expression = ExpressionFieldPath::parse(expCtx, "$$NOW", expCtx->variablesParseState);
-        Value result = expression->evaluate(Document());
+        Value result = expression->evaluate(Document(), &(expCtx->variables));
         ASSERT_EQ(result.getType(), Date);
     }
     // $$CLUSTER_TIME is the timestamp type.
     {
         auto expression =
             ExpressionFieldPath::parse(expCtx, "$$CLUSTER_TIME", expCtx->variablesParseState);
-        Value result = expression->evaluate(Document());
+        Value result = expression->evaluate(Document(), &(expCtx->variables));
         ASSERT_EQ(result.getType(), bsonTimestamp);
     }
 
@@ -6395,7 +6450,7 @@ TEST(NowAndClusterTime, BasicTest) {
     {
         auto expression = Expression::parseExpression(
             expCtx, fromjson("{$eq: [\"$$NOW\", \"$$NOW\"]}"), expCtx->variablesParseState);
-        Value result = expression->evaluate(Document());
+        Value result = expression->evaluate(Document(), &(expCtx->variables));
 
         ASSERT_VALUE_EQ(result, Value{true});
     }
@@ -6405,7 +6460,7 @@ TEST(NowAndClusterTime, BasicTest) {
             Expression::parseExpression(expCtx,
                                         fromjson("{$eq: [\"$$CLUSTER_TIME\", \"$$CLUSTER_TIME\"]}"),
                                         expCtx->variablesParseState);
-        Value result = expression->evaluate(Document());
+        Value result = expression->evaluate(Document(), &(expCtx->variables));
 
         ASSERT_VALUE_EQ(result, Value{true});
     }
