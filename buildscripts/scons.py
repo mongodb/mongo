@@ -5,7 +5,7 @@ from __future__ import print_function
 import os
 import sys
 
-if sys.version_info != (2, 7):
+if (sys.version_info[0], sys.version_info[1]) != (2, 7):
     print("This version of MongoDB can only be built with Python 2.7"
           " you appear to be using version: %s" % sys.version)
     sys.exit(1)
