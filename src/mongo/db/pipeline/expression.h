@@ -954,11 +954,23 @@ private:
      *   out parameter, and the function returns true.
      */
     bool evaluateNumberWithDefault(const Document& root,
-                                   boost::intrusive_ptr<Expression> field,
+                                   const Expression* field,
                                    StringData fieldName,
                                    long long defaultValue,
                                    long long* returnValue,
                                    Variables* variables) const;
+
+    /**
+     * This function has the same behavior as evaluteNumberWithDefault(), except that it uasserts if
+     * the resulting value is not in the range defined by kMaxValueForDatePart and
+     * kMinValueForDatePart.
+     */
+    bool evaluateNumberWithDefaultAndBounds(const Document& root,
+                                            const Expression* field,
+                                            StringData fieldName,
+                                            long long defaultValue,
+                                            long long* returnValue,
+                                            Variables* variables) const;
 
     boost::intrusive_ptr<Expression> _year;
     boost::intrusive_ptr<Expression> _month;
@@ -971,6 +983,12 @@ private:
     boost::intrusive_ptr<Expression> _isoWeek;
     boost::intrusive_ptr<Expression> _isoDayOfWeek;
     boost::intrusive_ptr<Expression> _timeZone;
+
+    // Some date conversions spend a long time iterating through date tables when dealing with large
+    // input numbers, so we place a reasonable limit on the magnitude of any argument to
+    // $dateFromParts: inputs that fit within a 16-bit int are permitted.
+    static constexpr long long kMaxValueForDatePart = std::numeric_limits<int16_t>::max();
+    static constexpr long long kMinValueForDatePart = std::numeric_limits<int16_t>::lowest();
 };
 
 class ExpressionDateToParts final : public Expression {
