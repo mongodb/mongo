@@ -74,7 +74,10 @@ void LocalOplogInfo::setOplogCollectionName(ServiceContext* service) {
             _oplogName = NamespaceString::kRsOplogNamespace;
             break;
         case ReplicationCoordinator::modeNone:
-            // leave empty.
+            if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+                _oplogName = NamespaceString::kRsOplogNamespace;
+            }
+            // leave empty otherwise.
             break;
     }
 }

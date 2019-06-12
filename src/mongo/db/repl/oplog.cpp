@@ -1417,26 +1417,30 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // We do not assign timestamps on replicated writes since they will get their oplog
             // timestamp once they are logged.
             return false;
+        } else if (haveWrappingWriteUnitOfWork) {
+            // We do not assign timestamps to non-replicated writes that have a wrapping
+            // WriteUnitOfWork, as they will get the timestamp on that WUOW.
+            // The typical usage of this is for operations inside of atomic 'applyOps' commands
+            // being applied on a secondary. They will get the timestamp of the outer 'applyOps'
+            // oplog entry in their wrapper WUOW.
+            // We also use a WUOW for replaying a prepared transaction when we encounter its
+            // corresponding commitTransaction entry during recovery. We set the timestamp on the
+            // WUOW to be the commit timestamp.
+            return false;
         } else {
             switch (replMode) {
                 case ReplicationCoordinator::modeReplSet: {
-                    if (haveWrappingWriteUnitOfWork) {
-                        // We do not assign timestamps to non-replicated writes that have a wrapping
-                        // WUOW. These must be operations inside of atomic 'applyOps' commands being
-                        // applied on a secondary. They will get the timestamp of the outer
-                        // 'applyOps' oplog entry in their wrapper WUOW.
-                        return false;
-                    }
-                    break;
+                    // We typically timestamp these writes, unless they are in a WUOW.
+                    return true;
                 }
                 case ReplicationCoordinator::modeNone: {
                     // Only assign timestamps on standalones during replication recovery when
-                    // started with 'recoverFromOplogAsStandalone'.
+                    // started with the 'recoverFromOplogAsStandalone' flag.
                     return mode == OplogApplication::Mode::kRecovering;
                 }
             }
         }
-        return true;
+        MONGO_UNREACHABLE;
     }();
     invariant(!assignOperationTimestamp || !fieldTs.eoo(),
               str::stream() << "Oplog entry did not have 'ts' field when expected: " << redact(op));
