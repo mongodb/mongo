@@ -2075,13 +2075,43 @@ functions:
         ${activate_virtualenv}
 
         rm -rf /data/install /data/multiversion
+
+        edition="${multiversion_edition|base}"
+        platform="${multiversion_platform|linux}"
+        architecture="${multiversion_architecture|x86_64}"
+
         $python buildscripts/setup_multiversion_mongodb.py   \
           --installDir /data/install                         \
           --linkDir /data/multiversion                       \
-          --edition ${multiversion_edition|base}             \
-          --platform ${multiversion_platform|linux}          \
-          --architecture ${multiversion_architecture|x86_64} \
-          --useLatest 3.2 3.4 3.6 4.0 4.2
+          --edition $edition                                 \
+          --platform $platform                               \
+          --architecture $architecture                       \
+          --useLatest 3.2 3.4 3.6 4.0
+
+        # The platform and architecture for how some of the binaries are reported in
+        # https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
+        # Certain build variants define additional multiversion_*_42_or_later expansions in order to
+        # be able to fetch a complete set of versions.
+
+        if [ ! -z "${multiversion_edition_42_or_later}" ]; then
+          edition="${multiversion_edition_42_or_later}"
+        fi
+
+        if [ ! -z "${multiversion_platform_42_or_later}" ]; then
+          platform="${multiversion_platform_42_or_later}"
+        fi
+
+        if [ ! -z "${multiversion_architecture_42_or_later}" ]; then
+          architecture="${multiversion_architecture_42_or_later}"
+        fi
+
+        $python buildscripts/setup_multiversion_mongodb.py   \
+          --installDir /data/install                         \
+          --linkDir /data/multiversion                       \
+          --edition $edition                                 \
+          --platform $platform                               \
+          --architecture $architecture                       \
+          --useLatest 4.2
 
   "do snmp setup":
     command: shell.exec
@@ -8480,6 +8510,7 @@ buildvariants:
     build_mongoreplay: true
     multiversion_platform: ubuntu1604
     multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
     multiversion_edition: enterprise
   display_tasks:
   - *dbtest
@@ -8531,6 +8562,7 @@ buildvariants:
     build_mongoreplay: true
     multiversion_platform: ubuntu1804
     multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
     multiversion_edition: enterprise
   display_tasks:
   - *dbtest
@@ -8580,6 +8612,7 @@ buildvariants:
     build_mongoreplay: true
     multiversion_platform: ubuntu1804
     multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
     multiversion_edition: targeted
   display_tasks:
   - *dbtest
@@ -9359,6 +9392,7 @@ buildvariants:
     push_name: win32
     push_arch: x86_64-2012plus
     multiversion_platform: windows_x86_64-2008plus-ssl
+    multiversion_platform_42_or_later: windows_x86_64-2012plus
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=2012plus -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
