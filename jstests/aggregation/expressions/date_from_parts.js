@@ -9,7 +9,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
     /* Basic Sanity Checks */
     coll.drop();
 
-    assert.writeOK(coll.insert([
+    assert.commandWorked(coll.insert([
         {_id: 0, year: 2017, month: 6, day: 19, hour: 15, minute: 13, second: 25, millisecond: 713},
         {
           _id: 1,
@@ -105,7 +105,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     coll.drop();
 
-    assert.writeOK(coll.insert([
+    assert.commandWorked(coll.insert([
         {
           _id: 0,
           year: 2017,
@@ -389,7 +389,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     coll.drop();
 
-    assert.writeOK(coll.insert([
+    assert.commandWorked(coll.insert([
         {_id: 0},
     ]));
 
@@ -421,7 +421,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     coll.drop();
 
-    assert.writeOK(coll.insert([
+    assert.commandWorked(coll.insert([
         {_id: 0, falseValue: false},
     ]));
 
@@ -453,7 +453,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     coll.drop();
 
-    assert.writeOK(coll.insert([
+    assert.commandWorked(coll.insert([
         {_id: 0, outOfRangeValue: 10002},
     ]));
 
@@ -472,7 +472,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     coll.drop();
 
-    assert.writeOK(coll.insert([{
+    assert.commandWorked(coll.insert([{
         _id: 0,
         minusOne: -1,
         zero: 0,
@@ -548,7 +548,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
      */
     coll.drop();
 
-    assert.writeOK(coll.insert([{
+    assert.commandWorked(coll.insert([{
         _id: 0,
         veryBigDoubleA: 18014398509481984.0,
         veryBigDecimal128A: NumberDecimal("9223372036854775807"),  // 2^63-1
@@ -581,11 +581,112 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
     assertErrMsgContains(coll, pipeline, 40515, "'millisecond' must evaluate to an integer");
 
     /* --------------------------------------------------------------------------------------- */
+    /* Testing that year values are only allowed in the range [0, 9999] and that month, day, hour,
+     * and minute values are only allowed in the range [-32,768, 32,767]. */
+    coll.drop();
+
+    assert.commandWorked(coll.insert([{
+        _id: 0,
+        bigYear: 10000,
+        smallYear: -1,
+        prettyBigInt: 32768,
+        prettyBigNegativeInt: -32769
+    }]));
+
+    pipeline = [{$project: {date: {"$dateFromParts": {year: "$bigYear"}}}}];
+    assertErrMsgContains(
+        coll, pipeline, 40523, "'year' must evaluate to an integer in the range 0 to 9999");
+
+    pipeline = [{$project: {date: {"$dateFromParts": {year: "$smallYear"}}}}];
+    assertErrMsgContains(
+        coll, pipeline, 40523, "'year' must evaluate to an integer in the range 0 to 9999");
+
+    pipeline = [{$project: {date: {"$dateFromParts": {year: 1970, month: "$prettyBigInt"}}}}];
+    assertErrMsgContains(
+        coll, pipeline, 31034, "'month' must evaluate to a value in the range [-32768, 32767]");
+
+    pipeline =
+        [{$project: {date: {"$dateFromParts": {year: 1970, month: "$prettyBigNegativeInt"}}}}];
+    assertErrMsgContains(
+        coll, pipeline, 31034, "'month' must evaluate to a value in the range [-32768, 32767]");
+
+    pipeline =
+        [{$project: {date: {"$dateFromParts": {year: 1970, month: 1, day: "$prettyBigInt"}}}}];
+    assertErrMsgContains(
+        coll, pipeline, 31034, "'day' must evaluate to a value in the range [-32768, 32767]");
+
+    pipeline = [{
+        $project:
+            {date: {"$dateFromParts": {year: 1970, month: 1, day: "$prettyBigNegativeInt"}}}
+    }];
+    assertErrMsgContains(
+        coll, pipeline, 31034, "'day' must evaluate to a value in the range [-32768, 32767]");
+
+    pipeline = [{$project: {date: {"$dateFromParts": {year: 1970, hour: "$prettyBigInt"}}}}];
+    assertErrMsgContains(
+        coll, pipeline, 31034, "'hour' must evaluate to a value in the range [-32768, 32767]");
+
+    pipeline =
+        [{$project: {date: {"$dateFromParts": {year: 1970, hour: "$prettyBigNegativeInt"}}}}];
+    assertErrMsgContains(
+        coll, pipeline, 31034, "'hour' must evaluate to a value in the range [-32768, 32767]");
+
+    pipeline =
+        [{$project: {date: {"$dateFromParts": {year: 1970, hour: 0, minute: "$prettyBigInt"}}}}];
+    assertErrMsgContains(
+        coll, pipeline, 31034, "'minute' must evaluate to a value in the range [-32768, 32767]");
+
+    pipeline = [{
+        $project:
+            {date: {"$dateFromParts": {year: 1970, hour: 0, minute: "$prettyBigNegativeInt"}}}
+    }];
+    assertErrMsgContains(
+        coll, pipeline, 31034, "'minute' must evaluate to a value in the range [-32768, 32767]");
+
+    pipeline = [{$project: {date: {"$dateFromParts": {isoWeekYear: "$bigYear"}}}}];
+    assertErrMsgContains(
+        coll, pipeline, 31095, "'isoWeekYear' must evaluate to an integer in the range 0 to 9999");
+
+    pipeline = [{$project: {date: {"$dateFromParts": {isoWeekYear: "$smallYear"}}}}];
+    assertErrMsgContains(
+        coll, pipeline, 31095, "'isoWeekYear' must evaluate to an integer in the range 0 to 9999");
+
+    pipeline =
+        [{$project: {date: {"$dateFromParts": {isoWeekYear: 1970, isoWeek: "$prettyBigInt"}}}}];
+    assertErrMsgContains(
+        coll, pipeline, 31034, "'isoWeek' must evaluate to a value in the range [-32768, 32767]");
+
+    pipeline = [{
+        $project:
+            {date: {"$dateFromParts": {isoWeekYear: 1970, isoWeek: "$prettyBigNegativeInt"}}}
+    }];
+    assertErrMsgContains(
+        coll, pipeline, 31034, "'isoWeek' must evaluate to a value in the range [-32768, 32767]");
+
+    pipeline = [
+        {$project: {date: {"$dateFromParts": {isoWeekYear: 1970, isoDayOfWeek: "$prettyBigInt"}}}}
+    ];
+    assertErrMsgContains(coll,
+                         pipeline,
+                         31034,
+                         "'isoDayOfWeek' must evaluate to a value in the range [-32768, 32767]");
+
+    pipeline = [{
+        $project: {
+            date: {"$dateFromParts": {isoWeekYear: 1970, isoDayOfWeek: "$prettyBigNegativeInt"}}
+        }
+    }];
+    assertErrMsgContains(coll,
+                         pipeline,
+                         31034,
+                         "'isoDayOfWeek' must evaluate to a value in the range [-32768, 32767]");
+
+    /* --------------------------------------------------------------------------------------- */
     /* Testing wrong arguments */
 
     coll.drop();
 
-    assert.writeOK(coll.insert([
+    assert.commandWorked(coll.insert([
         {_id: 0},
     ]));
 
@@ -630,7 +731,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     coll.drop();
 
-    assert.writeOK(coll.insert([
+    assert.commandWorked(coll.insert([
         {_id: 0, floatField: 2017.5, decimalField: NumberDecimal("2017.5")},
     ]));
 
@@ -653,7 +754,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     coll.drop();
 
-    assert.writeOK(coll.insert([
+    assert.commandWorked(coll.insert([
         {_id: 0, year: NumberDecimal("2017"), month: 6.0, day: NumberInt(19), hour: NumberLong(15)},
         {
           _id: 1,
@@ -733,7 +834,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     coll.drop();
 
-    assert.writeOK(coll.insert([
+    assert.commandWorked(coll.insert([
         {
           _id: 0,
           year: NumberDecimal("2017"),
@@ -783,7 +884,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     coll.drop();
 
-    assert.writeOK(coll.insert([
+    assert.commandWorked(coll.insert([
         {
           _id: 0,
           isoWeekYear: NumberDecimal("2017"),

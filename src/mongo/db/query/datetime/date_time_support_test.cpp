@@ -1099,5 +1099,61 @@ TEST(DateFromString, EmptyFormatStringThrowsForAllInputs) {
                        ErrorCodes::ConversionFailure);
 }
 
+TEST(DayOfWeek, WeekNumber) {
+    long long year = 2019;
+    long long week = 1;
+    long long day = 1;
+    long long hour = 0;
+    long long minute = 0;
+    long long second = 0;
+    long long millisecond = 0;
+
+    Date_t baseline = kDefaultTimeZone.createFromIso8601DateParts(
+        year, week, day, hour, minute, second, millisecond);
+
+    long long weekDurationInMillis = 7 * 24 * 60 * 60 * 1000;
+
+    for (int weekIt = -10000; weekIt < 10000; weekIt++) {
+        // Calculate a date using the ISO 8601 week-numbered year method.
+        Date_t dateFromIso8601 = kDefaultTimeZone.createFromIso8601DateParts(
+            year, weekIt, day, hour, minute, second, millisecond);
+
+        // Calculate the same date by adding 'weekDurationInMillis' to 'baseline' for each week past
+        // the baseline date.
+        Date_t dateFromArithmetic = baseline + Milliseconds(weekDurationInMillis * (weekIt - 1));
+
+        // The two methods should produce the same time.
+        ASSERT_EQ(dateFromIso8601, dateFromArithmetic);
+    }
+}
+
+TEST(DayOfWeek, DayNumber) {
+    long long year = 2019;
+    long long week = 34;
+    long long day = 1;
+    long long hour = 0;
+    long long minute = 0;
+    long long second = 0;
+    long long millisecond = 0;
+
+    Date_t baseline = kDefaultTimeZone.createFromIso8601DateParts(
+        year, week, day, hour, minute, second, millisecond);
+
+    long long dayDurationInMillis = 24 * 60 * 60 * 1000;
+
+    for (int dayIt = -10000; dayIt < 10000; dayIt++) {
+        // Calculate a date using the ISO 8601 week-numbered year method.
+        Date_t dateFromIso8601 = kDefaultTimeZone.createFromIso8601DateParts(
+            year, week, dayIt, hour, minute, second, millisecond);
+
+        // Calculate the same date by adding 'dayDurationInMillis' to 'baseline' for each day past
+        // the baseline date.
+        Date_t dateFromArithmetic = baseline + Milliseconds(dayDurationInMillis * (dayIt - 1));
+
+        // The two methods should produce the same time.
+        ASSERT_EQ(dateFromIso8601, dateFromArithmetic);
+    }
+}
+
 }  // namespace
 }  // namespace mongo
