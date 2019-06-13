@@ -265,15 +265,15 @@
  * }
  */
 #define TEST(CASE_NAME, TEST_NAME)                                                          \
-    class _TEST_TYPE_NAME(CASE_NAME, TEST_NAME) : public ::mongo::unittest::Test {          \
+    class UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME) : public ::mongo::unittest::Test {          \
     private:                                                                                \
         virtual void _doTest();                                                             \
                                                                                             \
-        static const RegistrationAgent<_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)> _agent;       \
+        static const RegistrationAgent<UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)> _agent;       \
     };                                                                                      \
-    const ::mongo::unittest::Test::RegistrationAgent<_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)> \
-        _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_agent(#CASE_NAME, #TEST_NAME);              \
-    void _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_doTest()
+    const ::mongo::unittest::Test::RegistrationAgent<UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)> \
+        UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_agent(#CASE_NAME, #TEST_NAME);              \
+    void UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_doTest()
 
 /**
  * Construct a single test named TEST_NAME that has access to a common class (a "fixture")
@@ -292,21 +292,21 @@
  * }
  */
 #define TEST_F(FIXTURE_NAME, TEST_NAME)                                                        \
-    class _TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME) : public FIXTURE_NAME {                     \
+    class UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME) : public FIXTURE_NAME {                     \
     private:                                                                                   \
         virtual void _doTest();                                                                \
                                                                                                \
-        static const RegistrationAgent<_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)> _agent;       \
+        static const RegistrationAgent<UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)> _agent;       \
     };                                                                                         \
-    const ::mongo::unittest::Test::RegistrationAgent<_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)> \
-        _TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_agent(#FIXTURE_NAME, #TEST_NAME);           \
-    void _TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_doTest()
+    const ::mongo::unittest::Test::RegistrationAgent<UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)> \
+        UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_agent(#FIXTURE_NAME, #TEST_NAME);           \
+    void UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_doTest()
 
 /**
  * Macro to construct a type name for a test, from its "CASE_NAME" and "TEST_NAME".
  * Do not use directly in test code.
  */
-#define _TEST_TYPE_NAME(CASE_NAME, TEST_NAME) UnitTest__##CASE_NAME##__##TEST_NAME
+#define UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME) UnitTest_CaseName##CASE_NAME##TestName##TEST_NAME
 
 namespace mongo {
 namespace unittest {
