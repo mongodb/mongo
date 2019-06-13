@@ -37,7 +37,6 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer_dependency_graph.h"
-#include "mongo/base/make_string_vector.h"
 #include "mongo/unittest/unittest.h"
 
 #define ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS)      \

@@ -34,7 +34,6 @@
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/initializer_dependency_graph.h"
-#include "mongo/base/make_string_vector.h"
 #include "mongo/unittest/unittest.h"
 
 /*
@@ -51,12 +50,14 @@
  *
  */
 
+#define STRIP_PARENS_(...) __VA_ARGS__
+
 #define ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS)      \
     (GRAPH).addInitializer((NAME),                           \
                            (FN),                             \
                            DeinitializerFunction(),          \
-                           MONGO_MAKE_STRING_VECTOR PREREQS, \
-                           MONGO_MAKE_STRING_VECTOR DEPS)
+                           std::vector<std::string>{STRIP_PARENS_ PREREQS}, \
+                           std::vector<std::string>{STRIP_PARENS_ DEPS})
 
 #define ASSERT_ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS) \
     ASSERT_EQUALS(Status::OK(), ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS))
