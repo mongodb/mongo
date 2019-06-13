@@ -34,7 +34,7 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
-structs:
+commands:
     refineCollectionShardKey:
         description: "The public refineCollectionShardKey command on mongos"
         strict: false
@@ -47,7 +47,7 @@ structs:
                 optional: false
     
     _configsvrRefineCollectionShardKey:
-        cpp_name: configsvrRefineCollectionShardKey
+        cpp_name: ConfigsvrRefineCollectionShardKey
         description: "The internal refineCollectionShardKey command on the config server"
         strict: false
         namespace: type

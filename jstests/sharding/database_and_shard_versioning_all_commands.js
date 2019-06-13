@@ -354,6 +354,7 @@
         },
         profile: {skip: "not supported in mongos"},
         reapLogicalSessionCacheNow: {skip: "is a no-op on mongos"},
+        refineCollectionShardKey: {skip: "not on a user database"},
         refreshLogicalSessionCacheNow: {skip: "goes through the cluster write path"},
         refreshSessions: {skip: "executes locally on mongos (not sent to any remote node)"},
         refreshSessionsInternal:
@@ -564,15 +565,18 @@
             // After iterating through all the existing commands, ensure there were no additional
             // test cases that did not correspond to any mongos command.
             for (let key of Object.keys(testCases)) {
-                // We have defined real test cases for commands added in 4.2 so that the test cases
-                // are exercised in the regular suites, but because these test cases can't run in
-                // the last stable suite, we skip processing them here to avoid failing the below
-                // assertion. We have defined "skip" test cases for commands removed in 4.2 so the
-                // test case is defined in last stable suites (in which these commands still exist
-                // on the mongos), but these test cases won't be run in regular suites, so we skip
-                // processing them below as well.
+                // We have defined real test cases for commands added in 4.2/4.4 so that the test
+                // cases are exercised in the regular suites, but because these test cases can't
+                // run in the last stable suite, we skip processing them here to avoid failing the
+                // below assertion. We have defined "skip" test cases for commands removed in 4.2
+                // so the test case is defined in last stable suites (in which these commands still
+                // exist on the mongos), but these test cases won't be run in regular suites, so we
+                // skip processing them below as well.
                 if (commandsAddedToMongosIn42.includes(key) ||
                     commandsRemovedFromMongosIn42.includes(key)) {
+                    continue;
+                }
+                if (commandsAddedToMongosIn44.includes(key)) {
                     continue;
                 }
                 assert(testCases[key].validated || testCases[key].conditional,

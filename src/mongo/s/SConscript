@@ -185,6 +185,7 @@ env.Library(
         env.Idlc('request_types/move_primary.idl')[0],
         env.Idlc('request_types/shard_collection.idl')[0],
         env.Idlc('request_types/clone_collection_options_from_primary_shard.idl')[0],
+        env.Idlc('request_types/refine_collection_shard_key.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/connection_string',
