@@ -1295,6 +1295,45 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
 // ---------------------------
 
+Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
+                                    IndexCatalogEntry* index,
+                                    const std::vector<BSONObj>& keys,
+                                    const BSONObjSet& multikeyMetadataKeys,
+                                    const MultikeyPaths& multikeyPaths,
+                                    RecordId loc,
+                                    const InsertDeleteOptions& options,
+                                    int64_t* keysInsertedOut) {
+    Status status = Status::OK();
+    if (index->isHybridBuilding()) {
+        int64_t inserted;
+        status = index->indexBuildInterceptor()->sideWrite(opCtx,
+                                                           keys,
+                                                           multikeyMetadataKeys,
+                                                           multikeyPaths,
+                                                           loc,
+                                                           IndexBuildInterceptor::Op::kInsert,
+                                                           &inserted);
+        if (keysInsertedOut) {
+            *keysInsertedOut += inserted;
+        }
+    } else {
+        InsertResult result;
+        status = index->accessMethod()->insertKeys(
+            opCtx,
+            keys,
+            {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
+            multikeyPaths,
+            loc,
+            options,
+            &result);
+        if (keysInsertedOut) {
+            *keysInsertedOut += result.numInserted;
+        }
+    }
+
+    return status;
+}
+
 Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
                                                IndexCatalogEntry* index,
                                                const std::vector<BsonRecord>& bsonRecords,
@@ -1311,32 +1350,26 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
                 return status;
         }
 
-        Status status = Status::OK();
-        if (index->isHybridBuilding()) {
-            int64_t inserted;
-            status = index->indexBuildInterceptor()->sideWrite(opCtx,
-                                                               index->accessMethod(),
-                                                               bsonRecord.docPtr,
-                                                               options,
-                                                               bsonRecord.id,
-                                                               IndexBuildInterceptor::Op::kInsert,
-                                                               &inserted);
-            if (keysInsertedOut) {
-                *keysInsertedOut += inserted;
-            }
-        } else {
-            InsertResult result;
-            status = index->accessMethod()->insert(
-                opCtx, *bsonRecord.docPtr, bsonRecord.id, options, &result);
-            if (keysInsertedOut) {
-                *keysInsertedOut += result.numInserted;
-            }
-        }
+        BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+        BSONObjSet multikeyMetadataKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+        MultikeyPaths multikeyPaths;
 
+        index->accessMethod()->getKeys(
+            *bsonRecord.docPtr, options.getKeysMode, &keys, &multikeyMetadataKeys, &multikeyPaths);
+
+        Status status = _indexKeys(opCtx,
+                                   index,
+                                   {keys.begin(), keys.end()},
+                                   multikeyMetadataKeys,
+                                   multikeyPaths,
+                                   bsonRecord.id,
+                                   options,
+                                   keysInsertedOut);
         if (!status.isOK()) {
             return status;
         }
     }
+
     return Status::OK();
 }
 
@@ -1357,30 +1390,78 @@ Status IndexCatalogImpl::_indexRecords(OperationContext* opCtx,
     return _indexFilteredRecords(opCtx, index, filteredBsonRecords, keysInsertedOut);
 }
 
-Status IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
-                                        IndexCatalogEntry* index,
-                                        const BSONObj& obj,
-                                        const RecordId& loc,
-                                        bool logIfError,
-                                        int64_t* keysDeletedOut) {
+Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
+                                       IndexCatalogEntry* index,
+                                       const BSONObj& oldDoc,
+                                       const BSONObj& newDoc,
+                                       const RecordId& recordId,
+                                       int64_t* const keysInsertedOut,
+                                       int64_t* const keysDeletedOut) {
+    IndexAccessMethod* iam = index->accessMethod();
+
+    InsertDeleteOptions options;
+    prepareInsertDeleteOptions(opCtx, index->descriptor(), &options);
+
+    UpdateTicket updateTicket;
+
+    iam->prepareUpdate(opCtx, index, oldDoc, newDoc, recordId, options, &updateTicket);
+
+    int64_t keysInserted;
+    int64_t keysDeleted;
+
+    auto status = Status::OK();
+    if (index->isHybridBuilding() || !index->isReady(opCtx)) {
+        bool logIfError = false;
+        _unindexKeys(
+            opCtx, index, updateTicket.removed, oldDoc, recordId, logIfError, &keysDeleted);
+        status = _indexKeys(opCtx,
+                            index,
+                            updateTicket.added,
+                            updateTicket.newMultikeyMetadataKeys,
+                            updateTicket.newMultikeyPaths,
+                            recordId,
+                            options,
+                            &keysInserted);
+    } else {
+        status = iam->update(opCtx, updateTicket, &keysInserted, &keysDeleted);
+    }
+
+    if (!status.isOK())
+        return status;
+
+    *keysInsertedOut += keysInserted;
+    *keysDeletedOut += keysDeleted;
+
+    return Status::OK();
+}
+
+void IndexCatalogImpl::_unindexKeys(OperationContext* opCtx,
+                                    IndexCatalogEntry* index,
+                                    const std::vector<BSONObj>& keys,
+                                    const BSONObj& obj,
+                                    RecordId loc,
+                                    bool logIfError,
+                                    int64_t* const keysDeletedOut) {
     InsertDeleteOptions options;
     prepareInsertDeleteOptions(opCtx, index->descriptor(), &options);
     options.logIfError = logIfError;
 
     if (index->isHybridBuilding()) {
         int64_t removed;
-        auto status = index->indexBuildInterceptor()->sideWrite(opCtx,
-                                                                index->accessMethod(),
-                                                                &obj,
-                                                                options,
-                                                                loc,
-                                                                IndexBuildInterceptor::Op::kDelete,
-                                                                &removed);
-        if (status.isOK() && keysDeletedOut) {
+        fassert(31155,
+                index->indexBuildInterceptor()->sideWrite(
+                    opCtx,
+                    keys,
+                    SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
+                    {},
+                    loc,
+                    IndexBuildInterceptor::Op::kDelete,
+                    &removed));
+        if (keysDeletedOut) {
             *keysDeletedOut += removed;
         }
 
-        return status;
+        return;
     }
 
     // On WiredTiger, we do blind unindexing of records for efficiency.  However, when duplicates
@@ -1393,7 +1474,7 @@ Status IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
     options.dupsAllowed = options.dupsAllowed || !index->isReady(opCtx);
 
     int64_t removed;
-    Status status = index->accessMethod()->remove(opCtx, obj, loc, options, &removed);
+    Status status = index->accessMethod()->removeKeys(opCtx, keys, loc, options, &removed);
 
     if (!status.isOK()) {
         log() << "Couldn't unindex record " << redact(obj) << " from collection "
@@ -1403,8 +1484,23 @@ Status IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
     if (keysDeletedOut) {
         *keysDeletedOut += removed;
     }
+}
 
-    return Status::OK();
+void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
+                                      IndexCatalogEntry* entry,
+                                      const BSONObj& obj,
+                                      const RecordId& loc,
+                                      bool logIfError,
+                                      int64_t* keysDeletedOut) {
+    // There's no need to compute the prefixes of the indexed fields that cause the index to be
+    // multikey when removing a document since the index metadata isn't updated when keys are
+    // deleted.
+    BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+
+    entry->accessMethod()->getKeys(
+        obj, IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered, &keys, nullptr, nullptr);
+
+    _unindexKeys(opCtx, entry, {keys.begin(), keys.end()}, obj, loc, logIfError, keysDeletedOut);
 }
 
 Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
@@ -1443,41 +1539,19 @@ Status IndexCatalogImpl::updateRecord(OperationContext* const opCtx,
          it != _readyIndexes.end();
          ++it) {
         IndexCatalogEntry* entry = it->get();
-
-        IndexDescriptor* descriptor = entry->descriptor();
-        IndexAccessMethod* iam = entry->accessMethod();
-
-        InsertDeleteOptions options;
-        prepareInsertDeleteOptions(opCtx, descriptor, &options);
-
-        UpdateTicket updateTicket;
-
-        auto status = iam->validateUpdate(
-            opCtx, oldDoc, newDoc, recordId, options, &updateTicket, entry->getFilterExpression());
+        auto status =
+            _updateRecord(opCtx, entry, oldDoc, newDoc, recordId, keysInsertedOut, keysDeletedOut);
         if (!status.isOK())
             return status;
-
-        int64_t keysInserted;
-        int64_t keysDeleted;
-        status = iam->update(opCtx, updateTicket, &keysInserted, &keysDeleted);
-        if (!status.isOK())
-            return status;
-
-        *keysInsertedOut += keysInserted;
-        *keysDeletedOut += keysDeleted;
     }
 
     // Building indexes go through the interceptor.
-    BsonRecord record{recordId, Timestamp(), &newDoc};
     for (IndexCatalogEntryContainer::const_iterator it = _buildingIndexes.begin();
          it != _buildingIndexes.end();
          ++it) {
         IndexCatalogEntry* entry = it->get();
-
-        bool logIfError = false;
-        invariant(_unindexRecord(opCtx, entry, oldDoc, recordId, logIfError, keysDeletedOut));
-
-        auto status = _indexRecords(opCtx, entry, {record}, keysInsertedOut);
+        auto status =
+            _updateRecord(opCtx, entry, oldDoc, newDoc, recordId, keysInsertedOut, keysDeletedOut);
         if (!status.isOK())
             return status;
     }
@@ -1499,7 +1573,7 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
         IndexCatalogEntry* entry = it->get();
 
         bool logIfError = !noWarn;
-        invariant(_unindexRecord(opCtx, entry, obj, loc, logIfError, keysDeletedOut));
+        _unindexRecord(opCtx, entry, obj, loc, logIfError, keysDeletedOut);
     }
 
     for (IndexCatalogEntryContainer::const_iterator it = _buildingIndexes.begin();
@@ -1509,7 +1583,7 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
 
         // If it's a background index, we DO NOT want to log anything.
         bool logIfError = entry->isReady(opCtx) ? !noWarn : false;
-        invariant(_unindexRecord(opCtx, entry, obj, loc, logIfError, keysDeletedOut));
+        _unindexRecord(opCtx, entry, obj, loc, logIfError, keysDeletedOut);
     }
 }
 

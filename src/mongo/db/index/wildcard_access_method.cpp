@@ -43,9 +43,10 @@ WildcardAccessMethod::WildcardAccessMethod(IndexCatalogEntry* wildcardState,
       _keyGen(
           _descriptor->keyPattern(), _descriptor->pathProjection(), _btreeState->getCollator()) {}
 
-bool WildcardAccessMethod::shouldMarkIndexAsMultikey(const BSONObjSet& keys,
-                                                     const BSONObjSet& multikeyMetadataKeys,
-                                                     const MultikeyPaths& multikeyPaths) const {
+bool WildcardAccessMethod::shouldMarkIndexAsMultikey(
+    const std::vector<BSONObj>& keys,
+    const std::vector<BSONObj>& multikeyMetadataKeys,
+    const MultikeyPaths& multikeyPaths) const {
     return !multikeyMetadataKeys.empty();
 }
 
