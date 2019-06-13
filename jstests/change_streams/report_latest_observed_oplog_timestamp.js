@@ -1,6 +1,10 @@
 // Tests that an aggregate with a $changeStream stage will report the latest optime read in
 // the oplog by its cursor. This is information is needed in order to correctly merge the results
 // from the various shards on mongos.
+//
+// This test expects operations timestamps from a change stream to strictly increase with each
+// operation, which does not happen when the operations get grouped into a transaction.
+// @tags: [change_stream_does_not_expect_txns]
 (function() {
     "use strict";
 

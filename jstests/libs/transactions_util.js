@@ -2,6 +2,8 @@
  * Utilities for testing transactions.
  */
 var TransactionsUtil = (function() {
+    load("jstests/libs/override_methods/override_helpers.js");
+
     const kCmdsSupportingTransactions = new Set([
         'aggregate',
         'delete',
@@ -21,12 +23,21 @@ var TransactionsUtil = (function() {
         'delete',
     ]);
 
+    // Indicates an aggregation command with a pipeline that cannot run in a transaction but can
+    // still execute concurrently with other transactions. Pipelines with $changeStream or $out
+    // cannot run within a transaction.
+    function commandIsNonTxnAggregation(cmdName, cmdObj) {
+        return OverrideHelpers.isAggregationWithOutOrMergeStage(cmdName, cmdObj) ||
+            OverrideHelpers.isAggregationWithChangeStreamStage(cmdName, cmdObj);
+    }
+
     function commandSupportsTxn(dbName, cmdName, cmdObj) {
         if (cmdName === 'commitTransaction' || cmdName === 'abortTransaction') {
             return true;
         }
 
-        if (!kCmdsSupportingTransactions.has(cmdName)) {
+        if (!kCmdsSupportingTransactions.has(cmdName) ||
+            commandIsNonTxnAggregation(cmdName, cmdObj)) {
             return false;
         }
 
@@ -93,6 +104,10 @@ var TransactionsUtil = (function() {
     }
 
     return {
-        commandSupportsTxn, commandTypeCanSupportTxn, deepCopyObject, isTransientTransactionError,
+        commandIsNonTxnAggregation,
+        commandSupportsTxn,
+        commandTypeCanSupportTxn,
+        deepCopyObject,
+        isTransientTransactionError,
     };
 })();

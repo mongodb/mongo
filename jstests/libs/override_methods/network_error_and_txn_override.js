@@ -250,6 +250,12 @@
         ops = [];
     }
 
+    // The (initially empty) set of cursors belonging to aggregation operations that executed
+    // outside of a transaction. Any getMore operations on these cursors must also execute outside
+    // of a transaction. The set stores key/value pairs where the key is a cursor id and the value
+    // is the true boolean value.
+    let nonTxnAggCursorSet = {};
+
     // Set the max number of operations to run in a transaction. Once we've hit this number of
     // operations, we will commit the transaction. This is to prevent having to retry an extremely
     // long running transaction.
@@ -381,8 +387,11 @@
                 shouldForceWriteConcern = false;
             }
         } else if (cmdName === "aggregate") {
-            if (OverrideHelpers.isAggregationWithListLocalSessionsStage(cmdName, cmdObj)) {
-                // The $listLocalSessions stage can only be used with readConcern={level: "local"}.
+            if (OverrideHelpers.isAggregationWithListLocalSessionsStage(cmdName, cmdObj) ||
+                OverrideHelpers.isAggregationWithChangeStreamStage(cmdName, cmdObj)) {
+                // The $listLocalSessions stage can only be used with readConcern={level: "local"},
+                // and the $changeStream stage can only be used with
+                // readConcern={level: "majority"}.
                 shouldForceReadConcern = false;
             }
 
@@ -573,6 +582,12 @@
         }
     }
 
+    // Returns true iff a command is a "getMore" on a cursor that is in the `nonTxnAggCursorSet`
+    // dictionary of cursors that were created outside of any transaction.
+    function isCommandNonTxnGetMore(cmdName, cmdObj) {
+        return cmdName === "getMore" && nonTxnAggCursorSet[cmdObj.getMore];
+    }
+
     function setupTransactionCommand(conn, dbName, cmdName, cmdObj, lsid) {
         // We want to overwrite whatever read and write concern is already set.
         delete cmdObj.readConcern;
@@ -583,7 +598,8 @@
         const driverSession = conn.getDB(dbName).getSession();
         const commandSupportsTransaction =
             TransactionsUtil.commandSupportsTxn(dbName, cmdName, cmdObj);
-        if (commandSupportsTransaction && driverSession.getSessionId() !== null) {
+        if (commandSupportsTransaction && driverSession.getSessionId() !== null &&
+            !isCommandNonTxnGetMore(cmdName, cmdObj)) {
             if (isNested()) {
                 // Nested commands should never start a new transaction.
             } else if (ops.length === 0) {
@@ -966,6 +982,11 @@
                 if (configuredForTxnOverride()) {
                     logMsgFull("Override got response",
                                `res: ${tojsononeline(res)}, cmd: ${tojsononeline(cmdObj)}`);
+
+                    if (!hasError(res) &&
+                        TransactionsUtil.commandIsNonTxnAggregation(cmdName, cmdObj)) {
+                        nonTxnAggCursorSet[res.cursor.id] = true;
+                    }
                 }
 
                 const logError = (msg) => logErrorFull(msg, cmdName, cmdObj, res);

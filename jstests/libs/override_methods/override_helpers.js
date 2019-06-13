@@ -101,6 +101,7 @@ var OverrideHelpers = (function() {
         isAggregationWithListLocalSessionsStage:
             makeIsAggregationWithFirstStage("$listLocalSessions"),
         isAggregationWithOutOrMergeStage: isAggregationWithOutOrMergeStage,
+        isAggregationWithChangeStreamStage: makeIsAggregationWithFirstStage("$changeStream"),
         isMapReduceWithInlineOutput: isMapReduceWithInlineOutput,
         prependOverrideInParallelShell: prependOverrideInParallelShell,
         overrideRunCommand: overrideRunCommand,
