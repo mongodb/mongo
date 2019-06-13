@@ -134,7 +134,9 @@ public:
         Date_t lastWriteDate{};            // from isMasterReply
         Date_t lastWriteDateUpdateTime{};  // set to the local system's time at the time of updating
                                            // lastWriteDate
-        repl::OpTime opTime{};             // from isMasterReply
+        Date_t nextPossibleIsMasterCall{};  // time that previous isMaster check ended
+        executor::TaskExecutor::CallbackHandle scheduledIsMasterHandle;  //
+        repl::OpTime opTime{};                                           // from isMasterReply
     };
 
     using Nodes = std::vector<Node>;

@@ -298,5 +298,67 @@ TEST_F(ReplicaSetMonitorConcurrentTest, StepdownAndElection) {
         advanceTime(Milliseconds(100));
     }
 }
+
+// Check that isMaster is being called at most every 500ms.
+//
+// 1. Create a replica set with two secondaries, Node 0 and Node 1
+// 2. Begin a ReplicaSetMonitor::getHostOrRefresh call with primaryOnly
+// 3. Node 0 responds but Node 1 does not
+// 4. After 0.5s call ReplicaSetMonitor::getHostOrRefresh again
+TEST_F(ReplicaSetMonitorConcurrentTest, IsMasterFrequency) {
+    MockReplicaSet replSet("test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
+    const auto node0 = HostAndPort(replSet.getSecondaries()[0]);
+    const auto node1 = HostAndPort(replSet.getSecondaries()[1]);
+
+    auto state = std::make_shared<ReplicaSetMonitor::SetState>(
+        replSet.getURI(), &getNotifier(), &getExecutor());
+    auto monitor = std::make_shared<ReplicaSetMonitor>(state);
+
+    // Node 1 is unresponsive.
+    replSet.kill(replSet.getSecondaries()[1]);
+    monitor->init();
+
+    std::vector<SemiFuture<HostAndPort>> primaryFutures;
+    primaryFutures.push_back(monitor->getHostOrRefresh(primaryOnly, Seconds(4)));
+
+    // Because Node 1 is unresponsive, the monitor rechecks Node 0 every 500ms
+    // until Node 1 times out after 5 seconds.
+    auto checkUntil = [&](auto timeToStop, auto func) {
+        while (elapsed() < timeToStop) {
+            processReadyRequests(replSet);
+            func();
+            // all primaryFutures are not ready, because the monitor cannot find the primary
+            for (SemiFuture<HostAndPort>& future : primaryFutures) {
+                ASSERT(!future.isReady());
+            }
+            advanceTime(Milliseconds(100));
+        }
+    };
+
+    // Up until 500ms there is only one isMaster call.
+    // At 500ms, the monitor rechecks node 0.
+    checkUntil(Milliseconds(500), [&]() {
+        ASSERT_EQ(getNumChecks(node0), 1);
+        ASSERT_EQ(getNumChecks(node1), 1);
+    });
+
+    // Triggers isMaster calls that will be delayed until 1000ms
+    checkUntil(Milliseconds(1000), [&]() {
+        // this should schedule a new isMaster call at 1000ms and cancel the
+        // previous job scheduled for the same time
+        primaryFutures.push_back(monitor->getHostOrRefresh(primaryOnly, Seconds(4)));
+        ASSERT_EQ(getNumChecks(node0), 2);
+        ASSERT_EQ(getNumChecks(node1), 1);
+    });
+
+    // At 1000ms, only one scheduled isMaster call runs, because all others have been canceled
+    checkUntil(Milliseconds(1500), [&]() {
+        ASSERT_EQ(getNumChecks(node0), 3);
+        ASSERT_EQ(getNumChecks(node1), 1);
+    });
+
+    // TODO: advanceTime(Seconds(5)) and getNoThrow() each entry in primaryFutures once
+    // race conditions in RSM expedited scans are fixed
+}
 }  // namespace
 }  // namespace mongo

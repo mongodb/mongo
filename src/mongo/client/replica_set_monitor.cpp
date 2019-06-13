@@ -511,7 +511,25 @@ void Refresher::scheduleNetworkRequests(WithLock withLock) {
         if (ns.step != Refresher::NextStep::CONTACT_HOST)
             break;
 
-        scheduleIsMaster(ns.host, withLock);
+        // cancel any scheduled isMaster calls that haven't yet been called
+        Node* node = _set->findOrCreateNode(ns.host);
+        if (node->scheduledIsMasterHandle) {
+            _set->executor->cancel(node->scheduledIsMasterHandle);
+        }
+
+        // ensure that the call to isMaster is scheduled at most every 500ms
+        if (_set->executor && (_set->executor->now() < node->nextPossibleIsMasterCall) &&
+            !_set->isMocked) {
+            // schedule a new call
+            node->scheduledIsMasterHandle = uassertStatusOK(_set->executor->scheduleWorkAt(
+                node->nextPossibleIsMasterCall,
+                [ *this, host = ns.host ](const CallbackArgs& cbArgs) mutable {
+                    stdx::lock_guard lk(_set->mutex);
+                    scheduleIsMaster(host, lk);
+                }));
+        } else {
+            scheduleIsMaster(ns.host, withLock);
+        }
     }
 
     DEV _set->checkInvariants();
@@ -544,7 +562,6 @@ void Refresher::scheduleIsMaster(const HostAndPort& host, WithLock withLock) {
                                                   nullptr,
                                                   Milliseconds(int64_t(socketTimeoutSecs * 1000)));
     request.sslMode = _set->setUri.getSSLMode();
-
     auto status =
         _set->executor
             ->scheduleRemoteCommand(
@@ -669,6 +686,14 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
     if (!reply.ok) {
         failedHost(from, {ErrorCodes::CommandFailed, "Failed to execute 'ismaster' command"});
         return;
+    }
+
+    // ensure that isMaster calls occur at most 500ms after the previous call ended
+    if (_set->executor) {
+        Node* node = _set->findNode(from);
+        if (node) {
+            node->nextPossibleIsMasterCall = _set->executor->now() + Milliseconds(500);
+        }
     }
 
     if (reply.setName != _set->name) {
