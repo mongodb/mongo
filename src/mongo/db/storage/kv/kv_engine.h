@@ -399,6 +399,13 @@ public:
     }
 
     /**
+     * See `StorageEngine::supportsOplogStones`
+     */
+    virtual bool supportsOplogStones() const {
+        return false;
+    }
+
+    /**
      * See `StorageEngine::replicationBatchIsComplete()`
      */
     virtual void replicationBatchIsComplete() const {};

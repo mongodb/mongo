@@ -236,6 +236,8 @@ public:
 
     bool supportsReadConcernSnapshot() const final override;
 
+    bool supportsOplogStones() const final override;
+
     /*
      * This function is called when replication has completed a batch.  In this function, we
      * refresh our oplog visiblity read-at-timestamp value.
@@ -288,21 +290,6 @@ public:
     WiredTigerOplogManager* getOplogManager() const {
         return _oplogManager.get();
     }
-
-    /**
-     * Sets the implementation for `initRsOplogBackgroundThread` (allowing tests to skip the
-     * background job, for example). Intended to be called from a MONGO_INITIALIZER and therefore in
-     * a single threaded context.
-     */
-    static void setInitRsOplogBackgroundThreadCallback(std::function<bool(StringData)> cb);
-
-    /**
-     * Initializes a background job to remove excess documents in the oplog collections.
-     * This applies to the capped collections in the local.oplog.* namespaces (specifically
-     * local.oplog.rs for replica sets).
-     * Returns true if a background job is running for the namespace.
-     */
-    static bool initRsOplogBackgroundThread(StringData ns);
 
     static void appendGlobalStats(BSONObjBuilder& b);
 

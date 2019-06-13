@@ -500,10 +500,6 @@ Status OpenReadTransactionParam::setFromString(const std::string& str) {
 
 namespace {
 
-std::function<bool(StringData)> initRsOplogBackgroundThreadCallback = [](StringData) -> bool {
-    fassertFailed(40358);
-};
-
 StatusWith<std::vector<std::string>> getDataFilesFromBackupCursor(WT_CURSOR* cursor,
                                                                   std::string dbPath,
                                                                   const char* statusPrefix) {
@@ -1549,15 +1545,6 @@ void WiredTigerKVEngine::setJournalListener(JournalListener* jl) {
     return _sessionCache->setJournalListener(jl);
 }
 
-void WiredTigerKVEngine::setInitRsOplogBackgroundThreadCallback(
-    std::function<bool(StringData)> cb) {
-    initRsOplogBackgroundThreadCallback = std::move(cb);
-}
-
-bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
-    return initRsOplogBackgroundThreadCallback(ns);
-}
-
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
@@ -1905,6 +1892,10 @@ bool WiredTigerKVEngine::supportsReadConcernSnapshot() const {
 
 bool WiredTigerKVEngine::supportsReadConcernMajority() const {
     return _keepDataHistory;
+}
+
+bool WiredTigerKVEngine::supportsOplogStones() const {
+    return true;
 }
 
 void WiredTigerKVEngine::startOplogManager(OperationContext* opCtx,

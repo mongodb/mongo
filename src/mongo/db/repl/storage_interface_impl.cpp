@@ -75,7 +75,9 @@
 #include "mongo/db/repl/rollback_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/oplog_cap_maintainer_thread.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/background.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
@@ -1089,6 +1091,18 @@ bool StorageInterfaceImpl::supportsRecoverToStableTimestamp(ServiceContext* serv
 
 bool StorageInterfaceImpl::supportsRecoveryTimestamp(ServiceContext* serviceCtx) const {
     return serviceCtx->getStorageEngine()->supportsRecoveryTimestamp();
+}
+
+void StorageInterfaceImpl::initializeStorageControlsForReplication(
+    ServiceContext* serviceCtx) const {
+    // The storage engine may support the use of OplogStones to more finely control
+    // oplog history deletion, in which case we need to start the thread to
+    // periodically execute deletion via oplog stones. OplogStones are a replacement
+    // for capped collection deletion of the oplog collection history.
+    if (serviceCtx->getStorageEngine()->supportsOplogStones()) {
+        BackgroundJob* backgroundThread = new OplogCapMaintainerThread();
+        backgroundThread->go();
+    }
 }
 
 boost::optional<Timestamp> StorageInterfaceImpl::getRecoveryTimestamp(

@@ -767,7 +767,8 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
     if (_sizeStorer)
         _sizeStorer->store(_uri, _sizeInfo);
 
-    if (WiredTigerKVEngine::initRsOplogBackgroundThread(ns())) {
+    if (NamespaceString::oplog(ns()) &&
+        !(storageGlobalParams.repair || storageGlobalParams.readOnly)) {
         _oplogStones = std::make_shared<OplogStones>(opCtx, this);
     }
 

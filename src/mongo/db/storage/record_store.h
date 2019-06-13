@@ -560,6 +560,24 @@ public:
                       "this storage engine does not support updateCappedSize");
     }
 
+    /**
+     * Returns false if the oplog was dropped while waiting for a deletion request.
+     * This should only be called if StorageEngine::supportsOplogStones() is true.
+     * Storage engines supporting oplog stones must implement this function.
+     */
+    virtual bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx) {
+        MONGO_UNREACHABLE;
+    }
+
+    /**
+     * This should only be called if StorageEngine::supportsOplogStones() is true.
+     * Storage engines supporting oplog stones must implement this function.
+     */
+    virtual void reclaimOplog(OperationContext* opCtx) {
+        MONGO_UNREACHABLE;
+    }
+
+
 protected:
     std::string _ns;
 };

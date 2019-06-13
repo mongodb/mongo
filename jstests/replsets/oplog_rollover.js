@@ -54,9 +54,9 @@
         // happen when oplog size exceeds the configured maximum.
         if (primary.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
             // Wait for checkpointing/stable timestamp to catch up with the second insert so oplog
-            // entry of the first insert is allowed to be deleted by the oplog truncater thread when
-            // a new oplog stone is created. "inMemory" WT engine does not run checkpoint thread and
-            // lastStableRecoveryTimestamp is the stable timestamp in this case.
+            // entry of the first insert is allowed to be deleted by the oplog cap maintainer thread
+            // when a new oplog stone is created. "inMemory" WT engine does not run checkpoint
+            // thread and lastStableRecoveryTimestamp is the stable timestamp in this case.
             assert.soon(
                 () => {
                     const primaryTimestamp =
@@ -81,14 +81,14 @@
                 2000);
 
             // Insert the third document which will trigger a new oplog stone to be created. The
-            // oplog truncater thread will then be unblocked on the creation of the new oplog stone
-            // and will start truncating oplog entries. The oplog entry for the first insert will be
-            // truncated after the oplog truncater thread finishes.
+            // oplog cap maintainer thread will then be unblocked on the creation of the new oplog
+            // stone and will start truncating oplog entries. The oplog entry for the first
+            // insert will be truncated after the oplog cap maintainer thread finishes.
             assert.commandWorked(
                 coll.insert({_id: 2, longString: longString}, {writeConcern: {w: 2}}));
 
             // Test that oplog entry of the initial insert rolls over on both primary and secondary.
-            // Use assert.soon to wait for oplog truncater thread to run.
+            // Use assert.soon to wait for oplog cap maintainer thread to run.
             assert.soon(() => {
                 return numInsertOplogEntry(primaryOplog) === 2;
             }, "Timeout waiting for oplog to roll over on primary");

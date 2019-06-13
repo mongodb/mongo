@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,26 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/base/init.h"
+#include <string>
+
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-
-#include <memory>
+#include "mongo/util/background.h"
 
 namespace mongo {
-namespace {
 
-bool initRsOplogBackgroundThread(StringData ns) {
-    return NamespaceString::oplog(ns);
-}
+/**
+ * Responsible for deleting oplog stones once their max capacity has been reached.
+ */
+class OplogCapMaintainerThread : public BackgroundJob {
+public:
+    OplogCapMaintainerThread() : BackgroundJob(true /* deleteSelf */) {}
 
-MONGO_INITIALIZER(SetInitRsOplogBackgroundThreadCallback)(InitializerContext* context) {
-    WiredTigerKVEngine::setInitRsOplogBackgroundThreadCallback(initRsOplogBackgroundThread);
-    return Status::OK();
-}
+    virtual std::string name() const {
+        return _name;
+    }
 
-}  // namespace
+    virtual void run();
+
+private:
+    /**
+     * Returns true iff there was an oplog to delete from.
+     */
+    bool _deleteExcessDocuments();
+
+    std::string _name =
+        std::string("OplogCapMaintainerThread-") + NamespaceString::kRsOplogNamespace.toString();
+};
+
 }  // namespace mongo

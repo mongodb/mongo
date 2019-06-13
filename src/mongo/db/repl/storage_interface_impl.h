@@ -166,6 +166,8 @@ public:
 
     bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const override;
 
+    void initializeStorageControlsForReplication(ServiceContext* serviceCtx) const override;
+
     boost::optional<Timestamp> getRecoveryTimestamp(ServiceContext* serviceCtx) const override;
 
     bool supportsDocLocking(ServiceContext* serviceCtx) const override;

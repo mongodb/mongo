@@ -811,8 +811,11 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
         _setConfigState_inlock(kConfigReplicationDisabled);
         return;
     }
+
     invariant(_settings.usingReplSets());
     invariant(!ReplSettings::shouldRecoverFromOplogAsStandalone());
+
+    _storage->initializeStorageControlsForReplication(opCtx->getServiceContext());
 
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);

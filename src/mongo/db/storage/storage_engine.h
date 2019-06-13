@@ -353,6 +353,15 @@ public:
     }
 
     /**
+     * Returns true if the storage engine uses oplog stones to more finely control
+     * deletion of oplog history, instead of the standard capped collection controls on
+     * the oplog collection size.
+     */
+    virtual bool supportsOplogStones() const {
+        return false;
+    }
+
+    /**
      * Returns true if the storage engine supports deferring collection drops until the the storage
      * engine determines that the storage layer artifacts for the pending drops are no longer needed
      * based on the stable and oldest timestamps.

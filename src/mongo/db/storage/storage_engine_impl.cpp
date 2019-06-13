@@ -788,6 +788,10 @@ bool StorageEngineImpl::supportsReadConcernMajority() const {
     return _engine->supportsReadConcernMajority();
 }
 
+bool StorageEngineImpl::supportsOplogStones() const {
+    return _engine->supportsOplogStones();
+}
+
 bool StorageEngineImpl::supportsPendingDrops() const {
     return supportsReadConcernMajority();
 }
