@@ -123,10 +123,10 @@ DBCollection.prototype.help = function() {
         ".update( query, <update object or pipeline>[, upsert_bool, multi_bool] ) - instead of two flags, you can pass an object with fields: upsert, multi");
     print(
         "\tdb." + shortName +
-        ".updateOne( filter, <update object or pipeline>, <optional params> ) - update the first matching document, optional parameters are: upsert, w, wtimeout, j");
+        ".updateOne( filter, <update object or pipeline>, <optional params> ) - update the first matching document, optional parameters are: upsert, w, wtimeout, j, hint");
     print(
         "\tdb." + shortName +
-        ".updateMany( filter, <update object or pipeline>, <optional params> ) - update all matching documents, optional parameters are: upsert, w, wtimeout, j");
+        ".updateMany( filter, <update object or pipeline>, <optional params> ) - update all matching documents, optional parameters are: upsert, w, wtimeout, j, hint");
     print("\tdb." + shortName + ".validate( <full> ) - SLOW");
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName +
@@ -449,6 +449,8 @@ DBCollection.prototype._parseUpdate = function(query, updateSpec, upsert, multi)
     var wc = undefined;
     var collation = undefined;
     var arrayFilters = undefined;
+    let hint = undefined;
+
     // can pass options via object for improved readability
     if (typeof(upsert) === "object") {
         if (multi) {
@@ -462,6 +464,7 @@ DBCollection.prototype._parseUpdate = function(query, updateSpec, upsert, multi)
         upsert = opts.upsert;
         collation = opts.collation;
         arrayFilters = opts.arrayFilters;
+        hint = opts.hint;
     }
 
     // Normalize 'upsert' and 'multi' to booleans.
@@ -475,6 +478,7 @@ DBCollection.prototype._parseUpdate = function(query, updateSpec, upsert, multi)
     return {
         "query": query,
         "updateSpec": updateSpec,
+        "hint": hint,
         "upsert": upsert,
         "multi": multi,
         "wc": wc,
@@ -489,6 +493,7 @@ DBCollection.prototype.update = function(query, updateSpec, upsert, multi) {
     var parsed = this._parseUpdate(query, updateSpec, upsert, multi);
     var query = parsed.query;
     var updateSpec = parsed.updateSpec;
+    const hint = parsed.hint;
     var upsert = parsed.upsert;
     var multi = parsed.multi;
     var wc = parsed.wc;
@@ -502,6 +507,10 @@ DBCollection.prototype.update = function(query, updateSpec, upsert, multi) {
     if (this.getMongo().writeMode() != "legacy") {
         var bulk = this.initializeOrderedBulkOp();
         var updateOp = bulk.find(query);
+
+        if (hint) {
+            updateOp.hint(hint);
+        }
 
         if (upsert) {
             updateOp = updateOp.upsert();

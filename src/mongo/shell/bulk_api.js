@@ -668,6 +668,11 @@ var _bulk_api_module = (function() {
                 var document =
                     {q: currentOp.selector, u: updateDocument, multi: true, upsert: upsert};
 
+                // Copy over the hint, if we have one.
+                if (currentOp.hasOwnProperty('hint')) {
+                    document.hint = currentOp.hint;
+                }
+
                 // Copy over the collation, if we have one.
                 if (currentOp.hasOwnProperty('collation')) {
                     document.collation = currentOp.collation;
@@ -690,6 +695,11 @@ var _bulk_api_module = (function() {
                 // Establish the update command
                 var document =
                     {q: currentOp.selector, u: updateDocument, multi: false, upsert: upsert};
+
+                // Copy over the hint, if we have one.
+                if (currentOp.hasOwnProperty('hint')) {
+                    document.hint = currentOp.hint;
+                }
 
                 // Copy over the collation, if we have one.
                 if (currentOp.hasOwnProperty('collation')) {
@@ -718,6 +728,11 @@ var _bulk_api_module = (function() {
             upsert: function() {
                 currentOp.upsert = true;
                 // Return the findOperations
+                return findOperations;
+            },
+
+            hint: function(hint) {
+                currentOp.hint = hint;
                 return findOperations;
             },
 

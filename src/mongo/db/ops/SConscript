@@ -37,6 +37,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/db/pipeline/runtime_constants_idl',
+        '$BUILD_DIR/mongo/db/query/hint_parser',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )

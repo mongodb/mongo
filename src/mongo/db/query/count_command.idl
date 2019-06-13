@@ -33,14 +33,9 @@ global:
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/db/query/hint.idl"
 
 types:
-    indexHint:
-        bson_serialization_type: any
-        description: "Either a string index name or an object index specification."
-        cpp_type: mongo::BSONObj
-        deserializer: ::mongo::count_request::countParseHint
-
     countLimit:
         bson_serialization_type: any
         description: "The absolute value of an int for limit."

@@ -1035,27 +1035,31 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     driver->refreshIndexKeys(&updateIndexData);
 
     if (!parsedUpdate->hasParsedQuery()) {
-        // This is the idhack fast-path for getting a PlanExecutor without doing the work
-        // to create a CanonicalQuery.
-        const BSONObj& unparsedQuery = request->getQuery();
 
-        const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
+        // Only consider using the idhack if no hint was provided.
+        if (request->getHint().isEmpty()) {
+            // This is the idhack fast-path for getting a PlanExecutor without doing the work
+            // to create a CanonicalQuery.
+            const BSONObj& unparsedQuery = request->getQuery();
 
-        const bool hasCollectionDefaultCollation = CollatorInterface::collatorsMatch(
-            parsedUpdate->getCollator(), collection->getDefaultCollator());
+            const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
 
-        if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-            request->getProj().isEmpty() && hasCollectionDefaultCollation) {
-            LOG(2) << "Using idhack: " << redact(unparsedQuery);
+            const bool hasCollectionDefaultCollation = CollatorInterface::collatorsMatch(
+                parsedUpdate->getCollator(), collection->getDefaultCollator());
 
-            // Working set 'ws' is discarded. InternalPlanner::updateWithIdHack() makes its own
-            // WorkingSet.
-            return InternalPlanner::updateWithIdHack(opCtx,
-                                                     collection,
-                                                     updateStageParams,
-                                                     descriptor,
-                                                     unparsedQuery["_id"].wrap(),
-                                                     policy);
+            if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
+                request->getProj().isEmpty() && hasCollectionDefaultCollation) {
+                LOG(2) << "Using idhack: " << redact(unparsedQuery);
+
+                // Working set 'ws' is discarded. InternalPlanner::updateWithIdHack() makes its own
+                // WorkingSet.
+                return InternalPlanner::updateWithIdHack(opCtx,
+                                                         collection,
+                                                         updateStageParams,
+                                                         descriptor,
+                                                         unparsedQuery["_id"].wrap(),
+                                                         policy);
+            }
         }
 
         // If we're here then we don't have a parsed query, but we're also not eligible for
