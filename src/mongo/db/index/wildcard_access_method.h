@@ -56,8 +56,7 @@ public:
      */
     static FieldRef extractMultikeyPathFromIndexKey(const IndexKeyEntry& entry);
 
-    WildcardAccessMethod(IndexCatalogEntry* wildcardState,
-                         std::unique_ptr<SortedDataInterface> btree);
+    WildcardAccessMethod(IndexCatalogEntry* wildcardState, SortedDataInterface* btree);
 
     /**
      * Returns 'true' if the index should become multikey on the basis of the passed arguments.

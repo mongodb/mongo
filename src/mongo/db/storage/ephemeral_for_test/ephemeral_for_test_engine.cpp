@@ -92,8 +92,9 @@ Status EphemeralForTestEngine::createSortedDataInterface(OperationContext* opCtx
     return Status::OK();
 }
 
-std::unique_ptr<SortedDataInterface> EphemeralForTestEngine::getSortedDataInterface(
-    OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
+SortedDataInterface* EphemeralForTestEngine::getSortedDataInterface(OperationContext* opCtx,
+                                                                    StringData ident,
+                                                                    const IndexDescriptor* desc) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return getEphemeralForTestBtreeImpl(Ordering::make(desc->keyPattern()),
                                         desc->unique(),

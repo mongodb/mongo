@@ -38,8 +38,8 @@ public:
     IndexAccessMethodFactoryImpl() = default;
     ~IndexAccessMethodFactoryImpl() = default;
 
-    std::unique_ptr<IndexAccessMethod> make(
-        IndexCatalogEntry* entry, std::unique_ptr<SortedDataInterface> SortedDataInterface) final;
+    std::unique_ptr<IndexAccessMethod> make(IndexCatalogEntry* entry,
+                                            SortedDataInterface* SortedDataInterface) final;
 };
 
 }  // namespace mongo

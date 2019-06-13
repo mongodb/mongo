@@ -42,7 +42,7 @@ struct TwoDIndexingParams;
 
 class TwoDAccessMethod : public AbstractIndexAccessMethod {
 public:
-    TwoDAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
+    TwoDAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 
 private:
     const IndexDescriptor* getDescriptor() {

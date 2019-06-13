@@ -364,8 +364,8 @@ public:
     static void set(ServiceContext* service,
                     std::unique_ptr<IndexAccessMethodFactory> collectionFactory);
 
-    virtual std::unique_ptr<IndexAccessMethod> make(
-        IndexCatalogEntry* entry, std::unique_ptr<SortedDataInterface> sortedDataInterface) = 0;
+    virtual std::unique_ptr<IndexAccessMethod> make(IndexCatalogEntry* entry,
+                                                    SortedDataInterface* sortedDataInterface) = 0;
 };
 
 /**
@@ -449,8 +449,7 @@ public:
     static std::pair<std::vector<BSONObj>, std::vector<BSONObj>> setDifference(
         const BSONObjSet& left, const BSONObjSet& right);
 
-    AbstractIndexAccessMethod(IndexCatalogEntry* btreeState,
-                              std::unique_ptr<SortedDataInterface> btree);
+    AbstractIndexAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 
     Status insert(OperationContext* opCtx,
                   const BSONObj& obj,

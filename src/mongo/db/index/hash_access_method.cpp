@@ -36,9 +36,8 @@
 
 namespace mongo {
 
-HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState,
-                                   std::unique_ptr<SortedDataInterface> btree)
-    : AbstractIndexAccessMethod(btreeState, std::move(btree)) {
+HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
+    : AbstractIndexAccessMethod(btreeState, btree) {
     const IndexDescriptor* descriptor = btreeState->descriptor();
 
     // We can change these if the single-field limitation is lifted later.

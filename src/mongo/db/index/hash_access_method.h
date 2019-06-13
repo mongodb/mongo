@@ -46,7 +46,7 @@ class CollatorInterface;
  */
 class HashAccessMethod : public AbstractIndexAccessMethod {
 public:
-    HashAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
+    HashAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 
 private:
     /**

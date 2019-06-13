@@ -131,10 +131,8 @@ private:
 };
 
 AbstractIndexAccessMethod::AbstractIndexAccessMethod(IndexCatalogEntry* btreeState,
-                                                     std::unique_ptr<SortedDataInterface> btree)
-    : _btreeState(btreeState),
-      _descriptor(btreeState->descriptor()),
-      _newInterface(std::move(btree)) {
+                                                     SortedDataInterface* btree)
+    : _btreeState(btreeState), _descriptor(btreeState->descriptor()), _newInterface(btree) {
     verify(IndexDescriptor::isIndexVersionSupported(_descriptor->version()));
 }
 

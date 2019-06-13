@@ -40,12 +40,11 @@ class IndexCatalogEntry;
  * Caller takes ownership.
  * All permanent data will be stored and fetch from dataInOut.
  */
-std::unique_ptr<SortedDataInterface> getEphemeralForTestBtreeImpl(
-    const Ordering& ordering,
-    bool isUnique,
-    const NamespaceString& collectionNamespace,
-    const std::string& indexName,
-    const BSONObj& keyPattern,
-    std::shared_ptr<void>* dataInOut);
+SortedDataInterface* getEphemeralForTestBtreeImpl(const Ordering& ordering,
+                                                  bool isUnique,
+                                                  const NamespaceString& collectionNamespace,
+                                                  const std::string& indexName,
+                                                  const BSONObj& keyPattern,
+                                                  std::shared_ptr<void>* dataInOut);
 
 }  // namespace mongo
