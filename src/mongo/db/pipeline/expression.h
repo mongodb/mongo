@@ -1540,8 +1540,8 @@ public:
         return visitor->visit(this);
     }
 
-    auto getVariableId() const {
-        return _variable;
+    auto& getVariableMap() const {
+        return _variables;
     }
 
 protected:
