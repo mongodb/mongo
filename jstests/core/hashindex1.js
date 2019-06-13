@@ -9,23 +9,25 @@ t.drop();
 // Include helpers for analyzing explain output.
 load("jstests/libs/analyze_plan.js");
 
+assert.commandWorked(db.createCollection(t.getName()));
+
 // test non-single field hashed indexes don't get created (maybe change later)
 var badspec = {a: "hashed", b: 1};
-t.ensureIndex(badspec);
+assert.commandFailedWithCode(t.ensureIndex(badspec), 16763);
 assert.eq(t.getIndexes().length, 1, "only _id index should be created");
 
 // test unique index not created (maybe change later)
 var goodspec = {a: "hashed"};
-t.ensureIndex(goodspec, {"unique": true});
+assert.commandFailedWithCode(t.ensureIndex(goodspec, {"unique": true}), 16764);
 assert.eq(t.getIndexes().length, 1, "unique index got created.");
 
 // now test that non-unique index does get created
-t.ensureIndex(goodspec);
+assert.commandWorked(t.ensureIndex(goodspec));
 assert.eq(t.getIndexes().length, 2, "hashed index didn't get created");
 
 // test basic inserts
 for (i = 0; i < 10; i++) {
-    t.insert({a: i});
+    assert.commandWorked(t.insert({a: i}));
 }
 assert.eq(t.find().count(), 10, "basic insert didn't work");
 assert.eq(t.find().hint(goodspec).toArray().length, 10, "basic insert didn't work");
@@ -34,7 +36,7 @@ assert.eq(t.find({a: 3}).hint({_id: 1}).toArray()[0]._id,
           "hashindex lookup didn't work");
 
 // make sure things with the same hash are not both returned
-t.insert({a: 3.1});
+assert.commandWorked(t.insert({a: 3.1}));
 assert.eq(t.find().count(), 11, "additional insert didn't work");
 assert.eq(t.find({a: 3.1}).hint(goodspec).toArray().length, 1);
 assert.eq(t.find({a: 3}).hint(goodspec).toArray().length, 1);
@@ -68,7 +70,7 @@ assert(isIxscan(db, explain.queryPlanner.winningPlan), "not using hashed index")
 
 // test creation of index based on hash of _id index
 var goodspec2 = {'_id': "hashed"};
-t.ensureIndex(goodspec2);
+assert.commandWorked(t.ensureIndex(goodspec2));
 assert.eq(t.getIndexes().length, 3, "_id index didn't get created");
 
 var newid = t.findOne()["_id"];
@@ -78,12 +80,12 @@ assert.eq(t.find({_id: newid}).hint({_id: 1}).toArray()[0]._id,
 
 // test creation of sparse hashed index
 var sparseindex = {b: "hashed"};
-t.ensureIndex(sparseindex, {"sparse": true});
+assert.commandWorked(t.ensureIndex(sparseindex, {"sparse": true}));
 assert.eq(t.getIndexes().length, 4, "sparse index didn't get created");
 
 // test sparse index has smaller total items on after inserts
 for (i = 0; i < 10; i++) {
-    t.insert({b: i});
+    assert.commandWorked(t.insert({b: i}));
 }
 var totalb = t.find().hint(sparseindex).toArray().length;
 assert.eq(totalb, 10, "sparse index has wrong total");
