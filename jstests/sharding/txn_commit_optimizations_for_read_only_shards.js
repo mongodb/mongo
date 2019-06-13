@@ -40,7 +40,7 @@
 
     const defaultCommitCommand = {
         commitTransaction: 1,
-        writeConcern: {w: "majority", wtimeout: 3000}
+        writeConcern: {w: "majority", wtimeout: 6000}
     };
     const noop = () => {};
 
