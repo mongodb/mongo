@@ -869,7 +869,15 @@ public:
             InsertDeleteOptions options;
             options.dupsAllowed = true;
             options.logIfError = true;
-            auto removeStatus = iam->remove(&_opCtx, actualKey, id1, options, &numDeleted);
+
+            BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+            iam->getKeys(actualKey,
+                         IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         &keys,
+                         nullptr,
+                         nullptr);
+            auto removeStatus =
+                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
             auto insertStatus = iam->insert(&_opCtx, badKey, id1, options, &insertResult);
 
             ASSERT_EQUALS(numDeleted, 1);
@@ -1297,7 +1305,15 @@ public:
             InsertDeleteOptions options;
             options.logIfError = true;
             options.dupsAllowed = true;
-            auto removeStatus = iam->remove(&_opCtx, actualKey, rid, options, &numDeleted);
+
+            BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+            iam->getKeys(actualKey,
+                         IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         &keys,
+                         nullptr,
+                         nullptr);
+            auto removeStatus =
+                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);

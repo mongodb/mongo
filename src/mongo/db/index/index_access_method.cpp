@@ -190,12 +190,18 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
     // Delegate to the subclass.
     getKeys(obj, options.getKeysMode, &keys, &multikeyMetadataKeys, &multikeyPaths);
 
-    return insertKeys(opCtx, keys, multikeyMetadataKeys, multikeyPaths, loc, options, result);
+    return insertKeys(opCtx,
+                      {keys.begin(), keys.end()},
+                      {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
+                      multikeyPaths,
+                      loc,
+                      options,
+                      result);
 }
 
 Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
-                                             const BSONObjSet& keys,
-                                             const BSONObjSet& multikeyMetadataKeys,
+                                             const vector<BSONObj>& keys,
+                                             const vector<BSONObj>& multikeyMetadataKeys,
                                              const MultikeyPaths& multikeyPaths,
                                              const RecordId& loc,
                                              const InsertDeleteOptions& options,
@@ -205,9 +211,9 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
     // Add all new data keys, and all new multikey metadata keys, into the index. When iterating
     // over the data keys, each of them should point to the doc's RecordId. When iterating over
     // the multikey metadata keys, they should point to the reserved 'kMultikeyMetadataKeyId'.
-    for (const auto keySet : {&keys, &multikeyMetadataKeys}) {
-        const auto& recordId = (keySet == &keys ? loc : kMultikeyMetadataKeyId);
-        for (const auto& key : *keySet) {
+    for (const auto keyVec : {&keys, &multikeyMetadataKeys}) {
+        const auto& recordId = (keyVec == &keys ? loc : kMultikeyMetadataKeyId);
+        for (const auto& key : *keyVec) {
             Status status = checkIndexKeySize ? checkKeySize(key) : Status::OK();
             if (status.isOK()) {
                 bool unique = _descriptor->unique();
@@ -275,33 +281,8 @@ std::unique_ptr<SortedDataInterface::Cursor> AbstractIndexAccessMethod::newCurso
     return newCursor(opCtx, true);
 }
 
-// Remove the provided doc from the index.
-Status AbstractIndexAccessMethod::remove(OperationContext* opCtx,
-                                         const BSONObj& obj,
-                                         const RecordId& loc,
-                                         const InsertDeleteOptions& options,
-                                         int64_t* numDeleted) {
-    invariant(!_btreeState->isHybridBuilding());
-    invariant(numDeleted);
-
-    *numDeleted = 0;
-    BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    // There's no need to compute the prefixes of the indexed fields that cause the index to be
-    // multikey when removing a document since the index metadata isn't updated when keys are
-    // deleted.
-    BSONObjSet* multikeyMetadataKeys = nullptr;
-    MultikeyPaths* multikeyPaths = nullptr;
-
-    // Relax key constraints on removal when deleting documents with invalid formats, but only
-    // those that don't apply to the partialIndex filter.
-    getKeys(
-        obj, GetKeysMode::kRelaxConstraintsUnfiltered, &keys, multikeyMetadataKeys, multikeyPaths);
-
-    return removeKeys(opCtx, keys, loc, options, numDeleted);
-}
-
 Status AbstractIndexAccessMethod::removeKeys(OperationContext* opCtx,
-                                             const BSONObjSet& keys,
+                                             const std::vector<BSONObj>& keys,
                                              const RecordId& loc,
                                              const InsertDeleteOptions& options,
                                              int64_t* numDeleted) {
@@ -428,20 +409,25 @@ pair<vector<BSONObj>, vector<BSONObj>> AbstractIndexAccessMethod::setDifference(
     return {std::move(onlyLeft), std::move(onlyRight)};
 }
 
-Status AbstractIndexAccessMethod::validateUpdate(OperationContext* opCtx,
-                                                 const BSONObj& from,
-                                                 const BSONObj& to,
-                                                 const RecordId& record,
-                                                 const InsertDeleteOptions& options,
-                                                 UpdateTicket* ticket,
-                                                 const MatchExpression* indexFilter) {
+void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
+                                              IndexCatalogEntry* index,
+                                              const BSONObj& from,
+                                              const BSONObj& to,
+                                              const RecordId& record,
+                                              const InsertDeleteOptions& options,
+                                              UpdateTicket* ticket) {
+    const MatchExpression* indexFilter = index->getFilterExpression();
     if (!indexFilter || indexFilter->matchesBSON(from)) {
+        // Override key constraints when generating keys for removal. This only applies to keys
+        // that do not apply to a partial filter expression.
+        const auto getKeysMode = index->isHybridBuilding()
+            ? IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered
+            : options.getKeysMode;
+
         // There's no need to compute the prefixes of the indexed fields that possibly caused the
         // index to be multikey when the old version of the document was written since the index
         // metadata isn't updated when keys are deleted.
-        BSONObjSet* multikeyMetadataKeys = nullptr;
-        MultikeyPaths* multikeyPaths = nullptr;
-        getKeys(from, options.getKeysMode, &ticket->oldKeys, multikeyMetadataKeys, multikeyPaths);
+        getKeys(from, getKeysMode, &ticket->oldKeys, nullptr, nullptr);
     }
 
     if (!indexFilter || indexFilter->matchesBSON(to)) {
@@ -458,8 +444,6 @@ Status AbstractIndexAccessMethod::validateUpdate(OperationContext* opCtx,
     std::tie(ticket->removed, ticket->added) = setDifference(ticket->oldKeys, ticket->newKeys);
 
     ticket->_isValid = true;
-
-    return Status::OK();
 }
 
 Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
@@ -507,7 +491,9 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
     }
 
     if (shouldMarkIndexAsMultikey(
-            ticket.newKeys, ticket.newMultikeyMetadataKeys, ticket.newMultikeyPaths)) {
+            {ticket.newKeys.begin(), ticket.newKeys.end()},
+            {ticket.newMultikeyMetadataKeys.begin(), ticket.newMultikeyMetadataKeys.end()},
+            ticket.newMultikeyPaths)) {
         _btreeState->setMultikey(opCtx, ticket.newMultikeyPaths);
     }
 
@@ -607,8 +593,11 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCt
         ++_keysInserted;
     }
 
-    _isMultiKey =
-        _isMultiKey || _real->shouldMarkIndexAsMultikey(keys, _multikeyMetadataKeys, multikeyPaths);
+    _isMultiKey = _isMultiKey ||
+        _real->shouldMarkIndexAsMultikey(
+            {keys.begin(), keys.end()},
+            {_multikeyMetadataKeys.begin(), _multikeyMetadataKeys.end()},
+            multikeyPaths);
 
     return Status::OK();
 }
@@ -800,8 +789,8 @@ void AbstractIndexAccessMethod::getKeys(const BSONObj& obj,
 }
 
 bool AbstractIndexAccessMethod::shouldMarkIndexAsMultikey(
-    const BSONObjSet& keys,
-    const BSONObjSet& multikeyMetadataKeys,
+    const vector<BSONObj>& keys,
+    const vector<BSONObj>& multikeyMetadataKeys,
     const MultikeyPaths& multikeyPaths) const {
     return (keys.size() > 1 || isMultikeyFromPaths(multikeyPaths));
 }

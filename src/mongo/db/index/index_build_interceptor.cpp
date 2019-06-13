@@ -256,8 +256,8 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     if (opType == Op::kInsert) {
         InsertResult result;
         auto status = accessMethod->insertKeys(opCtx,
-                                               keySet,
-                                               SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
+                                               {keySet.begin(), keySet.end()},
+                                               {},
                                                MultikeyPaths{},
                                                opRecordId,
                                                options,
@@ -283,7 +283,8 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
         DEV invariant(strcmp(operation.getStringField("op"), "d") == 0);
 
         int64_t numDeleted;
-        Status s = accessMethod->removeKeys(opCtx, keySet, opRecordId, options, &numDeleted);
+        Status s = accessMethod->removeKeys(
+            opCtx, {keySet.begin(), keySet.end()}, opRecordId, options, &numDeleted);
         if (!s.isOK()) {
             return s;
         }
@@ -359,26 +360,13 @@ boost::optional<MultikeyPaths> IndexBuildInterceptor::getMultikeyPaths() const {
 }
 
 Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
-                                        IndexAccessMethod* indexAccessMethod,
-                                        const BSONObj* obj,
-                                        const InsertDeleteOptions& options,
+                                        const std::vector<BSONObj>& keys,
+                                        const BSONObjSet& multikeyMetadataKeys,
+                                        const MultikeyPaths& multikeyPaths,
                                         RecordId loc,
                                         Op op,
                                         int64_t* const numKeysOut) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
-
-    *numKeysOut = 0;
-    BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    BSONObjSet multikeyMetadataKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    MultikeyPaths multikeyPaths;
-
-    // Override key constraints when generating keys for removal. This is the same behavior as
-    // IndexAccessMethod::remove and only applies to keys that do not apply to a partial filter
-    // expression.
-    const auto getKeysMode = op == Op::kInsert
-        ? options.getKeysMode
-        : IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered;
-    indexAccessMethod->getKeys(*obj, getKeysMode, &keys, &multikeyMetadataKeys, &multikeyPaths);
 
     // Maintain parity with IndexAccessMethods handling of key counting. Only include
     // `multikeyMetadataKeys` when inserting.
@@ -388,7 +376,7 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         return Status::OK();
     }
 
-    {
+    if (op == Op::kInsert) {
         stdx::unique_lock<stdx::mutex> lk(_multikeyPathMutex);
         if (_multikeyPaths) {
             MultikeyPathTracker::mergeMultikeyPaths(&_multikeyPaths.get(), multikeyPaths);

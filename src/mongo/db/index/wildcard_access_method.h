@@ -64,10 +64,10 @@ public:
      * Because it is possible for a $** index to generate multiple keys per document without any of
      * them lying along a multikey (i.e. array) path, this method will only return 'true' if one or
      * more multikey metadata keys have been generated; that is, if the 'multikeyMetadataKeys'
-     * BSONObjSet is non-empty.
+     * vector is non-empty.
      */
-    bool shouldMarkIndexAsMultikey(const BSONObjSet& keys,
-                                   const BSONObjSet& multikeyMetadataKeys,
+    bool shouldMarkIndexAsMultikey(const std::vector<BSONObj>& keys,
+                                   const std::vector<BSONObj>& multikeyMetadataKeys,
                                    const MultikeyPaths& multikeyPaths) const final;
 
     /**

@@ -113,7 +113,10 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                      &multikeyPaths);
 
         if (!descriptor->isMultikey(_opCtx) &&
-            iam->shouldMarkIndexAsMultikey(documentKeySet, multikeyMetadataKeys, multikeyPaths)) {
+            iam->shouldMarkIndexAsMultikey(
+                {documentKeySet.begin(), documentKeySet.end()},
+                {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
+                multikeyPaths)) {
             std::string msg = str::stream() << "Index " << descriptor->indexName()
                                             << " is not multi-key, but a multikey path "
                                             << " is present in document " << recordId;
