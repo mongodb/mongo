@@ -714,6 +714,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
     request.setArrayFilters(write_ops::arrayFiltersOf(op));
     request.setMulti(op.getMulti());
     request.setUpsert(op.getUpsert());
+    request.setHint(op.getHint());
 
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     request.setYieldPolicy(readConcernArgs.getLevel() ==

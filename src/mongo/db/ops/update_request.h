@@ -190,6 +190,14 @@ public:
         _returnDocs = value;
     }
 
+    void setHint(const BSONObj& hint) {
+        _hint = hint;
+    }
+
+    BSONObj getHint() const {
+        return _hint;
+    }
+
     inline bool shouldReturnOldDocs() const {
         return _returnDocs == ReturnDocOption::RETURN_OLD;
     }
@@ -257,6 +265,11 @@ public:
 
 private:
     const NamespaceString& _nsString;
+
+    // The hint provided, if any.  If the hint was by index key pattern, the value of '_hint' is
+    // the key pattern hinted.  If the hint was by index name, the value of '_hint' is
+    // {$hint: <String>}, where <String> is the index name hinted.
+    BSONObj _hint;
 
     // Contains the query that selects documents to update.
     BSONObj _query;

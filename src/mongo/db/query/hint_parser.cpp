@@ -27,42 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/count_request.h"
+#include "mongo/db/query/hint_parser.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/query_request.h"
 
 namespace mongo {
-namespace count_request {
 
-long long countParseLimit(const BSONElement& element) {
-    uassert(ErrorCodes::BadValue, "limit value is not a valid number", element.isNumber());
-    auto limit = uassertStatusOK(element.parseIntegerElementToLong());
-    // The absolute value of the smallest long long is too large to be represented as a long
-    // long, so we fail to parse such count commands.
-    uassert(ErrorCodes::BadValue,
-            "limit value for count cannot be min long",
-            limit != std::numeric_limits<long long>::min());
-
-    // For counts, limit and -limit mean the same thing.
-    if (limit < 0) {
-        limit = -limit;
+BSONObj parseHint(const BSONElement& element) {
+    if (element.type() == BSONType::String) {
+        return BSON("$hint" << element.valueStringData());
+    } else if (element.type() == BSONType::Object) {
+        return element.Obj();
+    } else {
+        uasserted(ErrorCodes::FailedToParse, "Hint must be a string or an object");
     }
-    return limit;
+    MONGO_UNREACHABLE;
 }
 
-long long countParseSkip(const BSONElement& element) {
-    uassert(ErrorCodes::BadValue, "skip value is not a valid number", element.isNumber());
-    auto skip = uassertStatusOK(element.parseIntegerElementToNonNegativeLong());
-    return skip;
+void serializeHintToBSON(const BSONObj& hint, StringData fieldName, BSONObjBuilder* builder) {
+    if (hint.isEmpty())
+        return;
+    builder->append(fieldName, hint);
 }
 
-long long countParseMaxTime(const BSONElement& element) {
-    auto maxTimeVal = uassertStatusOK(QueryRequest::parseMaxTimeMS(element));
-    return static_cast<long long>(maxTimeVal);
-}
-}  // namespace count_request
 }  // namespace mongo

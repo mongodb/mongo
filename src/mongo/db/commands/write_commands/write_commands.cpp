@@ -371,6 +371,7 @@ private:
             updateRequest.setMulti(_batch.getUpdates()[0].getMulti());
             updateRequest.setUpsert(_batch.getUpdates()[0].getUpsert());
             updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+            updateRequest.setHint(_batch.getUpdates()[0].getHint());
             updateRequest.setExplain();
 
             const ExtensionsCallbackReal extensionsCallback(opCtx,

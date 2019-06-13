@@ -1,3 +1,4 @@
+
 /**
  *    Copyright (C) 2019-present MongoDB, Inc.
  *
@@ -29,40 +30,47 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/count_request.h"
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/hint_parser.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace count_request {
 
-long long countParseLimit(const BSONElement& element) {
-    uassert(ErrorCodes::BadValue, "limit value is not a valid number", element.isNumber());
-    auto limit = uassertStatusOK(element.parseIntegerElementToLong());
-    // The absolute value of the smallest long long is too large to be represented as a long
-    // long, so we fail to parse such count commands.
-    uassert(ErrorCodes::BadValue,
-            "limit value for count cannot be min long",
-            limit != std::numeric_limits<long long>::min());
+namespace {
 
-    // For counts, limit and -limit mean the same thing.
-    if (limit < 0) {
-        limit = -limit;
-    }
-    return limit;
+TEST(CommandParsers, ParseKeyPatternHint) {
+    auto hint = BSON("hint" << BSON("x" << 5));
+    ASSERT_BSONOBJ_EQ(parseHint(hint.firstElement()), BSON("x" << 5));
 }
 
-long long countParseSkip(const BSONElement& element) {
-    uassert(ErrorCodes::BadValue, "skip value is not a valid number", element.isNumber());
-    auto skip = uassertStatusOK(element.parseIntegerElementToNonNegativeLong());
-    return skip;
+TEST(CommandParsers, ParseIndexNameHint) {
+    auto hint = BSON("hint"
+                     << "x_1");
+    ASSERT_BSONOBJ_EQ(parseHint(hint.firstElement()),
+                      BSON("$hint"
+                           << "x_1"));
 }
 
-long long countParseMaxTime(const BSONElement& element) {
-    auto maxTimeVal = uassertStatusOK(QueryRequest::parseMaxTimeMS(element));
-    return static_cast<long long>(maxTimeVal);
+TEST(CommandParsers, BadHintType) {
+    auto hint = BSON("hint" << 1);
+    ASSERT_THROWS_CODE(
+        parseHint(hint.firstElement()), AssertionException, ErrorCodes::FailedToParse);
 }
-}  // namespace count_request
+
+TEST(CommandParsers, SerializeNonEmptyHint) {
+    auto hint = BSON("x" << 1);
+    BSONObjBuilder bob;
+    serializeHintToBSON(hint, "hint", &bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), BSON("hint" << BSON("x" << 1)));
+}
+
+TEST(CommandParsers, ShouldNotSerializeEmptyHint) {
+    BSONObjBuilder bob;
+    serializeHintToBSON(BSONObj(), "hint", &bob);
+    ASSERT_FALSE(bob.obj().hasField("hint"));
+}
+}  // namespace
+
 }  // namespace mongo

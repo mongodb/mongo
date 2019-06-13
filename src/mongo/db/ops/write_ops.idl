@@ -34,6 +34,8 @@ global:
 imports:
     - "mongo/db/logical_session_id.idl"
     - "mongo/db/pipeline/runtime_constants.idl"
+    - "mongo/idl/basic_types.idl"
+    - "mongo/db/query/hint.idl"
 
 types:
     multi_delete_bool:
@@ -110,6 +112,10 @@ structs:
                 description: "Specifies which array elements an update modifier should apply to."
                 type: array<object>
                 optional: true
+            hint:
+                description: "Specifies the hint to use for the operation."
+                type: indexHint 
+                default: mongo::BSONObj()
             multi:
                 description: "If true, updates all documents that meet the query criteria. If false,
                               limits the update to one document which meets the query criteria."

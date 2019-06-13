@@ -48,12 +48,6 @@ long long countParseLimit(const BSONElement& element);
 long long countParseSkip(const BSONElement& element);
 
 /**
- * Parses a hint for a CountCommand. Returns the hint object, or if the element was a string the
- * string wrapped in an object of the form {"$hint": <index_name>}.
- */
-BSONObj countParseHint(const BSONElement& element);
-
-/**
  * Parses a maxTimeMS for a CountCommand. Errors if the value passed is negative.
  * Throws on invalid values.
  */

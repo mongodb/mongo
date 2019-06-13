@@ -157,3 +157,4 @@ types:
         cpp_type: "mongo::NamespaceString"
         serializer: mongo::NamespaceString::toString
         deserializer: mongo::NamespaceString
+
