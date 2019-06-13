@@ -99,8 +99,6 @@ bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd) {
 }
 
 Status _applyOps(OperationContext* opCtx,
-                 const std::string& dbName,
-                 const BSONObj& applyOpCmd,
                  const ApplyOpsCommandInfo& info,
                  repl::OplogApplication::Mode oplogApplicationMode,
                  BSONObjBuilder* result,
@@ -410,8 +408,7 @@ Status applyOps(OperationContext* opCtx,
     }
 
     if (!info.isAtomic()) {
-        return _applyOps(
-            opCtx, dbName, applyOpCmd, info, oplogApplicationMode, result, &numApplied, nullptr);
+        return _applyOps(opCtx, info, oplogApplicationMode, result, &numApplied, nullptr);
     }
 
     // Perform write ops atomically
@@ -430,8 +427,6 @@ Status applyOps(OperationContext* opCtx,
                 // Suppress replication for atomic operations until end of applyOps.
                 repl::UnreplicatedWritesBlock uwb(opCtx);
                 uassertStatusOK(_applyOps(opCtx,
-                                          dbName,
-                                          applyOpCmd,
                                           info,
                                           oplogApplicationMode,
                                           &intermediateResult,
@@ -471,14 +466,7 @@ Status applyOps(OperationContext* opCtx,
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::AtomicityFailure) {
             // Retry in non-atomic mode.
-            return _applyOps(opCtx,
-                             dbName,
-                             applyOpCmd,
-                             info,
-                             oplogApplicationMode,
-                             result,
-                             &numApplied,
-                             nullptr);
+            return _applyOps(opCtx, info, oplogApplicationMode, result, &numApplied, nullptr);
         }
         BSONArrayBuilder ab;
         ++numApplied;
