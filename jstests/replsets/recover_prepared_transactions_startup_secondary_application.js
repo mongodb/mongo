@@ -67,8 +67,6 @@
     replTest.stop(secondary, undefined, {skipValidation: true});
     secondary = replTest.start(secondary, {}, true);
 
-    secondary.setSlaveOk();
-
     jsTestLog("Secondary was restarted");
 
     assert.commandWorked(
@@ -78,6 +76,10 @@
     // majority committed. So wait for prepare oplog entry to be majority committed before issuing
     // the commitTransaction command.
     PrepareHelpers.awaitMajorityCommitted(replTest, prepareTimestamp2);
+
+    // Wait for the node to complete recovery before trying to read from it.
+    replTest.awaitSecondaryNodes();
+    secondary.setSlaveOk();
 
     jsTestLog("Checking that the first transaction is properly prepared");
 
