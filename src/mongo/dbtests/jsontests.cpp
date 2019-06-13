@@ -935,7 +935,7 @@ TEST(FromJsonTest, NumericTypes) {
     long long kMaxS64 = 0x7fff'ffff'ffff'ffff;
     struct Val {
         int i;
-        long l;
+        long long l;
         double d;
     };
     const Val vals[] = {
