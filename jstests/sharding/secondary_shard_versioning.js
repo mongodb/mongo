@@ -7,7 +7,7 @@
     load('jstests/libs/profiler.js');  // for profilerHasSingleMatchingEntryOrThrow()
 
     // Set the secondaries to priority 0 and votes 0 to prevent the primaries from stepping down.
-    let rsOpts = {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]};
+    let rsOpts = {nodes: [{}, {rsConfig: {priority: 0}}]};
     let st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts}});
 
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
