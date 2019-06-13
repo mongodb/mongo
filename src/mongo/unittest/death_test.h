@@ -44,21 +44,21 @@
  * in your death test, start them in the test body, or use DEATH_TEST_F and start them
  * in the setUp() method of the fixture.
  */
-#define DEATH_TEST(CASE_NAME, TEST_NAME, MATCH_EXPR)                               \
+#define DEATH_TEST(CASE_NAME, TEST_NAME, MATCH_EXPR)                                               \
     class UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME) : public ::mongo::unittest::Test { \
-    private:                                                                       \
-        virtual void _doTest();                                                    \
-                                                                                   \
-        static const RegistrationAgent<                                            \
+    private:                                                                                       \
+        virtual void _doTest();                                                                    \
+                                                                                                   \
+        static const RegistrationAgent<                                                            \
             ::mongo::unittest::DeathTest<UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)>>   \
-            _agent;                                                                \
-    };                                                                             \
-    const ::mongo::unittest::Test::RegistrationAgent<                              \
+            _agent;                                                                                \
+    };                                                                                             \
+    const ::mongo::unittest::Test::RegistrationAgent<                                              \
         ::mongo::unittest::DeathTest<UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)>>       \
         UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_agent(#CASE_NAME, #TEST_NAME);     \
     std::string getDeathTestPattern(UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)*) {      \
-        return MATCH_EXPR;                                                         \
-    }                                                                              \
+        return MATCH_EXPR;                                                                         \
+    }                                                                                              \
     void UNIT_TEST_DETAIL_TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_doTest()
 
 /**
@@ -67,21 +67,22 @@
  *
  * See description of DEATH_TEST for more details on death tests.
  */
-#define DEATH_TEST_F(FIXTURE_NAME, TEST_NAME, MATCH_EXPR)                            \
-    class UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME) : public FIXTURE_NAME {           \
-    private:                                                                         \
-        virtual void _doTest();                                                      \
-                                                                                     \
-        static const RegistrationAgent<                                              \
-            ::mongo::unittest::DeathTest<UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)>>  \
-            _agent;                                                                  \
-    };                                                                               \
-    const ::mongo::unittest::Test::RegistrationAgent<                                \
-        ::mongo::unittest::DeathTest<UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)>>      \
-        UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_agent(#FIXTURE_NAME, #TEST_NAME); \
-    std::string getDeathTestPattern(UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)*) {     \
-        return MATCH_EXPR;                                                           \
-    }                                                                                \
+#define DEATH_TEST_F(FIXTURE_NAME, TEST_NAME, MATCH_EXPR)                                        \
+    class UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME) : public FIXTURE_NAME {       \
+    private:                                                                                     \
+        virtual void _doTest();                                                                  \
+                                                                                                 \
+        static const RegistrationAgent<::mongo::unittest::DeathTest<                             \
+            UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)>>                           \
+            _agent;                                                                              \
+    };                                                                                           \
+    const ::mongo::unittest::Test::RegistrationAgent<                                            \
+        ::mongo::unittest::DeathTest<UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)>>  \
+        UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_agent(#FIXTURE_NAME,          \
+                                                                         #TEST_NAME);            \
+    std::string getDeathTestPattern(UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)*) { \
+        return MATCH_EXPR;                                                                       \
+    }                                                                                            \
     void UNIT_TEST_DETAIL_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_doTest()
 
 namespace mongo {
