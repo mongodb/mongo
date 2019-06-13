@@ -2219,7 +2219,7 @@ void TopologyCoordinator::processLoseElection() {
     _role = Role::kFollower;
 }
 
-bool TopologyCoordinator::attemptStepDown(
+bool TopologyCoordinator::tryToStartStepDown(
     long long termAtStart, Date_t now, Date_t waitUntil, Date_t stepDownUntil, bool force) {
 
     if (_role != Role::kLeader || _leaderMode == LeaderMode::kSteppingDown ||
@@ -2255,7 +2255,7 @@ bool TopologyCoordinator::attemptStepDown(
 
     // Stepdown attempt success!
     _stepDownUntil = stepDownUntil;
-    _stepDownSelfAndReplaceWith(-1);
+    prepareForUnconditionalStepDown();
     return true;
 }
 

@@ -4244,9 +4244,10 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsWhenNotPrimary) {
 
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-    ASSERT_THROWS_CODE(getTopoCoord().attemptStepDown(term, curTime, futureTime, futureTime, false),
-                       DBException,
-                       ErrorCodes::PrimarySteppedDown);
+    ASSERT_THROWS_CODE(
+        getTopoCoord().tryToStartStepDown(term, curTime, futureTime, futureTime, false),
+        DBException,
+        ErrorCodes::PrimarySteppedDown);
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptFailsWhenAlreadySteppingDown) {
@@ -4273,9 +4274,10 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsWhenAlreadySteppingDown) {
     makeSelfPrimary();
     getTopoCoord().prepareForUnconditionalStepDown();
 
-    ASSERT_THROWS_CODE(getTopoCoord().attemptStepDown(term, curTime, futureTime, futureTime, false),
-                       DBException,
-                       ErrorCodes::PrimarySteppedDown);
+    ASSERT_THROWS_CODE(
+        getTopoCoord().tryToStartStepDown(term, curTime, futureTime, futureTime, false),
+        DBException,
+        ErrorCodes::PrimarySteppedDown);
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptFailsForDifferentTerm) {
@@ -4303,7 +4305,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsForDifferentTerm) {
     ASSERT_OK(getTopoCoord().prepareForStepDownAttempt().getStatus());
 
     ASSERT_THROWS_CODE(
-        getTopoCoord().attemptStepDown(term - 1, curTime, futureTime, futureTime, false),
+        getTopoCoord().tryToStartStepDown(term - 1, curTime, futureTime, futureTime, false),
         DBException,
         ErrorCodes::PrimarySteppedDown);
 }
@@ -4333,7 +4335,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfPastStepDownUntil) {
     ASSERT_OK(getTopoCoord().prepareForStepDownAttempt().getStatus());
 
     ASSERT_THROWS_CODE_AND_WHAT(
-        getTopoCoord().attemptStepDown(term, curTime, futureTime, curTime, false),
+        getTopoCoord().tryToStartStepDown(term, curTime, futureTime, curTime, false),
         DBException,
         ErrorCodes::ExceededTimeLimit,
         "By the time we were ready to step down, we were already past the time we were supposed to "
@@ -4369,7 +4371,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfPastWaitUntil) {
         << ". Please use the replSetStepDown command with the argument "
         << "{force: true} to force node to step down.";
     ASSERT_THROWS_CODE_AND_WHAT(
-        getTopoCoord().attemptStepDown(term, curTime, curTime, futureTime, false),
+        getTopoCoord().tryToStartStepDown(term, curTime, curTime, futureTime, false),
         DBException,
         ErrorCodes::ExceededTimeLimit,
         expectedWhat);
@@ -4405,7 +4407,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfNoSecondariesCaughtUp) {
     heartbeatFromMember(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
 
-    ASSERT_FALSE(getTopoCoord().attemptStepDown(term, curTime, futureTime, futureTime, false));
+    ASSERT_FALSE(getTopoCoord().tryToStartStepDown(term, curTime, futureTime, futureTime, false));
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptFailsIfNoSecondariesCaughtUpForceIsTrueButNotPastWaitUntil) {
@@ -4438,7 +4440,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfNoSecondariesCaughtUpForceIsTrueButN
     heartbeatFromMember(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
 
-    ASSERT_FALSE(getTopoCoord().attemptStepDown(term, curTime, futureTime, futureTime, true));
+    ASSERT_FALSE(getTopoCoord().tryToStartStepDown(term, curTime, futureTime, futureTime, true));
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptSucceedsIfNoSecondariesCaughtUpForceIsTrueAndPastWaitUntil) {
@@ -4471,7 +4473,7 @@ TEST_F(TopoCoordTest, StepDownAttemptSucceedsIfNoSecondariesCaughtUpForceIsTrueA
     heartbeatFromMember(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
 
-    ASSERT_TRUE(getTopoCoord().attemptStepDown(term, curTime, curTime, futureTime, true));
+    ASSERT_TRUE(getTopoCoord().tryToStartStepDown(term, curTime, curTime, futureTime, true));
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptSucceedsIfSecondariesCaughtUp) {
@@ -4504,7 +4506,7 @@ TEST_F(TopoCoordTest, StepDownAttemptSucceedsIfSecondariesCaughtUp) {
     heartbeatFromMember(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
 
-    ASSERT_TRUE(getTopoCoord().attemptStepDown(term, curTime, futureTime, futureTime, false));
+    ASSERT_TRUE(getTopoCoord().tryToStartStepDown(term, curTime, futureTime, futureTime, false));
 }
 
 TEST_F(TopoCoordTest, StepDownAttemptFailsIfSecondaryCaughtUpButNotElectable) {
@@ -4541,7 +4543,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfSecondaryCaughtUpButNotElectable) {
     heartbeatFromMember(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
 
-    ASSERT_FALSE(getTopoCoord().attemptStepDown(term, curTime, futureTime, futureTime, false));
+    ASSERT_FALSE(getTopoCoord().tryToStartStepDown(term, curTime, futureTime, futureTime, false));
 }
 
 TEST_F(TopoCoordTest,

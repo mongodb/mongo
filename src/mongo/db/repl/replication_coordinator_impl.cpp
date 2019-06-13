@@ -2049,7 +2049,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         ThreadWaiter waiter(lastAppliedOpTime, &waiterWriteConcern, &condVar);
         WaiterGuard guard(lk, &_replicationWaiterList, &waiter);
 
-        while (!_topCoord->attemptStepDown(
+        // If attemptStepDown() succeeds, we are guaranteed that no concurrent step up or
+        // step down can happen afterwards. So, it's safe to release the mutex before
+        // yieldLocksForPreparedTransactions().
+        while (!_topCoord->tryToStartStepDown(
             termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
 
             // The stepdown attempt failed. We now release the RSTL to allow secondaries to read the
@@ -2085,18 +2088,23 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
             // We ignore the case where waitForConditionOrInterruptUntil returns
             // stdx::cv_status::timeout because in that case coming back around the loop and calling
-            // attemptStepDown again will cause attemptStepDown to return ExceededTimeLimit with
-            // the proper error message.
+            // tryToStartStepDown again will cause tryToStartStepDown to return ExceededTimeLimit
+            // with the proper error message.
             opCtx->waitForConditionOrInterruptUntil(
                 condVar, lk, std::min(stepDownUntil, waitUntil));
         }
     }
 
-    // Stepdown success!
+    // Prepare for unconditional stepdown success!
+    // We need to release the mutex before yielding locks for prepared transactions, which might
+    // check out sessions, to avoid deadlocks with checked-out sessions accessing this mutex.
+    lk.unlock();
 
-    // Yield locks for prepared transactions.
     yieldLocksForPreparedTransactions(opCtx);
+
+    lk.lock();
     _updateAndLogStatsOnStepDown(&arsd);
+    _topCoord->finishUnconditionalStepDown();
 
     onExitGuard.dismiss();
     updateMemberState();
@@ -2664,7 +2672,14 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
         if (_topCoord->isSteppingDownUnconditionally()) {
             invariant(opCtx->lockState()->isRSTLExclusive());
             log() << "stepping down from primary, because we received a new config";
+            // We need to release the mutex before yielding locks for prepared transactions, which
+            // might check out sessions, to avoid deadlocks with checked-out sessions accessing
+            // this mutex.
+            lk.unlock();
+
             yieldLocksForPreparedTransactions(opCtx);
+
+            lk.lock();
             _updateAndLogStatsOnStepDown(&arsd.get());
         } else {
             // Release the rstl lock as the node might have stepped down due to

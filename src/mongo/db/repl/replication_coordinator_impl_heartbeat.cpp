@@ -414,11 +414,16 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
         return;
     }
 
-    // Yield locks for prepared transactions.
-    yieldLocksForPreparedTransactions(opCtx.get());
-    _updateAndLogStatsOnStepDown(&arsd);
+    // We need to release the mutex before yielding locks for prepared transactions, which might
+    // check out sessions, to avoid deadlocks with checked-out sessions accessing this mutex.
+    lk.unlock();
 
+    yieldLocksForPreparedTransactions(opCtx.get());
+
+    lk.lock();
+    _updateAndLogStatsOnStepDown(&arsd);
     _topCoord->finishUnconditionalStepDown();
+
     const auto action = _updateMemberStateFromTopologyCoordinator(lk, opCtx.get());
     if (_pendingTermUpdateDuringStepDown) {
         TopologyCoordinator::UpdateTermResult result;
@@ -630,7 +635,14 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         if (_topCoord->isSteppingDownUnconditionally()) {
             invariant(opCtx->lockState()->isRSTLExclusive());
             log() << "stepping down from primary, because we received a new config via heartbeat";
+            // We need to release the mutex before yielding locks for prepared transactions, which
+            // might check out sessions, to avoid deadlocks with checked-out sessions accessing
+            // this mutex.
+            lk.unlock();
+
             yieldLocksForPreparedTransactions(opCtx.get());
+
+            lk.lock();
             _updateAndLogStatsOnStepDown(&arsd.get());
         } else {
             // Release the rstl lock as the node might have stepped down due to
