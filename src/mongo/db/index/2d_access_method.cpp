@@ -41,8 +41,9 @@
 
 namespace mongo {
 
-TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
-    : AbstractIndexAccessMethod(btreeState, btree) {
+TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState,
+                                   std::unique_ptr<SortedDataInterface> btree)
+    : AbstractIndexAccessMethod(btreeState, std::move(btree)) {
     const IndexDescriptor* descriptor = btreeState->descriptor();
 
     ExpressionParams::parseTwoDParams(descriptor->infoObj(), &_params);

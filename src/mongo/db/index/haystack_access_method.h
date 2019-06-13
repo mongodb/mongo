@@ -57,7 +57,7 @@ class OperationContext;
  */
 class HaystackAccessMethod : public AbstractIndexAccessMethod {
 public:
-    HaystackAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
+    HaystackAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 
 protected:
     friend class GeoHaystackSearchCommand;

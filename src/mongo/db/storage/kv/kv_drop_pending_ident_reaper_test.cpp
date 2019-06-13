@@ -71,9 +71,8 @@ public:
                                                 const CollectionOptions& options) override {
         return {};
     }
-    SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
-                                                StringData ident,
-                                                const IndexDescriptor* desc) override {
+    std::unique_ptr<SortedDataInterface> getSortedDataInterface(
+        OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) override {
         return nullptr;
     }
     Status createRecordStore(OperationContext* opCtx,

@@ -256,10 +256,9 @@ std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(Operation
     return std::make_unique<DevNullRecordStore>("", CollectionOptions());
 }
 
-SortedDataInterface* DevNullKVEngine::getSortedDataInterface(OperationContext* opCtx,
-                                                             StringData ident,
-                                                             const IndexDescriptor* desc) {
-    return new DevNullSortedDataInterface();
+std::unique_ptr<SortedDataInterface> DevNullKVEngine::getSortedDataInterface(
+    OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
+    return std::make_unique<DevNullSortedDataInterface>();
 }
 
 int64_t DevNullKVEngine::getCacheOverflowTableInsertCount(OperationContext* opCtx) const {

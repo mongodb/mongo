@@ -153,11 +153,11 @@ IndexCatalogEntry* IndexCatalogImpl::_setupInMemoryStructures(
     std::string ident =
         engine->getCatalog()->getIndexIdent(opCtx, _collection->ns(), desc->indexName());
 
-    SortedDataInterface* sdi =
+    std::unique_ptr<SortedDataInterface> sdi =
         engine->getEngine()->getGroupedSortedDataInterface(opCtx, ident, desc, entry->getPrefix());
 
     std::unique_ptr<IndexAccessMethod> accessMethod =
-        IndexAccessMethodFactory::get(opCtx)->make(entry.get(), sdi);
+        IndexAccessMethodFactory::get(opCtx)->make(entry.get(), std::move(sdi));
 
     entry->init(std::move(accessMethod));
 

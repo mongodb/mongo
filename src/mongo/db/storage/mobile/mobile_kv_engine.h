@@ -68,9 +68,8 @@ public:
                                      StringData ident,
                                      const IndexDescriptor* desc) override;
 
-    SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
-                                                StringData ident,
-                                                const IndexDescriptor* desc) override;
+    std::unique_ptr<SortedDataInterface> getSortedDataInterface(
+        OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) override;
 
     Status beginBackup(OperationContext* opCtx) override {
         return Status::OK();

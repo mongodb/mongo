@@ -123,9 +123,8 @@ public:
         return createGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
     }
 
-    SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
-                                                StringData ident,
-                                                const IndexDescriptor* desc) override {
+    std::unique_ptr<SortedDataInterface> getSortedDataInterface(
+        OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) override {
         return getGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
     }
 
@@ -146,10 +145,10 @@ public:
                                             const IndexDescriptor* desc,
                                             KVPrefix prefix) override;
 
-    SortedDataInterface* getGroupedSortedDataInterface(OperationContext* opCtx,
-                                                       StringData ident,
-                                                       const IndexDescriptor* desc,
-                                                       KVPrefix prefix) override;
+    std::unique_ptr<SortedDataInterface> getGroupedSortedDataInterface(OperationContext* opCtx,
+                                                                       StringData ident,
+                                                                       const IndexDescriptor* desc,
+                                                                       KVPrefix prefix) override;
 
     Status dropIdent(OperationContext* opCtx, StringData ident) override;
 
