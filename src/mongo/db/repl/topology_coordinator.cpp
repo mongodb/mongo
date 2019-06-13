@@ -1607,6 +1607,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                      durationCount<Milliseconds>(_rsConfig.getHeartbeatInterval()));
 
     response->append("majorityVoteCount", _rsConfig.getMajorityVoteCount());
+    response->append("writeMajorityCount", _rsConfig.getWriteMajority());
 
     // New optimes, to hold them all.
     BSONObjBuilder optimes;
