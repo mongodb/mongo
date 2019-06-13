@@ -65,13 +65,6 @@ public:
     static CollectionShardingRuntime* get(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * It is the caller's responsibility to ensure that the collection locks for this namespace are
-     * held when this is called. The returned pointer should never be stored.
-     */
-    static CollectionShardingRuntime* get_UNSAFE(ServiceContext* svcCtx,
-                                                 const NamespaceString& nss);
-
-    /**
      * Updates the collection's filtering metadata based on changes received from the config server
      * and also resolves the pending receives map in case some of these pending receives have
      * committed on the config server or have been abandoned by the donor shard.

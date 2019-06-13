@@ -70,12 +70,6 @@ public:
     static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * It is the caller's responsibility to ensure that the collection locks for this namespace are
-     * held when this is called. The returned pointer should never be stored.
-     */
-    static CollectionShardingState* get_UNSAFE(ServiceContext* svcCtx, const NamespaceString& nss);
-
-    /**
      * Reports all collections which have filtering information associated.
      */
     static void report(OperationContext* opCtx, BSONObjBuilder* builder);

@@ -127,10 +127,6 @@ MigrationSourceManager* MigrationSourceManager::get(CollectionShardingRuntime* c
     return msmForCsr(csr);
 }
 
-MigrationSourceManager* MigrationSourceManager::get_UNSAFE(CollectionShardingRuntime* csr) {
-    return msmForCsr(csr);
-}
-
 MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                                                MoveChunkRequest request,
                                                ConnectionString donorConnStr,
@@ -284,8 +280,8 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         auto const readConcernArgs = repl::ReadConcernArgs(
             replCoord->getMyLastAppliedOpTime(), repl::ReadConcernLevel::kLocalReadConcern);
 
-        uassertStatusOK(waitForReadConcern(
-            opCtx, readConcernArgs, false, PrepareConflictBehavior::kIgnoreConflicts));
+        uassertStatusOK(
+            waitForReadConcern(opCtx, readConcernArgs, false, PrepareConflictBehavior::kEnforce));
     }
 
     Status startCloneStatus = _cloneDriver->startClone(opCtx);

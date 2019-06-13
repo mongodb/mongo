@@ -54,30 +54,6 @@ class Collection;
 class Database;
 class RecordId;
 
-/**
- * Used to commit work for LogOpForSharding. Used to keep track of changes in documents that are
- * part of a chunk being migrated.
- */
-class LogTransactionOperationsForShardingHandler final : public RecoveryUnit::Change {
-public:
-    /**
-     * Invariant: idObj should belong to a document that is part of the active chunk being migrated
-     */
-    LogTransactionOperationsForShardingHandler(ServiceContext* svcCtx,
-                                               const std::vector<repl::ReplOperation>& stmts,
-                                               const repl::OpTime& prepareOrCommitOpTime)
-        : _svcCtx(svcCtx), _stmts(stmts), _prepareOrCommitOpTime(prepareOrCommitOpTime) {}
-
-    void commit(boost::optional<Timestamp>) override;
-
-    void rollback() override{};
-
-private:
-    ServiceContext* _svcCtx;
-    std::vector<repl::ReplOperation> _stmts;
-    const repl::OpTime _prepareOrCommitOpTime;
-};
-
 class MigrationChunkClonerSourceLegacy final : public MigrationChunkClonerSource {
     MigrationChunkClonerSourceLegacy(const MigrationChunkClonerSourceLegacy&) = delete;
     MigrationChunkClonerSourceLegacy& operator=(const MigrationChunkClonerSourceLegacy&) = delete;
@@ -114,6 +90,10 @@ public:
                     const BSONObj& deletedDocId,
                     const repl::OpTime& opTime,
                     const repl::OpTime& preImageOpTime) override;
+
+    void onTransactionPrepareOrUnpreparedCommit(OperationContext* opCtx,
+                                                const repl::OpTime& opTime) override;
+
 
     // Legacy cloner specific functionality
 
@@ -203,7 +183,7 @@ public:
 
 private:
     friend class LogOpForShardingHandler;
-    friend class LogTransactionOperationsForShardingHandler;
+    friend class LogPrepareOrCommitOpForShardingHandler;
 
     // Represents the states in which the cloner can be
     enum State { kNew, kCloning, kDone };
@@ -236,20 +216,18 @@ private:
         const repl::OpTime& opTime,
         SessionCatalogMigrationSource::EntryAtOpTimeType entryAtOpTimeType);
 
-    void _addToSessionMigrationOptimeQueueForTransactionCommit(
-        const repl::OpTime& opTime,
-        SessionCatalogMigrationSource::EntryAtOpTimeType entryAtOpTimeType);
-
     /*
-     * Appends the relevant document changes to the appropriate internal data structures (known
-     * colloquially as the 'transfer mods queue'). These structures track document changes that are
-     * part of a part of a chunk being migrated. In doing so, this the method also removes the
-     * corresponding operation track request from the operation track requests queue.
+     * Consumes the operation track request and appends the relevant document changes to
+     * the appropriate internal data structures (known colloquially as the 'transfer mods queue').
+     * These structures track document changes that are part of a part of a chunk being migrated.
+     * In doing so, this the method also removes the corresponding operation track request from the
+     * operation track requests queue.
      */
-    void _addToTransferModsQueue(const BSONObj& idObj,
-                                 const char op,
-                                 const repl::OpTime& opTime,
-                                 const repl::OpTime& prePostImageOpTime);
+    void _consumeOperationTrackRequestAndAddToTransferModsQueue(
+        const BSONObj& idObj,
+        const char op,
+        const repl::OpTime& opTime,
+        const repl::OpTime& prePostImageOpTime);
 
     /**
      * Adds an operation to the outstanding operation track requests. Returns false if the cloner
