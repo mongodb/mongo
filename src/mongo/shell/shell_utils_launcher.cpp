@@ -60,6 +60,7 @@
 #include <unistd.h>
 #endif
 
+#include "mongo/base/environment_buffer.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/traffic_reader.h"
 #include "mongo/scripting/engine.h"
@@ -357,7 +358,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
 #else
     // environ is a POSIX defined array of char*s. Each char* in the array is a <key>=<value>\0
     // pair.
-    char** environEntry = environ;
+    char** environEntry = getEnvironPointer();
     while (*environEntry) {
         std::string envKeyValue(*environEntry);
         size_t splitPoint = envKeyValue.find('=');

@@ -126,6 +126,7 @@ env.Library(
     ],
     LIBDEPS=[
         'benchrun',
+        '$BUILD_DIR/mongo/base/environment_buffer',
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/traffic_reader',

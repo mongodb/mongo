@@ -65,6 +65,20 @@ env.Library(
     ],
 )
 
+env.Library(
+    target=[
+        'environment_buffer',
+    ],
+    source=[
+        'environment_buffer.cpp',
+    ],
+    # Because `::environ` is resolved in `/usr/lib/crt1.o` on FreeBSD, this library
+    # needs to be marked `incomplete` on FreeBSD.
+    LIBDEPS_TAGS=[] if not env.TargetOSIs('freebsd') else [
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+    ],
+)
+
 env.CppUnitTest(
     target=[
         'system_error_test',
