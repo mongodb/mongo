@@ -2919,29 +2919,6 @@ def doConfigure(myenv):
     if conf.CheckCXX14EnableIfT():
         conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_STD_ENABLE_IF_T')
 
-    myenv = conf.Finish()
-
-    def CheckCXX14MakeUnique(context):
-        test_body = """
-        #include <memory>
-        int main(int argc, char **argv) {
-            auto foo = std::make_unique<int>(5);
-            return 0;
-        }
-        """
-        context.Message('Checking for C++14 std::make_unique support... ')
-        ret = context.TryCompile(textwrap.dedent(test_body), '.cpp')
-        context.Result(ret)
-        return ret
-
-    # Check for std::make_unique support without using the __cplusplus macro
-    conf = Configure(myenv, help=False, custom_tests = {
-        'CheckCXX14MakeUnique': CheckCXX14MakeUnique,
-    })
-
-    if conf.CheckCXX14MakeUnique():
-        conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE')
-
     # pthread_setname_np was added in GLIBC 2.12, and Solaris 11.3
     if posix_system:
         myenv = conf.Finish()
