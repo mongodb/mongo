@@ -1,5 +1,6 @@
 /**
  * Tests that --repair on WiredTiger correctly and gracefully handles corrupt metadata files.
+ * This test should not run on debug builds because WiredTiger's diagnostic mode is enabled.
  *
  * @tags: [requires_wiredtiger,requires_journaling]
  */
@@ -27,9 +28,8 @@
         // following test case can exercise.
         // TODO: This return can be removed once WT-4310 is completed.
         let isDebug = db.adminCommand('buildInfo').debug;
-        if (isDebug && mongodOptions.hasOwnProperty('nojournal')) {
-            jsTestLog(
-                "Skipping test case because this is a debug build and --nojournal was provided.");
+        if (isDebug) {
+            jsTestLog("Skipping test case because this is a debug build");
             return;
         }
 
@@ -61,6 +61,8 @@
         removeFile(turtleFile);
         copyFile(turtleFileWithoutCollection, turtleFile);
 
+        // This test characterizes the current WiredTiger salvage behaviour, which may be subject to
+        // change in the future. See SERVER-41667.
         assertRepairSucceeds(dbpath, mongod.port, mongodOptions);
 
         mongod = startMongodOnExistingPath(dbpath, mongodOptions);
