@@ -1208,7 +1208,6 @@ functions:
 
   "set up virtualenv": &set_up_virtualenv
     command: shell.exec
-    type: test
     params:
         shell: bash
         script: |
