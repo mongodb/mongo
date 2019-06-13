@@ -75,11 +75,10 @@ public:
     static const Decimal128 kPiOver180;
     static const Decimal128 k180OverPi;
 
-    static constexpr std::uint32_t kMaxBiasedExponent = 6143 + 6144;
+    static const uint32_t kMaxBiasedExponent = 6143 + 6144;
     // Biased exponent of a Decimal128 with least significant digit in the units place
-    static constexpr std::int32_t kExponentBias = 6143 + 33;
-    static constexpr std::uint32_t kInfinityExponent =
-        kMaxBiasedExponent + 1;  // internal convention only
+    static const int32_t kExponentBias = 6143 + 33;
+    static const uint32_t kInfinityExponent = kMaxBiasedExponent + 1;  // internal convention only
 
     /**
      * This struct holds the raw data for IEEE 754-2008 data types
@@ -125,17 +124,17 @@ public:
         kInexact = 0x20,
     };
 
-    constexpr static bool hasFlag(std::uint32_t signalingFlags, SignalingFlag f) {
+    static bool hasFlag(std::uint32_t signalingFlags, SignalingFlag f) {
         return ((signalingFlags & f) != 0u);
     }
 
     /**
      * Returns true if a valid Decimal can be constructed from the given arguments.
      */
-    constexpr static bool isValid(std::uint64_t sign,
-                                  std::uint64_t exponent,
-                                  std::uint64_t coefficientHigh,
-                                  std::uint64_t coefficientLow) {
+    static bool isValid(uint64_t sign,
+                        uint64_t exponent,
+                        uint64_t coefficientHigh,
+                        uint64_t coefficientLow) {
         if (coefficientHigh >= 0x1ed09bead87c0 &&
             (coefficientHigh != 0x1ed09bead87c0 || coefficientLow != 0x378d8e63ffffffff)) {
             return false;
@@ -150,10 +149,7 @@ public:
     /**
      * Construct a 0E0 valued Decimal128.
      */
-    constexpr Decimal128()
-        : _value{0,
-                 static_cast<std::uint64_t>(Decimal128::kExponentBias)
-                     << Decimal128::kExponentFieldPos} {}
+    Decimal128() : _value(kNormalizedZero._value) {}
 
     /**
      * This constructor takes in a raw decimal128 type, which consists of two
@@ -166,15 +162,16 @@ public:
      * Constructs a Decimal128 from parts, dealing with proper encoding of the combination field.
      * Assumes that the value will be inside the valid range of finite values. (No NaN/Inf, etc.)
      */
-    constexpr Decimal128(std::uint64_t sign,
-                         std::uint64_t exponent,
-                         std::uint64_t coefficientHigh,
-                         std::uint64_t coefficientLow)
-        : _value(_valueFromParts(sign, exponent, coefficientHigh, coefficientLow)) {}
+    Decimal128(uint64_t sign, uint64_t exponent, uint64_t coefficientHigh, uint64_t coefficientLow)
+        : _value(
+              Value{coefficientLow,
+                    (sign << kSignFieldPos) | (exponent << kExponentFieldPos) | coefficientHigh}) {
+        dassert(isValid(sign, exponent, coefficientHigh, coefficientLow));
+    }
 
-    template <typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
-    constexpr explicit Decimal128(T v)
-        : Decimal128(std::signbit(v), kExponentBias, 0, _makeCoefficientLow(v)) {}
+    explicit Decimal128(std::int32_t int32Value);
+    explicit Decimal128(std::int64_t int64Value);
+    explicit Decimal128(std::uint64_t uint64Value);
 
     /**
      * This constructor takes a double and constructs a Decimal128 object given a roundMode, either
@@ -210,15 +207,13 @@ public:
     /**
      * This function gets the inner Value struct storing a Decimal128 value.
      */
-    constexpr Value getValue() const {
-        return _value;
-    }
+    Value getValue() const;
 
     /**
      *  Extracts the biased exponent from the combination field.
      */
-    constexpr std::uint32_t getBiasedExponent() const {
-        const std::uint64_t combo = _getCombinationField();
+    uint32_t getBiasedExponent() const {
+        const uint64_t combo = _getCombinationField();
         if (combo < kCombinationNonCanonical)
             return combo >> 3;
 
@@ -231,7 +226,7 @@ public:
      * Returns the high 49 bits of the 113-bit binary encoded coefficient. Returns 0 for
      * non-canonical or non-finite numbers.
      */
-    constexpr std::uint64_t getCoefficientHigh() const {
+    uint64_t getCoefficientHigh() const {
         return _getCombinationField() < kCombinationNonCanonical
             ? _value.high64 & kCanonicalCoefficientHighFieldMask
             : 0;
@@ -241,7 +236,7 @@ public:
      * Returns the low 64 bits of the 113-bit binary encoded coefficient. Returns 0 for
      * non-canonical or non-finite numbers.
      */
-    constexpr std::uint64_t getCoefficientLow() const {
+    uint64_t getCoefficientLow() const {
         return _getCombinationField() < kCombinationNonCanonical ? _value.low64 : 0;
     }
 
@@ -524,16 +519,15 @@ public:
     }
 
 private:
-    constexpr static std::uint8_t kSignFieldPos = 64 - 1;
-    constexpr static std::uint8_t kCombinationFieldPos = kSignFieldPos - 17;
-    constexpr static std::uint64_t kCombinationFieldMask = (1 << 17) - 1;
-    constexpr static std::uint64_t kExponentFieldPos = kCombinationFieldPos + 3;
-    constexpr static std::uint64_t kCoefficientContinuationFieldMask =
-        (1ull << kCombinationFieldPos) - 1;
-    constexpr static std::uint64_t kCombinationNonCanonical = 3 << 15;
-    constexpr static std::uint64_t kCombinationInfinity = 0x1e << 12;
-    constexpr static std::uint64_t kCombinationNaN = 0x1f << 12;
-    constexpr static std::uint64_t kCanonicalCoefficientHighFieldMask = (1ull << 49) - 1;
+    static const uint8_t kSignFieldPos = 64 - 1;
+    static const uint8_t kCombinationFieldPos = kSignFieldPos - 17;
+    static const uint64_t kCombinationFieldMask = (1 << 17) - 1;
+    static const uint64_t kExponentFieldPos = kCombinationFieldPos + 3;
+    static const uint64_t kCoefficientContinuationFieldMask = (1ull << kCombinationFieldPos) - 1;
+    static const uint64_t kCombinationNonCanonical = 3 << 15;
+    static const uint64_t kCombinationInfinity = 0x1e << 12;
+    static const uint64_t kCombinationNaN = 0x1f << 12;
+    static const uint64_t kCanonicalCoefficientHighFieldMask = (1ull << 49) - 1;
 
     std::string _convertToScientificNotation(StringData coefficient, int adjustedExponent) const;
     std::string _convertToStandardDecimalNotation(StringData coefficient, int exponent) const;
@@ -548,28 +542,8 @@ private:
                                       std::uint32_t* signalingFlags,
                                       RoundingMode roundMode = kRoundTiesToEven) const;
 
-    constexpr std::uint64_t _getCombinationField() const {
+    uint64_t _getCombinationField() const {
         return (_value.high64 >> kCombinationFieldPos) & kCombinationFieldMask;
-    }
-
-    constexpr static Value _valueFromParts(std::uint64_t sign,
-                                           std::uint64_t exponent,
-                                           std::uint64_t coefficientHigh,
-                                           std::uint64_t coefficientLow) {
-        // For constexpr's sake the invariant must be compiled only if !isValid().
-        if (!isValid(sign, exponent, coefficientHigh, coefficientLow)) {
-            invariant(false, "invalid arguments to Decimal128()");
-        }
-
-        return Value{coefficientLow,
-                     (sign << kSignFieldPos) | (exponent << kExponentFieldPos) | coefficientHigh};
-    }
-
-    // Constructs the absolute value of v as a uint64_t in a constexpr-permitted way.
-    template <typename T>
-    constexpr std::uint64_t _makeCoefficientLow(T i) {
-        auto wide = static_cast<std::uint64_t>(i);
-        return i < 0 ? -wide : wide;
     }
 
     Value _value;

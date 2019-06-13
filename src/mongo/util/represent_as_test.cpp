@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include <cmath>
-#include <fmt/format.h>
 #include <limits>
 #include <type_traits>
 
@@ -43,8 +42,6 @@
 namespace mongo {
 
 namespace {
-
-using namespace fmt::literals;
 
 // Char values
 const signed char kCharMax = std::numeric_limits<signed char>::max();
@@ -357,15 +354,8 @@ void integerToDecimal128() {
         v.emplace_back(-5);
     }
 
-    for (const Integer n : v) {
-        auto d = representAs<Decimal128>(n);
-        ASSERT(d);
-        if (!d->isEqual(Decimal128(std::to_string(n)))) {
-            FAIL(
-                "Failed expectation, representAs<Decimal128>({}) == Decimal128({}),"
-                " but !Decimal128({}).isEqual(Decimal128(std::to_string({}))"_format(
-                    n, d->toString(), d->toString(), n));
-        }
+    for (const auto& n : v) {
+        ASSERT(representAs<Decimal128>(n)->isEqual(Decimal128(std::to_string(n))));
     }
 }
 
