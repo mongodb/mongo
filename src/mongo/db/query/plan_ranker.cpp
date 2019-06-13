@@ -175,6 +175,23 @@ double computeSelectivity(const PlanStageStats* stats) {
     }
 }
 
+// TODO: Move this out.  This is a signal for ranking but will become its own complicated
+// stats-collecting beast.
+double computeDocsExamined(const PlanStageStats* stats) {
+    if (STAGE_FETCH == stats->stageType) {
+        FetchStats* fs = static_cast<FetchStats*>(stats->specific.get());
+        return static_cast<double>(fs->docsExamined) / static_cast<double>(stats->common.works);
+    } else {
+        // Return geometric mean.
+        double sumlog = 0;
+        for (size_t i = 0; i < stats->children.size(); ++i) {
+            auto rate = computeDocsExamined(stats->children[i].get());
+            sumlog += std::log(rate);
+        }
+        return std::exp(sumlog / static_cast<double>(stats->children.size()));
+    }
+}
+
 bool hasStage(const StageType type, const PlanStageStats* stats) {
     if (type == stats->stageType) {
         return true;
@@ -202,6 +219,10 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     // Range: [0, 1]
     double productivity =
         static_cast<double>(stats->common.advanced) / static_cast<double>(workUnits);
+
+    // How much of the produce were examined?
+    // Range: [-1, 0]
+    double docsExamined = -computeDocsExamined(stats);
 
     // Just enough to break a tie. Must be small enough to ensure that a more productive
     // plan doesn't lose to a less productive plan due to tie breaking.
@@ -240,13 +261,14 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     }
 
     double tieBreakers = noFetchBonus + noSortBonus + noIxisectBonus;
-    double score = baseScore + productivity + tieBreakers;
+    double score = baseScore + productivity + docsExamined + tieBreakers;
 
     StringBuilder sb;
     sb << "score(" << str::convertDoubleToString(score) << ") = baseScore("
        << str::convertDoubleToString(baseScore) << ")"
        << " + productivity((" << stats->common.advanced << " advanced)/(" << stats->common.works
        << " works) = " << str::convertDoubleToString(productivity) << ")"
+       << " + docsExamined(" << str::convertDoubleToString(docsExamined) << ")"
        << " + tieBreakers(" << str::convertDoubleToString(noFetchBonus) << " noFetchBonus + "
        << str::convertDoubleToString(noSortBonus) << " noSortBonus + "
        << str::convertDoubleToString(noIxisectBonus)
