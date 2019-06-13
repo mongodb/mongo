@@ -160,18 +160,22 @@
     const otherCollection = assertCreateCollection(db, otherCollName);
     const adminDB = db.getSiblingDB("admin");
 
-    // Open a stream on the test collection. Write one document to the test collection and one to
-    // the unrelated collection, in order to push the postBatchResumeToken (PBRT) past the last
-    // related event.
+    // Open a stream on the test collection, and write a document to it.
     csCursor = testCollection.watch();
     assert.commandWorked(testCollection.insert({_id: docId++}));
-    assert.commandWorked(otherCollection.insert({}));
 
-    // Consume all events. The PBRT of the batch should be greater than the last event, which
-    // guarantees that it is a synthetic high-water-mark token.
+    // Write an event to the unrelated collection in order to advance the PBRT, and then consume all
+    // events. When we see a PBRT that is greater than the timestamp of the last event (stored in
+    // 'relatedEvent'), we know it must be a synthetic high-water-mark token.
+    //
+    // Note that the first insert into the unrelated collection may not be enough to advance the
+    // PBRT; some passthroughs will group the unrelated write into a transaction with the related
+    // write, giving them the same timestamp. We put the unrelated insert into the assert.soon loop,
+    // so that it will eventually get its own transaction with a new timestamp.
     let relatedEvent = null;
     let hwmToken = null;
     assert.soon(() => {
+        assert.commandWorked(otherCollection.insert({}));
         if (csCursor.hasNext()) {
             relatedEvent = csCursor.next();
         }

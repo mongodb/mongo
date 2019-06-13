@@ -5817,6 +5817,39 @@ tasks:
       resmoke_args: --suites=change_streams_whole_cluster_sharded_collections_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: change_streams_multi_stmt_txn_passthrough
+  tags: ["change_streams"]
+  depends_on:
+  - name: change_streams
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=change_streams_multi_stmt_txn_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: change_streams_multi_stmt_txn_mongos_passthrough
+  tags: ["change_streams"]
+  depends_on:
+  - name: change_streams
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=change_streams_multi_stmt_txn_mongos_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: change_streams_multi_stmt_txn_sharded_collections_passthrough
+  tags: ["change_streams"]
+  depends_on:
+  - name: change_streams
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=change_streams_multi_stmt_txn_sharded_collections_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
   name: disk_mobile
   commands:
   - func: "do setup"

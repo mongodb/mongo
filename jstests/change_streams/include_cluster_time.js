@@ -1,4 +1,9 @@
 // Tests that each change in the stream will include the cluster time at which it happened.
+//
+// This test expects each change stream result to have an operationTime based on the clusterTime in
+// the oplog entry. When operations get bundled into a transaction, their operationTime is instead
+// based on the commit oplog entry, which would cause this test to fail.
+// @tags: [change_stream_does_not_expect_txns]
 (function() {
     "use strict";
 

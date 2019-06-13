@@ -1,6 +1,11 @@
 // Test change streams related shell helpers and options passed to them. Note that, while we only
 // call the DBCollection.watch helper in this file, it will be redirected to the DB.watch or
 // Mongo.watch equivalents in the whole_db and whole_cluster passthroughs.
+//
+// This test expects each change stream result to have an operationTime based on the clusterTime in
+// the oplog entry. When operations get bundled into a transaction, their operationTime is instead
+// based on the commit oplog entry, which would cause this test to fail.
+// @tags: [change_stream_does_not_expect_txns]
 (function() {
     "use strict";
 

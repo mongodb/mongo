@@ -1348,6 +1348,32 @@
               testBadDBName(session, 'local');
           }
         },
+        {
+          name: "getMore on change stream executes outside transaction",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+
+              // Starting a $changeStream aggregation within a transaction would fail, so the
+              // override has to execute this as a standalone command.
+              const changeStream = testDB.collName1.watch();
+              assert.commandWorked(testDB.collName1.insert({_id: 1}));
+              endCurrentTransactionIfOpen();
+
+              // Calling the `next` function on the change stream cursor will trigger a getmore,
+              // which the override must also run as a standalone command.
+              assert.eq(changeStream.next()["fullDocument"], {_id: 1});
+
+              // An aggregation without $changeStream runs within a transaction.
+              let aggCursor = testDB.collName1.aggregate([], {cursor: {batchSize: 0}});
+              assert.eq(aggCursor.next(), {_id: 1});
+
+              // Creating a non-$changeStream aggregation cursor and running its getMore in a
+              // different transaction will fail.
+              aggCursor = testDB.collName1.aggregate([], {cursor: {batchSize: 0}});
+              endCurrentTransactionIfOpen();
+              assert.throws(() => aggCursor.next());
+          }
+        },
     ];
 
     // Failpoints, overrides, and post-command functions are set by default to only run once, so
