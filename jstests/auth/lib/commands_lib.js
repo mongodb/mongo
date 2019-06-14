@@ -5205,6 +5205,24 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "refineCollectionShardKey",
+          command: {refineCollectionShardKey: "test.x", key: {aKey: 1}},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_clusterManager,
+                privileges: [{
+                    resource: {db: "test", collection: "x"},
+                    actions: ["refineCollectionShardKey"]
+                }],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "renameCollection_sameDb",
           command: {renameCollection: firstDbName + ".x", to: firstDbName + ".y", dropTarget: true},
           setup: function(db) {

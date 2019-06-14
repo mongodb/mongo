@@ -85,6 +85,7 @@
 "planCacheIndexFilter", # view/update index filters
 "planCacheRead", # view contents of plan cache
 "planCacheWrite", # clear cache, drop cache entry, pin/unpin/shun plans
+"refineCollectionShardKey",
 "reIndex",
 "remove",
 "removeShard",

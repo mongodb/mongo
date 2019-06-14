@@ -49,7 +49,7 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            const NamespaceString nss = request().getCommandParameter();
+            const NamespaceString nss = ns();
 
             ConfigsvrRefineCollectionShardKey configsvrRefineCollShardKey(nss, request().getKey());
             configsvrRefineCollShardKey.setDbName(request().getDbName());
@@ -80,8 +80,8 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::enableSharding));
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns()),
+                                                           ActionType::refineCollectionShardKey));
         }
     };
 
