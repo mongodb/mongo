@@ -432,3 +432,13 @@ env.Library(
     ],
 )
 
+env.CppLibfuzzerTest(
+    target='key_string_to_bson_fuzzer',
+    source=[
+        'key_string_to_bson_fuzzer.cpp',
+    ],
+    LIBDEPS=[
+        'key_string',
+        '$BUILD_DIR/mongo/base',
+    ],
+)
