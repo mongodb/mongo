@@ -9,9 +9,13 @@ To build MongoDB, you will need:
     * Visual Studio 2017 version 15.9 or newer (See Windows section below for details)
 * On Linux and macOS, the libcurl library and header is required. MacOS includes libcurl.
     * Fedora/RHEL - `dnf install libcurl-devel`
-    * Ubuntu/Debian - `apt-get install libcurl-dev`
+    * Ubuntu/Debian - `libcurl-dev` is provided by three packages. Install one of them:
+      * `libcurl4-openssl-dev`
+      * `libcurl4-nss-dev`
+      * `libcurl4-gnutls-dev`
 * Python 3.7.x and Pip modules:
   * See the section "Python Prerequisites" below.
+* About 13 GB of free disk space for the core binaries (`mongod`, `mongos`, and `mongo`) and about 600 GB for the all target.
 
 MongoDB supports the following architectures: arm64, ppc64le, s390x, and x86-64.
 More detailed platform instructions can be found below.
@@ -35,6 +39,11 @@ the required Python modules, run:
 
 Note: If the `pip3` command is not available, `pip` without a suffix may be the pip command
 associated with Python 3.7.x.
+
+Note: In order to compile C-based Python modules, you'll also need the Python and OpenSSL C headers. Run:
+
+* Fedora/RHEL - `dnf install python3-devel openssl-devel`
+* Ubuntu/Debian - `apt-get install python3.7-dev libssl-dev`
 
 SCons
 ---------------
@@ -86,12 +95,12 @@ Debian/Ubuntu
 
 To install dependencies on Debian or Ubuntu systems:
 
-    # aptitude install build-essential
-    # aptitude install libboost-filesystem-dev libboost-program-options-dev libboost-system-dev libboost-thread-dev
+    # apt-get install build-essential
+    # apt-get install libboost-filesystem-dev libboost-program-options-dev libboost-system-dev libboost-thread-dev
 
 To run tests as well, you will need PyMongo:
 
-    # aptitude install python-pymongo
+    # apt-get install python3-pymongo
 
 OS X
 --------------
