@@ -1319,7 +1319,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         args = appendSetParameterArgs(args);
         var progName = args[0];
 
-        if (jsTestOptions().auth && progName != 'mongod') {
+        // The bsondump tool doesn't support these auth related command line flags.
+        if (jsTestOptions().auth && progName != 'mongod' && progName != 'bsondump') {
             args = args.slice(1);
             args.unshift(progName,
                          '-u',

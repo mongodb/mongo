@@ -7,6 +7,7 @@
 
     load('jstests/libs/check_log.js');
     load('jstests/replsets/libs/rollback_test.js');
+    load('jstests/replsets/libs/rollback_files.js');
 
     // Operations that will be present on both nodes, before the common point.
     const dbName = 'test';
@@ -24,8 +25,9 @@
         const sessionDB = session.getDatabase(dbName);
         const sessionColl = sessionDB.getCollection(collNameShort);
         session.startTransaction();
-        assert.commandWorked(sessionColl.insert({_id: 1}));
-        assert.commandWorked(sessionColl.insert({_id: 2}));
+        assert.commandWorked(sessionColl.insert({_id: "a"}));
+        assert.commandWorked(sessionColl.insert({_id: "b"}));
+        assert.commandWorked(sessionColl.insert({_id: "c"}));
         assert.commandWorked(session.commitTransaction_forTesting());
         session.endSession();
     };
@@ -49,13 +51,10 @@
     assert.eq(1, coll.find().itcount());
     assert.eq(1, coll.count());
 
-    // Check logs and data directory to confirm that rollback wrote deleted documents to file.
-    checkLog.contains(
-        rollbackNode,
-        'Preparing to write deleted documents to a rollback file for collection ' + collName);
+    // Confirm that the rollback wrote deleted documents to a file.
     const replTest = rollbackTest.getTestFixture();
-    const rollbackDir = replTest.getDbPath(rollbackNode) + '/rollback';
-    assert(pathExists(rollbackDir), 'directory for rollback files does not exist: ' + rollbackDir);
+    const expectedDocs = [{_id: "a"}, {_id: "b"}, {_id: "c"}];
+    checkRollbackFiles(replTest.getDbPath(rollbackNode), collName, expectedDocs);
 
     rollbackTest.stop();
 })();
