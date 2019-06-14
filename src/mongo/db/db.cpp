@@ -112,6 +112,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/platform/random.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
@@ -1019,7 +1020,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
         executor::makeNetworkInterface("NetworkInterfaceASIO-Replication").release(),
         new repl::TopologyCoordinatorImpl(topoCoordOptions),
         storageInterface,
-        static_cast<int64_t>(curTimeMillis64()));
+        std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
     repl::setOplogCollectionName();
     return Status::OK();
