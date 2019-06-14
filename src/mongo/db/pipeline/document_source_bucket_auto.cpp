@@ -438,6 +438,14 @@ DocumentSourceBucketAuto::DocumentSourceBucketAuto(
     }
 }
 
+const boost::intrusive_ptr<Expression> DocumentSourceBucketAuto::getGroupByExpression() const {
+    return _groupByExpression;
+}
+
+const std::vector<AccumulationStatement>& DocumentSourceBucketAuto::getAccumulatedFields() const {
+    return _accumulatedFields;
+}
+
 intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(40240,
