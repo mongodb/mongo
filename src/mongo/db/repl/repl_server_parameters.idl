@@ -168,6 +168,17 @@ server_parameters:
         cpp_varname: collectionClonerUsesExhaust
         default: true
 
+    # From collection_bulk_loader_impl.cpp
+    collectionBulkLoaderBatchSizeInBytes:
+        description: >-
+            Limit for the number of bytes of data inserted per storage transaction 
+            (WriteUnitOfWork) by collectionBulkLoader during initial sync collection cloning
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: collectionBulkLoaderBatchSizeInBytes
+        default:
+            expr: 256 * 1024
+
     # From database_cloner.cpp
     collectionClonerBatchSize:
         description: >-
