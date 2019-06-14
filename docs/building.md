@@ -97,12 +97,12 @@ Debian/Ubuntu
 
 To install dependencies on Debian or Ubuntu systems:
 
-    # aptitude install build-essential
-    # aptitude install libboost-filesystem-dev libboost-program-options-dev libboost-system-dev libboost-thread-dev
+    # apt-get install build-essential
+    # apt-get install libboost-filesystem-dev libboost-program-options-dev libboost-system-dev libboost-thread-dev
 
 To run tests as well, you will need PyMongo:
 
-    # aptitude install python-pymongo
+    # apt-get install python-pymongo
 
 OS X
 --------------
