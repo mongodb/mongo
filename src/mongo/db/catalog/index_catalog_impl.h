@@ -378,6 +378,7 @@ private:
                       const std::vector<BSONObj>& keys,
                       const BSONObjSet& multikeyMetadataKeys,
                       const MultikeyPaths& multikeyPaths,
+                      const BSONObj& obj,
                       RecordId loc,
                       const InsertDeleteOptions& options,
                       int64_t* keysInsertedOut);
