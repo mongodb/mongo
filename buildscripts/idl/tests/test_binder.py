@@ -789,6 +789,19 @@ class TestBinder(testcase.IDLTestcase):
                         comparison_order: 1
             """), idl.errors.ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER)
 
+        # Test field marked with non_const_getter in immutable struct
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+            structs:
+                foo:
+                    description: foo
+                    immutable: true
+                    fields:
+                        foo:
+                            type: string
+                            non_const_getter: true
+            """), idl.errors.ERROR_ID_NON_CONST_GETTER_IN_IMMUTABLE_STRUCT)
+
     def test_ignored_field_negative(self):
         # type: () -> None
         """Test that if a field is marked as ignored, no other properties are set."""

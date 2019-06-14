@@ -1017,13 +1017,15 @@ private:
      * "originalTerm" was the term during which the dry run began, if the term has since
      * changed, do not run for election.
      */
-    void _processDryRunResult(long long originalTerm);
+    void _processDryRunResult(long long originalTerm,
+                              TopologyCoordinator::StartElectionReason reason);
 
     /**
      * Begins executing a real election. This is called either a successful dry run, or when the
      * dry run was skipped (which may be specified for a ReplSetStepUp).
      */
-    void _startRealElection_inlock(long long originalTerm);
+    void _startRealElection_inlock(long long originalTerm,
+                                   TopologyCoordinator::StartElectionReason reason);
 
     /**
      * Writes the last vote in persistent storage after completing dry run successfully.

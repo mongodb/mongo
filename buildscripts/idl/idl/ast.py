@@ -166,6 +166,7 @@ class Field(common.SourceLocation):
         self.ignore = False  # type: bool
         self.chained = False  # type: bool
         self.comparison_order = -1  # type: int
+        self.non_const_getter = False  # type: bool
 
         # Properties specific to fields which are types.
         self.cpp_type = None  # type: str
