@@ -1,3 +1,4 @@
+// @tags: [cannot_run_with_legacy_transport]
 (function() {
     'use strict';
     // Create a temporary host file that creates two aliases for localhost that are in the

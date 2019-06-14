@@ -6929,7 +6929,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
-    test_flags: --transportLayer=legacy
+    test_flags: --transportLayer=legacy --excludeWithAnyTags=cannot_run_with_legacy_transport
     tooltags: "ssl sasl"
     build_mongoreplay: false
   tasks:
@@ -10081,7 +10081,7 @@ buildvariants:
     build_mongoreplay: false
     hang_analyzer_dump_core: false
     use_scons_cache: true
-    test_flags: --transportLayer=legacy
+    test_flags: --transportLayer=legacy --excludeWithAnyTags=cannot_run_with_legacy_transport
   tasks:
   - name: compile
   - name: compile_all
