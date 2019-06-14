@@ -44,6 +44,37 @@ class BSONObjBuilder;
 class OperationContext;
 
 /**
+ * The PrepareConflictBehavior specifies how operations should behave when encountering prepare
+ * conflicts.
+ */
+enum class PrepareConflictBehavior {
+    /**
+     * When prepare conflicts are encountered, block until the conflict is resolved.
+     */
+    kEnforce,
+
+    /**
+     * Ignore prepare conflicts when they are encountered.
+     *
+     * When a prepared update is encountered, the previous version of a record will be returned.
+     * This behavior can result in reading different versions of a record within the same snapshot
+     * if the prepared update is committed during that snapshot. For this reason, operations that
+     * ignore prepared updates may only perform reads. This is to prevent updating a record based on
+     * an older version of itself, because a write conflict will not be generated in this scenario.
+     */
+    kIgnoreConflicts,
+
+    /**
+     * Ignore prepare conflicts when they are encountered, and allow operations to perform writes,
+     * an exception to the rule of kIgnoreConflicts.
+     *
+     * This should only be used in cases where this is known to be impossible to perform writes
+     * based on other prepared updates.
+     */
+    kIgnoreConflictsAllowWrites
+};
+
+/**
  * Storage statistics management class, with interfaces to provide the statistics in the BSON format
  * and an operator to add the statistics values.
  */
@@ -125,18 +156,17 @@ public:
     }
 
     /**
-     * Sets whether or not to ignore prepared transactions if supported by this storage engine. When
-     * 'ignore' is true, allows reading data from before prepared transactions, but will not show
-     * prepared data. This may not be called while a transaction is already open.
+     * Sets the behavior of handling conflicts that are encountered due to prepared transactions, if
+     * supported by this storage engine. See PrepareConflictBehavior.
      */
-    virtual void setIgnorePrepared(bool ignore) {}
+    virtual void setPrepareConflictBehavior(PrepareConflictBehavior behavior) {}
 
     /**
-     * Returns whether or not we are ignoring prepared conflicts. Defaults to false if prepared
-     * transactions are not supported by this storage engine.
+     * Returns the behavior of handling conflicts that are encountered due to prepared transactions.
+     * Defaults to kEnforce if prepared transactions are not supported by this storage engine.
      */
-    virtual bool getIgnorePrepared() const {
-        return false;
+    virtual PrepareConflictBehavior getPrepareConflictBehavior() const {
+        return PrepareConflictBehavior::kEnforce;
     }
 
     /**

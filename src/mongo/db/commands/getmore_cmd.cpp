@@ -374,8 +374,10 @@ public:
                         RecoveryUnit::ReadSource::kProvided, clusterTime);
 
                     // The $_internalReadAtClusterTime option also causes any storage-layer cursors
-                    // created during plan execution to block on prepared transactions.
-                    opCtx->recoveryUnit()->setIgnorePrepared(false);
+                    // created during plan execution to block on prepared transactions. Since the
+                    // getMore command ignores prepare conflicts by default, change the behavior.
+                    opCtx->recoveryUnit()->setPrepareConflictBehavior(
+                        PrepareConflictBehavior::kEnforce);
                 }
             }
             if (cursorPin->lockPolicy() == ClientCursorParams::LockPolicy::kLocksInternally) {

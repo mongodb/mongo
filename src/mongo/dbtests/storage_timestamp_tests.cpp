@@ -112,12 +112,13 @@ class IgnorePrepareBlock {
 public:
     IgnorePrepareBlock(OperationContext* opCtx) : _opCtx(opCtx) {
         _opCtx->recoveryUnit()->abandonSnapshot();
-        _opCtx->recoveryUnit()->setIgnorePrepared(true);
+        _opCtx->recoveryUnit()->setPrepareConflictBehavior(
+            PrepareConflictBehavior::kIgnoreConflicts);
     }
 
     ~IgnorePrepareBlock() {
         _opCtx->recoveryUnit()->abandonSnapshot();
-        _opCtx->recoveryUnit()->setIgnorePrepared(false);
+        _opCtx->recoveryUnit()->setPrepareConflictBehavior(PrepareConflictBehavior::kEnforce);
     }
 
 private:

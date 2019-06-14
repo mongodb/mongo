@@ -39,7 +39,6 @@
 
 namespace mongo {
 
-using IgnorePrepared = WiredTigerBeginTxnBlock::IgnorePrepared;
 using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
 
 class WiredTigerOplogManager;
@@ -67,7 +66,7 @@ public:
      */
     Timestamp beginTransactionOnCommittedSnapshot(
         WT_SESSION* session,
-        IgnorePrepared ignorePrepared,
+        PrepareConflictBehavior prepareConflictBehavior,
         RoundUpPreparedTimestamps roundUpPreparedTimestamps) const;
 
     /**
@@ -77,7 +76,7 @@ public:
      */
     Timestamp beginTransactionOnLocalSnapshot(
         WT_SESSION* session,
-        IgnorePrepared ignorePrepared,
+        PrepareConflictBehavior prepareConflictBehavior,
         RoundUpPreparedTimestamps roundUpPreparedTimestamps) const;
 
     /**

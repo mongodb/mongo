@@ -184,8 +184,9 @@ public:
                                                           targetClusterTime);
 
             // The $_internalReadAtClusterTime option also causes any storage-layer cursors created
-            // during plan execution to block on prepared transactions.
-            opCtx->recoveryUnit()->setIgnorePrepared(false);
+            // during plan execution to block on prepared transactions. Since the dbhash command
+            // ignores prepare conflicts by default, change the behavior.
+            opCtx->recoveryUnit()->setPrepareConflictBehavior(PrepareConflictBehavior::kEnforce);
         }
 
         // We lock the entire database in S-mode in order to ensure that the contents will not

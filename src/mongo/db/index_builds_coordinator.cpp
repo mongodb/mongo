@@ -849,10 +849,11 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID) ||
               storageGlobalParams.engine == "mobile");
 
-    // Index builds can safely ignore prepare conflicts. On secondaries, prepare operations wait for
-    // index builds to complete.
+    // Index builds can safely ignore prepare conflicts and perform writes. On secondaries, prepare
+    // operations wait for index builds to complete.
     opCtx->recoveryUnit()->abandonSnapshot();
-    opCtx->recoveryUnit()->setIgnorePrepared(true);
+    opCtx->recoveryUnit()->setPrepareConflictBehavior(
+        PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
     // Collection scan and insert into index, followed by a drain of writes received in the
     // background.

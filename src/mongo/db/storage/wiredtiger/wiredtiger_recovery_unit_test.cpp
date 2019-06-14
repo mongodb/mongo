@@ -252,11 +252,43 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     // A transaction that chooses to ignore prepare conflicts does not see the record instead of
     // returning a prepare conflict.
     ru2->beginUnitOfWork(clientAndCtx2.second.get());
-    ru2->setIgnorePrepared(true);
+    ru2->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
     int ret = cursor->search(cursor);
     ASSERT_EQ(WT_NOTFOUND, ret);
+
+    ru1->abortUnitOfWork();
+    ru2->abortUnitOfWork();
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, WriteAllowedWhileIgnorePrepareFalse) {
+    // Prepare but don't commit a transaction
+    ru1->beginUnitOfWork(clientAndCtx1.second.get());
+    WT_CURSOR* cursor;
+    getCursor(ru1, &cursor);
+    cursor->set_key(cursor, "key1");
+    cursor->set_value(cursor, "value1");
+    invariantWTOK(cursor->insert(cursor));
+    ru1->setPrepareTimestamp({1, 1});
+    ru1->prepareUnitOfWork();
+
+    // A transaction that chooses to ignore prepare conflicts with kIgnoreConflictsAllowWrites does
+    // not see the record
+    ru2->beginUnitOfWork(clientAndCtx2.second.get());
+    ru2->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+
+    // The prepared write is not visible.
+    getCursor(ru2, &cursor);
+    cursor->set_key(cursor, "key1");
+    ASSERT_EQ(WT_NOTFOUND, cursor->search(cursor));
+
+    getCursor(ru2, &cursor);
+    cursor->set_key(cursor, "key2");
+    cursor->set_value(cursor, "value2");
+
+    // The write is allowed.
+    invariantWTOK(cursor->insert(cursor));
 
     ru1->abortUnitOfWork();
     ru2->abortUnitOfWork();

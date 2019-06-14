@@ -74,9 +74,9 @@ boost::optional<Timestamp> WiredTigerSnapshotManager::getMinSnapshotForNextCommi
 
 Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     WT_SESSION* session,
-    IgnorePrepared ignorePrepared,
+    PrepareConflictBehavior prepareConflictBehavior,
     RoundUpPreparedTimestamps roundUpPreparedTimestamps) const {
-    WiredTigerBeginTxnBlock txnOpen(session, ignorePrepared, roundUpPreparedTimestamps);
+    WiredTigerBeginTxnBlock txnOpen(session, prepareConflictBehavior, roundUpPreparedTimestamps);
 
     stdx::lock_guard<stdx::mutex> lock(_committedSnapshotMutex);
     uassert(ErrorCodes::ReadConcernMajorityNotAvailableYet,
@@ -92,9 +92,9 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
 
 Timestamp WiredTigerSnapshotManager::beginTransactionOnLocalSnapshot(
     WT_SESSION* session,
-    IgnorePrepared ignorePrepared,
+    PrepareConflictBehavior prepareConflictBehavior,
     RoundUpPreparedTimestamps roundUpPreparedTimestamps) const {
-    WiredTigerBeginTxnBlock txnOpen(session, ignorePrepared, roundUpPreparedTimestamps);
+    WiredTigerBeginTxnBlock txnOpen(session, prepareConflictBehavior, roundUpPreparedTimestamps);
 
     stdx::lock_guard<stdx::mutex> lock(_localSnapshotMutex);
     invariant(_localSnapshot);

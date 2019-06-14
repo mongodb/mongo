@@ -48,7 +48,6 @@
 
 namespace mongo {
 
-using IgnorePrepared = WiredTigerBeginTxnBlock::IgnorePrepared;
 using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
 using RoundUpReadTimestamp = WiredTigerBeginTxnBlock::RoundUpReadTimestamp;
 
@@ -139,9 +138,9 @@ public:
 
     Timestamp getPrepareTimestamp() const override;
 
-    void setIgnorePrepared(bool ignore) override;
+    void setPrepareConflictBehavior(PrepareConflictBehavior behavior) override;
 
-    bool getIgnorePrepared() const override;
+    PrepareConflictBehavior getPrepareConflictBehavior() const override;
 
     void setRoundUpPreparedTimestamps(bool value) override;
 
@@ -310,9 +309,8 @@ private:
     // When 'true', data read from disk should not be kept in the storage engine cache.
     bool _readOnce = false;
 
-    // If set to kIgnore, updates from prepared transactions will not return prepare conflicts and
-    // will not allow seeing prepared data.
-    IgnorePrepared _ignorePrepared{IgnorePrepared::kNoIgnore};
+    // The behavior of handling prepare conflicts.
+    PrepareConflictBehavior _prepareConflictBehavior{PrepareConflictBehavior::kEnforce};
     // Dictates whether to round up prepare and commit timestamp of a prepared transaction.
     RoundUpPreparedTimestamps _roundUpPreparedTimestamps{RoundUpPreparedTimestamps::kNoRound};
     Timestamp _commitTimestamp;
