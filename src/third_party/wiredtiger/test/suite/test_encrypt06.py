@@ -45,7 +45,7 @@ class test_encrypt06(wttest.WiredTigerTestCase):
     # testing a potential misuse of the API: a table is opened with
     # with its own encryption options (different from the system),
     # but the indices and column groups do not specify encryption,
-    # so they'll get the system encryptor.
+    # so they may get the system encryptor.
     storagetype = [
         ('table', dict(
             uriprefix='table:', use_cg=False, use_index=False, match=True)),
@@ -66,25 +66,25 @@ class test_encrypt06(wttest.WiredTigerTestCase):
     ]
     encrypt = [
         ('none', dict(
-            sys_encrypt='none', sys_encrypt_args='', encryptmeta=False,
-            file0_encrypt='none', file0_encrypt_args='', encrypt0=False,
-            file1_encrypt='none', file1_encrypt_args='', encrypt1=False)),
+            sys_encrypt='none', sys_encrypt_args='',
+            table0_encrypt='none', table0_encrypt_args='',
+            table1_encrypt='none', table1_encrypt_args='')),
         ('rotn-implied', dict(
-            sys_encrypt='rotn', sys_encrypt_args=key11, encryptmeta=True,
-            file0_encrypt=None, file0_encrypt_args='', encrypt0=True,
-            file1_encrypt=None, file1_encrypt_args='', encrypt1=True)),
+            sys_encrypt='rotn', sys_encrypt_args=key11,
+            table0_encrypt=None, table0_encrypt_args='',
+            table1_encrypt=None, table1_encrypt_args='')),
         ('rotn-all', dict(
-            sys_encrypt='rotn', sys_encrypt_args=key11, encryptmeta=True,
-            file0_encrypt='rotn', file0_encrypt_args=key13, encrypt0=True,
-            file1_encrypt='rotn', file1_encrypt_args=key13, encrypt1=True)),
+            sys_encrypt='rotn', sys_encrypt_args=key11,
+            table0_encrypt='rotn', table0_encrypt_args=key13,
+            table1_encrypt='rotn', table1_encrypt_args=key13)),
         ('rotn-sys', dict(
-            sys_encrypt='rotn', sys_encrypt_args=key11, encryptmeta=True,
-            file0_encrypt='none', file0_encrypt_args='', encrypt0=False,
-            file1_encrypt='none', file1_encrypt_args='', encrypt1=False)),
-        ('rotn-file0', dict(
-            sys_encrypt='rotn', sys_encrypt_args=key11, encryptmeta=True,
-            file0_encrypt='rotn', file0_encrypt_args=key13, encrypt0=True,
-            file1_encrypt='none', file1_encrypt_args='', encrypt1=False)),
+            sys_encrypt='rotn', sys_encrypt_args=key11,
+            table0_encrypt='none', table0_encrypt_args='',
+            table1_encrypt='none', table1_encrypt_args='')),
+        ('rotn-table0', dict(
+            sys_encrypt='rotn', sys_encrypt_args=key11,
+            table0_encrypt='rotn', table0_encrypt_args=key13,
+            table1_encrypt='none', table1_encrypt_args='')),
     ]
     scenarios = make_scenarios(encrypt, storagetype)
     nrecords = 1000
@@ -92,14 +92,14 @@ class test_encrypt06(wttest.WiredTigerTestCase):
     def conn_extensions(self, extlist):
         extlist.skip_if_missing = True
         extlist.extension('encryptors', self.sys_encrypt)
-        extlist.extension('encryptors', self.file0_encrypt)
-        extlist.extension('encryptors', self.file1_encrypt)
+        extlist.extension('encryptors', self.table0_encrypt)
+        extlist.extension('encryptors', self.table1_encrypt)
 
     def conn_config(self):
         return 'encryption=(name={0}{1}),'.format(
             self.sys_encrypt, self.sys_encrypt_args)
 
-    def encrypt_file_params(self, name, args):
+    def encrypt_table_params(self, name, args):
         if name == None:
             return ''
         else:
@@ -116,63 +116,85 @@ class test_encrypt06(wttest.WiredTigerTestCase):
                 return True
         return False
 
-    def expected_encryption(self, exp):
-        expect = exp
-        # If we're expecting it to be unencrypted, but we (errantly)
-        # did not specify encryption on indices/columngroups,
-        # then column groups (if they exist) will be encrypted -
-        # there will be no data in the main table to be unencrypted.
-        if self.sys_encrypt != 'none' and not self.match and self.use_cg:
-            expect = True
-        return expect
+    def visible_data(self, table_setting):
+        if table_setting == None:
+            # No table encryption explicitly set, so we use the system setting
+            visible = (self.sys_encrypt == 'none')
+        else:
+            visible = (table_setting == 'none')
+        return visible
+
+    def visible_name(self, table_setting, iskey):
+        if table_setting == None:
+            # No table encryption explicitly set, so we use the system setting
+            visible = (self.sys_encrypt == 'none')
+        else:
+            visible = (table_setting == 'none')
+
+        # If we have everything in a column group, the key name will not
+        # be stored in the column group files.  It will be stored in the
+        # system metadata, if that is not encrypted.
+        if iskey and self.use_cg and self.sys_encrypt != 'none':
+            visible = False
+        return visible
 
     # Create a table, add key/values with specific lengths, then verify them.
     def test_encrypt(self):
         name0 = 'test_encrypt06-0'
         name1 = 'test_encrypt06-1'
 
-        enc0 = self.encrypt_file_params(self.file0_encrypt,
-                                        self.file0_encrypt_args)
-        enc1 = self.encrypt_file_params(self.file1_encrypt,
-                                        self.file1_encrypt_args)
+        enc0 = self.encrypt_table_params(self.table0_encrypt,
+                                        self.table0_encrypt_args)
+        enc1 = self.encrypt_table_params(self.table1_encrypt,
+                                        self.table1_encrypt_args)
 
         # This is the clear text that we'll be looking for
         txt0 = 'AbCdEfG'
         txt1 = 'aBcDeFg'
+        keyname0 = 'MyKey0Name'
+        keyname1 = 'MyKey1Name'
+        valname0 = 'MyValue0Name'
+        valname1 = 'MyValue1Name'
 
         # Make a bunch of column group and indices,
         # we want to see if any information is leaked anywhere.
+        # The key column and one of the value columns is given a name
+        # we will look for as clear text.
         sharedparam = 'key_format=S,value_format=SSSS,' + \
-                      'columns=(MyKeyName,v0,v1,v2,v3),'
+                      'columns=({},{},v1,v2,v3),'
 
         s = self.session
         pfx = self.uriprefix
 
         cgparam = 'colgroups=(g00,g01)' if self.use_cg else ''
-        s.create(pfx + name0, sharedparam + cgparam + enc0)
+        s.create(pfx + name0, sharedparam.format(keyname0, valname0) + \
+                 cgparam + enc0)
 
-        # Having unmatched encryption for colgroup or index is
-        # not recommended, but we check it.
         if not self.match:
             enc0 = ''
         if self.use_cg:
-            s.create('colgroup:' + name0 + ':g00', 'columns=(v0,v1)' + enc0)
+            s.create('colgroup:' + name0 + ':g00',
+                     'columns=({},v1)'.format(valname0) + enc0)
             s.create('colgroup:' + name0 + ':g01', 'columns=(v2,v3)' + enc0)
         if self.use_index:
-            s.create('index:' + name0 + ':i00', 'columns=(v0)' + enc0)
+            s.create('index:' + name0 + ':i00',
+                     'columns=({})'.format(valname0) + enc0)
             s.create('index:' + name0 + ':i01', 'columns=(v1,v2)' + enc0)
             s.create('index:' + name0 + ':i02', 'columns=(v3)' + enc0)
 
         cgparam = 'colgroups=(g10,g11)' if self.use_cg else ''
-        s.create(pfx + name1, sharedparam + cgparam + enc1)
+        s.create(pfx + name1, sharedparam.format(keyname1, valname1) + \
+                 cgparam + enc1)
 
         if not self.match:
             enc1 = ''
         if self.use_cg:
-            s.create('colgroup:' + name1 + ':g10', 'columns=(v0,v1)' + enc1)
+            s.create('colgroup:' + name1 + ':g10',
+                     'columns=({},v1)'.format(valname1) + enc1)
             s.create('colgroup:' + name1 + ':g11', 'columns=(v2,v3)' + enc1)
         if self.use_index:
-            s.create('index:' + name1 + ':i10', 'columns=(v0)' + enc1)
+            s.create('index:' + name1 + ':i10',
+                     'columns=({})'.format(valname1) + enc1)
             s.create('index:' + name1 + ':i11', 'columns=(v1,v2)' + enc1)
             s.create('index:' + name1 + ':i12', 'columns=(v3)' + enc1)
 
@@ -192,13 +214,40 @@ class test_encrypt06(wttest.WiredTigerTestCase):
         # Force everything to disk so we can examine it
         self.close_conn()
 
-        self.assertEqual(self.encryptmeta,
-                         not self.match_string_in_rundir('MyKeyName'))
+        if self.match:
+            # Key and value names are encrypted according to the
+            # encryption level on the associated table.
+            self.assertEqual(self.visible_data(self.table0_encrypt),
+                self.match_string_in_rundir(txt0))
+            self.assertEqual(self.visible_name(self.table0_encrypt, True),
+                self.match_string_in_rundir(keyname0))
+            self.assertEqual(self.visible_name(self.table0_encrypt, False),
+                self.match_string_in_rundir(valname0))
 
-        self.assertEqual(self.expected_encryption(self.encrypt0),
-                         not self.match_string_in_rundir(txt0))
-        self.assertEqual(self.expected_encryption(self.encrypt1),
-                         not self.match_string_in_rundir(txt1))
+            self.assertEqual(self.visible_data(self.table1_encrypt),
+                self.match_string_in_rundir(txt1))
+            self.assertEqual(self.visible_name(self.table1_encrypt, True),
+                self.match_string_in_rundir(keyname1))
+            self.assertEqual(self.visible_name(self.table1_encrypt, False),
+                self.match_string_in_rundir(valname1))
+        else:
+            # If the encryption config for indices and column groups is blank,
+            # we make a conservative check - if we specified encryption on the
+            # table, none of our data or key/value names should be exposed.
+            #
+            # If we have system encryption on, set table encryption to 'none',
+            # and set the index or column group config to blank, we technically
+            # should get no encryption for names or data. That currently
+            # doesn't work (CGs and indices instead will be encrypted),
+            # so we don't cover that case.
+            if self.table0_encrypt != 'none':
+                self.assertFalse(self.match_string_in_rundir(txt0))
+                self.assertFalse(self.match_string_in_rundir(keyname0))
+                self.assertFalse(self.match_string_in_rundir(valname0))
+            if self.table1_encrypt != 'none':
+                self.assertFalse(self.match_string_in_rundir(txt1))
+                self.assertFalse(self.match_string_in_rundir(keyname1))
+                self.assertFalse(self.match_string_in_rundir(valname1))
 
 if __name__ == '__main__':
     wttest.run()

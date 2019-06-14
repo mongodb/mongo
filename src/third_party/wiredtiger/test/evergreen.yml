@@ -364,6 +364,21 @@ tasks:
 
   # Start of csuite test tasks
 
+  - name: csuite-import-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/../test/csuite/import/smoke.sh 2>&1
+
   - name: csuite-random-abort-test
     depends_on:
       - name: compile
@@ -371,12 +386,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/../../../test/csuite/random_abort/smoke.sh 2>&1
+            ${test_env_vars|} $(pwd)/../test/csuite/random_abort/smoke.sh 2>&1
 
   - name: csuite-random-directio-test
     depends_on:
@@ -385,12 +400,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/../../../test/csuite/random_directio/smoke.sh 2>&1
+            ${test_env_vars|} $(pwd)/../test/csuite/random_directio/smoke.sh 2>&1
 
   - name: csuite-schema-abort-test
     depends_on:
@@ -399,12 +414,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/../../../test/csuite/schema_abort/smoke.sh 2>&1
+            ${test_env_vars|} $(pwd)/../test/csuite/schema_abort/smoke.sh 2>&1
 
   - name: csuite-timestamp-abort-test
     depends_on:
@@ -413,12 +428,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/../../../test/csuite/timestamp_abort/smoke.sh 2>&1
+            ${test_env_vars|} $(pwd)/../test/csuite/timestamp_abort/smoke.sh 2>&1
 
   - name: csuite-scope-test
     depends_on:
@@ -427,12 +442,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_scope 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_scope 2>&1
 
   - name: csuite-truncated-log-test
     depends_on:
@@ -441,12 +456,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_truncated_log 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_truncated_log 2>&1
 
   - name: csuite-wt1965-col-efficiency-test
     depends_on:
@@ -455,12 +470,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt1965_col_efficiency 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt1965_col_efficiency 2>&1
 
   - name: csuite-wt2403-lsm-workload-test
     depends_on:
@@ -469,12 +484,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt2403_lsm_workload 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt2403_lsm_workload 2>&1
 
   - name: csuite-wt2447-join-main-table-test
     depends_on:
@@ -483,12 +498,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt2447_join_main_table 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt2447_join_main_table 2>&1
 
   - name: csuite-wt2695-checksum-test
     depends_on:
@@ -497,12 +512,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt2695_checksum 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt2695_checksum 2>&1
 
   - name: csuite-wt2592-join-schema-test
     depends_on:
@@ -511,12 +526,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt2592_join_schema 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt2592_join_schema 2>&1
 
   - name: csuite-wt2719-reconfig-test
     depends_on:
@@ -525,12 +540,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt2719_reconfig 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt2719_reconfig 2>&1
 
   - name: csuite-wt2999-join-extractor-test
     depends_on:
@@ -539,12 +554,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt2999_join_extractor 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt2999_join_extractor 2>&1
 
   - name: csuite-wt3120-filesys-test
     depends_on:
@@ -553,12 +568,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt3120_filesys 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt3120_filesys 2>&1
 
   - name: csuite-wt3135-search-near-collator-test
     depends_on:
@@ -567,12 +582,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt3135_search_near_collator 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt3135_search_near_collator 2>&1
 
   - name: csuite-wt3184-dup-index-collator-test
     depends_on:
@@ -581,12 +596,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt3184_dup_index_collator 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt3184_dup_index_collator 2>&1
 
   - name: csuite-wt3363-checkpoint-op-races-test
     depends_on:
@@ -595,12 +610,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt3363_checkpoint_op_races 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt3363_checkpoint_op_races 2>&1
 
   - name: csuite-wt3874-pad-byte-collator-test
     depends_on:
@@ -609,12 +624,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt3874_pad_byte_collator 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt3874_pad_byte_collator 2>&1
 
   - name: csuite-wt4105-large-doc-small-upd-test
     depends_on:
@@ -623,12 +638,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt4105_large_doc_small_upd 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt4105_large_doc_small_upd 2>&1
 
   - name: csuite-wt4117-checksum-test
     depends_on:
@@ -637,12 +652,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt4117_checksum 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt4117_checksum 2>&1
 
   - name: csuite-wt4156-metadata-salvage-test
     depends_on:
@@ -651,12 +666,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt4156_metadata_salvage 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt4156_metadata_salvage 2>&1
 
   - name: csuite-wt4699-json-test
     depends_on:
@@ -665,12 +680,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt4699_json 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt4699_json 2>&1
 
   - name: csuite-wt4803-cache-overflow-abort-test
     depends_on:
@@ -679,12 +694,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt4803_cache_overflow_abort 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt4803_cache_overflow_abort 2>&1
 
   - name: csuite-rwlock-test
     depends_on:
@@ -693,12 +708,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_rwlock 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_rwlock 2>&1
 
   - name: csuite-wt2246-col-append-test
     depends_on:
@@ -707,12 +722,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt2246_col_append 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt2246_col_append 2>&1
 
   - name: csuite-wt2323-join-visibility-test
     depends_on:
@@ -721,12 +736,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt2323_join_visibility 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt2323_join_visibility 2>&1
 
   - name: csuite-wt2535-insert-race-test
     depends_on:
@@ -735,12 +750,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt2535_insert_race 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt2535_insert_race 2>&1
 
   - name: csuite-wt2834-join-bloom-fix-test
     depends_on:
@@ -749,12 +764,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt2834_join_bloom_fix 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt2834_join_bloom_fix 2>&1
 
   - name: csuite-wt2853-perf-test
     depends_on:
@@ -763,12 +778,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt2853_perf 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt2853_perf 2>&1
 
   - name: csuite-wt2909-checkpoint-integrity-test
     depends_on:
@@ -777,12 +792,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt2909_checkpoint_integrity 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt2909_checkpoint_integrity 2>&1
 
   - name: csuite-wt3338-partial-update-test
     depends_on:
@@ -791,12 +806,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt3338_partial_update 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt3338_partial_update 2>&1
 
   - name: csuite-wt4333-handle-locks-test
     depends_on:
@@ -805,12 +820,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/build_posix/test/csuite"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/test_wt4333_handle_locks 2>&1
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt4333_handle_locks 2>&1
 
   # End of csuite test tasks
 
@@ -1158,7 +1173,7 @@ buildvariants:
   - ubuntu1404-test
   expansions:
     # It's ugly, but we need the absolute path here, not the relative
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
@@ -1178,6 +1193,7 @@ buildvariants:
     - name: salvage-test
     - name: thread-test
     - name: bench-wtperf-test
+    - name: csuite-import-test
     - name: csuite-random-abort-test
     - name: csuite-random-directio-test
     - name: csuite-schema-abort-test
@@ -1224,7 +1240,7 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   expansions:
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     configure_python_setting: PYTHON=python3
@@ -1285,7 +1301,7 @@ buildvariants:
     smp_command: -j $(sysctl -n hw.logicalcpu)
     configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH DYLD_LIBRARY_PATH=$(pwd)/.libs
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH DYLD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
     - name: compile
     - name: make-check-test
@@ -1300,7 +1316,7 @@ buildvariants:
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
   - name: compile
   - name: generate-datafile-little-endian
@@ -1317,7 +1333,7 @@ buildvariants:
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.lib top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
   - name: compile
   - name: generate-datafile-big-endian

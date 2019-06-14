@@ -37,6 +37,7 @@ test/cursor_order
 test/fops
 test/format
 test/huge
+test/import
 test/manydbs
 test/packing
 test/readonly

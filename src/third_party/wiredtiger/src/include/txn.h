@@ -242,6 +242,11 @@ struct __wt_txn_op {
 			} mode;
 		} truncate_row;
 	} u;
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_TXN_OP_KEY_REPEATED	0x1u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
+	uint32_t flags;
 };
 
 /*
@@ -305,14 +310,6 @@ struct __wt_txn {
 	WT_TXN_OP      *mod;
 	size_t		mod_alloc;
 	u_int		mod_count;
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * Reference count of multiple updates processed, as part of a single
-	 * transaction operation processing for resolving the indirect update
-	 * references in a prepared transaction as part of commit.
-	 */
-	u_int		multi_update_count;
-#endif
 
 	/* Scratch buffer for in-memory log records. */
 	WT_ITEM	       *logrec;

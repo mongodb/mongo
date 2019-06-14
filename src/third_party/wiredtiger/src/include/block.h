@@ -125,6 +125,21 @@ struct __wt_size {
  */
 #define	WT_BM_CHECKPOINT_VERSION	1	/* Checkpoint format version */
 #define	WT_BLOCK_EXTLIST_MAGIC		71002	/* Identify a list */
+
+/*
+ * There are two versions of the extent list blocks: the original, and a second
+ * version where current checkpoint information is appended to the avail extent
+ * list.
+ */
+#define	WT_BLOCK_EXTLIST_VERSION_ORIG	0	/* Original version */
+#define	WT_BLOCK_EXTLIST_VERSION_CKPT	1	/* Checkpoint in avail output */
+
+/*
+ * Maximum buffer required to store a checkpoint: 1 version byte followed by
+ * 14 packed 8B values.
+ */
+#define	WT_BLOCK_CHECKPOINT_BUFFER	(1 + 14 * WT_INTPACK64_MAXSIZE)
+
 struct __wt_block_ckpt {
 	uint8_t	 version;			/* Version */
 
@@ -163,6 +178,8 @@ struct __wt_bm {
 	u_int (*block_header)(WT_BM *);
 	int (*checkpoint)
 	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, WT_CKPT *, bool);
+	int (*checkpoint_last)
+	    (WT_BM *, WT_SESSION_IMPL *, char **, char **, WT_ITEM *);
 	int (*checkpoint_load)(WT_BM *, WT_SESSION_IMPL *,
 	    const uint8_t *, size_t, uint8_t *, size_t *, bool);
 	int (*checkpoint_resolve)(WT_BM *, WT_SESSION_IMPL *, bool);
@@ -253,6 +270,8 @@ struct __wt_block {
 					/* Live checkpoint status */
 	enum { WT_CKPT_NONE=0, WT_CKPT_INPROGRESS,
 	    WT_CKPT_PANIC_ON_FAILURE, WT_CKPT_SALVAGE } ckpt_state;
+
+	WT_CKPT		*final_ckpt;	/* Final live checkpoint write */
 
 				/* Compaction support */
 	int	 compact_pct_tenths;	/* Percent to compact */

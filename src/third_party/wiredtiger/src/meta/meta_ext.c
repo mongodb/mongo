@@ -91,7 +91,7 @@ __wt_metadata_get_ckptlist(
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	return (__wt_meta_ckptlist_get(
-	    (WT_SESSION_IMPL *)session, name, ckptbasep));
+	    (WT_SESSION_IMPL *)session, name, false, ckptbasep));
 }
 
 /*

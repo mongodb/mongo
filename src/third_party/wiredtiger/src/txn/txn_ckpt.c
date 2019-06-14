@@ -1400,7 +1400,7 @@ __checkpoint_lock_dirty_tree(WT_SESSION_IMPL *session,
 	    WT_IS_METADATA(dhandle) || WT_META_TRACKING(session));
 
 	/* Get the list of checkpoints for this file. */
-	WT_RET(__wt_meta_ckptlist_get(session, dhandle->name, &ckptbase));
+	WT_RET(__wt_meta_ckptlist_get(session, dhandle->name, true, &ckptbase));
 
 	/* This may be a named checkpoint, check the configuration. */
 	cval.len = 0;
@@ -1449,16 +1449,10 @@ __checkpoint_lock_dirty_tree(WT_SESSION_IMPL *session,
 	/* Drop checkpoints with the same name as the one we're taking. */
 	__drop(ckptbase, name, strlen(name));
 
-	/* Add a new checkpoint entry at the end of the list. */
+	/* Set the name of the new entry at the end of the list. */
 	WT_CKPT_FOREACH(ckptbase, ckpt)
 		;
 	WT_ERR(__wt_strdup(session, name, &ckpt->name));
-	/*
-	 * We are now done with the local use of the name.  Free the local
-	 * allocation, if needed.
-	 */
-	__wt_free(session, name_alloc);
-	F_SET(ckpt, WT_CKPT_ADD);
 
 	/*
 	 * There is some interaction between backups and checkpoints.  Perform
@@ -1476,9 +1470,10 @@ __checkpoint_lock_dirty_tree(WT_SESSION_IMPL *session,
 	    !F_ISSET(btree, WT_BTREE_SKIP_CKPT));
 	btree->ckpt = ckptbase;
 
-	return (0);
-
-err:	__wt_meta_ckptlist_free(session, &ckptbase);
+	if (0) {
+err:
+		__wt_meta_ckptlist_free(session, &ckptbase);
+	}
 	__wt_free(session, name_alloc);
 
 	return (ret);

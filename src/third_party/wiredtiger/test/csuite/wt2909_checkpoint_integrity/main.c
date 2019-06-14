@@ -102,8 +102,6 @@ static void subtest_populate(TEST_OPTS *, bool);
 
 extern int   __wt_optind;
 
-#define	WT_FAIL_FS_LIB	"../../ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
-
 /*
  * check_results --
  *	Check all the tables and verify the results.
@@ -318,7 +316,7 @@ run_check_subtest(TEST_OPTS *opts, const char *debugger, uint64_t nops,
 		subtest_args[narg++] = (char *)"--";
 	}
 
-	subtest_args[narg++] = (char *)opts->progname;
+	subtest_args[narg++] = (char *)opts->argv0;
 	/* "subtest" must appear before arguments */
 	if (close_test)
 		subtest_args[narg++] = (char *)"subtest_close";
@@ -342,7 +340,7 @@ run_check_subtest(TEST_OPTS *opts, const char *debugger, uint64_t nops,
 		    " operations until fail...\n", nops);
 	testutil_clean_work_dir(opts->home);
 	testutil_check(run_process(
-	    opts, debugger != NULL ? debugger : opts->progname,
+	    opts, debugger != NULL ? debugger : opts->argv0,
 	    subtest_args, &estatus));
 	if (opts->verbose)
 		printf("process exited %d\n", estatus);
@@ -524,6 +522,7 @@ subtest_main(int argc, char *argv[], bool close_test)
 	TEST_OPTS *opts, _opts;
 	WT_SESSION *session;
 	char config[1024], filename[1024];
+	const char *p;
 
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
@@ -541,17 +540,25 @@ subtest_main(int argc, char *argv[], bool close_test)
 	testutil_check(__wt_snprintf(
 	    filename, sizeof(filename), "%s/%s", opts->home, STDOUT_FILE));
 	testutil_assert(freopen(filename, "a", stdout) != NULL);
+
+	/*
+	 * Use $top_builddir if it's available, otherwise assume we're building
+	 * in build_posix and running in the test/csuite directory.
+	 */
+#define	WT_FAIL_FS_LIB	"ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
+	if ((p = getenv("top_builddir")) == NULL)
+		p = "../../build_posix";
 	testutil_check(__wt_snprintf(config, sizeof(config),
 	    "create,cache_size=250M,log=(enabled),"
-	    "transaction_sync=(enabled,method=none),extensions=("
-	    WT_FAIL_FS_LIB
-	    "=(early_load,config={environment=true,verbose=true})]"));
-
+	    "transaction_sync=(enabled,method=none),"
+	    "extensions=(%s/%s="
+	    "(early_load,config={environment=true,verbose=true}))",
+	    p, WT_FAIL_FS_LIB));
 	testutil_check(
 	    wiredtiger_open(opts->home, &event_handler, config, &opts->conn));
+
 	testutil_check(
 	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
-
 	testutil_check(session->create(session, "table:subtest",
 	    "key_format=i,value_format=iiiS,"
 	    "columns=(id,v0,v1,v2,big)"));

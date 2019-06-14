@@ -47,6 +47,10 @@ usage(void)
 	    "\t" "downgrade downgrade a database\n"
 	    "\t" "drop\t  drop an object\n"
 	    "\t" "dump\t  dump an object\n"
+	    /*
+	     * Import is not documented.
+	     * "\t" "import\t  import an object\n"
+	     */
 	    "\t" "list\t  list database objects\n"
 	    "\t" "load\t  load an object\n"
 	    "\t" "loadtext  load an object from a text file\n"
@@ -192,6 +196,10 @@ main(int argc, char *argv[])
 			func = util_drop;
 		else if (strcmp(command, "dump") == 0)
 			func = util_dump;
+		break;
+	case 'i':
+		if (strcmp(command, "import") == 0)
+			func = util_import;
 		break;
 	case 'l':
 		if (strcmp(command, "list") == 0)

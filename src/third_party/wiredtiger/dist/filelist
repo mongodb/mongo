@@ -6,6 +6,7 @@ src/async/async_op.c
 src/async/async_worker.c
 src/block/block_addr.c
 src/block/block_ckpt.c
+src/block/block_ckpt_scan.c
 src/block/block_compact.c
 src/block/block_ext.c
 src/block/block_map.c
@@ -26,6 +27,7 @@ src/btree/bt_delete.c
 src/btree/bt_discard.c
 src/btree/bt_handle.c
 src/btree/bt_huffman.c
+src/btree/bt_import.c
 src/btree/bt_io.c
 src/btree/bt_misc.c
 src/btree/bt_ovfl.c
@@ -185,7 +187,6 @@ src/schema/schema_worker.c
 src/session/session_api.c
 src/session/session_compact.c
 src/session/session_dhandle.c
-src/session/session_salvage.c
 src/support/cond_auto.c
 src/support/crypto.c
 src/support/err.c

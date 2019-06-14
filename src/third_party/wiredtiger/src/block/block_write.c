@@ -232,6 +232,7 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	wt_off_t offset;
 	size_t align_size;
 	uint32_t checksum;
+	uint8_t *file_sizep;
 	bool local_locked;
 
 	*offsetp = 0;			/* -Werror=maybe-uninitialized */
@@ -240,19 +241,20 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 
 	fh = block->fh;
 
-	/*
-	 * Clear the block header to ensure all of it is initialized, even the
-	 * unused fields.
-	 */
-	blk = WT_BLOCK_HEADER_REF(buf->mem);
-	memset(blk, 0, sizeof(*blk));
-
 	/* Buffers should be aligned for writing. */
 	if (!F_ISSET(buf, WT_ITEM_ALIGNED)) {
 		WT_ASSERT(session, F_ISSET(buf, WT_ITEM_ALIGNED));
 		WT_RET_MSG(session, EINVAL,
 		    "direct I/O check: write buffer incorrectly allocated");
 	}
+
+	/*
+	 * File checkpoint/recovery magic: done before sizing the buffer as it
+	 * may grow the buffer.
+	 */
+	if (block->final_ckpt != NULL)
+		WT_RET(__wt_block_checkpoint_final(
+		    session, block, buf, &file_sizep));
 
 	/*
 	 * Align the size to an allocation unit.
@@ -273,8 +275,44 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		    "buffer size check: write buffer too large to write");
 	}
 
+	/* Pre-allocate some number of extension structures. */
+	WT_RET(__wt_block_ext_prealloc(session, 5));
+
+	/*
+	 * Acquire a lock, if we don't already hold one.
+	 * Allocate space for the write, and optionally extend the file (note
+	 * the block-extend function may release the lock).
+	 * Release any locally acquired lock.
+	 */
+	local_locked = false;
+	if (!caller_locked) {
+		__wt_spin_lock(session, &block->live_lock);
+		local_locked = true;
+	}
+	ret = __wt_block_alloc(session, block, &offset, (wt_off_t)align_size);
+	if (ret == 0)
+		ret = __wt_block_extend(
+		    session, block, fh, offset, align_size, &local_locked);
+	if (local_locked)
+		__wt_spin_unlock(session, &block->live_lock);
+	WT_RET(ret);
+
+	/*
+	 * The file has finished changing size. If this is the final write in a
+	 * checkpoint, update the checkpoint's information inline.
+	 */
+	if (block->final_ckpt != NULL)
+		WT_RET(__wt_vpack_uint(&file_sizep, 0, (uint64_t)block->size));
+
 	/* Zero out any unused bytes at the end of the buffer. */
 	memset((uint8_t *)buf->mem + buf->size, 0, align_size - buf->size);
+
+	/*
+	 * Clear the block header to ensure all of it is initialized, even the
+	 * unused fields.
+	 */
+	blk = WT_BLOCK_HEADER_REF(buf->mem);
+	memset(blk, 0, sizeof(*blk));
 
 	/*
 	 * Set the disk size so we don't have to incrementally read blocks
@@ -309,28 +347,6 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 #ifdef WORDS_BIGENDIAN
 	blk->checksum = __wt_bswap32(blk->checksum);
 #endif
-
-	/* Pre-allocate some number of extension structures. */
-	WT_RET(__wt_block_ext_prealloc(session, 5));
-
-	/*
-	 * Acquire a lock, if we don't already hold one.
-	 * Allocate space for the write, and optionally extend the file (note
-	 * the block-extend function may release the lock).
-	 * Release any locally acquired lock.
-	 */
-	local_locked = false;
-	if (!caller_locked) {
-		__wt_spin_lock(session, &block->live_lock);
-		local_locked = true;
-	}
-	ret = __wt_block_alloc(session, block, &offset, (wt_off_t)align_size);
-	if (ret == 0)
-		ret = __wt_block_extend(
-		    session, block, fh, offset, align_size, &local_locked);
-	if (local_locked)
-		__wt_spin_unlock(session, &block->live_lock);
-	WT_RET(ret);
 
 	/* Write the block. */
 	if ((ret =

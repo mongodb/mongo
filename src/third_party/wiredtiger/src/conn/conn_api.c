@@ -1830,23 +1830,14 @@ err:	/*
 int
 __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN_GLOBAL *txn_global;
 
 	conn = S2C(session);
+	cache = conn->cache;
 	txn_global = &conn->txn_global;
-
-	WT_RET(__wt_config_gets(session,
-	    cfg, "debug_mode.rollback_error", &cval));
-	txn_global->debug_rollback = (uint64_t)cval.val;
-
-	WT_RET(__wt_config_gets(session,
-	    cfg, "debug_mode.table_logging", &cval));
-	if (cval.val)
-		FLD_SET(conn->log_flags, WT_CONN_LOG_DEBUG_MODE);
-	else
-		FLD_CLR(conn->log_flags, WT_CONN_LOG_DEBUG_MODE);
 
 	WT_RET(__wt_config_gets(session,
 	    cfg, "debug_mode.checkpoint_retention", &cval));
@@ -1861,6 +1852,24 @@ __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
 	else
 		WT_RET(__wt_calloc_def(session,
 		    conn->debug_ckpt_cnt, &conn->debug_ckpt));
+
+	WT_RET(__wt_config_gets(session,
+	    cfg, "debug_mode.eviction", &cval));
+	if (cval.val)
+		F_SET(cache, WT_CACHE_EVICT_DEBUG_MODE);
+	else
+		F_CLR(cache, WT_CACHE_EVICT_DEBUG_MODE);
+
+	WT_RET(__wt_config_gets(session,
+	    cfg, "debug_mode.rollback_error", &cval));
+	txn_global->debug_rollback = (uint64_t)cval.val;
+
+	WT_RET(__wt_config_gets(session,
+	    cfg, "debug_mode.table_logging", &cval));
+	if (cval.val)
+		FLD_SET(conn->log_flags, WT_CONN_LOG_DEBUG_MODE);
+	else
+		FLD_CLR(conn->log_flags, WT_CONN_LOG_DEBUG_MODE);
 
 	return (0);
 }
@@ -2637,7 +2646,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		    session, cval.str, cval.len, &conn->error_prefix));
 	}
 	WT_ERR(__wt_verbose_config(session, cfg));
-	WT_ERR(__wt_debug_mode_config(session, cfg));
 	WT_ERR(__wt_timing_stress_config(session, cfg));
 	__wt_btree_page_version_config(session);
 
@@ -2760,6 +2768,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 */
 	WT_ERR(__wt_connection_open(conn, cfg));
 	session = conn->default_session;
+
+	/*
+	 * This function expects the cache to be created so parse this after
+	 * the rest of the connection is set up.
+	 */
+	WT_ERR(__wt_debug_mode_config(session, cfg));
 
 	/*
 	 * Load the extensions after initialization completes; extensions expect

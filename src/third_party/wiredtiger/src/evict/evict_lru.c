@@ -107,6 +107,25 @@ __evict_entry_priority(WT_SESSION_IMPL *session, WT_REF *ref)
 }
 
 /*
+ * __evict_lru_cmp_debug --
+ *	Qsort function: sort the eviction array.
+ *	Version for eviction debug mode.
+ */
+static int WT_CDECL
+__evict_lru_cmp_debug(const void *a_arg, const void *b_arg)
+{
+	const WT_EVICT_ENTRY *a, *b;
+	uint64_t a_score, b_score;
+
+	a = a_arg;
+	b = b_arg;
+	a_score = (a->ref == NULL ? UINT64_MAX : 0);
+	b_score = (b->ref == NULL ? UINT64_MAX : 0);
+
+	return ((a_score < b_score) ? -1 : (a_score == b_score) ? 0 : 1);
+}
+
+/*
  * __evict_lru_cmp --
  *	Qsort function: sort the eviction array.
  */
@@ -1257,8 +1276,17 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 		queue->evict_current = NULL;
 
 	entries = queue->evict_entries;
-	__wt_qsort(queue->evict_queue,
-	    entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
+	/*
+	 * Style note: __wt_qsort is a macro that can leave a dangling
+	 * else. Full curly braces are needed here for the compiler.
+	 */
+	if (F_ISSET(cache, WT_CACHE_EVICT_DEBUG_MODE)) {
+		__wt_qsort(queue->evict_queue,
+		    entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp_debug);
+	} else {
+		__wt_qsort(queue->evict_queue,
+		    entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
+	}
 
 	/* Trim empty entries from the end. */
 	while (entries > 0 && queue->evict_queue[entries - 1].ref == NULL)
@@ -2057,12 +2085,14 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue,
 		 * cache (indicated by seeing an internal page that is the
 		 * parent of the last page we saw).
 		 *
-		 * Also skip internal page unless we get aggressive or the tree
-		 * is idle (indicated by the tree being skipped for walks).
+		 * Also skip internal page unless we get aggressive, the tree
+		 * is idle (indicated by the tree being skipped for walks),
+		 * or we are in eviction debug mode.
 		 * The goal here is that if trees become completely idle, we
 		 * eventually push them out of cache completely.
 		 */
-		if (WT_PAGE_IS_INTERNAL(page)) {
+		if (!F_ISSET(cache, WT_CACHE_EVICT_DEBUG_MODE) &&
+		    WT_PAGE_IS_INTERNAL(page)) {
 			if (page == last_parent)
 				continue;
 			if (btree->evict_walk_period == 0 &&

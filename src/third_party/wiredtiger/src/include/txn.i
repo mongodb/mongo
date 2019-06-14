@@ -171,17 +171,21 @@ __txn_resolve_prepared_update(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 /*
  * __wt_txn_resolve_prepared_op --
- *      Resolve a transaction operation indirect references.
+ *      Resolve a transaction's operations indirect references.
  *
  *      In case of prepared transactions, the prepared updates could be evicted
  *      using cache overflow mechanism. Transaction operations referring to
  *      these prepared updates would be referring to them using indirect
  *      references (i.e keys/recnos), which need to be resolved as part of that
  *      transaction commit/rollback.
+ *
+ *      If no updates are resolved throw an error. Increment resolved update
+ *      count for each resolved update count we locate.
  */
 static inline int
 __wt_txn_resolve_prepared_op(
-    WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit)
+    WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit,
+    int64_t *resolved_update_countp)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
@@ -218,36 +222,28 @@ __wt_txn_resolve_prepared_op(
 	    (WT_CURSOR_BTREE *)cursor, &upd));
 	WT_ERR(ret);
 
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * Do what we can to ensure that finding prepared updates from a key
-	 * is working as expected. In the case where a transaction has updated
-	 * the same key multiple times, it's possible to resolve all updates
-	 * for the key when processing the first op structure, and then have
-	 * eviction free those updates before subsequent ops are processed,
-	 * which means a search could reasonably not find an update in that
-	 * case.
-	 * We track the update count only for commit, but not for rollback, as
-	 * our tracking is based on transaction id, and in case of rollback, we
-	 * set it to aborted.
-	 */
-	if (upd == NULL && commit) {
-		/*
-		 * FIXME:
-		 * WT_ASSERT(session, txn->multi_update_count > 0);
-		 */
-		--txn->multi_update_count;
+	/* If we haven't found anything then there's an error. */
+	if (upd == NULL) {
+		WT_ASSERT(session, upd != NULL);
+		WT_ERR(WT_NOTFOUND);
 	}
-#endif
-
-	WT_STAT_CONN_INCR(session, txn_prepared_updates_resolved);
 
 	for (; upd != NULL; upd = upd->next) {
-		 if (upd->txnid != txn->id)
+		/*
+		 * Aborted updates can exist in the update chain of our txn.
+		 * Generally this will occur due to a reserved update.
+		 * As such we should skip over these updates. If the txn
+		 * id is then different and not aborted we know we've
+		 * reached the end of our update chain and can exit.
+		 */
+		if (upd->txnid == WT_TXN_ABORTED)
 			continue;
-
+		if (upd->txnid != txn->id)
+			break;
 		if (op->u.op_upd == NULL)
 			op->u.op_upd = upd;
+
+		++(*resolved_update_countp);
 
 		if (!commit) {
 			upd->txnid = WT_TXN_ABORTED;
@@ -282,52 +278,9 @@ __wt_txn_resolve_prepared_op(
 		 * thing as part of "txn_op2".
 		 */
 
-#ifdef HAVE_DIAGNOSTIC
-		/*
-		 * When an update is not identified for resolution of a
-		 * transaction operation, it might have been already processed
-		 * during the resolution of a previous update belonging to the
-		 * same key. To ascertain transaction tracks multiple extra
-		 * updates processed in resolution of an transaction operation.
-		 */
-		if (upd->prepare_state == WT_PREPARE_RESOLVED) {
-			/*
-			 * FIXME:
-			 * WT_ASSERT(session, txn->multi_update_count > 0);
-			 */
-			--txn->multi_update_count;
-		} else if (upd != op->u.op_upd)
-			++txn->multi_update_count;
-#endif
-
-		if (upd->prepare_state == WT_PREPARE_RESOLVED)
-			break;
-
 		/* Resolve the prepared update to be committed update. */
 		__txn_resolve_prepared_update(session, upd);
 	}
-
-	/* FIXME: it isn't safe to walk updates after they are resolved. */
-#if 0 && defined(HAVE_DIAGNOSTIC)
-	upd = op->u.op_upd;
-	/* Ensure that we have not missed any of this transaction updates. */
-	for (; upd != NULL; upd = upd->next) {
-		/*
-		 * Should not have an unprocessed uncommitted update of this
-		 * transaction. For commit, no uncommitted update of this
-		 * transaction should be in prepared state. For rollback, there
-		 * should not be any more uncommitted updates from this
-		 * transaction.
-		 */
-		if (commit && upd->txnid == txn->id)
-			WT_ASSERT(session,
-			    upd->prepare_state != WT_PREPARE_INPROGRESS);
-		else
-			WT_ASSERT(session, upd->txnid != txn->id);
-
-	}
-#endif
-
 err:    WT_TRET(cursor->close(cursor));
 	return (ret);
 }
@@ -443,6 +396,43 @@ __wt_txn_op_apply_prepare_state(
 }
 
 /*
+ * __wt_txn_op_delete_commit_apply_timestamps --
+ *	Apply the correct start and durable timestamps to any
+ *	updates in the page del update list.
+ */
+static inline void
+__wt_txn_op_delete_commit_apply_timestamps(
+    WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_TXN *txn;
+	WT_UPDATE **updp;
+	uint32_t previous_state;
+
+	txn = &session->txn;
+
+	/*
+	 * Lock the ref to ensure we don't race with eviction freeing the page
+	 * deleted update list or with a page instantiate.
+	 */
+	for (;; __wt_yield()) {
+		previous_state = ref->state;
+		WT_ASSERT(session, previous_state != WT_REF_READING);
+		if (previous_state != WT_REF_LOCKED && WT_REF_CAS_STATE(
+		    session, ref, previous_state, WT_REF_LOCKED))
+			break;
+	}
+
+	for (updp = ref->page_del->update_list;
+	    updp != NULL && *updp != NULL; ++updp) {
+		(*updp)->start_ts = txn->commit_timestamp;
+		(*updp)->durable_ts = txn->durable_timestamp;
+	}
+
+	/* Unlock the page by setting it back to it's previous state */
+	WT_REF_SET_STATE(ref, previous_state);
+}
+
+/*
  * __wt_txn_op_set_timestamp --
  *	Decide whether to copy a commit timestamp into an update. If the op
  *	structure doesn't have a populated update or ref field or in prepared
@@ -496,6 +486,10 @@ __wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 			    &op->u.op_upd->durable_ts;
 			*timestamp = txn->durable_timestamp;
 		}
+
+		if (op->type == WT_TXN_OP_REF_DELETE)
+			__wt_txn_op_delete_commit_apply_timestamps(
+			    session, op->u.ref);
 	}
 }
 
@@ -511,9 +505,14 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 	txn = &session->txn;
 
-	if (F_ISSET(txn, WT_TXN_READONLY))
+	if (F_ISSET(txn, WT_TXN_READONLY)) {
+		if (F_ISSET(txn, WT_TXN_IGNORE_PREPARE))
+			WT_RET_MSG(session, ENOTSUP,
+			    "Transactions with ignore_prepare=true"
+			    " cannot perform updates");
 		WT_RET_MSG(session, WT_ROLLBACK,
 		    "Attempt to update in a read-only transaction");
+	}
 
 	WT_RET(__txn_next_op(session, &op));
 	if (F_ISSET(session, WT_SESSION_LOGGING_INMEM)) {

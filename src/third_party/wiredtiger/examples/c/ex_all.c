@@ -603,16 +603,8 @@ named_snapshot_ops(WT_SESSION *session)
 }
 
 static void
-session_ops(WT_SESSION *session)
+session_ops_create(WT_SESSION *session)
 {
-	WT_CONNECTION *conn;
-
-	conn = session->connection;
-
-	/*! [Reconfigure a session] */
-	error_check(session->reconfigure(session, "isolation=snapshot"));
-	/*! [Reconfigure a session] */
-
 	/*! [Create a table] */
 	error_check(session->create(session,
 	    "table:mytable", "key_format=S,value_format=S"));
@@ -622,12 +614,6 @@ session_ops(WT_SESSION *session)
 	/*! [Create a column-store table] */
 	error_check(session->create(session,
 	    "table:mytable", "key_format=r,value_format=S"));
-
-	/*! [Alter a table] */
-	error_check(session->alter(session,
-	    "table:mytable", "access_pattern_hint=random"));
-	/*! [Alter a table] */
-
 	/*! [Create a column-store table] */
 	error_check(session->drop(session, "table:mytable", NULL));
 
@@ -736,15 +722,40 @@ session_ops(WT_SESSION *session)
 	    "key_format=r,value_format=S,cache_resident=true"));
 	/*! [Create a cache-resident object] */
 	error_check(session->drop(session, "table:mytable", NULL));
+}
 
+static void
+session_ops(WT_SESSION *session)
+{
+	WT_CONNECTION *conn;
+
+	conn = session->connection;
+
+	/* WT_SESSION.create operations. */
+	session_ops_create(session);
+
+	/*! [Reconfigure a session] */
+	error_check(session->reconfigure(session, "isolation=snapshot"));
+	/*! [Reconfigure a session] */
 	{
 	/* Create a table for the session operations. */
 	error_check(session->create(
 	    session, "table:mytable", "key_format=S,value_format=S"));
 
+	/*! [Alter a table] */
+	error_check(session->alter(session,
+	    "table:mytable", "access_pattern_hint=random"));
+	/*! [Alter a table] */
+
 	/*! [Compact a table] */
 	error_check(session->compact(session, "table:mytable", NULL));
 	/*! [Compact a table] */
+
+#ifdef MIGHT_NOT_RUN
+	/*! [Import a file] */
+	error_check(session->import(session, "file:import", NULL));
+	/*! [Import a file] */
+#endif
 
 	/*! [Rebalance a table] */
 	error_check(session->rebalance(session, "table:mytable", NULL));
