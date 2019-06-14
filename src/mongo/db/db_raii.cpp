@@ -126,7 +126,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
         // and try again with the PBWM lock (by unsetting
         // _shouldNotConflictWithSecondaryBatchApplicationBlock).
 
-        const NamespaceString& nss = coll->ns();
+        const NamespaceString nss = coll->ns();
 
         bool readAtLastAppliedTimestamp =
             _shouldReadAtLastAppliedTimestamp(opCtx, nss, readConcernLevel);
