@@ -2,7 +2,7 @@
  * Tests that an idle cursor will appear in the $currentOp output if the idleCursors option is
  * set to true.
  *
- * @tags: [assumes_read_concern_unchanged, requires_capped]
+ * @tags: [assumes_read_concern_unchanged, assumes_read_preference_unchanged, requires_capped]
  */
 
 (function() {
