@@ -86,5 +86,11 @@
 // Defined if SSL support is enabled with chosen ssl provider
 @mongo_config_ssl_provider@
 
+// Defined if USDT probes are enabled
+@mongo_config_usdt_enabled@
+
+// Set to which provider defines USDT
+@mongo_config_usdt_provider@
+
 // Defined if WiredTiger storage engine is enabled
 @mongo_config_wiredtiger_enabled@

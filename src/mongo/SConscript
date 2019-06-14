@@ -275,6 +275,8 @@ config_header_substs = (
     ('@mongo_config_ssl@', 'MONGO_CONFIG_SSL'),
     ('@mongo_config_ssl_has_asn1_any_definitions@', 'MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS'),
     ('@mongo_config_ssl_provider@', 'MONGO_CONFIG_SSL_PROVIDER'),
+    ('@mongo_config_usdt_enabled@', 'MONGO_CONFIG_USDT_ENABLED'),
+    ('@mongo_config_usdt_provider@', 'MONGO_CONFIG_USDT_PROVIDER'),
     ('@mongo_config_wiredtiger_enabled@', 'MONGO_CONFIG_WIREDTIGER_ENABLED'),
 )
 
