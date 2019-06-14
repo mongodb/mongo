@@ -225,7 +225,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
     auto directDBClient = DBDirectClientFactory::get(opCtx).create(opCtx);
 
     unique_ptr<DBClientCursor> c =
-        directDBClient->query(coll, Query(), 0, 0, NULL, QueryOption_SlaveOk, 0);
+        directDBClient->query(coll, Query(), 0, 0, nullptr, QueryOption_SlaveOk, 0);
     massert(16669, "unable to get db client cursor from query", c.get());
 
     set<string> thisTime;
@@ -560,7 +560,7 @@ unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
     return p;
 }
 
-void (*ScriptEngine::_connectCallback)(DBClientBase&) = 0;
+void (*ScriptEngine::_connectCallback)(DBClientBase&) = nullptr;
 
 ScriptEngine* getGlobalScriptEngine() {
     if (hasGlobalServiceContext())

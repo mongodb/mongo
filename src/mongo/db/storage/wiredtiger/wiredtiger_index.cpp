@@ -79,7 +79,7 @@ MONGO_FAIL_POINT_DEFINE(WTEmulateOutOfOrderNextIndexKey);
 using std::string;
 using std::vector;
 
-static const WiredTigerItem emptyItem(NULL, 0);
+static const WiredTigerItem emptyItem(nullptr, 0);
 
 
 bool hasFieldNames(const BSONObj& obj) {
@@ -572,14 +572,14 @@ protected:
         // an unexpected pause in building an index.
         WT_SESSION* session = _session->getSession();
         int err = session->open_cursor(
-            session, idx->uri().c_str(), NULL, "bulk,checkpoint_wait=false", &cursor);
+            session, idx->uri().c_str(), nullptr, "bulk,checkpoint_wait=false", &cursor);
         if (!err)
             return cursor;
 
         warning() << "failed to create WiredTiger bulk cursor: " << wiredtiger_strerror(err);
         warning() << "falling back to non-bulk cursor for index " << idx->uri();
 
-        invariantWTOK(session->open_cursor(session, idx->uri().c_str(), NULL, NULL, &cursor));
+        invariantWTOK(session->open_cursor(session, idx->uri().c_str(), nullptr, nullptr, &cursor));
         return cursor;
     }
 

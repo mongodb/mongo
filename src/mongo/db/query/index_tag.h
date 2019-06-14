@@ -88,7 +88,7 @@ public:
 // used internally
 class RelevantTag : public MatchExpression::TagData {
 public:
-    RelevantTag() : elemMatchExpr(NULL), pathPrefix("") {}
+    RelevantTag() : elemMatchExpr(nullptr), pathPrefix("") {}
 
     std::vector<size_t> first;
     std::vector<size_t> notFirst;

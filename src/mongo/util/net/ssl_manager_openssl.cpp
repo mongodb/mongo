@@ -738,7 +738,7 @@ SSLConnectionOpenSSL::SSLConnectionOpenSSL(SSL_CTX* context,
     ssl = SSL_new(context);
 
     std::string sslErr =
-        NULL != getSSLManager() ? getSSLManager()->getSSLErrorMessage(ERR_get_error()) : "";
+        nullptr != getSSLManager() ? getSSLManager()->getSSLErrorMessage(ERR_get_error()) : "";
     massert(15861, "Error creating new SSL object " + sslErr, ssl);
 
     BIO_new_bio_pair(&internalBIO, BUFFER_SIZE, &networkBIO, BUFFER_SIZE);
@@ -794,7 +794,7 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params, bool isServer)
 
     if (!clientPEM.empty()) {
         if (!_parseAndValidateCertificate(
-                clientPEM, clientPassword, &_sslConfiguration.clientSubjectName, NULL)) {
+                clientPEM, clientPassword, &_sslConfiguration.clientSubjectName, nullptr)) {
             uasserted(16941, "ssl initialization problem");
         }
     }
@@ -1069,7 +1069,7 @@ bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
                                                      SSLX509Name* subjectName,
                                                      Date_t* serverCertificateExpirationDate) {
     BIO* inBIO = BIO_new(BIO_s_file());
-    if (inBIO == NULL) {
+    if (inBIO == nullptr) {
         error() << "failed to allocate BIO object: " << getSSLErrorMessage(ERR_get_error());
         return false;
     }
@@ -1082,8 +1082,8 @@ bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
     }
 
     X509* x509 = PEM_read_bio_X509(
-        inBIO, NULL, &SSLManagerOpenSSL::password_cb, static_cast<void*>(&keyPassword));
-    if (x509 == NULL) {
+        inBIO, nullptr, &SSLManagerOpenSSL::password_cb, static_cast<void*>(&keyPassword));
+    if (x509 == nullptr) {
         error() << "cannot retrieve certificate from keyfile: " << keyFile << ' '
                 << getSSLErrorMessage(ERR_get_error());
         return false;
@@ -1091,7 +1091,7 @@ bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
     ON_BLOCK_EXIT([&] { X509_free(x509); });
 
     *subjectName = getCertificateSubjectX509Name(x509);
-    if (serverCertificateExpirationDate != NULL) {
+    if (serverCertificateExpirationDate != nullptr) {
         unsigned long long notBeforeMillis = _convertASN1ToMillis(X509_get_notBefore(x509));
         if (notBeforeMillis == 0) {
             error() << "date conversion failed";
@@ -1166,7 +1166,7 @@ bool SSLManagerOpenSSL::_setupPEM(SSL_CTX* context,
 Status SSLManagerOpenSSL::_setupCA(SSL_CTX* context, const std::string& caFile) {
     // Set the list of CAs sent to clients
     STACK_OF(X509_NAME)* certNames = SSL_load_client_CA_file(caFile.c_str());
-    if (certNames == NULL) {
+    if (certNames == nullptr) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       str::stream() << "cannot read certificate authority file: " << caFile << " "
                                     << getSSLErrorMessage(ERR_get_error()));
@@ -1174,7 +1174,7 @@ Status SSLManagerOpenSSL::_setupCA(SSL_CTX* context, const std::string& caFile) 
     SSL_CTX_set_client_CA_list(context, certNames);
 
     // Load trusted CA
-    if (SSL_CTX_load_verify_locations(context, caFile.c_str(), NULL) != 1) {
+    if (SSL_CTX_load_verify_locations(context, caFile.c_str(), nullptr) != 1) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       str::stream() << "cannot read certificate authority file: " << caFile << " "
                                     << getSSLErrorMessage(ERR_get_error()));
@@ -1426,8 +1426,8 @@ bool SSLManagerOpenSSL::_doneWithSSLOp(SSLConnectionOpenSSL* conn, int status) {
 }
 
 SSLConnectionInterface* SSLManagerOpenSSL::connect(Socket* socket) {
-    std::unique_ptr<SSLConnectionOpenSSL> sslConn =
-        std::make_unique<SSLConnectionOpenSSL>(_clientContext.get(), socket, (const char*)NULL, 0);
+    std::unique_ptr<SSLConnectionOpenSSL> sslConn = std::make_unique<SSLConnectionOpenSSL>(
+        _clientContext.get(), socket, (const char*)nullptr, 0);
 
     const auto undotted = removeFQDNRoot(socket->remoteAddr().hostOrIp());
     int ret = ::SSL_set_tlsext_host_name(sslConn->ssl, undotted.c_str());
@@ -1497,7 +1497,7 @@ StatusWith<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
 
     X509* peerCert = SSL_get_peer_certificate(conn);
 
-    if (NULL == peerCert) {  // no certificate presented by peer
+    if (nullptr == peerCert) {  // no certificate presented by peer
         if (_weakValidation) {
             // do not give warning if certificate warnings are  suppressed
             if (!_suppressNoCertificateWarning) {
@@ -1561,9 +1561,9 @@ StatusWith<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     StringBuilder certificateNames;
 
     STACK_OF(GENERAL_NAME)* sanNames = static_cast<STACK_OF(GENERAL_NAME)*>(
-        X509_get_ext_d2i(peerCert, NID_subject_alt_name, NULL, NULL));
+        X509_get_ext_d2i(peerCert, NID_subject_alt_name, nullptr, nullptr));
 
-    if (sanNames != NULL) {
+    if (sanNames != nullptr) {
         int sanNamesList = sk_GENERAL_NAME_num(sanNames);
         certificateNames << "SAN(s): ";
         for (int i = 0; i < sanNamesList; i++) {

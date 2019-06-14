@@ -135,7 +135,7 @@ void OID::justForked() {
 
 void OID::init() {
     // each set* method handles endianness
-    setTimestamp(time(0));
+    setTimestamp(time(nullptr));
     setInstanceUnique(_instanceUnique);
     setIncrement(Increment::next());
 }

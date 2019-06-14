@@ -66,7 +66,7 @@ private:
 
 class Task {
 public:
-    Task() : _group(NULL), _killed(0) {}
+    Task() : _group(nullptr), _killed(0) {}
     explicit Task(TaskGroup* group) : _group(group), _killed(0) {}
     void kill() {
         _killed = curTimeMillis64();

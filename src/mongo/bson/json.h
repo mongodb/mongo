@@ -52,7 +52,7 @@ namespace mongo {
 BSONObj fromjson(const std::string& str);
 
 /** @param len will be size of JSON object in text chars. */
-BSONObj fromjson(const char* str, int* len = NULL);
+BSONObj fromjson(const char* str, int* len = nullptr);
 
 /**
  * Tests whether the JSON string is an Array.
@@ -410,7 +410,7 @@ private:
      * string, but there is no guarantee that it will not contain other
      * null characters.
      */
-    Status chars(std::string* result, const char* terminalSet, const char* allowedSet = NULL);
+    Status chars(std::string* result, const char* terminalSet, const char* allowedSet = nullptr);
 
     /**
      * Converts the two byte Unicode code point to its UTF8 character

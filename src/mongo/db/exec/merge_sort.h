@@ -76,7 +76,7 @@ public:
 
 private:
     struct StageWithValue {
-        StageWithValue() : id(WorkingSet::INVALID_ID), stage(NULL) {}
+        StageWithValue() : id(WorkingSet::INVALID_ID), stage(nullptr) {}
         WorkingSetID id;
         PlanStage* stage;
     };
@@ -135,7 +135,7 @@ private:
 // Parameters that must be provided to a MergeSortStage
 class MergeSortStageParams {
 public:
-    MergeSortStageParams() : collator(NULL), dedup(true) {}
+    MergeSortStageParams() : collator(nullptr), dedup(true) {}
 
     // How we're sorting.
     BSONObj pattern;

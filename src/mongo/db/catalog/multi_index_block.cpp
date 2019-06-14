@@ -575,7 +575,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
 
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
     for (size_t i = 0; i < _indexes.size(); i++) {
-        if (_indexes[i].bulk == NULL)
+        if (_indexes[i].bulk == nullptr)
             continue;
 
         // If 'dupRecords' is provided, it will be used to store all records that would result in

@@ -182,7 +182,7 @@ void generateBatch(int ntoreturn,
 
     BSONObj obj;
     while (!FindCommon::enoughForGetMore(ntoreturn, *numResults) &&
-           PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, NULL))) {
+           PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, nullptr))) {
         // If we can't fit this result inside the current batch, then we stash it for later.
         if (!FindCommon::haveSpaceForNext(obj, *numResults, bb->len())) {
             exec->enqueue(obj);
@@ -680,7 +680,7 @@ std::string runQuery(OperationContext* opCtx,
         curOp.setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
     }
 
-    while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+    while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
         // If we can't fit this result inside the current batch, then we stash it for later.
         if (!FindCommon::haveSpaceForNext(obj, numResults, bb.len())) {
             exec->enqueue(obj);

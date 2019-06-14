@@ -96,7 +96,7 @@ public:
         result.append("version", VersionInfoInterface::instance().version());
         result.append("process", serverGlobalParams.binaryName);
         result.append("pid", ProcessId::getCurrent().asLongLong());
-        result.append("uptime", (double)(time(0) - serverGlobalParams.started));
+        result.append("uptime", (double)(time(nullptr) - serverGlobalParams.started));
         auto uptime = clock->now() - _started;
         result.append("uptimeMillis", durationCount<Milliseconds>(uptime));
         result.append("uptimeEstimate", durationCount<Seconds>(uptime));
@@ -132,7 +132,7 @@ public:
         }
 
         // --- counters
-        bool includeMetricTree = MetricTree::theMetricTree != NULL;
+        bool includeMetricTree = MetricTree::theMetricTree != nullptr;
         if (cmdObj["metrics"].type() && !cmdObj["metrics"].trueValue())
             includeMetricTree = false;
 
@@ -144,7 +144,8 @@ public:
 
         {
             RamLog::LineIterator rl(RamLog::get("warnings"));
-            if (rl.lastWrite() >= time(0) - (10 * 60)) {  // only show warnings from last 10 minutes
+            if (rl.lastWrite() >=
+                time(nullptr) - (10 * 60)) {  // only show warnings from last 10 minutes
                 BSONArrayBuilder arr(result.subarrayStart("warnings"));
                 while (rl.more()) {
                     arr.append(rl.next());

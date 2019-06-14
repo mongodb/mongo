@@ -312,7 +312,7 @@ inline unsigned Status::refCount() const {
     return _error ? _error->refs.load() : 0;
 }
 
-inline Status::Status() : _error(NULL) {}
+inline Status::Status() : _error(nullptr) {}
 
 inline void Status::ref(ErrorInfo* error) {
     if (error)

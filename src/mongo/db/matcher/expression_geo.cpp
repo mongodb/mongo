@@ -89,7 +89,7 @@ Status GeoExpression::parseQuery(const BSONObj& obj) {
         }
     }
 
-    if (geoContainer == NULL) {
+    if (geoContainer == nullptr) {
         return Status(ErrorCodes::BadValue, "geo query doesn't have any geometry");
     }
 
@@ -376,7 +376,7 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
     debug << "GEO raw = " << builder.obj().toString();
 
     MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
+    if (nullptr != td) {
         debug << " ";
         td->debugString(&debug);
     }
@@ -434,7 +434,7 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLe
     _debugAddSpace(debug, indentationLevel);
     debug << "GEONEAR " << _query->toString();
     MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
+    if (nullptr != td) {
         debug << " ";
         td->debugString(&debug);
     }

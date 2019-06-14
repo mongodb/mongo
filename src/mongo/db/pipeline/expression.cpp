@@ -5871,7 +5871,7 @@ int ExpressionRegex::execute(RegexExecutionState* regexState) const {
     invariant(regexState->pcrePtr);
 
     int execResult = pcre_exec(regexState->pcrePtr.get(),
-                               0,
+                               nullptr,
                                regexState->input->c_str(),
                                regexState->input->size(),
                                regexState->startBytePos,
@@ -5981,8 +5981,10 @@ void ExpressionRegex::_compile(RegexExecutionState* executionState) const {
             executionState->pcrePtr);
 
     // Calculate the number of capture groups present in 'pattern' and store in 'numCaptures'.
-    const int pcre_retval = pcre_fullinfo(
-        executionState->pcrePtr.get(), NULL, PCRE_INFO_CAPTURECOUNT, &executionState->numCaptures);
+    const int pcre_retval = pcre_fullinfo(executionState->pcrePtr.get(),
+                                          nullptr,
+                                          PCRE_INFO_CAPTURECOUNT,
+                                          &executionState->numCaptures);
     invariant(pcre_retval == 0);
 
     // The first two-thirds of the vector is used to pass back captured substrings' start and

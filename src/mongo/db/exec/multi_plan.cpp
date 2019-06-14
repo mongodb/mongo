@@ -166,7 +166,7 @@ size_t MultiPlanStage::getTrialPeriodWorks(OperationContext* opCtx, const Collec
     // Run each plan some number of times. This number is at least as great as
     // 'internalQueryPlanEvaluationWorks', but may be larger for big collections.
     size_t numWorks = internalQueryPlanEvaluationWorks.load();
-    if (NULL != collection) {
+    if (nullptr != collection) {
         // For large collections, the number of works is set to be this
         // fraction of the collection size.
         double fraction = internalQueryPlanEvaluationCollFraction;
@@ -307,7 +307,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         // XXX: One known example is 2D queries
         bool validSolutions = true;
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
-            if (NULL == solutions[ix]->cacheData.get()) {
+            if (nullptr == solutions[ix]->cacheData.get()) {
                 LOG(5) << "Not caching query because this solution has no cache data: "
                        << redact(solutions[ix]->toString());
                 validSolutions = false;
@@ -413,7 +413,7 @@ int MultiPlanStage::bestPlanIdx() const {
 
 QuerySolution* MultiPlanStage::bestSolution() {
     if (_bestPlanIdx == kNoSuchPlan)
-        return NULL;
+        return nullptr;
 
     return _candidates[_bestPlanIdx].solution.get();
 }

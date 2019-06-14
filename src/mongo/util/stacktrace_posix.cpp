@@ -61,7 +61,7 @@ const int maxBackTraceFrames = 100;
 
 /// Optional string containing extra unwinding information.  Should take the form of a
 /// JSON document.
-std::string* soMapJson = NULL;
+std::string* soMapJson = nullptr;
 
 /**
  * Returns the "basename" of a path.  The returned StringData is valid until the data referenced
@@ -188,9 +188,9 @@ void printStackTrace(std::ostream& os) {
         Dl_info& dlinfo(dlinfoForFrames[i]);
         if (!dladdr(addresses[i], &dlinfo)) {
             dlinfo.dli_fname = unknownFileName;
-            dlinfo.dli_fbase = NULL;
-            dlinfo.dli_sname = NULL;
-            dlinfo.dli_saddr = NULL;
+            dlinfo.dli_fbase = nullptr;
+            dlinfo.dli_sname = nullptr;
+            dlinfo.dli_saddr = nullptr;
         }
         os << ' ' << addresses[i];
     }

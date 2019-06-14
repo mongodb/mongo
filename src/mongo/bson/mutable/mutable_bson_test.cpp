@@ -1017,11 +1017,11 @@ TEST(Documentation, Example2InPlaceWithDamageVector) {
 
     // Extract the damage events
     mmb::DamageVector damages;
-    const char* source = NULL;
+    const char* source = nullptr;
     size_t size = 0;
     ASSERT_EQUALS(true, doc.getInPlaceUpdates(&damages, &source, &size));
     ASSERT_NOT_EQUALS(0U, damages.size());
-    ASSERT_NOT_EQUALS(static_cast<const char*>(NULL), source);
+    ASSERT_NOT_EQUALS(static_cast<const char*>(nullptr), source);
     ASSERT_NOT_EQUALS(0U, size);
 
     apply(&obj, damages, source);
@@ -2772,12 +2772,12 @@ TEST(DocumentInPlace, InPlaceModeWorksWithNoMutations) {
     mongo::BSONObj obj;
     mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    const char* source = NULL;
+    const char* source = nullptr;
     mmb::DamageVector damages;
     ASSERT_TRUE(damages.empty());
     doc.getInPlaceUpdates(&damages, &source);
     ASSERT_TRUE(damages.empty());
-    ASSERT_NOT_EQUALS(static_cast<const char*>(NULL), source);
+    ASSERT_NOT_EQUALS(static_cast<const char*>(nullptr), source);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 }
 
@@ -2876,14 +2876,14 @@ TEST(DocumentInPlace, GettingInPlaceUpdatesWhenDisabledClearsArguments) {
     const char* source = "foo";
     ASSERT_FALSE(doc.getInPlaceUpdates(&damages, &source));
     ASSERT_TRUE(damages.empty());
-    ASSERT_EQUALS(static_cast<const char*>(NULL), source);
+    ASSERT_EQUALS(static_cast<const char*>(nullptr), source);
 
     damages.push_back(event);
     source = "bar";
     size_t size = 1;
     ASSERT_FALSE(doc.getInPlaceUpdates(&damages, &source, &size));
     ASSERT_TRUE(damages.empty());
-    ASSERT_EQUALS(static_cast<const char*>(NULL), source);
+    ASSERT_EQUALS(static_cast<const char*>(nullptr), source);
     ASSERT_EQUALS(0U, size);
 }
 
@@ -2929,7 +2929,7 @@ TEST(DocumentInPlace, StringLifecycle) {
     mmb::Element x = doc.root().leftChild();
 
     mmb::DamageVector damages;
-    const char* source = NULL;
+    const char* source = nullptr;
 
     x.setValueString("bar").transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
@@ -2955,7 +2955,7 @@ TEST(DocumentInPlace, BinDataLifecycle) {
     mmb::Element x = doc.root().leftChild();
 
     mmb::DamageVector damages;
-    const char* source = NULL;
+    const char* source = nullptr;
 
     x.setValueBinary(binData2.length, binData2.type, binData2.data).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
@@ -2985,7 +2985,7 @@ TEST(DocumentInPlace, OIDLifecycle) {
     mmb::Element x = doc.root().leftChild();
 
     mmb::DamageVector damages;
-    const char* source = NULL;
+    const char* source = nullptr;
 
     x.setValueOID(oid2).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
@@ -3005,7 +3005,7 @@ TEST(DocumentInPlace, BooleanLifecycle) {
     mmb::Element x = doc.root().leftChild();
 
     mmb::DamageVector damages;
-    const char* source = NULL;
+    const char* source = nullptr;
 
     x.setValueBool(false).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
@@ -3031,7 +3031,7 @@ TEST(DocumentInPlace, DateLifecycle) {
     mmb::Element x = doc.root().leftChild();
 
     mmb::DamageVector damages;
-    const char* source = NULL;
+    const char* source = nullptr;
 
     x.setValueDate(mongo::Date_t::fromMillisSinceEpoch(20000)).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
@@ -3053,7 +3053,7 @@ TEST(DocumentInPlace, NumberIntLifecycle) {
     mmb::Element x = doc.root().leftChild();
 
     mmb::DamageVector damages;
-    const char* source = NULL;
+    const char* source = nullptr;
 
     x.setValueInt(value2).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
@@ -3079,7 +3079,7 @@ TEST(DocumentInPlace, TimestampLifecycle) {
     mmb::Element x = doc.root().leftChild();
 
     mmb::DamageVector damages;
-    const char* source = NULL;
+    const char* source = nullptr;
 
     x.setValueTimestamp(mongo::Timestamp(mongo::Date_t::fromMillisSinceEpoch(20000)))
         .transitional_ignore();
@@ -3103,7 +3103,7 @@ TEST(DocumentInPlace, NumberLongLifecycle) {
     mmb::Element x = doc.root().leftChild();
 
     mmb::DamageVector damages;
-    const char* source = NULL;
+    const char* source = nullptr;
 
     x.setValueLong(value2).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
@@ -3132,7 +3132,7 @@ TEST(DocumentInPlace, NumberDoubleLifecycle) {
     mmb::Element x = doc.root().leftChild();
 
     mmb::DamageVector damages;
-    const char* source = NULL;
+    const char* source = nullptr;
 
     x.setValueDouble(value2).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
@@ -3161,7 +3161,7 @@ TEST(DocumentInPlace, NumberDecimalLifecycle) {
     mmb::Element x = doc.root().leftChild();
 
     mmb::DamageVector damages;
-    const char* source = NULL;
+    const char* source = nullptr;
 
     x.setValueDecimal(value2).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
@@ -3192,7 +3192,7 @@ TEST(DocumentInPlace, DoubleToLongAndBack) {
     mmb::Element x = doc.root().leftChild();
 
     mmb::DamageVector damages;
-    const char* source = NULL;
+    const char* source = nullptr;
 
     x.setValueLong(value2).transitional_ignore();
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));

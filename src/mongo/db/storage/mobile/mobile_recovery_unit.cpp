@@ -146,7 +146,7 @@ bool MobileRecoveryUnit::waitUntilDurable() {
             Lock::GlobalLock lk(opCtx, MODE_X);
             // Use FULL mode to guarantee durability
             ret = sqlite3_wal_checkpoint_v2(_session.get()->getSession(),
-                                            NULL,
+                                            nullptr,
                                             SQLITE_CHECKPOINT_FULL,
                                             &framesInWAL,
                                             &checkpointedFrames);

@@ -490,7 +490,7 @@ void DBClientCursor::attach(AScopedConnection* conn) {
     }
 
     conn->done();
-    _client = 0;
+    _client = nullptr;
     _lazyHost = "";
 }
 

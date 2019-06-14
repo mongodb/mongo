@@ -114,7 +114,7 @@ public:
         // Use the runner to count the number of objects scanned.
         int count = 0;
         PlanExecutor::ExecState state;
-        for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL));) {
+        for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr));) {
             ++count;
         }
         ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
@@ -130,7 +130,8 @@ public:
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, collection, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(
+            new CollectionScan(&_opCtx, collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -227,7 +228,7 @@ public:
 
         int count = 0;
         PlanExecutor::ExecState state;
-        for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL));) {
+        for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr));) {
             // Make sure we get the objects in the order we want
             ASSERT_EQUALS(count, obj["foo"].numberInt());
             ++count;
@@ -262,7 +263,7 @@ public:
 
         int count = 0;
         PlanExecutor::ExecState state;
-        for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL));) {
+        for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr));) {
             ++count;
             ASSERT_EQUALS(numObj() - count, obj["foo"].numberInt());
         }
@@ -293,7 +294,7 @@ public:
         params.tailable = false;
 
         WorkingSet ws;
-        unique_ptr<PlanStage> scan(new CollectionScan(&_opCtx, coll, params, &ws, NULL));
+        unique_ptr<PlanStage> scan(new CollectionScan(&_opCtx, coll, params, &ws, nullptr));
 
         int count = 0;
         while (count < 10) {
@@ -352,7 +353,7 @@ public:
         params.tailable = false;
 
         WorkingSet ws;
-        unique_ptr<PlanStage> scan(new CollectionScan(&_opCtx, coll, params, &ws, NULL));
+        unique_ptr<PlanStage> scan(new CollectionScan(&_opCtx, coll, params, &ws, nullptr));
 
         int count = 0;
         while (count < 10) {

@@ -75,7 +75,7 @@ TEST(RecordStoreTestHarness, Simple1) {
 
         RecordData rd;
         ASSERT(!rs->findRecord(opCtx.get(), RecordId(111, 17), &rd));
-        ASSERT(rd.data() == NULL);
+        ASSERT(rd.data() == nullptr);
 
         ASSERT(rs->findRecord(opCtx.get(), loc1, &rd));
         ASSERT_EQUALS(s, rd.data());

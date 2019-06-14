@@ -153,7 +153,7 @@ public:
               bool assertOnError,
               int timeoutMs) override;
 
-    void injectNative(const char* field, NativeFunction func, void* data = 0) override;
+    void injectNative(const char* field, NativeFunction func, void* data = nullptr) override;
 
     ScriptingFunction _createFunction(const char* code) override;
 

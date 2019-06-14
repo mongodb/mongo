@@ -2359,7 +2359,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
     _topCoord->prepareStatusResponse(
         TopologyCoordinator::ReplSetStatusArgs{
             _replExecutor->now(),
-            static_cast<unsigned>(time(0) - serverGlobalParams.started),
+            static_cast<unsigned>(time(nullptr) - serverGlobalParams.started),
             _getCurrentCommittedSnapshotOpTimeAndWallTime_inlock(),
             initialSyncProgress,
             _storage->getLastStableCheckpointTimestampDeprecated(_service),

@@ -373,16 +373,16 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
 Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
                                          const PlanCacheIndexTree* const indexTree,
                                          const map<IndexEntry::Identifier, size_t>& indexMap) {
-    if (NULL == filter) {
+    if (nullptr == filter) {
         return Status(ErrorCodes::BadValue, "Cannot tag tree: filter is NULL.");
     }
-    if (NULL == indexTree) {
+    if (nullptr == indexTree) {
         return Status(ErrorCodes::BadValue, "Cannot tag tree: indexTree is NULL.");
     }
 
     // We're tagging the tree here, so it shouldn't have
     // any tags hanging off yet.
-    verify(NULL == filter->getTag());
+    verify(nullptr == filter->getTag());
 
     if (filter->numChildren() != indexTree->children.size()) {
         str::stream ss;
@@ -721,7 +721,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     LOG(5) << "Rated tree:" << endl << redact(query.root()->debugString());
 
     // If there is a GEO_NEAR it must have an index it can use directly.
-    const MatchExpression* gnNode = NULL;
+    const MatchExpression* gnNode = nullptr;
     if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR, &gnNode)) {
         // No index for GEO_NEAR?  No query.
         RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
@@ -736,7 +736,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     // Likewise, if there is a TEXT it must have an index it can use directly.
-    const MatchExpression* textNode = NULL;
+    const MatchExpression* textNode = nullptr;
     if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT, &textNode)) {
         RelevantTag* tag = static_cast<RelevantTag*>(textNode->getTag());
 
@@ -832,7 +832,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     // Produce legible error message for failed OR planning with a TEXT child.
     // TODO: support collection scan for non-TEXT children of OR.
-    if (out.size() == 0 && textNode != NULL && MatchExpression::OR == query.root()->matchType()) {
+    if (out.size() == 0 && textNode != nullptr &&
+        MatchExpression::OR == query.root()->matchType()) {
         MatchExpression* root = query.root();
         for (size_t i = 0; i < root->numChildren(); ++i) {
             if (textNode == root->getChild(i)) {

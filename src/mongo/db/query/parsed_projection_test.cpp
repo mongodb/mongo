@@ -58,7 +58,7 @@ unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query, const 
         MatchExpressionParser::parse(query, std::move(expCtx));
     ASSERT(statusWithMatcher.isOK());
     std::unique_ptr<MatchExpression> queryMatchExpr = std::move(statusWithMatcher.getValue());
-    ParsedProjection* out = NULL;
+    ParsedProjection* out = nullptr;
     Status status = ParsedProjection::make(opCtx.get(), projObj, queryMatchExpr.get(), &out);
     if (!status.isOK()) {
         FAIL(str::stream() << "failed to parse projection " << projObj << " (query: " << query
@@ -91,7 +91,7 @@ void assertInvalidProjection(const char* queryStr, const char* projStr) {
         MatchExpressionParser::parse(query, std::move(expCtx));
     ASSERT(statusWithMatcher.isOK());
     std::unique_ptr<MatchExpression> queryMatchExpr = std::move(statusWithMatcher.getValue());
-    ParsedProjection* out = NULL;
+    ParsedProjection* out = nullptr;
     Status status = ParsedProjection::make(opCtx.get(), projObj, queryMatchExpr.get(), &out);
     std::unique_ptr<ParsedProjection> destroy(out);
     ASSERT(!status.isOK());
@@ -213,9 +213,9 @@ TEST(ParsedProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
     unique_ptr<MatchExpression> queryMatchExpr(new AlwaysFalseMatchExpression());
-    ASSERT(NULL == queryMatchExpr->path().rawData());
+    ASSERT(nullptr == queryMatchExpr->path().rawData());
 
-    ParsedProjection* out = NULL;
+    ParsedProjection* out = nullptr;
     BSONObj projObj = fromjson("{'a.$': 1}");
     Status status = ParsedProjection::make(opCtx.get(), projObj, queryMatchExpr.get(), &out);
     ASSERT(!status.isOK());

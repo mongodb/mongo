@@ -330,7 +330,7 @@ KVCatalog::KVCatalog(RecordStore* rs,
       _engine(engine) {}
 
 KVCatalog::~KVCatalog() {
-    _rs = NULL;
+    _rs = nullptr;
 }
 
 std::string KVCatalog::_newRand() {

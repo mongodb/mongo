@@ -420,7 +420,7 @@ Status extractFullEqualityMatches(const MatchExpression& root,
 }
 
 Status extractEqualityMatches(const MatchExpression& root, EqualityMatches* equalities) {
-    return _extractFullEqualityMatches(root, NULL, equalities);
+    return _extractFullEqualityMatches(root, nullptr, equalities);
 }
 
 Status addEqualitiesToDoc(const EqualityMatches& equalities, mutablebson::Document* doc) {

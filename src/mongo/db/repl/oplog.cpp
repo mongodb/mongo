@@ -608,7 +608,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                           nss,
                                           uuid,
                                           begin[i].doc,
-                                          NULL,
+                                          nullptr,
                                           fromMigrate,
                                           insertStatementOplogSlot,
                                           wallClockTime,
@@ -1683,7 +1683,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // such as an updateCriteria of the form
                     // { _id:..., { x : {$size:...} }
                     // thus this is not ideal.
-                    if (collection == NULL ||
+                    if (collection == nullptr ||
                         (indexCatalog->haveIdIndex(opCtx) &&
                          Helpers::findById(opCtx, collection, updateCriteria).isNull()) ||
                         // capped collections won't have an _id index
@@ -1980,7 +1980,7 @@ void initTimestampFromOplog(OperationContext* opCtx, const NamespaceString& oplo
     DBDirectClient c(opCtx);
     static const BSONObj reverseNaturalObj = BSON("$natural" << -1);
     BSONObj lastOp =
-        c.findOne(oplogNss.ns(), Query().sort(reverseNaturalObj), NULL, QueryOption_SlaveOk);
+        c.findOne(oplogNss.ns(), Query().sort(reverseNaturalObj), nullptr, QueryOption_SlaveOk);
 
     if (!lastOp.isEmpty()) {
         LOG(1) << "replSet setting last Timestamp";

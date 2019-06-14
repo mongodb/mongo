@@ -269,7 +269,7 @@ void PlanCacheIndexTree::setIndexEntry(const IndexEntry& ie) {
 
 PlanCacheIndexTree* PlanCacheIndexTree::clone() const {
     PlanCacheIndexTree* root = new PlanCacheIndexTree();
-    if (NULL != entry.get()) {
+    if (nullptr != entry.get()) {
         root->index_pos = index_pos;
         root->setIndexEntry(*entry.get());
         root->canCombineBounds = canCombineBounds;
@@ -298,7 +298,7 @@ std::string PlanCacheIndexTree::toString(int indents) const {
         return result.str();
     } else {
         result << std::string(3 * indents, '-') << "Leaf ";
-        if (NULL != entry.get()) {
+        if (nullptr != entry.get()) {
             result << entry->identifier << ", pos: " << index_pos << ", can combine? "
                    << canCombineBounds;
         }
@@ -326,7 +326,7 @@ std::string PlanCacheIndexTree::toString(int indents) const {
 
 SolutionCacheData* SolutionCacheData::clone() const {
     SolutionCacheData* other = new SolutionCacheData();
-    if (NULL != this->tree.get()) {
+    if (nullptr != this->tree.get()) {
         // 'tree' could be NULL if the cached solution
         // is a collection scan.
         other->tree.reset(this->tree->clone());
@@ -542,7 +542,7 @@ Status PlanCache::set(const CanonicalQuery& query,
 
     std::unique_ptr<PlanCacheEntry> evictedEntry = _cache.add(key, newEntry.release());
 
-    if (NULL != evictedEntry.get()) {
+    if (nullptr != evictedEntry.get()) {
         LOG(1) << _ns << ": plan cache maximum size exceeded - "
                << "removed least recently used entry " << redact(evictedEntry->toString());
     }

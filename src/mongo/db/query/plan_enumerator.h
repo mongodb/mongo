@@ -158,7 +158,7 @@ private:
     };
 
     struct PrepMemoContext {
-        PrepMemoContext() : elemMatchExpr(NULL) {}
+        PrepMemoContext() : elemMatchExpr(nullptr) {}
         MatchExpression* elemMatchExpr;
 
         // Maps from indexable predicates that can be pushed into the current node to the route

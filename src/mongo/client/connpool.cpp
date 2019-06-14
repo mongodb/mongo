@@ -572,7 +572,7 @@ bool DBConnectionPool::poolKeyCompare::operator()(const PoolKey& a, const PoolKe
 }
 
 bool DBConnectionPool::isConnectionGood(const string& hostName, DBClientBase* conn) {
-    if (conn == NULL) {
+    if (conn == nullptr) {
         return false;
     }
 
@@ -642,13 +642,13 @@ void ScopedDbConnection::done() {
     }
 
     globalConnPool.release(_host, _conn);
-    _conn = NULL;
+    _conn = nullptr;
 }
 
 void ScopedDbConnection::kill() {
     globalConnPool.decrementEgress(_host, _conn);
     delete _conn;
-    _conn = NULL;
+    _conn = nullptr;
 }
 
 void ScopedDbConnection::_setSocketTimeout() {

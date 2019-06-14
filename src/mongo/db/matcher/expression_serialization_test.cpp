@@ -1695,7 +1695,7 @@ TEST(SerializeInternalBinDataSubType, ExpressionBinDataSubTypeSerializesCorrectl
                       fromjson("{x: {$_internalSchemaBinDataSubType: 1}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
-    BSONObj obj = BSON("x" << BSONBinData(NULL, 0, BinDataType::bdtCustom));
+    BSONObj obj = BSON("x" << BSONBinData(nullptr, 0, BinDataType::bdtCustom));
     ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
 
     uint8_t bytes[] = {0, 1, 2, 10, 11, 12};

@@ -166,7 +166,7 @@ vector<string> MockReplicaSet::getSecondaries() const {
 }
 
 MockRemoteDBServer* MockReplicaSet::getNode(const string& hostAndPort) {
-    return mapFindWithDefault(_nodeMap, hostAndPort, static_cast<MockRemoteDBServer*>(NULL));
+    return mapFindWithDefault(_nodeMap, hostAndPort, static_cast<MockRemoteDBServer*>(nullptr));
 }
 
 repl::ReplSetConfig MockReplicaSet::getReplConfig() const {
@@ -342,7 +342,7 @@ void MockReplicaSet::mockReplSetGetStatusCmd() {
         // TODO: syncingTo
 
         fullStatBuilder.append("set", _setName);
-        fullStatBuilder.appendTimeT("date", time(0));
+        fullStatBuilder.appendTimeT("date", time(nullptr));
         fullStatBuilder.append("myState", getState(node->getServerAddress()));
         fullStatBuilder.append("members", hostsField);
         fullStatBuilder.append("ok", true);

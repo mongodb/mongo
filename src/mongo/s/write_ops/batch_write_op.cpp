@@ -363,7 +363,7 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
         if (ordered && !batchMap.empty()) {
             dassert(batchMap.size() == 1u);
             if (isNewBatchRequiredOrdered(writes, batchMap)) {
-                writeOp.cancelWrites(NULL);
+                writeOp.cancelWrites(nullptr);
                 break;
             }
         }
@@ -591,7 +591,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
 
     vector<WriteErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
     int index = 0;
-    WriteErrorDetail* lastError = NULL;
+    WriteErrorDetail* lastError = nullptr;
     for (vector<TargetedWrite *>::const_iterator it = targetedBatch.getWrites().begin();
          it != targetedBatch.getWrites().end();
          ++it, ++index) {
@@ -601,7 +601,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
         dassert(writeOp.getWriteState() == WriteOpState_Pending);
 
         // See if we have an error for the write
-        WriteErrorDetail* writeError = NULL;
+        WriteErrorDetail* writeError = nullptr;
 
         if (itemErrorIt != itemErrors.end() && (*itemErrorIt)->getIndex() == index) {
             // We have an per-item error for this write op's index
@@ -610,7 +610,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
         }
 
         // Finish the response (with error, if needed)
-        if (NULL == writeError) {
+        if (nullptr == writeError) {
             if (!ordered || !lastError) {
                 writeOp.noteWriteComplete(*write);
             } else {
@@ -625,7 +625,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
     }
 
     // Track errors we care about, whether batch or individual errors
-    if (NULL != trackedErrors) {
+    if (nullptr != trackedErrors) {
         trackErrors(targetedBatch.getEndpoint(), itemErrors, trackedErrors);
     }
 
@@ -723,7 +723,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
 
     // For non-verbose, it's all we need.
     if (!_clientRequest.isVerboseWC()) {
-        dassert(batchResp->isValid(NULL));
+        dassert(batchResp->isValid(nullptr));
         return;
     }
 
@@ -802,7 +802,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
         batchResp->setNModified(_numModified);
     }
 
-    dassert(batchResp->isValid(NULL));
+    dassert(batchResp->isValid(nullptr));
 }
 
 int BatchWriteOp::numWriteOpsIn(WriteOpState opState) const {

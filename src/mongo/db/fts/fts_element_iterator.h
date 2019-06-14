@@ -48,7 +48,7 @@ struct FTSIteratorValue {
     FTSIteratorValue(const char* text, const FTSLanguage* language, double weight)
         : _text(text), _language(language), _weight(weight), _valid(true) {}
 
-    FTSIteratorValue() : _text(NULL), _language(), _weight(0.0), _valid(false) {}
+    FTSIteratorValue() : _text(nullptr), _language(), _weight(0.0), _valid(false) {}
 
     bool valid() const {
         return _valid;

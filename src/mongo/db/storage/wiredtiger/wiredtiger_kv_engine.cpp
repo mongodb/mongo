@@ -631,7 +631,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                 Status s(wtRCToStatus(ret));
                 msgasserted(28718, s.reason());
             }
-            invariantWTOK(_conn->close(_conn, NULL));
+            invariantWTOK(_conn->close(_conn, nullptr));
             // After successful recovery, remove the journal directory.
             try {
                 boost::filesystem::remove_all(journalPath);
@@ -706,7 +706,7 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
         cleanShutdown();
     }
 
-    _sessionCache.reset(NULL);
+    _sessionCache.reset(nullptr);
 }
 
 void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
@@ -887,7 +887,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
     WiredTigerSession sessionWrapper(_conn);
     WT_SESSION* session = sessionWrapper.getSession();
 
-    int rc = (session->verify)(session, uri, NULL);
+    int rc = (session->verify)(session, uri, nullptr);
     if (rc == 0) {
         log() << "Verify succeeded on uri " << uri << ". Not salvaging.";
         return Status::OK();
@@ -912,7 +912,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
     }
 
     log() << "Verify failed on uri " << uri << ". Running a salvage operation.";
-    auto status = wtRCToStatus(session->salvage(session, uri, NULL), "Salvage failed:");
+    auto status = wtRCToStatus(session->salvage(session, uri, nullptr), "Salvage failed:");
     if (status.isOK()) {
         return {ErrorCodes::DataModifiedByRepair, str::stream() << "Salvaged data for " << uri};
     }
@@ -952,7 +952,7 @@ Status WiredTigerKVEngine::_rebuildIdent(WT_SESSION* session, const char* uri) {
         return swMetadata.getStatus();
     }
 
-    int rc = session->drop(session, uri, NULL);
+    int rc = session->drop(session, uri, nullptr);
     if (rc != 0) {
         error() << "Failed to drop " << uri;
         return wtRCToStatus(rc);
@@ -995,9 +995,9 @@ Status WiredTigerKVEngine::beginBackup(OperationContext* opCtx) {
 
     // This cursor will be freed by the backupSession being closed as the session is uncached
     auto session = std::make_unique<WiredTigerSession>(_conn);
-    WT_CURSOR* c = NULL;
+    WT_CURSOR* c = nullptr;
     WT_SESSION* s = session->getSession();
-    int ret = WT_OP_CHECK(s->open_cursor(s, "backup:", NULL, NULL, &c));
+    int ret = WT_OP_CHECK(s->open_cursor(s, "backup:", nullptr, nullptr, &c));
     if (ret != 0) {
         return wtRCToStatus(ret);
     }
@@ -1025,9 +1025,9 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
 
     // This cursor will be freed by the backupSession being closed as the session is uncached
     auto sessionRaii = std::make_unique<WiredTigerSession>(_conn);
-    WT_CURSOR* cursor = NULL;
+    WT_CURSOR* cursor = nullptr;
     WT_SESSION* session = sessionRaii->getSession();
-    int wtRet = session->open_cursor(session, "backup:", NULL, NULL, &cursor);
+    int wtRet = session->open_cursor(session, "backup:", nullptr, nullptr, &cursor);
     if (wtRet != 0) {
         return wtRCToStatus(wtRet);
     }
@@ -1059,9 +1059,9 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
     uassert(51033, "Cannot extend backup cursor with in-memory mode.", !isEphemeral());
     invariant(_backupCursor);
 
-    WT_CURSOR* cursor = NULL;
+    WT_CURSOR* cursor = nullptr;
     WT_SESSION* session = _backupSession->getSession();
-    int wtRet = session->open_cursor(session, NULL, _backupCursor, "target=(\"log:\")", &cursor);
+    int wtRet = session->open_cursor(session, nullptr, _backupCursor, "target=(\"log:\")", &cursor);
     if (wtRet != 0) {
         return wtRCToStatus(wtRet);
     }
@@ -1475,8 +1475,8 @@ bool WiredTigerKVEngine::hasIdent(OperationContext* opCtx, StringData ident) con
 
 bool WiredTigerKVEngine::_hasUri(WT_SESSION* session, const std::string& uri) const {
     // can't use WiredTigerCursor since this is called from constructor.
-    WT_CURSOR* c = NULL;
-    int ret = session->open_cursor(session, "metadata:create", NULL, NULL, &c);
+    WT_CURSOR* c = nullptr;
+    int ret = session->open_cursor(session, "metadata:create", nullptr, nullptr, &c);
     if (ret == ENOENT)
         return false;
     invariantWTOK(ret);

@@ -738,7 +738,7 @@ GeoHash GeoHashConverter::hash(const Point& p) const {
 }
 
 GeoHash GeoHashConverter::hash(const BSONObj& o) const {
-    return hash(o, NULL);
+    return hash(o, nullptr);
 }
 
 // src is printed out as debugging information.  Maybe it is actually somehow the 'source' of o?

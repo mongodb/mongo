@@ -167,7 +167,7 @@ void CollectionInfoCacheImpl::notifyOfQuery(OperationContext* opCtx,
     for (auto it = indexesUsed.begin(); it != indexesUsed.end(); ++it) {
         // This index should still exist, since the PlanExecutor would have been killed if the
         // index was dropped (and we would not get here).
-        dassert(NULL != _collection->getIndexCatalog()->findIndexByName(opCtx, *it));
+        dassert(nullptr != _collection->getIndexCatalog()->findIndexByName(opCtx, *it));
 
         _indexUsageTracker.recordIndexAccess(*it);
     }
@@ -175,7 +175,7 @@ void CollectionInfoCacheImpl::notifyOfQuery(OperationContext* opCtx,
 
 void CollectionInfoCacheImpl::clearQueryCache() {
     LOG(1) << _collection->ns() << ": clearing plan cache - collection info cache reset";
-    if (NULL != _planCache.get()) {
+    if (nullptr != _planCache.get()) {
         _planCache->clear();
     }
 }

@@ -724,7 +724,7 @@ inline bool Element::isValueMaxKey() const {
 }
 
 inline bool Element::ok() const {
-    dassert(_doc != NULL);
+    dassert(_doc != nullptr);
     return _repIdx <= kMaxRepIdx;
 }
 
@@ -745,7 +745,7 @@ inline Element::RepIdx Element::getIdx() const {
 }
 
 inline Element::Element(Document* doc, RepIdx repIdx) : _doc(doc), _repIdx(repIdx) {
-    dassert(_doc != NULL);
+    dassert(_doc != nullptr);
 }
 
 inline StringData Element::getValueStringOrSymbol() const {

@@ -43,7 +43,7 @@ namespace mongo {
  */
 class RecordData {
 public:
-    RecordData() : _data(NULL), _size(0) {}
+    RecordData() : _data(nullptr), _size(0) {}
     RecordData(const char* data, int size) : _data(data), _size(size) {}
 
     RecordData(SharedBuffer ownedData, int size)

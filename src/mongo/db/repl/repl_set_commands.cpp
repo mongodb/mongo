@@ -248,14 +248,14 @@ void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
         *setname = p;
     }
 
-    if (slash == 0) {
+    if (slash == nullptr) {
         return;
     }
 
     p = slash + 1;
     while (1) {
         const char* comma = strchr(p, ',');
-        if (comma == 0) {
+        if (comma == nullptr) {
             comma = strchr(p, 0);
         }
         if (p == comma) {

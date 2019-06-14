@@ -138,7 +138,7 @@ public:
         }
 
         unique_ptr<FetchStage> fetchStage(
-            new FetchStage(&_opCtx, &ws, mockStage.release(), NULL, coll));
+            new FetchStage(&_opCtx, &ws, mockStage.release(), nullptr, coll));
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state;

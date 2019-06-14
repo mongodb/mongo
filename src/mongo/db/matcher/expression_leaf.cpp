@@ -263,7 +263,7 @@ void RegexMatchExpression::debugString(StringBuilder& debug, int indentationLeve
     debug << path() << " regex /" << _regex << "/" << _flags;
 
     MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
+    if (nullptr != td) {
         debug << " ";
         td->debugString(&debug);
     }
@@ -306,7 +306,7 @@ void ModMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " mod " << _divisor << " % x == " << _remainder;
     MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
+    if (nullptr != td) {
         debug << " ";
         td->debugString(&debug);
     }
@@ -340,7 +340,7 @@ void ExistsMatchExpression::debugString(StringBuilder& debug, int indentationLev
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " exists";
     MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
+    if (nullptr != td) {
         debug << " ";
         td->debugString(&debug);
     }
@@ -416,7 +416,7 @@ void InMatchExpression::debugString(StringBuilder& debug, int indentationLevel) 
     }
     debug << "]";
     MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
+    if (nullptr != td) {
         debug << " ";
         td->debugString(&debug);
     }

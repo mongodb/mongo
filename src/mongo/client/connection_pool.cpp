@@ -273,7 +273,7 @@ ConnectionPool::ConnectionPtr& ConnectionPool::ConnectionPtr::operator=(Connecti
 
 void ConnectionPool::ConnectionPtr::done(Date_t now) {
     _pool->releaseConnection(_connInfo, now);
-    _pool = NULL;
+    _pool = nullptr;
 }
 
 }  // namespace mongo

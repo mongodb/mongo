@@ -255,8 +255,8 @@ public:
         char fstr[1024] = {0};
 
         f = fopen(fname, "r");
-        if (f != NULL) {
-            if (fgets(fstr, 1023, f) != NULL)
+        if (f != nullptr) {
+            if (fgets(fstr, 1023, f) != nullptr)
                 fstr[strlen(fstr) < 1 ? 0 : strlen(fstr) - 1] = '\0';
             fclose(f);
         }
@@ -272,10 +272,10 @@ public:
         procCount = 0;
 
         f = fopen("/proc/cpuinfo", "r");
-        if (f == NULL)
+        if (f == nullptr)
             return;
 
-        while (fgets(fstr, 1023, f) != NULL && !feof(f)) {
+        while (fgets(fstr, 1023, f) != nullptr && !feof(f)) {
             // until the end of the file
             fstr[strlen(fstr) < 1 ? 0 : strlen(fstr) - 1] = '\0';
             if (strncmp(fstr, "processor ", 10) == 0 || strncmp(fstr, "processor\t:", 11) == 0)

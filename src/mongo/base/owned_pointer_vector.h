@@ -157,7 +157,7 @@ public:
      */
     T* releaseAt(size_t i) {
         T* out = _vector[i];
-        _vector[i] = NULL;
+        _vector[i] = nullptr;
         return out;
     }
 

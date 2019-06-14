@@ -242,7 +242,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         ASSERT_EQUALS(N, rs->numRecords(opCtx.get()));
     }
 
-    rs.reset(NULL);
+    rs.reset(nullptr);
 
     {
         auto& info = *ss.load(uri);

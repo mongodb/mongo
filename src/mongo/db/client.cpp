@@ -117,13 +117,13 @@ ServiceContext::UniqueOperationContext Client::makeOperationContext() {
 
 void Client::setOperationContext(OperationContext* opCtx) {
     // We can only set the OperationContext once before resetting it.
-    invariant(opCtx != NULL && _opCtx == NULL);
+    invariant(opCtx != nullptr && _opCtx == nullptr);
     _opCtx = opCtx;
 }
 
 void Client::resetOperationContext() {
-    invariant(_opCtx != NULL);
-    _opCtx = NULL;
+    invariant(_opCtx != nullptr);
+    _opCtx = nullptr;
 }
 
 std::string Client::clientAddress(bool includePort) const {

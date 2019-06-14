@@ -239,7 +239,7 @@ public:
 
         BSONObj obj;
         PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = executor.getValue()->getNext(&obj, NULL))) {
+        while (PlanExecutor::ADVANCED == (state = executor.getValue()->getNext(&obj, nullptr))) {
             // Distinct expands arrays.
             //
             // If our query is covered, each value of the key should be in the index key and

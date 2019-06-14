@@ -135,7 +135,7 @@ Status RemoveSaver::goingToDelete(const BSONObj& o) {
                                        << " for remove saving: " << redact(errnoWithDescription());
             error() << msg;
             _out.reset();
-            _out = 0;
+            _out = nullptr;
             return Status(ErrorCodes::FileNotOpen, msg);
         }
     }

@@ -58,7 +58,7 @@ bool isPositionalElement(const StringData& field);
  *   isPositional assumes that the field is updatable. Call isUpdatable() above to
  *   verify.
  */
-bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count = NULL);
+bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count = nullptr);
 
 /**
  * Returns true iff 'field' is an array filter (matching the regular expression /\$\[.*\]/).

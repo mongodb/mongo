@@ -1108,7 +1108,7 @@ Status JParse::chars(std::string* result, const char* terminalSet, const char* a
     const char* q = _input;
     while (q < _input_end && !match(*q, terminalSet)) {
         MONGO_JSON_DEBUG("q: " << q);
-        if (allowedSet != NULL) {
+        if (allowedSet != nullptr) {
             if (!match(*q, allowedSet)) {
                 _input = q;
                 return Status::OK();
@@ -1226,7 +1226,7 @@ inline bool JParse::readToken(const char* token) {
 bool JParse::readTokenImpl(const char* token, bool advance) {
     MONGO_JSON_DEBUG("token: " << token);
     const char* check = _input;
-    if (token == NULL) {
+    if (token == nullptr) {
         return false;
     }
     // 'isspace()' takes an 'int' (signed), so (default signed) 'char's get sign-extended
@@ -1264,13 +1264,13 @@ bool JParse::readField(StringData expectedField) {
 }
 
 inline bool JParse::match(char matchChar, const char* matchSet) const {
-    if (matchSet == NULL) {
+    if (matchSet == nullptr) {
         return true;
     }
     if (*matchSet == '\0') {
         return false;
     }
-    return (strchr(matchSet, matchChar) != NULL);
+    return (strchr(matchSet, matchChar) != nullptr);
 }
 
 bool JParse::isHexString(StringData str) const {

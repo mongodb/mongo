@@ -155,7 +155,7 @@ StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj&
         if (e.type()) {
             b.append(e);
         } else {
-            b.appendOID("_id", NULL, true);
+            b.appendOID("_id", nullptr, true);
         }
     }
 

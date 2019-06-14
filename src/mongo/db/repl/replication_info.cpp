@@ -101,7 +101,7 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
                 opCtx, localSources.ns(), ctx.getCollection(), PlanExecutor::NO_YIELD);
             BSONObj obj;
             PlanExecutor::ExecState state;
-            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
                 src.push_back(obj.getOwned());
             }
 

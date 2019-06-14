@@ -297,7 +297,7 @@ private:
     struct IndexToBuild {
         std::unique_ptr<IndexCatalog::IndexBuildBlockInterface> block;
 
-        IndexAccessMethod* real = NULL;           // owned elsewhere
+        IndexAccessMethod* real = nullptr;        // owned elsewhere
         const MatchExpression* filterExpression;  // might be NULL, owned elsewhere
         std::unique_ptr<IndexAccessMethod::BulkBuilder> bulk;
 

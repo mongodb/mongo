@@ -44,17 +44,17 @@ TEST(EmptySet, Normal) {
     FieldRef bSimple("b");
     const FieldRef* conflict;
     ASSERT_TRUE(fieldSet.insert(&bSimple, &conflict));
-    ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
+    ASSERT_EQUALS(static_cast<const FieldRef*>(nullptr), conflict);
 
     // insert "a", OK
     FieldRef aSimple("a");
     ASSERT_TRUE(fieldSet.insert(&aSimple, &conflict));
-    ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
+    ASSERT_EQUALS(static_cast<const FieldRef*>(nullptr), conflict);
 
     // insert "c", OK
     FieldRef cSimple("c");
     ASSERT_TRUE(fieldSet.insert(&cSimple, &conflict));
-    ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
+    ASSERT_EQUALS(static_cast<const FieldRef*>(nullptr), conflict);
 }
 
 TEST(EmptySet, Conflict) {
@@ -63,7 +63,7 @@ TEST(EmptySet, Conflict) {
     FieldRef aDotB("a.b");
     const FieldRef* conflict;
     ASSERT_TRUE(fieldSet.insert(&aDotB, &conflict));
-    ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
+    ASSERT_EQUALS(static_cast<const FieldRef*>(nullptr), conflict);
 
     // insert "a", conflicts with "a.b"
     FieldRef prefix("a");
@@ -83,7 +83,7 @@ TEST(EmptySet, EmptyField) {
     FieldRef empty;
     const FieldRef* conflict;
     ASSERT_TRUE(fieldSet.insert(&empty, &conflict));
-    ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
+    ASSERT_EQUALS(static_cast<const FieldRef*>(nullptr), conflict);
 
     ASSERT_FALSE(fieldSet.insert(&empty, &conflict));
     ASSERT_EQUALS(empty, *conflict);
@@ -96,24 +96,24 @@ TEST(NotEmptySet, Normal) {
     FieldRef bDotE("b.e");
     const FieldRef* conflict;
     ASSERT_TRUE(fieldSet.insert(&bDotC, &conflict));
-    ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
+    ASSERT_EQUALS(static_cast<const FieldRef*>(nullptr), conflict);
     ASSERT_TRUE(fieldSet.insert(&bDotE, &conflict));
-    ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
+    ASSERT_EQUALS(static_cast<const FieldRef*>(nullptr), conflict);
 
     // insert "a" before, OK
     FieldRef aSimple("a");
     ASSERT_TRUE(fieldSet.insert(&aSimple, &conflict));
-    ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
+    ASSERT_EQUALS(static_cast<const FieldRef*>(nullptr), conflict);
 
     // insert "b.d" in the middle, OK
     FieldRef bDotD("b.d");
     ASSERT_TRUE(fieldSet.insert(&bDotD, &conflict));
-    ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
+    ASSERT_EQUALS(static_cast<const FieldRef*>(nullptr), conflict);
 
     // insert "c" after, OK
     FieldRef cSimple("c");
     ASSERT_TRUE(fieldSet.insert(&cSimple, &conflict));
-    ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
+    ASSERT_EQUALS(static_cast<const FieldRef*>(nullptr), conflict);
 }
 
 TEST(NotEmpty, Conflict) {
@@ -123,9 +123,9 @@ TEST(NotEmpty, Conflict) {
     FieldRef bDotE("b.e");
     const FieldRef* conflict;
     ASSERT_TRUE(fieldSet.insert(&bDotC, &conflict));
-    ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
+    ASSERT_EQUALS(static_cast<const FieldRef*>(nullptr), conflict);
     ASSERT_TRUE(fieldSet.insert(&bDotE, &conflict));
-    ASSERT_EQUALS(static_cast<const FieldRef*>(NULL), conflict);
+    ASSERT_EQUALS(static_cast<const FieldRef*>(nullptr), conflict);
 
     // insert "b" before, conflicts "b.c"
     FieldRef bSimple("b");

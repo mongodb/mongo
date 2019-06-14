@@ -223,7 +223,7 @@ std::string demangleName(const std::type_info& typeinfo) {
 #else
     int status;
 
-    char* niceName = abi::__cxa_demangle(typeinfo.name(), 0, 0, &status);
+    char* niceName = abi::__cxa_demangle(typeinfo.name(), nullptr, nullptr, &status);
     if (!niceName)
         return typeinfo.name();
 

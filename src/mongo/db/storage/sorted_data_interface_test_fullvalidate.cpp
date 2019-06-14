@@ -69,7 +69,7 @@ TEST(SortedDataInterface, FullValidate) {
     {
         long long numKeysOut;
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        sorted->fullValidate(opCtx.get(), &numKeysOut, NULL);
+        sorted->fullValidate(opCtx.get(), &numKeysOut, nullptr);
         // fullValidate() can set numKeysOut as the number of existing keys or -1.
         ASSERT(numKeysOut == nToInsert || numKeysOut == -1);
     }

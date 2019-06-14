@@ -147,7 +147,7 @@ public:
      * Was a backup plan picked during the ranking process?
      */
     bool hasBackupPlan() const {
-        ASSERT(NULL != _mps.get());
+        ASSERT(nullptr != _mps.get());
         return _mps->hasBackupPlan();
     }
 
@@ -256,7 +256,7 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(NULL != cq.get());
+        ASSERT(nullptr != cq.get());
 
         // Turn on the "force intersect" option.
         // This will be reverted by PlanRankingTestBase's destructor when the test completes.
@@ -297,7 +297,7 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(NULL != cq.get());
+        ASSERT(nullptr != cq.get());
 
         QuerySolution* soln = pickBestPlan(cq.get());
 
@@ -331,7 +331,7 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(NULL != cq.get());
+        ASSERT(nullptr != cq.get());
 
         QuerySolution* soln = pickBestPlan(cq.get());
 
@@ -370,7 +370,7 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(NULL != cq.get());
+        ASSERT(nullptr != cq.get());
 
         QuerySolution* soln = pickBestPlan(cq.get());
         // Prefer the fully covered plan.
@@ -403,7 +403,7 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(NULL != cq.get());
+        ASSERT(nullptr != cq.get());
 
         // {a: 100} is super selective so choose that.
         QuerySolution* soln = pickBestPlan(cq.get());
@@ -439,7 +439,7 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(NULL != cq.get());
+        ASSERT(nullptr != cq.get());
 
         // {a: 100} is super selective so choose that.
         QuerySolution* soln = pickBestPlan(cq.get());
@@ -498,7 +498,7 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(NULL != cq.get());
+        ASSERT(nullptr != cq.get());
 
         QuerySolution* soln = pickBestPlan(cq.get());
 
@@ -532,7 +532,7 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(NULL != cq.get());
+        ASSERT(nullptr != cq.get());
 
         // No results will be returned during the trial period,
         // so we expect to choose {d: 1, e: 1}, as it allows us
@@ -569,7 +569,7 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(NULL != cq.get());
+        ASSERT(nullptr != cq.get());
 
         // Use index on 'b'.
         QuerySolution* soln = pickBestPlan(cq.get());
@@ -601,7 +601,7 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        ASSERT(NULL != cq.get());
+        ASSERT(nullptr != cq.get());
 
         // Expect to use index {a: 1, b: 1}.
         QuerySolution* soln = pickBestPlan(cq.get());

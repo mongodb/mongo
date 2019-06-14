@@ -67,9 +67,9 @@ static Status getQuerySettingsAndPlanCache(OperationContext* opCtx,
                                            const string& ns,
                                            QuerySettings** querySettingsOut,
                                            PlanCache** planCacheOut) {
-    *querySettingsOut = NULL;
-    *planCacheOut = NULL;
-    if (NULL == collection) {
+    *querySettingsOut = nullptr;
+    *planCacheOut = nullptr;
+    if (nullptr == collection) {
         return Status(ErrorCodes::BadValue, "no such collection");
     }
 

@@ -79,7 +79,7 @@ class SimpleMutex {
 
 public:
     SimpleMutex() {
-        verify(pthread_mutex_init(&_lock, 0) == 0);
+        verify(pthread_mutex_init(&_lock, nullptr) == 0);
     }
 
     ~SimpleMutex() {

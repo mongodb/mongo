@@ -93,14 +93,14 @@ public:
                                           Query query,
                                           int nToReturn = 0,
                                           int nToSkip = 0,
-                                          const BSONObj* fieldsToReturn = 0,
+                                          const BSONObj* fieldsToReturn = nullptr,
                                           int queryOptions = 0,
                                           int batchSize = 0) override;
 
     /** throws userassertion "no master found" */
     BSONObj findOne(const std::string& ns,
                     const Query& query,
-                    const BSONObj* fieldsToReturn = 0,
+                    const BSONObj* fieldsToReturn = nullptr,
                     int queryOptions = 0) override;
 
     void insert(const std::string& ns, BSONObj obj, int flags = 0) override;
@@ -136,12 +136,12 @@ public:
 
     // ---- callback pieces -------
 
-    void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0) override;
+    void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
     bool recv(Message& toRecv, int lastRequestId) override;
     void checkResponse(const std::vector<BSONObj>& batch,
                        bool networkError,
-                       bool* retry = NULL,
-                       std::string* targetHost = NULL) override;
+                       bool* retry = nullptr,
+                       std::string* targetHost = nullptr) override;
 
     /* this is the callback from our underlying connections to notify us that we got a "not master"
      * error.
@@ -345,7 +345,7 @@ protected:
      */
     class LazyState {
     public:
-        LazyState() : _lastClient(NULL), _lastOp(-1), _secondaryQueryOk(false), _retries(0) {}
+        LazyState() : _lastClient(nullptr), _lastOp(-1), _secondaryQueryOk(false), _retries(0) {}
         DBClientConnection* _lastClient;
         int _lastOp;
         bool _secondaryQueryOk;

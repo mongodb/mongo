@@ -119,11 +119,11 @@ PlanExecutor::YieldPolicy ParsedDelete::yieldPolicy() const {
 }
 
 bool ParsedDelete::hasParsedQuery() const {
-    return _canonicalQuery.get() != NULL;
+    return _canonicalQuery.get() != nullptr;
 }
 
 std::unique_ptr<CanonicalQuery> ParsedDelete::releaseParsedQuery() {
-    invariant(_canonicalQuery.get() != NULL);
+    invariant(_canonicalQuery.get() != nullptr);
     return std::move(_canonicalQuery);
 }
 

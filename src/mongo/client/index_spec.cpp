@@ -46,8 +46,8 @@ namespace {
 
 const int kIndexTypeNumbers[] = {IndexSpec::kIndexValAscending, IndexSpec::kIndexValDescending};
 
-const char* const kIndexTypeStrings[] = {NULL,
-                                         NULL,
+const char* const kIndexTypeStrings[] = {nullptr,
+                                         nullptr,
                                          IndexSpec::kIndexValText,
                                          IndexSpec::kIndexValGeo2D,
                                          IndexSpec::kIndexValGeoHaystack,

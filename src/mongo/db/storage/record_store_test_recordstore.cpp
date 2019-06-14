@@ -48,7 +48,7 @@ TEST(RecordStoreTestHarness, RecordStoreName) {
 
     {
         const char* name = rs->name();
-        ASSERT(name != NULL && name[0] != '\0');
+        ASSERT(name != nullptr && name[0] != '\0');
     }
 }
 

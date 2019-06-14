@@ -90,7 +90,7 @@ BSONObjBuilder& BSONObjBuilder::appendMinForType(StringData fieldName, int t) {
             appendArray(fieldName, BSONObj());
             return *this;
         case BinData:
-            appendBinData(fieldName, 0, BinDataGeneral, (const char*)0);
+            appendBinData(fieldName, 0, BinDataGeneral, (const char*)nullptr);
             return *this;
         case RegEx:
             appendRegex(fieldName, "");

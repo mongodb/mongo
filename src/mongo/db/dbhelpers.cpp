@@ -176,7 +176,7 @@ bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& res
     AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
     auto exec =
         InternalPlanner::collectionScan(opCtx, ns, ctx.getCollection(), PlanExecutor::NO_YIELD);
-    PlanExecutor::ExecState state = exec->getNext(&result, NULL);
+    PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     CurOp::get(opCtx)->done();
 
@@ -195,7 +195,7 @@ bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) 
     AutoGetCollectionForReadCommand autoColl(opCtx, NamespaceString(ns));
     auto exec = InternalPlanner::collectionScan(
         opCtx, ns, autoColl.getCollection(), PlanExecutor::NO_YIELD, InternalPlanner::BACKWARD);
-    PlanExecutor::ExecState state = exec->getNext(&result, NULL);
+    PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     // Non-yielding collection scans from InternalPlanner will never error.
     invariant(PlanExecutor::ADVANCED == state || PlanExecutor::IS_EOF == state);

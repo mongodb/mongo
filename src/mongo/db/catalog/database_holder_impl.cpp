@@ -80,7 +80,7 @@ Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, StringData ns) cons
         return it->second;
     }
 
-    return NULL;
+    return nullptr;
 }
 
 std::set<std::string> DatabaseHolderImpl::_getNamesWithConflictingCasing_inlock(StringData name) {

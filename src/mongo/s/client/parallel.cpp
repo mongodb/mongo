@@ -198,7 +198,7 @@ ParallelSortClusteredCursor::~ParallelSortClusteredCursor() {
     }
 
     delete[] _cursors;
-    _cursors = 0;
+    _cursors = nullptr;
 
     // Clear out our metadata after removing legacy cursor data
     _cursorMap.clear();
@@ -224,11 +224,11 @@ void ParallelSortClusteredCursor::init(OperationContext* opCtx) {
 void ParallelSortClusteredCursor::_finishCons() {
     _numServers = _servers.size();
     _lastFrom = 0;
-    _cursors = 0;
+    _cursors = nullptr;
 
     if (!_qSpec.isEmpty()) {
         _needToSkip = _qSpec.ntoskip();
-        _cursors = 0;
+        _cursors = nullptr;
         _sortKey = _qSpec.sort();
         _fields = _qSpec.fields();
     }
@@ -552,8 +552,9 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
                         isCommand() ? 1 : 0,  // nToReturn (0 if query indicates multi)
                         0,                    // nToSkip
                         // Does this need to be a ptr?
-                        _qSpec.fields().isEmpty() ? 0 : _qSpec.fieldsData(),  // fieldsToReturn
-                        _qSpec.options(),                                     // options
+                        _qSpec.fields().isEmpty() ? nullptr
+                                                  : _qSpec.fieldsData(),  // fieldsToReturn
+                        _qSpec.options(),                                 // options
                         // NtoReturn is weird.
                         // If zero, it means use default size, so we do that for all cursors
                         // If positive, it's the batch size (we don't want this cursor limiting
@@ -579,9 +580,10 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
                         _qSpec.ntoreturn(),  // nToReturn
                         _qSpec.ntoskip(),    // nToSkip
                         // Does this need to be a ptr?
-                        _qSpec.fields().isEmpty() ? 0 : _qSpec.fieldsData(),  // fieldsToReturn
-                        _qSpec.options(),                                     // options
-                        0));                                                  // batchSize
+                        _qSpec.fields().isEmpty() ? nullptr
+                                                  : _qSpec.fieldsData(),  // fieldsToReturn
+                        _qSpec.options(),                                 // options
+                        0));                                              // batchSize
                 }
             }
 
@@ -1005,25 +1007,25 @@ void ParallelSortClusteredCursor::_oldInit(OperationContext* opCtx) {
                     new DBClientCursor(conns[i]->get(),
                                        NamespaceString(_ns),
                                        _query,
-                                       0,                                 // nToReturn
-                                       0,                                 // nToSkip
-                                       _fields.isEmpty() ? 0 : &_fields,  // fieldsToReturn
+                                       0,                                       // nToReturn
+                                       0,                                       // nToSkip
+                                       _fields.isEmpty() ? nullptr : &_fields,  // fieldsToReturn
                                        _options,
                                        _batchSize == 0 ? 0 : _batchSize + _needToSkip  // batchSize
                                        ),
-                    NULL);
+                    nullptr);
 
             try {
                 _cursors[i].get()->initLazy(!firstPass);
             } catch (NetworkException& e) {
                 socketExs.push_back(e.what() + errLoc);
-                _cursors[i].reset(NULL, NULL);
+                _cursors[i].reset(nullptr, nullptr);
                 conns[i]->done();
                 if (!returnPartial)
                     break;
             } catch (std::exception& e) {
                 otherExs.push_back(e.what() + errLoc);
-                _cursors[i].reset(NULL, NULL);
+                _cursors[i].reset(nullptr, nullptr);
                 conns[i]->done();
                 break;
             }
@@ -1051,7 +1053,7 @@ void ParallelSortClusteredCursor::_oldInit(OperationContext* opCtx) {
                 if (!_cursors[i].get()->initLazyFinish(retry)) {
                     warning() << "invalid result from " << conns[i]->getHost()
                               << (retry ? ", retrying" : "");
-                    _cursors[i].reset(NULL, NULL);
+                    _cursors[i].reset(nullptr, nullptr);
 
                     if (!retry) {
                         socketExs.push_back(str::stream() << "error querying server: "
@@ -1071,17 +1073,17 @@ void ParallelSortClusteredCursor::_oldInit(OperationContext* opCtx) {
                 staleConfigExs.push_back(
                     (string) "stale config detected when receiving response for " + e.toString() +
                     errLoc);
-                _cursors[i].reset(NULL, NULL);
+                _cursors[i].reset(nullptr, nullptr);
                 conns[i]->done();
                 continue;
             } catch (NetworkException& e) {
                 socketExs.push_back(e.what() + errLoc);
-                _cursors[i].reset(NULL, NULL);
+                _cursors[i].reset(nullptr, nullptr);
                 conns[i]->done();
                 continue;
             } catch (std::exception& e) {
                 otherExs.push_back(e.what() + errLoc);
-                _cursors[i].reset(NULL, NULL);
+                _cursors[i].reset(nullptr, nullptr);
                 conns[i]->done();
                 continue;
             }
@@ -1100,12 +1102,12 @@ void ParallelSortClusteredCursor::_oldInit(OperationContext* opCtx) {
 
                 staleConfigExs.push_back((string) "stale config detected for " + e.toString() +
                                          errLoc);
-                _cursors[i].reset(NULL, NULL);
+                _cursors[i].reset(nullptr, nullptr);
                 conns[i]->done();
                 continue;
             } catch (std::exception& e) {
                 otherExs.push_back(e.what() + errLoc);
-                _cursors[i].reset(NULL, NULL);
+                _cursors[i].reset(nullptr, nullptr);
                 conns[i]->done();
                 continue;
             }

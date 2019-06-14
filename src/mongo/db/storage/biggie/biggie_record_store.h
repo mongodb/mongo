@@ -64,7 +64,7 @@ public:
     virtual bool isCapped() const;
     virtual void setCappedCallback(CappedCallback*);
     virtual int64_t storageSize(OperationContext* opCtx,
-                                BSONObjBuilder* extraInfo = NULL,
+                                BSONObjBuilder* extraInfo = nullptr,
                                 int infoLevel = 0) const;
 
     virtual bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const;

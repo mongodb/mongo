@@ -59,7 +59,7 @@ public:
             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
                 MatchExpressionParser::kDefaultSpecialFeatures);
 
-    bool matches(const BSONObj& doc, MatchDetails* details = NULL) const;
+    bool matches(const BSONObj& doc, MatchDetails* details = nullptr) const;
 
     const BSONObj* getQuery() const {
         return &_pattern;

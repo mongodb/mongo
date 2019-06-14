@@ -78,7 +78,7 @@ ElementIterator::Context SimpleArrayElementIterator::next() {
 
 // ------
 BSONElementIterator::BSONElementIterator() {
-    _path = NULL;
+    _path = nullptr;
 }
 
 BSONElementIterator::BSONElementIterator(const ElementPath* path,

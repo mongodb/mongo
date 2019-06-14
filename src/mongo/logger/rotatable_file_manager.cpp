@@ -61,7 +61,7 @@ StatusWithRotatableFileWriter RotatableFileManager::openFile(const std::string& 
 }
 
 RotatableFileWriter* RotatableFileManager::getFile(const std::string& name) {
-    return mapFindWithDefault(_writers, name, static_cast<RotatableFileWriter*>(NULL));
+    return mapFindWithDefault(_writers, name, static_cast<RotatableFileWriter*>(nullptr));
 }
 
 RotatableFileManager::FileNameStatusPairVector RotatableFileManager::rotateAll(

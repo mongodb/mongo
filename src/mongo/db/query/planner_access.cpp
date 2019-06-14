@@ -205,7 +205,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
             auto ret = std::make_unique<GeoNear2DNode>(index);
             ret->nq = &nearExpr->getData();
             ret->baseBounds.fields.resize(index.keyPattern.nFields());
-            if (NULL != query.getProj()) {
+            if (nullptr != query.getProj()) {
                 ret->addPointMeta = query.getProj()->wantGeoNearPoint();
                 ret->addDistMeta = query.getProj()->wantGeoNearDistance();
             }
@@ -215,7 +215,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
             auto ret = std::make_unique<GeoNear2DSphereNode>(index);
             ret->nq = &nearExpr->getData();
             ret->baseBounds.fields.resize(index.keyPattern.nFields());
-            if (NULL != query.getProj()) {
+            if (nullptr != query.getProj()) {
                 ret->addPointMeta = query.getProj()->wantGeoNearPoint();
                 ret->addDistMeta = query.getProj()->wantGeoNearDistance();
             }
@@ -266,11 +266,11 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
 bool QueryPlannerAccess::shouldMergeWithLeaf(const MatchExpression* expr,
                                              const ScanBuildingState& scanState) {
     const QuerySolutionNode* node = scanState.currentScan.get();
-    if (NULL == node || NULL == expr) {
+    if (nullptr == node || nullptr == expr) {
         return false;
     }
 
-    if (NULL == scanState.ixtag) {
+    if (nullptr == scanState.ixtag) {
         return false;
     }
 
@@ -340,7 +340,7 @@ bool QueryPlannerAccess::shouldMergeWithLeaf(const MatchExpression* expr,
 
 void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingState* scanState) {
     QuerySolutionNode* node = scanState->currentScan.get();
-    invariant(NULL != node);
+    invariant(nullptr != node);
 
     const MatchExpression::MatchType mergeType = scanState->root->matchType();
     size_t pos = scanState->ixtag->pos;
@@ -369,7 +369,7 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
         return;
     }
 
-    IndexBounds* boundsToFillOut = NULL;
+    IndexBounds* boundsToFillOut = nullptr;
 
     if (STAGE_GEO_NEAR_2D == type) {
         invariant(INDEX_2D == index.type);
@@ -459,7 +459,7 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
     // We can't create a text stage if there aren't EQ predicates on its prefix terms.  So
     // if we've made it this far, we should have collected the prefix predicates in the
     // filter.
-    invariant(NULL != tn->filter.get());
+    invariant(nullptr != tn->filter.get());
     MatchExpression* textFilterMe = tn->filter.get();
 
     BSONObjBuilder prefixBob;
@@ -489,10 +489,10 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
         while (curChild < amExpr->numChildren()) {
             MatchExpression* child = amExpr->getChild(curChild);
             IndexTag* ixtag = static_cast<IndexTag*>(child->getTag());
-            invariant(NULL != ixtag);
+            invariant(nullptr != ixtag);
             // Skip this child if it's not part of a prefix, or if we've already assigned a
             // predicate to this prefix position.
-            if (ixtag->pos >= tn->numPrefixFields || prefixExprs[ixtag->pos] != NULL) {
+            if (ixtag->pos >= tn->numPrefixFields || prefixExprs[ixtag->pos] != nullptr) {
                 ++curChild;
                 continue;
             }
@@ -505,7 +505,7 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
         // Go through the prefix equalities in order and create an index prefix out of them.
         for (size_t i = 0; i < prefixExprs.size(); ++i) {
             MatchExpression* prefixMe = prefixExprs[i];
-            invariant(NULL != prefixMe);
+            invariant(nullptr != prefixMe);
             invariant(MatchExpression::EQ == prefixMe->matchType());
             EqualityMatchExpression* eqExpr = static_cast<EqualityMatchExpression*>(prefixMe);
             prefixBob.append(eqExpr->getData());
@@ -651,12 +651,12 @@ void QueryPlannerAccess::findElemMatchChildren(const MatchExpression* node,
                                                vector<MatchExpression*>* subnodesOut) {
     for (size_t i = 0; i < node->numChildren(); ++i) {
         MatchExpression* child = node->getChild(i);
-        if (Indexability::isBoundsGenerating(child) && NULL != child->getTag()) {
+        if (Indexability::isBoundsGenerating(child) && nullptr != child->getTag()) {
             out->push_back(child);
         } else if (MatchExpression::AND == child->matchType() ||
                    Indexability::arrayUsesIndexOnChildren(child)) {
             findElemMatchChildren(child, out, subnodesOut);
-        } else if (NULL != child->getTag()) {
+        } else if (nullptr != child->getTag()) {
             subnodesOut->push_back(child);
         }
     }
@@ -728,7 +728,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
 
         // If there is no tag, it's not using an index.  We've sorted our children such that the
         // children with tags are first, so we stop now.
-        if (NULL == child->getTag()) {
+        if (nullptr == child->getTag()) {
             break;
         }
 
@@ -789,7 +789,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
             mergeWithLeafNode(child, &scanState);
             handleFilter(&scanState);
         } else {
-            if (NULL != scanState.currentScan.get()) {
+            if (nullptr != scanState.currentScan.get()) {
                 // Output the current scan before starting to construct a new out.
                 finishAndOutputLeaf(&scanState, out);
             } else {
@@ -810,7 +810,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
     }
 
     // Output the scan we're done with, if it exists.
-    if (NULL != scanState.currentScan.get()) {
+    if (nullptr != scanState.currentScan.get()) {
         finishAndOutputLeaf(&scanState, out);
     }
 
@@ -876,13 +876,13 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
     // the complete $elemMatch expression will be affixed as a filter later on.
     for (size_t i = 0; i < emChildren.size(); ++i) {
         MatchExpression* emChild = emChildren[i];
-        invariant(NULL != emChild->getTag());
+        invariant(nullptr != emChild->getTag());
         scanState->ixtag = static_cast<IndexTag*>(emChild->getTag());
 
         // If 'emChild' is a NOT, then the tag we're interested in is on the NOT's
         // child node.
         if (MatchExpression::NOT == emChild->matchType()) {
-            invariant(NULL != emChild->getChild(0)->getTag());
+            invariant(nullptr != emChild->getChild(0)->getTag());
             scanState->ixtag = static_cast<IndexTag*>(emChild->getChild(0)->getTag());
             invariant(IndexTag::kNoIndex != scanState->ixtag->index);
         }
@@ -895,7 +895,7 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
             scanState->tightness = IndexBoundsBuilder::INEXACT_FETCH;
             mergeWithLeafNode(emChild, scanState);
         } else {
-            if (NULL != scanState->currentScan.get()) {
+            if (nullptr != scanState->currentScan.get()) {
                 finishAndOutputLeaf(scanState, out);
             } else {
                 verify(IndexTag::kNoIndex == scanState->currentIndexNumber);
@@ -972,7 +972,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
     std::vector<std::unique_ptr<QuerySolutionNode>> ixscanNodes;
     const bool inArrayOperator = !ownedRoot;
     if (!processIndexScans(query, root, inArrayOperator, indices, params, &ixscanNodes)) {
-        return NULL;
+        return nullptr;
     }
 
     //
@@ -1095,7 +1095,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
     const bool inArrayOperator = !ownedRoot;
     std::vector<std::unique_ptr<QuerySolutionNode>> ixscanNodes;
     if (!processIndexScans(query, root, inArrayOperator, indices, params, &ixscanNodes)) {
-        return NULL;
+        return nullptr;
     }
 
     // Unlike an AND, an OR cannot have filters hanging off of it.  We stop processing
@@ -1106,7 +1106,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
         // We won't enumerate an OR without indices for each child, so this isn't an issue, even
         // if we have an AND with an OR child -- we won't get here unless the OR is fully
         // indexed.
-        return NULL;
+        return nullptr;
     }
 
     // If all index scans are identical, then we collapse them into a single scan. This prevents
@@ -1196,7 +1196,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
 
             IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::EXACT;
             auto soln = makeLeafNode(query, indices[tag->index], tag->pos, root, &tightness);
-            verify(NULL != soln);
+            verify(nullptr != soln);
             finishLeafNode(soln.get(), indices[tag->index]);
 
             if (!ownedRoot) {
@@ -1216,7 +1216,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
                 return soln;
             } else if (tightness == IndexBoundsBuilder::INEXACT_COVERED &&
                        !indices[tag->index].multikey) {
-                verify(NULL == soln->filter.get());
+                verify(nullptr == soln->filter.get());
                 soln->filter = std::move(ownedRoot);
                 return soln;
             } else {
@@ -1293,7 +1293,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
 void QueryPlannerAccess::addFilterToSolutionNode(QuerySolutionNode* node,
                                                  MatchExpression* match,
                                                  MatchExpression::MatchType type) {
-    if (NULL == node->filter) {
+    if (nullptr == node->filter) {
         node->filter.reset(match);
     } else if (type == node->filter->matchType()) {
         // The 'node' already has either an AND or OR filter that matches 'type'. Add 'match' as

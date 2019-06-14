@@ -92,14 +92,14 @@ void buildResponse(int n, BatchedCommandResponse* response) {
     response->clear();
     response->setStatus(Status::OK());
     response->setN(n);
-    ASSERT(response->isValid(NULL));
+    ASSERT(response->isValid(nullptr));
 }
 
 void buildErrResponse(int code, const std::string& message, BatchedCommandResponse* response) {
     response->clear();
     response->setN(0);
     response->setStatus({ErrorCodes::Error(code), message});
-    ASSERT(response->isValid(NULL));
+    ASSERT(response->isValid(nullptr));
 }
 
 void addError(int code, const std::string& message, int index, BatchedCommandResponse* response) {
@@ -154,7 +154,7 @@ TEST_F(BatchWriteOpTest, SingleOp) {
     BatchedCommandResponse response;
     buildResponse(1, &response);
 
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
     BatchedCommandResponse clientResponse;
@@ -187,7 +187,7 @@ TEST_F(BatchWriteOpTest, SingleError) {
     BatchedCommandResponse response;
     buildErrResponse(ErrorCodes::UnknownError, "message", &response);
 
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
     BatchedCommandResponse clientResponse;
@@ -266,7 +266,7 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
     addWCError(&response);
 
     // First stale response comes back, we should retry
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
     BatchedCommandResponse clientResponse;
@@ -301,14 +301,14 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
     addError(ErrorCodes::StaleShardVersion, "mock stale error", 0, &response);
 
     // First stale response comes back, we should retry
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
     ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
 
     // Respond again with a stale response
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
@@ -317,7 +317,7 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
     buildResponse(1, &response);
 
     // Respond with an 'ok' response
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
     BatchedCommandResponse clientResponse;
@@ -359,7 +359,7 @@ TEST_F(BatchWriteOpTest, MultiOpSameShardOrdered) {
     BatchedCommandResponse response;
     buildResponse(2, &response);
 
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
     BatchedCommandResponse clientResponse;
@@ -401,7 +401,7 @@ TEST_F(BatchWriteOpTest, MultiOpSameShardUnordered) {
     BatchedCommandResponse response;
     buildResponse(2, &response);
 
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
     BatchedCommandResponse clientResponse;
@@ -440,7 +440,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsOrdered) {
     buildResponse(1, &response);
 
     // Respond to first targeted batch
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
@@ -452,7 +452,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsOrdered) {
     assertEndpointsEqual(targeted.begin()->second->getEndpoint(), endpointB);
 
     // Respond to second targeted batch
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
     BatchedCommandResponse clientResponse;
@@ -513,7 +513,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsUnordered) {
     // Respond to both targeted batches
     for (auto it = targeted.begin(); it != targeted.end(); ++it) {
         ASSERT(!batchOp.isFinished());
-        batchOp.noteBatchResponse(*it->second, response, NULL);
+        batchOp.noteBatchResponse(*it->second, response, nullptr);
     }
     ASSERT(batchOp.isFinished());
 
@@ -555,7 +555,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachOrdered) {
     // Respond to both targeted batches for first multi-delete
     for (auto it = targeted.begin(); it != targeted.end(); ++it) {
         ASSERT(!batchOp.isFinished());
-        batchOp.noteBatchResponse(*it->second, response, NULL);
+        batchOp.noteBatchResponse(*it->second, response, nullptr);
     }
     ASSERT(!batchOp.isFinished());
 
@@ -569,7 +569,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachOrdered) {
     // Respond to second targeted batches for second multi-delete
     for (auto it = targeted.begin(); it != targeted.end(); ++it) {
         ASSERT(!batchOp.isFinished());
-        batchOp.noteBatchResponse(*it->second, response, NULL);
+        batchOp.noteBatchResponse(*it->second, response, nullptr);
     }
     ASSERT(batchOp.isFinished());
 
@@ -616,7 +616,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachUnordered) {
     // Respond to both targeted batches, each containing two ops
     for (auto it = targeted.begin(); it != targeted.end(); ++it) {
         ASSERT(!batchOp.isFinished());
-        batchOp.noteBatchResponse(*it->second, response, NULL);
+        batchOp.noteBatchResponse(*it->second, response, nullptr);
     }
     ASSERT(batchOp.isFinished());
 
@@ -667,7 +667,7 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsOrdered) {
     buildResponse(2, &response);
 
     // Respond to first targeted batch containing the two single-host deletes
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
@@ -683,7 +683,7 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsOrdered) {
     // Respond to two targeted batches for first multi-delete
     for (auto it = targeted.begin(); it != targeted.end(); ++it) {
         ASSERT(!batchOp.isFinished());
-        batchOp.noteBatchResponse(*it->second, response, NULL);
+        batchOp.noteBatchResponse(*it->second, response, nullptr);
     }
     ASSERT(!batchOp.isFinished());
 
@@ -697,7 +697,7 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsOrdered) {
     // Respond to two targeted batches for second multi-delete
     for (auto it = targeted.begin(); it != targeted.end(); ++it) {
         ASSERT(!batchOp.isFinished());
-        batchOp.noteBatchResponse(*it->second, response, NULL);
+        batchOp.noteBatchResponse(*it->second, response, nullptr);
     }
     ASSERT(!batchOp.isFinished());
 
@@ -713,7 +713,7 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsOrdered) {
     buildResponse(2, &response);
 
     // Respond to final targeted batch containing the last two single-host deletes
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
     BatchedCommandResponse clientResponse;
@@ -766,7 +766,7 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsUnordered) {
     // Respond to first targeted batch containing the two single-host deletes
     for (auto it = targeted.begin(); it != targeted.end(); ++it) {
         ASSERT(!batchOp.isFinished());
-        batchOp.noteBatchResponse(*it->second, response, NULL);
+        batchOp.noteBatchResponse(*it->second, response, nullptr);
     }
     ASSERT(batchOp.isFinished());
 
@@ -812,7 +812,7 @@ TEST_F(BatchWriteOpTest, MultiOpSingleShardErrorUnordered) {
     auto targetedIt = targeted.begin();
 
     // No error on first shard
-    batchOp.noteBatchResponse(*targetedIt->second, response, NULL);
+    batchOp.noteBatchResponse(*targetedIt->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     buildResponse(0, &response);
@@ -820,7 +820,7 @@ TEST_F(BatchWriteOpTest, MultiOpSingleShardErrorUnordered) {
 
     // Error on second write on second shard
     ++targetedIt;
-    batchOp.noteBatchResponse(*targetedIt->second, response, NULL);
+    batchOp.noteBatchResponse(*targetedIt->second, response, nullptr);
     ASSERT(batchOp.isFinished());
     ASSERT(++targetedIt == targeted.end());
 
@@ -873,7 +873,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardErrorsUnordered) {
     // Error on first write on first shard and second write on second shard.
     for (auto it = targeted.begin(); it != targeted.end(); ++it) {
         ASSERT(!batchOp.isFinished());
-        batchOp.noteBatchResponse(*it->second, response, NULL);
+        batchOp.noteBatchResponse(*it->second, response, nullptr);
     }
     ASSERT(batchOp.isFinished());
 
@@ -932,7 +932,7 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorUnordered) {
     buildResponse(2, &response);
 
     // No errors on first shard
-    batchOp.noteBatchResponse(*targetedIt->second, response, NULL);
+    batchOp.noteBatchResponse(*targetedIt->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     buildResponse(1, &response);
@@ -940,7 +940,7 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorUnordered) {
 
     // Error on second write on second shard
     ++targetedIt;
-    batchOp.noteBatchResponse(*targetedIt->second, response, NULL);
+    batchOp.noteBatchResponse(*targetedIt->second, response, nullptr);
     ASSERT(batchOp.isFinished());
     ASSERT(++targetedIt == targeted.end());
 
@@ -990,7 +990,7 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorOrdered) {
     buildResponse(1, &response);
 
     // No errors on first shard
-    batchOp.noteBatchResponse(*targetedIt->second, response, NULL);
+    batchOp.noteBatchResponse(*targetedIt->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     buildResponse(0, &response);
@@ -998,7 +998,7 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorOrdered) {
 
     // Error on second write on second shard
     ++targetedIt;
-    batchOp.noteBatchResponse(*targetedIt->second, response, NULL);
+    batchOp.noteBatchResponse(*targetedIt->second, response, nullptr);
     ASSERT(batchOp.isFinished());
     ASSERT(++targetedIt == targeted.end());
 
@@ -1052,7 +1052,7 @@ TEST_F(BatchWriteOpTest, MultiOpErrorAndWriteConcernErrorUnordered) {
     addWCError(&response);
 
     // First stale response comes back, we should retry
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
     // Unordered reports write concern error
@@ -1099,7 +1099,7 @@ TEST_F(BatchWriteOpTest, SingleOpErrorAndWriteConcernErrorOrdered) {
     addWCError(&response);
 
     // First response comes back with write concern error
-    batchOp.noteBatchResponse(*targetedIt->second, response, NULL);
+    batchOp.noteBatchResponse(*targetedIt->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     buildResponse(0, &response);
@@ -1107,7 +1107,7 @@ TEST_F(BatchWriteOpTest, SingleOpErrorAndWriteConcernErrorOrdered) {
 
     // Second response comes back with write error
     ++targetedIt;
-    batchOp.noteBatchResponse(*targetedIt->second, response, NULL);
+    batchOp.noteBatchResponse(*targetedIt->second, response, nullptr);
     ASSERT(batchOp.isFinished());
     ASSERT(++targetedIt == targeted.end());
 
@@ -1157,7 +1157,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedTargetOrdered) {
     buildResponse(1, &response);
 
     // First response ok
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
@@ -1217,7 +1217,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedTargetUnordered) {
     buildResponse(2, &response);
 
     // Response is ok for first and third write
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
     BatchedCommandResponse clientResponse;
@@ -1254,7 +1254,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchOrdered) {
     buildResponse(1, &response);
 
     // First shard batch is ok
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
@@ -1263,7 +1263,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchOrdered) {
     buildErrResponse(ErrorCodes::UnknownError, "mock error", &response);
 
     // Second shard batch fails
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
     // We should have recorded an error for the second write
@@ -1310,14 +1310,14 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchUnordered) {
     buildResponse(1, &response);
 
     // First shard batch is ok
-    batchOp.noteBatchResponse(*targetedIt->second, response, NULL);
+    batchOp.noteBatchResponse(*targetedIt->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     buildErrResponse(ErrorCodes::UnknownError, "mock error", &response);
 
     // Second shard batch fails
     ++targetedIt;
-    batchOp.noteBatchResponse(*targetedIt->second, response, NULL);
+    batchOp.noteBatchResponse(*targetedIt->second, response, nullptr);
     ASSERT(batchOp.isFinished());
     ASSERT(++targetedIt == targeted.end());
 
@@ -1359,7 +1359,7 @@ TEST_F(BatchWriteOpTest, MultiOpAbortOrdered) {
     buildResponse(1, &response);
 
     // First shard batch is ok
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     WriteErrorDetail abortError;
@@ -1447,14 +1447,14 @@ TEST_F(BatchWriteOpTest, MultiOpTwoWCErrors) {
     addWCError(&response);
 
     // First shard write write concern fails.
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
     ASSERT_OK(batchOp.targetBatch(targeter, true, &targeted));
 
     // Second shard write write concern fails.
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 
     BatchedCommandResponse clientResponse;
@@ -1503,7 +1503,7 @@ TEST_F(BatchWriteOpLimitTests, OneBigDoc) {
     BatchedCommandResponse response;
     buildResponse(1, &response);
 
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 }
 
@@ -1535,7 +1535,7 @@ TEST_F(BatchWriteOpLimitTests, OneBigOneSmall) {
     BatchedCommandResponse response;
     buildResponse(1, &response);
 
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(!batchOp.isFinished());
 
     targetedOwned.clear();
@@ -1543,7 +1543,7 @@ TEST_F(BatchWriteOpLimitTests, OneBigOneSmall) {
     ASSERT_EQUALS(targeted.size(), 1u);
     ASSERT_EQUALS(targeted.begin()->second->getWrites().size(), 1u);
 
-    batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
     ASSERT(batchOp.isFinished());
 }
 

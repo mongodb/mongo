@@ -127,7 +127,7 @@ public:
         std::unique_ptr<DBClientBase> c;
         if (s->avail) {
             c.reset(s->avail);
-            s->avail = 0;
+            s->avail = nullptr;
 
             // May throw an exception
             shardConnectionPool.onHandedOut(c.get());
@@ -162,7 +162,7 @@ public:
                     release(addr, ss->avail);
                 }
 
-                ss->avail = 0;
+                ss->avail = nullptr;
             }
 
             if (fromDestructor) {
@@ -181,7 +181,7 @@ public:
 
         const bool isConnGood = shardConnectionPool.isConnectionGood(addr, conn);
 
-        if (s->avail != NULL) {
+        if (s->avail != nullptr) {
             warning() << "Detected additional sharded connection in the "
                       << "thread local pool for " << addr;
 
@@ -193,7 +193,7 @@ public:
 
             if (!isConnGood) {
                 delete s->avail;
-                s->avail = NULL;
+                s->avail = nullptr;
             }
 
             // Let the internal pool handle the bad connection, this can also
@@ -268,7 +268,7 @@ public:
      */
     void clearPool() {
         for (HostMap::iterator iter = _hosts.begin(); iter != _hosts.end(); ++iter) {
-            if (iter->second->avail != NULL) {
+            if (iter->second->avail != nullptr) {
                 delete iter->second->avail;
             }
             delete iter->second;
@@ -443,7 +443,7 @@ void ShardConnection::kill() {
             delete _conn;
         }
 
-        _conn = 0;
+        _conn = nullptr;
         _finishedInit = true;
     }
 }

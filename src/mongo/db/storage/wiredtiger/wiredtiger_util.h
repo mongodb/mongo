@@ -55,7 +55,7 @@ Status wtRCToStatus_slow(int retCode, const char* prefix);
 /**
  * converts wiredtiger return codes to mongodb statuses.
  */
-inline Status wtRCToStatus(int retCode, const char* prefix = NULL) {
+inline Status wtRCToStatus(int retCode, const char* prefix = nullptr) {
     if (MONGO_likely(retCode == 0))
         return Status::OK();
 
@@ -247,7 +247,7 @@ public:
      */
     static int verifyTable(OperationContext* opCtx,
                            const std::string& uri,
-                           std::vector<std::string>* errors = NULL);
+                           std::vector<std::string>* errors = nullptr);
 
     static bool useTableLogging(NamespaceString ns, bool replEnabled);
 
@@ -278,12 +278,12 @@ class WiredTigerConfigParser {
 public:
     WiredTigerConfigParser(StringData config) {
         invariantWTOK(
-            wiredtiger_config_parser_open(NULL, config.rawData(), config.size(), &_parser));
+            wiredtiger_config_parser_open(nullptr, config.rawData(), config.size(), &_parser));
     }
 
     WiredTigerConfigParser(const WT_CONFIG_ITEM& nested) {
         invariant(nested.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT);
-        invariantWTOK(wiredtiger_config_parser_open(NULL, nested.str, nested.len, &_parser));
+        invariantWTOK(wiredtiger_config_parser_open(nullptr, nested.str, nested.len, &_parser));
     }
 
     ~WiredTigerConfigParser() {

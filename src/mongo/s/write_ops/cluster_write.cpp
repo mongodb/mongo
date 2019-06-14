@@ -58,7 +58,7 @@ namespace {
 void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
     response->setStatus(status);
-    dassert(response->isValid(NULL));
+    dassert(response->isValid(nullptr));
 }
 
 }  // namespace

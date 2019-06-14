@@ -95,7 +95,7 @@ public:
     }
 
     char* get() const {
-        return _holder ? _holder->data() : NULL;
+        return _holder ? _holder->data() : nullptr;
     }
 
     explicit operator bool() const {

@@ -160,7 +160,7 @@ void BSONElement::jsonStringStream(JsonStringFormat format,
                             s << "  ";
                     }
 
-                    if (strtol(e.fieldName(), 0, 10) > count) {
+                    if (strtol(e.fieldName(), nullptr, 10) > count) {
                         s << "undefined";
                     } else {
                         e.jsonStringStream(format, false, pretty ? pretty + 1 : 0, s);

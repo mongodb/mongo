@@ -45,7 +45,7 @@ void ProgressMeter::reset(unsigned long long total, int secondsBetween, int chec
 
     _done = 0;
     _hits = 0;
-    _lastTime = (int)time(0);
+    _lastTime = (int)time(nullptr);
 
     _active = true;
 }
@@ -62,7 +62,7 @@ bool ProgressMeter::hit(int n) {
     if (_hits % _checkInterval)
         return false;
 
-    int t = (int)time(0);
+    int t = (int)time(nullptr);
     if (t - _lastTime < _secondsBetween)
         return false;
 

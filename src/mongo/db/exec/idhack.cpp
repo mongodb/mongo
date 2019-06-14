@@ -58,7 +58,7 @@ IDHackStage::IDHackStage(OperationContext* opCtx,
       _workingSet(ws),
       _key(query->getQueryObj()["_id"].wrap()) {
     _specificStats.indexName = descriptor->indexName();
-    if (NULL != query->getProj()) {
+    if (nullptr != query->getProj()) {
         _addKeyMetadata = query->getProj()->wantIndexKey();
     }
 }

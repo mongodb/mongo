@@ -37,7 +37,7 @@ namespace mongo {
 namespace fts {
 
 Stemmer::Stemmer(const FTSLanguage* language) {
-    _stemmer = NULL;
+    _stemmer = nullptr;
     if (language->str() != "none")
         _stemmer = sb_stemmer_new(language->str().c_str(), "UTF_8");
 }
@@ -45,7 +45,7 @@ Stemmer::Stemmer(const FTSLanguage* language) {
 Stemmer::~Stemmer() {
     if (_stemmer) {
         sb_stemmer_delete(_stemmer);
-        _stemmer = NULL;
+        _stemmer = nullptr;
     }
 }
 
@@ -56,7 +56,7 @@ StringData Stemmer::stem(StringData word) const {
     const sb_symbol* sb_sym =
         sb_stemmer_stem(_stemmer, (const sb_symbol*)word.rawData(), word.size());
 
-    if (sb_sym == NULL) {
+    if (sb_sym == nullptr) {
         // out of memory
         MONGO_UNREACHABLE;
     }

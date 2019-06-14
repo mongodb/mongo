@@ -168,7 +168,7 @@ UpdateStage::UpdateStage(OperationContext* opCtx,
       _ws(ws),
       _idRetrying(WorkingSet::INVALID_ID),
       _idReturning(WorkingSet::INVALID_ID),
-      _updatedRecordIds(params.request->isMulti() ? new RecordIdSet() : NULL),
+      _updatedRecordIds(params.request->isMulti() ? new RecordIdSet() : nullptr),
       _doc(params.driver->getDocument()) {
     _children.emplace_back(child);
 
@@ -282,7 +282,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     }
 
     // See if the changes were applied in place
-    const char* source = NULL;
+    const char* source = nullptr;
     const bool inPlace = _doc.getInPlaceUpdates(&_damages, &source);
 
     if (inPlace && _damages.empty()) {

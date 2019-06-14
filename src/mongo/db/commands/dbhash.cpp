@@ -374,8 +374,8 @@ private:
         long long n = 0;
         PlanExecutor::ExecState state;
         BSONObj c;
-        verify(NULL != exec.get());
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&c, NULL))) {
+        verify(nullptr != exec.get());
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&c, nullptr))) {
             md5_append(&st, (const md5_byte_t*)c.objdata(), c.objsize());
             n++;
         }

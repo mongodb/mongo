@@ -476,7 +476,7 @@ public:
      *  The destination offsets in the damage events are implicitly offsets into the
      *  BSONObj used to construct this Document.
      */
-    bool getInPlaceUpdates(DamageVector* damages, const char** source, size_t* size = NULL);
+    bool getInPlaceUpdates(DamageVector* damages, const char** source, size_t* size = nullptr);
 
     /** Drop the queue of in-place update damage events, and do not queue new operations
      *  that would otherwise have been in-place. Use this if you know that in-place updates

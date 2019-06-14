@@ -139,7 +139,7 @@ bool FieldRefSet::insert(const FieldRef* toInsert, const FieldRef** conflict) {
     }
 
     _fieldSet.insert(it, toInsert);
-    *conflict = NULL;
+    *conflict = nullptr;
     return true;
 }
 

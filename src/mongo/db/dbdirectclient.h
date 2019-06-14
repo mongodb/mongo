@@ -62,7 +62,7 @@ public:
                                                   Query query,
                                                   int nToReturn = 0,
                                                   int nToSkip = 0,
-                                                  const BSONObj* fieldsToReturn = 0,
+                                                  const BSONObj* fieldsToReturn = nullptr,
                                                   int queryOptions = 0,
                                                   int batchSize = 0);
 
@@ -77,9 +77,9 @@ public:
     virtual bool call(Message& toSend,
                       Message& response,
                       bool assertOk = true,
-                      std::string* actualServer = 0);
+                      std::string* actualServer = nullptr);
 
-    virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
+    virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr);
 
     virtual unsigned long long count(const std::string& ns,
                                      const BSONObj& query = BSONObj(),

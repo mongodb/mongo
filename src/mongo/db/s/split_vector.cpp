@@ -86,7 +86,7 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
         // any multi-key index prefixed by shard key cannot be multikey over the shard key fields.
         const IndexDescriptor* idx =
             collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
-        if (idx == NULL) {
+        if (idx == nullptr) {
             return {ErrorCodes::IndexNotFound,
                     "couldn't find index over splitting key " +
                         keyPattern.clientReadable().toString()};
@@ -171,7 +171,7 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
                                                InternalPlanner::FORWARD);
 
         BSONObj currKey;
-        PlanExecutor::ExecState state = exec->getNext(&currKey, NULL);
+        PlanExecutor::ExecState state = exec->getNext(&currKey, nullptr);
         if (PlanExecutor::ADVANCED != state) {
             return {ErrorCodes::OperationFailed,
                     "can't open a cursor to scan the range (desired range is possibly empty)"};
@@ -189,7 +189,7 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
                                                    PlanExecutor::YIELD_AUTO,
                                                    InternalPlanner::BACKWARD);
 
-            PlanExecutor::ExecState state = exec->getNext(&maxKeyInChunk, NULL);
+            PlanExecutor::ExecState state = exec->getNext(&maxKeyInChunk, nullptr);
             if (PlanExecutor::ADVANCED != state) {
                 return {ErrorCodes::OperationFailed,
                         "can't open a cursor to find final key in range (desired range is possibly "
@@ -241,7 +241,7 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
                     break;
                 }
 
-                state = exec->getNext(&currKey, NULL);
+                state = exec->getNext(&currKey, nullptr);
             }
 
             if (PlanExecutor::FAILURE == state) {
@@ -271,7 +271,7 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
                                               PlanExecutor::YIELD_AUTO,
                                               InternalPlanner::FORWARD);
 
-            state = exec->getNext(&currKey, NULL);
+            state = exec->getNext(&currKey, nullptr);
         }
 
         //

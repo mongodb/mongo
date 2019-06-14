@@ -83,8 +83,8 @@ struct Helpers {
                          StringData ns,
                          BSONObj query,
                          BSONObj& result,
-                         bool* nsFound = 0,
-                         bool* indexFound = 0);
+                         bool* nsFound = nullptr,
+                         bool* indexFound = nullptr);
 
     /* TODO: should this move into Collection?
      * uasserts if no _id index.

@@ -220,7 +220,7 @@ public:
             WriteUnitOfWork wunit(&_opCtx);
             Database* db = ctx.db();
             if (db->getCollection(&_opCtx, nss())) {
-                _collection = NULL;
+                _collection = nullptr;
                 db->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
             _collection = db->createCollection(&_opCtx, nss(), CollectionOptions(), false);
@@ -338,7 +338,8 @@ public:
         }
 
         // Create a cursor on the collection, with a batch size of 200.
-        unique_ptr<DBClientCursor> cursor = _client.query(NamespaceString(ns), "", 0, 0, 0, 0, 200);
+        unique_ptr<DBClientCursor> cursor =
+            _client.query(NamespaceString(ns), "", 0, 0, nullptr, 0, 200);
 
         // Count 500 results, spanning a few batches of documents.
         for (int i = 0; i < 500; ++i) {
@@ -383,7 +384,8 @@ public:
         }
 
         // Create a cursor on the collection, with a batch size of 200.
-        unique_ptr<DBClientCursor> cursor = _client.query(NamespaceString(ns), "", 0, 0, 0, 0, 200);
+        unique_ptr<DBClientCursor> cursor =
+            _client.query(NamespaceString(ns), "", 0, 0, nullptr, 0, 200);
         CursorId cursorId = cursor->getCursorId();
 
         // Count 500 results, spanning a few batches of documents.
@@ -461,7 +463,7 @@ public:
                                                      Query().hint(BSON("$natural" << 1)),
                                                      2,
                                                      0,
-                                                     0,
+                                                     nullptr,
                                                      QueryOption_CursorTailable);
         ASSERT(0 != c->getCursorId());
         while (c->more())
@@ -493,7 +495,7 @@ public:
                                                      Query().hint(BSON("$natural" << 1)),
                                                      2,
                                                      0,
-                                                     0,
+                                                     nullptr,
                                                      QueryOption_CursorTailable);
         ASSERT_EQUALS(0, c->getCursorId());
         ASSERT(c->isDead());
@@ -502,7 +504,7 @@ public:
                           QUERY("a" << 1).hint(BSON("$natural" << 1)),
                           2,
                           0,
-                          0,
+                          nullptr,
                           QueryOption_CursorTailable);
         ASSERT(0 != c->getCursorId());
         ASSERT(!c->isDead());
@@ -528,7 +530,7 @@ public:
                                                      Query().hint(BSON("$natural" << 1)),
                                                      2,
                                                      0,
-                                                     0,
+                                                     nullptr,
                                                      QueryOption_CursorTailable);
         c->next();
         c->next();
@@ -560,7 +562,7 @@ public:
                                                      Query().hint(BSON("$natural" << 1)),
                                                      2,
                                                      0,
-                                                     0,
+                                                     nullptr,
                                                      QueryOption_CursorTailable);
         c->next();
         c->next();
@@ -594,7 +596,7 @@ public:
                                                      Query().hint(BSON("$natural" << 1)),
                                                      2,
                                                      0,
-                                                     0,
+                                                     nullptr,
                                                      QueryOption_CursorTailable);
         c->next();
         c->next();
@@ -616,7 +618,8 @@ public:
         const char* ns = "unittests.querytests.TailCappedOnly";
         _client.insert(ns, BSONObj());
         ASSERT_THROWS(
-            _client.query(NamespaceString(ns), BSONObj(), 0, 0, 0, QueryOption_CursorTailable),
+            _client.query(
+                NamespaceString(ns), BSONObj(), 0, 0, nullptr, QueryOption_CursorTailable),
             AssertionException);
     }
 };
@@ -629,8 +632,8 @@ public:
 
     void insertA(const char* ns, int a) {
         BSONObjBuilder b;
-        b.appendOID("_id", 0, true);
-        b.appendOID("value", 0, true);
+        b.appendOID("_id", nullptr, true);
+        b.appendOID("value", nullptr, true);
         b.append("a", a);
         insert(ns, b.obj());
     }
@@ -656,11 +659,15 @@ public:
         insertA(ns, 0);
         insertA(ns, 1);
         unique_ptr<DBClientCursor> c1 = _client.query(
-            NamespaceString(ns), QUERY("a" << GT << -1), 0, 0, 0, QueryOption_CursorTailable);
+            NamespaceString(ns), QUERY("a" << GT << -1), 0, 0, nullptr, QueryOption_CursorTailable);
         OID id;
         id.init("000000000000000000000000");
-        unique_ptr<DBClientCursor> c2 = _client.query(
-            NamespaceString(ns), QUERY("value" << GT << id), 0, 0, 0, QueryOption_CursorTailable);
+        unique_ptr<DBClientCursor> c2 = _client.query(NamespaceString(ns),
+                                                      QUERY("value" << GT << id),
+                                                      0,
+                                                      0,
+                                                      nullptr,
+                                                      QueryOption_CursorTailable);
         c1->next();
         c1->next();
         ASSERT(!c1->more());
@@ -703,7 +710,7 @@ public:
                           QUERY("ts" << GT << Timestamp(1000, 1)).hint(BSON("$natural" << 1)),
                           0,
                           0,
-                          0,
+                          nullptr,
                           QueryOption_OplogReplay);
         ASSERT(c->more());
         ASSERT_EQUALS(2u, c->next()["ts"].timestamp().getInc());
@@ -714,7 +721,7 @@ public:
                           QUERY("ts" << GT << Timestamp(1000, 1)).hint(BSON("$natural" << 1)),
                           0,
                           0,
-                          0,
+                          nullptr,
                           QueryOption_OplogReplay);
         ASSERT(c->more());
         ASSERT_EQUALS(2u, c->next()["ts"].timestamp().getInc());
@@ -747,7 +754,7 @@ public:
             QUERY("ts" << GT << Timestamp(1000, 1)).hint(BSON("$natural" << 1)).explain(),
             0,
             0,
-            0,
+            nullptr,
             QueryOption_OplogReplay);
         ASSERT(c->more());
 
@@ -1370,7 +1377,7 @@ public:
                           QUERY("i" << GT << 0).hint(BSON("$natural" << 1)),
                           0,
                           0,
-                          0,
+                          nullptr,
                           QueryOption_CursorTailable);
         int n = 0;
         while (c->more()) {
@@ -1397,7 +1404,7 @@ public:
 
     void insertNext() {
         BSONObjBuilder b;
-        b.appendOID("_id", 0, true);
+        b.appendOID("_id", nullptr, true);
         b.append("i", _n++);
         insert(ns(), b.obj());
     }
@@ -1539,7 +1546,7 @@ public:
                                   QUERY("ts" << GTE << Timestamp(1000, j)),
                                   0,
                                   0,
-                                  0,
+                                  nullptr,
                                   QueryOption_OplogReplay);
                 ASSERT(c->more());
                 BSONObj next = c->next();
@@ -1596,7 +1603,7 @@ public:
                                   QUERY("ts" << GTE << Timestamp(1000, j)),
                                   0,
                                   0,
-                                  0,
+                                  nullptr,
                                   QueryOption_OplogReplay);
                 ASSERT(c->more());
                 BSONObj next = c->next();
@@ -1634,7 +1641,7 @@ public:
                                                       QUERY("ts" << GTE << Timestamp(1000, 50)),
                                                       0,
                                                       0,
-                                                      0,
+                                                      nullptr,
                                                       QueryOption_OplogReplay);
         ASSERT(!c0->more());
 
@@ -1656,7 +1663,7 @@ public:
                                                      QUERY("ts" << GTE << Timestamp(1000, 50)),
                                                      0,
                                                      0,
-                                                     0,
+                                                     nullptr,
                                                      QueryOption_OplogReplay);
         ASSERT(!c->more());
 
@@ -1667,7 +1674,7 @@ public:
                           QUERY("ts" << GTE << Timestamp(1000, 50)),
                           0,
                           0,
-                          0,
+                          nullptr,
                           QueryOption_OplogReplay);
         ASSERT(c->more());
         ASSERT_EQUALS(100u, c->next()["ts"].timestamp().getInc());
@@ -1752,7 +1759,7 @@ public:
                              BSON("ts" << GTE << Timestamp(1000, 0)),
                              0,
                              0,
-                             0,
+                             nullptr,
                              QueryOption_OplogReplay | QueryOption_CursorTailable |
                                  QueryOption_Exhaust,
                              message);

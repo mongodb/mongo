@@ -29,7 +29,7 @@
 namespace asio {
 namespace ssl {
 
-context::context(context::method m) : handle_(0) {
+context::context(context::method m) : handle_(nullptr) {
     ::ERR_clear_error();
 
     switch (m) {
@@ -257,11 +257,11 @@ context::context(context::method m) : handle_(0) {
 #endif  // (OPENSSL_VERSION_NUMBER >= 0x10100000L)
 
         default:
-            handle_ = ::SSL_CTX_new(0);
+            handle_ = ::SSL_CTX_new(nullptr);
             break;
     }
 
-    if (handle_ == 0) {
+    if (handle_ == nullptr) {
         asio::error_code ec(static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category());
         asio::detail::throw_error(ec, "context");
     }
@@ -270,13 +270,13 @@ context::context(context::method m) : handle_(0) {
 #if defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
 context::context(context&& other) {
     handle_ = other.handle_;
-    other.handle_ = 0;
+    other.handle_ = nullptr;
 }
 
 context& context::operator=(context&& other) {
     context tmp(ASIO_MOVE_CAST(context)(*this));
     handle_ = other.handle_;
-    other.handle_ = 0;
+    other.handle_ = nullptr;
     return *this;
 }
 #endif  // defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
@@ -284,7 +284,7 @@ context& context::operator=(context&& other) {
 context::~context() {
     if (handle_) {
         if (SSL_CTX_get_app_data(handle_)) {
-            SSL_CTX_set_app_data(handle_, 0);
+            SSL_CTX_set_app_data(handle_, nullptr);
         }
 
         ::SSL_CTX_free(handle_);

@@ -1200,7 +1200,7 @@ std::vector<HostAndPort> SetState::getMatchingHosts(const ReadPreferenceSetting&
 Node* SetState::findNode(const HostAndPort& host) {
     const Nodes::iterator it = std::lower_bound(nodes.begin(), nodes.end(), host, compareHosts);
     if (it == nodes.end() || it->host != host)
-        return NULL;
+        return nullptr;
 
     return &(*it);
 }

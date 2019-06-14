@@ -39,7 +39,7 @@ using std::string;
 
 namespace dps = ::mongo::dotted_path_support;
 
-WorkingSet::MemberHolder::MemberHolder() : member(NULL) {}
+WorkingSet::MemberHolder::MemberHolder() : member(nullptr) {}
 WorkingSet::MemberHolder::~MemberHolder() {}
 
 WorkingSet::WorkingSet() : _freeList(INVALID_ID) {}

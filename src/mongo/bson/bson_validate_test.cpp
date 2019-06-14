@@ -146,7 +146,7 @@ TEST(BSONValidate, MuckingData1) {
 }
 
 TEST(BSONValidate, Fuzz) {
-    int64_t seed = time(0);
+    int64_t seed = time(nullptr);
     log() << "BSONValidate Fuzz random seed: " << seed << endl;
     PseudoRandom randomSource(seed);
 

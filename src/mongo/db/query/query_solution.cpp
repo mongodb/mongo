@@ -203,7 +203,7 @@ void TextNode::appendToString(str::stream* ss, int indent) const {
     *ss << "diacriticSensitive= " << ftsQuery->getDiacriticSensitive() << '\n';
     addIndent(ss, indent + 1);
     *ss << "indexPrefix = " << indexPrefix.toString() << '\n';
-    if (NULL != filter) {
+    if (nullptr != filter) {
         addIndent(ss, indent + 1);
         *ss << " filter = " << filter->debugString();
     }
@@ -233,7 +233,7 @@ void CollectionScanNode::appendToString(str::stream* ss, int indent) const {
     *ss << "COLLSCAN\n";
     addIndent(ss, indent + 1);
     *ss << "ns = " << name << '\n';
-    if (NULL != filter) {
+    if (nullptr != filter) {
         addIndent(ss, indent + 1);
         *ss << "filter = " << filter->debugString();
     }
@@ -265,7 +265,7 @@ AndHashNode::~AndHashNode() {}
 void AndHashNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "AND_HASH\n";
-    if (NULL != filter) {
+    if (nullptr != filter) {
         addIndent(ss, indent + 1);
         *ss << " filter = " << filter->debugString() << '\n';
     }
@@ -369,7 +369,7 @@ OrNode::~OrNode() {}
 void OrNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "OR\n";
-    if (NULL != filter) {
+    if (nullptr != filter) {
         addIndent(ss, indent + 1);
         *ss << " filter = " << filter->debugString() << '\n';
     }
@@ -430,7 +430,7 @@ MergeSortNode::~MergeSortNode() {}
 void MergeSortNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "MERGE_SORT\n";
-    if (NULL != filter) {
+    if (nullptr != filter) {
         addIndent(ss, indent + 1);
         *ss << " filter = " << filter->debugString() << '\n';
     }
@@ -489,7 +489,7 @@ FetchNode::FetchNode() : _sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSe
 void FetchNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "FETCH\n";
-    if (NULL != filter) {
+    if (nullptr != filter) {
         addIndent(ss, indent + 1);
         StringBuilder sb;
         *ss << "filter:\n";
@@ -529,7 +529,7 @@ void IndexScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "indexName = " << index.identifier.catalogName << '\n';
     *ss << "keyPattern = " << index.keyPattern << '\n';
-    if (NULL != filter) {
+    if (nullptr != filter) {
         addIndent(ss, indent + 1);
         *ss << "filter = " << filter->debugString();
     }
@@ -1041,7 +1041,7 @@ void GeoNear2DNode::appendToString(str::stream* ss, int indent) const {
     *ss << "keyPattern = " << index.keyPattern.toString() << '\n';
     addCommon(ss, indent);
     *ss << "nearQuery = " << nq->toString() << '\n';
-    if (NULL != filter) {
+    if (nullptr != filter) {
         addIndent(ss, indent + 1);
         *ss << " filter = " << filter->debugString();
     }
@@ -1075,7 +1075,7 @@ void GeoNear2DSphereNode::appendToString(str::stream* ss, int indent) const {
     *ss << "baseBounds = " << baseBounds.toString() << '\n';
     addIndent(ss, indent + 1);
     *ss << "nearQuery = " << nq->toString() << '\n';
-    if (NULL != filter) {
+    if (nullptr != filter) {
         addIndent(ss, indent + 1);
         *ss << " filter = " << filter->debugString();
     }
@@ -1101,7 +1101,7 @@ QuerySolutionNode* GeoNear2DSphereNode::clone() const {
 void ShardingFilterNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "SHARDING_FILTER\n";
-    if (NULL != filter) {
+    if (nullptr != filter) {
         addIndent(ss, indent + 1);
         StringBuilder sb;
         *ss << "filter:\n";

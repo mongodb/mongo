@@ -43,7 +43,7 @@ static std::vector<std::string> svec(const char* first, ...) {
         va_list ap;
         va_start(ap, first);
         const char* curr;
-        while (NULL != (curr = va_arg(ap, const char*))) {
+        while (nullptr != (curr = va_arg(ap, const char*))) {
             result.push_back(curr);
         }
         va_end(ap);
@@ -52,7 +52,7 @@ static std::vector<std::string> svec(const char* first, ...) {
 }
 
 TEST(WindowsCommandLineConstruction, EmptyCommandLine) {
-    ASSERT_EQUALS("", constructUtf8WindowsCommandLine(svec(NULL)));
+    ASSERT_EQUALS("", constructUtf8WindowsCommandLine(svec(nullptr)));
 }
 
 TEST(WindowsCommandLineConstruction, NothingToQuote) {

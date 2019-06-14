@@ -457,7 +457,7 @@ public:
     explicit ScopedDbConnection(const ConnectionString& host, double socketTimeout = 0);
     explicit ScopedDbConnection(const MongoURI& host, double socketTimeout = 0);
 
-    ScopedDbConnection() : _host(""), _conn(0), _socketTimeoutSecs(0) {}
+    ScopedDbConnection() : _host(""), _conn(nullptr), _socketTimeoutSecs(0) {}
 
     /* @param conn - bind to an existing connection */
     ScopedDbConnection(const std::string& host, DBClientBase* conn, double socketTimeout = 0)
@@ -488,7 +488,7 @@ public:
     }
 
     bool ok() const {
-        return _conn != NULL;
+        return _conn != nullptr;
     }
 
     std::string getHost() const {

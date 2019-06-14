@@ -724,7 +724,7 @@ public:
 
     void addPath(const string& path) {
         _ownedPaths.push_back(std::make_unique<FieldRef>(path));
-        FieldRef const* conflictPath = NULL;
+        FieldRef const* conflictPath = nullptr;
         ASSERT(_immutablePathSet.insert(_ownedPaths.back().get(), &conflictPath));
     }
 

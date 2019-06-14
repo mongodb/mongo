@@ -54,7 +54,7 @@ WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx,
                                            WhereParams params,
                                            StringData dbName)
     : WhereMatchExpressionBase(std::move(params)), _dbName(dbName.toString()), _opCtx(opCtx) {
-    invariant(_opCtx != NULL);
+    invariant(_opCtx != nullptr);
 
     uassert(
         ErrorCodes::BadValue, "no globalScriptEngine in $where parsing", getGlobalScriptEngine());
@@ -87,7 +87,7 @@ bool WhereMatchExpression::matches(const MatchableDocument* doc, MatchDetails* d
     _scope->setObject("obj", const_cast<BSONObj&>(obj));
     _scope->setBoolean("fullObject", true);  // this is a hack b/c fullObject used to be relevant
 
-    int err = _scope->invoke(_func, 0, &obj, 1000 * 60, false);
+    int err = _scope->invoke(_func, nullptr, &obj, 1000 * 60, false);
     if (err == -3) {  // INVOKE_ERROR
         stringstream ss;
         ss << "error on invocation of $where function:\n" << _scope->getError();

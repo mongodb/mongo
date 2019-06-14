@@ -120,7 +120,7 @@ private:
     friend class Document;
 
     template <typename Builder>
-    inline void writeElement(Builder* builder, const StringData* fieldName = NULL) const;
+    inline void writeElement(Builder* builder, const StringData* fieldName = nullptr) const;
 
     Element _basis;
 };

@@ -42,7 +42,7 @@ using std::string;
 TEST(Construction, Empty) {
     StringData strData;
     ASSERT_EQUALS(strData.size(), 0U);
-    ASSERT_TRUE(strData.rawData() == NULL);
+    ASSERT_TRUE(strData.rawData() == nullptr);
 }
 
 TEST(Construction, FromStdString) {
@@ -60,10 +60,10 @@ TEST(Construction, FromCString) {
 }
 
 TEST(Construction, FromNullCString) {
-    char* c = NULL;
+    char* c = nullptr;
     StringData strData(c);
     ASSERT_EQUALS(strData.size(), 0U);
-    ASSERT_TRUE(strData.rawData() == NULL);
+    ASSERT_TRUE(strData.rawData() == nullptr);
 }
 
 TEST(Construction, FromUserDefinedLiteral) {

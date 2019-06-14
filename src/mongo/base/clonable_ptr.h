@@ -63,7 +63,7 @@ struct detect_clone_factory_type_member_impl {
     template <typename U>
     static Yes& test(U*);
 
-    static constexpr bool value = sizeof(test<Derived>(0)) == sizeof(Yes);
+    static constexpr bool value = sizeof(test<Derived>(nullptr)) == sizeof(Yes);
 
     using type = typename std::integral_constant<bool, value>::type;
 };

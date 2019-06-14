@@ -102,7 +102,7 @@ public:
 
         int count = 0;
         PlanExecutor::ExecState state;
-        for (RecordId dl; PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &dl));) {
+        for (RecordId dl; PlanExecutor::ADVANCED == (state = exec->getNext(nullptr, &dl));) {
             ++count;
         }
         ASSERT_EQUALS(PlanExecutor::IS_EOF, state);

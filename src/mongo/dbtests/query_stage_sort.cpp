@@ -175,7 +175,7 @@ public:
         // Look at pairs of objects to make sure that the sort order is pairwise (and therefore
         // totally) correct.
         BSONObj last;
-        ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&last, NULL));
+        ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&last, nullptr));
         last = last.getOwned();
 
         // Count 'last'.
@@ -183,7 +183,7 @@ public:
 
         BSONObj current;
         PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&current, NULL))) {
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&current, nullptr))) {
             int cmp = sgn(dps::compareObjectsAccordingToSort(current, last, params.pattern));
             // The next object should be equal to the previous or oriented according to the sort
             // pattern.
@@ -364,7 +364,7 @@ public:
         CollectionUpdateArgs args;
         {
             WriteUnitOfWork wuow(&_opCtx);
-            coll->updateDocument(&_opCtx, *it, oldDoc, newDoc(oldDoc), false, NULL, &args);
+            coll->updateDocument(&_opCtx, *it, oldDoc, newDoc(oldDoc), false, nullptr, &args);
             wuow.commit();
         }
         exec->restoreState();
@@ -382,7 +382,7 @@ public:
             oldDoc = coll->docFor(&_opCtx, *it);
             {
                 WriteUnitOfWork wuow(&_opCtx);
-                coll->updateDocument(&_opCtx, *it++, oldDoc, newDoc(oldDoc), false, NULL, &args);
+                coll->updateDocument(&_opCtx, *it++, oldDoc, newDoc(oldDoc), false, nullptr, &args);
                 wuow.commit();
             }
         }
@@ -571,7 +571,7 @@ public:
             &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
-        PlanExecutor::ExecState runnerState = exec->getNext(NULL, NULL);
+        PlanExecutor::ExecState runnerState = exec->getNext(nullptr, nullptr);
         ASSERT_EQUALS(PlanExecutor::FAILURE, runnerState);
     }
 };

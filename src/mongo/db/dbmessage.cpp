@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-DbMessage::DbMessage(const Message& msg) : _msg(msg), _nsStart(NULL), _mark(NULL), _nsLen(0) {
+DbMessage::DbMessage(const Message& msg) : _msg(msg), _nsStart(nullptr), _mark(nullptr), _nsLen(0) {
     // for received messages, Message has only one buffer
     _theEnd = _msg.singleData().data() + _msg.singleData().dataLen();
     _nextjsobj = _msg.singleData().data();
@@ -89,7 +89,7 @@ const char* DbMessage::getArray(size_t count) const {
 BSONObj DbMessage::nextJsObj() {
     uassert(ErrorCodes::InvalidBSON,
             "Client Error: Remaining data too small for BSON object",
-            _nextjsobj != NULL && _theEnd - _nextjsobj >= 5);
+            _nextjsobj != nullptr && _theEnd - _nextjsobj >= 5);
 
     if (serverGlobalParams.objcheck) {
         Status status = validateBSON(
@@ -105,12 +105,12 @@ BSONObj DbMessage::nextJsObj() {
 
     _nextjsobj += js.objsize();
     if (_nextjsobj >= _theEnd)
-        _nextjsobj = NULL;
+        _nextjsobj = nullptr;
     return js;
 }
 
-void DbMessage::markReset(const char* toMark = NULL) {
-    if (toMark == NULL) {
+void DbMessage::markReset(const char* toMark = nullptr) {
+    if (toMark == nullptr) {
         toMark = _mark;
     }
 

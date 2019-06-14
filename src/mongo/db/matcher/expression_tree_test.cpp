@@ -46,18 +46,18 @@ TEST(NotMatchExpression, MatchesScalar) {
     BSONObj baseOperand = BSON("$lt" << 5);
     unique_ptr<ComparisonMatchExpression> lt(new LTMatchExpression("a", baseOperand["$lt"]));
     NotMatchExpression notOp(lt.release());
-    ASSERT(notOp.matchesBSON(BSON("a" << 6), NULL));
-    ASSERT(!notOp.matchesBSON(BSON("a" << 4), NULL));
+    ASSERT(notOp.matchesBSON(BSON("a" << 6), nullptr));
+    ASSERT(!notOp.matchesBSON(BSON("a" << 4), nullptr));
 }
 
 TEST(NotMatchExpression, MatchesArray) {
     BSONObj baseOperand = BSON("$lt" << 5);
     unique_ptr<ComparisonMatchExpression> lt(new LTMatchExpression("a", baseOperand["$lt"]));
     NotMatchExpression notOp(lt.release());
-    ASSERT(notOp.matchesBSON(BSON("a" << BSON_ARRAY(6)), NULL));
-    ASSERT(!notOp.matchesBSON(BSON("a" << BSON_ARRAY(4)), NULL));
+    ASSERT(notOp.matchesBSON(BSON("a" << BSON_ARRAY(6)), nullptr));
+    ASSERT(!notOp.matchesBSON(BSON("a" << BSON_ARRAY(4)), nullptr));
     // All array elements must match.
-    ASSERT(!notOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5 << 6)), NULL));
+    ASSERT(!notOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5 << 6)), nullptr));
 }
 
 TEST(NotMatchExpression, ElemMatchKey) {
@@ -89,7 +89,7 @@ TEST(NotMatchExpression, SetCollatorPropagatesToChild) {
 
 TEST(AndOp, NoClauses) {
     AndMatchExpression andMatchExpression;
-    ASSERT(andMatchExpression.matchesBSON(BSONObj(), NULL));
+    ASSERT(andMatchExpression.matchesBSON(BSONObj(), nullptr));
 }
 
 TEST(AndOp, MatchesElementThreeClauses) {
@@ -129,10 +129,10 @@ TEST(AndOp, MatchesSingleClause) {
     AndMatchExpression andOp;
     andOp.add(ne.release());
 
-    ASSERT(andOp.matchesBSON(BSON("a" << 4), NULL));
-    ASSERT(andOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 6)), NULL));
-    ASSERT(!andOp.matchesBSON(BSON("a" << 5), NULL));
-    ASSERT(!andOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5)), NULL));
+    ASSERT(andOp.matchesBSON(BSON("a" << 4), nullptr));
+    ASSERT(andOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 6)), nullptr));
+    ASSERT(!andOp.matchesBSON(BSON("a" << 5), nullptr));
+    ASSERT(!andOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5)), nullptr));
 }
 
 TEST(AndOp, MatchesThreeClauses) {
@@ -149,11 +149,11 @@ TEST(AndOp, MatchesThreeClauses) {
     andOp.add(sub2.release());
     andOp.add(sub3.release());
 
-    ASSERT(andOp.matchesBSON(BSON("a" << 5 << "b" << 6), NULL));
-    ASSERT(!andOp.matchesBSON(BSON("a" << 5), NULL));
-    ASSERT(!andOp.matchesBSON(BSON("b" << 6), NULL));
-    ASSERT(!andOp.matchesBSON(BSON("a" << 1 << "b" << 6), NULL));
-    ASSERT(!andOp.matchesBSON(BSON("a" << 10 << "b" << 6), NULL));
+    ASSERT(andOp.matchesBSON(BSON("a" << 5 << "b" << 6), nullptr));
+    ASSERT(!andOp.matchesBSON(BSON("a" << 5), nullptr));
+    ASSERT(!andOp.matchesBSON(BSON("b" << 6), nullptr));
+    ASSERT(!andOp.matchesBSON(BSON("a" << 1 << "b" << 6), nullptr));
+    ASSERT(!andOp.matchesBSON(BSON("a" << 10 << "b" << 6), nullptr));
 }
 
 TEST(AndOp, ElemMatchKey) {
@@ -181,7 +181,7 @@ TEST(AndOp, ElemMatchKey) {
 
 TEST(OrOp, NoClauses) {
     OrMatchExpression orOp;
-    ASSERT(!orOp.matchesBSON(BSONObj(), NULL));
+    ASSERT(!orOp.matchesBSON(BSONObj(), nullptr));
 }
 
 TEST(OrOp, MatchesSingleClause) {
@@ -192,10 +192,10 @@ TEST(OrOp, MatchesSingleClause) {
     OrMatchExpression orOp;
     orOp.add(ne.release());
 
-    ASSERT(orOp.matchesBSON(BSON("a" << 4), NULL));
-    ASSERT(orOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 6)), NULL));
-    ASSERT(!orOp.matchesBSON(BSON("a" << 5), NULL));
-    ASSERT(!orOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5)), NULL));
+    ASSERT(orOp.matchesBSON(BSON("a" << 4), nullptr));
+    ASSERT(orOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 6)), nullptr));
+    ASSERT(!orOp.matchesBSON(BSON("a" << 5), nullptr));
+    ASSERT(!orOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5)), nullptr));
 }
 
 TEST(OrOp, MatchesThreeClauses) {
@@ -211,13 +211,13 @@ TEST(OrOp, MatchesThreeClauses) {
     orOp.add(sub2.release());
     orOp.add(sub3.release());
 
-    ASSERT(orOp.matchesBSON(BSON("a" << -1), NULL));
-    ASSERT(orOp.matchesBSON(BSON("a" << 11), NULL));
-    ASSERT(!orOp.matchesBSON(BSON("a" << 5), NULL));
-    ASSERT(orOp.matchesBSON(BSON("b" << 100), NULL));
-    ASSERT(!orOp.matchesBSON(BSON("b" << 101), NULL));
-    ASSERT(!orOp.matchesBSON(BSONObj(), NULL));
-    ASSERT(orOp.matchesBSON(BSON("a" << 11 << "b" << 100), NULL));
+    ASSERT(orOp.matchesBSON(BSON("a" << -1), nullptr));
+    ASSERT(orOp.matchesBSON(BSON("a" << 11), nullptr));
+    ASSERT(!orOp.matchesBSON(BSON("a" << 5), nullptr));
+    ASSERT(orOp.matchesBSON(BSON("b" << 100), nullptr));
+    ASSERT(!orOp.matchesBSON(BSON("b" << 101), nullptr));
+    ASSERT(!orOp.matchesBSON(BSONObj(), nullptr));
+    ASSERT(orOp.matchesBSON(BSON("a" << 11 << "b" << 100), nullptr));
 }
 
 TEST(OrOp, ElemMatchKey) {
@@ -243,7 +243,7 @@ TEST(OrOp, ElemMatchKey) {
 
 TEST(NorOp, NoClauses) {
     NorMatchExpression norOp;
-    ASSERT(norOp.matchesBSON(BSONObj(), NULL));
+    ASSERT(norOp.matchesBSON(BSONObj(), nullptr));
 }
 
 TEST(NorOp, MatchesSingleClause) {
@@ -254,10 +254,10 @@ TEST(NorOp, MatchesSingleClause) {
     NorMatchExpression norOp;
     norOp.add(ne.release());
 
-    ASSERT(!norOp.matchesBSON(BSON("a" << 4), NULL));
-    ASSERT(!norOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 6)), NULL));
-    ASSERT(norOp.matchesBSON(BSON("a" << 5), NULL));
-    ASSERT(norOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5)), NULL));
+    ASSERT(!norOp.matchesBSON(BSON("a" << 4), nullptr));
+    ASSERT(!norOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 6)), nullptr));
+    ASSERT(norOp.matchesBSON(BSON("a" << 5), nullptr));
+    ASSERT(norOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5)), nullptr));
 }
 
 TEST(NorOp, MatchesThreeClauses) {
@@ -274,13 +274,13 @@ TEST(NorOp, MatchesThreeClauses) {
     norOp.add(sub2.release());
     norOp.add(sub3.release());
 
-    ASSERT(!norOp.matchesBSON(BSON("a" << -1), NULL));
-    ASSERT(!norOp.matchesBSON(BSON("a" << 11), NULL));
-    ASSERT(norOp.matchesBSON(BSON("a" << 5), NULL));
-    ASSERT(!norOp.matchesBSON(BSON("b" << 100), NULL));
-    ASSERT(norOp.matchesBSON(BSON("b" << 101), NULL));
-    ASSERT(norOp.matchesBSON(BSONObj(), NULL));
-    ASSERT(!norOp.matchesBSON(BSON("a" << 11 << "b" << 100), NULL));
+    ASSERT(!norOp.matchesBSON(BSON("a" << -1), nullptr));
+    ASSERT(!norOp.matchesBSON(BSON("a" << 11), nullptr));
+    ASSERT(norOp.matchesBSON(BSON("a" << 5), nullptr));
+    ASSERT(!norOp.matchesBSON(BSON("b" << 100), nullptr));
+    ASSERT(norOp.matchesBSON(BSON("b" << 101), nullptr));
+    ASSERT(norOp.matchesBSON(BSONObj(), nullptr));
+    ASSERT(!norOp.matchesBSON(BSON("a" << 11 << "b" << 100), nullptr));
 }
 
 TEST(NorOp, ElemMatchKey) {

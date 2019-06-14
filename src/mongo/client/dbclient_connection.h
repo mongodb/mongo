@@ -154,7 +154,7 @@ public:
                                           Query query = Query(),
                                           int nToReturn = 0,
                                           int nToSkip = 0,
-                                          const BSONObj* fieldsToReturn = 0,
+                                          const BSONObj* fieldsToReturn = nullptr,
                                           int queryOptions = 0,
                                           int batchSize = 0) override {
         checkConnection();
@@ -227,12 +227,12 @@ public:
         return _serverAddress;
     }
 
-    void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0) override;
+    void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
     bool recv(Message& m, int lastRequestId) override;
     void checkResponse(const std::vector<BSONObj>& batch,
                        bool networkError,
-                       bool* retry = NULL,
-                       std::string* host = NULL) override;
+                       bool* retry = nullptr,
+                       std::string* host = nullptr) override;
     bool call(Message& toSend,
               Message& response,
               bool assertOk,

@@ -131,8 +131,8 @@ public:
     /**
      * @return true if this query has an orderby, hint, or some other field
      */
-    bool isComplex(bool* hasDollar = 0) const;
-    static bool isComplex(const BSONObj& obj, bool* hasDollar = 0);
+    bool isComplex(bool* hasDollar = nullptr) const;
+    static bool isComplex(const BSONObj& obj, bool* hasDollar = nullptr);
 
     BSONObj getFilter() const;
     BSONObj getSort() const;

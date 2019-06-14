@@ -41,7 +41,7 @@ namespace {
 //
 
 void assertInKVStore(LRUKeyValue<int, int>& cache, int key, int value) {
-    int* cachedValue = NULL;
+    int* cachedValue = nullptr;
     ASSERT_TRUE(cache.hasKey(key));
     Status s = cache.get(key, &cachedValue);
     ASSERT_OK(s);
@@ -49,7 +49,7 @@ void assertInKVStore(LRUKeyValue<int, int>& cache, int key, int value) {
 }
 
 void assertNotInKVStore(LRUKeyValue<int, int>& cache, int key) {
-    int* cachedValue = NULL;
+    int* cachedValue = nullptr;
     ASSERT_FALSE(cache.hasKey(key));
     Status s = cache.get(key, &cachedValue);
     ASSERT_NOT_OK(s);
@@ -99,7 +99,7 @@ TEST(LRUKeyValueTest, EvictionTest) {
     LRUKeyValue<int, int> cache(maxSize);
     for (int i = 0; i < maxSize; ++i) {
         std::unique_ptr<int> evicted = cache.add(i, new int(i));
-        ASSERT(NULL == evicted.get());
+        ASSERT(nullptr == evicted.get());
     }
     ASSERT_EQUALS(cache.size(), (size_t)maxSize);
 
@@ -115,7 +115,7 @@ TEST(LRUKeyValueTest, EvictionTest) {
     // Adding another entry causes an eviction.
     std::unique_ptr<int> evicted = cache.add(maxSize + 1, new int(maxSize + 1));
     ASSERT_EQUALS(cache.size(), (size_t)maxSize);
-    ASSERT(NULL != evicted.get());
+    ASSERT(nullptr != evicted.get());
     ASSERT_EQUALS(*evicted, evictKey);
 
     // Check that the least recently accessed has been evicted.
@@ -139,7 +139,7 @@ TEST(LRUKeyValueTest, PromotionTest) {
     LRUKeyValue<int, int> cache(maxSize);
     for (int i = 0; i < maxSize; ++i) {
         std::unique_ptr<int> evicted = cache.add(i, new int(i));
-        ASSERT(NULL == evicted.get());
+        ASSERT(nullptr == evicted.get());
     }
     ASSERT_EQUALS(cache.size(), (size_t)maxSize);
 
@@ -150,7 +150,7 @@ TEST(LRUKeyValueTest, PromotionTest) {
     // Evict all but one of the original entries.
     for (int i = maxSize; i < (maxSize + maxSize - 1); ++i) {
         std::unique_ptr<int> evicted = cache.add(i, new int(i));
-        ASSERT(NULL != evicted.get());
+        ASSERT(nullptr != evicted.get());
     }
     ASSERT_EQUALS(cache.size(), (size_t)maxSize);
 

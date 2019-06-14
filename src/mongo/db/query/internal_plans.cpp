@@ -55,7 +55,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     const RecordId startLoc) {
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
-    if (NULL == collection) {
+    if (nullptr == collection) {
         auto eof = std::make_unique<EOFStage>(opCtx);
         // Takes ownership of 'ws' and 'eof'.
         auto statusWithPlanExecutor = PlanExecutor::make(

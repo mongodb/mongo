@@ -1161,7 +1161,7 @@ protected:
         dumpSolutions(ss);
         FAIL(ss);
 
-        return NULL;
+        return nullptr;
     }
 
     /**
@@ -1216,8 +1216,8 @@ protected:
      */
     void assertNotCached(const string& solnJson) {
         QuerySolution* bestSoln = firstMatchingSolution(solnJson);
-        ASSERT(NULL != bestSoln);
-        ASSERT(NULL == bestSoln->cacheData.get());
+        ASSERT(nullptr != bestSoln);
+        ASSERT(nullptr == bestSoln->cacheData.get());
     }
 
     static const PlanCacheKey ck;

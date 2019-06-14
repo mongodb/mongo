@@ -628,7 +628,7 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
     // If we're not allowed to put a blocking sort in, bail out.
     if (params.options & QueryPlannerParams::NO_BLOCKING_SORT) {
         delete solnRoot;
-        return NULL;
+        return nullptr;
     }
 
     if (!solnRoot->fetched()) {

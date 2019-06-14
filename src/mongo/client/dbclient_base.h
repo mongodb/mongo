@@ -77,21 +77,21 @@ class DBClientQueryInterface {
                                                   Query query,
                                                   int nToReturn = 0,
                                                   int nToSkip = 0,
-                                                  const BSONObj* fieldsToReturn = 0,
+                                                  const BSONObj* fieldsToReturn = nullptr,
                                                   int queryOptions = 0,
                                                   int batchSize = 0) = 0;
 
     virtual unsigned long long query(std::function<void(const BSONObj&)> f,
                                      const NamespaceStringOrUUID& nsOrUuid,
                                      Query query,
-                                     const BSONObj* fieldsToReturn = 0,
+                                     const BSONObj* fieldsToReturn = nullptr,
                                      int queryOptions = 0,
                                      int batchSize = 0) = 0;
 
     virtual unsigned long long query(std::function<void(DBClientCursorBatchIterator&)> f,
                                      const NamespaceStringOrUUID& nsOrUuid,
                                      Query query,
-                                     const BSONObj* fieldsToReturn = 0,
+                                     const BSONObj* fieldsToReturn = nullptr,
                                      int queryOptions = 0,
                                      int batchSize = 0) = 0;
 };
@@ -118,7 +118,7 @@ public:
     */
     virtual BSONObj findOne(const std::string& ns,
                             const Query& query,
-                            const BSONObj* fieldsToReturn = 0,
+                            const BSONObj* fieldsToReturn = nullptr,
                             int queryOptions = 0);
 
     /** query N objects from the database into an array.  makes sense mostly when you want a small
@@ -129,7 +129,7 @@ public:
                Query query,
                int nToReturn,
                int nToSkip = 0,
-               const BSONObj* fieldsToReturn = 0,
+               const BSONObj* fieldsToReturn = nullptr,
                int queryOptions = 0);
 
     /**
@@ -368,7 +368,7 @@ public:
 
        returns true if command invoked successfully.
     */
-    virtual bool isMaster(bool& isMaster, BSONObj* info = 0);
+    virtual bool isMaster(bool& isMaster, BSONObj* info = nullptr);
 
     /**
        Create a new collection in the database.  Normally, collection creation is automatic.  You
@@ -390,7 +390,7 @@ public:
                           long long size = 0,
                           bool capped = false,
                           int max = 0,
-                          BSONObj* info = 0);
+                          BSONObj* info = nullptr);
 
     /** Get error result from the last write operation (insert/update/delete) on this connection.
         db doesn't change the command's behavior - it is just for auth checks.
@@ -583,7 +583,7 @@ public:
                                           Query query,
                                           int nToReturn = 0,
                                           int nToSkip = 0,
-                                          const BSONObj* fieldsToReturn = 0,
+                                          const BSONObj* fieldsToReturn = nullptr,
                                           int queryOptions = 0,
                                           int batchSize = 0) override;
 
@@ -605,14 +605,14 @@ public:
     unsigned long long query(std::function<void(const BSONObj&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,
                              Query query,
-                             const BSONObj* fieldsToReturn = 0,
+                             const BSONObj* fieldsToReturn = nullptr,
                              int queryOptions = QueryOption_Exhaust,
                              int batchSize = 0) final;
 
     unsigned long long query(std::function<void(DBClientCursorBatchIterator&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,
                              Query query,
-                             const BSONObj* fieldsToReturn = 0,
+                             const BSONObj* fieldsToReturn = nullptr,
                              int queryOptions = QueryOption_Exhaust,
                              int batchSize = 0) override;
 

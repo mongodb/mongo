@@ -74,7 +74,7 @@ protected:
                                  const char* queryStr,
                                  const IndexBounds& expectedBounds) {
         auto query(canonicalize(queryStr));
-        ASSERT(query.get() != NULL);
+        ASSERT(query.get() != nullptr);
 
         BSONObj key = fromjson(keyStr);
 
@@ -98,7 +98,7 @@ protected:
     // Assume shard key is { a: 1 }
     void checkIndexBounds(const char* queryStr, const OrderedIntervalList& expectedOil) {
         auto query(canonicalize(queryStr));
-        ASSERT(query.get() != NULL);
+        ASSERT(query.get() != nullptr);
 
         BSONObj key = fromjson("{a: 1}");
 
@@ -284,7 +284,7 @@ TEST_F(CMCollapseTreeTest, BasicAllElemMatch) {
 
     const char* queryStr = "{foo: {$all: [ {$elemMatch: {a:1, b:1}} ]}}";
     auto query(canonicalize(queryStr));
-    ASSERT(query.get() != NULL);
+    ASSERT(query.get() != nullptr);
 
     BSONObj key = fromjson("{'foo.a': 1}");
 
@@ -365,7 +365,7 @@ TEST_F(CMCollapseTreeTest, TextWithQuery) {
 TEST_F(CMCollapseTreeTest, HashedSinglePoint) {
     const char* queryStr = "{ a: 0 }";
     auto query(canonicalize(queryStr));
-    ASSERT(query.get() != NULL);
+    ASSERT(query.get() != nullptr);
 
     BSONObj key = fromjson("{a: 'hashed'}");
 

@@ -47,9 +47,9 @@ public:
      */
     static bool hasNode(const MatchExpression* root,
                         MatchExpression::MatchType type,
-                        const MatchExpression** out = NULL) {
+                        const MatchExpression** out = nullptr) {
         if (type == root->matchType()) {
-            if (NULL != out) {
+            if (nullptr != out) {
                 *out = root;
             }
             return true;

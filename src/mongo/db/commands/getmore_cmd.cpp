@@ -277,7 +277,7 @@ public:
             BSONObj obj;
             try {
                 while (!FindCommon::enoughForGetMore(request.batchSize.value_or(0), *numResults) &&
-                       PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, NULL))) {
+                       PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, nullptr))) {
                     // If adding this object will cause us to exceed the message size limit, then we
                     // stash it for later.
                     if (!FindCommon::haveSpaceForNext(obj, *numResults, nextBatch->bytesUsed())) {

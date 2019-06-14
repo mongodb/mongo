@@ -140,7 +140,7 @@ public:
         uasserted(9005, std::string("invoke failed: ") + getError());
     }
 
-    virtual void injectNative(const char* field, NativeFunction func, void* data = 0) = 0;
+    virtual void injectNative(const char* field, NativeFunction func, void* data = nullptr) = 0;
 
     virtual bool exec(StringData code,
                       const std::string& name,

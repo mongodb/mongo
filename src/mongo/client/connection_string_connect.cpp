@@ -44,7 +44,7 @@
 namespace mongo {
 
 stdx::mutex ConnectionString::_connectHookMutex;
-ConnectionString::ConnectionHook* ConnectionString::_connectHook = NULL;
+ConnectionString::ConnectionHook* ConnectionString::_connectHook = nullptr;
 
 std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationName,
                                                         std::string& errmsg,

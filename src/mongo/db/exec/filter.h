@@ -151,21 +151,21 @@ public:
      * Returns false if 'wsm' does not satisfy the filter.
      */
     static bool passes(WorkingSetMember* wsm, const MatchExpression* filter) {
-        if (NULL == filter) {
+        if (nullptr == filter) {
             return true;
         }
         WorkingSetMatchableDocument doc(wsm);
-        return filter->matches(&doc, NULL);
+        return filter->matches(&doc, nullptr);
     }
 
     static bool passes(const BSONObj& keyData,
                        const BSONObj& keyPattern,
                        const MatchExpression* filter) {
-        if (NULL == filter) {
+        if (nullptr == filter) {
             return true;
         }
         IndexKeyMatchableDocument doc(keyData, keyPattern);
-        return filter->matches(&doc, NULL);
+        return filter->matches(&doc, nullptr);
     }
 };
 

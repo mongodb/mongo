@@ -47,7 +47,8 @@ namespace mongo {
  * Generic parameters for a GeoNear search
  */
 struct GeoNearParams {
-    GeoNearParams() : filter(NULL), nearQuery(NULL), addPointMeta(false), addDistMeta(false) {}
+    GeoNearParams()
+        : filter(nullptr), nearQuery(nullptr), addPointMeta(false), addDistMeta(false) {}
 
     // MatchExpression to apply to the index keys and fetched documents
     // Not owned here, owned by solution nodes

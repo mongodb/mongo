@@ -37,7 +37,7 @@ using std::string;
 
 ServerStatusMetric::ServerStatusMetric(const string& nameIn)
     : _name(nameIn), _leafName(_parseLeafName(nameIn)) {
-    if (MetricTree::theMetricTree == 0)
+    if (MetricTree::theMetricTree == nullptr)
         MetricTree::theMetricTree = new MetricTree();
     MetricTree::theMetricTree->add(this);
 }

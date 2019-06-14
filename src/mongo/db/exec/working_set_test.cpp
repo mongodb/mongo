@@ -52,12 +52,12 @@ protected:
         id = ws->allocate();
         ASSERT(id != WorkingSet::INVALID_ID);
         member = ws->get(id);
-        ASSERT(NULL != member);
+        ASSERT(nullptr != member);
     }
 
     void tearDown() {
         ws.reset();
-        member = NULL;
+        member = nullptr;
     }
 
     std::unique_ptr<WorkingSet> ws;
@@ -123,7 +123,7 @@ TEST_F(WorkingSetFixture, getFieldFromIndex) {
     string secondName = "y";
     int secondValue = 10;
 
-    member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), NULL));
+    member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), nullptr));
     // Also a minor lie as RecordId is bogus.
     ws->transitionToRecordIdAndIdx(id);
     BSONElement elt;
@@ -133,7 +133,8 @@ TEST_F(WorkingSetFixture, getFieldFromIndex) {
     ASSERT_FALSE(member->getFieldDotted("foo", &elt));
 
     // Add another index datum.
-    member->keyData.push_back(IndexKeyDatum(BSON(secondName << 1), BSON("" << secondValue), NULL));
+    member->keyData.push_back(
+        IndexKeyDatum(BSON(secondName << 1), BSON("" << secondValue), nullptr));
     ASSERT_TRUE(member->getFieldDotted(secondName, &elt));
     ASSERT_EQUALS(elt.numberInt(), secondValue);
     ASSERT_TRUE(member->getFieldDotted(firstName, &elt));
@@ -146,7 +147,7 @@ TEST_F(WorkingSetFixture, getDottedFieldFromIndex) {
     string firstName = "x.y";
     int firstValue = 5;
 
-    member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), NULL));
+    member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), nullptr));
     ws->transitionToRecordIdAndIdx(id);
     BSONElement elt;
     ASSERT_TRUE(member->getFieldDotted(firstName, &elt));

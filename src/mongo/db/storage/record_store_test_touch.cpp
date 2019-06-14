@@ -122,7 +122,7 @@ TEST(RecordStoreTestHarness, TouchEmptyWithNullStats) {
     {
         ServiceContext::UniqueOperationContext opCtx(
             harnessHelper->newOperationContext(harnessHelper->client()));
-        Status status = rs->touch(opCtx.get(), NULL /* stats output */);
+        Status status = rs->touch(opCtx.get(), nullptr /* stats output */);
         ASSERT(status.isOK() || status.code() == ErrorCodes::CommandNotSupported);
     }
 }
@@ -164,7 +164,7 @@ TEST(RecordStoreTestHarness, TouchNonEmptyWithNullStats) {
             harnessHelper->newOperationContext(harnessHelper->client()));
         // XXX does not verify the collection was loaded into cache
         // (even if supported by storage engine)
-        Status status = rs->touch(opCtx.get(), NULL /* stats output */);
+        Status status = rs->touch(opCtx.get(), nullptr /* stats output */);
         ASSERT(status.isOK() || status.code() == ErrorCodes::CommandNotSupported);
     }
 }

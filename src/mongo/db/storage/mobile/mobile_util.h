@@ -44,7 +44,7 @@ namespace embedded {
 /**
  * Converts SQLite return codes to MongoDB statuses.
  */
-Status sqliteRCToStatus(int retCode, const char* prefix = NULL);
+Status sqliteRCToStatus(int retCode, const char* prefix = nullptr);
 
 /**
  * Converts SQLite return codes to string equivalents.
@@ -54,7 +54,10 @@ const char* sqliteStatusToStr(int retStatus);
 /**
  * Checks if retStatus == desiredStatus; else calls fassert.
  */
-void checkStatus(int retStatus, int desiredStatus, const char* fnName, const char* errMsg = NULL);
+void checkStatus(int retStatus,
+                 int desiredStatus,
+                 const char* fnName,
+                 const char* errMsg = nullptr);
 
 /**
  * Validate helper function to log an error and append the error to the results.

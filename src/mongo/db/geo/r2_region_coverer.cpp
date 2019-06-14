@@ -61,7 +61,7 @@ R2RegionCoverer::R2RegionCoverer(GeoHashConverter* hashConverter)
       _minLevel(0u),
       _maxLevel(GeoHash::kMaxBits),
       _maxCells(kDefaultMaxCells),
-      _region(NULL),
+      _region(nullptr),
       _candidateQueue(new CandidateQueue),
       _results(new vector<GeoHash>) {}
 
@@ -126,7 +126,7 @@ void R2RegionCoverer::getCovering(const R2Region& region, vector<GeoHash>* cover
         LOG(3) << "Queue: " << _candidateQueue->size();
     }
 
-    _region = NULL;
+    _region = nullptr;
     cover->swap(*_results);
 }
 
@@ -136,7 +136,7 @@ R2RegionCoverer::Candidate* R2RegionCoverer::newCandidate(const GeoHash& cell) {
     Box box = _hashConverter->unhashToBoxCovering(cell);
 
     if (_region->fastDisjoint(box)) {
-        return NULL;
+        return nullptr;
     }
 
     Candidate* candidate = new Candidate();
@@ -152,7 +152,7 @@ R2RegionCoverer::Candidate* R2RegionCoverer::newCandidate(const GeoHash& cell) {
 
 // Takes ownership of "candidate"
 void R2RegionCoverer::addCandidate(Candidate* candidate) {
-    if (candidate == NULL)
+    if (candidate == nullptr)
         return;
 
     if (candidate->isTerminal) {

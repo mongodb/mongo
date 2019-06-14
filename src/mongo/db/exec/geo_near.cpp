@@ -80,14 +80,14 @@ namespace {
 struct StoredGeometry {
     static StoredGeometry* parseFrom(const BSONElement& element) {
         if (!element.isABSONObj())
-            return NULL;
+            return nullptr;
 
         unique_ptr<StoredGeometry> stored(new StoredGeometry);
 
         // GeoNear stage can only be run with an existing index
         // Therefore, it is always safe to skip geometry validation
         if (!stored->geometry.parseFromStorage(element, true).isOK())
-            return NULL;
+            return nullptr;
         stored->element = element;
         return stored.release();
     }
@@ -343,7 +343,7 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(OperationContext* opCtx,
     IndexBoundsBuilder::intersectize(oil, &scanParams.bounds.fields[twoDFieldPosition]);
 
     invariant(!_indexScan);
-    _indexScan = new IndexScan(opCtx, scanParams, workingSet, NULL);
+    _indexScan = new IndexScan(opCtx, scanParams, workingSet, nullptr);
     _children->emplace_back(_indexScan);
 }
 
@@ -461,7 +461,7 @@ PlanStage::StageState GeoNear2DStage::initialize(OperationContext* opCtx,
         invariant(_boundsIncrement > 0.0);
 
         // Clean up
-        _densityEstimator.reset(NULL);
+        _densityEstimator.reset(nullptr);
     }
 
     return state;
@@ -530,7 +530,7 @@ public:
 
     unique_ptr<MatchExpression> shallowClone() const final {
         MONGO_UNREACHABLE;
-        return NULL;
+        return nullptr;
     }
 
 private:
@@ -897,7 +897,7 @@ void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(OperationContext* op
 
     // Index scan
     invariant(!_indexScan);
-    _indexScan = new IndexScan(opCtx, scanParams, workingSet, NULL);
+    _indexScan = new IndexScan(opCtx, scanParams, workingSet, nullptr);
     _children->emplace_back(_indexScan);
 }
 
@@ -1003,7 +1003,7 @@ PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* opCtx,
         invariant(_boundsIncrement > 0.0);
 
         // Clean up
-        _densityEstimator.reset(NULL);
+        _densityEstimator.reset(nullptr);
     }
 
     return state;

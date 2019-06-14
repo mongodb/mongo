@@ -110,7 +110,7 @@ public:
     AndMatchExpression() : ListOfMatchExpression(AND) {}
     virtual ~AndMatchExpression() {}
 
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const;
+    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const;
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
@@ -139,7 +139,7 @@ public:
     OrMatchExpression() : ListOfMatchExpression(OR) {}
     virtual ~OrMatchExpression() {}
 
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const;
+    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const;
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
@@ -168,7 +168,7 @@ public:
     NorMatchExpression() : ListOfMatchExpression(NOR) {}
     virtual ~NorMatchExpression() {}
 
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const;
+    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const;
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
@@ -201,8 +201,8 @@ public:
         return std::move(self);
     }
 
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const {
-        return !_exp->matches(doc, NULL);
+    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const {
+        return !_exp->matches(doc, nullptr);
     }
 
     bool matchesSingleElement(const BSONElement& elt, MatchDetails* details = nullptr) const final {

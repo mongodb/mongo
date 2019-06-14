@@ -56,9 +56,9 @@ using std::string;
 
 class MyHarnessHelper final : public SortedDataInterfaceHarnessHelper {
 public:
-    MyHarnessHelper() : _dbpath("wt_test"), _conn(NULL) {
+    MyHarnessHelper() : _dbpath("wt_test"), _conn(nullptr) {
         const char* config = "create,cache_size=1G,";
-        int ret = wiredtiger_open(_dbpath.path().c_str(), NULL, config, &_conn);
+        int ret = wiredtiger_open(_dbpath.path().c_str(), nullptr, config, &_conn);
         invariantWTOK(ret);
 
         _fastClockSource = std::make_unique<SystemClockSource>();
@@ -67,7 +67,7 @@ public:
 
     ~MyHarnessHelper() final {
         delete _sessionCache;
-        _conn->close(_conn, NULL);
+        _conn->close(_conn, nullptr);
     }
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique, bool partial) final {

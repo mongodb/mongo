@@ -119,7 +119,7 @@ void safeClose(int fd) {
         }
 
         ~ScopedSignalBlocker() {
-            pthread_sigmask(SIG_SETMASK, &_oldMask, NULL);
+            pthread_sigmask(SIG_SETMASK, &_oldMask, nullptr);
         }
 
     private:
@@ -314,7 +314,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
             if (str == "--port") {
                 _port = -2;
             } else if (_port == -2) {
-                _port = strtol(str.c_str(), 0, 10);
+                _port = strtol(str.c_str(), nullptr, 10);
             } else if (isMongodProgram && str == "--configsvr") {
                 _name = "c";
             }
@@ -428,7 +428,7 @@ void ProgramRunner::start() {
         }
 #endif
 
-        fflush(0);
+        fflush(nullptr);
 
         launchProcess(pipeEnds[1]);  // sets _pid
 
@@ -692,7 +692,7 @@ void ProgramRunner::launchProcess(int child_stdout) {
 // returns true if process exited
 // If this function returns true, it will always call `registry.unregisterProgram(pid);`
 // If block is true, this will throw if it cannot wait for the processes to exit.
-bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = NULL) {
+bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = nullptr) {
 #ifdef _WIN32
     verify(registry.countHandleForPid(pid));
     HANDLE h = registry.getHandleForPid(pid);
@@ -1100,7 +1100,7 @@ std::vector<ProcessId> getRunningMongoChildProcessIds() {
 }
 
 MongoProgramScope::~MongoProgramScope() {
-    DESTRUCTOR_GUARD(KillMongoProgramInstances(); ClearRawMongoProgramOutput(BSONObj(), 0);)
+    DESTRUCTOR_GUARD(KillMongoProgramInstances(); ClearRawMongoProgramOutput(BSONObj(), nullptr);)
 }
 
 void installShellUtilsLauncher(Scope& scope) {

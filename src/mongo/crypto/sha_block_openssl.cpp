@@ -98,13 +98,13 @@ HashType computeHashImpl(const EVP_MD* md, std::initializer_list<ConstDataRange>
                                                                       EVP_MD_CTX_free);
 
     fassert(40379,
-            EVP_DigestInit_ex(digestCtx.get(), md, NULL) == 1 &&
+            EVP_DigestInit_ex(digestCtx.get(), md, nullptr) == 1 &&
                 std::all_of(begin(input),
                             end(input),
                             [&](const auto& i) {
                                 return EVP_DigestUpdate(digestCtx.get(), i.data(), i.length()) == 1;
                             }) &&
-                EVP_DigestFinal_ex(digestCtx.get(), output.data(), NULL) == 1);
+                EVP_DigestFinal_ex(digestCtx.get(), output.data(), nullptr) == 1);
     return output;
 }
 
@@ -117,7 +117,7 @@ void computeHmacImpl(const EVP_MD* md,
     std::unique_ptr<HMAC_CTX, decltype(&HMAC_CTX_free)> digestCtx(HMAC_CTX_new(), HMAC_CTX_free);
 
     fassert(40380,
-            HMAC_Init_ex(digestCtx.get(), key, keyLen, md, NULL) == 1 &&
+            HMAC_Init_ex(digestCtx.get(), key, keyLen, md, nullptr) == 1 &&
                 std::all_of(begin(input),
                             end(input),
                             [&](const auto& i) {
@@ -125,7 +125,7 @@ void computeHmacImpl(const EVP_MD* md,
                                                    reinterpret_cast<const unsigned char*>(i.data()),
                                                    i.length()) == 1;
                             }) &&
-                HMAC_Final(digestCtx.get(), output->data(), NULL) == 1);
+                HMAC_Final(digestCtx.get(), output->data(), nullptr) == 1);
 }
 
 }  // namespace

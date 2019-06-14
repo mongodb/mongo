@@ -290,7 +290,7 @@ std::string PlanEnumerator::dumpMemo() {
 }
 
 string PlanEnumerator::NodeAssignment::toString() const {
-    if (NULL != andAssignment) {
+    if (nullptr != andAssignment) {
         str::stream ss;
         ss << "AND enumstate counter " << andAssignment->counter;
         for (size_t i = 0; i < andAssignment->choices.size(); ++i) {
@@ -316,7 +316,7 @@ string PlanEnumerator::NodeAssignment::toString() const {
             }
         }
         return ss;
-    } else if (NULL != arrayAssignment) {
+    } else if (nullptr != arrayAssignment) {
         str::stream ss;
         ss << "ARRAY SUBNODES enumstate " << arrayAssignment->counter << "/ ONE OF: [ ";
         for (size_t i = 0; i < arrayAssignment->subnodes.size(); ++i) {
@@ -325,7 +325,7 @@ string PlanEnumerator::NodeAssignment::toString() const {
         ss << "]";
         return ss;
     } else {
-        verify(NULL != orAssignment);
+        verify(nullptr != orAssignment);
         str::stream ss;
         ss << "ALL OF: [ ";
         for (size_t i = 0; i < orAssignment->subnodes.size(); ++i) {
@@ -506,7 +506,7 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
 
         // There can only be one mandatory predicate (at most one $text, at most one
         // $geoNear, can't combine $text/$geoNear).
-        MatchExpression* mandatoryPred = NULL;
+        MatchExpression* mandatoryPred = nullptr;
 
         // There could be multiple indices which we could use to satisfy the mandatory
         // predicate. Keep the set of such indices. Currently only one text index is
@@ -528,7 +528,7 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
                 // This should include only TEXT and GEO_NEAR preds.
 
                 // We expect either 0 or 1 mandatory predicates.
-                invariant(NULL == mandatoryPred);
+                invariant(nullptr == mandatoryPred);
 
                 // Mandatory predicates are TEXT or GEO_NEAR.
                 invariant(MatchExpression::TEXT == child->matchType() ||
@@ -577,7 +577,7 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
             return true;
         }
 
-        if (NULL != mandatoryPred) {
+        if (nullptr != mandatoryPred) {
             // We must have at least one index which can be used to answer 'mandatoryPred'.
             invariant(!mandatoryIndices.empty());
             return enumerateMandatoryIndex(
@@ -1325,7 +1325,7 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
     // initializing the top-level scope with the prefix of the full path.
     for (size_t i = 0; i < assigned.size(); i++) {
         const MatchExpression* assignedPred = assigned[i];
-        invariant(NULL != assignedPred->getTag());
+        invariant(nullptr != assignedPred->getTag());
         RelevantTag* usedRt = static_cast<RelevantTag*>(assignedPred->getTag());
         set<string> usedPrefixes;
         usedPrefixes.insert(getPathPrefix(usedRt->path));
@@ -1336,7 +1336,7 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
         // the $elemMatch context. For example, if 'assigned' is {a: {$elemMatch: {b: 1}}},
         // then we will have already added "a" to the set for NULL. We now
         // also need to add "b" to the set for the $elemMatch.
-        if (NULL != usedRt->elemMatchExpr) {
+        if (nullptr != usedRt->elemMatchExpr) {
             set<string> elemMatchUsed;
             // Whereas getPathPrefix(usedRt->path) is the prefix of the full path,
             // usedRt->pathPrefix contains the prefix of the portion of the
@@ -1570,17 +1570,17 @@ void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,
 void PlanEnumerator::tagMemo(size_t id) {
     LOG(5) << "Tagging memoID " << id;
     NodeAssignment* assign = _memo[id];
-    verify(NULL != assign);
+    verify(nullptr != assign);
 
-    if (NULL != assign->orAssignment) {
+    if (nullptr != assign->orAssignment) {
         OrAssignment* oa = assign->orAssignment.get();
         for (size_t i = 0; i < oa->subnodes.size(); ++i) {
             tagMemo(oa->subnodes[i]);
         }
-    } else if (NULL != assign->arrayAssignment) {
+    } else if (nullptr != assign->arrayAssignment) {
         ArrayAssignment* aa = assign->arrayAssignment.get();
         tagMemo(aa->subnodes[aa->counter]);
-    } else if (NULL != assign->andAssignment) {
+    } else if (nullptr != assign->andAssignment) {
         AndAssignment* aa = assign->andAssignment.get();
         verify(aa->counter < aa->choices.size());
 
@@ -1622,9 +1622,9 @@ void PlanEnumerator::tagMemo(size_t id) {
 
 bool PlanEnumerator::nextMemo(size_t id) {
     NodeAssignment* assign = _memo[id];
-    verify(NULL != assign);
+    verify(nullptr != assign);
 
-    if (NULL != assign->orAssignment) {
+    if (nullptr != assign->orAssignment) {
         OrAssignment* oa = assign->orAssignment.get();
 
         // Limit the number of OR enumerations
@@ -1644,7 +1644,7 @@ bool PlanEnumerator::nextMemo(size_t id) {
         }
         // If we're here, the last subnode had a carry, therefore the OR has a carry.
         return true;
-    } else if (NULL != assign->arrayAssignment) {
+    } else if (nullptr != assign->arrayAssignment) {
         ArrayAssignment* aa = assign->arrayAssignment.get();
         // moving to next on current subnode is OK
         if (!nextMemo(aa->subnodes[aa->counter])) {
@@ -1657,7 +1657,7 @@ bool PlanEnumerator::nextMemo(size_t id) {
         }
         aa->counter = 0;
         return true;
-    } else if (NULL != assign->andAssignment) {
+    } else if (nullptr != assign->andAssignment) {
         AndAssignment* aa = assign->andAssignment.get();
 
         // One of our subnodes might have to move on to its next enumeration state.

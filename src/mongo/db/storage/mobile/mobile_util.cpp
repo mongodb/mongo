@@ -91,7 +91,7 @@ Status sqliteRCToStatus(int retCode, const char* prefix) {
 }
 
 const char* sqliteStatusToStr(int retStatus) {
-    const char* msg = NULL;
+    const char* msg = nullptr;
 
     switch (retStatus) {
         case SQLITE_OK:

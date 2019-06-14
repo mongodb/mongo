@@ -137,7 +137,7 @@ BENCHMARK_DEFINE_F(CacheLatencyTest, BM_CacheLatency)(benchmark::State& state) {
     size_t counter = arrLength / (kStrideBytes * 100) + 1;
 
     for (auto keepRunning : state) {
-        char** dummyResult = 0;  // Dummy result to prevent the loop from being optimized out.
+        char** dummyResult = nullptr;  // Dummy result to prevent the loop from being optimized out.
         char** ptrToNextLinkedListNode = reinterpret_cast<char**>(data.get()[0]);
 
         for (size_t i = 0; i < counter; ++i) {

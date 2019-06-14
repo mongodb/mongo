@@ -280,7 +280,7 @@ std::string SockAddr::getAddr() const {
         case AF_INET6: {
             const int buflen = 128;
             char buffer[buflen];
-            int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
+            int ret = getnameinfo(raw(), addressSize, buffer, buflen, nullptr, 0, NI_NUMERICHOST);
             massert(
                 13082, str::stream() << "getnameinfo error " << getAddrInfoStrError(ret), ret == 0);
             return buffer;

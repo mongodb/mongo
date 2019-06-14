@@ -1072,9 +1072,9 @@ class append {
 public:
     void run() {
         BSONObjBuilder b;
-        b.appendOID("a", 0);
-        b.appendOID("b", 0, false);
-        b.appendOID("c", 0, true);
+        b.appendOID("a", nullptr);
+        b.appendOID("b", nullptr, false);
+        b.appendOID("c", nullptr, true);
         BSONObj o = b.obj();
         ASSERT(o["a"].__oid().toString() == "000000000000000000000000");
         ASSERT(o["b"].__oid().toString() == "000000000000000000000000");
@@ -1086,7 +1086,7 @@ class increasing {
 public:
     BSONObj g() {
         BSONObjBuilder b;
-        b.appendOID("_id", 0, true);
+        b.appendOID("_id", nullptr, true);
         return b.obj();
     }
     void run() {
@@ -1869,7 +1869,7 @@ public:
                 state = 1;
             } catch (std::exception& e) {
                 state = 2;
-                ASSERT(strstr(e.what(), "_id: 5") != NULL);
+                ASSERT(strstr(e.what(), "_id: 5") != nullptr);
             }
             free(crap);
             ASSERT_EQUALS(2, state);

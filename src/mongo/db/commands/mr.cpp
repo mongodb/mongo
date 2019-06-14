@@ -266,7 +266,7 @@ void JSMapper::map(const BSONObj& o) {
 BSONObj JSFinalizer::finalize(const BSONObj& o) {
     Scope* s = _func.scope();
 
-    s->invokeSafe(_func.func(), &o, 0);
+    s->invokeSafe(_func.func(), &o, nullptr);
 
     // We don't want to use o.objsize() to size b since there are many cases where the point of
     // finalize is converting many fields to 1
@@ -371,7 +371,7 @@ void JSReducer::_reduce(const BSONList& tuples, BSONObj& key, int& endSizeEstima
 
     Scope* s = _func.scope();
 
-    s->invokeSafe(_func.func(), &args, 0);
+    s->invokeSafe(_func.func(), &args, nullptr);
     ++numReduces;
 
     if (s->type("__returnValue") == Array) {
@@ -669,7 +669,7 @@ void State::appendResults(BSONObjBuilder& final) {
             "  result.push({_id: key, value: map[key]});"
             "}"
             "return result;");
-        _scope->invoke(getResult, 0, 0, 0, false);
+        _scope->invoke(getResult, nullptr, nullptr, 0, false);
         BSONObj obj = _scope->getObject("__returnValue");
         final.append("results", BSONArray(obj));
         return;
@@ -832,7 +832,7 @@ void State::insert(const NamespaceString& nss, const BSONObj& o) {
         WriteUnitOfWork wuow(_opCtx);
         BSONObjBuilder b;
         if (!o.hasField("_id")) {
-            b.appendOID("_id", NULL, true);
+            b.appendOID("_id", nullptr, true);
         }
         b.appendElements(o);
         BSONObj bo = b.obj();
@@ -934,7 +934,7 @@ State::~State() {
         try {
             ScriptingFunction cleanup =
                 _scope->createFunction("delete _emitCt; delete _keyCt; delete _mrMap;");
-            _scope->invoke(cleanup, 0, 0, 0, true);
+            _scope->invoke(cleanup, nullptr, nullptr, 0, true);
         } catch (const DBException&) {
             // not important because properties will be reset if scope is reused
             LOG(1) << "MapReduce terminated during state destruction";
@@ -962,7 +962,7 @@ void State::init() {
     _config.reducer->init(this);
     if (_config.finalizer)
         _config.finalizer->init(this);
-    _scope->setBoolean("_doFinal", _config.finalizer.get() != 0);
+    _scope->setBoolean("_doFinal", _config.finalizer.get() != nullptr);
 
     switchMode(_config.jsMode);  // set up js-mode based on Config
 
@@ -979,7 +979,7 @@ void State::init() {
         "if (typeof(_mrMap) === 'undefined') {"
         "  _mrMap = {};"
         "}");
-    _scope->invoke(init, 0, 0, 0, true);
+    _scope->invoke(init, nullptr, nullptr, 0, true);
 
     // js function to run reduce on all keys
     // redfunc = _scope->createFunction("for (var key in hashmap) {  print('Key is ' + key);
@@ -1085,7 +1085,7 @@ void State::bailFromJS() {
 
     // reduce and reemit into c++
     switchMode(false);
-    _scope->invoke(_reduceAndEmit, 0, 0, 0, true);
+    _scope->invoke(_reduceAndEmit, nullptr, nullptr, 0, true);
     // need to get the real number emitted so far
     _numEmits = _scope->getNumberInt("_emitCt");
     _config.reducer->numReduces = _scope->getNumberInt("_redCt");
@@ -1128,10 +1128,10 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp) {
         // apply the reduce within JS
         if (_onDisk) {
             _scope->injectNative("_nativeToTemp", _nativeToTemp, this);
-            _scope->invoke(_reduceAndFinalizeAndInsert, 0, 0, 0, true);
+            _scope->invoke(_reduceAndFinalizeAndInsert, nullptr, nullptr, 0, true);
             return;
         } else {
-            _scope->invoke(_reduceAndFinalize, 0, 0, 0, true);
+            _scope->invoke(_reduceAndFinalize, nullptr, nullptr, 0, true);
             return;
         }
     }
@@ -1220,7 +1220,7 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp) {
         // iterate over all sorted objects
         BSONObj o;
         PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&o, NULL))) {
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&o, nullptr))) {
             o = o.getOwned();  // we will be accessing outside of the lock
             pm.hit();
 
@@ -1357,7 +1357,7 @@ void State::reduceAndSpillInMemoryStateIfNeeded() {
         } else if (dupCt > (keyCt * _config.reduceTriggerRatio)) {
             // reduce now to lower mem usage
             Timer t;
-            _scope->invoke(_reduceAll, 0, 0, 0, true);
+            _scope->invoke(_reduceAll, nullptr, nullptr, 0, true);
             LOG(3) << "  MR - did reduceAll: keys=" << keyCt << " dups=" << dupCt
                    << " newKeys=" << _scope->getNumberInt("_keyCt") << " time=" << t.millis()
                    << "ms";
@@ -1549,7 +1549,7 @@ public:
 
                 BSONObj o;
                 PlanExecutor::ExecState execState;
-                while (PlanExecutor::ADVANCED == (execState = exec->getNext(&o, NULL))) {
+                while (PlanExecutor::ADVANCED == (execState = exec->getNext(&o, nullptr))) {
                     o = o.getOwned();  // The object will be accessed outside of collection lock
 
                     // Check to see if this is a new object we don't own yet because of a chunk

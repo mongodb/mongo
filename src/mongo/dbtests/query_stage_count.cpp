@@ -57,7 +57,9 @@ const int kInterjections = kDocuments;
 class CountStageTest {
 public:
     CountStageTest()
-        : _dbLock(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X), _ctx(&_opCtx, ns()), _coll(NULL) {}
+        : _dbLock(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X),
+          _ctx(&_opCtx, ns()),
+          _coll(nullptr) {}
 
     virtual ~CountStageTest() {}
 
@@ -94,7 +96,7 @@ public:
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, _coll, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, _coll, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -129,7 +131,7 @@ public:
                               Snapshotted<BSONObj>(_opCtx.recoveryUnit()->getSnapshotId(), oldDoc),
                               newDoc,
                               true,
-                              NULL,
+                              nullptr,
                               &args);
         wunit.commit();
     }

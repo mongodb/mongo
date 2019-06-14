@@ -409,7 +409,7 @@ private:
 
     /// Used by MutableDocument(MutableValue)
     const RefCountable*& getDocPtr() {
-        if (_val.getType() != Object || _val._storage.genericRCPtr == NULL) {
+        if (_val.getType() != Object || _val._storage.genericRCPtr == nullptr) {
             // If the current value isn't an object we replace it with a Object-typed Value.
             // Note that we can't just use Document() here because that is a NULL pointer and
             // Value doesn't refcount NULL pointers. This led to a memory leak (SERVER-10554)
@@ -451,11 +451,11 @@ public:
      *
      *  TODO: find some way to convey field-name sizes to make even more efficient
      */
-    MutableDocument() : _storageHolder(NULL), _storage(_storageHolder) {}
+    MutableDocument() : _storageHolder(nullptr), _storage(_storageHolder) {}
     explicit MutableDocument(size_t expectedFields);
 
     /// No copy of data yet. Copy-on-write. See storage()
-    explicit MutableDocument(Document d) : _storageHolder(NULL), _storage(_storageHolder) {
+    explicit MutableDocument(Document d) : _storageHolder(nullptr), _storage(_storageHolder) {
         reset(std::move(d));
     }
 
@@ -589,7 +589,7 @@ public:
         Document ret;
         boost::intrusive_ptr<const DocumentStorage> temp(storagePtr(), /*inc_ref_count=*/false);
         temp.swap(ret._storage);
-        _storage = NULL;
+        _storage = nullptr;
         return ret;
     }
 
@@ -614,7 +614,7 @@ public:
 
 private:
     friend class MutableValue;  // for access to next constructor
-    explicit MutableDocument(MutableValue mv) : _storageHolder(NULL), _storage(mv.getDocPtr()) {}
+    explicit MutableDocument(MutableValue mv) : _storageHolder(nullptr), _storage(mv.getDocPtr()) {}
 
     void reset(boost::intrusive_ptr<const DocumentStorage> ds) {
         if (_storage)

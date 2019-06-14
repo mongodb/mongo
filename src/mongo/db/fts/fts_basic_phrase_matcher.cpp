@@ -43,7 +43,7 @@ bool BasicFTSPhraseMatcher::phraseMatches(const string& phrase,
         return haystack.find(phrase) != string::npos;
     }
 
-    return strcasestr(haystack.c_str(), phrase.c_str()) != NULL;
+    return strcasestr(haystack.c_str(), phrase.c_str()) != nullptr;
 }
 
 }  // namespace fts

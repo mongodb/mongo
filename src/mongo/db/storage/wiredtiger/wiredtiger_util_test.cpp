@@ -50,18 +50,18 @@ using std::stringstream;
 
 class WiredTigerConnection {
 public:
-    WiredTigerConnection(StringData dbpath, StringData extraStrings) : _conn(NULL) {
+    WiredTigerConnection(StringData dbpath, StringData extraStrings) : _conn(nullptr) {
         std::stringstream ss;
         ss << "create,";
         ss << extraStrings;
         string config = ss.str();
         _fastClockSource = std::make_unique<SystemClockSource>();
-        int ret = wiredtiger_open(dbpath.toString().c_str(), NULL, config.c_str(), &_conn);
+        int ret = wiredtiger_open(dbpath.toString().c_str(), nullptr, config.c_str(), &_conn);
         ASSERT_OK(wtRCToStatus(ret));
         ASSERT(_conn);
     }
     ~WiredTigerConnection() {
-        _conn->close(_conn, NULL);
+        _conn->close(_conn, nullptr);
     }
     WT_CONNECTION* getConnection() const {
         return _conn;
@@ -111,8 +111,8 @@ public:
     }
 
     virtual void tearDown() {
-        _opCtx.reset(NULL);
-        _harnessHelper.reset(NULL);
+        _opCtx.reset(nullptr);
+        _harnessHelper.reset(nullptr);
     }
 
 protected:
@@ -143,7 +143,7 @@ TEST_F(WiredTigerUtilMetadataTest, GetConfigurationStringInvalidURI) {
 }
 
 TEST_F(WiredTigerUtilMetadataTest, GetConfigurationStringNull) {
-    const char* config = NULL;
+    const char* config = nullptr;
     createSession(config);
     StatusWith<std::string> result = WiredTigerUtil::getMetadata(getOperationContext(), getURI());
     ASSERT_OK(result.getStatus());
@@ -166,7 +166,7 @@ TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataInvalidURI) {
 }
 
 TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataNull) {
-    const char* config = NULL;
+    const char* config = nullptr;
     createSession(config);
     StatusWith<BSONObj> result =
         WiredTigerUtil::getApplicationMetadata(getOperationContext(), getURI());
@@ -282,7 +282,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
                                         harnessHelper.getOplogManager());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
+    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr)));
     auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
                                                      "statistics:table:mytable",
                                                      "statistics=(fast)",
@@ -297,7 +297,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
                                         harnessHelper.getOplogManager());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
+    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr)));
     // Use connection statistics key which does not apply to a table.
     auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
                                                      "statistics:table:mytable",
@@ -313,7 +313,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueValidKey) {
                                         harnessHelper.getOplogManager());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
+    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr)));
     // Use connection statistics key which does not apply to a table.
     auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
                                                      "statistics:table:mytable",

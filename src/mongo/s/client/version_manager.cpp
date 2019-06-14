@@ -196,7 +196,7 @@ bool initShardVersionEmptyNS(OperationContext* opCtx, DBClientBase* conn_in) {
                             "",
                             Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString(),
                             ChunkVersion(),
-                            NULL,
+                            nullptr,
                             true,
                             result);
 

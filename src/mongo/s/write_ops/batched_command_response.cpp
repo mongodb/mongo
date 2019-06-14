@@ -66,7 +66,7 @@ BatchedCommandResponse::~BatchedCommandResponse() {
 
 bool BatchedCommandResponse::isValid(std::string* errMsg) const {
     std::string dummy;
-    if (errMsg == NULL) {
+    if (errMsg == nullptr) {
         errMsg = &dummy;
     }
 
@@ -195,7 +195,7 @@ bool BatchedCommandResponse::parseBSON(const BSONObj& source, string* errMsg) {
         _nModified = intNModified;
     }
 
-    std::vector<BatchedUpsertDetail*>* tempUpsertDetails = NULL;
+    std::vector<BatchedUpsertDetail*>* tempUpsertDetails = nullptr;
     fieldState = FieldParser::extract(source, upsertDetails, &tempUpsertDetails, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
         return false;
@@ -223,12 +223,12 @@ bool BatchedCommandResponse::parseBSON(const BSONObj& source, string* errMsg) {
         return false;
     _isElectionIdSet = fieldState == FieldParser::FIELD_SET;
 
-    std::vector<WriteErrorDetail*>* tempErrDetails = NULL;
+    std::vector<WriteErrorDetail*>* tempErrDetails = nullptr;
     fieldState = FieldParser::extract(source, writeErrors, &tempErrDetails, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
         return false;
     _writeErrorDetails.reset(tempErrDetails);
-    WriteConcernErrorDetail* wcError = NULL;
+    WriteConcernErrorDetail* wcError = nullptr;
     fieldState = FieldParser::extract(source, writeConcernError, &wcError, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
         return false;
@@ -347,14 +347,14 @@ void BatchedCommandResponse::setUpsertDetails(
 }
 
 void BatchedCommandResponse::addToUpsertDetails(BatchedUpsertDetail* upsertDetails) {
-    if (_upsertDetails.get() == NULL) {
+    if (_upsertDetails.get() == nullptr) {
         _upsertDetails.reset(new std::vector<BatchedUpsertDetail*>);
     }
     _upsertDetails->push_back(upsertDetails);
 }
 
 void BatchedCommandResponse::unsetUpsertDetails() {
-    if (_upsertDetails.get() != NULL) {
+    if (_upsertDetails.get() != nullptr) {
         for (std::vector<BatchedUpsertDetail*>::iterator it = _upsertDetails->begin();
              it != _upsertDetails->end();
              ++it) {
@@ -365,7 +365,7 @@ void BatchedCommandResponse::unsetUpsertDetails() {
 }
 
 bool BatchedCommandResponse::isUpsertDetailsSet() const {
-    return _upsertDetails.get() != NULL;
+    return _upsertDetails.get() != nullptr;
 }
 
 size_t BatchedCommandResponse::sizeUpsertDetails() const {
@@ -432,14 +432,14 @@ void BatchedCommandResponse::setErrDetails(const std::vector<WriteErrorDetail*>&
 }
 
 void BatchedCommandResponse::addToErrDetails(WriteErrorDetail* errDetails) {
-    if (_writeErrorDetails.get() == NULL) {
+    if (_writeErrorDetails.get() == nullptr) {
         _writeErrorDetails.reset(new std::vector<WriteErrorDetail*>);
     }
     _writeErrorDetails->push_back(errDetails);
 }
 
 void BatchedCommandResponse::unsetErrDetails() {
-    if (_writeErrorDetails.get() != NULL) {
+    if (_writeErrorDetails.get() != nullptr) {
         for (std::vector<WriteErrorDetail*>::iterator it = _writeErrorDetails->begin();
              it != _writeErrorDetails->end();
              ++it) {
@@ -450,7 +450,7 @@ void BatchedCommandResponse::unsetErrDetails() {
 }
 
 bool BatchedCommandResponse::isErrDetailsSet() const {
-    return _writeErrorDetails.get() != NULL;
+    return _writeErrorDetails.get() != nullptr;
 }
 
 size_t BatchedCommandResponse::sizeErrDetails() const {

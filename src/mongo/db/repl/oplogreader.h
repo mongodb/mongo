@@ -73,7 +73,7 @@ public:
         return _conn.get();
     }
     BSONObj findOne(const char* ns, const Query& q) {
-        return conn()->findOne(ns, q, 0, QueryOption_SlaveOk);
+        return conn()->findOne(ns, q, nullptr, QueryOption_SlaveOk);
     }
     BSONObj findOneByUUID(const std::string& db, UUID uuid, const BSONObj& filter) {
         // Note that the findOneByUUID() function of DBClient passes SlaveOK to the client.
@@ -91,7 +91,7 @@ public:
     void tailCheck();
 
     bool haveCursor() {
-        return cursor.get() != 0;
+        return cursor.get() != nullptr;
     }
 
     void tailingQuery(const char* ns, const BSONObj& query);

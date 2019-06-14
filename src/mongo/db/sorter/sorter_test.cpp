@@ -516,7 +516,7 @@ class Dupes : public Basic {
 template <bool Random = true>
 class LotsOfDataLittleMemory : public Basic {
 public:
-    LotsOfDataLittleMemory() : _array(new int[NUM_ITEMS]), _random(int64_t(time(0))) {
+    LotsOfDataLittleMemory() : _array(new int[NUM_ITEMS]), _random(int64_t(time(nullptr))) {
         for (int i = 0; i < NUM_ITEMS; i++)
             _array[i] = i;
 

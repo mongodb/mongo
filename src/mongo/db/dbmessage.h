@@ -241,7 +241,7 @@ public:
 
     /* for insert and update msgs */
     bool moreJSObjs() const {
-        return _nextjsobj != 0 && _nextjsobj != _theEnd;
+        return _nextjsobj != nullptr && _nextjsobj != _theEnd;
     }
 
     BSONObj nextJsObj();

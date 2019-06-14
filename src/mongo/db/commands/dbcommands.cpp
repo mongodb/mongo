@@ -484,7 +484,7 @@ public:
                                                                          keyPattern,
                                                                          true);  // requireSingleKey
 
-            if (idx == NULL) {
+            if (idx == nullptr) {
                 errmsg = "couldn't find valid index containing key pattern";
                 return false;
             }

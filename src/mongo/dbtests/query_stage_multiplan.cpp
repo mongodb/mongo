@@ -267,7 +267,7 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
     int results = 0;
     BSONObj obj;
     PlanExecutor::ExecState state;
-    while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+    while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
         ASSERT_EQUALS(obj["foo"].numberInt(), 7);
         ++results;
     }
@@ -378,7 +378,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
     verify(statusWithCQ.isOK());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-    ASSERT(NULL != cq.get());
+    ASSERT(nullptr != cq.get());
 
     // Force index intersection.
     bool forceIxisectOldValue = internalQueryForceIntersectionPlans.load();

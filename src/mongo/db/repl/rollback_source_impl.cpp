@@ -67,11 +67,13 @@ int RollbackSourceImpl::getRollbackId() const {
 
 BSONObj RollbackSourceImpl::getLastOperation() const {
     const Query query = Query().sort(BSON("$natural" << -1));
-    return _getConnection()->findOne(_collectionName, query, 0, QueryOption_SlaveOk);
+    return _getConnection()->findOne(_collectionName, query, nullptr, QueryOption_SlaveOk);
 }
 
 BSONObj RollbackSourceImpl::findOne(const NamespaceString& nss, const BSONObj& filter) const {
-    return _getConnection()->findOne(nss.toString(), filter, NULL, QueryOption_SlaveOk).getOwned();
+    return _getConnection()
+        ->findOne(nss.toString(), filter, nullptr, QueryOption_SlaveOk)
+        .getOwned();
 }
 
 std::pair<BSONObj, NamespaceString> RollbackSourceImpl::findOneByUUID(const std::string& db,

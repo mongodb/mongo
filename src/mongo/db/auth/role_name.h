@@ -134,7 +134,7 @@ public:
         Impl(){};
         virtual ~Impl(){};
         static Impl* clone(Impl* orig) {
-            return orig ? orig->doClone() : NULL;
+            return orig ? orig->doClone() : nullptr;
         }
         virtual bool more() const = 0;
         virtual const RoleName& get() const = 0;

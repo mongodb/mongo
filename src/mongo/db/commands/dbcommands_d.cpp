@@ -265,7 +265,7 @@ public:
 
             BSONObj obj;
             PlanExecutor::ExecState state;
-            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
                 BSONElement ne = obj["n"];
                 verify(ne.isNumber());
                 int myn = ne.numberInt();

@@ -742,7 +742,7 @@ const MemberConfig* ReplSetConfig::findMemberByID(int id) const {
             return &(*it);
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
@@ -770,7 +770,7 @@ int ReplSetConfig::findMemberIndexByConfigId(long long configId) const {
 
 const MemberConfig* ReplSetConfig::findMemberByHostAndPort(const HostAndPort& hap) const {
     int idx = findMemberIndexByHostAndPort(hap);
-    return idx != -1 ? &getMemberAt(idx) : NULL;
+    return idx != -1 ? &getMemberAt(idx) : nullptr;
 }
 
 Milliseconds ReplSetConfig::getHeartbeatInterval() const {

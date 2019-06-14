@@ -68,7 +68,7 @@ class BSONObjBuilder {
 public:
     /** @param initsize this is just a hint as to the final size of the object */
     BSONObjBuilder(int initsize = 512)
-        : _b(_buf), _buf(initsize), _offset(0), _s(this), _tracker(0), _doneCalled(false) {
+        : _b(_buf), _buf(initsize), _offset(0), _s(this), _tracker(nullptr), _doneCalled(false) {
         // Skip over space for the object length. The length is filled in by _done.
         _b.skip(sizeof(int));
 
@@ -85,7 +85,7 @@ public:
           _buf(0),
           _offset(baseBuilder.len()),
           _s(this),
-          _tracker(0),
+          _tracker(nullptr),
           _doneCalled(false) {
         // Skip over space for the object length, which is filled in by _done. We don't need a
         // holder since we are a sub-builder, and some parent builder has already made the
@@ -135,7 +135,7 @@ public:
      * into this constructor where possible.
      */
     BSONObjBuilder(BSONObj prefix)
-        : _b(_buf), _buf(0), _offset(0), _s(this), _tracker(0), _doneCalled(false) {
+        : _b(_buf), _buf(0), _offset(0), _s(this), _tracker(nullptr), _doneCalled(false) {
         // If prefix wasn't owned or we don't have exclusive access to it, we must copy.
         if (!prefix.isOwned() || prefix.sharedBuffer().isShared()) {
             _b.grow(prefix.objsize());  // Make sure we won't need to realloc().
@@ -386,7 +386,9 @@ public:
         @deprecated Generally, it is preferred to use the append append(name, oid)
         method for this.
     */
-    BSONObjBuilder& appendOID(StringData fieldName, OID* oid = 0, bool generateIfBlank = false) {
+    BSONObjBuilder& appendOID(StringData fieldName,
+                              OID* oid = nullptr,
+                              bool generateIfBlank = false) {
         _b.appendNum((char)jstOID);
         _b.appendStr(fieldName);
         if (oid)

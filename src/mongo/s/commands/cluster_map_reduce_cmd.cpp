@@ -70,7 +70,7 @@ const Milliseconds kNoDistLockTimeout(-1);
  * Generates a unique name for the temporary M/R output collection.
  */
 std::string getTmpName(StringData coll) {
-    return str::stream() << "tmp.mrs." << coll << "_" << time(0) << "_"
+    return str::stream() << "tmp.mrs." << coll << "_" << time(nullptr) << "_"
                          << JOB_NUMBER.fetchAndAdd(1);
 }
 

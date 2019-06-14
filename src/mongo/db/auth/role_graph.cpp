@@ -132,19 +132,19 @@ Status RoleGraph::deleteRole(const RoleName& role) {
 
 RoleNameIterator RoleGraph::getDirectSubordinates(const RoleName& role) {
     if (!roleExists(role))
-        return RoleNameIterator(NULL);
+        return RoleNameIterator(nullptr);
     return makeRoleNameIteratorForContainer(_roleToSubordinates[role]);
 }
 
 RoleNameIterator RoleGraph::getIndirectSubordinates(const RoleName& role) {
     if (!roleExists(role))
-        return RoleNameIterator(NULL);
+        return RoleNameIterator(nullptr);
     return makeRoleNameIteratorForContainer(_roleToIndirectSubordinates[role]);
 }
 
 RoleNameIterator RoleGraph::getDirectMembers(const RoleName& role) {
     if (!roleExists(role))
-        return RoleNameIterator(NULL);
+        return RoleNameIterator(nullptr);
     return makeRoleNameIteratorForContainer(_roleToMembers[role]);
 }
 

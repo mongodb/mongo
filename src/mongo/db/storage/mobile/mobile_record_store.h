@@ -113,7 +113,7 @@ public:
     Status touch(OperationContext* opCtx, BSONObjBuilder* output) const override;
 
     int64_t storageSize(OperationContext* opCtx,
-                        BSONObjBuilder* extraInfo = NULL,
+                        BSONObjBuilder* extraInfo = nullptr,
                         int infoLevel = 0) const override;
 
     long long dataSize(OperationContext* opCtx) const override;

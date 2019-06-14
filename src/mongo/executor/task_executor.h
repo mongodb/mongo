@@ -448,7 +448,7 @@ struct TaskExecutor::CallbackArgs {
     CallbackArgs(TaskExecutor* theExecutor,
                  CallbackHandle theHandle,
                  Status theStatus,
-                 OperationContext* opCtx = NULL);
+                 OperationContext* opCtx = nullptr);
 
     TaskExecutor* executor;
     CallbackHandle myHandle;

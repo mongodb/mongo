@@ -147,7 +147,7 @@ struct QuerySolutionNode {
         for (size_t i = 0; i < this->children.size(); i++) {
             other->children.push_back(this->children[i]->clone());
         }
-        if (NULL != this->filter) {
+        if (nullptr != this->filter) {
             other->filter = this->filter->shallowClone();
         }
     }
@@ -229,7 +229,7 @@ struct QuerySolution {
      * Output a human-readable std::string representing the plan.
      */
     std::string toString() {
-        if (NULL == root) {
+        if (nullptr == root) {
             return "empty query solution";
         }
 

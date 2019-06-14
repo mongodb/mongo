@@ -882,7 +882,7 @@ public:
         audit::logCreateUser(Client::getCurrent(),
                              args.userName,
                              args.hasPassword,
-                             args.hasCustomData ? &args.customData : NULL,
+                             args.hasCustomData ? &args.customData : nullptr,
                              args.roles,
                              args.authenticationRestrictions);
         status = insertPrivilegeDocument(opCtx, userObj);
@@ -1003,8 +1003,8 @@ public:
         audit::logUpdateUser(Client::getCurrent(),
                              args.userName,
                              args.hasPassword,
-                             args.hasCustomData ? &args.customData : NULL,
-                             args.hasRoles ? &args.roles : NULL,
+                             args.hasCustomData ? &args.customData : nullptr,
+                             args.hasRoles ? &args.roles : nullptr,
                              args.authenticationRestrictions);
 
         status = updatePrivilegeDocument(
@@ -2437,14 +2437,14 @@ public:
             audit::logCreateUser(Client::getCurrent(),
                                  userName,
                                  hasPwd,
-                                 userObj.hasField("customData") ? &customData : NULL,
+                                 userObj.hasField("customData") ? &customData : nullptr,
                                  roles,
                                  authenticationRestrictions);
         } else {
             audit::logUpdateUser(Client::getCurrent(),
                                  userName,
                                  hasPwd,
-                                 userObj.hasField("customData") ? &customData : NULL,
+                                 userObj.hasField("customData") ? &customData : nullptr,
                                  &roles,
                                  authenticationRestrictions);
         }

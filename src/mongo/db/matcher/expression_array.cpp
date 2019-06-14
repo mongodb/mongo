@@ -77,7 +77,7 @@ bool ElemMatchObjectMatchExpression::matchesArray(const BSONObj& anArray,
         BSONElement inner = i.next();
         if (!inner.isABSONObj())
             continue;
-        if (_sub->matchesBSON(inner.Obj(), NULL)) {
+        if (_sub->matchesBSON(inner.Obj(), nullptr)) {
             if (details && details->needRecord()) {
                 details->setElemMatchKey(inner.fieldName());
             }
@@ -92,7 +92,7 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int inden
     debug << path() << " $elemMatch (obj)";
 
     MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
+    if (nullptr != td) {
         debug << " ";
         td->debugString(&debug);
     }
@@ -165,7 +165,7 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indent
     debug << path() << " $elemMatch (value)";
 
     MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
+    if (nullptr != td) {
         debug << " ";
         td->debugString(&debug);
     }
@@ -218,7 +218,7 @@ void SizeMatchExpression::debugString(StringBuilder& debug, int indentationLevel
     debug << path() << " $size : " << _size << "\n";
 
     MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
+    if (nullptr != td) {
         debug << " ";
         td->debugString(&debug);
     }

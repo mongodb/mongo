@@ -75,7 +75,7 @@ OplogReader::OplogReader() {
 }
 
 bool OplogReader::connect(const HostAndPort& host) {
-    if (conn() == NULL || _host != host) {
+    if (conn() == nullptr || _host != host) {
         resetConnection();
         _conn = std::shared_ptr<DBClientConnection>(
             new DBClientConnection(false, durationCount<Seconds>(kSocketTimeout)));

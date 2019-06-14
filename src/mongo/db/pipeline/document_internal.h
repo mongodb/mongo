@@ -184,8 +184,8 @@ private:
 class DocumentStorage : public RefCountable {
 public:
     DocumentStorage()
-        : _buffer(NULL),
-          _bufferEnd(NULL),
+        : _buffer(nullptr),
+          _bufferEnd(nullptr),
           _usedBytes(0),
           _numFields(0),
           _hashTabMask(0),

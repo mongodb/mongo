@@ -1409,7 +1409,7 @@ void TopologyCoordinator::setCurrentPrimary_forTest(int primaryIndex,
 
 const MemberConfig* TopologyCoordinator::_currentPrimaryMember() const {
     if (_currentPrimaryIndex == -1)
-        return NULL;
+        return nullptr;
 
     return &(_rsConfig.getMemberAt(_currentPrimaryIndex));
 }

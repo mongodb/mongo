@@ -117,12 +117,12 @@ void assertEmpty(OperationContext* opCtx, const NamespaceString& nss) {
 bool indexExists(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
-    return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, true) != NULL;
+    return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, true) != nullptr;
 }
 bool indexReady(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
-    return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, false) != NULL;
+    return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, false) != nullptr;
 }
 size_t getNumIndexEntries(OperationContext* opCtx,
                           const NamespaceString& nss,

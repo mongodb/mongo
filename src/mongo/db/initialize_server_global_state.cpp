@@ -177,21 +177,21 @@ static bool forkServer() {
         // this is run in the final child process (the server)
 
         FILE* f = freopen("/dev/null", "w", stdout);
-        if (f == NULL) {
+        if (f == nullptr) {
             cout << "Cant reassign stdout while forking server process: " << strerror(errno)
                  << endl;
             return false;
         }
 
         f = freopen("/dev/null", "w", stderr);
-        if (f == NULL) {
+        if (f == nullptr) {
             cout << "Cant reassign stderr while forking server process: " << strerror(errno)
                  << endl;
             return false;
         }
 
         f = freopen("/dev/null", "r", stdin);
-        if (f == NULL) {
+        if (f == nullptr) {
             cout << "Cant reassign stdin while forking server process: " << strerror(errno) << endl;
             return false;
         }

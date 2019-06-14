@@ -212,7 +212,7 @@ void logStartup(OperationContext* opCtx) {
     toLog.append("_id", id.str());
     toLog.append("hostname", getHostNameCached());
 
-    toLog.appendTimeT("startTime", time(0));
+    toLog.appendTimeT("startTime", time(nullptr));
     toLog.append("startTimeLocal", dateToCtimeString(Date_t::now()));
 
     toLog.append("cmdLine", serverGlobalParams.parsedOpts);

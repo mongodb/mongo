@@ -199,7 +199,7 @@ public:
 
             for (long long objCount = 0; objCount < batchSize; objCount++) {
                 BSONObj next;
-                PlanExecutor::ExecState state = exec->getNext(&next, NULL);
+                PlanExecutor::ExecState state = exec->getNext(&next, nullptr);
                 if (state == PlanExecutor::IS_EOF) {
                     break;
                 }

@@ -50,7 +50,7 @@ using std::string;
 using std::vector;
 
 DocumentSource::DocumentSource(const intrusive_ptr<ExpressionContext>& pCtx)
-    : pSource(NULL), pExpCtx(pCtx) {}
+    : pSource(nullptr), pExpCtx(pCtx) {}
 
 namespace {
 // Used to keep track of which DocumentSources are registered under which name.

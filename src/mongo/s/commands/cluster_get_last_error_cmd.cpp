@@ -277,7 +277,7 @@ public:
         BSONArrayBuilder errorRawGLE;
 
         int numWCErrors = 0;
-        const LegacyWCResponse* lastErrResponse = NULL;
+        const LegacyWCResponse* lastErrResponse = nullptr;
 
         for (std::vector<LegacyWCResponse>::const_iterator it = wcResponses.begin();
              it != wcResponses.end();

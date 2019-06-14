@@ -557,7 +557,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             const CapWithCRS* cap = gc.getCapGeometryHack();
 
             // 2d indices can answer centerSphere queries.
-            if (NULL == cap) {
+            if (nullptr == cap) {
                 return false;
             }
 
@@ -666,7 +666,7 @@ void QueryPlannerIXSelect::_rateIndices(MatchExpression* node,
             fullPath = prefix + node->path().toString();
         }
 
-        verify(NULL == node->getTag());
+        verify(nullptr == node->getTag());
         node->setTag(new RelevantTag());
         auto rt = static_cast<RelevantTag*>(node->getTag());
         rt->path = fullPath;
@@ -995,7 +995,7 @@ static void stripInvalidAssignmentsToTextIndex(MatchExpression* node,
         MatchExpression* child = node->getChild(i);
         RelevantTag* tag = static_cast<RelevantTag*>(child->getTag());
 
-        if (NULL == tag) {
+        if (nullptr == tag) {
             // 'child' could be a logical operator.  Maybe there are some assignments hiding
             // inside.
             stripInvalidAssignmentsToTextIndex(child, idx, prefixPaths);

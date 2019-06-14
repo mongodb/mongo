@@ -346,7 +346,7 @@ void KeyString::_appendAllElementsForIndexing(const BSONObj& obj,
         const int elemIdx = elemCount++;
         const bool invert = (ord.get(elemIdx) == -1);
 
-        _appendBsonValue(elem, invert, NULL);
+        _appendBsonValue(elem, invert, nullptr);
 
         dassert(elem.fieldNameSize() < 3);  // fieldNameSize includes the NUL
 
@@ -517,7 +517,7 @@ void KeyString::_appendArray(const BSONArray& val, bool invert) {
     _append(CType::kArray, invert);
     BSONForEach(elem, val) {
         // No generic ctype byte needed here since no name is encoded.
-        _appendBsonValue(elem, invert, NULL);
+        _appendBsonValue(elem, invert, nullptr);
     }
     _append(int8_t(0), invert);
 }

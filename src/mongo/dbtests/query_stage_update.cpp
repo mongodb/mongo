@@ -131,7 +131,8 @@ public:
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, collection, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(
+            new CollectionScan(&_opCtx, collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -152,7 +153,8 @@ public:
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, collection, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(
+            new CollectionScan(&_opCtx, collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);

@@ -85,102 +85,102 @@ public:
     static FieldState extract(BSONObj doc,
                               const BSONField<bool>& field,
                               bool* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONElement elem,
                               const BSONField<bool>& field,
                               bool* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONObj doc,
                               const BSONField<BSONArray>& field,
                               BSONArray* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONElement elem,
                               const BSONField<BSONArray>& field,
                               BSONArray* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONObj doc,
                               const BSONField<BSONObj>& field,
                               BSONObj* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONElement elem,
                               const BSONField<BSONObj>& field,
                               BSONObj* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONObj doc,
                               const BSONField<Date_t>& field,
                               Date_t* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONElement elem,
                               const BSONField<Date_t>& field,
                               Date_t* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONObj doc,
                               const BSONField<Timestamp>& field,
                               Timestamp* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONElement elem,
                               const BSONField<Timestamp>& field,
                               Timestamp* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONObj doc,
                               const BSONField<std::string>& field,
                               std::string* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONElement elem,
                               const BSONField<std::string>& field,
                               std::string* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONObj doc,
                               const BSONField<OID>& field,
                               OID* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONElement elem,
                               const BSONField<OID>& field,
                               OID* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONObj doc,
                               const BSONField<int>& field,
                               int* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONElement elem,
                               const BSONField<int>& field,
                               int* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONObj doc,
                               const BSONField<long long>& field,
                               long long* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONElement elem,
                               const BSONField<long long>& field,
                               long long* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONElement elem,
                               const BSONField<double>& field,
                               double* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     static FieldState extract(BSONObj doc,
                               const BSONField<double>& field,
                               double* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     /**
      * The following extractNumber methods do implicit conversion between any numeric type and
@@ -190,32 +190,32 @@ public:
     static FieldState extractNumber(BSONObj doc,
                                     const BSONField<int>& field,
                                     int* out,
-                                    std::string* errMsg = NULL);
+                                    std::string* errMsg = nullptr);
 
     static FieldState extractNumber(BSONElement elem,
                                     const BSONField<int>& field,
                                     int* out,
-                                    std::string* errMsg = NULL);
+                                    std::string* errMsg = nullptr);
 
     static FieldState extractNumber(BSONObj doc,
                                     const BSONField<long long>& field,
                                     long long* out,
-                                    std::string* errMsg = NULL);
+                                    std::string* errMsg = nullptr);
 
     static FieldState extractNumber(BSONElement elem,
                                     const BSONField<long long>& field,
                                     long long* out,
-                                    std::string* errMsg = NULL);
+                                    std::string* errMsg = nullptr);
 
     static FieldState extractNumber(BSONObj doc,
                                     const BSONField<double>& field,
                                     double* out,
-                                    std::string* errMsg = NULL);
+                                    std::string* errMsg = nullptr);
 
     static FieldState extractNumber(BSONElement elem,
                                     const BSONField<double>& field,
                                     double* out,
-                                    std::string* errMsg = NULL);
+                                    std::string* errMsg = nullptr);
 
     /**
      * Extracts a document id from a particular field name, which may be of any type but Array.
@@ -224,12 +224,12 @@ public:
     static FieldState extractID(BSONObj doc,
                                 const BSONField<BSONObj>& field,
                                 BSONObj* out,
-                                std::string* errMsg = NULL);
+                                std::string* errMsg = nullptr);
 
     static FieldState extractID(BSONElement elem,
                                 const BSONField<BSONObj>& field,
                                 BSONObj* out,
-                                std::string* errMsg = NULL);
+                                std::string* errMsg = nullptr);
 
     // TODO: BSONElement extraction of types below
 
@@ -242,7 +242,7 @@ public:
     static FieldState extract(BSONObj doc,
                               const BSONField<T>& field,
                               T* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     /**
      * Similar to the mandatory 'extract' but on a optional field. The '*out' value would only be
@@ -253,13 +253,13 @@ public:
     static FieldState extract(BSONObj doc,
                               const BSONField<T*>& field,
                               T** out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     template <typename T>
     static FieldState extract(BSONObj doc,
                               const BSONField<T>& field,
                               T** out,  // alloc variation
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     /**
      * Extracts a mandatory repetition of 'field', from the object 'doc'. Writes the extracted
@@ -272,7 +272,7 @@ public:
     static FieldState extract(BSONObj doc,
                               const BSONField<std::vector<T*>>& field,
                               std::vector<T*>* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     /**
      * Extracts a mandatory repetition of 'field', from the field 'elem'. Writes the extracted
@@ -285,7 +285,7 @@ public:
     static FieldState extract(BSONElement elem,
                               const BSONField<std::vector<T*>>& field,
                               std::vector<T*>* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     /**
      * Similar to the mandatory repetition' extract but on an optional field. The '*out' value would
@@ -298,7 +298,7 @@ public:
     static FieldState extract(BSONObj doc,
                               const BSONField<std::vector<T*>>& field,
                               std::vector<T*>** out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     //
     // ==================== Below DEPRECATED; use types instead ====================
@@ -317,25 +317,25 @@ public:
     static FieldState extract(BSONObj doc,
                               const BSONField<std::vector<T>>& field,
                               std::vector<T>* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     template <typename T>
     static FieldState extract(BSONElement elem,
                               const BSONField<std::vector<T>>& field,
                               std::vector<T>* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     template <typename K, typename T>
     static FieldState extract(BSONObj doc,
                               const BSONField<std::map<K, T>>& field,
                               std::map<K, T>* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 
     template <typename K, typename T>
     static FieldState extract(BSONElement elem,
                               const BSONField<std::map<K, T>>& field,
                               std::map<K, T>* out,
-                              std::string* errMsg = NULL);
+                              std::string* errMsg = nullptr);
 };
 
 template <typename T>

@@ -286,7 +286,7 @@ public:
      * @return total estimate size (in bytes) on stable storage
      */
     virtual int64_t storageSize(OperationContext* opCtx,
-                                BSONObjBuilder* extraInfo = NULL,
+                                BSONObjBuilder* extraInfo = nullptr,
                                 int infoLevel = 0) const = 0;
 
     // CRUD related

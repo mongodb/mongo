@@ -190,7 +190,7 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
     invariant(compositeCacheData);
 
     // We want a well-formed *indexed* solution.
-    if (NULL == branchCacheData) {
+    if (nullptr == branchCacheData) {
         // For example, we don't cache things for 2d indices.
         str::stream ss;
         ss << "No cache data for subchild " << orChild->debugString();
@@ -298,7 +298,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
             // Check that we have good cache data. For example, we don't cache things
             // for 2d indices.
-            if (NULL == bestSoln->cacheData.get()) {
+            if (nullptr == bestSoln->cacheData.get()) {
                 str::stream ss;
                 ss << "No cache data for subchild " << orChild->debugString();
                 return Status(ErrorCodes::BadValue, ss);
@@ -343,7 +343,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
     _compositeSolution =
         QueryPlannerAnalysis::analyzeDataAccess(*_query, _plannerParams, std::move(solnRoot));
 
-    if (NULL == _compositeSolution.get()) {
+    if (nullptr == _compositeSolution.get()) {
         str::stream ss;
         ss << "Failed to analyze subplanned query";
         return Status(ErrorCodes::BadValue, ss);
@@ -487,11 +487,11 @@ unique_ptr<PlanStageStats> SubplanStage::getStats() {
 }
 
 bool SubplanStage::branchPlannedFromCache(size_t i) const {
-    return NULL != _branchResults[i]->cachedSolution.get();
+    return nullptr != _branchResults[i]->cachedSolution.get();
 }
 
 const SpecificStats* SubplanStage::getSpecificStats() const {
-    return NULL;
+    return nullptr;
 }
 
 }  // namespace mongo

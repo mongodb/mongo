@@ -142,7 +142,7 @@ struct Cloner::Fun {
         auto db = databaseHolder->openDb(opCtx, _dbName);
 
         bool createdCollection = false;
-        Collection* collection = NULL;
+        Collection* collection = nullptr;
 
         collection = db->getCollection(opCtx, to_collection);
         if (!collection) {
@@ -177,7 +177,7 @@ struct Cloner::Fun {
 
         while (i.moreInCurrentBatch()) {
             if (numSeen % 128 == 127) {
-                time_t now = time(0);
+                time_t now = time(nullptr);
                 if (now - lastLog >= 60) {
                     // report progress
                     if (lastLog)
@@ -205,13 +205,13 @@ struct Cloner::Fun {
                 db = databaseHolder->getDb(opCtx, _dbName);
                 uassert(28593,
                         str::stream() << "Database " << _dbName << " dropped while cloning",
-                        db != NULL);
+                        db != nullptr);
 
                 collection = db->getCollection(opCtx, to_collection);
                 uassert(28594,
                         str::stream() << "Collection " << to_collection.ns()
                                       << " dropped while cloning",
-                        collection != NULL);
+                        collection != nullptr);
             }
 
             BSONObj tmp = i.nextSafe();
@@ -271,9 +271,9 @@ struct Cloner::Fun {
             });
 
             static Rarely sampler;
-            if (sampler.tick() && (time(0) - saveLast > 60)) {
+            if (sampler.tick() && (time(nullptr) - saveLast > 60)) {
                 log() << numSeen << " objects cloned so far from collection " << from_collection;
-                saveLast = time(0);
+                saveLast = time(nullptr);
             }
         }
     }
@@ -310,7 +310,7 @@ void Cloner::copy(OperationContext* opCtx,
     f.from_options = from_opts;
     f.from_id_index = from_id_index;
     f.to_collection = to_collection;
-    f.saveLast = time(0);
+    f.saveLast = time(nullptr);
     f._opts = opts;
 
     int options = QueryOption_NoCursorTimeout | (opts.slaveOk ? QueryOption_SlaveOk : 0) |
@@ -320,7 +320,7 @@ void Cloner::copy(OperationContext* opCtx,
         _conn->query(std::function<void(DBClientCursorBatchIterator&)>(f),
                      from_collection,
                      query,
-                     0,
+                     nullptr,
                      options);
     }
 

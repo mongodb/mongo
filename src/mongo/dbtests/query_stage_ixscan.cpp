@@ -47,7 +47,9 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 class IndexScanTest {
 public:
     IndexScanTest()
-        : _dbLock(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X), _ctx(&_opCtx, ns()), _coll(NULL) {}
+        : _dbLock(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X),
+          _ctx(&_opCtx, ns()),
+          _coll(nullptr) {}
 
     virtual ~IndexScanTest() {}
 
@@ -109,7 +111,7 @@ public:
         params.direction = 1;
 
         // This child stage gets owned and freed by the caller.
-        MatchExpression* filter = NULL;
+        MatchExpression* filter = nullptr;
         return new IndexScan(&_opCtx, params, &_ws, filter);
     }
 
@@ -133,7 +135,7 @@ public:
         oil.intervals.push_back(Interval(bob.obj(), startInclusive, endInclusive));
         params.bounds.fields.push_back(oil);
 
-        MatchExpression* filter = NULL;
+        MatchExpression* filter = nullptr;
         return new IndexScan(&_opCtx, params, &_ws, filter);
     }
 

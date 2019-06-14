@@ -669,7 +669,7 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     // In general we should have a canonical query, but sometimes we may avoid
     // creating a canonical query as an optimization (specifically, the update system
     // does not canonicalize for idhack updates). In these cases, 'query' is NULL.
-    if (NULL != query) {
+    if (nullptr != query) {
         BSONObjBuilder parsedQueryBob(plannerBob.subobjStart("parsedQuery"));
         query->root()->serialize(&parsedQueryBob);
         parsedQueryBob.doneFast();
@@ -938,7 +938,7 @@ std::string Explain::getPlanSummary(const PlanStage* root) {
 
 // static
 void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsOut) {
-    invariant(NULL != statsOut);
+    invariant(nullptr != statsOut);
 
     PlanStage* root = exec.getRootStage();
 

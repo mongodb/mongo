@@ -66,7 +66,7 @@ bool isPositionalElement(const StringData& field) {
 bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count) {
     // 'count' is optional.
     size_t dummy;
-    if (count == NULL) {
+    if (count == nullptr) {
         count = &dummy;
     }
 

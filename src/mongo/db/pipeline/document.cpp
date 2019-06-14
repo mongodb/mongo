@@ -379,7 +379,7 @@ Document Document::fromBsonWithMetaData(const BSONObj& bson) {
 }
 
 MutableDocument::MutableDocument(size_t expectedFields)
-    : _storageHolder(NULL), _storage(_storageHolder) {
+    : _storageHolder(nullptr), _storage(_storageHolder) {
     if (expectedFields) {
         storage().reserveFields(expectedFields);
     }

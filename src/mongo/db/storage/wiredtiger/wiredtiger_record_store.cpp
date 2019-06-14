@@ -1502,7 +1502,7 @@ Status WiredTigerRecordStore::truncate(OperationContext* opCtx) {
     invariantWTOK(ret);
 
     WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
-    invariantWTOK(WT_OP_CHECK(session->truncate(session, NULL, start, NULL, NULL)));
+    invariantWTOK(WT_OP_CHECK(session->truncate(session, nullptr, start, nullptr, nullptr)));
     _changeNumRecords(opCtx, -numRecords(opCtx));
     _increaseDataSize(opCtx, -dataSize(opCtx));
 
@@ -1714,7 +1714,7 @@ public:
     DataSizeChange(WiredTigerRecordStore* rs, int64_t amount) : _rs(rs), _amount(amount) {}
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
-        _rs->_increaseDataSize(NULL, -_amount);
+        _rs->_increaseDataSize(nullptr, -_amount);
     }
 
 private:

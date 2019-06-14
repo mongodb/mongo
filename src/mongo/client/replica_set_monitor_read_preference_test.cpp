@@ -589,7 +589,7 @@ public:
     virtual ~MultiTagsTest() = default;
 
     const TagSet& getMatchesFirstTagSet() {
-        if (matchFirstTags.get() != NULL) {
+        if (matchFirstTags.get() != nullptr) {
             return *matchFirstTags;
         }
 
@@ -604,7 +604,7 @@ public:
     }
 
     const TagSet& getMatchesSecondTagSet() {
-        if (matchSecondTags.get() != NULL) {
+        if (matchSecondTags.get() != nullptr) {
             return *matchSecondTags;
         }
 
@@ -621,7 +621,7 @@ public:
     }
 
     const TagSet& getMatchesLastTagSet() {
-        if (matchLastTags.get() != NULL) {
+        if (matchLastTags.get() != nullptr) {
             return *matchLastTags;
         }
 
@@ -642,7 +642,7 @@ public:
     }
 
     const TagSet& getMatchesPriTagSet() {
-        if (matchPriTags.get() != NULL) {
+        if (matchPriTags.get() != nullptr) {
             return *matchPriTags;
         }
 

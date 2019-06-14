@@ -458,7 +458,8 @@ public:
         verify(z >= 0);
         verify(z < maxSize);
         _buf.l = prev + z;
-        if (strchr(start, '.') == 0 && strchr(start, 'E') == 0 && strchr(start, 'N') == 0) {
+        if (strchr(start, '.') == nullptr && strchr(start, 'E') == nullptr &&
+            strchr(start, 'N') == nullptr) {
             write(".0", 2);
         }
     }

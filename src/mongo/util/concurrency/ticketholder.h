@@ -118,7 +118,7 @@ class TicketHolderReleaser {
 
 public:
     TicketHolderReleaser() {
-        _holder = NULL;
+        _holder = nullptr;
     }
 
     explicit TicketHolderReleaser(TicketHolder* holder) {
@@ -132,10 +132,10 @@ public:
     }
 
     bool hasTicket() const {
-        return _holder != NULL;
+        return _holder != nullptr;
     }
 
-    void reset(TicketHolder* holder = NULL) {
+    void reset(TicketHolder* holder = nullptr) {
         if (_holder) {
             _holder->release();
         }

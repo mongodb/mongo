@@ -184,7 +184,7 @@ public:
         unique_ptr<WorkingSet> ws(new WorkingSet());
 
         PlanStage* userRoot = parseQuery(opCtx, collection, planObj, ws.get(), &exprs);
-        uassert(16911, "Couldn't parse plan from " + cmdObj.toString(), NULL != userRoot);
+        uassert(16911, "Couldn't parse plan from " + cmdObj.toString(), nullptr != userRoot);
 
         // Add a fetch at the top for the user so we can get obj back for sure.
         // TODO: Do we want to do this for the user?  I think so.
@@ -200,7 +200,7 @@ public:
 
         BSONObj obj;
         PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
             resultBuilder.append(obj);
         }
 
@@ -224,11 +224,11 @@ public:
                           std::vector<std::unique_ptr<MatchExpression>>* exprs) {
         BSONElement firstElt = obj.firstElement();
         if (!firstElt.isABSONObj()) {
-            return NULL;
+            return nullptr;
         }
         BSONObj paramObj = firstElt.Obj();
 
-        MatchExpression* matcher = NULL;
+        MatchExpression* matcher = nullptr;
         BSONObj nodeArgs;
 
         // Every node has these two fields.
@@ -239,7 +239,7 @@ public:
         while (it.more()) {
             BSONElement e = it.next();
             if (!e.isABSONObj()) {
-                return NULL;
+                return nullptr;
             }
             BSONObj argObj = e.Obj();
             if (filterTag == e.fieldName()) {
@@ -252,12 +252,12 @@ public:
                                                  ExtensionsCallbackReal(opCtx, &collection->ns()),
                                                  MatchExpressionParser::kAllowAllSpecialFeatures);
                 if (!statusWithMatcher.isOK()) {
-                    return NULL;
+                    return nullptr;
                 }
                 std::unique_ptr<MatchExpression> me = std::move(statusWithMatcher.getValue());
                 // exprs is what will wind up deleting this.
                 matcher = me.get();
-                verify(NULL != matcher);
+                verify(nullptr != matcher);
                 exprs->push_back(std::move(me));
             } else if (argsTag == e.fieldName()) {
                 nodeArgs = argObj;
@@ -265,7 +265,7 @@ public:
                 uasserted(16910,
                           "Unknown fieldname " + string(e.fieldName()) + " in query node " +
                               obj.toString());
-                return NULL;
+                return nullptr;
             }
         }
 
@@ -323,8 +323,9 @@ public:
                 uassert(16922, "node of AND isn't an obj?: " + e.toString(), e.isABSONObj());
 
                 PlanStage* subNode = parseQuery(opCtx, collection, e.Obj(), workingSet, exprs);
-                uassert(
-                    16923, "Can't parse sub-node of AND: " + e.Obj().toString(), NULL != subNode);
+                uassert(16923,
+                        "Can't parse sub-node of AND: " + e.Obj().toString(),
+                        nullptr != subNode);
                 // takes ownership
                 andStage->addChild(subNode);
                 ++nodesAdded;
@@ -346,8 +347,9 @@ public:
                 uassert(16925, "node of AND isn't an obj?: " + e.toString(), e.isABSONObj());
 
                 PlanStage* subNode = parseQuery(opCtx, collection, e.Obj(), workingSet, exprs);
-                uassert(
-                    16926, "Can't parse sub-node of AND: " + e.Obj().toString(), NULL != subNode);
+                uassert(16926,
+                        "Can't parse sub-node of AND: " + e.Obj().toString(),
+                        nullptr != subNode);
                 // takes ownership
                 andStage->addChild(subNode);
                 ++nodesAdded;
@@ -366,11 +368,11 @@ public:
             while (it.more()) {
                 BSONElement e = it.next();
                 if (!e.isABSONObj()) {
-                    return NULL;
+                    return nullptr;
                 }
                 PlanStage* subNode = parseQuery(opCtx, collection, e.Obj(), workingSet, exprs);
                 uassert(
-                    16936, "Can't parse sub-node of OR: " + e.Obj().toString(), NULL != subNode);
+                    16936, "Can't parse sub-node of OR: " + e.Obj().toString(), nullptr != subNode);
                 // takes ownership
                 orStage->addChild(subNode);
             }
@@ -383,11 +385,12 @@ public:
                 parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs);
             uassert(28731,
                     "Can't parse sub-node of FETCH: " + nodeArgs["node"].Obj().toString(),
-                    NULL != subNode);
+                    nullptr != subNode);
             return new FetchStage(opCtx, workingSet, subNode, matcher, collection);
         } else if ("limit" == nodeName) {
-            uassert(
-                16937, "Limit stage doesn't have a filter (put it on the child)", NULL == matcher);
+            uassert(16937,
+                    "Limit stage doesn't have a filter (put it on the child)",
+                    nullptr == matcher);
             uassert(
                 16930, "Node argument must be provided to limit", nodeArgs["node"].isABSONObj());
             uassert(16931, "Num argument must be provided to limit", nodeArgs["num"].isNumber());
@@ -395,18 +398,19 @@ public:
                 parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs);
             uassert(28732,
                     "Can't parse sub-node of LIMIT: " + nodeArgs["node"].Obj().toString(),
-                    NULL != subNode);
+                    nullptr != subNode);
             return new LimitStage(opCtx, nodeArgs["num"].numberInt(), workingSet, subNode);
         } else if ("skip" == nodeName) {
-            uassert(
-                16938, "Skip stage doesn't have a filter (put it on the child)", NULL == matcher);
+            uassert(16938,
+                    "Skip stage doesn't have a filter (put it on the child)",
+                    nullptr == matcher);
             uassert(16932, "Node argument must be provided to skip", nodeArgs["node"].isABSONObj());
             uassert(16933, "Num argument must be provided to skip", nodeArgs["num"].isNumber());
             PlanStage* subNode =
                 parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs);
             uassert(28733,
                     "Can't parse sub-node of SKIP: " + nodeArgs["node"].Obj().toString(),
-                    NULL != subNode);
+                    nullptr != subNode);
             return new SkipStage(opCtx, nodeArgs["num"].numberInt(), workingSet, subNode);
         } else if ("cscan" == nodeName) {
             CollectionScanParams params;
@@ -443,7 +447,7 @@ public:
                 PlanStage* subNode = parseQuery(opCtx, collection, e.Obj(), workingSet, exprs);
                 uassert(16974,
                         "Can't parse sub-node of mergeSort: " + e.Obj().toString(),
-                        NULL != subNode);
+                        nullptr != subNode);
                 // takes ownership
                 mergeStage->addChild(subNode);
             }
@@ -466,7 +470,7 @@ public:
             // that can only be checked for equality.  We ignore this now.
             Status s = fam->getSpec().getIndexPrefix(BSONObj(), &params.indexPrefix);
             if (!s.isOK()) {
-                return NULL;
+                return nullptr;
             }
 
             params.spec = fam->getSpec();
@@ -476,13 +480,14 @@ public:
             params.query.setCaseSensitive(TextMatchExpressionBase::kCaseSensitiveDefault);
             params.query.setDiacriticSensitive(TextMatchExpressionBase::kDiacriticSensitiveDefault);
             if (!params.query.parse(fam->getSpec().getTextIndexVersion()).isOK()) {
-                return NULL;
+                return nullptr;
             }
 
             return new TextStage(opCtx, params, workingSet, matcher);
         } else if ("delete" == nodeName) {
-            uassert(
-                18636, "Delete stage doesn't have a filter (put it on the child)", NULL == matcher);
+            uassert(18636,
+                    "Delete stage doesn't have a filter (put it on the child)",
+                    nullptr == matcher);
             uassert(
                 18637, "node argument must be provided to delete", nodeArgs["node"].isABSONObj());
             uassert(18638,
@@ -492,12 +497,12 @@ public:
                 parseQuery(opCtx, collection, nodeArgs["node"].Obj(), workingSet, exprs);
             uassert(28734,
                     "Can't parse sub-node of DELETE: " + nodeArgs["node"].Obj().toString(),
-                    NULL != subNode);
+                    nullptr != subNode);
             auto params = std::make_unique<DeleteStageParams>();
             params->isMulti = nodeArgs["isMulti"].Bool();
             return new DeleteStage(opCtx, std::move(params), workingSet, collection, subNode);
         } else {
-            return NULL;
+            return nullptr;
         }
     }
 };

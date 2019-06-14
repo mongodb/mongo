@@ -48,7 +48,7 @@ void TextMatchExpressionBase::debugString(StringBuilder& debug, int indentationL
           << ", caseSensitive=" << ftsQuery.getCaseSensitive()
           << ", diacriticSensitive=" << ftsQuery.getDiacriticSensitive() << ", tag=";
     MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
+    if (nullptr != td) {
         td->debugString(&debug);
     } else {
         debug << "NULL";

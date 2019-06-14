@@ -56,11 +56,11 @@ const std::string kWTRepairMsg =
 WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64_t cursorEpoch)
     : _epoch(epoch),
       _cursorEpoch(cursorEpoch),
-      _session(NULL),
+      _session(nullptr),
       _cursorGen(0),
       _cursorsOut(0),
       _idleExpireTime(Date_t::min()) {
-    invariantWTOK(conn->open_session(conn, NULL, "isolation=snapshot", &_session));
+    invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session));
 }
 
 WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
@@ -70,16 +70,16 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
     : _epoch(epoch),
       _cursorEpoch(cursorEpoch),
       _cache(cache),
-      _session(NULL),
+      _session(nullptr),
       _cursorGen(0),
       _cursorsOut(0),
       _idleExpireTime(Date_t::min()) {
-    invariantWTOK(conn->open_session(conn, NULL, "isolation=snapshot", &_session));
+    invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session));
 }
 
 WiredTigerSession::~WiredTigerSession() {
     if (_session) {
-        invariantWTOK(_session->close(_session, NULL));
+        invariantWTOK(_session->close(_session, nullptr));
     }
 }
 
@@ -88,7 +88,7 @@ void _openCursor(WT_SESSION* session,
                  const std::string& uri,
                  const char* config,
                  WT_CURSOR** cursorOut) {
-    int ret = session->open_cursor(session, uri.c_str(), NULL, config, cursorOut);
+    int ret = session->open_cursor(session, uri.c_str(), nullptr, config, cursorOut);
     if (ret == EBUSY) {
         // This can only happen when trying to open a cursor on the oplog and it is currently locked
         // by a verify or salvage, because we don't employ database locks to protect the oplog.
@@ -116,7 +116,7 @@ WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, boo
         }
     }
 
-    WT_CURSOR* cursor = NULL;
+    WT_CURSOR* cursor = nullptr;
     _openCursor(_session, uri, allowOverwrite ? "" : "overwrite=false", &cursor);
     _cursorsOut++;
     return cursor;
@@ -125,7 +125,7 @@ WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, boo
 WT_CURSOR* WiredTigerSession::getReadOnceCursor(const std::string& uri, bool allowOverwrite) {
     const char* config = allowOverwrite ? "read_once=true" : "read_once=true,overwrite=false";
 
-    WT_CURSOR* cursor = NULL;
+    WT_CURSOR* cursor = nullptr;
     _openCursor(_session, uri, config, &cursor);
     _cursorsOut++;
     return cursor;
@@ -288,7 +288,7 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableC
     // Initialize on first use.
     if (!_waitUntilDurableSession) {
         invariantWTOK(
-            _conn->open_session(_conn, NULL, "isolation=snapshot", &_waitUntilDurableSession));
+            _conn->open_session(_conn, nullptr, "isolation=snapshot", &_waitUntilDurableSession));
     }
 
     // Use the journal when available, or a checkpoint otherwise.
@@ -296,7 +296,7 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableC
         invariantWTOK(_waitUntilDurableSession->log_flush(_waitUntilDurableSession, "sync=on"));
         LOG(4) << "flushed journal";
     } else {
-        invariantWTOK(_waitUntilDurableSession->checkpoint(_waitUntilDurableSession, NULL));
+        invariantWTOK(_waitUntilDurableSession->checkpoint(_waitUntilDurableSession, nullptr));
         LOG(4) << "created checkpoint";
     }
     _journalListener->onDurable(token);

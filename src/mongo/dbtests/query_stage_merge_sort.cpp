@@ -173,11 +173,11 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
 
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
@@ -189,9 +189,9 @@ public:
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, nullptr));
             first = first.getOwned();
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, nullptr));
             ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
             ASSERT_EQUALS(i, first["c"].numberInt());
             ASSERT((first.hasField("a") && second.hasField("b")) ||
@@ -200,7 +200,7 @@ public:
 
         // Should be done now.
         BSONObj foo;
-        ASSERT_NOT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&foo, NULL));
+        ASSERT_NOT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&foo, nullptr));
     }
 };
 
@@ -238,11 +238,11 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
@@ -253,9 +253,9 @@ public:
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, nullptr));
             first = first.getOwned();
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, nullptr));
             ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
             ASSERT_EQUALS(i, first["c"].numberInt());
             ASSERT((first.hasField("a") && second.hasField("b")) ||
@@ -264,7 +264,7 @@ public:
 
         // Should be done now.
         BSONObj foo;
-        ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, NULL));
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, nullptr));
     }
 };
 
@@ -302,11 +302,11 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
@@ -318,9 +318,9 @@ public:
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
             // We inserted N objects but we get 2 * N from the runner because of dups.
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, nullptr));
             first = first.getOwned();
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, nullptr));
             ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
             ASSERT_EQUALS(i, first["c"].numberInt());
             ASSERT((first.hasField("a") && second.hasField("b")) ||
@@ -329,7 +329,7 @@ public:
 
         // Should be done now.
         BSONObj foo;
-        ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, NULL));
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, nullptr));
     }
 };
 
@@ -370,13 +370,13 @@ public:
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
         params.bounds.startKey = objWithMaxKey(1);
         params.bounds.endKey = objWithMinKey(1);
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
         params.bounds.startKey = objWithMaxKey(1);
         params.bounds.endKey = objWithMinKey(1);
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
@@ -387,9 +387,9 @@ public:
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, nullptr));
             first = first.getOwned();
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, nullptr));
             ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
             ASSERT_EQUALS(N - i - 1, first["c"].numberInt());
             ASSERT((first.hasField("a") && second.hasField("b")) ||
@@ -398,7 +398,7 @@ public:
 
         // Should be done now.
         BSONObj foo;
-        ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, NULL));
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, nullptr));
     }
 };
 
@@ -436,13 +436,13 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
 
         // b:51 (EOF)
         params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
         params.bounds.startKey = BSON("" << 51 << "" << MinKey);
         params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
@@ -454,14 +454,14 @@ public:
         // Only getting results from the a:1 index scan.
         for (int i = 0; i < N; ++i) {
             BSONObj obj;
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
             ASSERT_EQUALS(i, obj["c"].numberInt());
             ASSERT_EQUALS(1, obj["a"].numberInt());
         }
 
         // Should be done now.
         BSONObj foo;
-        ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, NULL));
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, nullptr));
     }
 };
 
@@ -493,7 +493,7 @@ public:
             BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
             addIndex(indexSpec);
             auto params = makeIndexScanParams(&_opCtx, getIndex(indexSpec, coll));
-            ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+            ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
         }
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
@@ -505,7 +505,7 @@ public:
 
         for (int i = 0; i < numIndices; ++i) {
             BSONObj obj;
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, nullptr));
             ASSERT_EQUALS(i, obj["foo"].numberInt());
             string index(1, 'a' + i);
             ASSERT_EQUALS(1, obj[index].numberInt());
@@ -513,7 +513,7 @@ public:
 
         // Should be done now.
         BSONObj foo;
-        ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, NULL));
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, nullptr));
     }
 };
 
@@ -547,7 +547,7 @@ public:
             BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
             addIndex(indexSpec);
             auto params = makeIndexScanParams(&_opCtx, getIndex(indexSpec, coll));
-            ms->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
+            ms->addChild(new IndexScan(&_opCtx, params, &ws, nullptr));
         }
 
         set<RecordId> recordIds;
@@ -765,11 +765,11 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
 
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
@@ -781,9 +781,9 @@ public:
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, nullptr));
             first = first.getOwned();
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, nullptr));
             ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
             ASSERT_EQUALS(i, first["c"].numberInt());
             // {a: 1, c: i, d: "abc"} should precede {b: 1, c: i, d: "bca"}.
@@ -792,7 +792,7 @@ public:
 
         // Should be done now.
         BSONObj foo;
-        ASSERT_NOT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&foo, NULL));
+        ASSERT_NOT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&foo, nullptr));
     }
 };
 
@@ -833,11 +833,11 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), nullptr));
 
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
@@ -849,9 +849,9 @@ public:
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, nullptr));
             first = first.getOwned();
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, nullptr));
             ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
             ASSERT_EQUALS(i, first["c"].numberInt());
             // {b: 1, c: i, d: "cba"} should precede {a: 1, c: i, d: "abc"}.
@@ -860,7 +860,7 @@ public:
 
         // Should be done now.
         BSONObj foo;
-        ASSERT_NOT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&foo, NULL));
+        ASSERT_NOT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&foo, nullptr));
     }
 };
 

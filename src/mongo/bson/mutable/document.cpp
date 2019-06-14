@@ -997,7 +997,7 @@ public:
         // inform upstream that we are not returning in-place result data.
         if (_inPlaceMode == Document::kInPlaceDisabled) {
             damages->clear();
-            *source = NULL;
+            *source = nullptr;
             if (size)
                 *size = 0;
             return false;
@@ -1077,7 +1077,7 @@ public:
     template <typename Builder>
     void writeElement(Element::RepIdx repIdx,
                       Builder* builder,
-                      const StringData* fieldName = NULL) const;
+                      const StringData* fieldName = nullptr) const;
 
     template <typename Builder>
     void writeChildren(Element::RepIdx repIdx, Builder* builder) const;
@@ -2647,7 +2647,7 @@ Element Document::makeElementSafeNum(StringData fieldName, SafeNum value) {
 }
 
 Element Document::makeElement(ConstElement element) {
-    return makeElement(element, NULL);
+    return makeElement(element, nullptr);
 }
 
 Element Document::makeElementWithNewFieldName(StringData fieldName, ConstElement element) {

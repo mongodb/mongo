@@ -180,7 +180,7 @@ public:
      */
     virtual long long numEntries(OperationContext* opCtx) const {
         long long x = -1;
-        fullValidate(opCtx, &x, NULL);
+        fullValidate(opCtx, &x, nullptr);
         return x;
     }
 

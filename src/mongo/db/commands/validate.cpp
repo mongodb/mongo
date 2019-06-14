@@ -125,7 +125,7 @@ public:
 
         AutoGetDb ctx(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLk(opCtx, nss, MODE_X);
-        Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(opCtx, nss) : NULL;
+        Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(opCtx, nss) : nullptr;
         if (!collection) {
             if (ctx.getDb() && ViewCatalog::get(ctx.getDb())->lookup(opCtx, nss.ns())) {
                 uasserted(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");

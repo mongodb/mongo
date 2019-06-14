@@ -309,7 +309,7 @@ Status validateElementInfo(Buffer* buffer,
 Status validateBSONIterative(Buffer* buffer) {
     std::vector<ValidationObjectFrame> frames;
     frames.reserve(16);
-    ValidationObjectFrame* curr = NULL;
+    ValidationObjectFrame* curr = nullptr;
     ValidationState::State state = ValidationState::BeginObj;
 
     uint64_t idElemStartPos = 0;  // will become idElem once validated

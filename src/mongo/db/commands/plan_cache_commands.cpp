@@ -64,9 +64,9 @@ static Status getPlanCache(OperationContext* opCtx,
                            Collection* collection,
                            const string& ns,
                            PlanCache** planCacheOut) {
-    *planCacheOut = NULL;
+    *planCacheOut = nullptr;
 
-    if (NULL == collection) {
+    if (nullptr == collection) {
         return Status(ErrorCodes::BadValue, "no such collection");
     }
 

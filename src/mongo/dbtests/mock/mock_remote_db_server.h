@@ -166,7 +166,7 @@ public:
                            mongo::Query query = mongo::Query(),
                            int nToReturn = 0,
                            int nToSkip = 0,
-                           const mongo::BSONObj* fieldsToReturn = 0,
+                           const mongo::BSONObj* fieldsToReturn = nullptr,
                            int queryOptions = 0,
                            int batchSize = 0);
 

@@ -261,7 +261,7 @@ std::unique_ptr<PlanStageStats> IndexScan::getStats() {
     // catalog information here.
 
     // Add a BSON representation of the filter to the stats tree, if there is one.
-    if (NULL != _filter) {
+    if (nullptr != _filter) {
         BSONObjBuilder bob;
         _filter->serialize(&bob);
         _commonStats.filter = bob.obj();

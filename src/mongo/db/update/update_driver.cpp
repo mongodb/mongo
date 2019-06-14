@@ -261,7 +261,7 @@ Status UpdateDriver::update(StringData matchedField,
 
     _affectIndices =
         ((_updateType == UpdateType::kReplacement || _updateType == UpdateType::kPipeline) &&
-         (_indexedFields != NULL));
+         (_indexedFields != nullptr));
 
     _logDoc.reset();
     LogBuilder logBuilder(_logDoc.root());

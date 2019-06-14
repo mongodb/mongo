@@ -87,7 +87,7 @@ public:
     }
 
     virtual int64_t storageSize(OperationContext* opCtx,
-                                BSONObjBuilder* extraInfo = NULL,
+                                BSONObjBuilder* extraInfo = nullptr,
                                 int infoLevel = 0) const {
         return 0;
     }

@@ -47,7 +47,7 @@ struct PlanSummaryStats;
 
 struct UpdateStageParams {
     UpdateStageParams(const UpdateRequest* r, UpdateDriver* d, OpDebug* o)
-        : request(r), driver(d), opDebug(o), canonicalQuery(NULL) {}
+        : request(r), driver(d), opDebug(o), canonicalQuery(nullptr) {}
 
     // Contains update parameters like whether it's a multi update or an upsert. Not owned.
     // Must outlive the UpdateStage.

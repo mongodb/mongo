@@ -340,7 +340,8 @@ Status storeBaseOptions(const moe::Environment& params) {
         bool set = false;
         // match facility string to facility value
         size_t facilitynamesLength = sizeof(facilitynames) / sizeof(facilitynames[0]);
-        for (unsigned long i = 0; i < facilitynamesLength && facilitynames[i].c_name != NULL; i++) {
+        for (unsigned long i = 0; i < facilitynamesLength && facilitynames[i].c_name != nullptr;
+             i++) {
             if (!facility.compare(facilitynames[i].c_name)) {
                 serverGlobalParams.syslogFacility = facilitynames[i].c_val;
                 set = true;
@@ -399,8 +400,8 @@ Status storeBaseOptions(const moe::Environment& params) {
             ServerParameter* parameter =
                 mapFindWithDefault(ServerParameterSet::getGlobal()->getMap(),
                                    parametersIt->first,
-                                   static_cast<ServerParameter*>(NULL));
-            if (NULL == parameter) {
+                                   static_cast<ServerParameter*>(nullptr));
+            if (nullptr == parameter) {
                 StringBuilder sb;
                 sb << "Illegal --setParameter parameter: \"" << parametersIt->first << "\"";
                 return Status(ErrorCodes::BadValue, sb.str());

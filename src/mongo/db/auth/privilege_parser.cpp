@@ -56,7 +56,7 @@ ParsedResource::~ParsedResource() {}
 
 bool ParsedResource::isValid(std::string* errMsg) const {
     std::string dummy;
-    if (errMsg == NULL) {
+    if (errMsg == nullptr) {
         errMsg = &dummy;
     }
 
@@ -273,7 +273,7 @@ ParsedPrivilege::~ParsedPrivilege() {}
 
 bool ParsedPrivilege::isValid(std::string* errMsg) const {
     std::string dummy;
-    if (errMsg == NULL) {
+    if (errMsg == nullptr) {
         errMsg = &dummy;
     }
 

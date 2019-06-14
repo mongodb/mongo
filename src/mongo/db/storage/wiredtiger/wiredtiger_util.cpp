@@ -119,7 +119,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadataRaw(WT_SESSION* session, Stri
     } else if (ret != 0) {
         return StatusWith<std::string>(wtRCToStatus(ret));
     }
-    const char* metadata = NULL;
+    const char* metadata = nullptr;
     ret = cursor->get_value(cursor, &metadata);
     if (ret != 0) {
         return StatusWith<std::string>(wtRCToStatus(ret));
@@ -147,7 +147,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, Str
     } else if (ret != 0) {
         return StatusWith<std::string>(wtRCToStatus(ret));
     }
-    const char* metadata = NULL;
+    const char* metadata = nullptr;
     ret = cursor->get_value(cursor, &metadata);
     if (ret != 0) {
         return StatusWith<std::string>(wtRCToStatus(ret));
@@ -314,9 +314,9 @@ StatusWith<int64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
                                                        const std::string& config,
                                                        int statisticsKey) {
     invariant(session);
-    WT_CURSOR* cursor = NULL;
-    const char* cursorConfig = config.empty() ? NULL : config.c_str();
-    int ret = session->open_cursor(session, uri.c_str(), NULL, cursorConfig, &cursor);
+    WT_CURSOR* cursor = nullptr;
+    const char* cursorConfig = config.empty() ? nullptr : config.c_str();
+    int ret = session->open_cursor(session, uri.c_str(), nullptr, cursorConfig, &cursor);
     if (ret != 0) {
         return StatusWith<int64_t>(ErrorCodes::CursorNotFound,
                                    str::stream() << "unable to open cursor at URI " << uri
@@ -516,11 +516,11 @@ int WiredTigerUtil::verifyTable(OperationContext* opCtx,
     // Open a new session with custom error handlers.
     WT_CONNECTION* conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
     WT_SESSION* session;
-    invariantWTOK(conn->open_session(conn, &eventHandler, NULL, &session));
+    invariantWTOK(conn->open_session(conn, &eventHandler, nullptr, &session));
     ON_BLOCK_EXIT([&] { session->close(session, ""); });
 
     // Do the verify. Weird parens prevent treating "verify" as a macro.
-    return (session->verify)(session, uri.c_str(), NULL);
+    return (session->verify)(session, uri.c_str(), nullptr);
 }
 
 bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
@@ -612,9 +612,9 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                                          const std::vector<std::string>& filter) {
     invariant(session);
     invariant(bob);
-    WT_CURSOR* c = NULL;
-    const char* cursorConfig = config.empty() ? NULL : config.c_str();
-    int ret = session->open_cursor(session, uri.c_str(), NULL, cursorConfig, &c);
+    WT_CURSOR* c = nullptr;
+    const char* cursorConfig = config.empty() ? nullptr : config.c_str();
+    int ret = session->open_cursor(session, uri.c_str(), nullptr, cursorConfig, &c);
     if (ret != 0) {
         return Status(ErrorCodes::CursorNotFound,
                       str::stream() << "unable to open cursor at URI " << uri << ". reason: "

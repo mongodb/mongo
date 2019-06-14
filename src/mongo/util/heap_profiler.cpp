@@ -481,7 +481,7 @@ private:
             if (dladdr(stack.frames[j], &dli)) {
                 if (dli.dli_sname) {
                     int status;
-                    demangled = abi::__cxa_demangle(dli.dli_sname, 0, 0, &status);
+                    demangled = abi::__cxa_demangle(dli.dli_sname, nullptr, nullptr, &status);
                     if (demangled) {
                         // strip off function parameters as they are very verbose and not useful
                         char* p = strchr(demangled, '(');

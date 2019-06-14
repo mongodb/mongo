@@ -110,7 +110,7 @@ public:
     }
 
     bool ok() const {
-        return _conn != NULL;
+        return _conn != nullptr;
     }
 
     /** reports all thread local connections on this instance */

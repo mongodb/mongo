@@ -1240,7 +1240,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
         invariant(!opCtx->lockState()->isLocked());
     }
 
-    const char* ns = dbmsg.messageShouldHaveNs() ? dbmsg.getns() : NULL;
+    const char* ns = dbmsg.messageShouldHaveNs() ? dbmsg.getns() : nullptr;
     const NamespaceString nsString = ns ? NamespaceString(ns) : NamespaceString();
 
     if (op == dbQuery) {

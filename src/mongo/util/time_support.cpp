@@ -143,7 +143,7 @@ std::string time_t_to_String_short(time_t t) {
 // colonsOk should be false when creating filenames
 string terseCurrentTime(bool colonsOk) {
     struct tm t;
-    time_t_to_Struct(time(0), &t);
+    time_t_to_Struct(time(nullptr), &t);
 
     const char* fmt = (colonsOk ? "%Y-%m-%dT%H:%M:%S" : "%Y-%m-%dT%H-%M-%S");
     char buf[32];
@@ -921,13 +921,13 @@ unsigned long long curTimeMicros64() {
 #include <sys/time.h>
 unsigned long long curTimeMillis64() {
     timeval tv;
-    gettimeofday(&tv, NULL);
+    gettimeofday(&tv, nullptr);
     return ((unsigned long long)tv.tv_sec) * 1000 + tv.tv_usec / 1000;
 }
 
 unsigned long long curTimeMicros64() {
     timeval tv;
-    gettimeofday(&tv, NULL);
+    gettimeofday(&tv, nullptr);
     return (((unsigned long long)tv.tv_sec) * 1000 * 1000) + tv.tv_usec;
 }
 #endif

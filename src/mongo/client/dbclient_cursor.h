@@ -94,7 +94,7 @@ public:
     /**
      * peek ahead and see if an error occurred, and get the error if so.
      */
-    bool peekError(BSONObj* error = NULL);
+    bool peekError(BSONObj* error = nullptr);
 
     /**
        iterate the rest of the cursor and return the number if items

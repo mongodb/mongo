@@ -75,7 +75,7 @@ TEST(RecordStoreTestHarness, StorageSizeNonEmpty) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(rs->storageSize(opCtx.get(), NULL) >= 0);
+        ASSERT(rs->storageSize(opCtx.get(), nullptr) >= 0);
     }
 }
 

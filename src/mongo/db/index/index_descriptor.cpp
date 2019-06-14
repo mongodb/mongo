@@ -112,7 +112,7 @@ IndexDescriptor::IndexDescriptor(Collection* collection,
       _sparse(infoObj[IndexDescriptor::kSparseFieldName].trueValue()),
       _unique(_isIdIndex || infoObj[kUniqueFieldName].trueValue()),
       _partial(!infoObj[kPartialFilterExprFieldName].eoo()),
-      _cachedEntry(NULL) {
+      _cachedEntry(nullptr) {
     _indexNamespace = NamespaceString(_parentNS).makeIndexNamespace(_indexName).ns();
 
     BSONElement e = _infoObj[IndexDescriptor::kIndexVersionFieldName];

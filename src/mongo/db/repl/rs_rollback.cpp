@@ -793,7 +793,7 @@ void dropCollection(OperationContext* opCtx,
             opCtx, nss.toString(), collection, PlanExecutor::YIELD_AUTO);
         BSONObj curObj;
         PlanExecutor::ExecState execState;
-        while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, NULL))) {
+        while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, nullptr))) {
             auto status = removeSaver.goingToDelete(curObj);
             if (!status.isOK()) {
                 severe() << "Rolling back createCollection on " << nss
@@ -1319,7 +1319,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     log() << "Deleting and updating documents to roll back insert, update and remove "
              "operations";
     unsigned deletes = 0, updates = 0;
-    time_t lastProgressUpdate = time(0);
+    time_t lastProgressUpdate = time(nullptr);
     time_t progressUpdateGap = 10;
 
     for (const auto& nsAndGoodVersionsByDocID : goodVersions) {
@@ -1345,7 +1345,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
         const auto& goodVersionsByDocID = nsAndGoodVersionsByDocID.second;
         for (const auto& idAndDoc : goodVersionsByDocID) {
-            time_t now = time(0);
+            time_t now = time(nullptr);
             if (now - lastProgressUpdate > progressUpdateGap) {
                 log() << deletes << " delete and " << updates
                       << " update operations processed out of " << goodVersions.size()

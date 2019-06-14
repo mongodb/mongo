@@ -144,8 +144,8 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
             rs->updateRecord(t2.get(), id1, "c", 2).transitional_ignore();
             ASSERT(0);
         } catch (WriteConflictException&) {
-            w2.reset(NULL);
-            t2.reset(NULL);
+            w2.reset(nullptr);
+            t2.reset(nullptr);
         }
 
         w1->commit();  // this should succeed

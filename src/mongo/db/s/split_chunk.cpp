@@ -76,8 +76,8 @@ bool checkIfSingleDoc(OperationContext* opCtx,
     // check if exactly one document found
     PlanExecutor::ExecState state;
     BSONObj obj;
-    if (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
-        if (PlanExecutor::IS_EOF == (state = exec->getNext(&obj, NULL))) {
+    if (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
+        if (PlanExecutor::IS_EOF == (state = exec->getNext(&obj, nullptr))) {
             return true;
         }
     }

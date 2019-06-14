@@ -279,7 +279,7 @@ inline size_t StringData::find(char c, size_t fromPos) const {
         return std::string::npos;
 
     const void* x = memchr(_data + fromPos, c, _size - fromPos);
-    if (x == 0)
+    if (x == nullptr)
         return std::string::npos;
     return static_cast<size_t>(static_cast<const char*>(x) - _data);
 }

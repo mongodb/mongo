@@ -3364,7 +3364,7 @@ TEST_F(ReplCoordTest, DoNotProcessSelfWhenUpdatePositionContainsInfoAboutSelf) {
                                 << UpdatePositionArgs::kAppliedWallTimeFieldName
                                 << Date_t() + Seconds(time2.getSecs()))))));
 
-    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args, 0));
+    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args, nullptr));
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                   getReplCoord()->awaitReplication(opCtx.get(), time2, writeConcern).status);
 }
@@ -3488,7 +3488,8 @@ TEST_F(ReplCoordTest, DoNotProcessUpdatePositionOfMembersWhoseIdsAreNotInTheConf
     auto opCtx = makeOperationContext();
 
 
-    ASSERT_EQUALS(ErrorCodes::NodeNotFound, getReplCoord()->processReplSetUpdatePosition(args, 0));
+    ASSERT_EQUALS(ErrorCodes::NodeNotFound,
+                  getReplCoord()->processReplSetUpdatePosition(args, nullptr));
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                   getReplCoord()->awaitReplication(opCtx.get(), time2, writeConcern).status);
 }
@@ -3565,7 +3566,7 @@ TEST_F(ReplCoordTest,
     auto opCtx = makeOperationContext();
 
 
-    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args, 0));
+    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args, nullptr));
     ASSERT_OK(getReplCoord()->awaitReplication(opCtx.get(), time2, writeConcern).status);
 
     writeConcern.wNumNodes = 3;
@@ -6122,7 +6123,7 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
                                    << UpdatePositionArgs::kDurableWallTimeFieldName
                                    << Date_t() + Seconds(startingOpTime.getSecs()))))));
 
-    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args, 0));
+    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args, nullptr));
     // Become PRIMARY.
     simulateSuccessfulV1Election();
 
@@ -6161,7 +6162,7 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
     const Date_t startDate = getNet()->now();
     getNet()->enterNetwork();
     getNet()->runUntil(startDate + Milliseconds(100));
-    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args1, 0));
+    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args1, nullptr));
 
     // Confirm that the node remains PRIMARY after the other two nodes are marked DOWN.
     getNet()->runUntil(startDate + Milliseconds(2080));
@@ -6212,7 +6213,7 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
                                 << startingOpTime.toBSON()
                                 << UpdatePositionArgs::kAppliedWallTimeFieldName
                                 << Date_t() + Seconds(startingOpTime.getSecs()))))));
-    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args2, 0));
+    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args2, nullptr));
 
     hbArgs.setSetName("mySet");
     hbArgs.setConfigVersion(2);

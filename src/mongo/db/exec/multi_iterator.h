@@ -63,7 +63,7 @@ public:
 
     // Not used.
     SpecificStats* getSpecificStats() const final {
-        return NULL;
+        return nullptr;
     }
 
     // Not used.

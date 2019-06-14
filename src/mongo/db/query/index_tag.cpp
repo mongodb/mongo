@@ -45,12 +45,12 @@ namespace {
 
 bool TagComparison(const MatchExpression* lhs, const MatchExpression* rhs) {
     IndexTag* lhsTag = static_cast<IndexTag*>(lhs->getTag());
-    size_t lhsValue = (NULL == lhsTag) ? IndexTag::kNoIndex : lhsTag->index;
-    size_t lhsPos = (NULL == lhsTag) ? IndexTag::kNoIndex : lhsTag->pos;
+    size_t lhsValue = (nullptr == lhsTag) ? IndexTag::kNoIndex : lhsTag->index;
+    size_t lhsPos = (nullptr == lhsTag) ? IndexTag::kNoIndex : lhsTag->pos;
 
     IndexTag* rhsTag = static_cast<IndexTag*>(rhs->getTag());
-    size_t rhsValue = (NULL == rhsTag) ? IndexTag::kNoIndex : rhsTag->index;
-    size_t rhsPos = (NULL == rhsTag) ? IndexTag::kNoIndex : rhsTag->pos;
+    size_t rhsValue = (nullptr == rhsTag) ? IndexTag::kNoIndex : rhsTag->index;
+    size_t rhsPos = (nullptr == rhsTag) ? IndexTag::kNoIndex : rhsTag->pos;
 
     // First, order on indices.
     if (lhsValue != rhsValue) {
@@ -94,7 +94,7 @@ void sortUsingTags(MatchExpression* tree) {
         sortUsingTags(tree->getChild(i));
     }
     std::vector<MatchExpression*>* children = tree->getChildVector();
-    if (NULL != children) {
+    if (nullptr != children) {
         std::sort(children->begin(), children->end(), TagComparison);
     }
 }

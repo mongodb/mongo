@@ -365,7 +365,7 @@ void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
                                                        q,
                                                        nToReturn,
                                                        nToSkip,
-                                                       haveFields ? &fields : NULL,
+                                                       haveFields ? &fields : nullptr,
                                                        options,
                                                        batchSize));
     if (!cursor.get()) {

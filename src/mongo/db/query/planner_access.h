@@ -146,7 +146,7 @@ private:
               currentScan(nullptr),
               curChild(0),
               currentIndexNumber(IndexTag::kNoIndex),
-              ixtag(NULL),
+              ixtag(nullptr),
               tightness(IndexBoundsBuilder::INEXACT_FETCH),
               curOr(nullptr),
               loosestBounds(IndexBoundsBuilder::EXACT) {}
@@ -157,7 +157,7 @@ private:
          * This always should be called prior to allocating a new 'currentScan'.
          */
         void resetForNextScan(IndexTag* newTag) {
-            currentScan.reset(NULL);
+            currentScan.reset(nullptr);
             currentIndexNumber = newTag->index;
             tightness = IndexBoundsBuilder::INEXACT_FETCH;
             loosestBounds = IndexBoundsBuilder::EXACT;

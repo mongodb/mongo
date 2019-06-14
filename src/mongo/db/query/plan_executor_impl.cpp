@@ -122,7 +122,7 @@ PlanStage* getStageByType(PlanStage* root, StageType type) {
         }
     }
 
-    return NULL;
+    return nullptr;
 }
 }  // namespace
 
@@ -379,7 +379,7 @@ void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
 
 PlanExecutor::ExecState PlanExecutorImpl::getNext(BSONObj* objOut, RecordId* dlOut) {
     Snapshotted<BSONObj> snapshotted;
-    ExecState state = _getNextImpl(objOut ? &snapshotted : NULL, dlOut);
+    ExecState state = _getNextImpl(objOut ? &snapshotted : nullptr, dlOut);
 
     if (objOut) {
         *objOut = snapshotted.value();
@@ -483,7 +483,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
 
     invariant(_currentState == kUsable);
     if (isMarkedAsKilled()) {
-        if (NULL != objOut) {
+        if (nullptr != objOut) {
             *objOut = Snapshotted<BSONObj>(SnapshotId(),
                                            WorkingSetCommon::buildMemberStatusObject(_killStatus));
         }
@@ -535,7 +535,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
             WorkingSetMember* member = _workingSet->get(id);
             bool hasRequestedData = true;
 
-            if (NULL != objOut) {
+            if (nullptr != objOut) {
                 if (WorkingSetMember::RID_AND_IDX == member->getState()) {
                     if (1 != member->keyData.size()) {
                         _workingSet->free(id);
@@ -553,7 +553,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
                 }
             }
 
-            if (NULL != dlOut) {
+            if (nullptr != dlOut) {
                 if (member->hasRecordId()) {
                     *dlOut = member->recordId;
                 } else {
@@ -602,7 +602,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
         } else {
             invariant(PlanStage::FAILURE == code);
 
-            if (NULL != objOut) {
+            if (nullptr != objOut) {
                 BSONObj statusObj;
                 invariant(WorkingSet::INVALID_ID != id);
                 WorkingSetCommon::getStatusMemberObject(*_workingSet, id, &statusObj);
@@ -641,7 +641,7 @@ Status PlanExecutorImpl::executePlan() {
     BSONObj obj;
     PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
     while (PlanExecutor::ADVANCED == state) {
-        state = this->getNext(&obj, NULL);
+        state = this->getNext(&obj, nullptr);
     }
 
     if (PlanExecutor::FAILURE == state) {

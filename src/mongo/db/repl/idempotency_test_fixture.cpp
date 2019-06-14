@@ -550,13 +550,13 @@ std::string IdempotencyTest::computeDataHash(Collection* collection) {
                                            PlanExecutor::NO_YIELD,
                                            InternalPlanner::FORWARD,
                                            InternalPlanner::IXSCAN_FETCH);
-    ASSERT(NULL != exec.get());
+    ASSERT(nullptr != exec.get());
     md5_state_t st;
     md5_init(&st);
 
     PlanExecutor::ExecState state;
     BSONObj obj;
-    while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+    while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
         obj = this->canonicalizeDocumentForDataHash(obj);
         md5_append(&st, (const md5_byte_t*)obj.objdata(), obj.objsize());
     }

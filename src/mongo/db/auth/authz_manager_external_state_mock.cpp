@@ -90,7 +90,7 @@ void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privileges
 }
 }  // namespace
 
-AuthzManagerExternalStateMock::AuthzManagerExternalStateMock() : _authzManager(NULL) {}
+AuthzManagerExternalStateMock::AuthzManagerExternalStateMock() : _authzManager(nullptr) {}
 AuthzManagerExternalStateMock::~AuthzManagerExternalStateMock() {}
 
 void AuthzManagerExternalStateMock::setAuthorizationManager(AuthorizationManager* authzManager) {
@@ -164,7 +164,7 @@ Status AuthzManagerExternalStateMock::insert(OperationContext* opCtx,
     _documents[collectionName].push_back(toInsert);
 
     if (_authzManager) {
-        _authzManager->logOp(opCtx, "i", collectionName, toInsert, NULL);
+        _authzManager->logOp(opCtx, "i", collectionName, toInsert, nullptr);
     }
 
     return Status::OK();
@@ -262,7 +262,7 @@ Status AuthzManagerExternalStateMock::remove(OperationContext* opCtx,
         ++n;
 
         if (_authzManager) {
-            _authzManager->logOp(opCtx, "d", collectionName, idQuery, NULL);
+            _authzManager->logOp(opCtx, "d", collectionName, idQuery, nullptr);
         }
     }
     *numRemoved = n;

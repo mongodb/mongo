@@ -58,7 +58,7 @@ using std::string;
 bool filterMatches(const BSONObj& testFilter,
                    const BSONObj& testCollation,
                    const QuerySolutionNode* trueFilterNode) {
-    if (NULL == trueFilterNode->filter) {
+    if (nullptr == trueFilterNode->filter) {
         return false;
     }
 
@@ -267,7 +267,7 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         if (filter.eoo()) {
             return true;
         } else if (filter.isNull()) {
-            return NULL == csn->filter;
+            return nullptr == csn->filter;
         } else if (!filter.isABSONObj()) {
             return false;
         }
@@ -336,7 +336,7 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         if (filter.eoo()) {
             return true;
         } else if (filter.isNull()) {
-            return NULL == ixn->filter;
+            return nullptr == ixn->filter;
         } else if (!filter.isABSONObj()) {
             return false;
         }
@@ -453,7 +453,7 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONElement filter = textObj["filter"];
         if (!filter.eoo()) {
             if (filter.isNull()) {
-                if (NULL != node->filter) {
+                if (nullptr != node->filter) {
                     return false;
                 }
             } else if (!filter.isABSONObj()) {
@@ -490,7 +490,7 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONElement filter = fetchObj["filter"];
         if (!filter.eoo()) {
             if (filter.isNull()) {
-                if (NULL != fn->filter) {
+                if (nullptr != fn->filter) {
                     return false;
                 }
             } else if (!filter.isABSONObj()) {
@@ -533,7 +533,7 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONElement filter = andHashObj["filter"];
         if (!filter.eoo()) {
             if (filter.isNull()) {
-                if (NULL != ahn->filter) {
+                if (nullptr != ahn->filter) {
                     return false;
                 }
             } else if (!filter.isABSONObj()) {
@@ -564,7 +564,7 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONElement filter = andSortedObj["filter"];
         if (!filter.eoo()) {
             if (filter.isNull()) {
-                if (NULL != asn->filter) {
+                if (nullptr != asn->filter) {
                     return false;
                 }
             } else if (!filter.isABSONObj()) {

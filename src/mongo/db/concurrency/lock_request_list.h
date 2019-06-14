@@ -48,10 +48,10 @@ class LockRequestList {
 public:
     void push_front(LockRequest* request) {
         // Sanity check that we do not reuse entries without cleaning them up
-        invariant(request->next == NULL);
-        invariant(request->prev == NULL);
+        invariant(request->next == nullptr);
+        invariant(request->prev == nullptr);
 
-        if (_front == NULL) {
+        if (_front == nullptr) {
             _front = _back = request;
         } else {
             request->next = _front;
@@ -63,10 +63,10 @@ public:
 
     void push_back(LockRequest* request) {
         // Sanity check that we do not reuse entries without cleaning them up
-        invariant(request->next == NULL);
-        invariant(request->prev == NULL);
+        invariant(request->next == nullptr);
+        invariant(request->prev == nullptr);
 
-        if (_front == NULL) {
+        if (_front == nullptr) {
             _front = _back = request;
         } else {
             request->prev = _back;
@@ -77,28 +77,28 @@ public:
     }
 
     void remove(LockRequest* request) {
-        if (request->prev != NULL) {
+        if (request->prev != nullptr) {
             request->prev->next = request->next;
         } else {
             _front = request->next;
         }
 
-        if (request->next != NULL) {
+        if (request->next != nullptr) {
             request->next->prev = request->prev;
         } else {
             _back = request->prev;
         }
 
-        request->prev = NULL;
-        request->next = NULL;
+        request->prev = nullptr;
+        request->next = nullptr;
     }
 
     void reset() {
-        _front = _back = NULL;
+        _front = _back = nullptr;
     }
 
     bool empty() const {
-        return _front == NULL;
+        return _front == nullptr;
     }
 
     // Pointers to the beginning and the end of the list

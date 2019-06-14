@@ -287,7 +287,7 @@ bool DBClientBase::runCommand(const string& dbname, BSONObj cmd, BSONObj& info, 
 */
 bool DBClientBase::simpleCommand(const string& dbname, BSONObj* info, const string& command) {
     BSONObj o;
-    if (info == 0)
+    if (info == nullptr)
         info = &o;
     BSONObjBuilder b;
     b.append(command, 1);
@@ -532,7 +532,7 @@ bool DBClientBase::isMaster(bool& isMaster, BSONObj* info) {
     }
 
     BSONObj o;
-    if (info == 0)
+    if (info == nullptr)
         info = &o;
     bool ok = runCommand("admin", bob.obj(), *info);
     isMaster = info->getField("ismaster").trueValue();
@@ -543,7 +543,7 @@ bool DBClientBase::createCollection(
     const string& ns, long long size, bool capped, int max, BSONObj* info) {
     verify(!capped || size);
     BSONObj o;
-    if (info == 0)
+    if (info == nullptr)
         info = &o;
     BSONObjBuilder b;
     string db = nsToDatabase(ns);

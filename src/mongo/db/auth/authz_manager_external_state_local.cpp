@@ -574,7 +574,7 @@ private:
     void _refreshRoleGraph() {
         stdx::lock_guard<stdx::mutex> lk(_externalState->_roleGraphMutex);
         Status status = _externalState->_roleGraph.handleLogOp(
-            _opCtx, _op.c_str(), _nss, _o, _o2 ? &*_o2 : NULL);
+            _opCtx, _op.c_str(), _nss, _o, _o2 ? &*_o2 : nullptr);
 
         if (status == ErrorCodes::OplogOperationUnsupported) {
             _externalState->_roleGraph = RoleGraph();

@@ -112,7 +112,7 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        verify(NULL != cq.get());
+        verify(nullptr != cq.get());
 
         // Make the stage.
         unique_ptr<PlanStage> root(
@@ -151,14 +151,14 @@ public:
         const Collection* coll = db->getCollection(&_opCtx, nss);
 
         unique_ptr<WorkingSet> ws(new WorkingSet());
-        IndexScan* ix = new IndexScan(&_opCtx, ixparams, ws.get(), NULL);
-        unique_ptr<PlanStage> root(new FetchStage(&_opCtx, ws.get(), ix, NULL, coll));
+        IndexScan* ix = new IndexScan(&_opCtx, ixparams, ws.get(), nullptr);
+        unique_ptr<PlanStage> root(new FetchStage(&_opCtx, ws.get(), ix, nullptr, coll));
 
         auto qr = std::make_unique<QueryRequest>(nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        verify(NULL != cq.get());
+        verify(nullptr != cq.get());
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor = PlanExecutor::make(&_opCtx,
@@ -334,7 +334,7 @@ protected:
         BSONObj objOut;
         int idcount = 0;
         PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&objOut, NULL))) {
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&objOut, nullptr))) {
             ASSERT_EQUALS(expectedIds[idcount], objOut["_id"].numberInt());
             ++idcount;
         }
@@ -358,7 +358,7 @@ TEST_F(PlanExecutorSnapshotTest, SnapshotControl) {
     auto exec = makeCollScanExec(coll, filterObj);
 
     BSONObj objOut;
-    ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
+    ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, nullptr));
     ASSERT_EQUALS(2, objOut["a"].numberInt());
 
     forceDocumentMove();
@@ -382,7 +382,7 @@ TEST_F(PlanExecutorSnapshotTest, SnapshotTest) {
     auto exec = makeIndexScanExec(ctx.db(), indexSpec, 2, 5);
 
     BSONObj objOut;
-    ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
+    ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, nullptr));
     ASSERT_EQUALS(2, objOut["a"].numberInt());
 
     forceDocumentMove();

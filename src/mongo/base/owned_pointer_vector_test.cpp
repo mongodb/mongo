@@ -290,7 +290,7 @@ TEST(OwnedPointerVectorTest, ReleaseAt) {
         holder.reset(owned.releaseAt(1));
         ASSERT_EQUALS(0U, DestructionLogger::destroyedNames().size());
         ASSERT_EQUALS(3U, owned.size());
-        ASSERT_EQUALS(static_cast<DestructionLogger*>(NULL), owned[1]);
+        ASSERT_EQUALS(static_cast<DestructionLogger*>(nullptr), owned[1]);
 
         // owned destroyed
     }

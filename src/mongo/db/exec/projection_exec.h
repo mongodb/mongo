@@ -211,7 +211,7 @@ private:
      */
     Status append(BSONObjBuilder* bob,
                   const BSONElement& elt,
-                  const MatchDetails* details = NULL,
+                  const MatchDetails* details = nullptr,
                   const ArrayOpType arrayOpType = ARRAY_OP_NORMAL) const;
 
     /**

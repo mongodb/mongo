@@ -138,7 +138,7 @@ public:
     static Result* cur;
 };
 
-Result* Result::cur = 0;
+Result* Result::cur = nullptr;
 
 namespace {
 
@@ -390,7 +390,7 @@ int Suite::run(const std::vector<std::string>& suites, const std::string& filter
 
     for (std::string name : torun) {
         std::shared_ptr<Suite>& s = _allSuites()[name];
-        fassert(16145, s != NULL);
+        fassert(16145, s != nullptr);
 
         log() << "going to run suite: " << name << std::endl;
         results.emplace_back(s->run(filter, runsPerTest));
@@ -407,7 +407,7 @@ int Suite::run(const std::vector<std::string>& suites, const std::string& filter
     Result totals("TOTALS");
     std::vector<std::string> failedSuites;
 
-    Result::cur = NULL;
+    Result::cur = nullptr;
     for (const auto& r : results) {
         log().setIsTruncatable(false) << r->toString();
         if (abs(r->rc()) > abs(rc))

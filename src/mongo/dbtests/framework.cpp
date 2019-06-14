@@ -66,7 +66,7 @@ namespace dbtests {
 
 int runDbTests(int argc, char** argv) {
     frameworkGlobalParams.perfHist = 1;
-    frameworkGlobalParams.seed = time(0);
+    frameworkGlobalParams.seed = time(nullptr);
     frameworkGlobalParams.runsPerTest = 1;
 
     registerShutdownTask([] {

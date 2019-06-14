@@ -46,18 +46,18 @@ using std::stringstream;
 
 class WiredTigerConnection {
 public:
-    WiredTigerConnection(StringData dbpath, StringData extraStrings) : _conn(NULL) {
+    WiredTigerConnection(StringData dbpath, StringData extraStrings) : _conn(nullptr) {
         std::stringstream ss;
         ss << "create,";
         ss << extraStrings;
         string config = ss.str();
         _fastClockSource = std::make_unique<SystemClockSource>();
-        int ret = wiredtiger_open(dbpath.toString().c_str(), NULL, config.c_str(), &_conn);
+        int ret = wiredtiger_open(dbpath.toString().c_str(), nullptr, config.c_str(), &_conn);
         ASSERT_OK(wtRCToStatus(ret));
         ASSERT(_conn);
     }
     ~WiredTigerConnection() {
-        _conn->close(_conn, NULL);
+        _conn->close(_conn, nullptr);
     }
     WT_CONNECTION* getConnection() const {
         return _conn;

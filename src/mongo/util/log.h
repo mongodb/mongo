@@ -236,7 +236,7 @@ extern Tee* const startupWarningsLog;  // Things put here get reported in MMS
 /**
  * Write the current context (backtrace), along with the optional "msg".
  */
-void logContext(const char* msg = NULL);
+void logContext(const char* msg = nullptr);
 
 /**
  * Turns the global log manager into a plain console logger (no adornments).

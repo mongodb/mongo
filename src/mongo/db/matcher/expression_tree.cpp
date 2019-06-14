@@ -241,7 +241,7 @@ bool AndMatchExpression::isTriviallyTrue() const {
 
 bool OrMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
     for (size_t i = 0; i < numChildren(); i++) {
-        if (getChild(i)->matches(doc, NULL)) {
+        if (getChild(i)->matches(doc, nullptr)) {
             return true;
         }
     }
@@ -284,7 +284,7 @@ bool OrMatchExpression::isTriviallyFalse() const {
 
 bool NorMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
     for (size_t i = 0; i < numChildren(); i++) {
-        if (getChild(i)->matches(doc, NULL)) {
+        if (getChild(i)->matches(doc, nullptr)) {
             return false;
         }
     }

@@ -276,7 +276,7 @@ void PeriodicTaskRunner::remove(PeriodicTask* task) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     for (size_t i = 0; i != _tasks.size(); i++) {
         if (_tasks[i] == task) {
-            _tasks[i] = NULL;
+            _tasks[i] = nullptr;
             break;
         }
     }

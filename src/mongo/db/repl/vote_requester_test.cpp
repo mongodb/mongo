@@ -98,7 +98,7 @@ public:
     }
 
     virtual void tearDown() {
-        _requester.reset(NULL);
+        _requester.reset(nullptr);
     }
 
 protected:

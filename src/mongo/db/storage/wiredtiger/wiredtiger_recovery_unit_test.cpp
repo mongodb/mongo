@@ -146,7 +146,7 @@ public:
     void getCursor(WiredTigerRecoveryUnit* ru, WT_CURSOR** cursor) {
         WT_SESSION* wt_session = ru->getSession()->getSession();
         invariantWTOK(wt_session->create(wt_session, wt_uri, wt_config));
-        invariantWTOK(wt_session->open_cursor(wt_session, wt_uri, NULL, NULL, cursor));
+        invariantWTOK(wt_session->open_cursor(wt_session, wt_uri, nullptr, nullptr, cursor));
     }
 
     void setUp() override {

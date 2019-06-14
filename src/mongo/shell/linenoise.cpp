@@ -385,12 +385,12 @@ public:
     }
 
     Utf32String* yank() {
-        return (size > 0) ? &theRing[indexToSlot[index]] : 0;
+        return (size > 0) ? &theRing[indexToSlot[index]] : nullptr;
     }
 
     Utf32String* yankPop() {
         if (size == 0) {
-            return 0;
+            return nullptr;
         }
         ++index;
         if (index == size) {
@@ -467,8 +467,8 @@ static const int DELETE_KEY = 0x10E00000;
 static const int PAGE_UP_KEY = 0x11000000;
 static const int PAGE_DOWN_KEY = 0x11200000;
 
-static const char* unsupported_term[] = {"dumb", "cons25", "emacs", NULL};
-static linenoiseCompletionCallback* completionCallback = NULL;
+static const char* unsupported_term[] = {"dumb", "cons25", "emacs", nullptr};
+static linenoiseCompletionCallback* completionCallback = nullptr;
 
 #ifdef _WIN32
 static HANDLE console_in, console_out;
@@ -485,7 +485,7 @@ static int atexit_registered = 0; /* register atexit just 1 time */
 static int historyMaxLen = LINENOISE_DEFAULT_HISTORY_MAX_LEN;
 static int historyLen = 0;
 static int historyIndex = 0;
-static UChar8** history = NULL;
+static UChar8** history = nullptr;
 
 // used to emulate Windows command prompt on down-arrow after a recall
 // we use -2 as our "not set" value because we add 1 to the previous index on down-arrow,
@@ -497,7 +497,7 @@ static void linenoiseAtExit(void);
 
 static bool isUnsupportedTerm(void) {
     char* term = getenv("TERM");
-    if (term == NULL)
+    if (term == nullptr)
         return false;
     for (int j = 0; unsupported_term[j]; ++j)
         if (!strcasecmp(term, unsupported_term[j])) {
@@ -517,7 +517,7 @@ void linenoiseHistoryFree(void) {
             free(history[j]);
         historyLen = 0;
         free(history);
-        history = 0;
+        history = nullptr;
     }
 }
 
@@ -1754,7 +1754,7 @@ int InputBuffer::incrementalHistorySearch(PromptBase& pi, int startChar) {
     bool keepLooping = true;
     bool useSearchedLine = true;
     bool searchAgain = false;
-    UChar32* activeHistoryLine = 0;
+    UChar32* activeHistoryLine = nullptr;
     while (keepLooping) {
         c = linenoiseReadChar();
         c = cleanupCtrl(c);  // convert CTRL + <char> into normal ctrl
@@ -2639,12 +2639,12 @@ char* linenoise(const char* prompt) {
         PromptInfo pi(reinterpret_cast<const UChar8*>(prompt), getScreenColumns());
         if (isUnsupportedTerm()) {
             if (write32(1, pi.promptText.get(), pi.promptChars) == -1)
-                return 0;
+                return nullptr;
             fflush(stdout);
             if (preloadedBufferContents.empty()) {
                 unique_ptr<char[]> buf8(new char[LINENOISE_MAX_LINE]);
-                if (fgets(buf8.get(), LINENOISE_MAX_LINE, stdin) == NULL) {
-                    return NULL;
+                if (fgets(buf8.get(), LINENOISE_MAX_LINE, stdin) == nullptr) {
+                    return nullptr;
                 }
                 size_t len = strlen(buf8.get());
                 while (len && (buf8[len - 1] == '\n' || buf8[len - 1] == '\r')) {
@@ -2659,7 +2659,7 @@ char* linenoise(const char* prompt) {
             }
         } else {
             if (enableRawMode() == -1) {
-                return NULL;
+                return nullptr;
             }
             InputBuffer ib(buf32, charWidths, LINENOISE_MAX_LINE);
             if (!preloadedBufferContents.empty()) {
@@ -2670,7 +2670,7 @@ char* linenoise(const char* prompt) {
             disableRawMode();
             printf("\n");
             if (count == -1) {
-                return NULL;
+                return nullptr;
             }
             size_t bufferSize = sizeof(UChar32) * ib.length() + 1;
             unique_ptr<UChar8[]> buf8(new UChar8[bufferSize]);
@@ -2679,8 +2679,8 @@ char* linenoise(const char* prompt) {
         }
     } else {  // input not from a terminal, we should work with piped input, i.e. redirected stdin
         unique_ptr<char[]> buf8(new char[LINENOISE_MAX_LINE]);
-        if (fgets(buf8.get(), LINENOISE_MAX_LINE, stdin) == NULL) {
-            return NULL;
+        if (fgets(buf8.get(), LINENOISE_MAX_LINE, stdin) == nullptr) {
+            return nullptr;
         }
 
         // if fgets() gave us the newline, remove it
@@ -2706,9 +2706,9 @@ int linenoiseHistoryAdd(const char* line) {
     if (historyMaxLen == 0) {
         return 0;
     }
-    if (history == NULL) {
+    if (history == nullptr) {
         history = reinterpret_cast<UChar8**>(malloc(sizeof(UChar8*) * historyMaxLen));
-        if (history == NULL) {
+        if (history == nullptr) {
             return 0;
         }
         memset(history, 0, (sizeof(char*) * historyMaxLen));
@@ -2746,7 +2746,7 @@ int linenoiseHistorySetMaxLen(int len) {
     if (history) {
         int tocopy = historyLen;
         UChar8** newHistory = reinterpret_cast<UChar8**>(malloc(sizeof(UChar8*) * len));
-        if (newHistory == NULL) {
+        if (newHistory == nullptr) {
             return 0;
         }
         if (len < tocopy) {
@@ -2784,7 +2784,7 @@ mongo::Status linenoiseHistorySave(const char* filename) {
         return linenoiseFileError(mongo::ErrorCodes::FileOpenFailed, "open()", filename, ewd);
     }
     fp = fdopen(fd, "wt");
-    if (fp == NULL) {
+    if (fp == nullptr) {
         const auto ewd = mongo::errnoWithDescription();
         // We've already failed, so no need to report any close() failure.
         (void)close(fd);
@@ -2820,7 +2820,7 @@ mongo::Status linenoiseHistorySave(const char* filename) {
 /* Load the history from the specified file. */
 mongo::Status linenoiseHistoryLoad(const char* filename) {
     FILE* fp = fopen(filename, "rt");
-    if (fp == NULL) {
+    if (fp == nullptr) {
         if (errno == ENOENT) {
             // Not having a history file isn't an error condition.
             // For example, it's always the case when the shell is run for the first time.
@@ -2831,7 +2831,7 @@ mongo::Status linenoiseHistoryLoad(const char* filename) {
     }
 
     char buf[LINENOISE_MAX_LINE];
-    while (fgets(buf, LINENOISE_MAX_LINE, fp) != NULL) {
+    while (fgets(buf, LINENOISE_MAX_LINE, fp) != nullptr) {
         char* p = strchr(buf, '\r');
         if (!p) {
             p = strchr(buf, '\n');

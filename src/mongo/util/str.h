@@ -128,7 +128,7 @@ inline bool endsWith(const char* p, const char* suffix) {
 /** find char x, and return rest of the string thereafter, or an empty string if not found */
 inline const char* after(const char* s, char x) {
     const char* p = strchr(s, x);
-    return (p != 0) ? p + 1 : "";
+    return (p != nullptr) ? p + 1 : "";
 }
 inline mongo::StringData after(mongo::StringData s, char x) {
     auto pos = s.find(x);
@@ -138,7 +138,7 @@ inline mongo::StringData after(mongo::StringData s, char x) {
 /** find string x, and return rest of the string thereafter, or an empty string if not found */
 inline const char* after(const char* s, const char* x) {
     const char* p = strstr(s, x);
-    return (p != 0) ? p + strlen(x) : "";
+    return (p != nullptr) ? p + strlen(x) : "";
 }
 inline mongo::StringData after(mongo::StringData s, mongo::StringData x) {
     auto pos = s.find(x);

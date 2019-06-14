@@ -190,7 +190,7 @@ Socket::Socket(int fd, const SockAddr& remote)
     : _fd(fd),
       _remote(remote),
       _timeout(0),
-      _lastValidityCheckAtSecs(time(0)),
+      _lastValidityCheckAtSecs(time(nullptr)),
       _logLevel(logger::LogSeverity::Log()) {
     _init();
     if (fd >= 0) {
@@ -201,7 +201,7 @@ Socket::Socket(int fd, const SockAddr& remote)
 Socket::Socket(double timeout, logger::LogSeverity ll) : _logLevel(ll) {
     _fd = INVALID_SOCKET;
     _timeout = timeout;
-    _lastValidityCheckAtSecs = time(0);
+    _lastValidityCheckAtSecs = time(nullptr);
     _init();
 }
 
@@ -214,7 +214,7 @@ void Socket::_init() {
     _bytesIn = 0;
     _awaitingHandshake = true;
 #ifdef MONGO_CONFIG_SSL
-    _sslManager = 0;
+    _sslManager = nullptr;
 #endif
 }
 
@@ -612,7 +612,7 @@ bool Socket::isStillConnected() {
     if (!isPollSupported())
         return true;  // nothing we can do
 
-    time_t now = time(0);
+    time_t now = time(nullptr);
     time_t idleTimeSecs = now - _lastValidityCheckAtSecs;
 
     // Only check once every 5 secs

@@ -228,7 +228,7 @@ void WriteOp::noteWriteComplete(const TargetedWrite& targetedWrite) {
     const WriteOpRef& ref = targetedWrite.writeOpRef;
     auto& childOp = _childOps[ref.second];
 
-    childOp.pendingWrite = NULL;
+    childOp.pendingWrite = nullptr;
     childOp.endpoint.reset(new ShardEndpoint(targetedWrite.endpoint));
     childOp.state = WriteOpState_Completed;
     _updateOpState();
@@ -238,7 +238,7 @@ void WriteOp::noteWriteError(const TargetedWrite& targetedWrite, const WriteErro
     const WriteOpRef& ref = targetedWrite.writeOpRef;
     auto& childOp = _childOps[ref.second];
 
-    childOp.pendingWrite = NULL;
+    childOp.pendingWrite = nullptr;
     childOp.endpoint.reset(new ShardEndpoint(targetedWrite.endpoint));
     childOp.error.reset(new WriteErrorDetail);
     error.cloneTo(childOp.error.get());

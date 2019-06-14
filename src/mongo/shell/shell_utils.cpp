@@ -264,7 +264,7 @@ bool isBalanced(const std::string& code) {
 
 std::string dbConnect;
 
-static const char* argv0 = 0;
+static const char* argv0 = nullptr;
 EnterpriseShellCallback* enterpriseCallback = nullptr;
 
 void RecordMyLocation(const char* _argv0) {

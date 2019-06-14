@@ -370,7 +370,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
     unique_ptr<PlanStage> root;
 
     // This can happen as we're called by internal clients as well.
-    if (NULL == collection) {
+    if (nullptr == collection) {
         const string& ns = canonicalQuery->ns();
         LOG(2) << "Collection " << ns << " does not exist."
                << " Using EOF plan: " << redact(canonicalQuery->toStringShort());
@@ -745,7 +745,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getExecutorFind(
     unique_ptr<CanonicalQuery> canonicalQuery,
     PlanExecutor::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
-    if (NULL != collection && canonicalQuery->getQueryRequest().isOplogReplay()) {
+    if (nullptr != collection && canonicalQuery->getQueryRequest().isOplogReplay()) {
         return getOplogStartHack(
             opCtx, collection, std::move(canonicalQuery), plannerOptions, yieldPolicy);
     }
@@ -1131,7 +1131,7 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
         return false;
     }
 
-    if (STAGE_FETCH == root->getType() && NULL != root->filter.get()) {
+    if (STAGE_FETCH == root->getType() && nullptr != root->filter.get()) {
         return false;
     }
 
@@ -1148,7 +1148,7 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
     // isSimpleRange here?  because we could well use it.  I just don't think we ever do see
     // it.
 
-    if (NULL != isn->filter.get() || isn->bounds.isSimpleRange) {
+    if (nullptr != isn->filter.get() || isn->bounds.isSimpleRange) {
         return false;
     }
 

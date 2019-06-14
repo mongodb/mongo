@@ -180,31 +180,33 @@ TEST_F(ExtractionFixture, GetLong) {
 TEST_F(ExtractionFixture, IsFound) {
     bool bool_val;
     BSONField<bool> aBoolMissing("aBoolMissing");
-    ASSERT_EQUALS(FieldParser::extract(doc, aBool, &bool_val, NULL), FieldParser::FIELD_SET);
-    ASSERT_EQUALS(FieldParser::extract(doc, aBoolMissing, &bool_val, NULL),
+    ASSERT_EQUALS(FieldParser::extract(doc, aBool, &bool_val, nullptr), FieldParser::FIELD_SET);
+    ASSERT_EQUALS(FieldParser::extract(doc, aBoolMissing, &bool_val, nullptr),
                   FieldParser::FIELD_NONE);
 
     Date_t Date_t_val;
     BSONField<Date_t> aDateMissing("aDateMissing");
-    ASSERT_EQUALS(FieldParser::extract(doc, aDate, &Date_t_val, NULL), FieldParser::FIELD_SET);
-    ASSERT_EQUALS(FieldParser::extract(doc, aDateMissing, &Date_t_val, NULL),
+    ASSERT_EQUALS(FieldParser::extract(doc, aDate, &Date_t_val, nullptr), FieldParser::FIELD_SET);
+    ASSERT_EQUALS(FieldParser::extract(doc, aDateMissing, &Date_t_val, nullptr),
                   FieldParser::FIELD_NONE);
 
     string string_val;
     BSONField<string> aStringMissing("aStringMissing");
-    ASSERT_EQUALS(FieldParser::extract(doc, aString, &string_val, NULL), FieldParser::FIELD_SET);
-    ASSERT_EQUALS(FieldParser::extract(doc, aStringMissing, &string_val, NULL),
+    ASSERT_EQUALS(FieldParser::extract(doc, aString, &string_val, nullptr), FieldParser::FIELD_SET);
+    ASSERT_EQUALS(FieldParser::extract(doc, aStringMissing, &string_val, nullptr),
                   FieldParser::FIELD_NONE);
 
     OID OID_val;
     BSONField<OID> anOIDMissing("anOIDMissing");
-    ASSERT_EQUALS(FieldParser::extract(doc, anOID, &OID_val, NULL), FieldParser::FIELD_SET);
-    ASSERT_EQUALS(FieldParser::extract(doc, anOIDMissing, &OID_val, NULL), FieldParser::FIELD_NONE);
+    ASSERT_EQUALS(FieldParser::extract(doc, anOID, &OID_val, nullptr), FieldParser::FIELD_SET);
+    ASSERT_EQUALS(FieldParser::extract(doc, anOIDMissing, &OID_val, nullptr),
+                  FieldParser::FIELD_NONE);
 
     long long long_long_val;
     BSONField<long long> aLongMissing("aLongMissing");
-    ASSERT_EQUALS(FieldParser::extract(doc, aLong, &long_long_val, NULL), FieldParser::FIELD_SET);
-    ASSERT_EQUALS(FieldParser::extract(doc, aLongMissing, &long_long_val, NULL),
+    ASSERT_EQUALS(FieldParser::extract(doc, aLong, &long_long_val, nullptr),
+                  FieldParser::FIELD_SET);
+    ASSERT_EQUALS(FieldParser::extract(doc, aLongMissing, &long_long_val, nullptr),
                   FieldParser::FIELD_NONE);
 }
 

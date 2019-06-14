@@ -166,7 +166,7 @@ void ProjectionExec::add(const string& field, bool include) {
 
         ProjectionExec*& fm = _fields[subfield.c_str()];
 
-        if (NULL == fm) {
+        if (nullptr == fm) {
             fm = new ProjectionExec();
         }
 
@@ -187,7 +187,7 @@ void ProjectionExec::add(const string& field, int skip, int limit) {
 
         ProjectionExec*& fm = _fields[subfield.c_str()];
 
-        if (NULL == fm) {
+        if (nullptr == fm) {
             fm = new ProjectionExec();
         }
 

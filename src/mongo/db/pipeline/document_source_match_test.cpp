@@ -184,7 +184,7 @@ TEST_F(DocumentSourceMatchTest, RedactSafePortion) {
     assertExpectedRedactSafePortion("{a: {$in: [1, 0, null]}}", "{}");
 
     {
-        const char* comparisonOps[] = {"$gt", "$lt", "$gte", "$lte", NULL};
+        const char* comparisonOps[] = {"$gt", "$lt", "$gte", "$lte", nullptr};
         for (int i = 0; comparisonOps[i]; i++) {
             const char* op = comparisonOps[i];
             assertExpectedRedactSafePortion(string("{a: {") + op + ": 1}}",
@@ -610,7 +610,7 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateJSONSchemaPredicate) {
         fromjson("{$jsonSchema: {properties: {a: {type: 'number'}}}}"), getExpCtx());
 
     const auto mock = DocumentSourceMock::createForTest(
-        {Document{{"a", 1}}, Document{{"a", "str"_sd}}, Document{{"a", {Document{{0, 1}}}}}});
+        {Document{{"a", 1}}, Document{{"a", "str"_sd}}, Document{{"a", {Document{{nullptr, 1}}}}}});
 
     match->setSource(mock.get());
 
