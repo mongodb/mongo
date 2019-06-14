@@ -16,6 +16,8 @@ To build MongoDB, you will need:
 
 * Python 3.7.x and Pip modules:
     * See the section "Python Prerequisites" below.
+* About 600 GB of free disk space (for source code and to build all components).
+
 
 MongoDB supports the following architectures: arm64, ppc64le, s390x, and x86-64.
 More detailed platform instructions can be found below.
