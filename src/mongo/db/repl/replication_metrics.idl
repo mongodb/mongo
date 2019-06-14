@@ -39,10 +39,25 @@ imports:
 structs:
     ElectionMetrics:
         description: "Stores metrics related to all the elections a node has called"
+        strict: true
+        fields:
+            numStepUpsRequested:
+                description: "Number of elections this node has called due to step up requests"
+                type: int
 
     ElectionCandidateMetrics:
         description: "Stores metrics that are specific to the last election in which the node was a
                       candidate"
+        strict: true
+        fields:
+            priorityAtElection:
+                description: "The node's priority at the time of the election"
+                type: double
 
     ElectionParticipantMetrics:
         description: "Stores metrics that are specific to the last election in which the node voted"
+        strict: true
+        fields:
+            priorityAtElection:
+                description: "The node's priority at the time of the election"
+                type: double
