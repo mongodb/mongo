@@ -163,8 +163,8 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
         // waiting for the lastAppliedTimestamp to move forward. Instead we force the reader take
         // the PBWM lock and retry.
         if (lastAppliedTimestamp) {
-            LOG(2) << "Tried reading at last-applied time: " << *lastAppliedTimestamp
-                   << " on nss: " << nss.ns() << ", but future catalog changes are pending at time "
+            LOG(0) << "tried reading at last-applied time: " << *lastAppliedTimestamp
+                   << " on ns: " << nss.ns() << ", but future catalog changes are pending at time "
                    << *minSnapshot << ". Trying again without reading at last-applied time.";
             _shouldNotConflictWithSecondaryBatchApplicationBlock = boost::none;
             opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
@@ -189,8 +189,20 @@ bool AutoGetCollectionForRead::_shouldReadAtLastAppliedTimestamp(
     const NamespaceString& nss,
     repl::ReadConcernLevel readConcernLevel) const {
 
-    // If external circumstances prevent us from reading at lastApplied, disallow it.
+    // If this block is unset, then the operation did not opt-out of the PBWM lock, implying that it
+    // cannot read at lastApplied. It's important to note that it is possible for this to be set,
+    // but still be holding the PBWM lock, explained below.
     if (!_shouldNotConflictWithSecondaryBatchApplicationBlock) {
+        return false;
+    }
+
+    // If we are already holding the PBWM lock, do not read at last-applied. This is because once an
+    // operation reads without a timestamp (effectively seeing all writes), it is no longer safe to
+    // start reading at a timestamp, as writes or catalog operations may appear to vanish.
+    // This may occur when multiple collection locks are held concurrently, which is often the case
+    // when DBDirectClient is used.
+    if (opCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode, MODE_IS)) {
+        LOG(1) << "not reading at last-applied because the PBWM lock is held";
         return false;
     }
 
