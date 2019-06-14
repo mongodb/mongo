@@ -14,7 +14,7 @@ To build MongoDB, you will need:
       * `libcurl4-nss-dev`
       * `libcurl4-gnutls-dev`
 * Python 3.7.x and Pip modules:
-    * See the section "Python Prerequisites" below.
+  * See the section "Python Prerequisites" below.
 * About 600 GB of free disk space (for source code and to build all components).
 
 
