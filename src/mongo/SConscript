@@ -67,6 +67,7 @@ env.Library(
         'base/init.cpp',
         'base/initializer.cpp',
         'base/initializer_dependency_graph.cpp',
+        'base/make_string_vector.cpp',
         'base/parse_number.cpp',
         'base/shim.cpp',
         'base/simple_string_data_comparator.cpp',
