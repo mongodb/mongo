@@ -42,9 +42,9 @@ the required Python modules, run:
 Note: If the `pip3` command is not available, `pip` without a suffix may be the pip command
 associated with Python 3.7.x.
 
-Note: In order to compile C-based Python modules, you'll also need the Python C headers. Run:
+Note: In order to compile C-based Python modules, you'll also need the Python and OpenSSL C headers. Run:
 * Fedora/RHEL - `dnf install python3-devel openssl-devel`
-* Ubuntu/Debian - `apt-get install python3.7-dev`
+* Ubuntu/Debian - `apt-get install python3.7-dev libssl-dev`
 
 
 SCons
