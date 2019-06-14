@@ -29,18 +29,40 @@
 
 #include "mongo/platform/basic.h"
 
+#include <sstream>
+
 #include "mongo/db/multi_key_path_tracker.h"
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
 const OperationContext::Decoration<MultikeyPathTracker> MultikeyPathTracker::get =
     OperationContext::declareDecoration<MultikeyPathTracker>();
 
+// static
+std::string MultikeyPathTracker::dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
+    std::stringstream ss;
+
+    ss << "[ ";
+    for (const auto& multikeyComponents : multikeyPaths) {
+        ss << "[ ";
+        for (const auto& multikeyComponent : multikeyComponents) {
+            ss << multikeyComponent << " ";
+        }
+        ss << "] ";
+    }
+    ss << "]";
+
+    return ss.str();
+}
+
 void MultikeyPathTracker::mergeMultikeyPaths(MultikeyPaths* toMergeInto,
                                              const MultikeyPaths& newPaths) {
-    invariant(toMergeInto->size() == newPaths.size());
+    invariant(toMergeInto->size() == newPaths.size(),
+              str::stream() << "toMergeInto: " << dumpMultikeyPaths(*toMergeInto) << "; newPaths: "
+                            << dumpMultikeyPaths(newPaths));
     for (auto idx = std::size_t(0); idx < toMergeInto->size(); ++idx) {
         toMergeInto->at(idx).insert(newPaths[idx].begin(), newPaths[idx].end());
     }

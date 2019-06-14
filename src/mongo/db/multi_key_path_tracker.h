@@ -56,6 +56,11 @@ class MultikeyPathTracker {
 public:
     static const OperationContext::Decoration<MultikeyPathTracker> get;
 
+    /**
+     * Returns a string representation of MultikeyPaths for logging.
+     */
+    static std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths);
+
     static void mergeMultikeyPaths(MultikeyPaths* toMergeInto, const MultikeyPaths& newPaths);
 
     // Decoration requires a default constructor.
