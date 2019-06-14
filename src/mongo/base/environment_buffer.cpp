@@ -31,10 +31,16 @@
 
 #ifndef _WIN32
 extern char** environ;
+namespace {
+char** environmentPointer = environ;
+}
 #else
-char** const environ = nullptr;
+namespace {
+char** environmentPointer = nullptr;
+}
+
 #endif
 
 char** mongo::getEnvironPointer() {
-    return environ;
+    return environmentPointer;
 }

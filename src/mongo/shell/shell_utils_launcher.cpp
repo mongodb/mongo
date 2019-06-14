@@ -76,10 +76,6 @@
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
 
-#ifndef _WIN32
-extern char** environ;
-#endif
-
 namespace mongo {
 
 using std::cout;
