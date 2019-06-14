@@ -253,6 +253,7 @@ selector:
   # Command expects to see result from parallel operation.
   # E.g. Suppose the following sequence of events: op1, join() op2 in parallel shell, op3.
   # op3 will still be using the snapshot from op1, and not see op2 at all.
+  - jstests/core/benchrun_pipeline_updates.js
   - jstests/core/cursora.js
 
   # Expect drops/creates to fail or have a certain response:

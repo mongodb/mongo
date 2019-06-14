@@ -37,6 +37,7 @@ selector:
   - jstests/core/sort4.js
   - jstests/core/ord.js
   # Parallel shell is not causally consistent
+  - jstests/core/benchrun_pipeline_updates.js
   - jstests/core/cursora.js
   - jstests/core/find_and_modify_concurrent_update.js
   - jstests/core/shellstartparallel.js

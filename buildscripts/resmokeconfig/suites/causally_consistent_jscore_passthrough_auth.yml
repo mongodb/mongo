@@ -88,6 +88,7 @@ selector:
   # An index drop does not necessarily cause cursors to be killed on the secondary.
   - jstests/core/ord.js
   # Parallel shell is not causally consistent
+  - jstests/core/benchrun_pipeline_updates.js
   - jstests/core/cursora.js
   - jstests/core/find_and_modify_concurrent_update.js
   - jstests/core/removec.js
