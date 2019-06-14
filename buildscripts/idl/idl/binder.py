@@ -290,6 +290,10 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
                 ctxt.add_bad_struct_field_as_doc_sequence_error(ast_struct, ast_struct.name,
                                                                 ast_field.name)
 
+            if ast_field.non_const_getter and struct.immutable:
+                ctxt.add_bad_field_non_const_getter_in_immutable_struct_error(
+                    ast_struct, ast_struct.name, ast_field.name)
+
             if not _is_duplicate_field(ctxt, ast_struct.name, ast_struct.fields, ast_field):
                 ast_struct.fields.append(ast_field)
 
@@ -535,6 +539,7 @@ def _bind_field(ctxt, parsed_spec, field):
     ast_field.serialize_op_msg_request_only = field.serialize_op_msg_request_only
     ast_field.constructed = field.constructed
     ast_field.comparison_order = field.comparison_order
+    ast_field.non_const_getter = field.non_const_getter
 
     ast_field.cpp_name = field.name
     if field.cpp_name:

@@ -98,6 +98,7 @@ ERROR_ID_IS_NODE_VALID_INT = "ID0049"
 ERROR_ID_IS_NODE_VALID_NON_NEGATIVE_INT = "ID0050"
 ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER = "ID0051"
 ERROR_ID_IS_COMMAND_TYPE_EXTRANEOUS = "ID0052"
+ERROR_ID_NON_CONST_GETTER_IN_IMMUTABLE_STRUCT = "ID0069"
 
 
 class IDLError(Exception):
@@ -630,6 +631,16 @@ class ParserContext(object):
         self._add_error(location, ERROR_ID_COMMAND_DUPLICATES_FIELD,
                         ("Command '%s' cannot have the same name as a field.") % (command_name))
 
+    def add_bad_field_non_const_getter_in_immutable_struct_error(self, location, struct_name,
+                                                                 field_name):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        """Add an error about marking a field with non_const_getter in an immutable struct."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_NON_CONST_GETTER_IN_IMMUTABLE_STRUCT,
+                        ("Cannot generate a non-const getter for field '%s' in struct '%s' since"
+                         " struct '%s' is marked as immutable.") % (field_name, struct_name,
+                                                                    struct_name))
+
     def is_scalar_non_negative_int_node(self, node, node_name):
         # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], unicode) -> bool
         """Return True if this YAML node is a Scalar and a valid non-negative int."""
@@ -689,7 +700,7 @@ def _assert_unique_error_messages():
 
     error_ids_set = set(error_ids)
     if len(error_ids) != len(error_ids_set):
-        raise IDLError("IDL error codes prefixed with ERRROR_ID are not unique.")
+        raise IDLError("IDL error codes prefixed with ERROR_ID are not unique.")
 
 
 # On file import, check the error messages are unique

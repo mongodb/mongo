@@ -220,6 +220,7 @@ def _parse_field(ctxt, name, node):
             "default": _RuleDesc('scalar'),
             "supports_doc_sequence": _RuleDesc("bool_scalar"),
             "comparison_order": _RuleDesc("int_scalar"),
+            "non_const_getter": _RuleDesc("bool_scalar"),
         })
 
     return field

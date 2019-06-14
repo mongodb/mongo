@@ -32,18 +32,51 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    cpp_includes:
+        - "mongo/db/repl/election_reason_counter_parser.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
+
+types:
+    ElectionReasonCounter:
+        bson_serialization_type: any
+        description: "Wrapper around ElectionReasonCounterBase that has increment methods"
+        cpp_type: ElectionReasonCounter
+        serializer: "::mongo::repl::serializeElectionReasonCounterToBSON"
+        deserializer: "::mongo::repl::parseElectionReasonCounter"
 
 structs:
     ElectionMetrics:
         description: "Stores metrics related to all the elections a node has called"
         strict: true
         fields:
-            numStepUpsRequested:
-                description: "Number of elections this node has called due to step up requests"
-                type: int
+            stepUpCmd:
+                description: "Election reason counter for step up requests"
+                type: ElectionReasonCounter
+                default: "ElectionReasonCounter()"
+                non_const_getter: true
+            priorityTakeover:
+                description: "Election reason counter for priority takeovers"
+                type: ElectionReasonCounter
+                default: "ElectionReasonCounter()"
+                non_const_getter: true
+            catchUpTakeover:
+                description: "Election reason counter for catchup takeovers"
+                type: ElectionReasonCounter
+                default: "ElectionReasonCounter()"
+                non_const_getter: true
+            electionTimeout:
+                description: "Election reason counter for when the node didn't see a primary in the
+                              past electionTimeoutPeriod milliseconds"
+                type: ElectionReasonCounter
+                default: "ElectionReasonCounter()"
+                non_const_getter: true
+            freezeTimeout:
+                description: "Election reason counter for single node replica set prompt elections"
+                type: ElectionReasonCounter
+                default: "ElectionReasonCounter()"
+                non_const_getter: true
 
     ElectionCandidateMetrics:
         description: "Stores metrics that are specific to the last election in which the node was a
