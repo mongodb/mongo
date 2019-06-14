@@ -35,11 +35,14 @@
 
     // Test that advancing the oplog time updates the postBatchResumeToken, even with no results.
     assert.commandWorked(otherCollection.insert({}));
-    assert(!csCursor.hasNext());  // Causes a getMore to be dispatched.
     let prevResumeToken = curResumeToken;
-    curResumeToken = csCursor.getResumeToken();
-    assert.neq(undefined, curResumeToken);
-    assert.gt(bsonWoCompare(curResumeToken, prevResumeToken), 0);
+    assert.soon(() => {
+        assert(!csCursor.hasNext());  // Causes a getMore to be dispatched.
+        prevResumeToken = curResumeToken;
+        curResumeToken = csCursor.getResumeToken();
+        assert.neq(undefined, curResumeToken);
+        return bsonWoCompare(curResumeToken, prevResumeToken) > 0;
+    });
 
     // Insert 9 documents into the collection, followed by a write to the unrelated collection.
     for (let i = 0; i < 9; ++i) {
@@ -48,7 +51,7 @@
     assert.commandWorked(otherCollection.insert({}));
 
     // Retrieve the first batch of events from the cursor.
-    assert(csCursor.hasNext());  // Causes a getMore to be dispatched.
+    assert.soon(() => csCursor.hasNext());  // Causes a getMore to be dispatched.
 
     // We have not yet iterated any of the events. Verify that the resume token is unchanged.
     assert.docEq(curResumeToken, csCursor.getResumeToken());
@@ -64,14 +67,14 @@
     }
 
     // Retrieve the second batch of events from the cursor.
-    assert(csCursor.hasNext());  // Causes a getMore to be dispatched.
+    assert.soon(() => csCursor.hasNext());  // Causes a getMore to be dispatched.
 
     // We haven't pulled any events out of the cursor yet, so the resumeToken should be unchanged.
     assert.docEq(curResumeToken, csCursor.getResumeToken());
 
     // For all but the final event, the resume token should match the document's _id.
     while ((currentDoc = csCursor.next()).fullDocument._id < docId) {
-        assert(csCursor.hasNext());
+        assert.soon(() => csCursor.hasNext());
         prevResumeToken = curResumeToken;
         curResumeToken = csCursor.getResumeToken();
         assert.docEq(curResumeToken, currentDoc._id);
