@@ -48,7 +48,6 @@
 #include "mongo/db/storage/mobile/mobile_session.h"
 #include "mongo/db/storage/mobile/mobile_sqlite_statement.h"
 #include "mongo/db/storage/mobile/mobile_util.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -219,7 +218,7 @@ std::unique_ptr<RecordStore> MobileKVEngine::getRecordStore(OperationContext* op
                                                             StringData ns,
                                                             StringData ident,
                                                             const CollectionOptions& options) {
-    return stdx::make_unique<MobileRecordStore>(opCtx, ns, _path, ident.toString(), options);
+    return std::make_unique<MobileRecordStore>(opCtx, ns, _path, ident.toString(), options);
 }
 
 std::unique_ptr<RecordStore> MobileKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
@@ -236,13 +235,12 @@ Status MobileKVEngine::createSortedDataInterface(OperationContext* opCtx,
     return MobileIndex::create(opCtx, ident.toString());
 }
 
-SortedDataInterface* MobileKVEngine::getSortedDataInterface(OperationContext* opCtx,
-                                                            StringData ident,
-                                                            const IndexDescriptor* desc) {
+std::unique_ptr<SortedDataInterface> MobileKVEngine::getSortedDataInterface(
+    OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
     if (desc->unique()) {
-        return new MobileIndexUnique(opCtx, desc, ident.toString());
+        return std::make_unique<MobileIndexUnique>(opCtx, desc, ident.toString());
     }
-    return new MobileIndexStandard(opCtx, desc, ident.toString());
+    return std::make_unique<MobileIndexStandard>(opCtx, desc, ident.toString());
 }
 
 Status MobileKVEngine::dropIdent(OperationContext* opCtx, StringData ident) {

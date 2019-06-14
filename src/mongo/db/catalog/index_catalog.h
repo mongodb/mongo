@@ -395,7 +395,7 @@ public:
      */
     virtual void dropAllIndexes(OperationContext* opCtx,
                                 bool includingIdIndex,
-                                stdx::function<void(const IndexDescriptor*)> onDropFn) = 0;
+                                std::function<void(const IndexDescriptor*)> onDropFn) = 0;
     virtual void dropAllIndexes(OperationContext* opCtx, bool includingIdIndex) = 0;
 
     /**

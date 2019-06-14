@@ -33,9 +33,10 @@
 
 #include "mongo/util/background.h"
 
+#include <functional>
+
 #include "mongo/config.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/idle_thread_block.h"

@@ -31,16 +31,16 @@
 
 #include "mongo/transport/message_compressor_registry.h"
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <memory>
+
 #include "mongo/base/init.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/transport/message_compressor_noop.h"
 #include "mongo/transport/message_compressor_snappy.h"
 #include "mongo/transport/message_compressor_zlib.h"
 #include "mongo/transport/message_compressor_zstd.h"
 #include "mongo/util/options_parser/option_section.h"
-
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/split.hpp>
 
 namespace mongo {
 namespace {
@@ -133,7 +133,7 @@ MONGO_INITIALIZER_GENERAL(NoopMessageCompressorInit,
                           ("AllCompressorsRegistered"))
 (InitializerContext* context) {
     auto& compressorRegistry = MessageCompressorRegistry::get();
-    compressorRegistry.registerImplementation(stdx::make_unique<NoopMessageCompressor>());
+    compressorRegistry.registerImplementation(std::make_unique<NoopMessageCompressor>());
     return Status::OK();
 }
 

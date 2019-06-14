@@ -30,15 +30,15 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
+#include <memory>
 
 #include "mongo/db/service_liaison_mock.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/periodic_runner_factory.h"
 
 namespace mongo {
 
 MockServiceLiaisonImpl::MockServiceLiaisonImpl() {
-    _timerFactory = stdx::make_unique<executor::AsyncTimerFactoryMock>();
+    _timerFactory = std::make_unique<executor::AsyncTimerFactoryMock>();
     _runner = makePeriodicRunner(getGlobalServiceContext());
     _runner->startup();
 }

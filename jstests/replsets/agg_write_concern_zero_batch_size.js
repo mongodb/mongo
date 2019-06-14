@@ -3,8 +3,8 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/out_helpers.js");  // For withEachKindOfWriteStage.
-    load("jstests/libs/write_concern_util.js");         // For [stop|restart]ServerReplication.
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachKindOfWriteStage.
+    load("jstests/libs/write_concern_util.js");           // For [stop|restart]ServerReplication.
 
     // Start a replica set with two nodes: one with the default configuration and one with priority
     // zero to ensure we don't have any elections.

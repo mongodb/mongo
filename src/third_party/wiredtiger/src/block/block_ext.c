@@ -1186,15 +1186,8 @@ __wt_block_extlist_read(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_block_read_off(
 	    session, block, tmp, el->offset, el->size, el->checksum));
 
-#define	WT_EXTLIST_READ(p, v) do {					\
-	uint64_t _v;							\
-	WT_ERR(__wt_vunpack_uint(&(p), 0, &_v));			\
-	(v) = (wt_off_t)_v;						\
-} while (0)
-
 	p = WT_BLOCK_HEADER_BYTE(tmp->mem);
-	WT_EXTLIST_READ(p, off);
-	WT_EXTLIST_READ(p, size);
+	WT_ERR(__wt_extlist_read_pair(&p, &off, &size));
 	if (off != WT_BLOCK_EXTLIST_MAGIC || size != 0)
 		goto corrupted;
 
@@ -1210,8 +1203,7 @@ __wt_block_extlist_read(WT_SESSION_IMPL *session,
 	 */
 	func = el->track_size == 0 ? __block_append : __block_merge;
 	for (;;) {
-		WT_EXTLIST_READ(p, off);
-		WT_EXTLIST_READ(p, size);
+		WT_ERR(__wt_extlist_read_pair(&p, &off, &size));
 		if (off == WT_BLOCK_INVALID_OFFSET)
 			break;
 
@@ -1263,10 +1255,11 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 
 	/*
 	 * Figure out how many entries we're writing -- if there aren't any
-	 * entries, we're done.
+	 * entries, there's nothing to write, unless we still have to write
+	 * the extent list to include the checkpoint recovery information.
 	 */
 	entries = el->entries + (additional == NULL ? 0 : additional->entries);
-	if (entries == 0) {
+	if (entries == 0 && block->final_ckpt == NULL) {
 		el->offset = WT_BLOCK_INVALID_OFFSET;
 		el->checksum = el->size = 0;
 		return (0);
@@ -1286,25 +1279,21 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	dsk = tmp->mem;
 	memset(dsk, 0, WT_BLOCK_HEADER_BYTE_SIZE);
 	dsk->type = WT_PAGE_BLOCK_MANAGER;
-
-#define	WT_EXTLIST_WRITE(p, v)						\
-	WT_ERR(__wt_vpack_uint(&(p), 0, (uint64_t)(v)))
+	dsk->version = WT_PAGE_VERSION_TS;
 
 	/* Fill the page's data. */
 	p = WT_BLOCK_HEADER_BYTE(dsk);
-	WT_EXTLIST_WRITE(p, WT_BLOCK_EXTLIST_MAGIC);	/* Initial value */
-	WT_EXTLIST_WRITE(p, 0);
-	WT_EXT_FOREACH(ext, el->off) {			/* Free ranges */
-		WT_EXTLIST_WRITE(p, ext->off);
-		WT_EXTLIST_WRITE(p, ext->size);
-	}
+							/* Extent list starts */
+	WT_ERR(__wt_extlist_write_pair(&p, WT_BLOCK_EXTLIST_MAGIC, 0));
+	WT_EXT_FOREACH(ext, el->off)			/* Free ranges */
+		WT_ERR(__wt_extlist_write_pair(&p, ext->off, ext->size));
 	if (additional != NULL)
-		WT_EXT_FOREACH(ext, additional->off) {	/* Free ranges */
-			WT_EXTLIST_WRITE(p, ext->off);
-			WT_EXTLIST_WRITE(p, ext->size);
-		}
-	WT_EXTLIST_WRITE(p, WT_BLOCK_INVALID_OFFSET);	/* Ending value */
-	WT_EXTLIST_WRITE(p, 0);
+		WT_EXT_FOREACH(ext, additional->off)	/* Free ranges */
+			WT_ERR(
+			    __wt_extlist_write_pair(&p, ext->off, ext->size));
+							/* Extent list stops */
+	WT_ERR(__wt_extlist_write_pair(&p, WT_BLOCK_INVALID_OFFSET,
+	    block->final_ckpt == NULL ? 0 : WT_BLOCK_EXTLIST_VERSION_CKPT));
 
 	dsk->u.datalen = WT_PTRDIFF32(p, WT_BLOCK_HEADER_BYTE(dsk));
 	tmp->size = dsk->mem_size = WT_PTRDIFF32(p, dsk);

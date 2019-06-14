@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <functional>
 #include <memory>
 #include <set>
 
@@ -50,8 +51,6 @@
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/db/views/view_graph.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
@@ -78,7 +77,7 @@ public:
     explicit DurableViewCatalogDummy() : _upsertCount(0), _iterateCount(0) {}
     static const std::string name;
 
-    using Callback = stdx::function<Status(const BSONObj& view)>;
+    using Callback = std::function<Status(const BSONObj& view)>;
     virtual Status iterate(OperationContext* opCtx, Callback callback) {
         ++_iterateCount;
         return Status::OK();
@@ -109,7 +108,7 @@ const std::string DurableViewCatalogDummy::name = "dummy";
 class ViewCatalogFixture : public unittest::Test {
 public:
     ViewCatalogFixture()
-        : _queryServiceContext(stdx::make_unique<QueryTestServiceContext>()),
+        : _queryServiceContext(std::make_unique<QueryTestServiceContext>()),
           opCtx(_queryServiceContext->makeOperationContext()),
           viewCatalog(std::move(durableViewCatalogUnique)) {}
 
@@ -140,8 +139,8 @@ public:
 
         settings.setReplSetString("viewCatalogTestSet/node1:12345");
 
-        repl::StorageInterface::set(service, stdx::make_unique<repl::StorageInterfaceMock>());
-        auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorMock>(service, settings);
+        repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service, settings);
 
         // Ensure that we are primary.
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -48,7 +49,6 @@
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
@@ -100,7 +100,7 @@ public:
      *
      * Used for testing only.
      */
-    using CreateClientFn = stdx::function<std::unique_ptr<DBClientConnection>()>;
+    using CreateClientFn = std::function<std::unique_ptr<DBClientConnection>()>;
 
     /**
      * Creates CollectionCloner task in inactive state. Use start() to activate cloner.

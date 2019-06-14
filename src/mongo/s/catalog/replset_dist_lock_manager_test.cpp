@@ -31,6 +31,7 @@
 
 #include <boost/optional.hpp>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -44,7 +45,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/system_tick_source.h"
@@ -80,20 +80,20 @@ protected:
     std::unique_ptr<DistLockManager> makeDistLockManager(
         std::unique_ptr<DistLockCatalog> distLockCatalog) override {
         invariant(distLockCatalog);
-        return stdx::make_unique<ReplSetDistLockManager>(getServiceContext(),
-                                                         _processID,
-                                                         std::move(distLockCatalog),
-                                                         kPingInterval,
-                                                         kLockExpiration);
+        return std::make_unique<ReplSetDistLockManager>(getServiceContext(),
+                                                        _processID,
+                                                        std::move(distLockCatalog),
+                                                        kPingInterval,
+                                                        kLockExpiration);
     }
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) override {
-        return stdx::make_unique<ShardingCatalogClientMock>(std::move(distLockManager));
+        return std::make_unique<ShardingCatalogClientMock>(std::move(distLockManager));
     }
 
     std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration() override {
-        return stdx::make_unique<BalancerConfiguration>();
+        return std::make_unique<BalancerConfiguration>();
     }
 
     /**
@@ -119,7 +119,7 @@ private:
 class RSDistLockMgrWithMockTickSource : public ReplSetDistLockManagerFixture {
 protected:
     RSDistLockMgrWithMockTickSource() {
-        getServiceContext()->setTickSource(stdx::make_unique<TickSourceMock<>>());
+        getServiceContext()->setTickSource(std::make_unique<TickSourceMock<>>());
     }
 
     /**

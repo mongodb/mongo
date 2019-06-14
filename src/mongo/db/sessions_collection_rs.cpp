@@ -32,6 +32,7 @@
 #include "mongo/db/sessions_collection_rs.h"
 
 #include <boost/optional.hpp>
+#include <memory>
 #include <utility>
 
 #include "mongo/client/authenticate.h"
@@ -45,7 +46,6 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace {

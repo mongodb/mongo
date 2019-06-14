@@ -31,11 +31,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"

@@ -30,10 +30,10 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 #include "mongo/platform/random.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
@@ -56,7 +56,7 @@ public:
      */
     struct Options {
         // This function is run before the worker thread begins consuming tasks.
-        using OnCreateThreadFn = stdx::function<void()>;
+        using OnCreateThreadFn = std::function<void()>;
         OnCreateThreadFn onCreateThread = []() {};
     };
 

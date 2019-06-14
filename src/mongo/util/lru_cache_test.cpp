@@ -141,7 +141,7 @@ void assertNotInCache(const LRUCache<K, V>& cache, const K& key) {
 }
 
 const std::array<int, 7> kTestSizes{1, 2, 3, 4, 5, 10, 1000};
-using SizedTest = stdx::function<void(int)>;
+using SizedTest = std::function<void(int)>;
 void runWithDifferentSizes(SizedTest test) {
     for (auto size : kTestSizes) {
         mongo::unittest::log() << "\t\tTesting cache size of " << size;

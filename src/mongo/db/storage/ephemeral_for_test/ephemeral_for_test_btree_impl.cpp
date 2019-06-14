@@ -31,12 +31,12 @@
 
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_btree_impl.h"
 
+#include <memory>
 #include <set>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -481,7 +481,7 @@ public:
 
     virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                                    bool isForward) const {
-        return stdx::make_unique<Cursor>(opCtx, *_data, isForward, _isUnique);
+        return std::make_unique<Cursor>(opCtx, *_data, isForward, _isUnique);
     }
 
     virtual Status initAsEmpty(OperationContext* opCtx) {
@@ -521,21 +521,22 @@ private:
 
 // IndexCatalogEntry argument taken by non-const pointer for consistency with other Btree
 // factories. We don't actually modify it.
-SortedDataInterface* getEphemeralForTestBtreeImpl(const Ordering& ordering,
-                                                  bool isUnique,
-                                                  const NamespaceString& collectionNamespace,
-                                                  const std::string& indexName,
-                                                  const BSONObj& keyPattern,
-                                                  std::shared_ptr<void>* dataInOut) {
+std::unique_ptr<SortedDataInterface> getEphemeralForTestBtreeImpl(
+    const Ordering& ordering,
+    bool isUnique,
+    const NamespaceString& collectionNamespace,
+    const std::string& indexName,
+    const BSONObj& keyPattern,
+    std::shared_ptr<void>* dataInOut) {
     invariant(dataInOut);
     if (!*dataInOut) {
         *dataInOut = std::make_shared<IndexSet>(IndexEntryComparison(ordering));
     }
-    return new EphemeralForTestBtreeImpl(static_cast<IndexSet*>(dataInOut->get()),
-                                         isUnique,
-                                         collectionNamespace,
-                                         indexName,
-                                         keyPattern);
+    return std::make_unique<EphemeralForTestBtreeImpl>(static_cast<IndexSet*>(dataInOut->get()),
+                                                       isUnique,
+                                                       collectionNamespace,
+                                                       indexName,
+                                                       keyPattern);
 }
 
 }  // namespace mongo

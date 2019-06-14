@@ -43,6 +43,8 @@ configs:
         arg_vartype: Double
         cpp_varname: 'wiredTigerGlobalOptions.cacheSizeGB'
         short_name: wiredTigerCacheSizeGB
+        validator:
+            lte: 10000
     "storage.wiredTiger.engineConfig.statisticsLogDelaySecs":
         # FTDC supercedes WiredTiger's statistics logging.
         description: >-
@@ -69,6 +71,16 @@ configs:
         arg_vartype: Switch
         cpp_varname: 'wiredTigerGlobalOptions.directoryForIndexes'
         short_name: wiredTigerDirectoryForIndexes
+    "storage.wiredTiger.engineConfig.maxCacheOverflowFileSizeGB":
+        description: >-
+            Maximum amount of disk space to use for cache overflow;
+            Defaults to 0 (unbounded)
+        arg_vartype: Double
+        cpp_varname: 'wiredTigerGlobalOptions.maxCacheOverflowFileSizeGB'
+        short_name: wiredTigerMaxCacheOverflowFileSizeGB
+        validator:
+            callback: 'WiredTigerGlobalOptions::validateMaxCacheOverflowFileSizeGB'
+        default: 0.0
     "storage.wiredTiger.engineConfig.configString":
         description: 'WiredTiger storage engine custom configuration setting'
         arg_vartype: String

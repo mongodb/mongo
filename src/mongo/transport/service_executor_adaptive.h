@@ -30,12 +30,12 @@
 #pragma once
 
 #include <array>
+#include <list>
 #include <vector>
 
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/list.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_task_names.h"
@@ -191,7 +191,7 @@ private:
         int recursionDepth = 0;
     };
 
-    using ThreadList = stdx::list<ThreadState>;
+    using ThreadList = std::list<ThreadState>;
 
     void _startWorkerThread(ThreadCreationReason reason);
     static StringData _threadStartedByToString(ThreadCreationReason reason);

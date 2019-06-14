@@ -31,11 +31,11 @@
 
 #include "mongo/db/exec/pipeline_proxy.h"
 
+#include <memory>
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline_d.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -43,7 +43,6 @@ using boost::intrusive_ptr;
 using std::shared_ptr;
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 const char* PipelineProxyStage::kStageType = "PIPELINE_PROXY";
 
@@ -116,8 +115,8 @@ void PipelineProxyStage::doDispose() {
 
 unique_ptr<PlanStageStats> PipelineProxyStage::getStats() {
     unique_ptr<PlanStageStats> ret =
-        make_unique<PlanStageStats>(CommonStats(kStageType), STAGE_PIPELINE_PROXY);
-    ret->specific = make_unique<CollectionScanStats>();
+        std::make_unique<PlanStageStats>(CommonStats(kStageType), STAGE_PIPELINE_PROXY);
+    ret->specific = std::make_unique<CollectionScanStats>();
     return ret;
 }
 

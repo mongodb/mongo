@@ -31,10 +31,11 @@
 
 #include "mongo/s/query/router_stage_skip.h"
 
+#include <memory>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/query/router_stage_mock.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -46,12 +47,12 @@ namespace {
 OperationContext* opCtx = nullptr;
 
 TEST(RouterStageSkipTest, SkipIsOne) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
+    auto mockStage = std::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueResult(BSON("a" << 2));
     mockStage->queueResult(BSON("a" << 3));
 
-    auto skipStage = stdx::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 1);
+    auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 1);
 
     auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(firstResult.getStatus());
@@ -74,13 +75,13 @@ TEST(RouterStageSkipTest, SkipIsOne) {
 }
 
 TEST(RouterStageSkipTest, SkipIsThree) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
+    auto mockStage = std::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueResult(BSON("a" << 2));
     mockStage->queueResult(BSON("a" << 3));
     mockStage->queueResult(BSON("a" << 4));
 
-    auto skipStage = stdx::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 3);
+    auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 3);
 
     auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(firstResult.getStatus());
@@ -93,12 +94,12 @@ TEST(RouterStageSkipTest, SkipIsThree) {
 }
 
 TEST(RouterStageSkipTest, SkipEqualToResultSetSize) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
+    auto mockStage = std::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueResult(BSON("a" << 2));
     mockStage->queueResult(BSON("a" << 3));
 
-    auto skipStage = stdx::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 3);
+    auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 3);
 
     auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(firstResult.getStatus());
@@ -106,12 +107,12 @@ TEST(RouterStageSkipTest, SkipEqualToResultSetSize) {
 }
 
 TEST(RouterStageSkipTest, SkipExceedsResultSetSize) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
+    auto mockStage = std::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueResult(BSON("a" << 2));
     mockStage->queueResult(BSON("a" << 3));
 
-    auto skipStage = stdx::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 100);
+    auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 100);
 
     auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(firstResult.getStatus());
@@ -119,13 +120,13 @@ TEST(RouterStageSkipTest, SkipExceedsResultSetSize) {
 }
 
 TEST(RouterStageSkipTest, ErrorWhileSkippingResults) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
+    auto mockStage = std::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueError(Status(ErrorCodes::BadValue, "bad thing happened"));
     mockStage->queueResult(BSON("a" << 2));
     mockStage->queueResult(BSON("a" << 3));
 
-    auto skipStage = stdx::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 2);
+    auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 2);
 
     auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_NOT_OK(firstResult.getStatus());
@@ -134,13 +135,13 @@ TEST(RouterStageSkipTest, ErrorWhileSkippingResults) {
 }
 
 TEST(RouterStageSkipTest, ErrorAfterSkippingResults) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
+    auto mockStage = std::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueResult(BSON("a" << 2));
     mockStage->queueResult(BSON("a" << 3));
     mockStage->queueError(Status(ErrorCodes::BadValue, "bad thing happened"));
 
-    auto skipStage = stdx::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 2);
+    auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 2);
 
     auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(firstResult.getStatus());
@@ -155,13 +156,13 @@ TEST(RouterStageSkipTest, ErrorAfterSkippingResults) {
 
 TEST(RouterStageSkipTest, SkipStageToleratesMidStreamEOF) {
     // Skip stage must propagate a boost::none, but not count it towards the skip value.
-    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
+    auto mockStage = std::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueEOF();
     mockStage->queueResult(BSON("a" << 2));
     mockStage->queueResult(BSON("a" << 3));
 
-    auto skipStage = stdx::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 2);
+    auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 2);
 
     auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
     ASSERT_OK(firstResult.getStatus());
@@ -178,13 +179,13 @@ TEST(RouterStageSkipTest, SkipStageToleratesMidStreamEOF) {
 }
 
 TEST(RouterStageSkipTest, SkipStageRemotesExhausted) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
+    auto mockStage = std::make_unique<RouterStageMock>(opCtx);
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueResult(BSON("a" << 2));
     mockStage->queueResult(BSON("a" << 3));
     mockStage->markRemotesExhausted();
 
-    auto skipStage = stdx::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 1);
+    auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 1);
     ASSERT_TRUE(skipStage->remotesExhausted());
 
     auto firstResult = skipStage->next(RouterExecStage::ExecContext::kInitialFind);
@@ -206,11 +207,11 @@ TEST(RouterStageSkipTest, SkipStageRemotesExhausted) {
 }
 
 TEST(RouterStageSkipTest, ForwardsAwaitDataTimeout) {
-    auto mockStage = stdx::make_unique<RouterStageMock>(opCtx);
+    auto mockStage = std::make_unique<RouterStageMock>(opCtx);
     auto mockStagePtr = mockStage.get();
     ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
 
-    auto skipStage = stdx::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 3);
+    auto skipStage = std::make_unique<RouterStageSkip>(opCtx, std::move(mockStage), 3);
     ASSERT_OK(skipStage->setAwaitDataTimeout(Milliseconds(789)));
 
     auto awaitDataTimeout = mockStagePtr->getAwaitDataTimeout();

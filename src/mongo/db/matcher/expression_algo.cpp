@@ -250,7 +250,7 @@ unique_ptr<MatchExpression> createAndOfNodes(std::vector<unique_ptr<MatchExpress
         return std::move(children->at(0));
     }
 
-    unique_ptr<AndMatchExpression> splitAnd = stdx::make_unique<AndMatchExpression>();
+    unique_ptr<AndMatchExpression> splitAnd = std::make_unique<AndMatchExpression>();
     for (auto&& expr : *children) {
         splitAnd->add(expr.release());
     }
@@ -266,7 +266,7 @@ unique_ptr<MatchExpression> createNorOfNodes(std::vector<unique_ptr<MatchExpress
         return nullptr;
     }
 
-    unique_ptr<NorMatchExpression> splitNor = stdx::make_unique<NorMatchExpression>();
+    unique_ptr<NorMatchExpression> splitNor = std::make_unique<NorMatchExpression>();
     for (auto&& expr : *children) {
         splitNor->add(expr.release());
     }

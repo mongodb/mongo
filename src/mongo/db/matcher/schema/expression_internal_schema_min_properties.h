@@ -60,7 +60,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const final {
         auto minProperties =
-            stdx::make_unique<InternalSchemaMinPropertiesMatchExpression>(numProperties());
+            std::make_unique<InternalSchemaMinPropertiesMatchExpression>(numProperties());
         if (getTag()) {
             minProperties->setTag(getTag()->clone());
         }

@@ -571,6 +571,23 @@ tasks:
     - func: "analyze"
       vars:
         reports_analysis: true
+- name: pipeline-updates
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "pipeline-updates"
+        includeFilter2: "regression"
+        excludeFilter: "none"
+        threads: "1 2 4 8"
+        readCmd: true
+    - func: "download analysis scripts"
+    - func: "analyze"
+      vars:
+        reports_analysis: true
 
 buildvariants:
 - name: linux-wt-standalone
@@ -620,6 +637,7 @@ buildvariants:
   - name: geo
   - name: misc
   - name: singleThreaded
+  - name: pipeline-updates
 
 - name: linux-wt-repl
   display_name: 1-Node ReplSet Linux inMemory
@@ -653,3 +671,4 @@ buildvariants:
   - name: misc
   - name: singleThreaded
   - name: wildcard-index-write
+  - name: pipeline-updates

@@ -4610,7 +4610,7 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
     // No relevant index matching the index tag.
     relevantIndices.push_back(buildSimpleIndexEntry(BSON("a" << 1), "a_1"));
 
-    auto qr = stdx::make_unique<QueryRequest>(NamespaceString("test.collection"));
+    auto qr = std::make_unique<QueryRequest>(NamespaceString("test.collection"));
     qr->setFilter(BSON("a" << 3));
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -4624,7 +4624,7 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
 TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     const NamespaceString nss("test.collection");
 
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(BSON("a" << 3));
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -4653,7 +4653,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     ASSERT_OK(s);
 
     // Regenerate canonical query in order to clear tags.
-    auto newQR = stdx::make_unique<QueryRequest>(nss);
+    auto newQR = std::make_unique<QueryRequest>(nss);
     newQR->setFilter(BSON("a" << 3));
     statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(newQR));
     ASSERT_OK(statusWithCQ.getStatus());

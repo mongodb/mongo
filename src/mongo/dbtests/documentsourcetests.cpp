@@ -91,7 +91,7 @@ protected:
 
         dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
 
-        auto qr = stdx::make_unique<QueryRequest>(nss);
+        auto qr = std::make_unique<QueryRequest>(nss);
         if (hint) {
             qr->setHint(*hint);
         }
@@ -330,14 +330,14 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
 
     // Make a tailable collection scan wrapped up in a PlanExecutor.
     AutoGetCollectionForRead readLock(opCtx(), nss);
-    auto workingSet = stdx::make_unique<WorkingSet>();
+    auto workingSet = std::make_unique<WorkingSet>();
     CollectionScanParams collScanParams;
     collScanParams.tailable = true;
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
-    auto collectionScan = stdx::make_unique<CollectionScan>(
+    auto collectionScan = std::make_unique<CollectionScan>(
         opCtx(), readLock.getCollection(), collScanParams, workingSet.get(), matchExpression.get());
-    auto queryRequest = stdx::make_unique<QueryRequest>(nss);
+    auto queryRequest = std::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filter);
     queryRequest->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     auto canonicalQuery = unittest::assertGet(
@@ -369,13 +369,13 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
 
     // Make a tailable collection scan wrapped up in a PlanExecutor.
     AutoGetCollectionForRead readLock(opCtx(), nss);
-    auto workingSet = stdx::make_unique<WorkingSet>();
+    auto workingSet = std::make_unique<WorkingSet>();
     CollectionScanParams collScanParams;
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
-    auto collectionScan = stdx::make_unique<CollectionScan>(
+    auto collectionScan = std::make_unique<CollectionScan>(
         opCtx(), readLock.getCollection(), collScanParams, workingSet.get(), matchExpression.get());
-    auto queryRequest = stdx::make_unique<QueryRequest>(nss);
+    auto queryRequest = std::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filter);
     auto canonicalQuery = unittest::assertGet(
         CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
@@ -413,14 +413,14 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
 
     // Make a tailable collection scan wrapped up in a PlanExecutor.
     AutoGetCollectionForRead readLock(opCtx(), nss);
-    auto workingSet = stdx::make_unique<WorkingSet>();
+    auto workingSet = std::make_unique<WorkingSet>();
     CollectionScanParams collScanParams;
     collScanParams.tailable = true;
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
-    auto collectionScan = stdx::make_unique<CollectionScan>(
+    auto collectionScan = std::make_unique<CollectionScan>(
         opCtx(), readLock.getCollection(), collScanParams, workingSet.get(), matchExpression.get());
-    auto queryRequest = stdx::make_unique<QueryRequest>(nss);
+    auto queryRequest = std::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filter);
     queryRequest->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     auto canonicalQuery = unittest::assertGet(
@@ -451,13 +451,13 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
 
     // Make a tailable collection scan wrapped up in a PlanExecutor.
     AutoGetCollectionForRead readLock(opCtx(), nss);
-    auto workingSet = stdx::make_unique<WorkingSet>();
+    auto workingSet = std::make_unique<WorkingSet>();
     CollectionScanParams collScanParams;
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
-    auto collectionScan = stdx::make_unique<CollectionScan>(
+    auto collectionScan = std::make_unique<CollectionScan>(
         opCtx(), readLock.getCollection(), collScanParams, workingSet.get(), matchExpression.get());
-    auto queryRequest = stdx::make_unique<QueryRequest>(nss);
+    auto queryRequest = std::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filter);
     auto canonicalQuery = unittest::assertGet(
         CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));

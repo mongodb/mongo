@@ -76,7 +76,7 @@ Status DeferredWriter::_makeCollection(OperationContext* opCtx) {
 StatusWith<std::unique_ptr<AutoGetCollection>> DeferredWriter::_getCollection(
     OperationContext* opCtx) {
     std::unique_ptr<AutoGetCollection> agc;
-    agc = stdx::make_unique<AutoGetCollection>(opCtx, _nss, MODE_IX);
+    agc = std::make_unique<AutoGetCollection>(opCtx, _nss, MODE_IX);
 
     while (!agc->getCollection()) {
         // Release the previous AGC's lock before trying to rebuild the collection.
@@ -87,7 +87,7 @@ StatusWith<std::unique_ptr<AutoGetCollection>> DeferredWriter::_getCollection(
             return status;
         }
 
-        agc = stdx::make_unique<AutoGetCollection>(opCtx, _nss, MODE_IX);
+        agc = std::make_unique<AutoGetCollection>(opCtx, _nss, MODE_IX);
     }
 
     return std::move(agc);
@@ -147,7 +147,7 @@ void DeferredWriter::startup(std::string workerName) {
     options.minThreads = 0;
     options.maxThreads = 1;
     options.onCreateThread = [](const std::string& name) { Client::initThread(name); };
-    _pool = stdx::make_unique<ThreadPool>(options);
+    _pool = std::make_unique<ThreadPool>(options);
     _pool->startup();
 }
 

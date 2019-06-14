@@ -31,13 +31,13 @@
 
 #include "mongo/s/write_ops/batch_write_op.h"
 
+#include <memory>
 #include <numeric>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
@@ -643,7 +643,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
             int batchIndex = targetedBatch.getWrites()[childBatchIndex]->writeOpRef.first;
 
             // Push the upserted id with the correct index into the batch upserted ids
-            auto upsertedId = stdx::make_unique<BatchedUpsertDetail>();
+            auto upsertedId = std::make_unique<BatchedUpsertDetail>();
             upsertedId->setIndex(batchIndex);
             upsertedId->setUpsertedID(childUpsertedId->getUpsertedID());
             _upsertedIds.push_back(std::move(upsertedId));
@@ -662,7 +662,7 @@ void BatchWriteOp::noteBatchError(const TargetedWriteBatch& targetedBatch,
         _clientRequest.getWriteCommandBase().getOrdered() ? 1 : targetedBatch.getWrites().size();
 
     for (int i = 0; i < numErrors; i++) {
-        auto errorClone(stdx::make_unique<WriteErrorDetail>());
+        auto errorClone(std::make_unique<WriteErrorDetail>());
         error.cloneTo(errorClone.get());
         errorClone->setIndex(i);
         emulatedResponse.addToErrDetails(errorClone.release());

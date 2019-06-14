@@ -82,7 +82,7 @@ public:
 
     void getDatabase(
         StringData dbName,
-        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) override;
+        std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) override;
 
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
 
@@ -342,7 +342,7 @@ private:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkVersion& catalogCacheSinceVersion,
-        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
+        std::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
         std::shared_ptr<Notification<void>> notify);
 
     /**
@@ -361,7 +361,7 @@ private:
         const NamespaceString& nss,
         const ChunkVersion& catalogCacheSinceVersion,
         long long currentTerm,
-        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
+        std::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
         std::shared_ptr<Notification<void>> notify);
 
     /**
@@ -373,7 +373,7 @@ private:
     void _runSecondaryGetDatabase(
         OperationContext* opCtx,
         StringData dbName,
-        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn);
+        std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn);
 
     /**
      * Refreshes db version from the config server's metadata store, and schedules maintenance
@@ -389,7 +389,7 @@ private:
         OperationContext* opCtx,
         StringData dbName,
         long long termScheduled,
-        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn);
+        std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn);
 
     /**
      * Loads chunk metadata from the shard persisted metadata store and any in-memory tasks with

@@ -38,18 +38,11 @@ class OperationContext;
 class Status;
 template <typename T>
 class StatusWith;
+enum class PrepareConflictBehavior;
 namespace repl {
 class ReadConcernArgs;
 class SpeculativeMajorityReadInfo;
 }
-
-enum class PrepareConflictBehavior {
-    /* When prepare conflicts are encountered, block until the conflict is resolved. */
-    kEnforce,
-    /* Ignore prepare conflicts when they are encountered. This should only be enabled for
-     * operations than only perform reads. */
-    kIgnore
-};
 
 /**
  * Given the specified read concern arguments, performs checks that the read concern can actually be

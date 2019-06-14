@@ -33,6 +33,8 @@
 
 #include "mongo/db/s/shard_metadata_util.h"
 
+#include <memory>
+
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/write_concern_options.h"
@@ -43,7 +45,6 @@
 #include "mongo/s/catalog/type_shard_database.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

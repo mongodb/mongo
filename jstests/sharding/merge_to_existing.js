@@ -2,7 +2,8 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
+    load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1});
 
@@ -29,86 +30,72 @@
         for (let i = -5; i < 5; i++) {
             assert.commandWorked(sourceColl.insert({_id: i}));
         }
-
-        // Test whenMatched: "fail" to an existing collection with no documents.
-        sourceColl.aggregate([{
-            $merge: {
-                into: {
-                    db: targetColl.getDB().getName(),
-                    coll: targetColl.getName(),
-                },
-                whenMatched: "fail",
-                whenNotMatched: "insert"
+        withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+            // Test without documents in target collection.
+            assert.commandWorked(targetColl.remove({}));
+            if (whenNotMatchedMode == "fail") {
+                // Test whenNotMatchedMode: "fail" to an existing collection.
+                assertErrorCode(sourceColl,
+                                [{
+                                   $merge: {
+                                       into: {
+                                           db: targetColl.getDB().getName(),
+                                           coll: targetColl.getName(),
+                                       },
+                                       whenMatched: whenMatchedMode,
+                                       whenNotMatched: whenNotMatchedMode
+                                   }
+                                }],
+                                13113);
+            } else {
+                assert.doesNotThrow(() => sourceColl.aggregate([{
+                    $merge: {
+                        into: {
+                            db: targetColl.getDB().getName(),
+                            coll: targetColl.getName(),
+                        },
+                        whenMatched: whenMatchedMode,
+                        whenNotMatched: whenNotMatchedMode
+                    }
+                }]));
+                assert.eq(whenNotMatchedMode == "discard" ? 0 : 10, targetColl.find().itcount());
             }
-        }]);
-        assert.eq(10, targetColl.find().itcount());
 
-        // Test whenMatched: "fail" to an existing collection with unique key conflicts.
-        assertErrorCode(sourceColl,
-                        [{
-                           $merge: {
-                               into: {
-                                   db: targetColl.getDB().getName(),
-                                   coll: targetColl.getName(),
-                               },
-                               whenMatched: "fail",
-                               whenNotMatched: "insert"
-                           }
-                        }],
-                        ErrorCodes.DuplicateKey);
-
-        // Test $merge to an existing collection with no documents.
-        targetColl.remove({});
-        sourceColl.aggregate([{
-            $merge: {
-                into: {
-                    db: targetColl.getDB().getName(),
-                    coll: targetColl.getName(),
-                },
-                whenMatched: "replace",
-                whenNotMatched: "insert"
+            // Test with documents in target collection. Every document in the source collection is
+            // present in the target, plus some additional documents that doesn't match.
+            assert.commandWorked(targetColl.remove({}));
+            for (let i = -10; i < 5; i++) {
+                assert.commandWorked(targetColl.insert({_id: i}));
             }
-        }]);
-        assert.eq(10, targetColl.find().itcount());
 
-        // Test $merge to an existing collection with documents that match the default "on" fields.
-        // Re-run the previous aggregation, expecting it to succeed and overwrite the existing
-        // documents.
-        sourceColl.aggregate([{
-            $merge: {
-                into: {
-                    db: targetColl.getDB().getName(),
-                    coll: targetColl.getName(),
-                },
-                whenMatched: "replace",
-                whenNotMatched: "insert"
+            if (whenMatchedMode == "fail") {
+                // Test whenMatched: "fail" to an existing collection with unique key conflicts.
+                assertErrorCode(sourceColl,
+                                [{
+                                   $merge: {
+                                       into: {
+                                           db: targetColl.getDB().getName(),
+                                           coll: targetColl.getName(),
+                                       },
+                                       whenMatched: whenMatchedMode,
+                                       whenNotMatched: whenNotMatchedMode
+                                   }
+                                }],
+                                ErrorCodes.DuplicateKey);
+            } else {
+                assert.doesNotThrow(() => sourceColl.aggregate([{
+                    $merge: {
+                        into: {
+                            db: targetColl.getDB().getName(),
+                            coll: targetColl.getName(),
+                        },
+                        whenMatched: whenMatchedMode,
+                        whenNotMatched: whenNotMatchedMode
+                    }
+                }]));
             }
-        }]);
-        assert.eq(10, targetColl.find().itcount());
-
-        // Replace all documents in the target collection with documents that don't conflict with
-        // the insert operations.
-        assert.commandWorked(targetColl.remove({}));
-        let bulk = targetColl.initializeUnorderedBulkOp();
-        for (let i = -10; i < -5; ++i) {
-            bulk.insert({_id: i});
-        }
-        for (let i = 6; i < 11; ++i) {
-            bulk.insert({_id: i});
-        }
-        assert.commandWorked(bulk.execute());
-
-        sourceColl.aggregate([{
-            $merge: {
-                into: {
-                    db: targetColl.getDB().getName(),
-                    coll: targetColl.getName(),
-                },
-                whenMatched: "fail",
-                whenNotMatched: "insert"
-            }
-        }]);
-        assert.eq(20, targetColl.find().itcount());
+            assert.eq(15, targetColl.find().itcount());
+        });
 
         // Legacy $out is only supported to the same database.
         if (sourceColl.getDB() === targetColl.getDB()) {

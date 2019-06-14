@@ -1412,6 +1412,25 @@ err:	if (parent != NULL)
 	return (0);
 }
 
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __check_upd_list --
+ *	Sanity check an update list.
+ *	In particular, make sure there no birthmarks.
+ */
+static void
+__check_upd_list(WT_SESSION_IMPL *session, WT_UPDATE *upd)
+{
+	int birthmark_count;
+
+	for (birthmark_count = 0; upd != NULL; upd = upd->next)
+		if (upd->type == WT_UPDATE_BIRTHMARK)
+			++birthmark_count;
+
+	WT_ASSERT(session, birthmark_count <= 1);
+}
+#endif
+
 /*
  * __split_multi_inmem --
  *	Instantiate a page from a disk image.
@@ -1510,6 +1529,10 @@ __split_multi_inmem(
 				key->data = WT_INSERT_KEY(supd->ins);
 				key->size = WT_INSERT_KEY_SIZE(supd->ins);
 			}
+
+#ifdef HAVE_DIAGNOSTIC
+			__check_upd_list(session, upd);
+#endif
 
 			/* Search the page. */
 			WT_ERR(__wt_row_search(
@@ -1817,9 +1840,11 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 		    WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(page))) != NULL) {
 			key->data = WT_INSERT_KEY(ins);
 			key->size = WT_INSERT_KEY_SIZE(ins);
-		} else
+		} else {
+			WT_ASSERT(session, page->entries > 0);
 			WT_ERR(__wt_row_leaf_key(
 			    session, page, &page->pg_row[0], key, true));
+		}
 		WT_ERR(__wt_row_ikey(session, 0, key->data, key->size, child));
 		parent_incr += sizeof(WT_IKEY) + key->size;
 		__wt_scr_free(session, &key);

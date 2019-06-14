@@ -39,7 +39,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
@@ -79,7 +78,7 @@ public:
     }
 
     using MockDBClientConnection::query;  // This avoids warnings from -Woverloaded-virtual
-    unsigned long long query(stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
+    unsigned long long query(std::function<void(mongo::DBClientCursorBatchIterator&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,
                              mongo::Query query,
                              const mongo::BSONObj* fieldsToReturn,
@@ -502,7 +501,7 @@ TEST_F(CollectionClonerTest, CollectionClonerReturnsBadValueOnNegativeDocumentCo
 
 class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
 public:
-    using ShouldFailRequestFn = stdx::function<bool(const executor::RemoteCommandRequest&)>;
+    using ShouldFailRequestFn = std::function<bool(const executor::RemoteCommandRequest&)>;
 
     TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor,
                                                    ShouldFailRequestFn shouldFailRequest)
@@ -528,14 +527,14 @@ TEST_F(CollectionClonerTest,
             return request.cmdObj.firstElementFieldNameStringData() == "listIndexes";
         });
 
-    collectionCloner = stdx::make_unique<CollectionCloner>(&_executorProxy,
-                                                           dbWorkThreadPool.get(),
-                                                           target,
-                                                           nss,
-                                                           options,
-                                                           setStatusCallback(),
-                                                           storageInterface.get(),
-                                                           defaultBatchSize);
+    collectionCloner = std::make_unique<CollectionCloner>(&_executorProxy,
+                                                          dbWorkThreadPool.get(),
+                                                          target,
+                                                          nss,
+                                                          options,
+                                                          setStatusCallback(),
+                                                          storageInterface.get(),
+                                                          defaultBatchSize);
 
     ASSERT_OK(collectionCloner->startup());
 
@@ -1135,17 +1134,17 @@ TEST_F(CollectionClonerTest, CollectionClonerResetsOnCompletionCallbackFunctionA
 
     Status result = getDetectableErrorStatus();
     collectionCloner =
-        stdx::make_unique<CollectionCloner>(&getExecutor(),
-                                            dbWorkThreadPool.get(),
-                                            target,
-                                            nss,
-                                            options,
-                                            [&result, sharedCallbackData](const Status& status) {
-                                                log() << "setting result to " << status;
-                                                result = status;
-                                            },
-                                            storageInterface.get(),
-                                            defaultBatchSize);
+        std::make_unique<CollectionCloner>(&getExecutor(),
+                                           dbWorkThreadPool.get(),
+                                           target,
+                                           nss,
+                                           options,
+                                           [&result, sharedCallbackData](const Status& status) {
+                                               log() << "setting result to " << status;
+                                               result = status;
+                                           },
+                                           storageInterface.get(),
+                                           defaultBatchSize);
 
     ASSERT_OK(collectionCloner->startup());
     ASSERT_TRUE(collectionCloner->isActive());

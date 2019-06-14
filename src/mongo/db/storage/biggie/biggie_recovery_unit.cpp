@@ -40,7 +40,7 @@
 namespace mongo {
 namespace biggie {
 
-RecoveryUnit::RecoveryUnit(KVEngine* parentKVEngine, stdx::function<void()> cb)
+RecoveryUnit::RecoveryUnit(KVEngine* parentKVEngine, std::function<void()> cb)
     : _waitUntilDurableCallback(cb), _KVEngine(parentKVEngine) {}
 
 RecoveryUnit::~RecoveryUnit() {

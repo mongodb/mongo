@@ -29,9 +29,10 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/update/modifier_node.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -49,7 +50,7 @@ public:
                         ModifyResult modifyResult) const final;
 
     std::unique_ptr<UpdateNode> clone() const final {
-        return stdx::make_unique<PopNode>(*this);
+        return std::make_unique<PopNode>(*this);
     }
 
     void setCollator(const CollatorInterface* collator) final {}

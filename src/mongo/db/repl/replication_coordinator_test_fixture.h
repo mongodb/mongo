@@ -117,8 +117,8 @@ protected:
         return rpc::ReplSetMetadata::readFromMetadata(doc, requireWallTime);
     }
 
-    void replCoordSetMyLastAppliedOpTime(const OpTime& opTime, Date_t wallTime = Date_t::min()) {
-        if (wallTime == Date_t::min()) {
+    void replCoordSetMyLastAppliedOpTime(const OpTime& opTime, Date_t wallTime = Date_t()) {
+        if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getReplCoord()->setMyLastAppliedOpTimeAndWallTime({opTime, wallTime});
@@ -126,32 +126,31 @@ protected:
 
     void replCoordSetMyLastAppliedOpTimeForward(const OpTime& opTime,
                                                 ReplicationCoordinator::DataConsistency consistency,
-                                                Date_t wallTime = Date_t::min()) {
-        if (wallTime == Date_t::min()) {
+                                                Date_t wallTime = Date_t()) {
+        if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getReplCoord()->setMyLastAppliedOpTimeAndWallTimeForward({opTime, wallTime}, consistency);
     }
 
-    void replCoordSetMyLastDurableOpTime(const OpTime& opTime, Date_t wallTime = Date_t::min()) {
-        if (wallTime == Date_t::min()) {
+    void replCoordSetMyLastDurableOpTime(const OpTime& opTime, Date_t wallTime = Date_t()) {
+        if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getReplCoord()->setMyLastDurableOpTimeAndWallTime({opTime, wallTime});
     }
 
-    void replCoordSetMyLastDurableOpTimeForward(const OpTime& opTime,
-                                                Date_t wallTime = Date_t::min()) {
-        if (wallTime == Date_t::min()) {
+    void replCoordSetMyLastDurableOpTimeForward(const OpTime& opTime, Date_t wallTime = Date_t()) {
+        if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getReplCoord()->setMyLastDurableOpTimeAndWallTimeForward({opTime, wallTime});
     }
 
     void replCoordAdvanceCommitPoint(const OpTime& opTime,
-                                     Date_t wallTime = Date_t::min(),
+                                     Date_t wallTime = Date_t(),
                                      bool fromSyncSource = false) {
-        if (wallTime == Date_t::min()) {
+        if (wallTime == Date_t()) {
             wallTime = Date_t() + Seconds(opTime.getSecs());
         }
         getReplCoord()->advanceCommitPoint({opTime, wallTime}, fromSyncSource);
@@ -246,7 +245,7 @@ protected:
      * Applicable to protocol version 1 only.
      */
     void simulateSuccessfulDryRun(
-        stdx::function<void(const executor::RemoteCommandRequest& request)> onDryRunRequest);
+        std::function<void(const executor::RemoteCommandRequest& request)> onDryRunRequest);
     void simulateSuccessfulDryRun();
 
     /**

@@ -125,7 +125,7 @@ void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
                                        const BSONObj& query,
                                        const BSONObj& collation,
                                        std::set<ShardId>* shardIds) const {
-    auto qr = stdx::make_unique<QueryRequest>(_rt->getns());
+    auto qr = std::make_unique<QueryRequest>(_rt->getns());
     qr->setFilter(query);
 
     if (!collation.isEmpty()) {

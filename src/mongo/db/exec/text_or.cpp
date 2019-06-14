@@ -30,6 +30,7 @@
 #include "mongo/db/exec/text_or.h"
 
 #include <map>
+#include <memory>
 #include <vector>
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -41,14 +42,12 @@
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
 using std::string;
-using stdx::make_unique;
 
 using fts::FTSSpec;
 
@@ -111,8 +110,8 @@ std::unique_ptr<PlanStageStats> TextOrStage::getStats() {
         _commonStats.filter = bob.obj();
     }
 
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_TEXT_OR);
-    ret->specific = make_unique<TextOrStats>(_specificStats);
+    unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_TEXT_OR);
+    ret->specific = std::make_unique<TextOrStats>(_specificStats);
 
     for (auto&& child : _children) {
         ret->children.emplace_back(child->getStats());

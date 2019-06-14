@@ -31,6 +31,8 @@
 
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 
+#include <memory>
+
 #include "mongo/base/status.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -39,7 +41,6 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 

@@ -71,7 +71,8 @@ StringData _todb(StringData ns) {
 
 Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, StringData ns) const {
     const StringData db = _todb(ns);
-    invariant(opCtx->lockState()->isDbLockedForMode(db, MODE_IS));
+    invariant(opCtx->lockState()->isDbLockedForMode(db, MODE_IS) ||
+              (db.compare("local") == 0 && opCtx->lockState()->isLocked()));
 
     stdx::lock_guard<SimpleMutex> lk(_m);
     DBs::const_iterator it = _dbs.find(db);
@@ -142,7 +143,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
             *justCreated = true;
     }
 
-    auto newDb = stdx::make_unique<DatabaseImpl>(dbname, ++_epoch);
+    auto newDb = std::make_unique<DatabaseImpl>(dbname, ++_epoch);
     newDb->init(opCtx);
 
     // Finally replace our nullptr entry with the new Database pointer.

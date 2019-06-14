@@ -303,7 +303,7 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
         return Status(ErrorCodes::BadValue, "Cannot produce cache data: tree is NULL.");
     }
 
-    auto indexTree = stdx::make_unique<PlanCacheIndexTree>();
+    auto indexTree = std::make_unique<PlanCacheIndexTree>();
 
     if (taggedTree->getTag() &&
         taggedTree->getTag()->getType() == MatchExpression::TagData::Type::IndexTag) {
@@ -341,7 +341,7 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
             }
 
             std::unique_ptr<IndexEntry> indexEntry =
-                stdx::make_unique<IndexEntry>(relevantIndices[itag->index]);
+                std::make_unique<IndexEntry>(relevantIndices[itag->index]);
             indexTree->entry.reset(indexEntry.release());
             indexTree->index_pos = itag->pos;
             indexTree->canCombineBounds = itag->canCombineBounds;
@@ -411,7 +411,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
             }
             OrPushdownTag::Destination dest;
             dest.route = orPushdown.route;
-            dest.tagData = stdx::make_unique<IndexTag>(
+            dest.tagData = std::make_unique<IndexTag>(
                 index->second, orPushdown.position, orPushdown.canCombineBounds);
             orPushdownTag->addDestination(std::move(dest));
         }

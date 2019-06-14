@@ -54,7 +54,7 @@ public:
               std::move(nss), std::make_shared<StubMongoProcessInterface>(), kNullTimeZoneDatabase),
           _testOpCtx(_serviceContext.makeOperationContext()) {
         TimeZoneDatabase::set(_serviceContext.getServiceContext(),
-                              stdx::make_unique<TimeZoneDatabase>());
+                              std::make_unique<TimeZoneDatabase>());
 
         // As we don't have the TimeZoneDatabase prior to ExpressionContext construction, we must
         // initialize with a nullptr and set post-construction.

@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <functional>
+
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -41,7 +43,6 @@
 #include "mongo/db/repl/noop_writer.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
 
@@ -63,7 +64,7 @@ class NoopWriter::PeriodicNoopRunner {
     PeriodicNoopRunner(const PeriodicNoopRunner&) = delete;
     PeriodicNoopRunner& operator=(const PeriodicNoopRunner&) = delete;
 
-    using NoopWriteFn = stdx::function<void(OperationContext*)>;
+    using NoopWriteFn = std::function<void(OperationContext*)>;
 
 public:
     PeriodicNoopRunner(Seconds waitTime, NoopWriteFn noopWrite)
@@ -131,7 +132,7 @@ Status NoopWriter::startWritingPeriodicNoops(OpTime lastKnownOpTime) {
 
     invariant(!_noopRunner);
     _noopRunner =
-        stdx::make_unique<PeriodicNoopRunner>(_writeInterval, [this](OperationContext* opCtx) {
+        std::make_unique<PeriodicNoopRunner>(_writeInterval, [this](OperationContext* opCtx) {
             opCtx->setShouldParticipateInFlowControl(false);
             _writeNoop(opCtx);
         });

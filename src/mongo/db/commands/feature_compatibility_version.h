@@ -109,7 +109,7 @@ private:
     /**
      * Build update command.
      */
-    typedef stdx::function<void(BSONObjBuilder)> UpdateBuilder;
+    typedef std::function<void(BSONObjBuilder)> UpdateBuilder;
     static void _runUpdateCommand(OperationContext* opCtx, UpdateBuilder callback);
 };
 

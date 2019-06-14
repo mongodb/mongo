@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -56,7 +57,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/resolved_view.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

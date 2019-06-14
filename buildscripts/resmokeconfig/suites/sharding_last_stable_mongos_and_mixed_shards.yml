@@ -118,6 +118,7 @@ selector:
   - jstests/sharding/txn_two_phase_commit_coordinator_shutdown_and_restart.js
   - jstests/sharding/txn_two_phase_commit_failover.js
   - jstests/sharding/txn_two_phase_commit_killop.js
+  - jstests/sharding/txn_two_phase_commit_server_status.js
   - jstests/sharding/txn_recover_decision_using_recovery_router.js
   - jstests/sharding/txn_two_phase_commit_wait_for_majority_commit_after_stepup.js
   - jstests/sharding/txn_commit_optimizations_for_read_only_shards.js

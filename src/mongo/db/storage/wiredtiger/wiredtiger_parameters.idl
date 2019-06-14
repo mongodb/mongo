@@ -109,3 +109,14 @@ server_parameters:
         cpp_vartype: 'AtomicWord<std::int32_t>'
         cpp_varname: gWiredTigerCursorCacheSize
         default: -100
+
+    wiredTigerMaxCacheOverflowSizeGB:
+      description: >-
+        Maximum amount of disk space to use for cache overflow;
+        Defaults to 0 (unbounded)
+      set_at: runtime
+      cpp_class:
+        name: WiredTigerMaxCacheOverflowSizeGBParameter
+        data: 'std::pair<double, WiredTigerKVEngine*>'
+        override_set: true
+      condition: { expr: false }

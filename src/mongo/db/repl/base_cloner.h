@@ -29,8 +29,9 @@
 
 #pragma once
 
+#include <functional>
+
 #include "mongo/base/status.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 namespace repl {
@@ -45,7 +46,7 @@ public:
     /**
      * Callback function to report final status of cloning.
      */
-    using CallbackFn = stdx::function<void(const Status&)>;
+    using CallbackFn = std::function<void(const Status&)>;
 
     virtual ~BaseCloner() {}
 

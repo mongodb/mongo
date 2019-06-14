@@ -7,6 +7,9 @@ AM_LDFLAGS = -static
 all_TESTS=
 noinst_PROGRAMS=
 
+# The import test is only a shell script
+all_TESTS += import/smoke.sh
+
 test_random_abort_SOURCES = random_abort/main.c
 noinst_PROGRAMS += test_random_abort
 all_TESTS += random_abort/smoke.sh
@@ -137,7 +140,7 @@ all_TESTS += test_wt4803_cache_overflow_abort
 
 # Run this during a "make check" smoke test.
 TESTS = $(all_TESTS)
-LOG_COMPILER = $(TEST_WRAPPER)
+LOG_COMPILER = env top_builddir=$(top_builddir) top_srcdir=$(top_srcdir) $(TEST_WRAPPER)
 
 clean-local:
 	rm -rf WT_TEST.* core.* *.core

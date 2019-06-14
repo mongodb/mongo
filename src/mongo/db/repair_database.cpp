@@ -61,7 +61,7 @@ namespace mongo {
 
 StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
                                            CollectionCatalogEntry* cce,
-                                           stdx::function<bool(const std::string&)> filter) {
+                                           std::function<bool(const std::string&)> filter) {
     IndexNameObjs ret;
     std::vector<std::string>& indexNames = ret.first;
     std::vector<BSONObj>& indexSpecs = ret.second;

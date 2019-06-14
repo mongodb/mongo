@@ -236,4 +236,11 @@ boost::optional<size_t> parseUnsignedBase10Integer(StringData fieldName) {
     return boost::none;
 }
 
+std::string convertDoubleToString(double d, int prec) {
+    char buffer[StringBuilder::MONGO_DBL_SIZE];
+    int z = snprintf(buffer, sizeof(buffer), "%.*g", prec, d);
+    invariant(z >= 0);
+    return std::string(buffer);
+}
+
 }  // namespace mongo::str

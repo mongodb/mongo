@@ -31,6 +31,8 @@
 
 #include "mongo/db/logical_clock_test_fixture.h"
 
+#include <memory>
+
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
@@ -38,7 +40,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
@@ -53,14 +54,14 @@ void LogicalClockTestFixture::setUp() {
 
     auto service = getServiceContext();
 
-    auto logicalClock = stdx::make_unique<LogicalClock>(service);
+    auto logicalClock = std::make_unique<LogicalClock>(service);
     LogicalClock::set(service, std::move(logicalClock));
     _clock = LogicalClock::get(service);
 
-    service->setFastClockSource(stdx::make_unique<SharedClockSourceAdapter>(_mockClockSource));
-    service->setPreciseClockSource(stdx::make_unique<SharedClockSourceAdapter>(_mockClockSource));
+    service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(_mockClockSource));
+    service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(_mockClockSource));
 
-    _dbDirectClient = stdx::make_unique<DBDirectClient>(operationContext());
+    _dbDirectClient = std::make_unique<DBDirectClient>(operationContext());
 
     ASSERT_OK(replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
 }
@@ -72,7 +73,7 @@ void LogicalClockTestFixture::tearDown() {
 
 LogicalClock* LogicalClockTestFixture::resetClock() {
     auto service = getServiceContext();
-    auto logicalClock = stdx::make_unique<LogicalClock>(service);
+    auto logicalClock = std::make_unique<LogicalClock>(service);
 
     LogicalClock::set(service, std::move(logicalClock));
     _clock = LogicalClock::get(service);

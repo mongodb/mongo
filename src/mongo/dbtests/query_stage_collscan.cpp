@@ -33,6 +33,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -47,14 +49,12 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace QueryStageCollectionScan {
 
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 static const NamespaceString nss{"unittests.QueryStageCollectionScan"};
 
@@ -102,9 +102,9 @@ public:
         unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
         // Make a scan and have the runner own it.
-        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-        unique_ptr<PlanStage> ps =
-            make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), filterExpr.get());
+        unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+        unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
+            &_opCtx, collection, params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
             &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
@@ -216,9 +216,9 @@ public:
         params.tailable = false;
 
         // Make a scan and have the runner own it.
-        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+        unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         unique_ptr<PlanStage> ps =
-            make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), nullptr);
+            std::make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), nullptr);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
             &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
@@ -251,9 +251,9 @@ public:
         params.direction = CollectionScanParams::BACKWARD;
         params.tailable = false;
 
-        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+        unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         unique_ptr<PlanStage> ps =
-            make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), nullptr);
+            std::make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), nullptr);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
             &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);

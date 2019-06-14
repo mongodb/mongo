@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include <functional>
 #include <vector>
 
 #include "mongo/db/exec/projection_exec_agg.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -43,7 +43,7 @@ class CompositeIndexabilityDiscriminator;
 class MatchExpression;
 struct CoreIndexInfo;
 
-using IndexabilityDiscriminator = stdx::function<bool(const MatchExpression* me)>;
+using IndexabilityDiscriminator = std::function<bool(const MatchExpression* me)>;
 using IndexabilityDiscriminators = std::vector<IndexabilityDiscriminator>;
 using IndexToDiscriminatorMap = StringMap<CompositeIndexabilityDiscriminator>;
 

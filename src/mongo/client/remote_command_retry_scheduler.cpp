@@ -32,10 +32,10 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
+#include <memory>
 #include <vector>
 
 #include "mongo/client/remote_command_retry_scheduler.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
@@ -127,7 +127,7 @@ RemoteCommandRetryScheduler::makeRetryPolicy(
     Milliseconds maxResponseElapsedTotal,
     const std::initializer_list<ErrorCodes::Error>& retryableErrors) {
     std::unique_ptr<RetryPolicy> policy =
-        stdx::make_unique<RetryPolicyImpl>(maxAttempts, maxResponseElapsedTotal, retryableErrors);
+        std::make_unique<RetryPolicyImpl>(maxAttempts, maxResponseElapsedTotal, retryableErrors);
     return policy;
 }
 

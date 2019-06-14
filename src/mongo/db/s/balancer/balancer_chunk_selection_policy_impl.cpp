@@ -34,6 +34,7 @@
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
 
 #include <algorithm>
+#include <memory>
 #include <vector>
 
 #include "mongo/base/status_with.h"
@@ -43,7 +44,6 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 

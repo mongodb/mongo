@@ -48,7 +48,6 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -69,7 +68,7 @@ static const char* const ns = "unittests.document_source_group_tests";
 class CheckResultsBase {
 public:
     CheckResultsBase()
-        : _queryServiceContext(stdx::make_unique<QueryTestServiceContext>()),
+        : _queryServiceContext(std::make_unique<QueryTestServiceContext>()),
           _opCtx(_queryServiceContext->makeOperationContext()),
           _ctx(new ExpressionContextForTest(_opCtx.get(),
                                             AggregationRequest(NamespaceString(ns), {}))) {}

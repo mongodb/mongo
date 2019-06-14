@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -216,14 +216,14 @@ Status bsonExtractOIDFieldWithDefault(const BSONObj& object,
 Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
                                             StringData fieldName,
                                             long long defaultValue,
-                                            stdx::function<bool(long long)> pred,
+                                            std::function<bool(long long)> pred,
                                             const std::string& predDescription,
                                             long long* out);
 
 Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
                                             StringData fieldName,
                                             long long defaultValue,
-                                            stdx::function<bool(long long)> pred,
+                                            std::function<bool(long long)> pred,
                                             long long* out);
 
 }  // namespace mongo

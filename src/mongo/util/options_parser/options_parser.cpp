@@ -76,7 +76,7 @@ namespace optionenvironment {
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 
-stdx::function<bool()> OptionsParser::useStrict;
+std::function<bool()> OptionsParser::useStrict;
 
 namespace {
 

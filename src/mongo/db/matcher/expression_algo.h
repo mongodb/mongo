@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <set>
 
 #include "mongo/base/string_data.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -43,7 +43,7 @@ struct DepsTracker;
 
 namespace expression {
 
-using NodeTraversalFunc = stdx::function<void(MatchExpression*, std::string)>;
+using NodeTraversalFunc = std::function<void(MatchExpression*, std::string)>;
 
 /**
  * Returns true if the documents matched by 'lhs' are a subset of the documents matched by

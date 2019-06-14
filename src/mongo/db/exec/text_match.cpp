@@ -29,20 +29,19 @@
 
 #include "mongo/db/exec/text_match.h"
 
+#include <memory>
 #include <vector>
 
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 const char* TextMatchStage::kStageType = "TEXT_MATCH";
 
@@ -64,8 +63,9 @@ bool TextMatchStage::isEOF() {
 std::unique_ptr<PlanStageStats> TextMatchStage::getStats() {
     _commonStats.isEOF = isEOF();
 
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_TEXT_MATCH);
-    ret->specific = make_unique<TextMatchStats>(_specificStats);
+    unique_ptr<PlanStageStats> ret =
+        std::make_unique<PlanStageStats>(_commonStats, STAGE_TEXT_MATCH);
+    ret->specific = std::make_unique<TextMatchStats>(_specificStats);
     ret->children.emplace_back(child()->getStats());
 
     return ret;

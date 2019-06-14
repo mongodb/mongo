@@ -31,6 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <functional>
+#include <memory>
+
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
@@ -40,8 +43,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
@@ -239,7 +240,7 @@ executor::RemoteCommandResponse makeHeartbeatResponse(const ReplSetConfig& rsCon
     hbResp.setConfigVersion(configVersion);
     // The smallest valid optime in PV1.
     OpTime opTime(Timestamp(), 0);
-    Date_t wallTime = Date_t::min();
+    Date_t wallTime = Date_t();
     hbResp.setAppliedOpTimeAndWallTime({opTime, wallTime});
     hbResp.setDurableOpTimeAndWallTime({opTime, wallTime});
     auto bob = BSONObjBuilder(hbResp.toBSON());
@@ -470,7 +471,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
                                                         << request.target.toString();
         if (request.target == incompatibleHost) {
             OpTime opTime{Timestamp{10, 10}, 10};
-            Date_t wallTime = Date_t::min();
+            Date_t wallTime = Date_t();
             rpc::ReplSetMetadata metadata(opTime.getTerm(),
                                           {opTime, wallTime},
                                           opTime,

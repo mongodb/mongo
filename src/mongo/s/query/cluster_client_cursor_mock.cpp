@@ -39,7 +39,7 @@ namespace mongo {
 
 ClusterClientCursorMock::ClusterClientCursorMock(boost::optional<LogicalSessionId> lsid,
                                                  boost::optional<TxnNumber> txnNumber,
-                                                 stdx::function<void(void)> killCallback)
+                                                 std::function<void(void)> killCallback)
     : _killCallback(std::move(killCallback)), _lsid(lsid), _txnNumber(txnNumber) {}
 
 ClusterClientCursorMock::~ClusterClientCursorMock() {

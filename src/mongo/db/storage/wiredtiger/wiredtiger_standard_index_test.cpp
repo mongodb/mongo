@@ -33,6 +33,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
@@ -44,7 +45,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/system_clock_source.h"
@@ -61,7 +61,7 @@ public:
         int ret = wiredtiger_open(_dbpath.path().c_str(), NULL, config, &_conn);
         invariantWTOK(ret);
 
-        _fastClockSource = stdx::make_unique<SystemClockSource>();
+        _fastClockSource = std::make_unique<SystemClockSource>();
         _sessionCache = new WiredTigerSessionCache(_conn, _fastClockSource.get());
     }
 
@@ -90,7 +90,8 @@ public:
             spec = spec.addField(partialBSON.firstElement());
         }
 
-        IndexDescriptor desc(NULL, "", spec);
+        auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
+        IndexDescriptor desc(collection.get(), "", spec);
 
         KVPrefix prefix = KVPrefix::kNotPrefixed;
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
@@ -101,12 +102,12 @@ public:
         invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
         if (unique)
-            return stdx::make_unique<WiredTigerIndexUnique>(&opCtx, uri, &desc, prefix);
-        return stdx::make_unique<WiredTigerIndexStandard>(&opCtx, uri, &desc, prefix);
+            return std::make_unique<WiredTigerIndexUnique>(&opCtx, uri, &desc, prefix);
+        return std::make_unique<WiredTigerIndexStandard>(&opCtx, uri, &desc, prefix);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return stdx::make_unique<WiredTigerRecoveryUnit>(_sessionCache, &_oplogManager);
+        return std::make_unique<WiredTigerRecoveryUnit>(_sessionCache, &_oplogManager);
     }
 
 private:
@@ -118,7 +119,7 @@ private:
 };
 
 std::unique_ptr<HarnessHelper> makeHarnessHelper() {
-    return stdx::make_unique<MyHarnessHelper>();
+    return std::make_unique<MyHarnessHelper>();
 }
 
 MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {

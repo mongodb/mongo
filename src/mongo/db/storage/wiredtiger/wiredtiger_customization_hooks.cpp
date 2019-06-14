@@ -31,17 +31,18 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 
+#include <memory>
+
 #include "mongo/base/init.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace {
 
 ServiceContext::ConstructorActionRegisterer setWiredTigerCustomizationHooks{
     "SetWiredTigerCustomizationHooks", [](ServiceContext* service) {
-        auto customizationHooks = stdx::make_unique<WiredTigerCustomizationHooks>();
+        auto customizationHooks = std::make_unique<WiredTigerCustomizationHooks>();
         WiredTigerCustomizationHooks::set(service, std::move(customizationHooks));
     }};
 

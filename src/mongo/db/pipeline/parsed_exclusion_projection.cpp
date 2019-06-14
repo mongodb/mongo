@@ -31,10 +31,11 @@
 
 #include "mongo/db/pipeline/parsed_exclusion_projection.h"
 
+#include <memory>
+
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 

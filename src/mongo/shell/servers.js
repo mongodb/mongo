@@ -124,7 +124,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         new MongoRunner.VersionSub(extractMajorVersionFromVersionString(shellVersion()),
                                    shellVersion()),
         // To-be-updated when we branch for the next release.
-        new MongoRunner.VersionSub("last-stable", "4.0")
+        new MongoRunner.VersionSub("last-stable", "4.2")
     ];
 
     MongoRunner.getBinVersionFor = function(version) {

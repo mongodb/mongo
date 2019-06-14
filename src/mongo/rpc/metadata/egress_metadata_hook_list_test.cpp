@@ -29,10 +29,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -99,7 +100,7 @@ TEST(EgressMetadataHookListTest, EmptyHookShouldNotFail) {
 
 TEST(EgressMetadataHookListTest, SingleHook) {
     ReadReplyArgs hook1Args;
-    auto hook1 = stdx::make_unique<TestHook>("h1", &hook1Args);
+    auto hook1 = std::make_unique<TestHook>("h1", &hook1Args);
     EgressMetadataHookList hookList;
     hookList.addHook(std::move(hook1));
 
@@ -118,12 +119,12 @@ TEST(EgressMetadataHookListTest, SingleHook) {
 
 TEST(EgressMetadataHookListTest, MultipleHooks) {
     ReadReplyArgs hook1Args;
-    auto hook1 = stdx::make_unique<TestHook>("foo", &hook1Args);
+    auto hook1 = std::make_unique<TestHook>("foo", &hook1Args);
     EgressMetadataHookList hookList;
     hookList.addHook(std::move(hook1));
 
     ReadReplyArgs hook2Args;
-    auto hook2 = stdx::make_unique<TestHook>("bar", &hook2Args);
+    auto hook2 = std::make_unique<TestHook>("bar", &hook2Args);
     hookList.addHook(std::move(hook2));
 
     BSONObjBuilder builder;
@@ -147,12 +148,12 @@ TEST(EgressMetadataHookListTest, MultipleHooks) {
 
 TEST(EgressMetadataHookListTest, SingleBadHookShouldReturnError) {
     ReadReplyArgs hook1Args;
-    auto hook1 = stdx::make_unique<TestHook>("foo", &hook1Args);
+    auto hook1 = std::make_unique<TestHook>("foo", &hook1Args);
     EgressMetadataHookList hookList;
     hookList.addHook(std::move(hook1));
 
     Status err{ErrorCodes::IllegalOperation, "intentional error by test"};
-    auto hook2 = stdx::make_unique<FixedStatusTestHook>(err);
+    auto hook2 = std::make_unique<FixedStatusTestHook>(err);
     hookList.addHook(std::move(hook2));
 
     BSONObjBuilder builder;

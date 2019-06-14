@@ -132,7 +132,7 @@ FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* 
       _lastTimeSustainerAdvanced(Date_t::now()) {
     // Initialize _lastTargetTicketsPermitted to maximum tickets to make sure flow control doesn't
     // cause a slow start on start up.
-    FlowControlTicketholder::set(service, stdx::make_unique<FlowControlTicketholder>(_kMaxTickets));
+    FlowControlTicketholder::set(service, std::make_unique<FlowControlTicketholder>(_kMaxTickets));
 
     service->getPeriodicRunner()->scheduleJob(
         {"FlowControlRefresher",

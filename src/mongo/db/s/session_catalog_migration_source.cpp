@@ -31,6 +31,8 @@
 
 #include "mongo/db/s/session_catalog_migration_source.h"
 
+#include <memory>
+
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
@@ -44,7 +46,6 @@
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -148,7 +149,7 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
             IDLParserErrorContext("Session migration cloning"), cursor->next());
         if (!nextSession.getLastWriteOpTime().isNull()) {
             _sessionOplogIterators.push_back(
-                stdx::make_unique<SessionOplogIterator>(std::move(nextSession), _rollbackIdAtInit));
+                std::make_unique<SessionOplogIterator>(std::move(nextSession), _rollbackIdAtInit));
         }
     }
 
@@ -390,7 +391,7 @@ SessionCatalogMigrationSource::SessionOplogIterator::SessionOplogIterator(
     SessionTxnRecord txnRecord, int expectedRollbackId)
     : _record(std::move(txnRecord)), _initialRollbackId(expectedRollbackId) {
     _writeHistoryIterator =
-        stdx::make_unique<TransactionHistoryIterator>(_record.getLastWriteOpTime());
+        std::make_unique<TransactionHistoryIterator>(_record.getLastWriteOpTime());
 }
 
 boost::optional<repl::OplogEntry> SessionCatalogMigrationSource::SessionOplogIterator::getNext(

@@ -43,6 +43,7 @@
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/log.h"
@@ -205,25 +206,27 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
 }
 
 /**
- * Returns whether the command should ignore prepare conflicts or not.
+ * Returns the PrepareConflictBehavior that a command should use given the requested behavior and
+ * readConcern options.
  */
-bool shouldIgnorePrepared(PrepareConflictBehavior prepareConflictBehavior,
-                          repl::ReadConcernLevel readConcernLevel,
-                          boost::optional<LogicalTime> afterClusterTime,
-                          boost::optional<LogicalTime> atClusterTime) {
+PrepareConflictBehavior getPrepareBehaviorForReadConcern(
+    PrepareConflictBehavior requestedBehavior,
+    repl::ReadConcernLevel readConcernLevel,
+    boost::optional<LogicalTime> afterClusterTime,
+    boost::optional<LogicalTime> atClusterTime) {
 
     // Only these read concern levels are eligible for ignoring prepare conflicts.
     if (readConcernLevel != repl::ReadConcernLevel::kLocalReadConcern &&
         readConcernLevel != repl::ReadConcernLevel::kAvailableReadConcern &&
         readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern) {
-        return false;
+        return PrepareConflictBehavior::kEnforce;
     }
 
     if (afterClusterTime || atClusterTime) {
-        return false;
+        return PrepareConflictBehavior::kEnforce;
     }
 
-    return prepareConflictBehavior == PrepareConflictBehavior::kIgnore;
+    return requestedBehavior;
 }
 }  // namespace
 
@@ -367,8 +370,9 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
     // DBDirectClient should inherit whether or not to ignore prepare conflicts from its parent.
     if (!opCtx->getClient()->isInDirectClient()) {
         // Set whether this command should ignore prepare conflicts or not.
-        opCtx->recoveryUnit()->setIgnorePrepared(shouldIgnorePrepared(
-            prepareConflictBehavior, readConcernArgs.getLevel(), afterClusterTime, atClusterTime));
+        const auto behavior = getPrepareBehaviorForReadConcern(
+            prepareConflictBehavior, readConcernArgs.getLevel(), afterClusterTime, atClusterTime);
+        opCtx->recoveryUnit()->setPrepareConflictBehavior(behavior);
     }
 
     return Status::OK();
@@ -392,6 +396,16 @@ MONGO_REGISTER_SHIM(waitForLinearizableReadConcern)
         if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
             return {ErrorCodes::NotMaster,
                     "No longer primary when waiting for linearizable read concern"};
+        }
+
+        // With linearizable readConcern, read commands may write to the oplog, which is an
+        // exception to the rule that writes are not allowed while ignoring prepare conflicts. If we
+        // are ignoring prepare conflicts (during a read command), force the prepare conflict
+        // behavior to permit writes.
+        auto originalBehavior = opCtx->recoveryUnit()->getPrepareConflictBehavior();
+        if (originalBehavior == PrepareConflictBehavior::kIgnoreConflicts) {
+            opCtx->recoveryUnit()->setPrepareConflictBehavior(
+                PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
         }
 
         writeConflictRetry(

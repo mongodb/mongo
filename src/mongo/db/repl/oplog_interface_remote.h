@@ -29,8 +29,9 @@
 
 #pragma once
 
+#include <functional>
+
 #include "mongo/db/repl/oplog_interface.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -47,7 +48,7 @@ public:
     /**
      * Type of function to return a connection to the sync source.
      */
-    using GetConnectionFn = stdx::function<DBClientBase*()>;
+    using GetConnectionFn = std::function<DBClientBase*()>;
 
     OplogInterfaceRemote(HostAndPort hostAndPort,
                          GetConnectionFn getConnection,

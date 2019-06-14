@@ -88,7 +88,7 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     if (!collection)
         return RecordId();
 
-    auto qr = stdx::make_unique<QueryRequest>(collection->ns());
+    auto qr = std::make_unique<QueryRequest>(collection->ns());
     qr->setFilter(query);
     return findOne(opCtx, collection, std::move(qr), requireIndex);
 }

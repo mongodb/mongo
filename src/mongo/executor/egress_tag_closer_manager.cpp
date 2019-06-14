@@ -77,7 +77,7 @@ void EgressTagCloserManager::dropConnections(const HostAndPort& hostAndPort) {
 
 void EgressTagCloserManager::mutateTags(
     const HostAndPort& hostAndPort,
-    const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc) {
+    const std::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     for (auto etc : _egressTagClosers) {

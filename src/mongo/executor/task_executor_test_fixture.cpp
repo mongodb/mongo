@@ -31,10 +31,11 @@
 
 #include "mongo/executor/task_executor_test_fixture.h"
 
+#include <memory>
+
 #include "mongo/base/status.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -61,7 +62,7 @@ RemoteCommandRequest TaskExecutorTest::assertRemoteCommandNameEquals(
 TaskExecutorTest::~TaskExecutorTest() = default;
 
 void TaskExecutorTest::setUp() {
-    auto net = stdx::make_unique<NetworkInterfaceMock>();
+    auto net = std::make_unique<NetworkInterfaceMock>();
     _net = net.get();
     _executor = makeTaskExecutor(std::move(net));
 }

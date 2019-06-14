@@ -33,7 +33,6 @@
 #include <vector>
 
 #include "mongo/db/auth/restriction.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -122,7 +121,7 @@ public:
     }
 
     explicit RestrictionSetAll(const T& restriction) {
-        _restrictions.push_back(stdx::make_unique<T>(restriction));
+        _restrictions.push_back(std::make_unique<T>(restriction));
     }
 
     Status validate(const RestrictionEnvironment& environment) const final {

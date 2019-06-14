@@ -173,7 +173,7 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
-        _sessionCatalogSource = stdx::make_unique<SessionCatalogMigrationSource>(
+        _sessionCatalogSource = std::make_unique<SessionCatalogMigrationSource>(
             opCtx,
             _args.getNss(),
             ChunkRange(_args.getMinKey(), _args.getMaxKey()),

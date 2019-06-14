@@ -54,7 +54,7 @@ public:
 
         repl::ReplicationCoordinator::set(
             getServiceContext(),
-            stdx::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
+            std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
     }
 
     void assertRepairIncompleteOnTearDown() {

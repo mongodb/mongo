@@ -54,7 +54,7 @@ void Session::unsetTags(TagMask tagsToUnset) {
     mutateTags([tagsToUnset](TagMask originalTags) { return (originalTags & ~tagsToUnset); });
 }
 
-void Session::mutateTags(const stdx::function<TagMask(TagMask)>& mutateFunc) {
+void Session::mutateTags(const std::function<TagMask(TagMask)>& mutateFunc) {
     TagMask oldValue, newValue;
     do {
         oldValue = _tags.load();

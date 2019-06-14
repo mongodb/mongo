@@ -33,6 +33,7 @@
 
 #include "mongo/s/query/cluster_find.h"
 
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -62,7 +63,6 @@
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -156,7 +156,7 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
         newProjection = projectionBuilder.obj();
     }
 
-    auto newQR = stdx::make_unique<QueryRequest>(qr);
+    auto newQR = std::make_unique<QueryRequest>(qr);
     newQR->setProj(newProjection);
     newQR->setSkip(boost::none);
     newQR->setLimit(newLimit);

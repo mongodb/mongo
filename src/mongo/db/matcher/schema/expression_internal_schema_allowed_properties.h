@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include <memory>
 #include <pcrecpp.h>
 #include <utility>
 #include <vector>
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -94,7 +94,7 @@ public:
      */
     struct Pattern {
         explicit Pattern(StringData pattern)
-            : rawRegex(pattern), regex(stdx::make_unique<pcrecpp::RE>(pattern.toString())) {}
+            : rawRegex(pattern), regex(std::make_unique<pcrecpp::RE>(pattern.toString())) {}
 
         StringData rawRegex;
         std::unique_ptr<pcrecpp::RE> regex;

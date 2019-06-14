@@ -170,7 +170,7 @@ struct __wt_cache {
 	 * Score of how aggressive eviction should be about selecting eviction
 	 * candidates. If eviction is struggling to make progress, this score
 	 * rises (up to a maximum of 100), at which point the cache is "stuck"
-	 * and transaction will be rolled back.
+	 * and transactions will be rolled back.
 	 */
 	uint32_t evict_aggressive_score;
 
@@ -250,11 +250,12 @@ struct __wt_cache {
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define	WT_CACHE_EVICT_CLEAN	  0x01u	/* Evict clean pages */
 #define	WT_CACHE_EVICT_CLEAN_HARD 0x02u	/* Clean % blocking app threads */
-#define	WT_CACHE_EVICT_DIRTY	  0x04u	/* Evict dirty pages */
-#define	WT_CACHE_EVICT_DIRTY_HARD 0x08u	/* Dirty % blocking app threads */
-#define	WT_CACHE_EVICT_LOOKASIDE  0x10u	/* Try lookaside eviction */
-#define	WT_CACHE_EVICT_SCRUB	  0x20u	/* Scrub dirty pages */
-#define	WT_CACHE_EVICT_URGENT	  0x40u	/* Pages are in the urgent queue */
+#define	WT_CACHE_EVICT_DEBUG_MODE 0x04u	/* Aggressive debugging mode */
+#define	WT_CACHE_EVICT_DIRTY	  0x08u	/* Evict dirty pages */
+#define	WT_CACHE_EVICT_DIRTY_HARD 0x10u	/* Dirty % blocking app threads */
+#define	WT_CACHE_EVICT_LOOKASIDE  0x20u	/* Try lookaside eviction */
+#define	WT_CACHE_EVICT_SCRUB	  0x40u	/* Scrub dirty pages */
+#define	WT_CACHE_EVICT_URGENT	  0x80u	/* Pages are in the urgent queue */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 #define	WT_CACHE_EVICT_ALL	(WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_DIRTY)
 	uint32_t flags;

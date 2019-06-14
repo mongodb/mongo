@@ -34,6 +34,7 @@
 #include "mongo/watchdog/watchdog_mongod.h"
 
 #include <boost/filesystem.hpp>
+#include <memory>
 
 #include "mongo/base/init.h"
 #include "mongo/config.h"
@@ -42,7 +43,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
@@ -148,7 +148,7 @@ void startWatchdog() {
     std::vector<std::unique_ptr<WatchdogCheck>> checks;
 
     auto dataCheck =
-        stdx::make_unique<DirectoryCheck>(boost::filesystem::path(storageGlobalParams.dbpath));
+        std::make_unique<DirectoryCheck>(boost::filesystem::path(storageGlobalParams.dbpath));
 
     checks.push_back(std::move(dataCheck));
 
@@ -158,7 +158,7 @@ void startWatchdog() {
         journalDirectory /= "journal";
 
         if (boost::filesystem::exists(journalDirectory)) {
-            auto journalCheck = stdx::make_unique<DirectoryCheck>(journalDirectory);
+            auto journalCheck = std::make_unique<DirectoryCheck>(journalDirectory);
 
             checks.push_back(std::move(journalCheck));
         } else {
@@ -175,7 +175,7 @@ void startWatchdog() {
         boost::filesystem::path logFile(serverGlobalParams.logpath);
         auto logPath = logFile.parent_path();
 
-        auto logCheck = stdx::make_unique<DirectoryCheck>(logPath);
+        auto logCheck = std::make_unique<DirectoryCheck>(logPath);
         checks.push_back(std::move(logCheck));
     }
 
@@ -183,11 +183,11 @@ void startWatchdog() {
     // This may be redudant with the dbpath check but there is not easy way to confirm they are
     // duplicate.
     for (auto&& path : getWatchdogPaths()) {
-        auto auditCheck = stdx::make_unique<DirectoryCheck>(path);
+        auto auditCheck = std::make_unique<DirectoryCheck>(path);
         checks.push_back(std::move(auditCheck));
     }
 
-    auto monitor = stdx::make_unique<WatchdogMonitor>(
+    auto monitor = std::make_unique<WatchdogMonitor>(
         std::move(checks), watchdogCheckPeriod, period, watchdogTerminate);
 
     // Install the new WatchdogMonitor

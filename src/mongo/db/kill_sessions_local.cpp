@@ -57,8 +57,8 @@ namespace {
 void killSessionsAction(
     OperationContext* opCtx,
     const SessionKiller::Matcher& matcher,
-    const stdx::function<bool(const ObservableSession&)>& filterFn,
-    const stdx::function<void(OperationContext*, const SessionToKill&)>& killSessionFn,
+    const std::function<bool(const ObservableSession&)>& filterFn,
+    const std::function<void(OperationContext*, const SessionToKill&)>& killSessionFn,
     ErrorCodes::Error reason = ErrorCodes::Interrupted) {
     const auto catalog = SessionCatalog::get(opCtx);
 

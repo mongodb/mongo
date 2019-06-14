@@ -31,15 +31,15 @@
 
 #include "mongo/db/exec/multi_iterator.h"
 
+#include <memory>
+
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
 
@@ -110,8 +110,8 @@ void MultiIteratorStage::doReattachToOperationContext() {
 
 unique_ptr<PlanStageStats> MultiIteratorStage::getStats() {
     unique_ptr<PlanStageStats> ret =
-        make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_ITERATOR);
-    ret->specific = make_unique<CollectionScanStats>();
+        std::make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_ITERATOR);
+    ret->specific = std::make_unique<CollectionScanStats>();
     return ret;
 }
 

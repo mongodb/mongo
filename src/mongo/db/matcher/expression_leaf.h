@@ -29,13 +29,14 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace pcrecpp {
@@ -191,7 +192,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
-            stdx::make_unique<EqualityMatchExpression>(path(), _rhs);
+            std::make_unique<EqualityMatchExpression>(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -213,7 +214,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
-            stdx::make_unique<LTEMatchExpression>(path(), _rhs);
+            std::make_unique<LTEMatchExpression>(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -235,7 +236,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
-            stdx::make_unique<LTMatchExpression>(path(), _rhs);
+            std::make_unique<LTMatchExpression>(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -257,7 +258,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
-            stdx::make_unique<GTMatchExpression>(path(), _rhs);
+            std::make_unique<GTMatchExpression>(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -279,7 +280,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
-            stdx::make_unique<GTEMatchExpression>(path(), _rhs);
+            std::make_unique<GTEMatchExpression>(path(), _rhs);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -299,7 +300,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<RegexMatchExpression> e =
-            stdx::make_unique<RegexMatchExpression>(path(), _regex, _flags);
+            std::make_unique<RegexMatchExpression>(path(), _regex, _flags);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -343,7 +344,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ModMatchExpression> m =
-            stdx::make_unique<ModMatchExpression>(path(), _divisor, _remainder);
+            std::make_unique<ModMatchExpression>(path(), _divisor, _remainder);
         if (getTag()) {
             m->setTag(getTag()->clone());
         }
@@ -379,7 +380,7 @@ public:
     explicit ExistsMatchExpression(StringData path);
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<ExistsMatchExpression> e = stdx::make_unique<ExistsMatchExpression>(path());
+        std::unique_ptr<ExistsMatchExpression> e = std::make_unique<ExistsMatchExpression>(path());
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -563,7 +564,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression =
-            stdx::make_unique<BitsAllSetMatchExpression>(path(), getBitPositions());
+            std::make_unique<BitsAllSetMatchExpression>(path(), getBitPositions());
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
         }
@@ -584,7 +585,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression =
-            stdx::make_unique<BitsAllClearMatchExpression>(path(), getBitPositions());
+            std::make_unique<BitsAllClearMatchExpression>(path(), getBitPositions());
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
         }
@@ -605,7 +606,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression =
-            stdx::make_unique<BitsAnySetMatchExpression>(path(), getBitPositions());
+            std::make_unique<BitsAnySetMatchExpression>(path(), getBitPositions());
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
         }
@@ -626,7 +627,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression =
-            stdx::make_unique<BitsAnyClearMatchExpression>(path(), getBitPositions());
+            std::make_unique<BitsAnyClearMatchExpression>(path(), getBitPositions());
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
         }

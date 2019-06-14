@@ -64,7 +64,7 @@ Status IndexCatalogImpl::IndexBuildBlock::init(OperationContext* opCtx, Collecti
 
     // need this first for names, etc...
     BSONObj keyPattern = _spec.getObjectField("key");
-    auto descriptor = stdx::make_unique<IndexDescriptor>(
+    auto descriptor = std::make_unique<IndexDescriptor>(
         collection, IndexNames::findPluginName(keyPattern), _spec);
 
     _indexName = descriptor->indexName();
@@ -92,7 +92,7 @@ Status IndexCatalogImpl::IndexBuildBlock::init(OperationContext* opCtx, Collecti
         opCtx, std::move(descriptor), initFromDisk, isReadyIndex);
 
     if (_method == IndexBuildMethod::kHybrid) {
-        _indexBuildInterceptor = stdx::make_unique<IndexBuildInterceptor>(opCtx, _entry);
+        _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(opCtx, _entry);
         _entry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 
         if (IndexBuildProtocol::kTwoPhase == protocol) {

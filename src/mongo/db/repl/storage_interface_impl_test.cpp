@@ -52,7 +52,6 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/sync_tail_test_fixture.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -202,7 +201,7 @@ private:
         ServiceContextMongoDTest::setUp();
         _createOpCtx();
         auto service = getServiceContext();
-        auto replCoord = stdx::make_unique<ReplicationCoordinatorMock>(service);
+        auto replCoord = std::make_unique<ReplicationCoordinatorMock>(service);
         _replicationCoordinatorMock = replCoord.get();
         ReplicationCoordinator::set(service, std::move(replCoord));
     }
@@ -217,8 +216,8 @@ private:
     void _createOpCtx() {
         _opCtx = cc().makeOperationContext();
         // We are not replicating nor validating these writes.
-        _uwb = stdx::make_unique<UnreplicatedWritesBlock>(_opCtx.get());
-        _ddv = stdx::make_unique<DisableDocumentValidation>(_opCtx.get());
+        _uwb = std::make_unique<UnreplicatedWritesBlock>(_opCtx.get());
+        _ddv = std::make_unique<DisableDocumentValidation>(_opCtx.get());
     }
 
     ServiceContext::UniqueOperationContext _opCtx;
@@ -592,7 +591,7 @@ void _testDestroyUncommitedCollectionBulkLoader(
     OperationContext* opCtx,
     const NamespaceString& nss,
     std::vector<BSONObj> secondaryIndexes,
-    stdx::function<void(std::unique_ptr<CollectionBulkLoader> loader)> destroyLoaderFn) {
+    std::function<void(std::unique_ptr<CollectionBulkLoader> loader)> destroyLoaderFn) {
     StorageInterfaceImpl storage;
     CollectionOptions opts = generateOptionsWithUuid();
     auto loaderStatus =

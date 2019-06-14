@@ -53,29 +53,29 @@ void ClusterCommandTestFixture::setUp() {
     CatalogCacheTestFixture::setupNShards(numShards);
 
     // Set up a logical clock with an initial time.
-    auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
+    auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
     logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
     LogicalClock::set(getServiceContext(), std::move(logicalClock));
 
-    auto keysCollectionClient = stdx::make_unique<KeysCollectionClientSharded>(
+    auto keysCollectionClient = std::make_unique<KeysCollectionClientSharded>(
         Grid::get(operationContext())->catalogClient());
 
     auto keyManager = std::make_shared<KeysCollectionManager>(
         "dummy", std::move(keysCollectionClient), Seconds(KeysRotationIntervalSec));
 
-    auto validator = stdx::make_unique<LogicalTimeValidator>(keyManager);
+    auto validator = std::make_unique<LogicalTimeValidator>(keyManager);
     LogicalTimeValidator::set(getServiceContext(), std::move(validator));
 
-    LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
+    LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
 
     // Set up a tick source for transaction metrics.
-    auto tickSource = stdx::make_unique<TickSourceMock<Microseconds>>();
+    auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
     tickSource->reset(1);
     getServiceContext()->setTickSource(std::move(tickSource));
 
     loadRoutingTableWithTwoChunksAndTwoShards(kNss);
 
-    _staleVersionAndSnapshotRetriesBlock = stdx::make_unique<FailPointEnableBlock>(
+    _staleVersionAndSnapshotRetriesBlock = std::make_unique<FailPointEnableBlock>(
         "enableStaleVersionAndSnapshotRetriesWithinTransactions");
 }
 

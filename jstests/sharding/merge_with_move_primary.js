@@ -3,6 +3,8 @@
 (function() {
     'use strict';
 
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
+
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
     const mongosDB = st.s.getDB(jsTestName());
@@ -21,7 +23,7 @@
             {configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}));
     }
 
-    function runPipelineWithStage(stage, shardedColl, expectFailCode) {
+    function runPipelineWithStage({stage, shardedColl, expectedfailCode, expectedNumDocs}) {
         // Set the failpoint to hang in the first call to DocumentSourceCursor's getNext().
         setAggHang("alwaysOn");
 
@@ -38,8 +40,8 @@
                 cursor: {},
                 comment: "${comment}"
             });
-            if (${expectFailCode} !== undefined) {
-                assert.commandFailedWithCode(cmdRes, ${expectFailCode});
+            if (${expectedfailCode} !== undefined) {
+                assert.commandFailedWithCode(cmdRes, ${expectedfailCode});
             } else {
                 assert.commandWorked(cmdRes);
             }
@@ -68,8 +70,8 @@
         outShell();
 
         // Verify that the $merge succeeded.
-        if (expectFailCode === undefined) {
-            assert.eq(2, targetColl.find().itcount());
+        if (expectedfailCode === undefined) {
+            assert.eq(expectedNumDocs, targetColl.find().itcount());
         }
 
         assert.commandWorked(targetColl.remove({}));
@@ -81,14 +83,27 @@
 
     // Note that the actual error is NamespaceNotFound but it is wrapped in a generic error code by
     // mistake.
-    runPipelineWithStage({$out: targetColl.getName()}, sourceColl, ErrorCodes.CommandFailed);
-    runPipelineWithStage(
-        {$merge: {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
-        sourceColl);
-    runPipelineWithStage(
-        {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
-        sourceColl);
+    runPipelineWithStage({
+        stage: {$out: targetColl.getName()},
+        shardedColl: sourceColl,
+        expectedfailCode: ErrorCodes.CommandFailed
+    });
 
+    withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+        runPipelineWithStage({
+            stage: {
+                $merge: {
+                    into: targetColl.getName(),
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode
+                }
+            },
+            shardedColl: sourceColl,
+            expectedNumDocs: whenNotMatchedMode == "discard" ? 0 : 2,
+            expectedfailCode: whenNotMatchedMode == "fail" ? 13113 : undefined
+        });
+
+    });
     sourceColl.drop();
 
     // Shard the source collection with shard key {shardKey: 1} and split into 2 chunks.
@@ -98,13 +113,26 @@
     assert.commandWorked(sourceColl.insert({shardKey: -1}));
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-    runPipelineWithStage({$out: targetColl.getName()}, sourceColl, ErrorCodes.CommandFailed);
-    runPipelineWithStage(
-        {$merge: {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
-        sourceColl);
-    runPipelineWithStage(
-        {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
-        sourceColl);
+    runPipelineWithStage({
+        stage: {$out: targetColl.getName()},
+        shardedColl: sourceColl,
+        expectedfailCode: ErrorCodes.CommandFailed
+    });
+
+    withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+        runPipelineWithStage({
+            stage: {
+                $merge: {
+                    into: targetColl.getName(),
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode
+                }
+            },
+            shardedColl: sourceColl,
+            expectedNumDocs: whenNotMatchedMode == "discard" ? 0 : 2,
+            expectedfailCode: whenNotMatchedMode == "fail" ? 13113 : undefined
+        });
+    });
 
     sourceColl.drop();
 
@@ -116,13 +144,26 @@
     assert.commandWorked(sourceColl.insert({shardKey: -1}));
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
-    runPipelineWithStage({$out: targetColl.getName()}, targetColl, ErrorCodes.CommandFailed);
-    runPipelineWithStage(
-        {$merge: {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
-        targetColl);
-    runPipelineWithStage(
-        {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
-        targetColl);
+    runPipelineWithStage({
+        stage: {$out: targetColl.getName()},
+        shardedColl: targetColl,
+        expectedfailCode: ErrorCodes.CommandFailed
+    });
+
+    withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+        runPipelineWithStage({
+            stage: {
+                $merge: {
+                    into: targetColl.getName(),
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode
+                }
+            },
+            shardedColl: targetColl,
+            expectedNumDocs: whenNotMatchedMode == "discard" ? 0 : 2,
+            expectedfailCode: whenNotMatchedMode == "fail" ? 13113 : undefined
+        });
+    });
 
     sourceColl.drop();
     targetColl.drop();
@@ -137,12 +178,20 @@
     assert.commandWorked(sourceColl.insert({shardKey: 1}));
 
     // Note that the legacy $out is not supported with an existing sharded output collection.
-    runPipelineWithStage(
-        {$merge: {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}},
-        targetColl);
-    runPipelineWithStage(
-        {$merge: {into: targetColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}},
-        targetColl);
+    withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+        runPipelineWithStage({
+            stage: {
+                $merge: {
+                    into: targetColl.getName(),
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode
+                }
+            },
+            shardedColl: targetColl,
+            expectedNumDocs: whenNotMatchedMode == "discard" ? 0 : 2,
+            expectedfailCode: whenNotMatchedMode == "fail" ? 13113 : undefined
+        });
+    });
 
     st.stop();
 })();

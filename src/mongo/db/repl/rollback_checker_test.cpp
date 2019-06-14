@@ -30,11 +30,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/client.h"
 #include "mongo/db/repl/rollback_checker.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -64,7 +65,7 @@ void RollbackCheckerTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
     launchExecutorThread();
     getNet()->enterNetwork();
-    _rollbackChecker = stdx::make_unique<RollbackChecker>(&getExecutor(), HostAndPort());
+    _rollbackChecker = std::make_unique<RollbackChecker>(&getExecutor(), HostAndPort());
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _hasRolledBackResult = {ErrorCodes::NotYetInitialized, ""};
     _hasCalledCallback = false;

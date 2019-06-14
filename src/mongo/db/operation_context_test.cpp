@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/optional.hpp>
+#include <memory>
 
 #include "mongo/db/client.h"
 #include "mongo/db/json.h"
@@ -38,7 +39,6 @@
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
@@ -247,9 +247,9 @@ class OperationDeadlineTests : public unittest::Test {
 public:
     void setUp() {
         service = ServiceContext::make();
-        service->setFastClockSource(stdx::make_unique<SharedClockSourceAdapter>(mockClock));
-        service->setPreciseClockSource(stdx::make_unique<SharedClockSourceAdapter>(mockClock));
-        service->setTickSource(stdx::make_unique<TickSourceMock<>>());
+        service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
+        service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
+        service->setTickSource(std::make_unique<TickSourceMock<>>());
         client = service->makeClient("OperationDeadlineTest");
     }
 
@@ -646,8 +646,8 @@ TEST_F(OperationDeadlineTests, DuringWaitMaxTimeExpirationDominatesUntilExpirati
 
 class ThreadedOperationDeadlineTests : public OperationDeadlineTests {
 public:
-    using CvPred = stdx::function<bool()>;
-    using WaitFn = stdx::function<bool(
+    using CvPred = std::function<bool()>;
+    using WaitFn = std::function<bool(
         OperationContext*, stdx::condition_variable&, stdx::unique_lock<stdx::mutex>&, CvPred)>;
 
     struct WaitTestState {

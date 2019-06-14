@@ -48,7 +48,7 @@ public:
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        auto xorCopy = stdx::make_unique<InternalSchemaXorMatchExpression>();
+        auto xorCopy = std::make_unique<InternalSchemaXorMatchExpression>();
         for (size_t i = 0; i < numChildren(); ++i) {
             xorCopy->add(getChild(i)->shallowClone().release());
         }

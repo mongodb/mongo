@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/client/native_sasl_client_session.h"
 #include "mongo/client/scram_client_cache.h"
 #include "mongo/crypto/mechanism_scram.h"
@@ -45,7 +47,6 @@
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_scram_server_conversation.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/log.h"
@@ -139,7 +140,7 @@ class SCRAMMutators {
 public:
     SCRAMMutators() {}
 
-    void setMutator(SaslTestState state, stdx::function<void(std::string&)> fun) {
+    void setMutator(SaslTestState state, std::function<void(std::string&)> fun) {
         mutators.insert(std::make_pair(state, fun));
     }
 
@@ -151,7 +152,7 @@ public:
     }
 
 private:
-    std::map<SaslTestState, stdx::function<void(std::string&)>> mutators;
+    std::map<SaslTestState, std::function<void(std::string&)>> mutators;
 };
 
 struct SCRAMStepsResult {

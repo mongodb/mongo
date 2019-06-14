@@ -65,7 +65,7 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
     std::vector<std::unique_ptr<FieldRef>> parsedPaths;
 
     for (const auto& patternEl : keyPattern) {
-        auto newFieldRef(stdx::make_unique<FieldRef>(patternEl.fieldNameStringData()));
+        auto newFieldRef(std::make_unique<FieldRef>(patternEl.fieldNameStringData()));
 
         // Empty path
         uassert(ErrorCodes::BadValue,
@@ -293,7 +293,7 @@ std::vector<StringData> ShardKeyPattern::findMissingShardKeyFieldsFromDoc(const 
 
 StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* opCtx,
                                                               const BSONObj& basicQuery) const {
-    auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
+    auto qr = std::make_unique<QueryRequest>(NamespaceString(""));
     qr->setFilter(basicQuery);
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;

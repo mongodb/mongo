@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include "mongo/base/status.h"
@@ -36,7 +37,6 @@
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -101,7 +101,7 @@ public:
                          const NamespaceString& collectionName,
                          const BSONObj& query,
                          const BSONObj& projection,
-                         const stdx::function<void(const BSONObj&)>& resultProcessor) = 0;
+                         const std::function<void(const BSONObj&)>& resultProcessor) = 0;
 
     void logOp(OperationContext* opCtx,
                AuthorizationManagerImpl* authManager,

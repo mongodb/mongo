@@ -29,7 +29,8 @@
 
 #pragma once
 
-#include "mongo/stdx/functional.h"
+#include <functional>
+
 #include "mongo/transport/session.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -50,7 +51,7 @@ public:
     virtual void dropConnections(const HostAndPort& hostAndPort) = 0;
 
     virtual void mutateTags(const HostAndPort& hostAndPort,
-                            const stdx::function<transport::Session::TagMask(
+                            const std::function<transport::Session::TagMask(
                                 transport::Session::TagMask)>& mutateFunc) = 0;
 
 protected:

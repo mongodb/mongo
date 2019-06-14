@@ -34,13 +34,13 @@
 #include "mongo/s/async_requests_sender.h"
 
 #include <fmt/format.h>
+#include <memory>
 
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"

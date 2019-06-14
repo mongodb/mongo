@@ -37,6 +37,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <stack>
 #include <string>
@@ -48,7 +49,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
@@ -318,7 +318,7 @@ public:
         CRYPTO_set_locking_callback(&SSLThreadInfo::lockingCallback);
 
         while ((int)_mutex.size() < CRYPTO_num_locks()) {
-            _mutex.emplace_back(stdx::make_unique<stdx::recursive_mutex>());
+            _mutex.emplace_back(std::make_unique<stdx::recursive_mutex>());
         }
     }
 
@@ -635,7 +635,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOpt
 
 std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
-    return stdx::make_unique<SSLManagerOpenSSL>(params, isServer);
+    return std::make_unique<SSLManagerOpenSSL>(params, isServer);
 }
 
 SSLX509Name getCertificateSubjectX509Name(X509* cert) {
@@ -1427,7 +1427,7 @@ bool SSLManagerOpenSSL::_doneWithSSLOp(SSLConnectionOpenSSL* conn, int status) {
 
 SSLConnectionInterface* SSLManagerOpenSSL::connect(Socket* socket) {
     std::unique_ptr<SSLConnectionOpenSSL> sslConn =
-        stdx::make_unique<SSLConnectionOpenSSL>(_clientContext.get(), socket, (const char*)NULL, 0);
+        std::make_unique<SSLConnectionOpenSSL>(_clientContext.get(), socket, (const char*)NULL, 0);
 
     const auto undotted = removeFQDNRoot(socket->remoteAddr().hostOrIp());
     int ret = ::SSL_set_tlsext_host_name(sslConn->ssl, undotted.c_str());
@@ -1448,7 +1448,7 @@ SSLConnectionInterface* SSLManagerOpenSSL::accept(Socket* socket,
                                                   const char* initialBytes,
                                                   int len) {
     std::unique_ptr<SSLConnectionOpenSSL> sslConn =
-        stdx::make_unique<SSLConnectionOpenSSL>(_serverContext.get(), socket, initialBytes, len);
+        std::make_unique<SSLConnectionOpenSSL>(_serverContext.get(), socket, initialBytes, len);
 
     int ret;
     do {
@@ -1705,6 +1705,7 @@ std::string SSLManagerInterface::getSSLErrorMessage(int code) {
 void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
     int code = SSL_get_error(conn->ssl, ret);
     int err = ERR_get_error();
+    SocketErrorKind errToThrow = SocketErrorKind::CONNECT_ERROR;
 
     switch (code) {
         case SSL_ERROR_WANT_READ:
@@ -1713,12 +1714,15 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
             // However, it turns out this CAN happen during a connect, if the other side
             // accepts the socket connection but fails to do the SSL handshake in a timely
             // manner.
+            errToThrow = (code == SSL_ERROR_WANT_READ) ? SocketErrorKind::RECV_ERROR
+                                                       : SocketErrorKind::SEND_ERROR;
             error() << "SSL: " << code << ", possibly timed out during connect";
             break;
 
         case SSL_ERROR_ZERO_RETURN:
             // TODO: Check if we can avoid throwing an exception for this condition
-            LOG(3) << "SSL network connection closed";
+            // If so, change error() back to LOG(3)
+            error() << "SSL network connection closed";
             break;
         case SSL_ERROR_SYSCALL:
             // If ERR_get_error returned 0, the error queue is empty
@@ -1741,6 +1745,6 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
             break;
     }
     _flushNetworkBIO(conn);
-    throwSocketError(SocketErrorKind::CONNECT_ERROR, "");
+    throwSocketError(errToThrow, conn->socket->remoteString());
 }
 }  // namespace mongo

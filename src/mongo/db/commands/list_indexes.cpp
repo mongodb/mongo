@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -47,7 +49,6 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -56,7 +57,6 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 namespace {
 
@@ -168,8 +168,8 @@ public:
                 cce->getAllIndexes(opCtx, &indexNames);
             });
 
-            auto ws = make_unique<WorkingSet>();
-            auto root = make_unique<QueuedDataStage>(opCtx, ws.get());
+            auto ws = std::make_unique<WorkingSet>();
+            auto root = std::make_unique<QueuedDataStage>(opCtx, ws.get());
 
             for (size_t i = 0; i < indexNames.size(); i++) {
                 auto indexSpec = writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {

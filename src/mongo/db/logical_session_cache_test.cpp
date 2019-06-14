@@ -31,6 +31,8 @@
 
 #include "mongo/db/logical_session_cache_impl.h"
 
+#include <memory>
+
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session_for_test.h"
@@ -46,7 +48,6 @@
 #include "mongo/db/service_liaison_mock.h"
 #include "mongo/db/sessions_collection_mock.h"
 #include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/unittest.h"
 
@@ -76,9 +77,9 @@ public:
         Client::releaseCurrent();
         Client::initThread(getThreadName());
         _opCtx = makeOperationContext();
-        auto mockService = stdx::make_unique<MockServiceLiaison>(_service);
-        auto mockSessions = stdx::make_unique<MockSessionsCollection>(_sessions);
-        _cache = stdx::make_unique<LogicalSessionCacheImpl>(
+        auto mockService = std::make_unique<MockServiceLiaison>(_service);
+        auto mockSessions = std::make_unique<MockSessionsCollection>(_sessions);
+        _cache = std::make_unique<LogicalSessionCacheImpl>(
             std::move(mockService),
             std::move(mockSessions),
             [](OperationContext*, SessionsCollection&, Date_t) {

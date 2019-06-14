@@ -32,6 +32,7 @@
 #include "mongo/db/ftdc/ftdc_test.h"
 
 #include <boost/filesystem.hpp>
+#include <memory>
 
 #include "mongo/base/data_type_validated.h"
 #include "mongo/base/init.h"
@@ -40,7 +41,6 @@
 #include "mongo/db/ftdc/file_reader.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
@@ -141,9 +141,9 @@ void createDirectoryClean(const boost::filesystem::path& dir) {
 
 FTDCTest::FTDCTest() {
     auto service = getServiceContext();
-    service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
-    service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
-    service->setTickSource(stdx::make_unique<TickSourceMock<>>());
+    service->setFastClockSource(std::make_unique<ClockSourceMock>());
+    service->setPreciseClockSource(std::make_unique<ClockSourceMock>());
+    service->setTickSource(std::make_unique<TickSourceMock<>>());
 }
 
 }  // namespace mongo

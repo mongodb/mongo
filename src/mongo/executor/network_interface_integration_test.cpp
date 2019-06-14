@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <memory>
 
 #include "mongo/base/status_with.h"
 #include "mongo/client/connection_string.h"
@@ -45,7 +46,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -106,7 +106,7 @@ class HangingHook : public executor::NetworkConnectionHook {
 
 // Test that we time out a command if the connection hook hangs.
 TEST_F(NetworkInterfaceIntegrationFixture, HookHangs) {
-    startNet(stdx::make_unique<HangingHook>());
+    startNet(std::make_unique<HangingHook>());
 
     /**
      *  Since mongos's have no ping command, we effectively skip this test by returning

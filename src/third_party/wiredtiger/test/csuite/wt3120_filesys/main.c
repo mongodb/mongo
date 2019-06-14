@@ -36,24 +36,29 @@
  * than that.
  */
 
-#define	WT_FAIL_FS_LIB	"../../ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
-
 int
 main(int argc, char *argv[])
 {
 	TEST_OPTS *opts, _opts;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	char buf[1024];
-	char *kstr, *vstr;
+	char *kstr, *vstr, buf[1024];
+	const char *p;
 
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
 	testutil_check(testutil_parse_opts(argc, argv, opts));
 	testutil_make_work_dir(opts->home);
 
+	/*
+	 * Use $top_builddir if it's available, otherwise assume we're building
+	 * in build_posix and running in the test/csuite directory.
+	 */
+#define	WT_FAIL_FS_LIB	"ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
+	if ((p = getenv("top_builddir")) == NULL)
+		p = "../../build_posix";
 	testutil_check(__wt_snprintf(buf, sizeof(buf),
-	    "create,extensions=(" WT_FAIL_FS_LIB "=(early_load=true))"));
+	    "create,extensions=(%s/%s=(early_load=true))", p, WT_FAIL_FS_LIB));
 	testutil_check(wiredtiger_open(opts->home, NULL, buf, &opts->conn));
 	testutil_check(
 	    opts->conn->open_session(opts->conn, NULL, NULL, &session));

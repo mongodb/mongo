@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <exception>
+#include <memory>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
@@ -42,7 +43,6 @@
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/executor/network_interface_asio_test_utils.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -72,7 +72,7 @@ int timeNetworkTestMillis(std::size_t operations, NetworkInterface* net) {
 
     // This lambda function is declared here since it is mutually recursive with another callback
     // function
-    stdx::function<void()> func;
+    std::function<void()> func;
 
     const auto bsonObjPing = BSON("ping" << 1);
 
@@ -101,8 +101,8 @@ int timeNetworkTestMillis(std::size_t operations, NetworkInterface* net) {
 
 TEST(NetworkInterfaceASIO, SerialPerf) {
     NetworkInterfaceASIO::Options options{};
-    options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
-    options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+    options.streamFactory = std::make_unique<AsyncStreamFactory>();
+    options.timerFactory = std::make_unique<AsyncTimerFactoryASIO>();
     NetworkInterfaceASIO netAsio{std::move(options)};
 
     int duration = timeNetworkTestMillis(numOperations, &netAsio);

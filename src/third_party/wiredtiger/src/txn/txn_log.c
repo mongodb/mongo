@@ -38,6 +38,7 @@ __txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	if (cbt->ins == NULL) {
 		session = (WT_SESSION_IMPL *)cbt->iface.session;
 		page = cbt->ref->page;
+		WT_ASSERT(session, cbt->slot < page->entries);
 		rip = &page->pg_row[cbt->slot];
 		WT_ASSERT(session,
 		    __wt_row_leaf_key(session, page, rip, &key, false) == 0);
@@ -183,6 +184,7 @@ __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 	(void)__wt_atomic_subi32(&op->btree->dhandle->session_inuse, 1);
 
 	op->type = WT_TXN_OP_NONE;
+	op->flags = 0;
 }
 
 /*

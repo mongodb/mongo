@@ -242,14 +242,16 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     double tieBreakers = noFetchBonus + noSortBonus + noIxisectBonus;
     double score = baseScore + productivity + tieBreakers;
 
-    str::stream ss;
-    ss << "score(" << score << ") = baseScore(" << baseScore << ")"
+    StringBuilder sb;
+    sb << "score(" << str::convertDoubleToString(score) << ") = baseScore("
+       << str::convertDoubleToString(baseScore) << ")"
        << " + productivity((" << stats->common.advanced << " advanced)/(" << stats->common.works
-       << " works) = " << productivity << ")"
-       << " + tieBreakers(" << noFetchBonus << " noFetchBonus + " << noSortBonus
-       << " noSortBonus + " << noIxisectBonus << " noIxisectBonus = " << tieBreakers << ")";
-    std::string scoreStr = ss;
-    LOG(2) << scoreStr;
+       << " works) = " << str::convertDoubleToString(productivity) << ")"
+       << " + tieBreakers(" << str::convertDoubleToString(noFetchBonus) << " noFetchBonus + "
+       << str::convertDoubleToString(noSortBonus) << " noSortBonus + "
+       << str::convertDoubleToString(noIxisectBonus)
+       << " noIxisectBonus = " << str::convertDoubleToString(tieBreakers) << ")";
+    LOG(2) << sb.str();
 
     if (internalQueryForceIntersectionPlans.load()) {
         if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {

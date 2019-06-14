@@ -33,6 +33,9 @@
 
 #include "mongo/db/service_context.h"
 
+#include <list>
+#include <memory>
+
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
@@ -41,8 +44,6 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/stdx/list.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
@@ -55,7 +56,7 @@
 namespace mongo {
 namespace {
 
-using ConstructorActionList = stdx::list<ServiceContext::ConstructorDestructorActions>;
+using ConstructorActionList = std::list<ServiceContext::ConstructorDestructorActions>;
 
 ServiceContext* globalServiceContext = nullptr;
 
@@ -90,9 +91,9 @@ bool supportsDocLocking() {
 }
 
 ServiceContext::ServiceContext()
-    : _tickSource(stdx::make_unique<SystemTickSource>()),
-      _fastClockSource(stdx::make_unique<SystemClockSource>()),
-      _preciseClockSource(stdx::make_unique<SystemClockSource>()) {}
+    : _tickSource(std::make_unique<SystemTickSource>()),
+      _fastClockSource(std::make_unique<SystemClockSource>()),
+      _preciseClockSource(std::make_unique<SystemClockSource>()) {}
 
 ServiceContext::~ServiceContext() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);

@@ -146,29 +146,53 @@ void RouterTransactionsMetrics::incrementCommitInitiated(TransactionRouter::Comm
     }
 }
 
-void RouterTransactionsMetrics::incrementCommitSuccessful(
-    TransactionRouter::CommitType commitType) {
+void RouterTransactionsMetrics::incrementCommitSuccessful(TransactionRouter::CommitType commitType,
+                                                          Microseconds durationMicros) {
     switch (commitType) {
         case TransactionRouter::CommitType::kNotInitiated:
             MONGO_UNREACHABLE;
         case TransactionRouter::CommitType::kNoShards:
             _noShardsCommitStats.successful.fetchAndAdd(1);
+            _noShardsCommitStats.successfulDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(durationMicros));
             break;
         case TransactionRouter::CommitType::kSingleShard:
             _singleShardCommitStats.successful.fetchAndAdd(1);
+            _singleShardCommitStats.successfulDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(durationMicros));
             break;
         case TransactionRouter::CommitType::kSingleWriteShard:
             _singleWriteShardCommitStats.successful.fetchAndAdd(1);
+            _singleWriteShardCommitStats.successfulDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(durationMicros));
             break;
         case TransactionRouter::CommitType::kReadOnly:
             _readOnlyCommitStats.successful.fetchAndAdd(1);
+            _readOnlyCommitStats.successfulDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(durationMicros));
             break;
         case TransactionRouter::CommitType::kTwoPhaseCommit:
             _twoPhaseCommitStats.successful.fetchAndAdd(1);
+            _twoPhaseCommitStats.successfulDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(durationMicros));
             break;
         case TransactionRouter::CommitType::kRecoverWithToken:
             _recoverWithTokenCommitStats.successful.fetchAndAdd(1);
+            _recoverWithTokenCommitStats.successfulDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(durationMicros));
             break;
+    }
+}
+
+void RouterTransactionsMetrics::incrementAbortCauseMap(std::string abortCause) {
+    invariant(!abortCause.empty());
+
+    stdx::lock_guard<stdx::mutex> lock(_abortCauseMutex);
+    auto it = _abortCauseMap.find(abortCause);
+    if (it == _abortCauseMap.end()) {
+        _abortCauseMap.emplace(std::pair<std::string, std::int64_t>(std::move(abortCause), 1));
+    } else {
+        it->second++;
     }
 }
 
@@ -176,6 +200,7 @@ CommitTypeStats RouterTransactionsMetrics::_constructCommitTypeStats(const Commi
     CommitTypeStats commitStats;
     commitStats.setInitiated(stats.initiated.load());
     commitStats.setSuccessful(stats.successful.load());
+    commitStats.setSuccessfulDurationMicros(stats.successfulDurationMicros.load());
     return commitStats;
 }
 
@@ -195,6 +220,15 @@ void RouterTransactionsMetrics::updateStats(RouterTransactionsStats* stats) {
     commitTypes.setTwoPhaseCommit(_constructCommitTypeStats(_twoPhaseCommitStats));
     commitTypes.setRecoverWithToken(_constructCommitTypeStats(_recoverWithTokenCommitStats));
     stats->setCommitTypes(commitTypes);
+
+    BSONObjBuilder bob;
+    {
+        stdx::lock_guard<stdx::mutex> lock(_abortCauseMutex);
+        for (auto const& abortCauseEntry : _abortCauseMap) {
+            bob.append(abortCauseEntry.first, abortCauseEntry.second);
+        }
+    }
+    stats->setAbortCause(bob.obj());
 }
 
 }  // namespace mongo

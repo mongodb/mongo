@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,7 +40,6 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
@@ -210,7 +211,7 @@ public:
         return _ranSource;
     }
 
-    void setWaitHook(stdx::function<void()> hook) {
+    void setWaitHook(std::function<void()> hook) {
         _waitHook = std::move(hook);
     }
 
@@ -225,7 +226,7 @@ private:
     FailureMode _nextShouldFail = Nothing;
     Message _lastSunk;
     ServiceStateMachine* _ssm;
-    stdx::function<void()> _waitHook;
+    std::function<void()> _waitHook;
 
     // A custom message for this TransportLayer to source.
     Message _sourceMessage;
@@ -235,7 +236,7 @@ class MockServiceExecutor : public ServiceExecutor {
 public:
     explicit MockServiceExecutor(ServiceContext* ctx) {}
 
-    using ScheduleHook = stdx::function<bool(Task)>;
+    using ScheduleHook = std::function<bool(Task)>;
 
     Status start() override {
         return Status::OK();
@@ -296,18 +297,18 @@ protected:
         auto sc = scOwned.get();
         setGlobalServiceContext(std::move(scOwned));
 
-        sc->setTickSource(stdx::make_unique<TickSourceMock<>>());
-        sc->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+        sc->setTickSource(std::make_unique<TickSourceMock<>>());
+        sc->setFastClockSource(std::make_unique<ClockSourceMock>());
 
-        auto sep = stdx::make_unique<MockSEP>();
+        auto sep = std::make_unique<MockSEP>();
         _sep = sep.get();
         sc->setServiceEntryPoint(std::move(sep));
 
-        auto se = stdx::make_unique<MockServiceExecutor>(sc);
+        auto se = std::make_unique<MockServiceExecutor>(sc);
         _sexec = se.get();
         sc->setServiceExecutor(std::move(se));
 
-        auto tl = stdx::make_unique<MockTL>();
+        auto tl = std::make_unique<MockTL>();
         _tl = tl.get();
         sc->setTransportLayer(std::move(tl));
         _tl->start().transitional_ignore();

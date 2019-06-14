@@ -47,7 +47,7 @@ InternalSchemaAllElemMatchFromIndexMatchExpression::
 
 std::unique_ptr<MatchExpression> InternalSchemaAllElemMatchFromIndexMatchExpression::shallowClone()
     const {
-    auto clone = stdx::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>(
+    auto clone = std::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>(
         path(), _index, _expression->shallowClone());
     if (getTag()) {
         clone->setTag(getTag()->clone());

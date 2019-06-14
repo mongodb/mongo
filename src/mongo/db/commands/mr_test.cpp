@@ -405,7 +405,7 @@ void MapReduceCommandTest::setUp() {
 
     repl::DropPendingCollectionReaper::set(
         service,
-        stdx::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
+        std::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
 
     // Set up an OpObserver to track the temporary collections mapReduce creates.
     auto opObserver = std::make_unique<MapReduceOpObserver>();

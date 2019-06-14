@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
 #include <utility>
 
 #include "mongo/bson/json.h"
@@ -49,7 +50,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -72,17 +72,17 @@ const HostAndPort dummyHost("dummy", 123);
 class DistLockCatalogTest : public ShardServerTestFixture {
 protected:
     std::unique_ptr<DistLockCatalog> makeDistLockCatalog() override {
-        return stdx::make_unique<DistLockCatalogImpl>();
+        return std::make_unique<DistLockCatalogImpl>();
     }
 
     std::unique_ptr<DistLockManager> makeDistLockManager(
         std::unique_ptr<DistLockCatalog> distLockCatalog) override {
-        return stdx::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
+        return std::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
     }
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) override {
-        return stdx::make_unique<ShardingCatalogClientMock>(std::move(distLockManager));
+        return std::make_unique<ShardingCatalogClientMock>(std::move(distLockManager));
     }
 
     std::shared_ptr<RemoteCommandTargeterMock> configTargeter() {

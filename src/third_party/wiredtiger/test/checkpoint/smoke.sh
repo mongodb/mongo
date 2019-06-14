@@ -25,6 +25,9 @@ echo "checkpoint: 6 row-store tables, named checkpoint"
 $TEST_WRAPPER ./t -c 'TeSt' -T 6 -t r
 
 echo "checkpoint: row-store tables, stress LAS. Sweep and timestamps"
+$TEST_WRAPPER ./t -t r -W 3 -r 2 -D -s -x -n 100000 -k 100000 -C cache_size=100MB
+
+echo "checkpoint: row-store tables, Sweep and timestamps"
 $TEST_WRAPPER ./t -t r -W 3 -r 2 -s -x -n 100000 -k 100000 -C cache_size=100MB
 
 echo "checkpoint: 3 mixed tables, with sweep"

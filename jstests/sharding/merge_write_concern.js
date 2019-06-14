@@ -2,7 +2,7 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode.
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 3}, config: 1});
 
@@ -23,11 +23,6 @@
 
         // Test that $merge correctly returns a WC error.
         withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
-            // Skip the combination of merge modes which will fail depending on the contents of the
-            // source and target collection, as this will cause the assertion below to trip.
-            if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail")
-                return;
-
             const res = mongosDB.runCommand({
                 aggregate: "source",
                 pipeline: [{
@@ -44,7 +39,10 @@
             // $merge writeConcern errors are handled differently from normal writeConcern
             // errors. Rather than returing ok:1 and a WriteConcernError, the entire operation
             // fails.
-            assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+            assert.commandFailedWithCode(res,
+                                         whenNotMatchedMode == "fail"
+                                             ? [13113, ErrorCodes.WriteConcernFailed]
+                                             : ErrorCodes.WriteConcernFailed);
             assert.commandWorked(target.remove({}));
         });
 
@@ -54,7 +52,7 @@
         withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
             // Skip the combination of merge modes which will fail depending on the contents of the
             // source and target collection, as this will cause the assertion below to trip.
-            if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail")
+            if (whenNotMatchedMode == "fail")
                 return;
 
             const res = mongosDB.runCommand({

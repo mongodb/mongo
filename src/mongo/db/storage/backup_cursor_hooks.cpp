@@ -38,7 +38,7 @@ namespace mongo {
 
 namespace {
 BackupCursorHooks::InitializerFunction initializer = [](StorageEngine* storageEngine) {
-    return stdx::make_unique<BackupCursorHooks>();
+    return std::make_unique<BackupCursorHooks>();
 };
 
 struct BackupCursorHooksHolder {

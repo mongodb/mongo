@@ -29,6 +29,7 @@
 
 #include "mongo/db/update/modifier_table.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -48,7 +49,6 @@
 #include "mongo/db/update/rename_node.h"
 #include "mongo/db/update/set_node.h"
 #include "mongo/db/update/unset_node.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -138,37 +138,37 @@ ModifierType getType(StringData typeStr) {
 std::unique_ptr<UpdateLeafNode> makeUpdateLeafNode(ModifierType modType) {
     switch (modType) {
         case MOD_ADD_TO_SET:
-            return stdx::make_unique<AddToSetNode>();
+            return std::make_unique<AddToSetNode>();
         case MOD_BIT:
-            return stdx::make_unique<BitNode>();
+            return std::make_unique<BitNode>();
         case MOD_CONFLICT_PLACEHOLDER:
-            return stdx::make_unique<ConflictPlaceholderNode>();
+            return std::make_unique<ConflictPlaceholderNode>();
         case MOD_CURRENTDATE:
-            return stdx::make_unique<CurrentDateNode>();
+            return std::make_unique<CurrentDateNode>();
         case MOD_INC:
-            return stdx::make_unique<ArithmeticNode>(ArithmeticNode::ArithmeticOp::kAdd);
+            return std::make_unique<ArithmeticNode>(ArithmeticNode::ArithmeticOp::kAdd);
         case MOD_MAX:
-            return stdx::make_unique<CompareNode>(CompareNode::CompareMode::kMax);
+            return std::make_unique<CompareNode>(CompareNode::CompareMode::kMax);
         case MOD_MIN:
-            return stdx::make_unique<CompareNode>(CompareNode::CompareMode::kMin);
+            return std::make_unique<CompareNode>(CompareNode::CompareMode::kMin);
         case MOD_MUL:
-            return stdx::make_unique<ArithmeticNode>(ArithmeticNode::ArithmeticOp::kMultiply);
+            return std::make_unique<ArithmeticNode>(ArithmeticNode::ArithmeticOp::kMultiply);
         case MOD_POP:
-            return stdx::make_unique<PopNode>();
+            return std::make_unique<PopNode>();
         case MOD_PULL:
-            return stdx::make_unique<PullNode>();
+            return std::make_unique<PullNode>();
         case MOD_PULL_ALL:
-            return stdx::make_unique<PullAllNode>();
+            return std::make_unique<PullAllNode>();
         case MOD_PUSH:
-            return stdx::make_unique<PushNode>();
+            return std::make_unique<PushNode>();
         case MOD_RENAME:
-            return stdx::make_unique<RenameNode>();
+            return std::make_unique<RenameNode>();
         case MOD_SET:
-            return stdx::make_unique<SetNode>();
+            return std::make_unique<SetNode>();
         case MOD_SET_ON_INSERT:
-            return stdx::make_unique<SetNode>(UpdateNode::Context::kInsertOnly);
+            return std::make_unique<SetNode>(UpdateNode::Context::kInsertOnly);
         case MOD_UNSET:
-            return stdx::make_unique<UnsetNode>();
+            return std::make_unique<UnsetNode>();
         default:
             return nullptr;
     }

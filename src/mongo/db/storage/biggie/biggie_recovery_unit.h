@@ -29,25 +29,29 @@
 
 #pragma once
 
+#include <functional>
 #include <vector>
 
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
 #include "mongo/db/storage/biggie/store.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 namespace biggie {
 
 class RecoveryUnit : public ::mongo::RecoveryUnit {
 public:
-    RecoveryUnit(KVEngine* parentKVEngine, stdx::function<void()> cb = nullptr);
+    RecoveryUnit(KVEngine* parentKVEngine, std::function<void()> cb = nullptr);
     ~RecoveryUnit();
 
     void beginUnitOfWork(OperationContext* opCtx) override final;
     void commitUnitOfWork() override final;
     void abortUnitOfWork() override final;
+
+    bool inActiveTxn() const {
+        return _inUnitOfWork;
+    }
 
     virtual bool waitUntilDurable() override;
 
@@ -80,7 +84,7 @@ public:
 private:
     void _abort();
 
-    stdx::function<void()> _waitUntilDurableCallback;
+    std::function<void()> _waitUntilDurableCallback;
     // Official master is kept by KVEngine
     KVEngine* _KVEngine;
     StringStore _mergeBase;

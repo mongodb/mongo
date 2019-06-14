@@ -158,7 +158,7 @@ std::string RFC4514Parser::extractAttributeName() {
     StringBuilder sb;
 
     auto ch = _cur();
-    stdx::function<bool(char ch)> characterCheck;
+    std::function<bool(char ch)> characterCheck;
     // If the first character is a digit, then this is an OID and can only contain
     // numbers and '.'
     if (isDigit(ch)) {

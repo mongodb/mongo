@@ -129,7 +129,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
         "{$or: [{a: {$geoWithin: {$centerSphere: [[0,0],10]}}},"
         "{a: {$geoWithin: {$centerSphere: [[1,1],10]}}}]}");
 
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -166,7 +166,7 @@ void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteCon
 
     Collection* collection = ctx.getCollection();
 
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
     auto statusWithCQ = CanonicalQuery::canonicalize(test->opCtx(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -251,7 +251,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
 
     Collection* collection = ctx.getCollection();
 
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -307,7 +307,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
 
     Collection* collection = ctx.getCollection();
 
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -479,7 +479,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
     insert(BSON("_id" << 3 << "a" << 3));
     insert(BSON("_id" << 4));
 
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{$or: [{a: 1}, {a: {$ne:1}}]}"));
     qr->setSort(BSON("d" << 1));
     auto cq = unittest::assertGet(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
@@ -513,7 +513,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
 TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning) {
     dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
     // Build a query with a rooted $or.
-    auto queryRequest = stdx::make_unique<QueryRequest>(nss);
+    auto queryRequest = std::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));
@@ -546,7 +546,7 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
 TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
     dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
     // Build a query with a rooted $or.
-    auto queryRequest = stdx::make_unique<QueryRequest>(nss);
+    auto queryRequest = std::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));
@@ -583,7 +583,7 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
     }
 
     // Build a query with a rooted $or.
-    auto queryRequest = stdx::make_unique<QueryRequest>(nss);
+    auto queryRequest = std::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));
@@ -627,7 +627,7 @@ TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSele
     }
 
     // Build a query with a rooted $or.
-    auto queryRequest = stdx::make_unique<QueryRequest>(nss);
+    auto queryRequest = std::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));

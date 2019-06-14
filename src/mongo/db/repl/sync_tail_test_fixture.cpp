@@ -111,17 +111,17 @@ void SyncTailTest::setUp() {
     _opCtx = cc().makeOperationContext();
 
     ReplicationCoordinator::set(serviceContext,
-                                stdx::make_unique<ReplicationCoordinatorMock>(serviceContext));
+                                std::make_unique<ReplicationCoordinatorMock>(serviceContext));
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
 
-    StorageInterface::set(serviceContext, stdx::make_unique<StorageInterfaceImpl>());
+    StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
 
     DropPendingCollectionReaper::set(
-        serviceContext, stdx::make_unique<DropPendingCollectionReaper>(getStorageInterface()));
+        serviceContext, std::make_unique<DropPendingCollectionReaper>(getStorageInterface()));
     repl::setOplogCollectionName(serviceContext);
     repl::createOplog(_opCtx.get());
 
-    _consistencyMarkers = stdx::make_unique<ReplicationConsistencyMarkersMock>();
+    _consistencyMarkers = std::make_unique<ReplicationConsistencyMarkersMock>();
 
     // Set up an OpObserver to track the documents SyncTail inserts.
     auto opObserver = std::make_unique<SyncTailOpObserver>();

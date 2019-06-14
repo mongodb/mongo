@@ -31,14 +31,16 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/biggie/biggie_kv_engine.h"
+
+#include <memory>
+
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/snapshot_window_options.h"
-#include "mongo/db/storage/biggie/biggie_kv_engine.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace biggie {
@@ -109,11 +111,10 @@ Status KVEngine::createSortedDataInterface(OperationContext* opCtx,
     return Status::OK();  // I don't think we actually need to do anything here
 }
 
-mongo::SortedDataInterface* KVEngine::getSortedDataInterface(OperationContext* opCtx,
-                                                             StringData ident,
-                                                             const IndexDescriptor* desc) {
+std::unique_ptr<mongo::SortedDataInterface> KVEngine::getSortedDataInterface(
+    OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
     _idents[ident.toString()] = false;
-    return new SortedDataInterface(opCtx, ident, desc);
+    return std::make_unique<SortedDataInterface>(opCtx, ident, desc);
 }
 
 Status KVEngine::dropIdent(OperationContext* opCtx, StringData ident) {

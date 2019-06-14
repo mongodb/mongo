@@ -31,16 +31,16 @@
 
 #include "mongo/db/exec/count.h"
 
+#include <memory>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 // static
 const char* CountStage::kStageType = "COUNT";
@@ -115,8 +115,8 @@ PlanStage::StageState CountStage::doWork(WorkingSetID* out) {
 
 unique_ptr<PlanStageStats> CountStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_COUNT);
-    ret->specific = make_unique<CountStats>(_specificStats);
+    unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_COUNT);
+    ret->specific = std::make_unique<CountStats>(_specificStats);
     if (!_children.empty()) {
         ret->children.emplace_back(child()->getStats());
     }

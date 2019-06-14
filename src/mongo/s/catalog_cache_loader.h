@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "mongo/base/status_with.h"
@@ -37,7 +38,6 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/uuid.h"
 
@@ -91,7 +91,7 @@ public:
     };
 
     using GetChunksSinceCallbackFn =
-        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)>;
+        std::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)>;
 
     /**
      * Initializes internal state. Must be called only once when sharding state is initialized.
@@ -141,7 +141,7 @@ public:
      */
     virtual void getDatabase(
         StringData dbName,
-        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) = 0;
+        std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) = 0;
 
     /**
      * Waits for any pending changes for the specified collection to be persisted locally (not

@@ -1194,9 +1194,11 @@ void TransactionRouter::_endTransactionTrackingIfNecessary(OperationContext* opC
     auto routerTxnMetrics = RouterTransactionsMetrics::get(opCtx);
     if (terminationCause == TerminationCause::kAborted) {
         routerTxnMetrics->incrementTotalAborted();
+        routerTxnMetrics->incrementAbortCauseMap(_abortCause);
     } else {
         routerTxnMetrics->incrementTotalCommitted();
-        routerTxnMetrics->incrementCommitSuccessful(_commitType);
+        routerTxnMetrics->incrementCommitSuccessful(
+            _commitType, _timingStats.getCommitDuration(tickSource, curTicks));
     }
 }
 

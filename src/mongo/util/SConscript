@@ -468,6 +468,28 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target='diagnostic_info',
+    source= [
+        'diagnostic_info.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        "$BUILD_DIR/mongo/db/service_context",
+    ],
+)
+
+env.CppUnitTest(
+    target='diagnostic_info_test',
+    source=[
+        'diagnostic_info_test.cpp'
+        ],
+    LIBDEPS=[
+        'diagnostic_info',
+        'clock_source_mock',
+        ]
+)
+
 env.Benchmark(
     target='clock_source_bm',
     source=[

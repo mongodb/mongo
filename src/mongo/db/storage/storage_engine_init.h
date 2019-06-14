@@ -87,7 +87,7 @@ StorageEngine::Factory* getFactoryForStorageEngine(ServiceContext* context, Stri
 Status validateStorageOptions(
     ServiceContext* service,
     const BSONObj& storageEngineOptions,
-    stdx::function<Status(const StorageEngine::Factory* const, const BSONObj&)> validateFunc);
+    std::function<Status(const StorageEngine::Factory* const, const BSONObj&)> validateFunc);
 
 /*
  * Appends a the list of available storage engines to a BSONObjBuilder for reporting purposes.

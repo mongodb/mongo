@@ -45,23 +45,23 @@
 namespace mongo {
 
 std::unique_ptr<IndexAccessMethod> IndexAccessMethodFactoryImpl::make(
-    IndexCatalogEntry* entry, SortedDataInterface* sortedDataInterface) {
+    IndexCatalogEntry* entry, std::unique_ptr<SortedDataInterface> sortedDataInterface) {
     auto desc = entry->descriptor();
     const std::string& type = desc->getAccessMethodName();
     if ("" == type)
-        return std::make_unique<BtreeAccessMethod>(entry, sortedDataInterface);
+        return std::make_unique<BtreeAccessMethod>(entry, std::move(sortedDataInterface));
     else if (IndexNames::HASHED == type)
-        return std::make_unique<HashAccessMethod>(entry, sortedDataInterface);
+        return std::make_unique<HashAccessMethod>(entry, std::move(sortedDataInterface));
     else if (IndexNames::GEO_2DSPHERE == type)
-        return std::make_unique<S2AccessMethod>(entry, sortedDataInterface);
+        return std::make_unique<S2AccessMethod>(entry, std::move(sortedDataInterface));
     else if (IndexNames::TEXT == type)
-        return std::make_unique<FTSAccessMethod>(entry, sortedDataInterface);
+        return std::make_unique<FTSAccessMethod>(entry, std::move(sortedDataInterface));
     else if (IndexNames::GEO_HAYSTACK == type)
-        return std::make_unique<HaystackAccessMethod>(entry, sortedDataInterface);
+        return std::make_unique<HaystackAccessMethod>(entry, std::move(sortedDataInterface));
     else if (IndexNames::GEO_2D == type)
-        return std::make_unique<TwoDAccessMethod>(entry, sortedDataInterface);
+        return std::make_unique<TwoDAccessMethod>(entry, std::move(sortedDataInterface));
     else if (IndexNames::WILDCARD == type)
-        return std::make_unique<WildcardAccessMethod>(entry, sortedDataInterface);
+        return std::make_unique<WildcardAccessMethod>(entry, std::move(sortedDataInterface));
     log() << "Can't find index for keyPattern " << desc->keyPattern();
     fassertFailed(31021);
 }

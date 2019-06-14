@@ -44,6 +44,7 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <signal.h>
 #include <vector>
 
@@ -59,12 +60,12 @@
 #include <unistd.h>
 #endif
 
+#include "mongo/base/environment_buffer.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/traffic_reader.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -357,7 +358,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
 #else
     // environ is a POSIX defined array of char*s. Each char* in the array is a <key>=<value>\0
     // pair.
-    char** environEntry = environ;
+    char** environEntry = getEnvironPointer();
     while (*environEntry) {
         std::string envKeyValue(*environEntry);
         size_t splitPoint = envKeyValue.find('=');
@@ -587,7 +588,7 @@ void ProgramRunner::launchProcess(int child_stdout) {
     // Reserve space for the final NULL character which terminates the environment block
     environmentBlockSize += 1;
 
-    auto lpEnvironment = stdx::make_unique<wchar_t[]>(environmentBlockSize);
+    auto lpEnvironment = std::make_unique<wchar_t[]>(environmentBlockSize);
     size_t environmentOffset = 0;
     for (const std::wstring& envKeyValue : nativeEnvStrings) {
         // Ensure there is enough room to write the string, the string's NULL byte, and the block's

@@ -270,4 +270,14 @@ TEST(StringUtilsTest, WhitespaceWithinNumberFailsToParse) {
     boost::optional<size_t> result = parseUnsignedBase10Integer(" 10");
     ASSERT(!result);
 }
+
+TEST(StringUtilsTest, ConvertDoubleToStringWithProperPrecision) {
+    ASSERT_EQUALS(std::string("1.9876543219876543"), convertDoubleToString(1.98765432198765432));
+    ASSERT_EQUALS(std::string("1.987654321"), convertDoubleToString(1.987654321, 10));
+    ASSERT_EQUALS(std::string("1.988"), convertDoubleToString(1.987654321, 4));
+    ASSERT_EQUALS(std::string("6e-07"), convertDoubleToString(6E-7, 10));
+    ASSERT_EQUALS(std::string("6e-07"), convertDoubleToString(6E-7, 6));
+    ASSERT_EQUALS(std::string("0.1000000006"), convertDoubleToString(0.1 + 6E-10, 10));
+    ASSERT_EQUALS(std::string("0.1"), convertDoubleToString(0.1 + 6E-8, 6));
+}
 }  // namespace mongo::str

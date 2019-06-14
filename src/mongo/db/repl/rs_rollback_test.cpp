@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <initializer_list>
+#include <memory>
 #include <utility>
 
 #include "mongo/db/catalog/collection_catalog.h"
@@ -56,7 +57,6 @@
 #include "mongo/db/repl/rollback_test_fixture.h"
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
@@ -187,7 +187,7 @@ TEST_F(RSRollbackTest, InconsistentMinValid) {
                                                               OpTime(Timestamp(Seconds(1), 0), 0));
     auto status = syncRollback(_opCtx.get(),
                                OplogInterfaceMock(),
-                               RollbackSourceMock(stdx::make_unique<OplogInterfaceMock>()),
+                               RollbackSourceMock(std::make_unique<OplogInterfaceMock>()),
                                {},
                                _coordinator,
                                _replicationProcess.get());
@@ -199,7 +199,7 @@ TEST_F(RSRollbackTest, OplogStartMissing) {
     OpTime ts(Timestamp(Seconds(1), 0), 0);
     auto operation = std::make_pair(BSON("ts" << ts.getTimestamp()), RecordId());
     OplogInterfaceMock::Operations remoteOperations({operation});
-    auto remoteOplog = stdx::make_unique<OplogInterfaceMock>(remoteOperations);
+    auto remoteOplog = std::make_unique<OplogInterfaceMock>(remoteOperations);
     ASSERT_EQUALS(ErrorCodes::OplogStartMissing,
                   syncRollback(_opCtx.get(),
                                OplogInterfaceMock(),
@@ -215,7 +215,7 @@ TEST_F(RSRollbackTest, NoRemoteOpLog) {
     auto operation = std::make_pair(BSON("ts" << ts.getTimestamp()), RecordId());
     auto status = syncRollback(_opCtx.get(),
                                OplogInterfaceMock({operation}),
-                               RollbackSourceMock(stdx::make_unique<OplogInterfaceMock>()),
+                               RollbackSourceMock(std::make_unique<OplogInterfaceMock>()),
                                {},
                                _coordinator,
                                _replicationProcess.get());
@@ -236,7 +236,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdThrows) {
     };
     ASSERT_THROWS_CODE(syncRollback(_opCtx.get(),
                                     OplogInterfaceMock({operation}),
-                                    RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
+                                    RollbackSourceLocal(std::make_unique<OplogInterfaceMock>()),
                                     {},
                                     _coordinator,
                                     _replicationProcess.get()),
@@ -258,7 +258,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdDiffersFromRequiredRBID) {
 
     ASSERT_THROWS_CODE(syncRollback(_opCtx.get(),
                                     OplogInterfaceMock({operation}),
-                                    RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
+                                    RollbackSourceLocal(std::make_unique<OplogInterfaceMock>()),
                                     1,
                                     _coordinator,
                                     _replicationProcess.get()),
@@ -865,7 +865,7 @@ TEST_F(RSRollbackTest, RollbackDropIndexOnCollectionWithTwoExistingIndexes) {
     auto localOplog = {dropIndex0Op, createIndex1Op, createIndex0Op, commonOp};
 
     // Set up the mock rollback source and then run rollback.
-    RollbackSourceMock rollbackSource(stdx::make_unique<OplogInterfaceMock>(remoteOplog));
+    RollbackSourceMock rollbackSource(std::make_unique<OplogInterfaceMock>(remoteOplog));
     ASSERT_OK(syncRollback(_opCtx.get(),
                            OplogInterfaceMock(localOplog),
                            rollbackSource,
@@ -896,7 +896,7 @@ TEST_F(RSRollbackTest, RollbackTwoIndexDropsPrecededByTwoIndexCreationsOnSameCol
     auto localOplog = {dropIndex1Op, dropIndex0Op, createIndex1Op, createIndex0Op, commonOp};
 
     // Set up the mock rollback source and then run rollback.
-    RollbackSourceMock rollbackSource(stdx::make_unique<OplogInterfaceMock>(remoteOplog));
+    RollbackSourceMock rollbackSource(std::make_unique<OplogInterfaceMock>(remoteOplog));
     ASSERT_OK(syncRollback(_opCtx.get(),
                            OplogInterfaceMock(localOplog),
                            rollbackSource,
@@ -932,7 +932,7 @@ TEST_F(RSRollbackTest, RollbackMultipleCreateIndexesOnSameCollection) {
     auto localOplog = {createIndex2Op, createIndex1Op, createIndex0Op, commonOp};
 
     // Set up the mock rollback source and then run rollback.
-    RollbackSourceMock rollbackSource(stdx::make_unique<OplogInterfaceMock>(remoteOplog));
+    RollbackSourceMock rollbackSource(std::make_unique<OplogInterfaceMock>(remoteOplog));
     ASSERT_OK(syncRollback(_opCtx.get(),
                            OplogInterfaceMock(localOplog),
                            rollbackSource,
@@ -973,7 +973,7 @@ TEST_F(RSRollbackTest, RollbackCreateDropRecreateIndexOnCollection) {
     auto localOplog = {createIndex0AgainOp, dropIndex0Op, createIndex0Op, commonOp};
 
     // Set up the mock rollback source and then run rollback.
-    RollbackSourceMock rollbackSource(stdx::make_unique<OplogInterfaceMock>(remoteOplog));
+    RollbackSourceMock rollbackSource(std::make_unique<OplogInterfaceMock>(remoteOplog));
     ASSERT_OK(syncRollback(_opCtx.get(),
                            OplogInterfaceMock(localOplog),
                            rollbackSource,
@@ -2735,7 +2735,7 @@ TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback
     // syncRollback(). We provide an empty oplog so that if syncRollback() is called erroneously,
     // we would go fatal.
     OplogInterfaceMock localOplogWithSingleOplogEntry({makeNoopOplogEntryAndRecordId(Seconds(1))});
-    RollbackSourceMock rollbackSourceWithInvalidOplog(stdx::make_unique<OplogInterfaceMock>());
+    RollbackSourceMock rollbackSourceWithInvalidOplog(std::make_unique<OplogInterfaceMock>());
 
     // Inject ReplicationCoordinator::setFollowerMode() error. We set the current member state
     // because it will be logged by rollback() on failing to transition to ROLLBACK.
@@ -2764,7 +2764,7 @@ DEATH_TEST_F(
     // rollback() should abort on getting UnrecoverableRollbackError from syncRollback(). An empty
     // local oplog will make syncRollback() return the intended error.
     OplogInterfaceMock localOplogWithSingleOplogEntry({makeNoopOplogEntryAndRecordId(Seconds(1))});
-    RollbackSourceMock rollbackSourceWithInvalidOplog(stdx::make_unique<OplogInterfaceMock>());
+    RollbackSourceMock rollbackSourceWithInvalidOplog(std::make_unique<OplogInterfaceMock>());
 
     rollback(_opCtx.get(),
              localOplogWithSingleOplogEntry,
@@ -2780,7 +2780,7 @@ TEST_F(RSRollbackTest, RollbackLogsRetryMessageAndReturnsOnNonUnrecoverableRollb
     // about retrying rollback later before returning.
     OplogInterfaceMock localOplogWithNoEntries;
     OplogInterfaceMock::Operations remoteOperations({makeNoopOplogEntryAndRecordId(Seconds(1))});
-    auto remoteOplog = stdx::make_unique<OplogInterfaceMock>(remoteOperations);
+    auto remoteOplog = std::make_unique<OplogInterfaceMock>(remoteOperations);
     RollbackSourceMock rollbackSourceWithValidOplog(std::move(remoteOplog));
     auto noopSleepSecsFn = [](int) {};
 

@@ -37,12 +37,12 @@
 
     // Test that replSetGetStatus returns the correct results while initial sync is in progress.
     var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-    assert(!res.initialSyncStatus,
-           "Response should not have an 'initialSyncStatus' field: " + tojson(res));
-
-    res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
     assert(res.initialSyncStatus,
-           "Response should have an 'initialSyncStatus' field: " + tojson(res));
+           () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
+
+    res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 0}));
+    assert(!res.initialSyncStatus,
+           () => "Response should not have an 'initialSyncStatus' field: " + tojson(res));
 
     assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "t"}),
                                  ErrorCodes.TypeMismatch);
@@ -58,8 +58,9 @@
     checkLog.contains(secondary, 'initial sync - initialSyncHangBeforeFinish fail point enabled');
 
     // Test that replSetGetStatus returns the correct results when initial sync is at the very end.
-    res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
-    assert(res.initialSyncStatus, "Response should have an 'initialSyncStatus' field.");
+    res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
+    assert(res.initialSyncStatus,
+           () => "Response should have an 'initialSyncStatus' field: " + tojson(res));
     assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
     assert.eq(res.initialSyncStatus.appliedOps, 3);
     assert.eq(res.initialSyncStatus.failedInitialSyncAttempts, 0);
@@ -80,12 +81,13 @@
     // Test that replSetGetStatus returns the correct results after initial sync is finished.
     res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
     assert(!res.initialSyncStatus,
-           "Response should not have an 'initialSyncStatus' field: " + tojson(res));
+           () => "Response should not have an 'initialSyncStatus' field: " + tojson(res));
 
     assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "m"}),
                                  ErrorCodes.TypeMismatch);
     assert.eq(0,
               secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
               "Oplog buffer was not dropped after initial sync");
+
     replSet.stopSet();
 })();

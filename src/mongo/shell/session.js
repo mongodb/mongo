@@ -155,8 +155,6 @@ var {
             "geoNear",
             "geoSearch",
             "group",
-            "mapReduce",
-            "mapreduce",
         ]);
 
         function canUseReadConcern(driverSession, cmdObj) {

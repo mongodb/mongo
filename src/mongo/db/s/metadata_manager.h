@@ -30,6 +30,7 @@
 #pragma once
 
 #include <list>
+#include <memory>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/logical_time.h"
@@ -40,7 +41,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
 

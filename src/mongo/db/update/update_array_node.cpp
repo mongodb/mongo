@@ -38,7 +38,7 @@ std::unique_ptr<UpdateNode> UpdateArrayNode::createUpdateNodeByMerging(
     const UpdateArrayNode& leftNode, const UpdateArrayNode& rightNode, FieldRef* pathTaken) {
     invariant(&leftNode._arrayFilters == &rightNode._arrayFilters);
 
-    auto mergedNode = stdx::make_unique<UpdateArrayNode>(leftNode._arrayFilters);
+    auto mergedNode = std::make_unique<UpdateArrayNode>(leftNode._arrayFilters);
 
     const bool wrapFieldNameAsArrayFilterIdentifier = true;
     mergedNode->_children = createUpdateNodeMapByMerging(

@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sort.h"
 
 #include <boost/optional.hpp>
+#include <memory>
 
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
@@ -41,7 +42,6 @@
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
@@ -52,10 +52,9 @@ namespace {
 class SortStageTest : public ServiceContextMongoDTest {
 public:
     SortStageTest() {
-        getServiceContext()->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+        getServiceContext()->setFastClockSource(std::make_unique<ClockSourceMock>());
         _opCtx = makeOperationContext();
-        CollatorFactoryInterface::set(getServiceContext(),
-                                      stdx::make_unique<CollatorFactoryMock>());
+        CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());
     }
 
     OperationContext* getOpCtx() {
@@ -80,7 +79,7 @@ public:
         WorkingSet ws;
 
         // QueuedDataStage will be owned by SortStage.
-        auto queuedDataStage = stdx::make_unique<QueuedDataStage>(getOpCtx(), &ws);
+        auto queuedDataStage = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
         BSONObj inputObj = fromjson(inputStr);
         BSONElement inputElt = inputObj.getField("input");
         ASSERT(inputElt.isABSONObj());
@@ -104,7 +103,7 @@ public:
         params.pattern = fromjson(patternStr);
         params.limit = limit;
 
-        auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
+        auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
             getOpCtx(), queuedDataStage.release(), &ws, params.pattern, collator);
 
         SortStage sort(getOpCtx(), params, &ws, sortKeyGen.release());
@@ -160,8 +159,8 @@ TEST_F(SortStageTest, SortEmptyWorkingSet) {
     WorkingSet ws;
 
     // QueuedDataStage will be owned by SortStage.
-    auto queuedDataStage = stdx::make_unique<QueuedDataStage>(getOpCtx(), &ws);
-    auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
+    auto queuedDataStage = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
+    auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
         getOpCtx(), queuedDataStage.release(), &ws, BSONObj(), nullptr);
     SortStageParams params;
     SortStage sort(getOpCtx(), params, &ws, sortKeyGen.release());

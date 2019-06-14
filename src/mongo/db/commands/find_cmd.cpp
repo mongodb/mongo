@@ -358,8 +358,10 @@ public:
                                                               targetClusterTime);
 
                 // The $_internalReadAtClusterTime option also causes any storage-layer cursors
-                // created during plan execution to block on prepared transactions.
-                opCtx->recoveryUnit()->setIgnorePrepared(false);
+                // created during plan execution to block on prepared transactions. Since the find
+                // command ignores prepare conflicts by default, change the behavior.
+                opCtx->recoveryUnit()->setPrepareConflictBehavior(
+                    PrepareConflictBehavior::kEnforce);
             }
 
             // Acquire locks. If the query is on a view, we release our locks and convert the query

@@ -92,7 +92,7 @@ std::unique_ptr<ShardingCatalogClient> TransactionCoordinatorTestFixture::makeSh
         const std::vector<ShardId> _shardIds;
     };
 
-    return stdx::make_unique<StaticCatalogClient>(kThreeShardIdList);
+    return std::make_unique<StaticCatalogClient>(kThreeShardIdList);
 }
 
 void TransactionCoordinatorTestFixture::assertCommandSentAndRespondWith(

@@ -125,7 +125,7 @@ string MockDBClientConnection::toString() const {
 }
 
 unsigned long long MockDBClientConnection::query(
-    stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
+    std::function<void(mongo::DBClientCursorBatchIterator&)> f,
     const NamespaceStringOrUUID& nsOrUuid,
     mongo::Query query,
     const mongo::BSONObj* fieldsToReturn,

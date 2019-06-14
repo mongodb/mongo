@@ -376,6 +376,23 @@
                        }
                     }],
                     17276);
+    assertErrorCode(
+        coll,
+        [{$lookup: {let : {var1: 1, var2: "$$var1"}, pipeline: [], from: "from", as: "as"}}],
+        17276);
+    assertErrorCode(coll,
+                    [{
+                       $lookup: {
+                           let : {
+                               var1: {$let: {vars: {var1: 2}, in : "$$var1"}},
+                               var2: {$let: {vars: {var1: 4}, in : "$$var2"}},
+                           },
+                           pipeline: [],
+                           from: "from",
+                           as: "as"
+                       }
+                    }],
+                    17276);
 
     // The dotted path offset of a non-object variable is equivalent referencing an undefined
     // field.

@@ -31,6 +31,7 @@
 
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 
+#include <memory>
 #include <string>
 
 #include "mongo/base/init.h"
@@ -38,7 +39,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 

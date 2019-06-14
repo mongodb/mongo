@@ -116,7 +116,7 @@ public:
 
         // Add a RemoteCommandTargeter for the data shard.
         std::unique_ptr<RemoteCommandTargeterMock> targeter(
-            stdx::make_unique<RemoteCommandTargeterMock>());
+            std::make_unique<RemoteCommandTargeterMock>());
         targeter->setConnectionStringReturnValue(ConnectionString(kTestShardHost));
         targeter->setFindHostReturnValue(kTestShardHost);
         targeterFactory()->addTargeterToReturn(ConnectionString(kTestShardHost),
@@ -633,7 +633,7 @@ public:
         repl::ReadConcernArgs::get(operationContext()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
-        auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
+        auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
         logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
 

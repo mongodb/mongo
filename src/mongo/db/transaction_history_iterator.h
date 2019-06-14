@@ -74,6 +74,11 @@ public:
     repl::OplogEntry next(OperationContext* opCtx) override;
     repl::OpTime nextOpTime(OperationContext* opCtx) override;
 
+    /**
+     * Same as next() but makes exceptions fatal.
+     */
+    repl::OplogEntry nextFatalOnErrors(OperationContext* opCtx);
+
 private:
     // Clients can set this to allow PlanExecutors created by this TransactionHistoryIterator to
     // have a YIELD_AUTO yield policy. It is only safe to set this if next() will never be called

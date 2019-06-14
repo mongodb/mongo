@@ -29,8 +29,9 @@
 
 #include "mongo/executor/async_timer_mock.h"
 
+#include <memory>
+
 #include "mongo/base/system_error.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace executor {
@@ -135,7 +136,7 @@ void AsyncTimerMock::expireAfter(Milliseconds expiration) {
 std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryMock::make(Milliseconds expiration) {
     stdx::lock_guard<stdx::recursive_mutex> lk(_timersMutex);
     auto elem = _timers.emplace(std::make_shared<AsyncTimerMockImpl>(expiration));
-    return stdx::make_unique<AsyncTimerMock>(*elem.first);
+    return std::make_unique<AsyncTimerMock>(*elem.first);
 }
 
 void AsyncTimerFactoryMock::fastForward(Milliseconds time) {

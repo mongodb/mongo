@@ -169,7 +169,7 @@ public:
                 stdx::unique_lock<stdx::mutex> lk(lockStateMutex);
                 threadStatus = Status::OK();
                 threadStarted = false;
-                _lockThread = stdx::make_unique<FSyncLockThread>(allowFsyncFailure);
+                _lockThread = std::make_unique<FSyncLockThread>(allowFsyncFailure);
                 _lockThread->go();
 
                 while (!threadStarted && threadStatus.isOK()) {

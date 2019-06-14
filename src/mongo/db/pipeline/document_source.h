@@ -33,6 +33,7 @@
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
+#include <functional>
 #include <list>
 #include <memory>
 #include <string>
@@ -54,7 +55,6 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
@@ -129,7 +129,7 @@ class Document;
 
 class DocumentSource : public RefCountable {
 public:
-    using Parser = stdx::function<std::list<boost::intrusive_ptr<DocumentSource>>(
+    using Parser = std::function<std::list<boost::intrusive_ptr<DocumentSource>>(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&)>;
 
     using ChangeStreamRequirement = StageConstraints::ChangeStreamRequirement;

@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include <functional>
 #include <map>
+#include <memory>
 #include <string>
 
 #include "mongo/base/status_with.h"
@@ -44,8 +46,6 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/temporary_record_store.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/periodic_runner.h"
 
@@ -188,7 +188,7 @@ public:
         class TimestampListener {
         public:
             // Caller must ensure that the lifetime of the variables used in the callback are valid.
-            using Callback = stdx::function<void(Timestamp timestamp)>;
+            using Callback = std::function<void(Timestamp timestamp)>;
 
             /**
              * A TimestampListener saves a 'callback' that will be executed whenever the specified

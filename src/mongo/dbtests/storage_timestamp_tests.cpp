@@ -112,12 +112,13 @@ class IgnorePrepareBlock {
 public:
     IgnorePrepareBlock(OperationContext* opCtx) : _opCtx(opCtx) {
         _opCtx->recoveryUnit()->abandonSnapshot();
-        _opCtx->recoveryUnit()->setIgnorePrepared(true);
+        _opCtx->recoveryUnit()->setPrepareConflictBehavior(
+            PrepareConflictBehavior::kIgnoreConflicts);
     }
 
     ~IgnorePrepareBlock() {
         _opCtx->recoveryUnit()->abandonSnapshot();
-        _opCtx->recoveryUnit()->setIgnorePrepared(false);
+        _opCtx->recoveryUnit()->setPrepareConflictBehavior(PrepareConflictBehavior::kEnforce);
     }
 
 private:
@@ -178,12 +179,12 @@ public:
             _opCtx->getServiceContext(),
             std::unique_ptr<repl::ReplicationCoordinator>(coordinatorMock));
         repl::StorageInterface::set(_opCtx->getServiceContext(),
-                                    stdx::make_unique<repl::StorageInterfaceImpl>());
+                                    std::make_unique<repl::StorageInterfaceImpl>());
 
         auto replicationProcess = new repl::ReplicationProcess(
             repl::StorageInterface::get(_opCtx->getServiceContext()),
-            stdx::make_unique<repl::ReplicationConsistencyMarkersMock>(),
-            stdx::make_unique<repl::ReplicationRecoveryMock>());
+            std::make_unique<repl::ReplicationConsistencyMarkersMock>(),
+            std::make_unique<repl::ReplicationRecoveryMock>());
         repl::ReplicationProcess::set(
             cc().getServiceContext(),
             std::unique_ptr<repl::ReplicationProcess>(replicationProcess));
@@ -196,8 +197,8 @@ public:
         // to avoid the invariant in ReplClientInfo::setLastOp that the optime only goes forward.
         repl::ReplClientInfo::forClient(_opCtx->getClient()).clearLastOp_forTest();
 
-        auto registry = stdx::make_unique<OpObserverRegistry>();
-        registry->addObserver(stdx::make_unique<OpObserverShardingImpl>());
+        auto registry = std::make_unique<OpObserverRegistry>();
+        registry->addObserver(std::make_unique<OpObserverShardingImpl>());
         _opCtx->getServiceContext()->setOpObserver(std::move(registry));
 
         repl::setOplogCollectionName(getGlobalServiceContext());
@@ -445,7 +446,7 @@ public:
         ASSERT_FALSE(txnDoc.hasField(SessionTxnRecord::kStartOpTimeFieldName));
     }
 
-    void setReplCoordAppliedOpTime(const repl::OpTime& opTime, Date_t wallTime = Date_t::min()) {
+    void setReplCoordAppliedOpTime(const repl::OpTime& opTime, Date_t wallTime = Date_t()) {
         repl::ReplicationCoordinator::get(getGlobalServiceContext())
             ->setMyLastAppliedOpTimeAndWallTime({opTime, wallTime});
         ASSERT_OK(repl::ReplicationCoordinator::get(getGlobalServiceContext())
@@ -1742,7 +1743,7 @@ public:
         auto storageInterface = repl::StorageInterface::get(_opCtx);
         repl::DropPendingCollectionReaper::set(
             _opCtx->getServiceContext(),
-            stdx::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
+            std::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
 
         auto kvStorageEngine =
             dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());

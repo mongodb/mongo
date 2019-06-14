@@ -184,7 +184,7 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
             explainedCommand);
     auto innerRequest = std::make_unique<OpMsgRequest>(OpMsg{explainedObj});
     auto innerInvocation = explainedCommand->parse(opCtx, *innerRequest);
-    return stdx::make_unique<Invocation>(
+    return std::make_unique<Invocation>(
         this, request, std::move(verbosity), std::move(innerRequest), std::move(innerInvocation));
 }
 

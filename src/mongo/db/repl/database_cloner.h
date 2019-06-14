@@ -80,7 +80,7 @@ public:
      * Returns true if the collection described by the info object should be cloned.
      * Returns false if the collection should be ignored.
      */
-    using ListCollectionsPredicateFn = stdx::function<bool(const BSONObj&)>;
+    using ListCollectionsPredicateFn = std::function<bool(const BSONObj&)>;
 
     /**
      * Callback function to report progress of collection cloning. Arguments are:
@@ -89,14 +89,14 @@ public:
      *
      * Called exactly once for every collection cloner started by the the database cloner.
      */
-    using CollectionCallbackFn = stdx::function<void(const Status&, const NamespaceString&)>;
+    using CollectionCallbackFn = std::function<void(const Status&, const NamespaceString&)>;
 
     /**
      * Type of function to start a collection cloner.
      */
-    using StartCollectionClonerFn = stdx::function<Status(CollectionCloner&)>;
+    using StartCollectionClonerFn = std::function<Status(CollectionCloner&)>;
 
-    using ScheduleDbWorkFn = stdx::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
+    using ScheduleDbWorkFn = std::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
         executor::TaskExecutor::CallbackFn)>;
 
     /**

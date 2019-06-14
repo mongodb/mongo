@@ -120,7 +120,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
             checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
             ReplSetMetadata metadata(10,
-                                     {newOpTime, Date_t::min() + Seconds(newOpTime.getSecs())},
+                                     {newOpTime, Date_t() + Seconds(newOpTime.getSecs())},
                                      newOpTime,
                                      100,
                                      OID(),
@@ -193,7 +193,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         ReplSetMetadata metadata(10,
-                                 {newOpTime, Date_t::min() + Seconds(newOpTime.getSecs())},
+                                 {newOpTime, Date_t() + Seconds(newOpTime.getSecs())},
                                  newOpTime,
                                  100,
                                  OID(),
@@ -418,7 +418,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
             checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
             ReplSetMetadata metadata(10,
-                                     {newOpTime, Date_t::min() + Seconds(newOpTime.getSecs())},
+                                     {newOpTime, Date_t() + Seconds(newOpTime.getSecs())},
                                      newOpTime,
                                      100,
                                      OID(),
@@ -825,7 +825,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         ReplSetMetadata metadata(10,
-                                 {newOpTime, Date_t::min() + Seconds(newOpTime.getSecs())},
+                                 {newOpTime, Date_t() + Seconds(newOpTime.getSecs())},
                                  newOpTime,
                                  100,
                                  OID(),

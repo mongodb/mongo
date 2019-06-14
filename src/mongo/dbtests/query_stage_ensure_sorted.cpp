@@ -29,13 +29,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/exec/ensure_sorted.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -60,7 +61,7 @@ public:
         auto opCtx = _serviceContext.makeOperationContext();
 
         WorkingSet ws;
-        auto queuedDataStage = stdx::make_unique<QueuedDataStage>(opCtx.get(), &ws);
+        auto queuedDataStage = std::make_unique<QueuedDataStage>(opCtx.get(), &ws);
         BSONObj inputObj = fromjson(inputStr);
         BSONElement inputElt = inputObj["input"];
         ASSERT(inputElt.isABSONObj());
@@ -79,7 +80,7 @@ public:
 
         // Initialization.
         BSONObj pattern = fromjson(patternStr);
-        auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
+        auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
             opCtx.get(), queuedDataStage.release(), &ws, pattern, collator);
         EnsureSortedStage ess(opCtx.get(), pattern, &ws, sortKeyGen.release());
         WorkingSetID id = WorkingSet::INVALID_ID;
@@ -115,8 +116,8 @@ TEST_F(QueryStageEnsureSortedTest, EnsureSortedEmptyWorkingSet) {
     auto opCtx = _serviceContext.makeOperationContext();
 
     WorkingSet ws;
-    auto queuedDataStage = stdx::make_unique<QueuedDataStage>(opCtx.get(), &ws);
-    auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
+    auto queuedDataStage = std::make_unique<QueuedDataStage>(opCtx.get(), &ws);
+    auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
         opCtx.get(), queuedDataStage.release(), &ws, BSONObj(), nullptr);
     EnsureSortedStage ess(opCtx.get(), BSONObj(), &ws, sortKeyGen.release());
 

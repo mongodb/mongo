@@ -31,10 +31,11 @@
 
 #include "mongo/db/fts/fts_query_impl.h"
 
+#include <memory>
+
 #include "mongo/db/fts/fts_query_parser.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_tokenizer.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -136,7 +137,7 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
 }
 
 std::unique_ptr<FTSQuery> FTSQueryImpl::clone() const {
-    auto clonedQuery = stdx::make_unique<FTSQueryImpl>();
+    auto clonedQuery = std::make_unique<FTSQueryImpl>();
     clonedQuery->setQuery(getQuery());
     clonedQuery->setLanguage(getLanguage());
     clonedQuery->setCaseSensitive(getCaseSensitive());

@@ -29,10 +29,9 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
-
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -44,6 +43,6 @@ class ThreadPoolInterface;
  * work against any implementation of ThreadPoolInterface.
  */
 void addTestsForThreadPool(const std::string& suiteName,
-                           stdx::function<std::unique_ptr<ThreadPoolInterface>()> makeThreadPool);
+                           std::function<std::unique_ptr<ThreadPoolInterface>()> makeThreadPool);
 
 }  // namespace mongo

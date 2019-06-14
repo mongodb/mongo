@@ -31,6 +31,8 @@
 
 #include "mongo/s/shard_server_test_fixture.h"
 
+#include <memory>
+
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -41,7 +43,6 @@
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace {
@@ -71,8 +72,8 @@ void ShardServerTestFixture::setUp() {
     ShardingState::get(getServiceContext())->setInitialized(_myShardName, _clusterId);
 
     CatalogCacheLoader::set(getServiceContext(),
-                            stdx::make_unique<ShardServerCatalogCacheLoader>(
-                                stdx::make_unique<ConfigServerCatalogCacheLoader>()));
+                            std::make_unique<ShardServerCatalogCacheLoader>(
+                                std::make_unique<ConfigServerCatalogCacheLoader>()));
 
     uassertStatusOK(
         initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
@@ -89,19 +90,19 @@ void ShardServerTestFixture::tearDown() {
 }
 
 std::unique_ptr<DistLockCatalog> ShardServerTestFixture::makeDistLockCatalog() {
-    return stdx::make_unique<DistLockCatalogMock>();
+    return std::make_unique<DistLockCatalogMock>();
 }
 
 std::unique_ptr<DistLockManager> ShardServerTestFixture::makeDistLockManager(
     std::unique_ptr<DistLockCatalog> distLockCatalog) {
     invariant(distLockCatalog);
-    return stdx::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
+    return std::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
 }
 
 std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatalogClient(
     std::unique_ptr<DistLockManager> distLockManager) {
     invariant(distLockManager);
-    return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
+    return std::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
 }
 
 }  // namespace mongo

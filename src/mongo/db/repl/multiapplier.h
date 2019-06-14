@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <iosfwd>
 #include <memory>
 #include <string>
@@ -43,7 +44,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -69,7 +69,7 @@ public:
     using CallbackFn = unique_function<void(const Status&)>;
 
     using MultiApplyFn =
-        stdx::function<StatusWith<OpTime>(OperationContext*, MultiApplier::Operations)>;
+        std::function<StatusWith<OpTime>(OperationContext*, MultiApplier::Operations)>;
 
     /**
      * Creates MultiApplier in inactive state.

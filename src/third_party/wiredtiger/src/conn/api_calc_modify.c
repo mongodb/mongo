@@ -69,16 +69,31 @@ static void
 __cm_extend(WT_CM_STATE *cms,
     const uint8_t *m1, const uint8_t *m2, WT_CM_MATCH *match)
 {
+	ptrdiff_t n;
 	const uint8_t *p1, *p2;
 
-	/* Step past the end and before the beginning of the matching block. */
+	p1 = m1;
+	p2 = m2;
+
+	/*
+	 * Keep skipping half of the remaining bytes while they compare equal.
+	 * This is significantly faster than our byte-at-a-time loop below.
+	 */
 	for (p1 = m1, p2 = m2;
-	    p1 < cms->e1 && p2 < cms->e2 && *p1 == *p2;
-	    p1++, p2++)
+	    (n = WT_MIN(cms->e1 - p1, cms->e2 - p2) / 2) > 8 &&
+	    memcmp(p1, p2, (size_t)n) == 0;
+	    p1 += n, p2 += n)
 		;
 
-	for (; m1 >= cms->used1 && m2 >= cms->used2 && *m1 == *m2;
-	    m1--, m2--)
+	/* Step past the end and before the beginning of the matching block. */
+	for (n = WT_MIN(cms->e1 - p1, cms->e2 - p2);
+	    n > 0 && *p1 == *p2;
+	    n--, p1++, p2++)
+		;
+
+	for (n = WT_MIN(m1 - cms->used1, m2 - cms->used2);
+	    n > 0 && *m1 == *m2;
+	    n--, m1--, m2--)
 		;
 
 	match->m1 = m1 + 1;

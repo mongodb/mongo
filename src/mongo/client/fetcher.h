@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <iosfwd>
 #include <memory>
 #include <string>
@@ -42,7 +43,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -84,7 +84,7 @@ public:
     /**
      * Type of a fetcher callback function.
      */
-    typedef stdx::function<void(const StatusWith<QueryResponse>&, NextAction*, BSONObjBuilder*)>
+    typedef std::function<void(const StatusWith<QueryResponse>&, NextAction*, BSONObjBuilder*)>
         CallbackFn;
 
     /**

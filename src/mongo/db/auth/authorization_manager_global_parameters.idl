@@ -43,3 +43,10 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: gStartupAuthSchemaValidation
         default: true
+    allowRolesFromX509Certificates:
+        description:
+            Whether to allow roles contained in X509 certificates if X509 authentication is enabled
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: allowRolesFromX509Certificates
+        default: true

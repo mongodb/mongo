@@ -195,9 +195,9 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
 
     QueryPlannerParams params;
 
-    std::unique_ptr<FetchNode> fetchNodePtr = stdx::make_unique<FetchNode>();
+    std::unique_ptr<FetchNode> fetchNodePtr = std::make_unique<FetchNode>();
     std::unique_ptr<GeoMatchExpression> exprPtr =
-        stdx::make_unique<GeoMatchExpression>("geometry.field", nullptr, BSONObj());
+        std::make_unique<GeoMatchExpression>("geometry.field", nullptr, BSONObj());
 
     GeoMatchExpression* expr = exprPtr.get();
 

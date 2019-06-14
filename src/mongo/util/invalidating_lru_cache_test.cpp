@@ -31,10 +31,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "boost/optional.hpp"
+#include <boost/optional.hpp>
+#include <functional>
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future.h"
@@ -53,13 +53,13 @@ public:
         _isValid.store(isValid);
     }
 
-    void setValidHook(stdx::function<bool()> validHook) {
+    void setValidHook(std::function<bool()> validHook) {
         _isValidHook = std::move(validHook);
     }
 
 private:
     AtomicWord<bool> _isValid{true};
-    boost::optional<stdx::function<bool()>> _isValidHook;
+    boost::optional<std::function<bool()>> _isValidHook;
 };
 
 struct TestValueInvalidator {

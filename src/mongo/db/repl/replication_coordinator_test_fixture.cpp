@@ -33,6 +33,9 @@
 
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 
+#include <functional>
+#include <memory>
+
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
@@ -49,8 +52,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -121,43 +122,43 @@ void ReplCoordTest::init() {
     StorageInterface::set(service, std::unique_ptr<StorageInterface>(_storageInterface));
     ASSERT_TRUE(_storageInterface == StorageInterface::get(service));
 
-    ReplicationProcess::set(service,
-                            stdx::make_unique<ReplicationProcess>(
-                                _storageInterface,
-                                stdx::make_unique<ReplicationConsistencyMarkersMock>(),
-                                stdx::make_unique<ReplicationRecoveryMock>()));
+    ReplicationProcess::set(
+        service,
+        std::make_unique<ReplicationProcess>(_storageInterface,
+                                             std::make_unique<ReplicationConsistencyMarkersMock>(),
+                                             std::make_unique<ReplicationRecoveryMock>()));
     auto replicationProcess = ReplicationProcess::get(service);
 
     // PRNG seed for tests.
     const int64_t seed = 0;
 
-    auto logicalClock = stdx::make_unique<LogicalClock>(service);
+    auto logicalClock = std::make_unique<LogicalClock>(service);
     LogicalClock::set(service, std::move(logicalClock));
 
     TopologyCoordinator::Options settings;
-    auto topo = stdx::make_unique<TopologyCoordinator>(settings);
+    auto topo = std::make_unique<TopologyCoordinator>(settings);
     _topo = topo.get();
-    auto net = stdx::make_unique<NetworkInterfaceMock>();
+    auto net = std::make_unique<NetworkInterfaceMock>();
     _net = net.get();
-    auto externalState = stdx::make_unique<ReplicationCoordinatorExternalStateMock>();
+    auto externalState = std::make_unique<ReplicationCoordinatorExternalStateMock>();
     _externalState = externalState.get();
     executor::ThreadPoolMock::Options tpOptions;
     tpOptions.onCreateThread = []() { Client::initThread("replexec"); };
-    auto pool = stdx::make_unique<executor::ThreadPoolMock>(_net, seed, tpOptions);
+    auto pool = std::make_unique<executor::ThreadPoolMock>(_net, seed, tpOptions);
     auto replExec =
-        stdx::make_unique<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+        std::make_unique<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
     _replExec = replExec.get();
-    _repl = stdx::make_unique<ReplicationCoordinatorImpl>(service,
-                                                          _settings,
-                                                          std::move(externalState),
-                                                          std::move(replExec),
-                                                          std::move(topo),
-                                                          replicationProcess,
-                                                          _storageInterface,
-                                                          seed);
-    service->setFastClockSource(stdx::make_unique<executor::NetworkInterfaceMockClockSource>(_net));
+    _repl = std::make_unique<ReplicationCoordinatorImpl>(service,
+                                                         _settings,
+                                                         std::move(externalState),
+                                                         std::move(replExec),
+                                                         std::move(topo),
+                                                         replicationProcess,
+                                                         _storageInterface,
+                                                         seed);
+    service->setFastClockSource(std::make_unique<executor::NetworkInterfaceMockClockSource>(_net));
     service->setPreciseClockSource(
-        stdx::make_unique<executor::NetworkInterfaceMockClockSource>(_net));
+        std::make_unique<executor::NetworkInterfaceMockClockSource>(_net));
 }
 
 void ReplCoordTest::init(const ReplSettings& settings) {
@@ -236,9 +237,9 @@ void ReplCoordTest::simulateEnoughHeartbeatsForAllNodesUp() {
             hbResp.setState(MemberState::RS_SECONDARY);
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             hbResp.setAppliedOpTimeAndWallTime(
-                {OpTime(Timestamp(100, 2), 0), Date_t::min() + Seconds(100)});
+                {OpTime(Timestamp(100, 2), 0), Date_t() + Seconds(100)});
             hbResp.setDurableOpTimeAndWallTime(
-                {OpTime(Timestamp(100, 2), 0), Date_t::min() + Seconds(100)});
+                {OpTime(Timestamp(100, 2), 0), Date_t() + Seconds(100)});
             BSONObjBuilder respObj;
             net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
         } else {
@@ -252,7 +253,7 @@ void ReplCoordTest::simulateEnoughHeartbeatsForAllNodesUp() {
 }
 
 void ReplCoordTest::simulateSuccessfulDryRun(
-    stdx::function<void(const RemoteCommandRequest& request)> onDryRunRequest) {
+    std::function<void(const RemoteCommandRequest& request)> onDryRunRequest) {
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     ReplSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
     NetworkInterfaceMock* net = getNet();
@@ -340,8 +341,8 @@ void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t e
             hbResp.setState(MemberState::RS_SECONDARY);
             // The smallest valid optime in PV1.
             OpTime opTime(Timestamp(), 0);
-            hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t::min() + Seconds(opTime.getSecs())});
-            hbResp.setDurableOpTimeAndWallTime({opTime, Date_t::min() + Seconds(opTime.getSecs())});
+            hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t() + Seconds(opTime.getSecs())});
+            hbResp.setDurableOpTimeAndWallTime({opTime, Date_t() + Seconds(opTime.getSecs())});
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
         } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
@@ -397,8 +398,8 @@ void ReplCoordTest::signalDrainComplete(OperationContext* opCtx) {
 }
 
 void ReplCoordTest::runSingleNodeElection(OperationContext* opCtx) {
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(1, 1), 0), Date_t::min() + Seconds(1));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(1, 1), 0), Date_t::min() + Seconds(1));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(1, 1), 0), Date_t() + Seconds(1));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(1, 1), 0), Date_t() + Seconds(1));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->waitForElectionFinish_forTest();
 
@@ -438,10 +439,8 @@ bool ReplCoordTest::consumeHeartbeatV1(const NetworkInterfaceMock::NetworkOperat
     hbResp.setSetName(rsConfig.getReplSetName());
     hbResp.setState(MemberState::RS_SECONDARY);
     hbResp.setConfigVersion(rsConfig.getConfigVersion());
-    hbResp.setAppliedOpTimeAndWallTime(
-        {lastApplied, Date_t::min() + Seconds(lastApplied.getSecs())});
-    hbResp.setDurableOpTimeAndWallTime(
-        {lastApplied, Date_t::min() + Seconds(lastApplied.getSecs())});
+    hbResp.setAppliedOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
+    hbResp.setDurableOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
     BSONObjBuilder respObj;
     net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
     return true;

@@ -379,11 +379,11 @@ public:
     Status setLastAppliedOptime_forTest(long long cfgVer,
                                         long long memberId,
                                         const OpTime& opTime,
-                                        Date_t wallTime = Date_t::min());
+                                        Date_t wallTime = Date_t());
     Status setLastDurableOptime_forTest(long long cfgVer,
                                         long long memberId,
                                         const OpTime& opTime,
-                                        Date_t wallTime = Date_t::min());
+                                        Date_t wallTime = Date_t());
 
     /**
      * Simple test wrappers that expose private methods.
@@ -430,7 +430,7 @@ private:
 
     using EventHandle = executor::TaskExecutor::EventHandle;
 
-    using ScheduleFn = stdx::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
+    using ScheduleFn = std::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
         const executor::TaskExecutor::CallbackFn& work)>;
 
     class LoseElectionGuardV1;
@@ -611,7 +611,7 @@ private:
     //
     // This is used when we want to run a callback when the opTime is reached.
     struct CallbackWaiter : public Waiter {
-        using FinishFunc = stdx::function<void()>;
+        using FinishFunc = std::function<void()>;
 
         CallbackWaiter(OpTime _opTime, FinishFunc _finishCallback);
         void notify_inlock() override;
@@ -634,7 +634,7 @@ private:
         // Returns whether waiter is found and removed.
         bool remove_inlock(WaiterType waiter);
         // Signals all waiters that satisfy the condition.
-        void signalIf_inlock(stdx::function<bool(WaiterType)> fun);
+        void signalIf_inlock(std::function<bool(WaiterType)> fun);
         // Signals all waiters from the list.
         void signalAll_inlock();
 
@@ -937,7 +937,7 @@ private:
      * Start replicating data, and does an initial sync if needed first.
      */
     void _startDataReplication(OperationContext* opCtx,
-                               stdx::function<void()> startCompleted = nullptr);
+                               std::function<void()> startCompleted = nullptr);
 
     /**
      * Stops replicating data by stopping the applier, fetcher and such.
@@ -1282,7 +1282,7 @@ private:
      * Wrap a function into executor callback.
      * If the callback is cancelled, the given function won't run.
      */
-    executor::TaskExecutor::CallbackFn _wrapAsCallbackFn(const stdx::function<void()>& work);
+    executor::TaskExecutor::CallbackFn _wrapAsCallbackFn(const std::function<void()>& work);
 
     /**
      * Finish catch-up mode and start drain mode.

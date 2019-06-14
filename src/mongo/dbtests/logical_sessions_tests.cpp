@@ -38,7 +38,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/sessions_collection_standalone.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -87,7 +86,7 @@ StatusWith<LogicalSessionRecord> fetchRecord(OperationContext* opCtx,
 class SessionsCollectionStandaloneTest {
 public:
     SessionsCollectionStandaloneTest()
-        : _collection(stdx::make_unique<SessionsCollectionStandalone>()) {
+        : _collection(std::make_unique<SessionsCollectionStandalone>()) {
         _opCtx = cc().makeOperationContext();
         DBDirectClient db(opCtx());
         db.remove(ns(), BSONObj());

@@ -32,6 +32,7 @@
 #include "mongo/s/sharding_mongod_test_fixture.h"
 
 #include <algorithm>
+#include <memory>
 #include <vector>
 
 #include "mongo/base/checked_cast.h"
@@ -77,7 +78,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -122,25 +122,25 @@ void ShardingMongodTestFixture::setUp() {
 
     repl::ReplicationCoordinator::set(service, std::move(replCoordPtr));
 
-    auto storagePtr = stdx::make_unique<repl::StorageInterfaceMock>();
+    auto storagePtr = std::make_unique<repl::StorageInterfaceMock>();
 
     repl::DropPendingCollectionReaper::set(
-        service, stdx::make_unique<repl::DropPendingCollectionReaper>(storagePtr.get()));
+        service, std::make_unique<repl::DropPendingCollectionReaper>(storagePtr.get()));
 
     repl::ReplicationProcess::set(service,
-                                  stdx::make_unique<repl::ReplicationProcess>(
+                                  std::make_unique<repl::ReplicationProcess>(
                                       storagePtr.get(),
-                                      stdx::make_unique<repl::ReplicationConsistencyMarkersMock>(),
-                                      stdx::make_unique<repl::ReplicationRecoveryMock>()));
+                                      std::make_unique<repl::ReplicationConsistencyMarkersMock>(),
+                                      std::make_unique<repl::ReplicationRecoveryMock>()));
 
     ASSERT_OK(repl::ReplicationProcess::get(_opCtx.get())->initializeRollbackID(_opCtx.get()));
 
     repl::StorageInterface::set(service, std::move(storagePtr));
 
     auto opObserver = checked_cast<OpObserverRegistry*>(service->getOpObserver());
-    opObserver->addObserver(stdx::make_unique<OpObserverShardingImpl>());
-    opObserver->addObserver(stdx::make_unique<ConfigServerOpObserver>());
-    opObserver->addObserver(stdx::make_unique<ShardServerOpObserver>());
+    opObserver->addObserver(std::make_unique<OpObserverShardingImpl>());
+    opObserver->addObserver(std::make_unique<ConfigServerOpObserver>());
+    opObserver->addObserver(std::make_unique<ShardServerOpObserver>());
 
     repl::setOplogCollectionName(service);
     repl::createOplog(_opCtx.get());
@@ -154,7 +154,7 @@ void ShardingMongodTestFixture::setUp() {
 std::unique_ptr<ReplicationCoordinatorMock> ShardingMongodTestFixture::makeReplicationCoordinator(
     ReplSettings replSettings) {
     auto coordinator =
-        stdx::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext(), replSettings);
+        std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext(), replSettings);
     ASSERT_OK(coordinator->setFollowerMode(repl::MemberState::RS_PRIMARY));
     return coordinator;
 }
@@ -163,7 +163,7 @@ std::unique_ptr<executor::TaskExecutorPool> ShardingMongodTestFixture::makeTaskE
     // Set up a NetworkInterfaceMock. Note, unlike NetworkInterfaceASIO, which has its own pool of
     // threads, tasks in the NetworkInterfaceMock must be carried out synchronously by the (single)
     // thread the unit test is running on.
-    auto netForFixedTaskExecutor = stdx::make_unique<executor::NetworkInterfaceMock>();
+    auto netForFixedTaskExecutor = std::make_unique<executor::NetworkInterfaceMock>();
     _mockNetwork = netForFixedTaskExecutor.get();
 
     // Set up a ThreadPoolTaskExecutor. Note, for local tasks this TaskExecutor uses a
@@ -172,15 +172,15 @@ std::unique_ptr<executor::TaskExecutorPool> ShardingMongodTestFixture::makeTaskE
     // again just the (single) thread the unit test is running on. Therefore, all tasks, local and
     // remote, must be carried out synchronously by the test thread.
     auto fixedTaskExecutor = makeThreadPoolTestExecutor(std::move(netForFixedTaskExecutor));
-    _networkTestEnv = stdx::make_unique<NetworkTestEnv>(fixedTaskExecutor.get(), _mockNetwork);
+    _networkTestEnv = std::make_unique<NetworkTestEnv>(fixedTaskExecutor.get(), _mockNetwork);
 
     // Set up (one) TaskExecutor for the set of arbitrary TaskExecutors.
     std::vector<std::unique_ptr<executor::TaskExecutor>> arbitraryExecutorsForExecutorPool;
     arbitraryExecutorsForExecutorPool.emplace_back(
-        makeThreadPoolTestExecutor(stdx::make_unique<executor::NetworkInterfaceMock>()));
+        makeThreadPoolTestExecutor(std::make_unique<executor::NetworkInterfaceMock>()));
 
     // Set up the TaskExecutorPool with the fixed TaskExecutor and set of arbitrary TaskExecutors.
-    auto executorPool = stdx::make_unique<executor::TaskExecutorPool>();
+    auto executorPool = std::make_unique<executor::TaskExecutorPool>();
     executorPool->addExecutors(std::move(arbitraryExecutorsForExecutorPool),
                                std::move(fixedTaskExecutor));
 
@@ -189,21 +189,19 @@ std::unique_ptr<executor::TaskExecutorPool> ShardingMongodTestFixture::makeTaskE
 
 std::unique_ptr<ShardRegistry> ShardingMongodTestFixture::makeShardRegistry(
     ConnectionString configConnStr) {
-    auto targeterFactory(stdx::make_unique<RemoteCommandTargeterFactoryMock>());
+    auto targeterFactory(std::make_unique<RemoteCommandTargeterFactoryMock>());
     auto targeterFactoryPtr = targeterFactory.get();
     _targeterFactory = targeterFactoryPtr;
 
-    ShardFactory::BuilderCallable setBuilder =
-        [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-            return stdx::make_unique<ShardRemote>(
-                shardId, connStr, targeterFactoryPtr->create(connStr));
-        };
+    ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr](
+        const ShardId& shardId, const ConnectionString& connStr) {
+        return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
+    };
 
-    ShardFactory::BuilderCallable masterBuilder =
-        [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-            return stdx::make_unique<ShardRemote>(
-                shardId, connStr, targeterFactoryPtr->create(connStr));
-        };
+    ShardFactory::BuilderCallable masterBuilder = [targeterFactoryPtr](
+        const ShardId& shardId, const ConnectionString& connStr) {
+        return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
+    };
 
     ShardFactory::BuildersMap buildersMap{{ConnectionString::SET, std::move(setBuilder)},
                                           {ConnectionString::MASTER, std::move(masterBuilder)}};
@@ -212,7 +210,7 @@ std::unique_ptr<ShardRegistry> ShardingMongodTestFixture::makeShardRegistry(
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         ShardFactory::BuilderCallable localBuilder = [](const ShardId& shardId,
                                                         const ConnectionString& connStr) {
-            return stdx::make_unique<ShardLocal>(shardId);
+            return std::make_unique<ShardLocal>(shardId);
         };
         buildersMap.insert(
             std::pair<ConnectionString::ConnectionType, ShardFactory::BuilderCallable>(
@@ -220,9 +218,9 @@ std::unique_ptr<ShardRegistry> ShardingMongodTestFixture::makeShardRegistry(
     }
 
     auto shardFactory =
-        stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
+        std::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
-    return stdx::make_unique<ShardRegistry>(std::move(shardFactory), configConnStr);
+    return std::make_unique<ShardRegistry>(std::move(shardFactory), configConnStr);
 }
 
 std::unique_ptr<DistLockCatalog> ShardingMongodTestFixture::makeDistLockCatalog() {
@@ -268,7 +266,7 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
 
     auto const grid = Grid::get(operationContext());
     grid->init(makeShardingCatalogClient(std::move(distLockManagerPtr)),
-               stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(getServiceContext())),
+               std::make_unique<CatalogCache>(CatalogCacheLoader::get(getServiceContext())),
                makeShardRegistry(configConnStr),
                makeClusterCursorManager(),
                makeBalancerConfiguration(),

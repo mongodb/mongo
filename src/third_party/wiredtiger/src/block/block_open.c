@@ -8,7 +8,7 @@
 
 #include "wt_internal.h"
 
-static int __desc_read(WT_SESSION_IMPL *, WT_BLOCK *);
+static int __desc_read(WT_SESSION_IMPL *, uint32_t allocsize, WT_BLOCK *);
 
 /*
  * __wt_block_manager_drop --
@@ -228,7 +228,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	 * look at anything, including the description information.
 	 */
 	if (!forced_salvage)
-		WT_ERR(__desc_read(session, block));
+		WT_ERR(__desc_read(session, allocsize, block));
 
 	*blockp = block;
 	__wt_spin_unlock(session, &conn->block_lock);
@@ -314,7 +314,7 @@ __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
  *	Read and verify the file's metadata.
  */
 static int
-__desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
+__desc_read(WT_SESSION_IMPL *session, uint32_t allocsize, WT_BLOCK *block)
 {
 	WT_BLOCK_DESC *desc;
 	WT_DECL_ITEM(buf);
@@ -326,11 +326,11 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		return (0);
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
-	WT_RET(__wt_scr_alloc(session, block->allocsize, &buf));
+	WT_RET(__wt_scr_alloc(session, allocsize, &buf));
 
 	/* Read the first allocation-sized block and verify the file format. */
 	WT_ERR(__wt_read(session,
-	    block->fh, (wt_off_t)0, (size_t)block->allocsize, buf->mem));
+	    block->fh, (wt_off_t)0, (size_t)allocsize, buf->mem));
 
 	/*
 	 * Handle little- and big-endian objects. Objects are written in little-
@@ -342,7 +342,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	desc = buf->mem;
 	checksum_tmp = desc->checksum;
 	desc->checksum = 0;
-	checksum_calculate = __wt_checksum(desc, block->allocsize);
+	checksum_calculate = __wt_checksum(desc, allocsize);
 	desc->checksum = checksum_tmp;
 	__wt_block_desc_byteswap(desc);
 

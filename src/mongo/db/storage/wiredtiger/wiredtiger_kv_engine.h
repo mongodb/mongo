@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <list>
 #include <memory>
 #include <string>
@@ -43,7 +44,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/elapsed_tracker.h"
 
@@ -71,7 +71,8 @@ public:
                        const std::string& path,
                        ClockSource* cs,
                        const std::string& extraOpenOptions,
-                       size_t cacheSizeGB,
+                       size_t cacheSizeMB,
+                       size_t maxCacheOverflowFileSizeMB,
                        bool durable,
                        bool ephemeral,
                        bool repair,
@@ -122,9 +123,8 @@ public:
         return createGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
     }
 
-    SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
-                                                StringData ident,
-                                                const IndexDescriptor* desc) override {
+    std::unique_ptr<SortedDataInterface> getSortedDataInterface(
+        OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) override {
         return getGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
     }
 
@@ -145,10 +145,10 @@ public:
                                             const IndexDescriptor* desc,
                                             KVPrefix prefix) override;
 
-    SortedDataInterface* getGroupedSortedDataInterface(OperationContext* opCtx,
-                                                       StringData ident,
-                                                       const IndexDescriptor* desc,
-                                                       KVPrefix prefix) override;
+    std::unique_ptr<SortedDataInterface> getGroupedSortedDataInterface(OperationContext* opCtx,
+                                                                       StringData ident,
+                                                                       const IndexDescriptor* desc,
+                                                                       KVPrefix prefix) override;
 
     Status dropIdent(OperationContext* opCtx, StringData ident) override;
 
@@ -295,7 +295,7 @@ public:
      * background job, for example). Intended to be called from a MONGO_INITIALIZER and therefore in
      * a single threaded context.
      */
-    static void setInitRsOplogBackgroundThreadCallback(stdx::function<bool(StringData)> cb);
+    static void setInitRsOplogBackgroundThreadCallback(std::function<bool(StringData)> cb);
 
     /**
      * Initializes a background job to remove excess documents in the oplog collections.

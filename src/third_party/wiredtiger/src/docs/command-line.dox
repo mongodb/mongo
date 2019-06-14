@@ -342,7 +342,7 @@ data that cannot be recovered.  Underlying files are re-written in place,
 overwriting the original file contents.
 
 @subsection util_salvage_synopsis Synopsis
-<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] salvage [-F force] uri</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] salvage [-F] uri</code>
 
 @subsection util_salvage_options Options
 The following are command-specific options for the \c salvage command:

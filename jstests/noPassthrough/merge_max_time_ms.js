@@ -3,8 +3,8 @@
  * @tags: [requires_sharding, requires_replication]
  */
 (function() {
-    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode().
-    load("jstests/libs/fixture_helpers.js");            // For isMongos().
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode().
+    load("jstests/libs/fixture_helpers.js");              // For isMongos().
     load("jstests/libs/profiler.js");  // For profilerHasSingleMatchingEntryOrThrow.
 
     const kDBName = "test";

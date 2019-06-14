@@ -34,10 +34,10 @@
 #include "mongo/util/exit.h"
 
 #include <boost/optional.hpp>
+#include <functional>
 #include <stack>
 
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"

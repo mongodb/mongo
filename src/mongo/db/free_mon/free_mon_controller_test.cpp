@@ -34,6 +34,7 @@
 #include <boost/filesystem.hpp>
 #include <future>
 #include <iostream>
+#include <memory>
 #include <snappy.h>
 
 #include "mongo/db/free_mon/free_mon_controller.h"
@@ -63,7 +64,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/object_check.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
@@ -420,7 +420,7 @@ void FreeMonControllerTest::setUp() {
 
     _opCtx = cc().makeOperationContext();
 
-    //_storage = stdx::make_unique<repl::StorageInterfaceImpl>();
+    //_storage = std::make_unique<repl::StorageInterfaceImpl>();
     repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
 
     // Transition to PRIMARY so that the server can accept writes.
@@ -889,8 +889,8 @@ struct ControllerHolder {
     ControllerHolder(executor::ThreadPoolTaskExecutor* pool,
                      FreeMonNetworkInterfaceMock::Options opts,
                      bool useCrankForTest = true) {
-        auto registerCollectorUnique = stdx::make_unique<FreeMonMetricsCollectorMock>();
-        auto metricsCollectorUnique = stdx::make_unique<FreeMonMetricsCollectorMock>();
+        auto registerCollectorUnique = std::make_unique<FreeMonMetricsCollectorMock>();
+        auto metricsCollectorUnique = std::make_unique<FreeMonMetricsCollectorMock>();
 
         // If we want to manually turn the crank the queue, we must process the messages
         // synchronously

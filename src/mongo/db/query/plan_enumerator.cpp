@@ -805,7 +805,7 @@ void PlanEnumerator::assignPredicate(
         // This method should only be called if we can combine bounds.
         const bool canCombineBounds = true;
         dest.tagData =
-            stdx::make_unique<IndexTag>(indexAssignment->index, position, canCombineBounds);
+            std::make_unique<IndexTag>(indexAssignment->index, position, canCombineBounds);
         indexAssignment->orPushdowns.emplace_back(pred, std::move(dest));
     } else {
         indexAssignment->preds.push_back(pred);

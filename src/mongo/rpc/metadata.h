@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include <functional>
 #include <tuple>
 
 #include "mongo/base/status_with.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 class BSONObj;
@@ -74,7 +74,7 @@ OpMsgRequest upconvertRequest(StringData db, BSONObj legacyCmdObj, int queryFlag
  * metadata was written successfully.
  */
 using RequestMetadataWriter =
-    stdx::function<Status(OperationContext* opCtx, BSONObjBuilder* metadataBuilder)>;
+    std::function<Status(OperationContext* opCtx, BSONObjBuilder* metadataBuilder)>;
 
 /**
  * A function type for reading reply metadata. The function takes a a reference to a
@@ -84,7 +84,7 @@ using RequestMetadataWriter =
  *
  * TODO: would it be a layering violation if this hook took an OperationContext* ?
  */
-using ReplyMetadataReader = stdx::function<Status(
+using ReplyMetadataReader = std::function<Status(
     OperationContext* opCtx, const BSONObj& replyMetadata, StringData sourceHost)>;
 
 }  // namespace rpc

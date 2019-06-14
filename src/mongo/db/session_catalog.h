@@ -98,7 +98,7 @@ public:
      * Iterates through the SessionCatalog and applies 'workerFn' to each Session. This locks the
      * SessionCatalog.
      */
-    using ScanSessionsCallbackFn = stdx::function<void(ObservableSession&)>;
+    using ScanSessionsCallbackFn = std::function<void(ObservableSession&)>;
     void scanSession(const LogicalSessionId& lsid, const ScanSessionsCallbackFn& workerFn);
     void scanSessions(const SessionKiller::Matcher& matcher,
                       const ScanSessionsCallbackFn& workerFn);

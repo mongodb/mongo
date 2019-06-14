@@ -51,6 +51,9 @@ public:
 
         // Total number of times this commit completed successfully.
         AtomicWord<std::int64_t> successful{0};
+
+        // Total commit duration of successful transactions in microseconds.
+        AtomicWord<std::int64_t> successfulDurationMicros{0};
     };
 
     RouterTransactionsMetrics() = default;
@@ -78,7 +81,10 @@ public:
 
     const CommitStats& getCommitTypeStats_forTest(TransactionRouter::CommitType commitType);
     void incrementCommitInitiated(TransactionRouter::CommitType commitType);
-    void incrementCommitSuccessful(TransactionRouter::CommitType commitType);
+    void incrementCommitSuccessful(TransactionRouter::CommitType commitType,
+                                   Microseconds durationMicros);
+
+    void incrementAbortCauseMap(std::string abortCause);
 
     /**
      * Appends the accumulated stats to a sharded transactions stats object for reporting.
@@ -118,6 +124,13 @@ private:
     CommitStats _readOnlyCommitStats;
     CommitStats _twoPhaseCommitStats;
     CommitStats _recoverWithTokenCommitStats;
+
+    // Mutual exclusion for _abortCauseMap
+    stdx::mutex _abortCauseMutex;
+
+    // Map tracking the total number of each abort cause for any multi-statement transaction that
+    // was aborted through this router.
+    std::map<std::string, std::int64_t> _abortCauseMap;
 };
 
 }  // namespace mongo

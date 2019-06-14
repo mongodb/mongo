@@ -27,9 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -43,7 +45,6 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -112,9 +113,9 @@ private:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         _createOpCtx();
-        auto replCoord = stdx::make_unique<ReplicationCoordinatorMock>(getServiceContext());
+        auto replCoord = std::make_unique<ReplicationCoordinatorMock>(getServiceContext());
         ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
-        _storageInterface = stdx::make_unique<StorageInterfaceImpl>();
+        _storageInterface = std::make_unique<StorageInterfaceImpl>();
     }
 
     void tearDown() override {

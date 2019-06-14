@@ -33,6 +33,8 @@
 
 #include "mongo/s/catalog/replset_dist_lock_manager.h"
 
+#include <memory>
+
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/operation_context_noop.h"
@@ -43,7 +45,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/chrono.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point_service.h"
@@ -87,7 +88,7 @@ ReplSetDistLockManager::~ReplSetDistLockManager() = default;
 
 void ReplSetDistLockManager::startUp() {
     if (!_execThread) {
-        _execThread = stdx::make_unique<stdx::thread>(&ReplSetDistLockManager::doTask, this);
+        _execThread = std::make_unique<stdx::thread>(&ReplSetDistLockManager::doTask, this);
     }
 }
 

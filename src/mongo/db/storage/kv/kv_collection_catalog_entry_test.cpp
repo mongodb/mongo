@@ -35,6 +35,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
@@ -69,7 +70,7 @@ public:
     }
 
     std::unique_ptr<OperationContext> newOperationContext() {
-        auto opCtx = stdx::make_unique<OperationContextNoop>(&cc(), 0);
+        auto opCtx = std::make_unique<OperationContextNoop>(&cc(), 0);
         opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(_storageEngine.newRecoveryUnit()),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return opCtx;
@@ -100,8 +101,9 @@ public:
         auto opCtx = newOperationContext();
         std::string indexName = "idx" + std::to_string(numIndexesCreated);
 
+        auto collection = std::make_unique<CollectionMock>(_nss);
         IndexDescriptor desc(
-            nullptr,
+            collection.get(),
             indexType,
             BSON("v" << 1 << "key" << keyPattern << "name" << indexName << "ns" << _nss.ns()));
 

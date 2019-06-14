@@ -38,7 +38,6 @@
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/storage/journal_listener.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -65,14 +64,14 @@ std::unique_ptr<RecordStore> EphemeralForTestEngine::getRecordStore(
     OperationContext* opCtx, StringData ns, StringData ident, const CollectionOptions& options) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (options.capped) {
-        return stdx::make_unique<EphemeralForTestRecordStore>(
+        return std::make_unique<EphemeralForTestRecordStore>(
             ns,
             &_dataMap[ident],
             true,
             options.cappedSize ? options.cappedSize : kDefaultCappedSizeBytes,
             options.cappedMaxDocs ? options.cappedMaxDocs : -1);
     } else {
-        return stdx::make_unique<EphemeralForTestRecordStore>(ns, &_dataMap[ident]);
+        return std::make_unique<EphemeralForTestRecordStore>(ns, &_dataMap[ident]);
     }
 }
 
@@ -80,7 +79,7 @@ std::unique_ptr<RecordStore> EphemeralForTestEngine::makeTemporaryRecordStore(
     OperationContext* opCtx, StringData ident) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _dataMap[ident] = {};
-    return stdx::make_unique<EphemeralForTestRecordStore>(ident, &_dataMap[ident]);
+    return std::make_unique<EphemeralForTestRecordStore>(ident, &_dataMap[ident]);
 }
 
 Status EphemeralForTestEngine::createSortedDataInterface(OperationContext* opCtx,
@@ -93,9 +92,8 @@ Status EphemeralForTestEngine::createSortedDataInterface(OperationContext* opCtx
     return Status::OK();
 }
 
-SortedDataInterface* EphemeralForTestEngine::getSortedDataInterface(OperationContext* opCtx,
-                                                                    StringData ident,
-                                                                    const IndexDescriptor* desc) {
+std::unique_ptr<SortedDataInterface> EphemeralForTestEngine::getSortedDataInterface(
+    OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return getEphemeralForTestBtreeImpl(Ordering::make(desc->keyPattern()),
                                         desc->unique(),

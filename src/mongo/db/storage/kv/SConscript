@@ -73,6 +73,7 @@ env.Library(
         'kv_engine_timestamps_test.cpp',
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_impl',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/storage/storage_options',

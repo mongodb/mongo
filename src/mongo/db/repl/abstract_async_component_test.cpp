@@ -29,11 +29,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/base/status.h"
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/task_executor_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 
 #include "mongo/unittest/unittest.h"
@@ -462,7 +463,7 @@ TEST_F(AbstractAsyncComponentTest,
     ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, component.getState_forTest());
 
     // Create a child component to pass to _startupComponent_inlock().
-    auto childComponent = stdx::make_unique<MockAsyncComponent>(&getExecutor());
+    auto childComponent = std::make_unique<MockAsyncComponent>(&getExecutor());
     ASSERT_OK(component.startupComponent_forTest(childComponent));
     ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, childComponent->getState_forTest());
 }
@@ -479,7 +480,7 @@ TEST_F(AbstractAsyncComponentTest,
     // Create a child component to pass to _startupComponent_inlock().
     // _startupComponent_inlock() should return early because 'component' is shutting down and
     // reset the unique_ptr for the child component.
-    auto childComponent = stdx::make_unique<MockAsyncComponent>(&getExecutor());
+    auto childComponent = std::make_unique<MockAsyncComponent>(&getExecutor());
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, component.startupComponent_forTest(childComponent));
     ASSERT_FALSE(childComponent);
 }
@@ -492,7 +493,7 @@ TEST_F(AbstractAsyncComponentTest,
 
     // Create a child component to pass to _startupComponent_inlock(). Transition child component's
     // state to Complete so that calling startup() will fail.
-    auto childComponent = stdx::make_unique<MockAsyncComponent>(&getExecutor());
+    auto childComponent = std::make_unique<MockAsyncComponent>(&getExecutor());
     ASSERT_OK(childComponent->startup());
     childComponent->shutdown();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, childComponent->startup());
@@ -517,7 +518,7 @@ TEST_F(AbstractAsyncComponentTest,
     ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, component.getState_forTest());
 
     // Create a child component to pass to _startupComponent_inlock().
-    auto childComponent = stdx::make_unique<MockAsyncComponent>(&getExecutor());
+    auto childComponent = std::make_unique<MockAsyncComponent>(&getExecutor());
     ASSERT_OK(childComponent->startup());
     ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, childComponent->getState_forTest());
 

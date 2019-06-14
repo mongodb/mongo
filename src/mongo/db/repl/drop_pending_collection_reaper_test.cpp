@@ -43,7 +43,6 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/str.h"
 
@@ -75,9 +74,9 @@ protected:
 
 void DropPendingCollectionReaperTest::setUp() {
     ServiceContextMongoDTest::setUp();
-    _storageInterface = stdx::make_unique<StorageInterfaceImpl>();
+    _storageInterface = std::make_unique<StorageInterfaceImpl>();
     auto service = getServiceContext();
-    ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
+    ReplicationCoordinator::set(service, std::make_unique<ReplicationCoordinatorMock>(service));
 }
 
 void DropPendingCollectionReaperTest::tearDown() {

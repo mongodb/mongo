@@ -31,7 +31,8 @@
 
 #include "mongo/db/matcher/expression_where_noop.h"
 
-#include "mongo/stdx/memory.h"
+#include <memory>
+
 
 namespace mongo {
 
@@ -47,7 +48,7 @@ std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::shallowClone() const 
     params.code = getCode();
     params.scope = getScope();
     std::unique_ptr<WhereNoOpMatchExpression> e =
-        stdx::make_unique<WhereNoOpMatchExpression>(std::move(params));
+        std::make_unique<WhereNoOpMatchExpression>(std::move(params));
     if (getTag()) {
         e->setTag(getTag()->clone());
     }

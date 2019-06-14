@@ -94,7 +94,7 @@ protected:
                 ->setFindHostReturnValue(kRecipientConnStr.getServers()[0]);
         }
 
-        auto clockSource = stdx::make_unique<ClockSourceMock>();
+        auto clockSource = std::make_unique<ClockSourceMock>();
 
         // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
         // real second.
@@ -188,7 +188,7 @@ private:
             }
         };
 
-        return stdx::make_unique<StaticCatalogClient>();
+        return std::make_unique<StaticCatalogClient>();
     }
 
     boost::optional<DBDirectClient> _client;

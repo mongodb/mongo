@@ -182,7 +182,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
 
     // Generate an op object of all elements except for "ts", "t", and "o", since we
     // need to make those fields arrays of all the ts's, t's, and o's.
-    groupedInsertBuilder.appendElementsUnique(entry.raw);
+    groupedInsertBuilder.appendElementsUnique(entry.getRaw());
 
     auto groupedInsertObj = groupedInsertBuilder.done();
     try {
@@ -197,7 +197,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
         auto status = exceptionToStatus().withContext(
             str::stream() << "Error applying inserts in bulk: " << redact(groupedInsertObj)
                           << ". Trying first insert as a lone insert: "
-                          << redact(entry.raw));
+                          << redact(entry.getRaw()));
 
         // It's not an error during initial sync to encounter DuplicateKey errors.
         if (Mode::kInitialSync == _mode && ErrorCodes::DuplicateKey == status) {

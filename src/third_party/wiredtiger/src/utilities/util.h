@@ -38,6 +38,7 @@ int	 util_dump(WT_SESSION *, int, char *[]);
 int	 util_err(WT_SESSION *, int, const char *, ...)
 	    WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
 int	 util_flush(WT_SESSION *, const char *);
+int	 util_import(WT_SESSION *, int, char *[]);
 int	 util_list(WT_SESSION *, int, char *[]);
 int	 util_load(WT_SESSION *, int, char *[]);
 int	 util_loadtext(WT_SESSION *, int, char *[]);

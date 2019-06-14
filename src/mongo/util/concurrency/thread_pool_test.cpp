@@ -52,7 +52,7 @@ using namespace mongo;
 
 MONGO_INITIALIZER(ThreadPoolCommonTests)(InitializerContext*) {
     addTestsForThreadPool("ThreadPoolCommon",
-                          []() { return stdx::make_unique<ThreadPool>(ThreadPool::Options()); });
+                          []() { return std::make_unique<ThreadPool>(ThreadPool::Options()); });
     return Status::OK();
 }
 

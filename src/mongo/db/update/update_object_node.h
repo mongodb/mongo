@@ -30,6 +30,7 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -39,7 +40,6 @@
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/update_internal_node.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
@@ -82,7 +82,7 @@ public:
     UpdateObjectNode() : UpdateInternalNode(Type::Object) {}
 
     std::unique_ptr<UpdateNode> clone() const final {
-        return stdx::make_unique<UpdateObjectNode>(*this);
+        return std::make_unique<UpdateObjectNode>(*this);
     }
 
     void setCollator(const CollatorInterface* collator) final {

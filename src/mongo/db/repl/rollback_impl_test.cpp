@@ -258,40 +258,40 @@ protected:
     std::unique_ptr<RollbackImplForTest> _rollback;
 
     bool _transitionedToRollback = false;
-    stdx::function<void()> _onTransitionToRollbackFn = [this]() { _transitionedToRollback = true; };
+    std::function<void()> _onTransitionToRollbackFn = [this]() { _transitionedToRollback = true; };
 
     bool _recoveredToStableTimestamp = false;
     Timestamp _stableTimestamp;
-    stdx::function<void(Timestamp)> _onRecoverToStableTimestampFn =
+    std::function<void(Timestamp)> _onRecoverToStableTimestampFn =
         [this](Timestamp stableTimestamp) {
             _recoveredToStableTimestamp = true;
             _stableTimestamp = stableTimestamp;
         };
 
     bool _recoveredFromOplog = false;
-    stdx::function<void()> _onRecoverFromOplogFn = [this]() { _recoveredFromOplog = true; };
+    std::function<void()> _onRecoverFromOplogFn = [this]() { _recoveredFromOplog = true; };
 
     bool _incrementedRollbackID = false;
-    stdx::function<void()> _onRollbackIDIncrementedFn = [this]() { _incrementedRollbackID = true; };
+    std::function<void()> _onRollbackIDIncrementedFn = [this]() { _incrementedRollbackID = true; };
 
     bool _reconstructedPreparedTransactions = false;
-    stdx::function<void()> _onPreparedTransactionsReconstructedFn = [this]() {
+    std::function<void()> _onPreparedTransactionsReconstructedFn = [this]() {
         _reconstructedPreparedTransactions = true;
     };
 
     Timestamp _commonPointFound;
-    stdx::function<void(Timestamp commonPoint)> _onCommonPointFoundFn =
+    std::function<void(Timestamp commonPoint)> _onCommonPointFoundFn =
         [this](Timestamp commonPoint) { _commonPointFound = commonPoint; };
 
     Timestamp _truncatePoint;
-    stdx::function<void(Timestamp truncatePoint)> _onSetOplogTruncateAfterPointFn =
+    std::function<void(Timestamp truncatePoint)> _onSetOplogTruncateAfterPointFn =
         [this](Timestamp truncatePoint) { _truncatePoint = truncatePoint; };
 
     bool _triggeredOpObserver = false;
-    stdx::function<void(const OpObserver::RollbackObserverInfo& rbInfo)> _onRollbackOpObserverFn =
+    std::function<void(const OpObserver::RollbackObserverInfo& rbInfo)> _onRollbackOpObserverFn =
         [this](const OpObserver::RollbackObserverInfo& rbInfo) { _triggeredOpObserver = true; };
 
-    stdx::function<void(UUID, NamespaceString)> _onRollbackFileWrittenForNamespaceFn =
+    std::function<void(UUID, NamespaceString)> _onRollbackFileWrittenForNamespaceFn =
         [this](UUID, NamespaceString) {};
 
     std::unique_ptr<Listener> _listener;
@@ -305,15 +305,15 @@ private:
 void RollbackImplTest::setUp() {
     RollbackTest::setUp();
 
-    _localOplog = stdx::make_unique<OplogInterfaceLocal>(_opCtx.get());
-    _remoteOplog = stdx::make_unique<OplogInterfaceMock>();
-    _listener = stdx::make_unique<Listener>(this);
-    _rollback = stdx::make_unique<RollbackImplForTest>(_localOplog.get(),
-                                                       _remoteOplog.get(),
-                                                       _storageInterface,
-                                                       _replicationProcess.get(),
-                                                       _coordinator,
-                                                       _listener.get());
+    _localOplog = std::make_unique<OplogInterfaceLocal>(_opCtx.get());
+    _remoteOplog = std::make_unique<OplogInterfaceMock>();
+    _listener = std::make_unique<Listener>(this);
+    _rollback = std::make_unique<RollbackImplForTest>(_localOplog.get(),
+                                                      _remoteOplog.get(),
+                                                      _storageInterface,
+                                                      _replicationProcess.get(),
+                                                      _coordinator,
+                                                      _listener.get());
 
     createOplog(_opCtx.get());
     serverGlobalParams.clusterRole = ClusterRole::None;

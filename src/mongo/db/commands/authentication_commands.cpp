@@ -33,6 +33,7 @@
 
 #include "mongo/db/commands/authentication_commands.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -54,7 +55,6 @@
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
@@ -66,9 +66,7 @@ namespace mongo {
 namespace {
 
 static bool _isX509AuthDisabled;
-static const char _nonceAuthenticationDisabledMessage[] =
-    "Challenge-response authentication using getnonce and authenticate commands is disabled.";
-static const char _x509AuthenticationDisabledMessage[] = "x.509 authentication is disabled.";
+static constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is disabled."_sd;
 
 #ifdef MONGO_CONFIG_SSL
 Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BSONObj& cmdObj) {
@@ -126,7 +124,7 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
         // Handle normal client authentication, only applies to client-server connections
         else {
             if (_isX509AuthDisabled) {
-                return Status(ErrorCodes::BadValue, _x509AuthenticationDisabledMessage);
+                return Status(ErrorCodes::BadValue, kX509AuthenticationDisabledMessage);
             }
             Status status = authorizationSession->addAndAuthorizeUser(opCtx, user);
             if (!status.isOK()) {

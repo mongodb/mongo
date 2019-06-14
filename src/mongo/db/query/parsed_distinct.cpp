@@ -31,6 +31,8 @@
 
 #include "mongo/db/query/parsed_distinct.h"
 
+#include <memory>
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/query/canonical_query.h"
@@ -38,7 +40,6 @@
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -265,7 +266,7 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
         return exceptionToStatus();
     }
 
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
 
     if (parsedDistinct.getKey().find('\0') != std::string::npos) {
         return Status(ErrorCodes::Error(31032), "Key field cannot contain an embedded null byte");

@@ -33,6 +33,8 @@
 
 #include "mongo/db/repl/bgsync.h"
 
+#include <memory>
+
 #include "mongo/base/counter.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -57,7 +59,6 @@
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -269,7 +270,7 @@ void BackgroundSync::_produce() {
             log() << "Clearing sync source " << _syncSourceHost << " to choose a new one.";
         }
         _syncSourceHost = HostAndPort();
-        _syncSourceResolver = stdx::make_unique<SyncSourceResolver>(
+        _syncSourceResolver = std::make_unique<SyncSourceResolver>(
             _replicationCoordinatorExternalState->getTaskExecutor(),
             _replCoord,
             lastOpTimeFetched,
@@ -409,7 +410,7 @@ void BackgroundSync::_produce() {
         };
         // The construction of OplogFetcher has to be outside bgsync mutex, because it calls
         // replication coordinator.
-        auto oplogFetcherPtr = stdx::make_unique<OplogFetcher>(
+        auto oplogFetcherPtr = std::make_unique<OplogFetcher>(
             _replicationCoordinatorExternalState->getTaskExecutor(),
             lastOpTimeFetched,
             source,
@@ -631,7 +632,7 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
         }
     }
 
-    _rollback = stdx::make_unique<RollbackImpl>(
+    _rollback = std::make_unique<RollbackImpl>(
         localOplog, &remoteOplog, storageInterface, _replicationProcess, _replCoord);
 
     log() << "Scheduling rollback (sync source: " << source << ")";

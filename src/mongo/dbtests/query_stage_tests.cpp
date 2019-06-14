@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -43,7 +45,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/memory.h"
 
 /**
  * This file tests db/exec/index_scan.cpp
@@ -90,9 +91,9 @@ public:
         verify(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
-        unique_ptr<WorkingSet> ws = stdx::make_unique<WorkingSet>();
+        unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         unique_ptr<IndexScan> ix =
-            stdx::make_unique<IndexScan>(&_opCtx, params, ws.get(), filterExpr.get());
+            std::make_unique<IndexScan>(&_opCtx, params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
             &_opCtx, std::move(ws), std::move(ix), ctx.getCollection(), PlanExecutor::NO_YIELD);

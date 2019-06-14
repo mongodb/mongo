@@ -137,7 +137,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
         // empty AND as the same thing. The planner can create inferior plans for $alwaysTrue which
         // it would not produce for an AND with no children.
         if (children.empty() && matchType == MatchExpression::OR) {
-            return stdx::make_unique<AlwaysFalseMatchExpression>();
+            return std::make_unique<AlwaysFalseMatchExpression>();
         }
 
         if (children.size() == 1) {
@@ -149,7 +149,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                 return std::unique_ptr<MatchExpression>(simplifiedExpression);
             } else if (matchType == NOR) {
                 // Simplify NOR of exactly one operand to NOT of that operand.
-                auto simplifiedExpression = stdx::make_unique<NotMatchExpression>(children.front());
+                auto simplifiedExpression = std::make_unique<NotMatchExpression>(children.front());
                 children.clear();
                 return std::move(simplifiedExpression);
             }
@@ -160,13 +160,13 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                 // An AND containing an expression that always evaluates to false can be
                 // optimized to a single $alwaysFalse expression.
                 if (childExpression->isTriviallyFalse() && matchType == MatchExpression::AND) {
-                    return stdx::make_unique<AlwaysFalseMatchExpression>();
+                    return std::make_unique<AlwaysFalseMatchExpression>();
                 }
 
                 // Likewise, an OR containing an expression that always evaluates to true can be
                 // optimized to a single $alwaysTrue expression.
                 if (childExpression->isTriviallyTrue() && matchType == MatchExpression::OR) {
-                    return stdx::make_unique<AlwaysTrueMatchExpression>();
+                    return std::make_unique<AlwaysTrueMatchExpression>();
                 }
             }
         }

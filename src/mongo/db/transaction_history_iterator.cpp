@@ -29,12 +29,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_request.h"
+#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/logger/redaction.h"
@@ -75,14 +77,20 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
                             << causedBy(statusWithCQ.getStatus()));
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    AutoGetCollectionForReadCommand ctx(opCtx,
-                                        NamespaceString::kRsOplogNamespace,
-                                        AutoGetCollection::ViewMode::kViewsForbidden,
-                                        Date_t::max(),
-                                        AutoStatsTracker::LogMode::kUpdateTop);
+    ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
+    Lock::GlobalLock globalLock(opCtx, MODE_IS);
+    const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, "local");
+    invariant(localDb);
+    AutoStatsTracker statsTracker(opCtx,
+                                  NamespaceString::kRsOplogNamespace,
+                                  Top::LockType::ReadLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTop,
+                                  localDb->getProfilingLevel(),
+                                  Date_t::max());
+    auto oplog = repl::LocalOplogInfo::get(opCtx)->getCollection();
+    invariant(oplog);
 
-    auto exec =
-        uassertStatusOK(getExecutorFind(opCtx, ctx.getCollection(), std::move(cq), permitYield));
+    auto exec = uassertStatusOK(getExecutorFind(opCtx, oplog, std::move(cq), permitYield));
 
     auto getNextResult = exec->getNext(&oplogBSON, nullptr);
     uassert(ErrorCodes::IncompleteTransactionHistory,
@@ -123,6 +131,12 @@ repl::OplogEntry TransactionHistoryIterator::next(OperationContext* opCtx) {
     _nextOpTime = oplogPrevTsOption.value();
 
     return oplogEntry;
+}
+
+repl::OplogEntry TransactionHistoryIterator::nextFatalOnErrors(OperationContext* opCtx) try {
+    return next(opCtx);
+} catch (const DBException& ex) {
+    fassertFailedWithStatus(31145, ex.toStatus());
 }
 
 repl::OpTime TransactionHistoryIterator::nextOpTime(OperationContext* opCtx) {

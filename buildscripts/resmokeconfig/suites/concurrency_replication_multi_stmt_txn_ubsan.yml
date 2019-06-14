@@ -26,6 +26,9 @@ selector:
   # Performs direct writes to system.views
   - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
 
+  # Expects DocumentValidationFailure which causes transaction to abort and retry indefinitely.
+  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
+
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - requires_sharding

@@ -302,8 +302,7 @@ inline std::string toLower(StringData input) {
 
     for (std::string::size_type i = 0; i < sz; i++) {
         char c = input[i];
-        // See https://en.cppreference.com/w/cpp/string/byte/tolower
-        copy[i] = static_cast<char>(::tolower(static_cast<unsigned char>(c)));
+        copy[i] = (char)tolower((int)c);
     }
     copy[sz] = 0;
     return copy;
@@ -344,5 +343,11 @@ std::string escape(StringData s, bool escape_slash = false);
  * numerals, not even a +/- prefix or leading/trailing whitespace.
  */
 boost::optional<size_t> parseUnsignedBase10Integer(StringData integer);
+
+/**
+ * Converts a double to a string with specified precision. If unspecified, default to 17, which is
+ * the maximum decimal precision possible from a standard double.
+ */
+std::string convertDoubleToString(double d, int prec = 17);
 
 }  // namespace mongo::str

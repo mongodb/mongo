@@ -52,16 +52,16 @@ class ReplicaSetTest : public mongo::unittest::Test {
 protected:
     void setUp() {
         auto opCtx = makeOpCtx();
-        _storageInterface = stdx::make_unique<repl::StorageInterfaceMock>();
+        _storageInterface = std::make_unique<repl::StorageInterfaceMock>();
         _dropPendingCollectionReaper =
-            stdx::make_unique<repl::DropPendingCollectionReaper>(_storageInterface.get());
+            std::make_unique<repl::DropPendingCollectionReaper>(_storageInterface.get());
         auto consistencyMarkers =
-            stdx::make_unique<repl::ReplicationConsistencyMarkersImpl>(_storageInterface.get());
-        auto recovery = stdx::make_unique<repl::ReplicationRecoveryImpl>(_storageInterface.get(),
-                                                                         consistencyMarkers.get());
-        _replicationProcess = stdx::make_unique<repl::ReplicationProcess>(
+            std::make_unique<repl::ReplicationConsistencyMarkersImpl>(_storageInterface.get());
+        auto recovery = std::make_unique<repl::ReplicationRecoveryImpl>(_storageInterface.get(),
+                                                                        consistencyMarkers.get());
+        _replicationProcess = std::make_unique<repl::ReplicationProcess>(
             _storageInterface.get(), std::move(consistencyMarkers), std::move(recovery));
-        _replCoordExternalState = stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
+        _replCoordExternalState = std::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
             opCtx->getServiceContext(),
             _dropPendingCollectionReaper.get(),
             _storageInterface.get(),

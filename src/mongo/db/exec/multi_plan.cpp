@@ -35,6 +35,7 @@
 
 #include <algorithm>
 #include <math.h>
+#include <memory>
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/catalog/collection.h"
@@ -46,7 +47,6 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
@@ -56,7 +56,6 @@ using std::endl;
 using std::list;
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 // static
 const char* MultiPlanStage::kStageType = "MULTI_PLAN";
@@ -421,8 +420,9 @@ QuerySolution* MultiPlanStage::bestSolution() {
 
 unique_ptr<PlanStageStats> MultiPlanStage::getStats() {
     _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_PLAN);
-    ret->specific = make_unique<MultiPlanStats>(_specificStats);
+    unique_ptr<PlanStageStats> ret =
+        std::make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_PLAN);
+    ret->specific = std::make_unique<MultiPlanStats>(_specificStats);
     for (auto&& child : _children) {
         ret->children.emplace_back(child->getStats());
     }

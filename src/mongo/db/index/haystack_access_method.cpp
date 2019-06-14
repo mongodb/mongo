@@ -53,8 +53,8 @@ using std::unique_ptr;
 namespace dps = ::mongo::dotted_path_support;
 
 HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState,
-                                           SortedDataInterface* btree)
-    : AbstractIndexAccessMethod(btreeState, btree) {
+                                           std::unique_ptr<SortedDataInterface> btree)
+    : AbstractIndexAccessMethod(btreeState, std::move(btree)) {
     const IndexDescriptor* descriptor = btreeState->descriptor();
 
     ExpressionParams::parseHaystackParams(

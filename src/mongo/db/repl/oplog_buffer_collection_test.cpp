@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -43,7 +45,6 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/sync_tail_test_fixture.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -74,9 +75,9 @@ void OplogBufferCollectionTest::setUp() {
 
     // AutoGetCollectionForReadCommand requires a valid replication coordinator in order to check
     // the shard version.
-    ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
+    ReplicationCoordinator::set(service, std::make_unique<ReplicationCoordinatorMock>(service));
 
-    auto storageInterface = stdx::make_unique<StorageInterfaceImpl>();
+    auto storageInterface = std::make_unique<StorageInterfaceImpl>();
     _storageInterface = storageInterface.get();
     StorageInterface::set(service, std::move(storageInterface));
 
@@ -919,13 +920,12 @@ TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndTimesOutWhenItDoesNotFindD
     ASSERT_EQUALS(count, 0UL);
 }
 
-void _testPushSentinelsProperly(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    StorageInterface* storageInterface,
-    stdx::function<void(OperationContext* opCtx,
-                        OplogBufferCollection* oplogBuffer,
-                        const std::vector<BSONObj>& oplog)> pushDocsFn) {
+void _testPushSentinelsProperly(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                StorageInterface* storageInterface,
+                                std::function<void(OperationContext* opCtx,
+                                                   OplogBufferCollection* oplogBuffer,
+                                                   const std::vector<BSONObj>& oplog)> pushDocsFn) {
     OplogBufferCollection oplogBuffer(storageInterface, nss);
     oplogBuffer.startup(opCtx);
     const std::vector<BSONObj> oplog = {

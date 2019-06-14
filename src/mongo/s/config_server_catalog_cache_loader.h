@@ -56,7 +56,7 @@ public:
 
     void getDatabase(
         StringData dbName,
-        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) override;
+        std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) override;
 
 private:
     // Thread pool to be used to perform metadata load

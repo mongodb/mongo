@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -40,7 +41,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 class Collection;
@@ -162,7 +162,7 @@ void acquireOplogCollectionForLogging(OperationContext* opCtx);
  */
 void establishOplogCollectionForLogging(OperationContext* opCtx, Collection* oplog);
 
-using IncrementOpsAppliedStatsFn = stdx::function<void()>;
+using IncrementOpsAppliedStatsFn = std::function<void()>;
 
 /**
  * This class represents the different modes of oplog application that are used within the

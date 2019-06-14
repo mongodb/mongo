@@ -88,7 +88,7 @@ public:
 
         auto localServiceLiaison =
             std::make_unique<MockServiceLiaison>(std::make_shared<MockServiceLiaisonImpl>());
-        auto localSessionsCollection = stdx::make_unique<MockSessionsCollection>(
+        auto localSessionsCollection = std::make_unique<MockSessionsCollection>(
             std::make_shared<MockSessionsCollectionImpl>());
 
         auto localLogicalSessionCache = std::make_unique<LogicalSessionCacheImpl>(

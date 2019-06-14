@@ -33,6 +33,8 @@
 
 #include "mongo/db/catalog/collection_info_cache_impl.h"
 
+#include <memory>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -45,7 +47,6 @@
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/ttl_collection_cache.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/log.h"
 
@@ -55,8 +56,8 @@ CollectionInfoCacheImpl::CollectionInfoCacheImpl(Collection* collection, const N
     : _collection(collection),
       _ns(ns),
       _keysComputed(false),
-      _planCache(stdx::make_unique<PlanCache>(ns.ns())),
-      _querySettings(stdx::make_unique<QuerySettings>()),
+      _planCache(std::make_unique<PlanCache>(ns.ns())),
+      _querySettings(std::make_unique<QuerySettings>()),
       _indexUsageTracker(getGlobalServiceContext()->getPreciseClockSource()) {}
 
 CollectionInfoCacheImpl::~CollectionInfoCacheImpl() {

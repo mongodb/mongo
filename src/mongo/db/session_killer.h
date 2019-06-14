@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <functional>
 #include <memory>
 #include <random>
 #include <vector>
@@ -37,7 +38,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/kill_sessions.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
@@ -91,7 +91,7 @@ public:
      * A process specific kill function (we have a different impl in mongos versus mongod).
      */
     using KillFunc =
-        stdx::function<Result(OperationContext*, const Matcher&, UniformRandomBitGenerator* urbg)>;
+        std::function<Result(OperationContext*, const Matcher&, UniformRandomBitGenerator* urbg)>;
 
     /**
      * The killer lives as a decoration on the service context.

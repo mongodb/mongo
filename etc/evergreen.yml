@@ -1208,7 +1208,6 @@ functions:
 
   "set up virtualenv": &set_up_virtualenv
     command: shell.exec
-    type: test
     params:
         shell: bash
         script: |
@@ -2075,13 +2074,43 @@ functions:
         ${activate_virtualenv}
 
         rm -rf /data/install /data/multiversion
+
+        edition="${multiversion_edition|base}"
+        platform="${multiversion_platform|linux}"
+        architecture="${multiversion_architecture|x86_64}"
+
         $python buildscripts/setup_multiversion_mongodb.py   \
           --installDir /data/install                         \
           --linkDir /data/multiversion                       \
-          --edition ${multiversion_edition|base}             \
-          --platform ${multiversion_platform|linux}          \
-          --architecture ${multiversion_architecture|x86_64} \
-          --useLatest 3.2 3.4 3.6 4.0 4.0.1 4.0.5
+          --edition $edition                                 \
+          --platform $platform                               \
+          --architecture $architecture                       \
+          --useLatest 3.2 3.4 3.6 4.0
+
+        # The platform and architecture for how some of the binaries are reported in
+        # https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
+        # Certain build variants define additional multiversion_*_42_or_later expansions in order to
+        # be able to fetch a complete set of versions.
+
+        if [ ! -z "${multiversion_edition_42_or_later}" ]; then
+          edition="${multiversion_edition_42_or_later}"
+        fi
+
+        if [ ! -z "${multiversion_platform_42_or_later}" ]; then
+          platform="${multiversion_platform_42_or_later}"
+        fi
+
+        if [ ! -z "${multiversion_architecture_42_or_later}" ]; then
+          architecture="${multiversion_architecture_42_or_later}"
+        fi
+
+        $python buildscripts/setup_multiversion_mongodb.py   \
+          --installDir /data/install                         \
+          --linkDir /data/multiversion                       \
+          --edition $edition                                 \
+          --platform $platform                               \
+          --architecture $architecture                       \
+          --useLatest 4.2
 
   "do snmp setup":
     command: shell.exec
@@ -5109,6 +5138,20 @@ tasks:
       resmoke_args: --suites=generational_fuzzer
       name: aggregation_wildcard_fuzzer
 
+## jstestfuzz standalone fuzzer for checking find and aggregate equivalence ##
+- <<: *jstestfuzz_template
+  name: query_fuzzer_gen
+  tags: ["query_fuzzer"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 5
+      num_tasks: 10
+      npm_command: query-fuzzer
+      resmoke_args: --suites=generational_fuzzer
+      name: query_fuzzer
+
 ## jstestfuzz standalone update generational fuzzer ##
 - <<: *jstestfuzz_template
   name: update_fuzzer_gen
@@ -5370,19 +5413,20 @@ tasks:
       resmoke_args: --suites=jstestfuzz_replication_continuous_stepdown --flowControlTicketOverride=1 --storageEngine=wiredTiger
       name: jstestfuzz_replication_continuous_stepdown_flow_control
 
+# TODO(SERVER-41608) Re-enable once root cause of failures has been addressed.
 ## jstestfuzz concurrent replication continuous stepdown with flow control engaged ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control_gen
-  tags: ["jstestfuzz", "common", "repl", "flow_control"]
-  commands:
-  - func: "generate fuzzer tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 15
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      resmoke_args: --suites=jstestfuzz_replication_continuous_stepdown --flowControlTicketOverride=10 --storageEngine=wiredTiger --numClientsPerFixture=10
-      name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control
+#- <<: *jstestfuzz_template
+#  name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control_gen
+#  tags: ["jstestfuzz", "common", "repl", "flow_control"]
+#  commands:
+#  - func: "generate fuzzer tasks"
+#    vars:
+#      <<: *jstestfuzz_config_vars
+#      num_files: ${jstestfuzz_concurrent_num_files|10}
+#      num_tasks: 15
+#      jstestfuzz_vars: --jsTestsDir ../jstests
+#      resmoke_args: --suites=jstestfuzz_replication_continuous_stepdown --flowControlTicketOverride=10 --storageEngine=wiredTiger --numClientsPerFixture=10
+#      name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control
 
 ## jstestfuzz replica set ##
 - <<: *jstestfuzz_template
@@ -6053,13 +6097,13 @@ tasks:
       resmoke_args: --suites=core_txns --storageEngine=wiredTiger
 
 - <<: *task_template
-  name: jsCore_txns_multi_oplog_entries
+  name: jsCore_txns_large_txns_format
   tags: ["jscore", "txns"]
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core_txns_multi_oplog_entries --storageEngine=wiredTiger
+      resmoke_args: --suites=core_txns_large_txns_format --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharded_jscore_txns
@@ -6146,7 +6190,7 @@ tasks:
       fallback_num_sub_suites: 1
 
 - <<: *task_template
-  name: replica_sets_multi_oplog_txns_jscore_passthrough
+  name: replica_sets_large_txns_format_jscore_passthrough
   tags: ["replica_sets", "multi_oplog", "large", "non_maj_read", "san"]
   depends_on:
   - name: jsCore
@@ -6154,7 +6198,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=replica_sets_multi_oplog_txns_jscore_passthrough --storageEngine=wiredTiger
+      resmoke_args: --suites=replica_sets_large_txns_format_jscore_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_jscore_passthrough
@@ -6774,7 +6818,7 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
 
-- name: replica_sets_multi_oplog_txns_gen
+- name: replica_sets_large_txns_format_gen
   tags: ["replica_sets", "multi_oplog", "san"]
   commands:
   - func: "generate resmoke tasks"
@@ -8179,7 +8223,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: .integration !.audit
   - name: .jscore .common
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache
   - name: .multi_shard
@@ -8219,6 +8263,8 @@ buildvariants:
     push_name: linux-duroff
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
+    multiversion_platform: rhel62
+    multiversion_edition: targeted
     # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
     # does not include replica set tests. Since transactions are only supported on replica sets, we
     # exclude those tests as well.
@@ -8463,6 +8509,7 @@ buildvariants:
     build_mongoreplay: true
     multiversion_platform: ubuntu1604
     multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
     multiversion_edition: enterprise
   display_tasks:
   - *dbtest
@@ -8514,6 +8561,7 @@ buildvariants:
     build_mongoreplay: true
     multiversion_platform: ubuntu1804
     multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
     multiversion_edition: enterprise
   display_tasks:
   - *dbtest
@@ -8563,6 +8611,7 @@ buildvariants:
     build_mongoreplay: true
     multiversion_platform: ubuntu1804
     multiversion_architecture: arm64
+    multiversion_architecture_42_or_later: aarch64
     multiversion_edition: targeted
   display_tasks:
   - *dbtest
@@ -8805,6 +8854,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
     compile_flags: --ssl MONGO_DISTMOD=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: amzn64
+    multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -8918,6 +8969,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -9124,7 +9177,7 @@ buildvariants:
     distros:
     - windows-64-vs2017-compile
   - name: .jscore .common !.auth !.sharding
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache .one_sec
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
@@ -9187,7 +9240,7 @@ buildvariants:
   - name: .jscore .common !.compat !.sharding
   - name: jsCore_auth
   - name: jsCore_ese
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
@@ -9338,6 +9391,7 @@ buildvariants:
     push_name: win32
     push_arch: x86_64-2012plus
     multiversion_platform: windows_x86_64-2008plus-ssl
+    multiversion_platform_42_or_later: windows_x86_64-2012plus
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=2012plus -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
@@ -9376,6 +9430,7 @@ buildvariants:
   - name: multiversion
   - name: multiversion_auth
   - name: .powercycle
+  - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets
   - name: replica_sets_jscore_passthrough
@@ -9460,6 +9515,7 @@ buildvariants:
   - name: .jstestfuzz .common
   - name: .jstestfuzz .session
   - name: .logical_session_cache .one_sec
+  - name: .query_fuzzer
   - name: .read_write_concern !.linearize
   - name: replica_sets
   - name: replica_sets_kill_secondaries_jscore_passthrough
@@ -9496,10 +9552,10 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: .jscore .common !.auth !.sharding
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: mongosTest
   - name: replica_sets
-  - name: replica_sets_multi_oplog_txns_gen
+  - name: replica_sets_large_txns_format_gen
   - name: .ssl
   - name: .stitch
   - name: tool
@@ -10084,13 +10140,14 @@ buildvariants:
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .jstestfuzz
   - name: .logical_session_cache
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion
+  - name: .query_fuzzer
   - name: .read_write_concern .large
     distros:
     - rhel62-large
@@ -10124,8 +10181,8 @@ buildvariants:
     - ubuntu1604-packer
   - name: .publish
 
-- name: enterprise-rhel-62-64-bit-multi-txn-oplog-entries
-  display_name: "Enterprise RHEL 6.2 (Multiple oplog entries transaction format)"
+- name: enterprise-rhel-62-64-bit-large-txns-format
+  display_name: "Enterprise RHEL 6.2 (large transactions format)"
   modules:
   - enterprise
   run_on:
@@ -10361,7 +10418,7 @@ buildvariants:
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .jstestfuzz !.flow_control
   - name: .logical_session_cache
@@ -10430,12 +10487,13 @@ buildvariants:
     - name: initial_sync_fuzzer_gen
     - name: .integration !.audit
     - name: .jscore .common
-    - name: jsCore_txns_multi_oplog_entries
+    - name: jsCore_txns_large_txns_format
     - name: jsCore_minimum_batch_size
     - name: jsCore_op_query
     - name: .logical_session_cache .one_sec
     - name: .multi_shard .common
     - name: multiversion
+    - name: .query_fuzzer
     - name: .read_write_concern
     - name: .replica_sets
     - name: .read_only
@@ -10466,6 +10524,8 @@ buildvariants:
     push_arch: x86_64-enterprise-rhel70
     mh_target: dist-mh
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: rhel70
+    multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -10493,7 +10553,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: .jscore .common !.compat !.decimal !.sharding
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
@@ -10563,7 +10623,7 @@ buildvariants:
   - name: jsCore
   - name: .read_write_concern !.write !.aggregation
   - name: replica_sets_jscore_passthrough
-  - name: replica_sets_multi_oplog_txns_jscore_passthrough
+  - name: replica_sets_large_txns_format_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharding_gen
   - name: sharding_auth_gen
@@ -10954,6 +11014,8 @@ buildvariants:
     lang_environment: LANG=C
     push_arch: x86_64-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu1604
+    multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -11051,6 +11113,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: suse12
+    multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -11343,6 +11407,8 @@ buildvariants:
     push_arch: x86_64-enterprise-debian92
     mh_target: dist-mh
     compile_flags: --ssl MONGO_DISTMOD=debian92 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: debian92
+    multiversion_edition: enterprise
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -11500,7 +11566,7 @@ buildvariants:
     - rhel62-large
   - name: .jscore .common !.decimal
   - name: jsCore_op_query
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz !.initsync
   - name: .logical_session_cache
   - name: .multi_shard .common
@@ -11705,6 +11771,8 @@ buildvariants:
     # Speculative majority reads are currently only allowed for change streams, which are only supported on WiredTiger.
     test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_wiredtiger,uses_transactions,requires_document_locking,uses_speculative_majority,requires_snapshot_read,requires_majority_read_concern
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: rhel62
+    multiversion_edition: targeted
     scons_cache_scope: shared
     tooltags: ""
     build_mongoreplay: true
@@ -11887,14 +11955,15 @@ buildvariants:
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache
   - name: .multi_shard .common
   - name: multiversion
+  - name: .query_fuzzer
   - name: .read_write_concern
-  - name: replica_sets_multi_oplog_txns_gen
-  - name: replica_sets_multi_oplog_txns_jscore_passthrough
+  - name: replica_sets_large_txns_format_gen
+  - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog
   - name: .retry
   - name: .read_only
@@ -11921,6 +11990,8 @@ buildvariants:
     lang_environment: LANG=C
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+    multiversion_platform: ubuntu1804
+    multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     tooltags: "ssl"
     build_mongoreplay: true
@@ -11976,14 +12047,14 @@ buildvariants:
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: jsonSchema
   - name: .logical_session_cache .one_sec
   - name: .multi_shard .common
   - name: multiversion
   - name: .read_write_concern
-  - name: replica_sets_multi_oplog_txns_gen
-  - name: replica_sets_multi_oplog_txns_jscore_passthrough
+  - name: replica_sets_large_txns_format_gen
+  - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog
   - name: .retry
   - name: .rollbackfuzzer
@@ -12023,7 +12094,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: jsCore
   - name: jsCore_txns
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: .logical_session_cache .one_sec
   - name: watchdog_wiredtiger
 
@@ -12041,6 +12112,8 @@ buildvariants:
     lang_environment: LANG=C
     san_options: UBSAN_OPTIONS="print_stacktrace=1" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+    multiversion_platform: ubuntu1804
+    multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     tooltags: "ssl"
     build_mongoreplay: false
@@ -12068,7 +12141,7 @@ buildvariants:
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
-  - name: jsCore_txns_multi_oplog_entries
+  - name: jsCore_txns_large_txns_format
   - name: .logical_session_cache .one_sec
   - name: multiversion
   - name: .read_write_concern

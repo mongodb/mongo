@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <list>
 #include <memory>
 #include <queue>
 #include <utility>
@@ -37,7 +38,6 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
@@ -76,7 +76,7 @@ class NetworkConnectionHook;
 class NetworkInterfaceMock : public NetworkInterface {
 public:
     class NetworkOperation;
-    using NetworkOperationList = stdx::list<NetworkOperation>;
+    using NetworkOperationList = std::list<NetworkOperation>;
     using NetworkOperationIterator = NetworkOperationList::iterator;
 
     NetworkInterfaceMock();

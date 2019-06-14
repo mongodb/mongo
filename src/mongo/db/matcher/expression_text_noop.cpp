@@ -31,7 +31,8 @@
 
 #include "mongo/db/matcher/expression_text_noop.h"
 
-#include "mongo/stdx/memory.h"
+#include <memory>
+
 
 namespace mongo {
 
@@ -51,7 +52,7 @@ std::unique_ptr<MatchExpression> TextNoOpMatchExpression::shallowClone() const {
     params.caseSensitive = _ftsQuery.getCaseSensitive();
     params.diacriticSensitive = _ftsQuery.getDiacriticSensitive();
 
-    auto expr = stdx::make_unique<TextNoOpMatchExpression>(std::move(params));
+    auto expr = std::make_unique<TextNoOpMatchExpression>(std::move(params));
     if (getTag()) {
         expr->setTag(getTag()->clone());
     }

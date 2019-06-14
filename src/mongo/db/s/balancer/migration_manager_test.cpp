@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/balancer/migration_manager.h"
@@ -42,7 +44,6 @@
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/request_types/move_chunk_request.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -160,7 +161,7 @@ private:
 
 void MigrationManagerTest::setUp() {
     ConfigServerTestFixture::setUp();
-    _migrationManager = stdx::make_unique<MigrationManager>(getServiceContext());
+    _migrationManager = std::make_unique<MigrationManager>(getServiceContext());
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
     _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);
 }

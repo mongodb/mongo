@@ -35,6 +35,9 @@
 #include "mongo/db/service_context.h"
 
 namespace mongo {
+
+TransactionCoordinatorsSSS transactionCoordinatorsSSS;
+
 namespace {
 const auto ServerTransactionCoordinatorsMetricsDecoration =
     ServiceContext::declareDecoration<ServerTransactionCoordinatorsMetrics>();
@@ -112,6 +115,26 @@ void ServerTransactionCoordinatorsMetrics::incrementCurrentDeletingCoordinatorDo
 }
 void ServerTransactionCoordinatorsMetrics::decrementCurrentDeletingCoordinatorDoc() {
     _totalDeletingCoordinatorDoc.fetchAndSubtract(1);
+}
+
+void ServerTransactionCoordinatorsMetrics::updateStats(TransactionCoordinatorsStats* stats) {
+    stats->setTotalCreated(_totalCreated.load());
+    stats->setTotalStartedTwoPhaseCommit(_totalStartedTwoPhaseCommit.load());
+
+    CurrentInSteps currentInSteps;
+    currentInSteps.setWritingParticipantList(_totalWritingParticipantList.load());
+    currentInSteps.setWaitingForVotes(_totalWaitingForVotes.load());
+    currentInSteps.setWritingDecision(_totalWritingDecision.load());
+    currentInSteps.setWaitingForDecisionAcks(_totalWaitingForDecisionAcks.load());
+    currentInSteps.setDeletingCoordinatorDoc(_totalDeletingCoordinatorDoc.load());
+    stats->setCurrentInSteps(currentInSteps);
+}
+
+BSONObj TransactionCoordinatorsSSS::generateSection(OperationContext* opCtx,
+                                                    const BSONElement& configElement) const {
+    TransactionCoordinatorsStats stats;
+    ServerTransactionCoordinatorsMetrics::get(opCtx)->updateStats(&stats);
+    return stats.toBSON();
 }
 
 }  // namespace mongo

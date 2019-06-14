@@ -29,9 +29,10 @@
 
 #pragma once
 
+#include <functional>
+
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/session_killer.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 

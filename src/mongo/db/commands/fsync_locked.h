@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/stdx/functional.h"
+#include <functional>
 
 namespace mongo {
 /**
@@ -41,6 +41,6 @@ bool lockedForWriting();
 * Sets the implementation for lockedForWriting(). Should be done once during startup in a
 * MONGO_INITIALIZER.
 */
-void setLockedForWritingImpl(stdx::function<bool()> impl);
+void setLockedForWritingImpl(std::function<bool()> impl);
 
 }  // namespace mongo

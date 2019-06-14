@@ -45,7 +45,6 @@
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -117,7 +116,7 @@ std::unique_ptr<ReadPreferenceSetting> _extractReadPref(const BSONObj& query, in
         // The readPreference is embedded in the $queryOptions field.
         readPrefContainingObj = elem.Obj();
     }
-    return stdx::make_unique<ReadPreferenceSetting>(uassertStatusOK(
+    return std::make_unique<ReadPreferenceSetting>(uassertStatusOK(
         ReadPreferenceSetting::fromContainingBSON(readPrefContainingObj, defaultReadPref)));
 }
 

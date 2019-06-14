@@ -54,7 +54,7 @@ public:
     CopyableMatchExpression(BSONObj matchAST,
                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             std::unique_ptr<const ExtensionsCallback> extensionsCallback =
-                                stdx::make_unique<ExtensionsCallbackNoop>(),
+                                std::make_unique<ExtensionsCallbackNoop>(),
                             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
                                 MatchExpressionParser::kDefaultSpecialFeatures)
         : _matchAST(matchAST), _extensionsCallback(std::move(extensionsCallback)) {

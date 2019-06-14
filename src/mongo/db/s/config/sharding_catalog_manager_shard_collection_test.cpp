@@ -173,7 +173,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_ForMapReduce_NoInitialSpli
     shard.setHost(shardHost.toString());
 
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        stdx::make_unique<RemoteCommandTargeterMock>());
+        std::make_unique<RemoteCommandTargeterMock>());
     targeter->setConnectionStringReturnValue(ConnectionString(shardHost));
     targeter->setFindHostReturnValue(shardHost);
     targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
@@ -231,11 +231,11 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_ForMapReduce_WithInitialSp
     shard2.setHost(shard2Host.toString());
 
     std::unique_ptr<RemoteCommandTargeterMock> targeter0(
-        stdx::make_unique<RemoteCommandTargeterMock>());
+        std::make_unique<RemoteCommandTargeterMock>());
     std::unique_ptr<RemoteCommandTargeterMock> targeter1(
-        stdx::make_unique<RemoteCommandTargeterMock>());
+        std::make_unique<RemoteCommandTargeterMock>());
     std::unique_ptr<RemoteCommandTargeterMock> targeter2(
-        stdx::make_unique<RemoteCommandTargeterMock>());
+        std::make_unique<RemoteCommandTargeterMock>());
     targeter0->setConnectionStringReturnValue(ConnectionString(shard0Host));
     targeter0->setFindHostReturnValue(shard0Host);
     targeterFactory()->addTargeterToReturn(ConnectionString(shard0Host), std::move(targeter0));
@@ -308,7 +308,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_NoInitialSplitPoints_NoSpl
     shard.setHost(shardHost.toString());
 
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        stdx::make_unique<RemoteCommandTargeterMock>());
+        std::make_unique<RemoteCommandTargeterMock>());
     targeter->setConnectionStringReturnValue(ConnectionString(shardHost));
     targeter->setFindHostReturnValue(shardHost);
     targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
@@ -358,7 +358,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_NoInitialSplitPoints_WithS
     shard.setHost(shardHost.toString());
 
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        stdx::make_unique<RemoteCommandTargeterMock>());
+        std::make_unique<RemoteCommandTargeterMock>());
     targeter->setConnectionStringReturnValue(ConnectionString(shardHost));
     targeter->setFindHostReturnValue(shardHost);
     targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
@@ -430,7 +430,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_WithInitialSplitPoints_NoS
     shard.setHost(shardHost.toString());
 
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        stdx::make_unique<RemoteCommandTargeterMock>());
+        std::make_unique<RemoteCommandTargeterMock>());
     targeter->setConnectionStringReturnValue(ConnectionString(shardHost));
     targeter->setFindHostReturnValue(shardHost);
     targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
@@ -538,7 +538,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_Man
     const auto connStr = assertGet(ConnectionString::parse(kShards[1].getHost()));
 
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        stdx::make_unique<RemoteCommandTargeterMock>());
+        std::make_unique<RemoteCommandTargeterMock>());
     targeter->setConnectionStringReturnValue(connStr);
     targeter->setFindHostReturnValue(connStr.getServers()[0]);
     targeterFactory()->addTargeterToReturn(connStr, std::move(targeter));
@@ -576,7 +576,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromClient_ManyChun
     const auto connStr = assertGet(ConnectionString::parse(kShards[1].getHost()));
 
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        stdx::make_unique<RemoteCommandTargeterMock>());
+        std::make_unique<RemoteCommandTargeterMock>());
     targeter->setConnectionStringReturnValue(connStr);
     targeter->setFindHostReturnValue(connStr.getServers()[0]);
     targeterFactory()->addTargeterToReturn(connStr, std::move(targeter));
@@ -652,7 +652,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_SplitPoints_FromClient_ManyChunksD
     const auto connStr = assertGet(ConnectionString::parse(kShards[1].getHost()));
 
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        stdx::make_unique<RemoteCommandTargeterMock>());
+        std::make_unique<RemoteCommandTargeterMock>());
     targeter->setConnectionStringReturnValue(connStr);
     targeter->setFindHostReturnValue(connStr.getServers()[0]);
     targeterFactory()->addTargeterToReturn(connStr, std::move(targeter));
@@ -697,7 +697,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_NoSplitPoints_OneChunkToPrimary) {
     const auto connStr = assertGet(ConnectionString::parse(kShards[1].getHost()));
 
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        stdx::make_unique<RemoteCommandTargeterMock>());
+        std::make_unique<RemoteCommandTargeterMock>());
     targeter->setConnectionStringReturnValue(connStr);
     targeter->setFindHostReturnValue(connStr.getServers()[0]);
     targeterFactory()->addTargeterToReturn(connStr, std::move(targeter));

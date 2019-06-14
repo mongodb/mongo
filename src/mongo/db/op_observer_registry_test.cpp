@@ -100,8 +100,8 @@ struct ThrowingObserver : public TestObserver {
 
 struct OpObserverRegistryTest : public unittest::Test {
     NamespaceString testNss = {"test", "coll"};
-    std::unique_ptr<TestObserver> unique1 = stdx::make_unique<TestObserver>();
-    std::unique_ptr<TestObserver> unique2 = stdx::make_unique<TestObserver>();
+    std::unique_ptr<TestObserver> unique1 = std::make_unique<TestObserver>();
+    std::unique_ptr<TestObserver> unique2 = std::make_unique<TestObserver>();
     TestObserver* observer1 = unique1.get();
     TestObserver* observer2 = unique2.get();
     OpObserverRegistry registry;
@@ -109,7 +109,7 @@ struct OpObserverRegistryTest : public unittest::Test {
      * The 'op' function calls an observer method on the registry that returns an OpTime.
      * The method checks that the registry correctly returns only the first observer's `OpTime`.
      */
-    void checkConsistentOpTime(stdx::function<repl::OpTime()> op) {
+    void checkConsistentOpTime(std::function<repl::OpTime()> op) {
         const repl::OpTime myTime(Timestamp(1, 1), 1);
         ASSERT(op() == repl::OpTime());
         observer1->opTime = myTime;
@@ -124,7 +124,7 @@ struct OpObserverRegistryTest : public unittest::Test {
      * The 'op' function calls an observer method on the registry that returns an OpTime.
      * The method checks that the registry invariants if the observers return multiple times.
      */
-    void checkInconsistentOpTime(stdx::function<repl::OpTime()> op) {
+    void checkInconsistentOpTime(std::function<repl::OpTime()> op) {
         observer1->opTime = repl::OpTime(Timestamp(1, 1), 1);
         observer2->opTime = repl::OpTime(Timestamp(2, 2), 2);
         op();  // This will invariant because of inconsistent timestamps: for death test.
@@ -149,7 +149,7 @@ TEST_F(OpObserverRegistryTest, TwoObservers) {
 
 TEST_F(OpObserverRegistryTest, ThrowingObserver1) {
     OperationContextNoop opCtx;
-    unique1 = stdx::make_unique<ThrowingObserver>();
+    unique1 = std::make_unique<ThrowingObserver>();
     observer1 = unique1.get();
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));
@@ -160,7 +160,7 @@ TEST_F(OpObserverRegistryTest, ThrowingObserver1) {
 
 TEST_F(OpObserverRegistryTest, ThrowingObserver2) {
     OperationContextNoop opCtx;
-    unique2 = stdx::make_unique<ThrowingObserver>();
+    unique2 = std::make_unique<ThrowingObserver>();
     observer2 = unique1.get();
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));

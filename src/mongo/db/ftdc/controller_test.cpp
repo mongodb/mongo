@@ -31,6 +31,7 @@
 
 #include <boost/filesystem.hpp>
 #include <iostream>
+#include <memory>
 
 #include "mongo/base/data_type_validated.h"
 #include "mongo/base/init.h"
@@ -45,7 +46,6 @@
 #include "mongo/db/ftdc/ftdc_test.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -171,8 +171,8 @@ TEST_F(FTDCControllerTest, TestFull) {
 
     FTDCController c(dir, config);
 
-    auto c1 = stdx::make_unique<FTDCMetricsCollectorMock2>();
-    auto c2 = stdx::make_unique<FTDCMetricsCollectorMockRotate>();
+    auto c1 = std::make_unique<FTDCMetricsCollectorMock2>();
+    auto c2 = std::make_unique<FTDCMetricsCollectorMockRotate>();
 
     auto c1Ptr = c1.get();
     auto c2Ptr = c2.get();
@@ -243,7 +243,7 @@ TEST_F(FTDCControllerTest, TestStartAsDisabled) {
     config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
     config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
 
-    auto c1 = stdx::make_unique<FTDCMetricsCollectorMock2>();
+    auto c1 = std::make_unique<FTDCMetricsCollectorMock2>();
 
     auto c1Ptr = c1.get();
 

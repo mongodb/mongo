@@ -269,7 +269,9 @@ TEST_F(SocketFailPointTest, TestSend) {
     ASSERT_TRUE(tryRecv());
     {
         const ScopedFailPointEnabler enabled(*_failPoint);
-        ASSERT_THROWS(trySend(), NetworkException);
+        auto expectedEx =
+            makeSocketError(SocketErrorKind::SEND_ERROR, _sockets.first->remoteString());
+        ASSERT_THROWS_WHAT(trySend(), NetworkException, expectedEx.reason());
     }
     // Channel should be working again
     ASSERT_TRUE(trySend());
@@ -293,7 +295,9 @@ TEST_F(SocketFailPointTest, TestRecv) {
     {
         ASSERT_TRUE(trySend());  // data for recv
         const ScopedFailPointEnabler enabled(*_failPoint);
-        ASSERT_THROWS(tryRecv(), NetworkException);
+        auto expectedEx =
+            makeSocketError(SocketErrorKind::RECV_ERROR, _sockets.first->remoteString());
+        ASSERT_THROWS_WHAT(tryRecv(), NetworkException, expectedEx.reason());
     }
     ASSERT_TRUE(trySend());  // data for recv
     ASSERT_TRUE(tryRecv());

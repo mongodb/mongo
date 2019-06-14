@@ -31,12 +31,13 @@
 
 #include "mongo/db/update/update_object_node.h"
 
+#include <memory>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/update/field_checker.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/update_array_node.h"
 #include "mongo/db/update/update_leaf_node.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -303,9 +304,9 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
         } else {
             std::unique_ptr<UpdateInternalNode> ownedChild;
             if (childShouldBeArrayNode) {
-                ownedChild = stdx::make_unique<UpdateArrayNode>(arrayFilters);
+                ownedChild = std::make_unique<UpdateArrayNode>(arrayFilters);
             } else {
-                ownedChild = stdx::make_unique<UpdateObjectNode>();
+                ownedChild = std::make_unique<UpdateObjectNode>();
             }
             child = ownedChild.get();
             current->setChild(std::move(childName), std::move(ownedChild));
@@ -347,7 +348,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
 // static
 std::unique_ptr<UpdateNode> UpdateObjectNode::createUpdateNodeByMerging(
     const UpdateObjectNode& leftNode, const UpdateObjectNode& rightNode, FieldRef* pathTaken) {
-    auto mergedNode = stdx::make_unique<UpdateObjectNode>();
+    auto mergedNode = std::make_unique<UpdateObjectNode>();
 
     mergedNode->_children =
         createUpdateNodeMapByMerging(leftNode._children, rightNode._children, pathTaken);

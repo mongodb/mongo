@@ -86,7 +86,7 @@ protected:
         lockDb(MODE_IX);
         invariant(_opCtx.lockState()->isDbLockedForMode(_nss.db(), MODE_IX));
         std::unique_ptr<Lock::CollectionLock> lock =
-            stdx::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
+            std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
         invariant(_opCtx.lockState()->isCollectionLockedForMode(_nss, MODE_X));
 
         Database* db = _autoDb.get()->getDb();
@@ -869,7 +869,15 @@ public:
             InsertDeleteOptions options;
             options.dupsAllowed = true;
             options.logIfError = true;
-            auto removeStatus = iam->remove(&_opCtx, actualKey, id1, options, &numDeleted);
+
+            BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+            iam->getKeys(actualKey,
+                         IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         &keys,
+                         nullptr,
+                         nullptr);
+            auto removeStatus =
+                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
             auto insertStatus = iam->insert(&_opCtx, badKey, id1, options, &insertResult);
 
             ASSERT_EQUALS(numDeleted, 1);
@@ -1214,7 +1222,7 @@ public:
 
             lockDb(MODE_IX);
             std::unique_ptr<Lock::CollectionLock> lock =
-                stdx::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
+                std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
 
             Database* db = _autoDb.get()->getDb();
             ASSERT_OK(db->getCollection(&_opCtx, _nss)
@@ -1297,7 +1305,15 @@ public:
             InsertDeleteOptions options;
             options.logIfError = true;
             options.dupsAllowed = true;
-            auto removeStatus = iam->remove(&_opCtx, actualKey, rid, options, &numDeleted);
+
+            BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+            iam->getKeys(actualKey,
+                         IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         &keys,
+                         nullptr,
+                         nullptr);
+            auto removeStatus =
+                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -1310,7 +1326,7 @@ public:
 
             lockDb(MODE_IX);
             std::unique_ptr<Lock::CollectionLock> lock =
-                stdx::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
+                std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
 
             Database* db = _autoDb.get()->getDb();
             ASSERT_OK(db->getCollection(&_opCtx, _nss)
@@ -1394,7 +1410,7 @@ public:
 
             lockDb(MODE_IX);
             std::unique_ptr<Lock::CollectionLock> lock =
-                stdx::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
+                std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
 
             Database* db = _autoDb.get()->getDb();
             ASSERT_OK(db->getCollection(&_opCtx, _nss)

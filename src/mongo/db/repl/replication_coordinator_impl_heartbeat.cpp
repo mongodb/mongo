@@ -36,6 +36,7 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
+#include <functional>
 
 #include "mongo/base/status.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -54,7 +55,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"

@@ -92,7 +92,7 @@ public:
     }
 
     std::unique_ptr<ExpressionWithPlaceholder> shallowClone() const {
-        return stdx::make_unique<ExpressionWithPlaceholder>(_placeholder, _filter->shallowClone());
+        return std::make_unique<ExpressionWithPlaceholder>(_placeholder, _filter->shallowClone());
     }
 
     /*

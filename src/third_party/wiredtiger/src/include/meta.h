@@ -66,9 +66,19 @@
 struct __wt_ckpt {
 	char	*name;			/* Name or NULL */
 
-	WT_ITEM  addr;			/* Checkpoint cookie string */
-	WT_ITEM  raw;			/* Checkpoint cookie raw */
-
+	/*
+	 * Each internal checkpoint name is appended with a generation
+	 * to make it a unique name.  We're solving two problems: when
+	 * two checkpoints are taken quickly, the timer may not be
+	 * unique and/or we can even see time travel on the second
+	 * checkpoint if we snapshot the time in-between nanoseconds
+	 * rolling over.  Second, if we reset the generational counter
+	 * when new checkpoints arrive, we could logically re-create
+	 * specific checkpoints, racing with cursors open on those
+	 * checkpoints.  I can't think of any way to return incorrect
+	 * results by racing with those cursors, but it's simpler not
+	 * to worry about it.
+	 */
 	int64_t	 order;			/* Checkpoint order */
 
 	uint64_t sec;                   /* Wall clock time */
@@ -77,12 +87,18 @@ struct __wt_ckpt {
 
 	uint64_t write_gen;		/* Write generation */
 
+	char	*block_metadata;	/* Block-stored metadata */
+	char	*block_checkpoint;	/* Block-stored checkpoint */
+
 					/* Validity window */
 	wt_timestamp_t	newest_durable_ts;
 	wt_timestamp_t	oldest_start_ts;
 	uint64_t	oldest_start_txn;
 	wt_timestamp_t	newest_stop_ts;
 	uint64_t	newest_stop_txn;
+
+	WT_ITEM  addr;			/* Checkpoint cookie string */
+	WT_ITEM  raw;			/* Checkpoint cookie raw */
 
 	void	*bpriv;			/* Block manager private */
 

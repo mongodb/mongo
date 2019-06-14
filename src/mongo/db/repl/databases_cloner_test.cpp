@@ -193,7 +193,7 @@ protected:
 
         _dbWorkThreadPool.startup();
         _target = HostAndPort{"local:1234"};
-        _mockServer = stdx::make_unique<MockRemoteDBServer>(_target.toString());
+        _mockServer = std::make_unique<MockRemoteDBServer>(_target.toString());
     }
 
     void tearDown() override {
@@ -327,12 +327,12 @@ protected:
     };
 
     std::unique_ptr<DatabasesCloner> makeDummyDatabasesCloner() {
-        return stdx::make_unique<DatabasesCloner>(&getStorage(),
-                                                  &getExecutor(),
-                                                  &getDbWorkThreadPool(),
-                                                  HostAndPort{"local:1234"},
-                                                  [](const BSONObj&) { return true; },
-                                                  [](const Status&) {});
+        return std::make_unique<DatabasesCloner>(&getStorage(),
+                                                 &getExecutor(),
+                                                 &getDbWorkThreadPool(),
+                                                 HostAndPort{"local:1234"},
+                                                 [](const BSONObj&) { return true; },
+                                                 [](const Status&) {});
     }
 
 private:
@@ -767,7 +767,7 @@ TEST_F(DBsClonerTest, FailsOnListCollectionsOnFirstOfTwoDatabases) {
 
 class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
 public:
-    using ShouldFailRequestFn = stdx::function<bool(const executor::RemoteCommandRequest&)>;
+    using ShouldFailRequestFn = std::function<bool(const executor::RemoteCommandRequest&)>;
 
     TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor,
                                                    ShouldFailRequestFn shouldFailRequest)

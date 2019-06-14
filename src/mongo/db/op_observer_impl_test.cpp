@@ -65,12 +65,12 @@ public:
 
         auto service = getServiceContext();
         auto opCtx = cc().makeOperationContext();
-        repl::StorageInterface::set(service, stdx::make_unique<repl::StorageInterfaceMock>());
+        repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
 
         // Set up ReplicationCoordinator and create oplog.
         repl::ReplicationCoordinator::set(
             service,
-            stdx::make_unique<repl::ReplicationCoordinatorMock>(service, createReplSettings()));
+            std::make_unique<repl::ReplicationCoordinatorMock>(service, createReplSettings()));
         repl::setOplogCollectionName(service);
         repl::createOplog(opCtx.get());
 
@@ -520,7 +520,7 @@ TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {
 DEATH_TEST_F(OpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
-    opCtx->swapLockState(stdx::make_unique<LockerNoop>());
+    opCtx->swapLockState(std::make_unique<LockerNoop>());
     NamespaceString nss = {"test", "coll"};
     opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
 }
@@ -528,7 +528,7 @@ DEATH_TEST_F(OpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
 DEATH_TEST_F(OpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
-    opCtx->swapLockState(stdx::make_unique<LockerNoop>());
+    opCtx->swapLockState(std::make_unique<LockerNoop>());
     NamespaceString nss = {"test", "coll"};
     opObserver.aboutToDelete(opCtx.get(), nss, {});
     opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});

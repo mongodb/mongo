@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/version.hpp>
+#include <functional>
 #include <iostream>
 
 #include "mongo/config.h"
@@ -39,7 +40,6 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/bits.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"

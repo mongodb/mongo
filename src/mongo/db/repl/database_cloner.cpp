@@ -34,6 +34,7 @@
 #include "mongo/db/repl/database_cloner.h"
 
 #include <algorithm>
+#include <functional>
 #include <iterator>
 #include <set>
 
@@ -42,7 +43,6 @@
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point_service.h"

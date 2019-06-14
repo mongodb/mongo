@@ -38,7 +38,6 @@
 
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -59,7 +58,7 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationNa
     switch (_type) {
         case MASTER: {
             for (const auto& server : _servers) {
-                auto c = stdx::make_unique<DBClientConnection>(true, 0, newURI);
+                auto c = std::make_unique<DBClientConnection>(true, 0, newURI);
 
                 c->setSoTimeout(socketTimeout);
                 LOG(1) << "creating new connection to:" << server;
@@ -73,7 +72,7 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationNa
         }
 
         case SET: {
-            auto set = stdx::make_unique<DBClientReplicaSet>(
+            auto set = std::make_unique<DBClientReplicaSet>(
                 _setName, _servers, applicationName, socketTimeout, std::move(newURI));
             if (!set->connect()) {
                 errmsg = "connect failed to replica set ";

@@ -31,12 +31,12 @@
 
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 
+#include <memory>
 #include <tuple>
 
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/str.h"
@@ -171,7 +171,7 @@ rpc::UniqueReply MockRemoteDBServer::runCommand(InstanceID id, const OpMsgReques
     // We need to construct a reply message - it will always be read through a view so it
     // doesn't matter whether we use OpMsgReplyBuilder or LegacyReplyBuilder
     auto message = rpc::OpMsgReplyBuilder{}.setCommandReply(reply).done();
-    auto replyView = stdx::make_unique<rpc::OpMsgReply>(&message);
+    auto replyView = std::make_unique<rpc::OpMsgReply>(&message);
     return rpc::UniqueReply(std::move(message), std::move(replyView));
 }
 

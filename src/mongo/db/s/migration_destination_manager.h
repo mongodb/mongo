@@ -113,8 +113,8 @@ public:
      */
     static void cloneDocumentsFromDonor(
         OperationContext* opCtx,
-        stdx::function<void(OperationContext*, BSONObj)> insertBatchFn,
-        stdx::function<BSONObj(OperationContext*)> fetchBatchFn);
+        std::function<void(OperationContext*, BSONObj)> insertBatchFn,
+        std::function<BSONObj(OperationContext*)> fetchBatchFn);
 
     /**
      * Idempotent method, which causes the current ongoing migration to abort only if it has the

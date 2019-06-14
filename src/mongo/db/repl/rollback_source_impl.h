@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include "mongo/db/repl/oplog_interface_remote.h"
 #include "mongo/db/repl/rollback_source.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -51,7 +51,7 @@ public:
     /**
      * Type of function to return a connection to the sync source.
      */
-    using GetConnectionFn = stdx::function<DBClientBase*()>;
+    using GetConnectionFn = std::function<DBClientBase*()>;
 
     RollbackSourceImpl(GetConnectionFn getConnection,
                        const HostAndPort& source,

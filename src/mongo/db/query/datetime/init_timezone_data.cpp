@@ -29,13 +29,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include <timelib.h>
 
 #include "mongo/base/init.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -53,10 +54,10 @@ ServiceContext::ConstructorActionRegisterer loadTimeZoneDB{
                                         << "\"");
             }
             TimeZoneDatabase::set(service,
-                                  stdx::make_unique<TimeZoneDatabase>(std::move(timeZoneDatabase)));
+                                  std::make_unique<TimeZoneDatabase>(std::move(timeZoneDatabase)));
         } else {
             // No 'zoneInfo' specified on the command line, fall back to the built-in rules.
-            TimeZoneDatabase::set(service, stdx::make_unique<TimeZoneDatabase>());
+            TimeZoneDatabase::set(service, std::make_unique<TimeZoneDatabase>());
         }
     }};
 }  // namespace

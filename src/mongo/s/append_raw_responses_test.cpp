@@ -180,7 +180,7 @@ protected:
             const std::vector<ShardId> _shardIds;
         };
 
-        return stdx::make_unique<StaticCatalogClient>(kShardIdList);
+        return std::make_unique<StaticCatalogClient>(kShardIdList);
     }
 
     const ShardId kShard1{"s1"};

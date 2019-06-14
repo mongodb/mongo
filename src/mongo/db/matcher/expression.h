@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <functional>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
@@ -36,8 +38,6 @@
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matchable.h"
 #include "mongo/db/pipeline/dependencies.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
@@ -332,7 +332,7 @@ protected:
      * in the specification of MatchExpression::getOptimizer(std::unique_ptr<MatchExpression>).
      */
     using ExpressionOptimizerFunc =
-        stdx::function<std::unique_ptr<MatchExpression>(std::unique_ptr<MatchExpression>)>;
+        std::function<std::unique_ptr<MatchExpression>(std::unique_ptr<MatchExpression>)>;
 
     /**
      * Subclasses that are collation-aware must implement this method in order to capture changes

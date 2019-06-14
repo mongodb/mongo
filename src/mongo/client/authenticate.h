@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include "mongo/base/status_with.h"
@@ -37,7 +38,6 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/md5.h"
 #include "mongo/util/net/hostandport.h"
@@ -48,10 +48,10 @@ class BSONObj;
 
 namespace auth {
 
-using RunCommandHook = stdx::function<Future<BSONObj>(OpMsgRequest request)>;
+using RunCommandHook = std::function<Future<BSONObj>(OpMsgRequest request)>;
 
 /* Hook for legacy MONGODB-CR support provided by shell client only */
-using AuthMongoCRHandler = stdx::function<Future<void>(RunCommandHook, const BSONObj&)>;
+using AuthMongoCRHandler = std::function<Future<void>(RunCommandHook, const BSONObj&)>;
 extern AuthMongoCRHandler authMongoCR;
 
 /**

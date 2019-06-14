@@ -31,11 +31,12 @@
 
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 
+#include <memory>
+
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_merge.h"
 #include "mongo/s/query/router_stage_remove_metadata_fields.h"
 #include "mongo/s/query/router_stage_skip.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -230,17 +231,17 @@ std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
         std::make_unique<RouterStageMerge>(opCtx, executor, params->extractARMParams());
 
     if (skip) {
-        root = stdx::make_unique<RouterStageSkip>(opCtx, std::move(root), *skip);
+        root = std::make_unique<RouterStageSkip>(opCtx, std::move(root), *skip);
     }
 
     if (limit) {
-        root = stdx::make_unique<RouterStageLimit>(opCtx, std::move(root), *limit);
+        root = std::make_unique<RouterStageLimit>(opCtx, std::move(root), *limit);
     }
 
     const bool hasSort = !params->sort.isEmpty();
     if (hasSort) {
         // Strip out the sort key after sorting.
-        root = stdx::make_unique<RouterStageRemoveMetadataFields>(
+        root = std::make_unique<RouterStageRemoveMetadataFields>(
             opCtx, std::move(root), std::vector<StringData>{AsyncResultsMerger::kSortKeyField});
     }
 

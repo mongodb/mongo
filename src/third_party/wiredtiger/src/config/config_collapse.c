@@ -82,6 +82,103 @@ err:	__wt_scr_free(session, &tmp);
 }
 
 /*
+ * __wt_config_discard_defaults --
+ *	Copy non-default configuration strings into newly allocated memory.
+ *
+ * This function strips out entries from a configuration string that aren't the
+ * default values. It takes a NULL-terminated list of configuration strings, the
+ * defaults, and a configuration string, and copies into allocated memory the
+ * strings from the configuration string that aren't the same as the defaults.
+ */
+int
+__wt_config_discard_defaults(WT_SESSION_IMPL *session,
+    const char **cfg, const char *config, char **config_ret)
+{
+	WT_CONFIG cparser;
+	WT_CONFIG_ITEM k, v, vtmp;
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+
+	*config_ret = NULL;
+
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
+
+	/*
+	 * Walk the configuration string, search the default configuration for
+	 * each entry, and discard any matches.
+	 */
+	__wt_config_init(session, &cparser, config);
+	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
+		if (k.type != WT_CONFIG_ITEM_STRING &&
+		    k.type != WT_CONFIG_ITEM_ID)
+			WT_ERR_MSG(session, EINVAL,
+			    "Invalid configuration key found: '%s'", k.str);
+
+		/*
+		 * Get the default value. There isn't a default value in some
+		 * cases, so not finding one isn't an error.
+		 */
+		if ((ret =
+		    __wt_config_get(session, cfg, &k, &vtmp)) == WT_NOTFOUND)
+			goto keep;
+		WT_ERR(ret);
+
+		/*
+		 * Skip exact matches and simple things we can catch like "none"
+		 * and an empty string, "true" and 1, "false" and 0.
+		 */
+		if (v.type == WT_CONFIG_ITEM_STRUCT &&
+		    vtmp.type == WT_CONFIG_ITEM_STRUCT &&
+		    v.len == vtmp.len && memcmp(v.str, vtmp.str, v.len) == 0)
+			continue;
+		if ((v.type == WT_CONFIG_ITEM_BOOL ||
+		    v.type == WT_CONFIG_ITEM_NUM) &&
+		    (vtmp.type == WT_CONFIG_ITEM_BOOL ||
+		    vtmp.type == WT_CONFIG_ITEM_NUM) && v.val == vtmp.val)
+			continue;
+		if ((v.type == WT_CONFIG_ITEM_ID ||
+		    v.type == WT_CONFIG_ITEM_STRING) &&
+		    (vtmp.type == WT_CONFIG_ITEM_ID ||
+		    vtmp.type == WT_CONFIG_ITEM_STRING) &&
+		    v.len == vtmp.len && memcmp(v.str, vtmp.str, v.len) == 0)
+			continue;
+		if (vtmp.len == 0 && v.len == strlen("none") &&
+		    WT_STRING_MATCH("none", v.str, v.len))
+			continue;
+
+		/* Include the quotes around string keys/values. */
+keep:		if (k.type == WT_CONFIG_ITEM_STRING) {
+			--k.str;
+			k.len += 2;
+		}
+		if (v.type == WT_CONFIG_ITEM_STRING) {
+			--v.str;
+			v.len += 2;
+		}
+		WT_ERR(__wt_buf_catfmt(session, tmp, "%.*s=%.*s,",
+		    (int)k.len, k.str, (int)v.len, v.str));
+	}
+
+	/* We loop until error, and the expected error is WT_NOTFOUND. */
+	if (ret != WT_NOTFOUND)
+		goto err;
+
+	/*
+	 * If the caller passes us only default configuration strings, we get
+	 * here with no bytes to copy -- that's OK, the underlying string copy
+	 * can handle empty strings.
+	 *
+	 * Strip any trailing comma.
+	 */
+	if (tmp->size != 0)
+		--tmp->size;
+	ret = __wt_strndup(session, tmp->data, tmp->size, config_ret);
+
+err:	__wt_scr_free(session, &tmp);
+	return (ret);
+}
+
+/*
  * We need a character that can't appear in a key as a separator.
  */
 #undef	SEP					/* separator key, character */

@@ -1197,7 +1197,7 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp) {
 
     const ExtensionsCallbackReal extensionsCallback(_opCtx, &_config.incLong);
 
-    auto qr = stdx::make_unique<QueryRequest>(_config.incLong);
+    auto qr = std::make_unique<QueryRequest>(_config.incLong);
     qr->setSort(sortKey);
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -1518,7 +1518,7 @@ public:
                                 opCtx, config.nss));
                 }
 
-                auto qr = stdx::make_unique<QueryRequest>(config.nss);
+                auto qr = std::make_unique<QueryRequest>(config.nss);
                 qr->setFilter(config.filter);
                 qr->setSort(config.sort);
                 qr->setCollation(config.collation);

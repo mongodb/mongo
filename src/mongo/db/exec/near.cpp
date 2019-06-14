@@ -31,16 +31,16 @@
 
 #include "mongo/db/exec/near.h"
 
+#include <memory>
+
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 NearStage::NearStage(OperationContext* opCtx,
                      const char* typeName,
@@ -284,7 +284,7 @@ bool NearStage::isEOF() {
 }
 
 unique_ptr<PlanStageStats> NearStage::getStats() {
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, _stageType);
+    unique_ptr<PlanStageStats> ret = std::make_unique<PlanStageStats>(_commonStats, _stageType);
     ret->specific.reset(_specificStats.clone());
     for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
         ret->children.emplace_back(_childrenIntervals[i]->covering->getStats());

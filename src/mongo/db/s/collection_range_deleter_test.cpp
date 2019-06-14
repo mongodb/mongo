@@ -113,7 +113,7 @@ protected:
     }
 
     std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration() override {
-        return stdx::make_unique<BalancerConfiguration>();
+        return std::make_unique<BalancerConfiguration>();
     }
 
 private:
@@ -383,6 +383,35 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
 
     // discover there are no more ranges
     ASSERT_FALSE(next(rangeDeleter, 1));
+}
+
+// Tests that we retry on a WriteConflictException.
+TEST_F(CollectionRangeDeleterTest, RetryOnWriteConflictException) {
+    CollectionRangeDeleter rangeDeleter;
+    DBDirectClient dbclient(operationContext());
+
+    dbclient.insert(kNss.toString(), BSON(kShardKey << 1));
+    dbclient.insert(kNss.toString(), BSON(kShardKey << 2));
+    dbclient.insert(kNss.toString(), BSON(kShardKey << 3));
+    ASSERT_EQUALS(3ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 5)));
+
+    std::list<Deletion> ranges;
+    auto deletion = Deletion{ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10)), Date_t{}};
+    ranges.emplace_back(std::move(deletion));
+    auto when = rangeDeleter.add(std::move(ranges));
+    ASSERT(when && *when == Date_t{});
+
+    // TODO SERVER-41606: Remove this function when we refactor CollectionRangeDeleter.
+    rangeDeleter.setDoDeletionShouldThrowWriteConflictForTest(true);
+
+    ASSERT_TRUE(next(rangeDeleter, 1));
+    ASSERT_EQUALS(3ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 5)));
+
+    // TODO SERVER-41606: Remove this function when we refactor CollectionRangeDeleter.
+    rangeDeleter.setDoDeletionShouldThrowWriteConflictForTest(false);
+
+    ASSERT_TRUE(next(rangeDeleter, 1));
+    ASSERT_EQUALS(2ULL, dbclient.count(kNss.toString(), BSON(kShardKey << LT << 5)));
 }
 
 }  // namespace

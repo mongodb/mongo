@@ -7,8 +7,6 @@
 //   # update/delete on a sharded collection must contain an exact match on _id or contain the shard
 //   # key.
 //   assumes_unsharded_collection,
-//   # mapReduce does not support afterClusterTime.
-//   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
 //   requires_non_retryable_writes,
 // ]

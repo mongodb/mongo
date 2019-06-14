@@ -58,7 +58,6 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -374,8 +373,10 @@ public:
                         RecoveryUnit::ReadSource::kProvided, clusterTime);
 
                     // The $_internalReadAtClusterTime option also causes any storage-layer cursors
-                    // created during plan execution to block on prepared transactions.
-                    opCtx->recoveryUnit()->setIgnorePrepared(false);
+                    // created during plan execution to block on prepared transactions. Since the
+                    // getMore command ignores prepare conflicts by default, change the behavior.
+                    opCtx->recoveryUnit()->setPrepareConflictBehavior(
+                        PrepareConflictBehavior::kEnforce);
                 }
             }
             if (cursorPin->lockPolicy() == ClientCursorParams::LockPolicy::kLocksInternally) {
@@ -475,7 +476,7 @@ public:
             // repeatedly release and re-acquire the collection readLock at regular intervals until
             // the failpoint is released. This is done in order to avoid deadlocks caused by the
             // pinned-cursor failpoints in this file (see SERVER-21997).
-            stdx::function<void()> dropAndReacquireReadLock = [&readLock, opCtx, this]() {
+            std::function<void()> dropAndReacquireReadLock = [&readLock, opCtx, this]() {
                 // Make sure an interrupted operation does not prevent us from reacquiring the lock.
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
                 readLock.reset();
@@ -553,7 +554,7 @@ public:
             // the 'waitWithPinnedCursorDuringGetMoreBatch' failpoint is active, set the 'msg' field
             // of this operation's CurOp to signal that we've hit this point and then spin until the
             // failpoint is released.
-            stdx::function<void()> saveAndRestoreStateWithReadLockReacquisition =
+            std::function<void()> saveAndRestoreStateWithReadLockReacquisition =
                 [exec, dropAndReacquireReadLock]() {
                     exec->saveState();
                     dropAndReacquireReadLock();

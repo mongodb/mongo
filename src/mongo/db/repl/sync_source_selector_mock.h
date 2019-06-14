@@ -29,9 +29,10 @@
 
 #pragma once
 
+#include <functional>
+
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/sync_source_selector.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 namespace repl {
@@ -44,7 +45,7 @@ class SyncSourceSelectorMock : public SyncSourceSelector {
     SyncSourceSelectorMock& operator=(const SyncSourceSelectorMock&) = delete;
 
 public:
-    using ChooseNewSyncSourceHook = stdx::function<void()>;
+    using ChooseNewSyncSourceHook = std::function<void()>;
 
     SyncSourceSelectorMock();
     virtual ~SyncSourceSelectorMock();

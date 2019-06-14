@@ -69,9 +69,9 @@ public:
      * On success, `numKeysOut` if non-null will contain the number of keys added or removed.
      */
     Status sideWrite(OperationContext* opCtx,
-                     IndexAccessMethod* indexAccessMethod,
-                     const BSONObj* obj,
-                     const InsertDeleteOptions& options,
+                     const std::vector<BSONObj>& keys,
+                     const BSONObjSet& multikeyMetadataKeys,
+                     const MultikeyPaths& multikeyPaths,
                      RecordId loc,
                      Op op,
                      int64_t* const numKeysOut);

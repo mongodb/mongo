@@ -110,7 +110,7 @@ void FetcherTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
     clear();
     callbackHook = Fetcher::CallbackFn();
-    fetcher = stdx::make_unique<Fetcher>(&getExecutor(), source, "db", findCmdObj, makeCallback());
+    fetcher = std::make_unique<Fetcher>(&getExecutor(), source, "db", findCmdObj, makeCallback());
     launchExecutorThread();
 }
 
@@ -267,7 +267,7 @@ TEST_F(FetcherTest, RemoteCommandRequestShouldContainCommandParametersPassedToCo
     auto metadataObj = BSON("x" << 1);
     Milliseconds timeout(8000);
 
-    fetcher = stdx::make_unique<Fetcher>(
+    fetcher = std::make_unique<Fetcher>(
         &getExecutor(), source, "db", findCmdObj, doNothingCallback, metadataObj, timeout);
 
     ASSERT_EQUALS(source, fetcher->getSource());
@@ -1037,15 +1037,15 @@ TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreReques
         executor::RemoteCommandRequest::kNoTimeout,
         {ErrorCodes::BadValue, ErrorCodes::InternalError});
 
-    fetcher = stdx::make_unique<Fetcher>(&getExecutor(),
-                                         source,
-                                         "db",
-                                         findCmdObj,
-                                         makeCallback(),
-                                         rpc::makeEmptyMetadata(),
-                                         executor::RemoteCommandRequest::kNoTimeout,
-                                         executor::RemoteCommandRequest::kNoTimeout,
-                                         std::move(policy));
+    fetcher = std::make_unique<Fetcher>(&getExecutor(),
+                                        source,
+                                        "db",
+                                        findCmdObj,
+                                        makeCallback(),
+                                        rpc::makeEmptyMetadata(),
+                                        executor::RemoteCommandRequest::kNoTimeout,
+                                        executor::RemoteCommandRequest::kNoTimeout,
+                                        std::move(policy));
 
     callbackHook = appendGetMoreRequest;
 
@@ -1094,7 +1094,7 @@ TEST_F(FetcherTest, FetcherResetsInternalFinishCallbackFunctionPointerAfterLastC
     auto sharedCallbackData = std::make_shared<SharedCallbackState>();
     auto callbackInvoked = false;
 
-    fetcher = stdx::make_unique<Fetcher>(
+    fetcher = std::make_unique<Fetcher>(
         &getExecutor(),
         source,
         "db",

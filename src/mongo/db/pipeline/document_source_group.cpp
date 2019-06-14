@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <memory>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
@@ -41,7 +42,6 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/value_comparator.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/destructor_guard.h"
 
 namespace mongo {
@@ -73,7 +73,7 @@ Document GroupFromFirstDocumentTransformation::applyTransformation(const Documen
     MutableDocument output(_accumulatorExprs.size());
 
     for (auto&& expr : _accumulatorExprs) {
-        auto value = expr.second->evaluate(input);
+        auto value = expr.second->evaluate(input, &expr.second->getExpressionContext()->variables);
         output.addField(expr.first, value.missing() ? Value(BSONNULL) : value);
     }
 
@@ -495,8 +495,9 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         dassert(numAccumulators == group.size());
 
         for (size_t i = 0; i < numAccumulators; i++) {
-            group[i]->process(_accumulatedFields[i].expression->evaluate(rootDocument),
-                              _doingMerge);
+            group[i]->process(
+                _accumulatedFields[i].expression->evaluate(rootDocument, &pExpCtx->variables),
+                _doingMerge);
 
             _memoryUsageBytes += group[i]->memUsageForSorter();
         }
@@ -611,7 +612,7 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
 Value DocumentSourceGroup::computeId(const Document& root) {
     // If only one expression, return result directly
     if (_idExpressions.size() == 1) {
-        Value retValue = _idExpressions[0]->evaluate(root);
+        Value retValue = _idExpressions[0]->evaluate(root, &pExpCtx->variables);
         return retValue.missing() ? Value(BSONNULL) : std::move(retValue);
     }
 
@@ -619,7 +620,7 @@ Value DocumentSourceGroup::computeId(const Document& root) {
     vector<Value> vals;
     vals.reserve(_idExpressions.size());
     for (size_t i = 0; i < _idExpressions.size(); i++) {
-        vals.push_back(_idExpressions[i]->evaluate(root));
+        vals.push_back(_idExpressions[i]->evaluate(root, &pExpCtx->variables));
     }
     return Value(std::move(vals));
 }

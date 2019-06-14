@@ -114,16 +114,16 @@ protected:
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
         // Set up a logical clock with an initial time.
-        auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
+        auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
         logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
 
         // Set up a tick source for transaction metrics.
-        auto tickSource = stdx::make_unique<TickSourceMock<Microseconds>>();
+        auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
         tickSource->reset(1);
         getServiceContext()->setTickSource(std::move(tickSource));
 
-        _staleVersionAndSnapshotRetriesBlock = stdx::make_unique<FailPointEnableBlock>(
+        _staleVersionAndSnapshotRetriesBlock = std::make_unique<FailPointEnableBlock>(
             "enableStaleVersionAndSnapshotRetriesWithinTransactions");
     }
 
@@ -3588,7 +3588,7 @@ TEST_F(TransactionRouterMetricsTest, CommitDurationAdvancesDuringCommit) {
 
     auto future = beginAndPauseCommit();
 
-    // The clock hasn't advance since commit started, so the duration should be 0.
+    // The clock hasn't advanced since commit started, so the duration should be 0.
     assertCommitDurationIs(Microseconds(0));
 
     // Advancing the clock during commit should increase commit duration.
@@ -3960,6 +3960,10 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCommitTypeStatsNotUpdatedOnUnk
     ASSERT_EQUALS(
         0L,
         routerTxnMetrics()->getCommitTypeStats_forTest(CommitType::kSingleShard).successful.load());
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()
+                      ->getCommitTypeStats_forTest(CommitType::kSingleShard)
+                      .successfulDurationMicros.load());
 
     runCommit(kDummyRetryableErrorRes, true /* expectRetries */);
 
@@ -3970,6 +3974,72 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCommitTypeStatsNotUpdatedOnUnk
     ASSERT_EQUALS(
         0L,
         routerTxnMetrics()->getCommitTypeStats_forTest(CommitType::kSingleShard).successful.load());
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()
+                      ->getCommitTypeStats_forTest(CommitType::kSingleShard)
+                      .successfulDurationMicros.load());
+}
+
+TEST_F(TransactionRouterMetricsTest, RouterMetricsCommitTypeStatsSuccessfulDurationMicros) {
+    beginTxnWithDefaultTxnNumber();
+
+    // Advancing the clock before beginning commit shouldn't affect commit duration or successful
+    // commit duration.
+    tickSource()->advance(Microseconds(100));
+
+    auto future = beginAndPauseCommit();
+
+    // The clock hasn't advanced since commit started, so commit duration and successful commit
+    // duration should be 0.
+    assertCommitDurationIs(Microseconds(0));
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()
+                      ->getCommitTypeStats_forTest(CommitType::kSingleShard)
+                      .successfulDurationMicros.load());
+
+    tickSource()->advance(Microseconds(100));
+
+    // Advancing the clock during commit should increase commit duration but not successful commit
+    // duration.
+    assertCommitDurationIs(Microseconds(100));
+    ASSERT_EQUALS(0L,
+                  routerTxnMetrics()
+                      ->getCommitTypeStats_forTest(CommitType::kSingleShard)
+                      .successfulDurationMicros.load());
+
+    expectCommitTransaction();
+    future.default_timed_get();
+
+    // Finishing the commit successfully should now increase successful commit duration but not
+    // commit duration.
+    assertCommitDurationIs(Microseconds(100));
+    ASSERT_EQUALS(100L,
+                  routerTxnMetrics()
+                      ->getCommitTypeStats_forTest(CommitType::kSingleShard)
+                      .successfulDurationMicros.load());
+
+    // Commit duration and successful commit duration shouldn't change now that commit has finished.
+    tickSource()->advance(Microseconds(100));
+    assertCommitDurationIs(Microseconds(100));
+    ASSERT_EQUALS(100L,
+                  routerTxnMetrics()
+                      ->getCommitTypeStats_forTest(CommitType::kSingleShard)
+                      .successfulDurationMicros.load());
+
+    // Start a new transaction and verify that successful commit duration is cumulative.
+    txnRouter().beginOrContinueTxn(
+        operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
+    txnRouter().setDefaultAtClusterTime(operationContext());
+    future = beginAndPauseCommit();
+    tickSource()->advance(Microseconds(100));
+    expectCommitTransaction();
+    future.default_timed_get();
+
+    assertCommitDurationIs(Microseconds(100));
+    ASSERT_EQUALS(200L,
+                  routerTxnMetrics()
+                      ->getCommitTypeStats_forTest(CommitType::kSingleShard)
+                      .successfulDurationMicros.load());
 }
 
 }  // unnamed namespace

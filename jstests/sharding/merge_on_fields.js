@@ -3,8 +3,8 @@
 (function() {
     "use strict";
 
-    load("jstests/libs/analyze_plan.js");               // For 'getAggPlanStage'.
-    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode.
+    load("jstests/libs/analyze_plan.js");                 // For 'getAggPlanStage'.
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}, config: 1});
 

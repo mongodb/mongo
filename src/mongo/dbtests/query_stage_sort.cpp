@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection.h"
@@ -43,7 +45,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/memory.h"
 
 /**
  * This file tests db/exec/sort.cpp
@@ -53,7 +54,6 @@ namespace QueryStageSortTests {
 
 using std::set;
 using std::unique_ptr;
-using stdx::make_unique;
 
 namespace dps = ::mongo::dotted_path_support;
 
@@ -111,18 +111,18 @@ public:
     unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutorWithSortStage(
         Collection* coll) {
         // Build the mock scan stage which feeds the data.
-        auto ws = make_unique<WorkingSet>();
-        auto queuedDataStage = make_unique<QueuedDataStage>(&_opCtx, ws.get());
+        auto ws = std::make_unique<WorkingSet>();
+        auto queuedDataStage = std::make_unique<QueuedDataStage>(&_opCtx, ws.get());
         insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
 
         SortStageParams params;
         params.pattern = BSON("foo" << 1);
         params.limit = limit();
 
-        auto keyGenStage = make_unique<SortKeyGeneratorStage>(
+        auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
             &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, nullptr);
 
-        auto ss = make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
+        auto ss = std::make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
 
         // The PlanExecutor will be automatically registered on construction due to the auto
         // yield policy, so it can receive invalidations when we remove documents later.
@@ -147,8 +147,8 @@ public:
      * If limit is not zero, we limit the output of the sort stage to 'limit' results.
      */
     void sortAndCheck(int direction, Collection* coll) {
-        auto ws = make_unique<WorkingSet>();
-        auto queuedDataStage = make_unique<QueuedDataStage>(&_opCtx, ws.get());
+        auto ws = std::make_unique<WorkingSet>();
+        auto queuedDataStage = std::make_unique<QueuedDataStage>(&_opCtx, ws.get());
 
         // Insert a mix of the various types of data.
         insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
@@ -157,13 +157,14 @@ public:
         params.pattern = BSON("foo" << direction);
         params.limit = limit();
 
-        auto keyGenStage = make_unique<SortKeyGeneratorStage>(
+        auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
             &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, nullptr);
 
-        auto sortStage = make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
+        auto sortStage =
+            std::make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
 
         auto fetchStage =
-            make_unique<FetchStage>(&_opCtx, ws.get(), sortStage.release(), nullptr, coll);
+            std::make_unique<FetchStage>(&_opCtx, ws.get(), sortStage.release(), nullptr, coll);
 
         // Must fetch so we can look at the doc as a BSONObj.
         auto statusWithPlanExecutor = PlanExecutor::make(
@@ -532,8 +533,8 @@ public:
             wuow.commit();
         }
 
-        auto ws = make_unique<WorkingSet>();
-        auto queuedDataStage = make_unique<QueuedDataStage>(&_opCtx, ws.get());
+        auto ws = std::make_unique<WorkingSet>();
+        auto queuedDataStage = std::make_unique<QueuedDataStage>(&_opCtx, ws.get());
 
         for (int i = 0; i < numObj(); ++i) {
             {
@@ -556,13 +557,14 @@ public:
         SortStageParams params;
         params.pattern = BSON("b" << -1 << "c" << 1 << "a" << 1);
 
-        auto keyGenStage = make_unique<SortKeyGeneratorStage>(
+        auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
             &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, nullptr);
 
-        auto sortStage = make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
+        auto sortStage =
+            std::make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
 
         auto fetchStage =
-            make_unique<FetchStage>(&_opCtx, ws.get(), sortStage.release(), nullptr, coll);
+            std::make_unique<FetchStage>(&_opCtx, ws.get(), sortStage.release(), nullptr, coll);
 
         // We don't get results back since we're sorting some parallel arrays.
         auto statusWithPlanExecutor = PlanExecutor::make(

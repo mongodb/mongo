@@ -33,6 +33,8 @@
 
 #include "mongo/db/s/migration_source_manager.h"
 
+#include <memory>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -58,7 +60,6 @@
 #include "mongo/s/request_types/commit_chunk_migration_request_type.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/exit.h"
@@ -246,7 +247,7 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         // that a chunk on that collection is being migrated. With an active migration, write
         // operations require the cloner to be present in order to track changes to the chunk which
         // needs to be transmitted to the recipient.
-        _cloneDriver = stdx::make_unique<MigrationChunkClonerSourceLegacy>(
+        _cloneDriver = std::make_unique<MigrationChunkClonerSourceLegacy>(
             _args, metadata->getKeyPattern(), _donorConnStr, _recipientHost);
 
         boost::optional<AutoGetCollection> autoColl;

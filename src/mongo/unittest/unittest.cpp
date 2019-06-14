@@ -33,8 +33,10 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include <functional>
 #include <iostream>
 #include <map>
+#include <memory>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
@@ -44,8 +46,6 @@
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/message_log_domain.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"

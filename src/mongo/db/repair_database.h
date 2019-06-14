@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 class CollectionCatalogEntry;
@@ -52,7 +52,7 @@ typedef std::pair<std::vector<std::string>, std::vector<BSONObj>> IndexNameObjs;
  */
 StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
                                            CollectionCatalogEntry* cce,
-                                           stdx::function<bool(const std::string&)> filter =
+                                           std::function<bool(const std::string&)> filter =
                                                [](const std::string& indexName) { return true; });
 
 /**

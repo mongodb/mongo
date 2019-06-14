@@ -70,9 +70,8 @@ public:
                                              StringData ident,
                                              const IndexDescriptor* desc);
 
-    virtual mongo::SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
-                                                               StringData ident,
-                                                               const IndexDescriptor* desc);
+    virtual std::unique_ptr<mongo::SortedDataInterface> getSortedDataInterface(
+        OperationContext* opCtx, StringData ident, const IndexDescriptor* desc);
 
     virtual Status beginBackup(OperationContext* opCtx) {
         return Status::OK();

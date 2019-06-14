@@ -255,10 +255,23 @@ __wt_spin_backoff(uint64_t *yield_count, uint64_t *sleep_usecs)
 static inline void
 __wt_timing_stress(WT_SESSION_IMPL *session, u_int flag)
 {
-	uint64_t i;
+	double pct;
+	uint64_t i, max;
 
 	/* Optionally only sleep when a specified configuration flag is set. */
 	if (flag != 0 && !FLD_ISSET(S2C(session)->timing_stress_flags, flag))
+		return;
+
+	/*
+	 * If there is a lot of cache pressure, don't let the sleep time
+	 * get too large. If the cache is totally full, return.
+	 */
+	pct = 0.0;
+	if (__wt_eviction_needed(session, false, false, &pct))
+		max = 5;
+	else
+		max = 9;
+	if (pct > 100.0)
 		return;
 
 	/*
@@ -269,7 +282,7 @@ __wt_timing_stress(WT_SESSION_IMPL *session, u_int flag)
 	 * That means we'll hit the maximum roughly every 1K calls.
 	 */
 	for (i = 0;;)
-		if (__wt_random(&session->rnd) & 0x1 || ++i > 9)
+		if (__wt_random(&session->rnd) & 0x1 || ++i > max)
 			break;
 
 	if (i == 0)

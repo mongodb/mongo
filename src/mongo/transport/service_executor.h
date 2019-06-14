@@ -29,10 +29,11 @@
 
 #pragma once
 
+#include <functional>
+
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/bitwise_enum_operators.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/transport/transport_mode.h"
 #include "mongo/util/duration.h"
@@ -49,7 +50,7 @@ namespace transport {
 class ServiceExecutor {
 public:
     virtual ~ServiceExecutor() = default;
-    using Task = stdx::function<void()>;
+    using Task = std::function<void()>;
     enum ScheduleFlags {
         // No flags (kEmptyFlags) specifies that this is a normal task and that the executor should
         // launch new threads as needed to run the task.

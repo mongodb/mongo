@@ -83,7 +83,7 @@ std::pair<BSONObj, NamespaceString> RollbackSourceImpl::findOneByUUID(const std:
 void RollbackSourceImpl::copyCollectionFromRemote(OperationContext* opCtx,
                                                   const NamespaceString& nss) const {
     std::string errmsg;
-    auto tmpConn = stdx::make_unique<DBClientConnection>();
+    auto tmpConn = std::make_unique<DBClientConnection>();
     uassert(15908,
             errmsg,
             tmpConn->connect(_source, StringData(), errmsg) && replAuthenticate(tmpConn.get()));

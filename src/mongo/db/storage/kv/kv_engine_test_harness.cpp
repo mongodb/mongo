@@ -29,6 +29,8 @@
 
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
+#include "mongo/db/catalog/collection_catalog_entry_mock.h"
+#include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
@@ -49,7 +51,7 @@ namespace {
 using std::unique_ptr;
 using std::string;
 
-stdx::function<std::unique_ptr<KVHarnessHelper>()> basicFactory =
+std::function<std::unique_ptr<KVHarnessHelper>()> basicFactory =
     []() -> std::unique_ptr<KVHarnessHelper> { fassertFailed(40355); };
 
 class MyOperationContext : public OperationContextNoop {
@@ -57,7 +59,7 @@ public:
     MyOperationContext(KVEngine* engine) : OperationContextNoop(engine->newRecoveryUnit()) {}
 };
 
-const std::unique_ptr<ClockSource> clock = stdx::make_unique<ClockSourceMock>();
+const std::unique_ptr<ClockSource> clock = std::make_unique<ClockSourceMock>();
 
 TEST(KVEngineTestHarness, SimpleRS1) {
     unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
@@ -142,22 +144,45 @@ TEST(KVEngineTestHarness, Restart1) {
 
 
 TEST(KVEngineTestHarness, SimpleSorted1) {
+    setGlobalServiceContext(ServiceContext::make());
     unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
 
     string ident = "abc";
-    IndexDescriptor desc(nullptr,
-                         "",
-                         BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "ns"
-                                  << "mydb.mycoll"
-                                  << "key"
-                                  << BSON("a" << 1)));
+    string ns = "mydb.mycoll";
+
+    unique_ptr<RecordStore> rs;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(engine->createRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        rs = engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions());
+        uow.commit();
+    }
+
+
+    unique_ptr<CollectionCatalogEntryMock> catalogEntry =
+        std::make_unique<CollectionCatalogEntryMock>(ns);
+    unique_ptr<CollectionImpl> collection;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        collection =
+            std::make_unique<CollectionImpl>(&opCtx, ns, UUID::gen(), catalogEntry.get(), rs.get());
+        uow.commit();
+    }
+
+    IndexDescriptor desc(
+        collection.get(),
+        "",
+        BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "ns" << ns << "key"
+                 << BSON("a" << 1)));
     unique_ptr<SortedDataInterface> sorted;
     {
         MyOperationContext opCtx(engine);
         ASSERT_OK(engine->createSortedDataInterface(&opCtx, ident, &desc));
-        sorted.reset(engine->getSortedDataInterface(&opCtx, ident, &desc));
+        sorted = engine->getSortedDataInterface(&opCtx, ident, &desc);
         ASSERT(sorted);
     }
 
@@ -636,7 +661,7 @@ TEST_F(KVCatalogTest, RestartForPrefixes) {
         unique_ptr<RecordStore> rs =
             engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions());
         unique_ptr<KVCatalog> catalog =
-            stdx::make_unique<KVCatalog>(rs.get(), false, false, nullptr);
+            std::make_unique<KVCatalog>(rs.get(), false, false, nullptr);
         catalog->init(&opCtx);
 
         const BSONCollectionCatalogEntry::MetaData md =
@@ -660,24 +685,47 @@ TEST_F(KVCatalogTest, BackupImplemented) {
 }
 
 DEATH_TEST_F(KVCatalogTest, TerminateOnNonNumericIndexVersion, "Fatal Assertion 50942") {
+    setGlobalServiceContext(ServiceContext::make());
     unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
 
     string ident = "abc";
-    IndexDescriptor desc(nullptr,
+    string ns = "mydb.mycoll";
+
+    unique_ptr<RecordStore> rs;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        ASSERT_OK(engine->createRecordStore(&opCtx, "catalog", "catalog", CollectionOptions()));
+        rs = engine->getRecordStore(&opCtx, "catalog", "catalog", CollectionOptions());
+        uow.commit();
+    }
+
+    unique_ptr<CollectionCatalogEntryMock> catalogEntry =
+        std::make_unique<CollectionCatalogEntryMock>(ns);
+    unique_ptr<CollectionImpl> collection;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        collection =
+            std::make_unique<CollectionImpl>(&opCtx, ns, UUID::gen(), catalogEntry.get(), rs.get());
+        uow.commit();
+    }
+
+    IndexDescriptor desc(collection.get(),
                          "",
                          BSON("v"
                               << "1"
                               << "ns"
-                              << "mydb.mycoll"
+                              << ns
                               << "key"
                               << BSON("a" << 1)));
     unique_ptr<SortedDataInterface> sorted;
     {
         MyOperationContext opCtx(engine);
         ASSERT_OK(engine->createSortedDataInterface(&opCtx, ident, &desc));
-        sorted.reset(engine->getSortedDataInterface(&opCtx, ident, &desc));
+        sorted = engine->getSortedDataInterface(&opCtx, ident, &desc);
         ASSERT(sorted);
     }
 }
@@ -688,7 +736,7 @@ std::unique_ptr<KVHarnessHelper> KVHarnessHelper::create() {
     return basicFactory();
 };
 
-void KVHarnessHelper::registerFactory(stdx::function<std::unique_ptr<KVHarnessHelper>()> factory) {
+void KVHarnessHelper::registerFactory(std::function<std::unique_ptr<KVHarnessHelper>()> factory) {
     basicFactory = std::move(factory);
 };
 

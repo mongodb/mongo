@@ -79,19 +79,24 @@
         assert.commandWorked(coll.createIndex(pattern, option));
     }
 
-    // Check that 'pipeline' returns the correct results with and without indexes present.
-    // 'options' is the options to pass to aggregate() and may be omitted.
-    function assertResultsMatchWithAndWithoutIndexes(pipeline, expectedResults, options) {
-        // TODO SERVER-40810 hint doesn't work with $group all the time. Instead we drop and
-        // recreate the indexes.
+    // Check that 'pipeline' returns the correct results with and without a hint added to the query.
+    // We also test with and without indices to check all the possibilities. 'options' is the
+    // options to pass to aggregate() and may be omitted. Similarly, the hint object can be omitted
+    // and will default to a $natural hint.
+    function assertResultsMatchWithAndWithoutHintandIndexes(
+        pipeline, expectedResults, hintObj = {$natural: 1}, options = {}) {
         assert.commandWorked(coll.dropIndexes());
-
         const resultsNoIndex = coll.aggregate(pipeline, options).toArray();
+
         createIndexes();
         const resultsWithIndex = coll.aggregate(pipeline, options).toArray();
 
+        const passedOptions = Object.assign({}, {hint: hintObj}, options);
+        const resultsWithHint = coll.aggregate(pipeline, passedOptions).toArray();
+
         assert.sameMembers(resultsNoIndex, resultsWithIndex);
-        assert.sameMembers(resultsNoIndex, expectedResults);
+        assert.sameMembers(resultsWithIndex, resultsWithHint);
+        assert.sameMembers(resultsWithHint, expectedResults);
     }
 
     //
@@ -99,7 +104,7 @@
     // index.
     //
     let pipeline = [{$sort: {a: 1}}, {$group: {_id: "$a"}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [{_id: null}, {_id: 1}, {_id: 2}]);
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [{_id: null}, {_id: 1}, {_id: 2}]);
     let explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
     assert.eq({a: 1, b: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
@@ -112,17 +117,89 @@
     // sort.
     //
     pipeline = [{$group: {_id: "$a"}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [{_id: null}, {_id: 1}, {_id: 2}]);
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [{_id: null}, {_id: 1}, {_id: 2}]);
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
     assert.eq({a: 1, b: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
     assert.eq(null, getAggPlanStage(explain, "SORT"), explain);
 
     //
+    // Verify that a $group pipeline with a $natural hint does not use DISTINCT_SCAN.
+    //
+    pipeline = [{$group: {_id: "$a"}}];
+    explain = coll.explain().aggregate(pipeline, {hint: {$natural: 1}});
+    assert.neq(null, getAggPlanStage(explain, "COLLSCAN"), explain);
+
+    //
+    // Verify that a $group pipeline with a pertinent hint as string does use DISTINCT_SCAN.
+    //
+    pipeline = [{$group: {_id: "$a"}}];
+    explain = coll.explain().aggregate(pipeline, {hint: "a_1_b_1_c_1"});
+    assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
+    assert.eq({a: 1, b: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
+
+    //
+    // Verify that a $group pipeline with a pertinent hint as an object does use DISTINCT_SCAN.
+    //
+    pipeline = [{$group: {_id: "$a"}}];
+    explain = coll.explain().aggregate(pipeline, {hint: {a: 1, b: 1, c: 1}});
+    assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
+    assert.eq({a: 1, b: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
+
+    //
+    // Verify that a $group pipeline with a non-pertinent hint does not use DISTINCT_SCAN.
+    //
+    pipeline = [{$group: {_id: "$a"}}];
+    assertResultsMatchWithAndWithoutHintandIndexes(
+        pipeline, [{_id: null}, {_id: 1}, {_id: 2}], {_id: 1});
+    explain = coll.explain().aggregate(pipeline, {hint: {_id: 1}});
+    assert.neq(null, getAggPlanStage(explain, "IXSCAN"), explain);
+    assert.eq({_id: 1}, getAggPlanStage(explain, "IXSCAN").keyPattern);
+
+    //
+    // Verify that a $group pipeline with an index filter still uses DISTINCT_SCAN.
+    //
+    assert.commandWorked(db.runCommand({
+        planCacheSetFilter: coll.getName(),
+        query: {},
+        projection: {a: 1, _id: 0},
+        indexes: ["a_1_b_1_c_1"]
+    }));
+
+    pipeline = [{$group: {_id: "$a"}}];
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [{_id: null}, {_id: 1}, {_id: 2}]);
+    explain = coll.explain().aggregate(pipeline);
+    assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
+    assert.eq({a: 1, b: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
+    assert.eq(true, explain.stages[0].$cursor.queryPlanner.indexFilterSet);
+
+    //
+    // Verify that a $group pipeline with an index filter and $natural hint uses DISTINCT_SCAN.
+    //
+    pipeline = [{$group: {_id: "$a"}}];
+    explain = coll.explain().aggregate(pipeline, {hint: {$natural: 1}});
+    assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
+    assert.eq({a: 1, b: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
+    assert.eq(true, explain.stages[0].$cursor.queryPlanner.indexFilterSet);
+
+    //
+    // Verify that a $group pipeline with an index filter and non-pertinent hint uses DISTINCT_SCAN.
+    //
+    pipeline = [{$group: {_id: "$a"}}];
+    assertResultsMatchWithAndWithoutHintandIndexes(
+        pipeline, [{_id: null}, {_id: 1}, {_id: 2}], {_id: 1});
+    explain = coll.explain().aggregate(pipeline, {hint: {_id: 1}});
+    assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
+    assert.eq({a: 1, b: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
+    assert.eq(true, explain.stages[0].$cursor.queryPlanner.indexFilterSet);
+
+    assert.commandWorked(db.runCommand({planCacheClearFilters: coll.getName()}));
+
+    //
     // Verify that a $sort-$group pipeline _does not_ use a DISTINCT_SCAN on a multikey field.
     //
     pipeline = [{$sort: {mkA: 1}}, {$group: {_id: "$mkA"}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline, [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: [2, 3, 4]}]);
     explain = coll.explain().aggregate(pipeline);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -132,7 +209,7 @@
     // index and there are $first accumulators.
     //
     pipeline = [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline, [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}]);
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -144,7 +221,7 @@
     // entire document.
     //
     pipeline = [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$first: "$$ROOT"}}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [
         {_id: null, accum: {_id: 6, a: null, b: 1, c: 1}},
         {_id: 1, accum: {_id: 3, a: 1, b: 3, c: 2}},
         {_id: 2, accum: {_id: 4, a: 2, b: 2, c: 2}}
@@ -159,7 +236,7 @@
     //
     pipeline =
         [{$sort: {"foo.a": 1, "foo.b": 1}}, {$group: {_id: "$foo.a", accum: {$first: "$foo.b"}}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline,
         [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}, {_id: 3, accum: null}]);
     explain = coll.explain().aggregate(pipeline);
@@ -172,7 +249,8 @@
     // when the user does not specify a sort.
     //
     pipeline = [{$group: {_id: "$foo.a"}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}]);
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline,
+                                                   [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}]);
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
     assert.eq(null, getAggPlanStage(explain, "SORT"), explain);
@@ -181,7 +259,7 @@
     // Verify that we _do not_ attempt to use a DISTINCT_SCAN on a multikey field.
     //
     pipeline = [{$group: {_id: "$mkA"}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline, [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: [2, 3, 4]}]);
     explain = coll.explain().aggregate(pipeline);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -191,7 +269,7 @@
     // is not multikey, but an intermediate component is.
     //
     pipeline = [{$group: {_id: "$mkFoo.a"}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [
         {_id: null},
         {_id: 1},
         {_id: 2},
@@ -208,7 +286,7 @@
         {$sort: {"mkFoo.a": 1, "mkFoo.b": 1}},
         {$group: {_id: "$mkFoo.a", accum: {$first: "$mkFoo.b"}}}
     ];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [
         {_id: null, accum: null},
         {_id: 1, accum: 1},
         {_id: 2, accum: 2},
@@ -222,7 +300,7 @@
     // when the field we are grouping by is not multikey.
     //
     pipeline = [{$sort: {aa: 1, mkB: 1}}, {$group: {_id: "$aa", accum: {$first: "$mkB"}}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline, [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}]);
     explain = coll.explain().aggregate(pipeline);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), tojson(explain));
@@ -235,7 +313,7 @@
         {$sort: {"foo.a": 1, "mkFoo.b": 1}},
         {$group: {_id: "$foo.a", accum: {$first: "$mkFoo.b"}}}
     ];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [
         {_id: null, accum: null},
         {_id: 1, accum: 1},
         {_id: 2, accum: 2},
@@ -254,7 +332,8 @@
     //
     removeIndex({"foo.a": 1, "foo.b": 1});
     pipeline = [{$sort: {"foo.a": 1}}, {$group: {_id: "$foo.a"}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}]);
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline,
+                                                   [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}]);
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
     assert.eq({"foo.a": 1, "mkFoo.b": 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
@@ -265,7 +344,7 @@
     // accumulator that accesses a multikey field.
     //
     pipeline = [{$sort: {aa: 1, bb: 1}}, {$group: {_id: "$aa", accum: {$first: "$mkB"}}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline, [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}]);
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -278,7 +357,7 @@
     //
     pipeline =
         [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: {$add: ["$b", "$c"]}}}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline, [{_id: null, accum: null}, {_id: 1, accum: 2}, {_id: 2, accum: 4}]);
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -291,7 +370,7 @@
     // scanned with equality bounds (i.e., are point queries).
     //
     pipeline = [{$match: {a: 1}}, {$sort: {b: 1}}, {$group: {_id: "$b"}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [{_id: 1}, {_id: 2}, {_id: 3}]);
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [{_id: 1}, {_id: 2}, {_id: 3}]);
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
     assert.eq({a: 1, b: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
@@ -303,7 +382,7 @@
     // equality bounds for the 'a field.
     //
     pipeline = [{$match: {a: 1}}, {$sort: {a: 1, b: 1}}, {$group: {_id: "$b"}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [{_id: 1}, {_id: 2}, {_id: 3}]);
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [{_id: 1}, {_id: 2}, {_id: 3}]);
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
     assert.eq({a: 1, b: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
@@ -313,7 +392,7 @@
     // Same as the previous case but with no user-specified sort.
     //
     pipeline = [{$match: {a: 1}}, {$group: {_id: "$b"}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [{_id: 1}, {_id: 2}, {_id: 3}]);
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [{_id: 1}, {_id: 2}, {_id: 3}]);
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
     assert.eq({a: 1, b: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
@@ -324,7 +403,8 @@
     // on the second field of an index when there is no equality match on the first field.
     //
     pipeline = [{$sort: {a: 1, b: 1}}, {$group: {_id: "$b"}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}]);
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline,
+                                                   [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}]);
     explain = coll.explain().aggregate(pipeline);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
 
@@ -338,7 +418,7 @@
     // examine each document in order to determine which groups get filtered out by the $limit.
     //
     pipeline = [{$match: {a: 1}}, {$sort: {a: 1, b: 1}}, {$limit: 3}, {$group: {_id: "$b"}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [{_id: 1}, {_id: 2}]);
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [{_id: 1}, {_id: 2}]);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
 
     //
@@ -347,14 +427,14 @@
     //
     pipeline =
         [{$match: {a: 1}}, {$project: {a: 1, b: 1}}, {$sort: {a: 1, b: 1}}, {$group: {_id: "$b"}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [{_id: 1}, {_id: 2}, {_id: 3}]);
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [{_id: 1}, {_id: 2}, {_id: 3}]);
 
     //
     // Verify that a $sort-$group can use a DISTINCT_SCAN even when the requested sort is the
     // reverse of the index's sort.
     //
     pipeline = [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline, [{_id: null, accum: 1}, {_id: 1, accum: 3}, {_id: 2, accum: 2}]);
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -366,7 +446,7 @@
     // accumulators.
     //
     pipeline = [{$sort: {a: 1}}, {$group: {_id: "$a", accum: {$sum: "$b"}}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline, [{_id: null, accum: 2}, {_id: 1, accum: 8}, {_id: 2, accum: 2}]);
     explain = coll.explain().aggregate(pipeline);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -381,7 +461,7 @@
     // sorted by the field used for grouping.
     //
     pipeline = [{$sort: {b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline, [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}]);
     explain = coll.explain().aggregate(pipeline);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -392,7 +472,7 @@
     // index.
     //
     pipeline = [{$match: {a: {$gt: 0}}}, {$sort: {b: 1}}, {$group: {_id: "$b"}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [{_id: 1}, {_id: 2}, {_id: 3}]);
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [{_id: 1}, {_id: 2}, {_id: 3}]);
     explain = coll.explain().aggregate(pipeline);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
 
@@ -409,7 +489,7 @@
     // Verify that a $group on an unindexed field uses a collection scan.
     //
     pipeline = [{$group: {_id: "$str"}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline, [{_id: null}, {_id: "FoO"}, {_id: "bAr"}, {_id: "bar"}, {_id: "foo"}]);
     explain = coll.explain().aggregate(pipeline);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -419,8 +499,8 @@
     // Verify that a collated $group on an unindexed field uses a collection scan.
     //
     pipeline = [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str"}}];
-    assertResultsMatchWithAndWithoutIndexes(
-        pipeline, [{_id: null}, {_id: "bAr"}, {_id: "foo"}], collationOption);
+    assertResultsMatchWithAndWithoutHintandIndexes(
+        pipeline, [{_id: null}, {_id: "bAr"}, {_id: "foo"}], {$natural: 1}, collationOption);
     explain = coll.explain().aggregate(pipeline, collationOption);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
     assert.eq(null, getAggPlanStage(explain, "IXSCAN"), explain);
@@ -429,7 +509,7 @@
     // Verify that a $sort-$group pipeline uses a collection scan.
     //
     pipeline = [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [
         {_id: null, accum: null},
         {_id: "FoO", accum: 2},
         {_id: "bAr", accum: 3},
@@ -445,9 +525,10 @@
     // scan.
     //
     pipeline = [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline,
         [{_id: null, accum: null}, {_id: "bAr", accum: 3}, {_id: "foo", accum: 1}],
+        {$natural: 1},
         collationOption);
     explain = coll.explain().aggregate(pipeline, collationOption);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -463,7 +544,7 @@
     // Verify that a $group uses a DISTINCT_SCAN.
     //
     pipeline = [{$group: {_id: "$str"}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline, [{_id: null}, {_id: "FoO"}, {_id: "bAr"}, {_id: "bar"}, {_id: "foo"}]);
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -479,8 +560,8 @@
     // making this test more reliable.
     //
     pipeline = [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str"}}];
-    assertResultsMatchWithAndWithoutIndexes(
-        pipeline, [{_id: null}, {_id: "bAr"}, {_id: "foo"}], collationOption);
+    assertResultsMatchWithAndWithoutHintandIndexes(
+        pipeline, [{_id: null}, {_id: "bAr"}, {_id: "foo"}], {$natural: 1}, collationOption);
     explain = coll.explain().aggregate(pipeline, collationOption);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
     assert.eq(null, getAggPlanStage(explain, "IXSCAN"), explain);
@@ -489,7 +570,7 @@
     // Verify that a $sort-$group pipeline uses a DISTINCT_SCAN.
     //
     pipeline = [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [
         {_id: null, accum: null},
         {_id: "FoO", accum: 2},
         {_id: "bAr", accum: 3},
@@ -505,9 +586,10 @@
     // not_ scan the index, which is not aware of the collation.
     //
     pipeline = [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline,
         [{_id: null, accum: null}, {_id: "bAr", accum: 3}, {_id: "foo", accum: 1}],
+        {$natural: 1},
         collationOption);
     explain = coll.explain().aggregate(pipeline, collationOption);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -525,7 +607,7 @@
     // collation.
     //
     pipeline = [{$group: {_id: "$str"}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline, [{_id: null}, {_id: "FoO"}, {_id: "bAr"}, {_id: "bar"}, {_id: "foo"}]);
     explain = coll.explain().aggregate(pipeline);
     assert.eq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
@@ -541,8 +623,8 @@
     // making this test more reliable.
     //
     pipeline = [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str"}}];
-    assertResultsMatchWithAndWithoutIndexes(
-        pipeline, [{_id: null}, {_id: "bAr"}, {_id: "foo"}], collationOption);
+    assertResultsMatchWithAndWithoutHintandIndexes(
+        pipeline, [{_id: null}, {_id: "bAr"}, {_id: "foo"}], {$natural: 1}, collationOption);
     explain = coll.explain().aggregate(pipeline, collationOption);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
     assert.eq({str: 1, d: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
@@ -552,7 +634,7 @@
     // have a collation.
     //
     pipeline = [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}];
-    assertResultsMatchWithAndWithoutIndexes(pipeline, [
+    assertResultsMatchWithAndWithoutHintandIndexes(pipeline, [
         {_id: null, accum: null},
         {_id: "FoO", accum: 2},
         {_id: "bAr", accum: 3},
@@ -568,9 +650,10 @@
     // uses a DISTINCT_SCAN, which uses a matching collation.
     //
     pipeline = [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}];
-    assertResultsMatchWithAndWithoutIndexes(
+    assertResultsMatchWithAndWithoutHintandIndexes(
         pipeline,
         [{_id: null, accum: null}, {_id: "bAr", accum: 3}, {_id: "foo", accum: 1}],
+        {$natural: 1},
         collationOption);
     explain = coll.explain().aggregate(pipeline, collationOption);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);

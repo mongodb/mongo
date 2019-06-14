@@ -49,7 +49,7 @@ TEST(RestrictionSetTest, EmptyRestrictionSetAllValidates) {
 TEST(RestrictionSetTest, RestrictionSetAllWithMetRestrictionValidates) {
     RestrictionEnvironment env{SockAddr(), SockAddr()};
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(true));
+    restrictions.push_back(std::make_unique<RestrictionMock>(true));
     RestrictionSetAll<UnnamedRestriction> set(std::move(restrictions));
     ASSERT_OK(set.validate(env));
 }
@@ -57,8 +57,8 @@ TEST(RestrictionSetTest, RestrictionSetAllWithMetRestrictionValidates) {
 TEST(RestrictionSetTest, RestrictionSetAllWithMetRestrictionsValidates) {
     RestrictionEnvironment env{SockAddr(), SockAddr()};
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(true));
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(true));
+    restrictions.push_back(std::make_unique<RestrictionMock>(true));
+    restrictions.push_back(std::make_unique<RestrictionMock>(true));
     RestrictionSetAll<UnnamedRestriction> set(std::move(restrictions));
     ASSERT_OK(set.validate(env));
 }
@@ -66,7 +66,7 @@ TEST(RestrictionSetTest, RestrictionSetAllWithMetRestrictionsValidates) {
 TEST(RestrictionSetTest, RestrictionSetAllWithFailedRestrictionFails) {
     RestrictionEnvironment env{SockAddr(), SockAddr()};
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(false));
+    restrictions.push_back(std::make_unique<RestrictionMock>(false));
     RestrictionSetAll<UnnamedRestriction> set(std::move(restrictions));
     ASSERT_NOT_OK(set.validate(env));
 }
@@ -74,8 +74,8 @@ TEST(RestrictionSetTest, RestrictionSetAllWithFailedRestrictionFails) {
 TEST(RestrictionSetTest, RestrictionSetAllWithMetAndUnmetRestrictionsFails) {
     RestrictionEnvironment env{SockAddr(), SockAddr()};
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(true));
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(false));
+    restrictions.push_back(std::make_unique<RestrictionMock>(true));
+    restrictions.push_back(std::make_unique<RestrictionMock>(false));
     RestrictionSetAll<UnnamedRestriction> set(std::move(restrictions));
     ASSERT_NOT_OK(set.validate(env));
 }
@@ -90,7 +90,7 @@ TEST(RestrictionSetTest, EmptyRestrictionSetAnyValidates) {
 TEST(RestrictionSetTest, RestrictionSetAnyWithMetRestrictionValidates) {
     RestrictionEnvironment env{SockAddr(), SockAddr()};
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(true));
+    restrictions.push_back(std::make_unique<RestrictionMock>(true));
     RestrictionSetAny<UnnamedRestriction> set(std::move(restrictions));
     ASSERT_OK(set.validate(env));
 }
@@ -98,7 +98,7 @@ TEST(RestrictionSetTest, RestrictionSetAnyWithMetRestrictionValidates) {
 TEST(RestrictionSetTest, RestrictionSetAnyWithFailedRestrictionFails) {
     RestrictionEnvironment env{SockAddr(), SockAddr()};
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(false));
+    restrictions.push_back(std::make_unique<RestrictionMock>(false));
     RestrictionSetAny<UnnamedRestriction> set(std::move(restrictions));
     ASSERT_NOT_OK(set.validate(env));
 }
@@ -106,8 +106,8 @@ TEST(RestrictionSetTest, RestrictionSetAnyWithFailedRestrictionFails) {
 TEST(RestrictionSetTest, RestrictionSetAnyWithMetAndUnmetRestrictionsValidates) {
     RestrictionEnvironment env{SockAddr(), SockAddr()};
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(true));
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(false));
+    restrictions.push_back(std::make_unique<RestrictionMock>(true));
+    restrictions.push_back(std::make_unique<RestrictionMock>(false));
     RestrictionSetAny<UnnamedRestriction> set(std::move(restrictions));
     ASSERT_OK(set.validate(env));
 }
@@ -138,9 +138,9 @@ TEST(RestrictionSetTest, SerializeRestrictionSetToBSON) {
     ASSERT_BSONOBJ_EQ(emptySet.toBSON(), BSONObj());
 
     std::vector<std::unique_ptr<NamedRestriction>> restrictions;
-    restrictions.push_back(stdx::make_unique<NamedRestrictionMock>("a", true));
-    restrictions.push_back(stdx::make_unique<NamedRestrictionMock>("b", false));
-    restrictions.push_back(stdx::make_unique<NamedRestrictionMock>("c", true));
+    restrictions.push_back(std::make_unique<NamedRestrictionMock>("a", true));
+    restrictions.push_back(std::make_unique<NamedRestrictionMock>("b", false));
+    restrictions.push_back(std::make_unique<NamedRestrictionMock>("c", true));
     RestrictionSet<> mockSet(std::move(restrictions));
     ASSERT_BSONOBJ_EQ(mockSet.toBSON(), BSON("a" << true << "b" << false << "c" << true));
 }
@@ -150,9 +150,9 @@ TEST(RestrictionSetTest, SerializeRestrictionSetAnyToBSON) {
     ASSERT_BSONOBJ_EQ(emptySet.toBSON(), BSONArray());
 
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(true));
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(false));
-    restrictions.push_back(stdx::make_unique<RestrictionMock>(true));
+    restrictions.push_back(std::make_unique<RestrictionMock>(true));
+    restrictions.push_back(std::make_unique<RestrictionMock>(false));
+    restrictions.push_back(std::make_unique<RestrictionMock>(true));
 
     RestrictionSetAny<UnnamedRestriction> mockSet(std::move(restrictions));
     ASSERT_BSONOBJ_EQ(mockSet.toBSON(), BSON_ARRAY(true << false << true));
@@ -163,9 +163,9 @@ TEST(RestrictionSetTest, SerializeRestrictionDocumentToBSON) {
     ASSERT_BSONOBJ_EQ(emptyDoc.toBSON(), BSONArray());
 
     std::vector<std::unique_ptr<NamedRestriction>> restrictions;
-    restrictions.push_back(stdx::make_unique<NamedRestrictionMock>("truthy", true));
-    restrictions.push_back(stdx::make_unique<NamedRestrictionMock>("falsey", false));
-    auto mockSet = stdx::make_unique<RestrictionSet<>>(std::move(restrictions));
+    restrictions.push_back(std::make_unique<NamedRestrictionMock>("truthy", true));
+    restrictions.push_back(std::make_unique<NamedRestrictionMock>("falsey", false));
+    auto mockSet = std::make_unique<RestrictionSet<>>(std::move(restrictions));
     RestrictionDocument<> mockDoc(std::move(mockSet));
     ASSERT_BSONOBJ_EQ(mockDoc.toBSON(), BSON_ARRAY(BSON("truthy" << true << "falsey" << false)));
 }
@@ -175,10 +175,10 @@ TEST(RestrictionSetTest, SerializeRestrictionDocumentsToBSON) {
     ASSERT_BSONOBJ_EQ(emptyDoc.toBSON(), BSONArray());
 
     std::vector<std::unique_ptr<NamedRestriction>> restrictions;
-    restrictions.push_back(stdx::make_unique<NamedRestrictionMock>("truthy", true));
-    restrictions.push_back(stdx::make_unique<NamedRestrictionMock>("falsey", false));
-    auto mockSet = stdx::make_unique<RestrictionSet<>>(std::move(restrictions));
-    auto mockDoc = stdx::make_unique<RestrictionDocument<>>(std::move(mockSet));
+    restrictions.push_back(std::make_unique<NamedRestrictionMock>("truthy", true));
+    restrictions.push_back(std::make_unique<NamedRestrictionMock>("falsey", false));
+    auto mockSet = std::make_unique<RestrictionSet<>>(std::move(restrictions));
+    auto mockDoc = std::make_unique<RestrictionDocument<>>(std::move(mockSet));
     RestrictionDocuments mockDocs(std::move(mockDoc));
     ASSERT_BSONOBJ_EQ(mockDocs.toBSON(),
                       BSON_ARRAY(BSON_ARRAY(BSON("truthy" << true << "falsey" << false))));

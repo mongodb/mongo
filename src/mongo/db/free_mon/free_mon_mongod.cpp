@@ -81,7 +81,7 @@ auto makeTaskExecutor(ServiceContext* /*serviceContext*/) {
     tpOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
     };
-    return stdx::make_unique<executor::ThreadPoolTaskExecutor>(
+    return std::make_unique<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(tpOptions), executor::makeNetworkInterface("FreeMonNet"));
 }
 
@@ -285,23 +285,23 @@ void registerCollectors(FreeMonController* controller) {
     // These are collected only at registration
     //
     // CmdBuildInfo
-    controller->addRegistrationCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+    controller->addRegistrationCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
         "buildInfo", "buildInfo", "", BSON("buildInfo" << 1)));
 
     // HostInfoCmd
-    controller->addRegistrationCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+    controller->addRegistrationCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
         "hostInfo", "hostInfo", "", BSON("hostInfo" << 1)));
 
     // Add storageEngine section from serverStatus
     controller->addRegistrationCollector(
-        stdx::make_unique<FreeMonLocalStorageEngineStatusCollector>());
+        std::make_unique<FreeMonLocalStorageEngineStatusCollector>());
 
     // Gather one document from local.clustermanager
-    controller->addRegistrationCollector(stdx::make_unique<FreeMonLocalClusterManagerCollector>());
+    controller->addRegistrationCollector(std::make_unique<FreeMonLocalClusterManagerCollector>());
 
     // These are periodically for metrics upload
     //
-    controller->addMetricsCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+    controller->addMetricsCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
         "getDiagnosticData", "diagnosticData", "", BSON("getDiagnosticData" << 1)));
 
     // These are collected at registration and as metrics periodically
@@ -309,10 +309,10 @@ void registerCollectors(FreeMonController* controller) {
     if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
         repl::ReplicationCoordinator::modeNone) {
         // CmdReplSetGetConfig
-        controller->addRegistrationCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+        controller->addRegistrationCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
             "replSetGetConfig", "replSetGetConfig", "", BSON("replSetGetConfig" << 1)));
 
-        controller->addMetricsCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+        controller->addMetricsCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
             "replSetGetConfig", "replSetGetConfig", "", BSON("replSetGetConfig" << 1)));
 
         // Collect UUID for certain collections.
@@ -323,10 +323,10 @@ void registerCollectors(FreeMonController* controller) {
             std::make_unique<FreeMonNamespaceUUIDCollector>(namespaces));
     }
 
-    controller->addRegistrationCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+    controller->addRegistrationCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
         "isMaster", "isMaster", "", BSON("isMaster" << 1)));
 
-    controller->addMetricsCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+    controller->addMetricsCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
         "isMaster", "isMaster", "", BSON("isMaster" << 1)));
 }
 
@@ -344,7 +344,7 @@ void startFreeMonitoring(ServiceContext* serviceContext) {
 
     auto network = std::unique_ptr<FreeMonNetworkInterface>(new FreeMonNetworkHttp(serviceContext));
 
-    auto controller = stdx::make_unique<FreeMonController>(std::move(network));
+    auto controller = std::make_unique<FreeMonController>(std::move(network));
 
     auto controllerPtr = controller.get();
 
@@ -392,7 +392,7 @@ void notifyFreeMonitoringOnTransitionToPrimary() {
 }
 
 void setupFreeMonitoringOpObserver(OpObserverRegistry* registry) {
-    registry->addObserver(stdx::make_unique<FreeMonOpObserver>());
+    registry->addObserver(std::make_unique<FreeMonOpObserver>());
 }
 
 }  // namespace mongo

@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include <functional>
 #include <vector>
 
 #include "mongo/base/init.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
@@ -75,7 +75,7 @@ namespace mongo {
  */
 class GranularityRounder : public RefCountable {
 public:
-    using Rounder = stdx::function<boost::intrusive_ptr<GranularityRounder>(
+    using Rounder = std::function<boost::intrusive_ptr<GranularityRounder>(
         const boost::intrusive_ptr<ExpressionContext>&)>;
 
     /**

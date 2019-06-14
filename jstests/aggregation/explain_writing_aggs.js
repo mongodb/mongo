@@ -8,9 +8,9 @@
 (function() {
     "use strict";
 
-    load("jstests/libs/fixture_helpers.js");            // For FixtureHelpers.isMongos().
-    load("jstests/libs/analyze_plan.js");               // For getAggPlanStage().
-    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode().
+    load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos().
+    load("jstests/libs/analyze_plan.js");                 // For getAggPlanStage().
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode().
 
     let sourceColl = db.explain_writing_aggs_source;
     let targetColl = db.explain_writing_aggs_target;

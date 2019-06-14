@@ -136,8 +136,8 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     ASSERT(getReplCoord()->getMemberState().secondary())
         << getReplCoord()->getMemberState().toString();
 
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(10, 1), 0), Date_t::min() + Seconds(10));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(10, 1), 0), Date_t::min() + Seconds(10));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
 
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
@@ -200,8 +200,8 @@ TEST_F(ReplCoordTest, StartElectionDoesNotStartAnElectionWhenNodeIsRecovering) {
     ASSERT(getReplCoord()->getMemberState().recovering())
         << getReplCoord()->getMemberState().toString();
 
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(10, 1), 0), Date_t::min() + Seconds(10));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(10, 1), 0), Date_t::min() + Seconds(10));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
     simulateEnoughHeartbeatsForAllNodesUp();
 
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
@@ -221,8 +221,8 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
                             << 1),
                        HostAndPort("node1", 12345));
 
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(10, 1), 0), Date_t::min() + Seconds(10));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(10, 1), 0), Date_t::min() + Seconds(10));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->waitForElectionFinish_forTest();
     ASSERT(getReplCoord()->getMemberState().primary())
@@ -259,8 +259,8 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenAllNodesVoteYea) {
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     OperationContextNoop opCtx;
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     startCapturingLogMessages();
     simulateSuccessfulV1Election();
@@ -300,8 +300,8 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenMaxSevenNodesVoteYea) {
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     OperationContextNoop opCtx;
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     startCapturingLogMessages();
     simulateSuccessfulV1Election();
@@ -337,8 +337,8 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
 
     OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
+    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -398,8 +398,8 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
 
     OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
+    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -466,8 +466,8 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
                             << 1),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
 
     getGlobalFailPointRegistry()
         ->getFailPoint("blockHeartbeatReconfigFinish")
@@ -495,10 +495,8 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     hbResp2.setConfigVersion(3);
     hbResp2.setSetName("mySet");
     hbResp2.setState(MemberState::RS_SECONDARY);
-    hbResp2.setAppliedOpTimeAndWallTime(
-        {OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100)});
-    hbResp2.setDurableOpTimeAndWallTime(
-        {OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100)});
+    hbResp2.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    hbResp2.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
     net->runUntil(net->now() + Seconds(10));  // run until we've sent a heartbeat request
     const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
     net->scheduleResponse(noi2, net->now(), makeResponseStatus(hbResp2.toBSON()));
@@ -531,9 +529,9 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
             hbResp.setState(MemberState::RS_SECONDARY);
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             hbResp.setAppliedOpTimeAndWallTime(
-                {OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100)});
+                {OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
             hbResp.setDurableOpTimeAndWallTime(
-                {OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100)});
+                {OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
             BSONObjBuilder respObj;
             net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
         } else {
@@ -594,8 +592,8 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequest
 
     OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
+    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -644,8 +642,8 @@ TEST_F(ReplCoordTest, TransitionToRollbackFailsWhenElectionInProgress) {
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
+    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -684,8 +682,8 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
 
     OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
+    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -740,8 +738,8 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
 
     OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
+    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -780,8 +778,8 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
 
     OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t::min() + Seconds(time1.getSecs()));
+    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForAllNodesUp();
@@ -955,9 +953,9 @@ private:
             hbResp.setConfigVersion(config.getConfigVersion());
             hbResp.setTerm(replCoord->getTerm());
             hbResp.setAppliedOpTimeAndWallTime(
-                {otherNodesOpTime, Date_t::min() + Seconds(otherNodesOpTime.getSecs())});
+                {otherNodesOpTime, Date_t() + Seconds(otherNodesOpTime.getSecs())});
             hbResp.setDurableOpTimeAndWallTime(
-                {otherNodesOpTime, Date_t::min() + Seconds(otherNodesOpTime.getSecs())});
+                {otherNodesOpTime, Date_t() + Seconds(otherNodesOpTime.getSecs())});
             auto response = makeResponseStatus(hbResp.toBSON());
             net->scheduleResponse(noi, net->now(), response);
         }
@@ -989,10 +987,8 @@ TEST_F(TakeoverTest, DoesntScheduleCatchupTakeoverIfCatchupDisabledButTakeoverDe
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
-    replCoordSetMyLastAppliedOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
     ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&opCtx, 1));
 
@@ -1034,10 +1030,8 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfNodeIsFresherThanCurrentPrimary) 
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled yet.
@@ -1087,10 +1081,8 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
@@ -1143,10 +1135,8 @@ TEST_F(TakeoverTest, PrefersPriorityToCatchupTakeoverIfNodeHasHighestPriority) {
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
@@ -1195,10 +1185,8 @@ TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
@@ -1262,10 +1250,8 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
@@ -1322,10 +1308,8 @@ TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
@@ -1397,10 +1381,8 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
     // and some other node became the new primary. Once you hear about a primary election
     // in term 1, your term will be increased.
     replCoord->updateTerm_forTest(1, nullptr);
-    replCoordSetMyLastAppliedOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Make sure we're secondary and that no catchup takeover has been scheduled.
@@ -1462,10 +1444,8 @@ TEST_F(TakeoverTest, SuccessfulCatchupTakeover) {
     OpTime currentOptime(Timestamp(100, 5000), 0);
     OpTime behindOptime(Timestamp(100, 4000), 0);
 
-    replCoordSetMyLastAppliedOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
 
     // Update the term so that the current term is ahead of the term of
     // the last applied op time. This means that the primary is still in
@@ -1535,10 +1515,8 @@ TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
     OpTime currentOptime(Timestamp(100, 5000), 0);
     OpTime behindOptime(Timestamp(100, 4000), 0);
 
-    replCoordSetMyLastAppliedOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
 
     // Update the term so that the current term is ahead of the term of
     // the last applied op time. This means that the primary is still in
@@ -1639,10 +1617,8 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeCatchupTakeover) {
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
-    replCoordSetMyLastAppliedOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Update the term so that the current term is ahead of the term of
@@ -1706,10 +1682,8 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeHighPriorityNodeCatchupTakeover) {
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
-    replCoordSetMyLastAppliedOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(currentOptime,
-                                    Date_t::min() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(currentOptime, Date_t() + Seconds(currentOptime.getSecs()));
     OpTime behindOptime(Timestamp(100, 1), 0);
 
     // Update the term so that the current term is ahead of the term of
@@ -1790,8 +1764,8 @@ TEST_F(TakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurrent
 
     OperationContextNoop opCtx;
     OpTime myOptime(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(myOptime, Date_t::min() + Seconds(myOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(myOptime, Date_t::min() + Seconds(myOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(myOptime, Date_t() + Seconds(myOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(myOptime, Date_t() + Seconds(myOptime.getSecs()));
 
     // Make sure we're secondary and that no priority takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -1837,8 +1811,8 @@ TEST_F(TakeoverTest, SuccessfulPriorityTakeover) {
 
     OperationContextNoop opCtx;
     OpTime myOptime(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(myOptime, Date_t::min() + Seconds(myOptime.getSecs()));
-    replCoordSetMyLastDurableOpTime(myOptime, Date_t::min() + Seconds(myOptime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(myOptime, Date_t() + Seconds(myOptime.getSecs()));
+    replCoordSetMyLastDurableOpTime(myOptime, Date_t() + Seconds(myOptime.getSecs()));
 
     // Make sure we're secondary and that no priority takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -1896,8 +1870,8 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     OpTime behindOpTime(Timestamp(100, 3999), 0);
     OpTime closeEnoughOpTime(Timestamp(100, 4000), 0);
 
-    replCoordSetMyLastAppliedOpTime(behindOpTime, Date_t::min() + Seconds(behindOpTime.getSecs()));
-    replCoordSetMyLastDurableOpTime(behindOpTime, Date_t::min() + Seconds(behindOpTime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(behindOpTime, Date_t() + Seconds(behindOpTime.getSecs()));
+    replCoordSetMyLastDurableOpTime(behindOpTime, Date_t() + Seconds(behindOpTime.getSecs()));
 
     // Make sure we're secondary and that no priority takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -1937,9 +1911,9 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
 
     // Now make us caught up enough to call for priority takeover to succeed.
     replCoordSetMyLastAppliedOpTime(closeEnoughOpTime,
-                                    Date_t::min() + Seconds(closeEnoughOpTime.getSecs()));
+                                    Date_t() + Seconds(closeEnoughOpTime.getSecs()));
     replCoordSetMyLastDurableOpTime(closeEnoughOpTime,
-                                    Date_t::min() + Seconds(closeEnoughOpTime.getSecs()));
+                                    Date_t() + Seconds(closeEnoughOpTime.getSecs()));
 
     LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
     performSuccessfulTakeover(priorityTakeoverTime,
@@ -1974,8 +1948,8 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
     OpTime currentOpTime(Timestamp(100, 1), 0);
     OpTime behindOpTime(Timestamp(97, 1), 0);
     OpTime closeEnoughOpTime(Timestamp(98, 1), 0);
-    replCoordSetMyLastAppliedOpTime(behindOpTime, Date_t::min() + Seconds(behindOpTime.getSecs()));
-    replCoordSetMyLastDurableOpTime(behindOpTime, Date_t::min() + Seconds(behindOpTime.getSecs()));
+    replCoordSetMyLastAppliedOpTime(behindOpTime, Date_t() + Seconds(behindOpTime.getSecs()));
+    replCoordSetMyLastDurableOpTime(behindOpTime, Date_t() + Seconds(behindOpTime.getSecs()));
 
     // Make sure we're secondary and that no priority takeover has been scheduled.
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
@@ -2016,9 +1990,9 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
 
     // Now make us caught up enough to call for priority takeover to succeed.
     replCoordSetMyLastAppliedOpTime(closeEnoughOpTime,
-                                    Date_t::min() + Seconds(closeEnoughOpTime.getSecs()));
+                                    Date_t() + Seconds(closeEnoughOpTime.getSecs()));
     replCoordSetMyLastDurableOpTime(closeEnoughOpTime,
-                                    Date_t::min() + Seconds(closeEnoughOpTime.getSecs()));
+                                    Date_t() + Seconds(closeEnoughOpTime.getSecs()));
 
     LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
     performSuccessfulTakeover(priorityTakeoverTime,
@@ -2045,8 +2019,8 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
                             << BSON("heartbeatIntervalMillis" << 100)),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateEnoughHeartbeatsForAllNodesUp();
 
     // Advance to dry run vote request phase.
@@ -2110,8 +2084,8 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
                             << BSON("heartbeatIntervalMillis" << 100)),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t::min() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateSuccessfulDryRun();
     ASSERT(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
@@ -2144,7 +2118,7 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
 class PrimaryCatchUpTest : public ReplCoordTest {
 protected:
     using NetworkOpIter = NetworkInterfaceMock::NetworkOperationIterator;
-    using NetworkRequestFn = stdx::function<void(const NetworkOpIter)>;
+    using NetworkRequestFn = std::function<void(const NetworkOpIter)>;
 
     const Timestamp smallTimestamp{1, 1};
 
@@ -2154,8 +2128,8 @@ protected:
         hbResp.setSetName(rsConfig.getReplSetName());
         hbResp.setState(MemberState::RS_SECONDARY);
         hbResp.setConfigVersion(rsConfig.getConfigVersion());
-        hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t::min() + Seconds(opTime.getSecs())});
-        hbResp.setDurableOpTimeAndWallTime({opTime, Date_t::min() + Seconds(opTime.getSecs())});
+        hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t() + Seconds(opTime.getSecs())});
+        hbResp.setDurableOpTimeAndWallTime({opTime, Date_t() + Seconds(opTime.getSecs())});
         return makeResponseStatus(hbResp.toBSON());
     }
 
@@ -2224,8 +2198,8 @@ protected:
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
         ReplSetConfig config = assertMakeRSConfig(configObj);
 
-        replCoordSetMyLastAppliedOpTime(opTime, Date_t::min() + Seconds(opTime.getSecs()));
-        replCoordSetMyLastDurableOpTime(opTime, Date_t::min() + Seconds(opTime.getSecs()));
+        replCoordSetMyLastAppliedOpTime(opTime, Date_t() + Seconds(opTime.getSecs()));
+        replCoordSetMyLastDurableOpTime(opTime, Date_t() + Seconds(opTime.getSecs()));
         ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
         simulateSuccessfulV1Voting();
@@ -2288,7 +2262,7 @@ protected:
 
     // Simulate the work done by bgsync and applier threads. setMyLastAppliedOpTime() will signal
     // the optime waiter.
-    void advanceMyLastAppliedOpTime(OpTime opTime, Date_t wallTime = Date_t::min()) {
+    void advanceMyLastAppliedOpTime(OpTime opTime, Date_t wallTime = Date_t()) {
         replCoordSetMyLastAppliedOpTime(opTime, wallTime);
         getNet()->enterNetwork();
         getNet()->runReadyNetworkOperations();
@@ -2334,7 +2308,7 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
         net->scheduleResponse(noi, net->now(), makeHeartbeatResponse(time2));
     });
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
-    advanceMyLastAppliedOpTime(time2, Date_t::min() + Seconds(time2.getSecs()));
+    advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Caught up to the latest known optime successfully"));
@@ -2480,7 +2454,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
     });
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
-    advanceMyLastAppliedOpTime(time2, Date_t::min() + Seconds(time2.getSecs()));
+    advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
     ASSERT(replCoord->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Caught up to the latest"));
@@ -2542,7 +2516,7 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
     ASSERT_EQ(1, countLogLinesContaining("Heartbeats updated catchup target optime"));
 
     // 3) Advancing its applied optime to time 2 isn't enough.
-    advanceMyLastAppliedOpTime(time2, Date_t::min() + Seconds(time2.getSecs()));
+    advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
 
     // 4) After a while, the other node at time 4 becomes available. Time 4 becomes the new target.
@@ -2562,12 +2536,12 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
     ASSERT_EQ(1, countLogLinesContaining("Heartbeats updated catchup target optime"));
 
     // 5) Advancing to time 3 isn't enough now.
-    advanceMyLastAppliedOpTime(time3, Date_t::min() + Seconds(time3.getSecs()));
+    advanceMyLastAppliedOpTime(time3, Date_t() + Seconds(time3.getSecs()));
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
 
     // 6) The node catches up time 4 eventually.
     startCapturingLogMessages();
-    advanceMyLastAppliedOpTime(time4, Date_t::min() + Seconds(time4.getSecs()));
+    advanceMyLastAppliedOpTime(time4, Date_t() + Seconds(time4.getSecs()));
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countLogLinesContaining("Caught up to the latest"));

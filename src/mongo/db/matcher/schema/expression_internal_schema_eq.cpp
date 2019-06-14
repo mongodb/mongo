@@ -83,7 +83,7 @@ bool InternalSchemaEqMatchExpression::equivalent(const MatchExpression* other) c
 }
 
 std::unique_ptr<MatchExpression> InternalSchemaEqMatchExpression::shallowClone() const {
-    auto clone = stdx::make_unique<InternalSchemaEqMatchExpression>(path(), _rhsElem);
+    auto clone = std::make_unique<InternalSchemaEqMatchExpression>(path(), _rhsElem);
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }

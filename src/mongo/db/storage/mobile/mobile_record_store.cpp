@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/mobile/mobile_record_store.h"
 
+#include <memory>
 #include <sqlite3.h>
 
 #include "mongo/base/static_assert.h"
@@ -46,7 +47,6 @@
 #include "mongo/db/storage/mobile/mobile_util.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -63,16 +63,16 @@ public:
         : _opCtx(opCtx), _forward(forward) {
 
         MobileSession* session = MobileRecoveryUnit::get(_opCtx)->getSession(_opCtx);
-        _stmt = stdx::make_unique<SqliteStatement>(*session,
-                                                   "SELECT rec_id, data from \"",
-                                                   ident,
-                                                   "\" ",
-                                                   "WHERE rec_id ",
-                                                   (forward ? ">" : "<"),
-                                                   " ? ",
-                                                   "ORDER BY rec_id ",
-                                                   (forward ? "ASC" : "DESC"),
-                                                   ";");
+        _stmt = std::make_unique<SqliteStatement>(*session,
+                                                  "SELECT rec_id, data from \"",
+                                                  ident,
+                                                  "\" ",
+                                                  "WHERE rec_id ",
+                                                  (forward ? ">" : "<"),
+                                                  " ? ",
+                                                  "ORDER BY rec_id ",
+                                                  (forward ? "ASC" : "DESC"),
+                                                  ";");
 
         _startIdNum = (forward ? RecordId::min().repr() : RecordId::max().repr());
         _savedId = RecordId(_startIdNum);
@@ -387,7 +387,7 @@ StatusWith<RecordData> MobileRecordStore::updateWithDamages(
 
 std::unique_ptr<SeekableRecordCursor> MobileRecordStore::getCursor(OperationContext* opCtx,
                                                                    bool forward) const {
-    return stdx::make_unique<Cursor>(opCtx, *this, _path, _ident, forward);
+    return std::make_unique<Cursor>(opCtx, *this, _path, _ident, forward);
 }
 
 /**

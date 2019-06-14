@@ -1,0 +1,41 @@
+# This test suite exercises core, generic transactions behavior with the maximum number of
+# operations in a single transaction oplog entry set to 1. The tests in this suite, pulled from
+# 'jstests/core/txns', should be "topology agnostic". They ideally generalize to single replica
+# sets and sharded clusters. Since transactions aren't supported on MongoDB standalones in 4.0, we
+# run this set of tests in their own suite, against a 1-node replica set, to provide the most basic
+# layer of test coverage. This allows us to verify basic transaction behavior against a local node,
+# without the need to exercise data replication machinery.
+
+test_kind: js_test
+selector:
+  roots:
+  - jstests/core/txns/**/*.js
+  exclude_files:
+  # TODO SERVER-40793: Unblacklist this test.
+  - jstests/core/txns/await_prepared_transactions_on_FCV_downgrade.js
+  exclude_with_any_tags:
+  # Transactions are not allowed to operate on capped collections.
+  - requires_capped
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: "testingReplication = true;"
+      readMode: commands
+  hooks:
+  # We don't execute dbHash or oplog consistency checks since there is only a single replica set
+  # node.
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        maxNumberOfTransactionOperationsInSingleOplogEntry: 1
+    # Use a 1-node replica set.
+    num_nodes: 1

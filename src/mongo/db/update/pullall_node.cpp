@@ -42,7 +42,7 @@ public:
         : _elementsToMatch(std::move(elementsToMatch)), _collator(collator) {}
 
     std::unique_ptr<ElementMatcher> clone() const final {
-        return stdx::make_unique<SetMatcher>(*this);
+        return std::make_unique<SetMatcher>(*this);
     }
 
     bool match(const mutablebson::ConstElement& element) final {
@@ -83,7 +83,7 @@ Status PullAllNode::init(BSONElement modExpr,
                                     << typeName(modExpr.type()));
     }
 
-    _matcher = stdx::make_unique<SetMatcher>(modExpr.Array(), expCtx->getCollator());
+    _matcher = std::make_unique<SetMatcher>(modExpr.Array(), expCtx->getCollator());
 
     return Status::OK();
 }

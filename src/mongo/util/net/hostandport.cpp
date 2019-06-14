@@ -58,9 +58,7 @@ HostAndPort::HostAndPort(StringData text) {
     uassertStatusOK(initialize(text));
 }
 
-// Normalize hostname by lowercasing ASCII uppercase characters. Ignore non-ASCII characters.
-// Assume input is ASCII or UTF-8.
-HostAndPort::HostAndPort(const std::string& h, int p) : _host(str::toLower(h)), _port(p) {}
+HostAndPort::HostAndPort(const std::string& h, int p) : _host(h), _port(p) {}
 
 bool HostAndPort::operator<(const HostAndPort& r) const {
     const int cmp = host().compare(r.host());
@@ -211,8 +209,7 @@ Status HostAndPort::initialize(StringData s) {
     } else {
         port = -1;
     }
-
-    _host = str::toLower(hostPart);
+    _host = hostPart.toString();
     _port = port;
     return Status::OK();
 }

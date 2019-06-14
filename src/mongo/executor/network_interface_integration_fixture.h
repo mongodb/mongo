@@ -59,7 +59,7 @@ inline TaskExecutor::CallbackHandle makeCallbackHandle() {
     return TaskExecutor::CallbackHandle(std::make_shared<MockCallbackState>());
 }
 
-using StartCommandCB = stdx::function<void(const RemoteCommandResponse&)>;
+using StartCommandCB = std::function<void(const RemoteCommandResponse&)>;
 
 class NetworkInterfaceIntegrationFixture : public mongo::unittest::Test {
 public:

@@ -31,6 +31,8 @@
 
 #include "mongo/scripting/mozjs/mongo.h"
 
+#include <memory>
+
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_rs.h"
@@ -53,7 +55,6 @@
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/quick_exit.h"
 
@@ -590,7 +591,7 @@ void MongoBase::Functions::cursorFromId::call(JSContext* cx, JS::CallArgs args) 
     long long cursorId = NumberLongInfo::ToNumberLong(cx, args.get(1));
 
     // The shell only calls this method when it wants to test OP_GETMORE.
-    auto cursor = stdx::make_unique<DBClientCursor>(
+    auto cursor = std::make_unique<DBClientCursor>(
         conn, NamespaceString(ns), cursorId, 0, DBClientCursor::QueryOptionLocal_forceOpQuery);
 
     if (args.get(2).isNumber())

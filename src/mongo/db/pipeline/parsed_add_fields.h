@@ -35,7 +35,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/db/pipeline/parsed_inclusion_projection.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 

@@ -30,6 +30,7 @@
 #pragma once
 
 #include <deque>
+#include <functional>
 #include <memory>
 
 #include "mongo/base/status.h"
@@ -42,7 +43,6 @@
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/session_update_tracker.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
@@ -67,10 +67,10 @@ class OpTime;
 class SyncTail {
 public:
     using MultiSyncApplyFunc =
-        stdx::function<Status(OperationContext* opCtx,
-                              MultiApplier::OperationPtrs* ops,
-                              SyncTail* st,
-                              WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
+        std::function<Status(OperationContext* opCtx,
+                             MultiApplier::OperationPtrs* ops,
+                             SyncTail* st,
+                             WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
 
     /**
      * Applies the operation that is in param o.

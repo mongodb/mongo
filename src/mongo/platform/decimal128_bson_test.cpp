@@ -35,6 +35,7 @@
 
 #include <array>
 #include <cmath>
+#include <memory>
 #include <utility>
 
 #include "mongo/bson/bsonelement.h"
@@ -43,7 +44,6 @@
 #include "mongo/config.h"
 #include "mongo/db/json.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"

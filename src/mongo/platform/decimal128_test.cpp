@@ -31,11 +31,11 @@
 
 #include <array>
 #include <cmath>
+#include <memory>
 #include <string>
 #include <utility>
 
 #include "mongo/config.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -345,7 +345,7 @@ TEST(Decimal128Test, TestDecimal128ToInt32Even) {
     int32_t out[6] = {-3, -2, -2, 2, 2, 3};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toInt(), out[testNo]);
     }
 }
@@ -356,7 +356,7 @@ TEST(Decimal128Test, TestDecimal128ToInt32Neg) {
     int32_t out[6] = {-3, -3, -3, 2, 2, 2};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toInt(roundMode), out[testNo]);
     }
 }
@@ -367,7 +367,7 @@ TEST(Decimal128Test, TestDecimal128ToInt32Pos) {
     int32_t out[6] = {-2, -2, -2, 3, 3, 3};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toInt(roundMode), out[testNo]);
     }
 }
@@ -378,7 +378,7 @@ TEST(Decimal128Test, TestDecimal128ToInt32Zero) {
     int32_t out[6] = {-2, -2, -2, 2, 2, 2};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toInt(roundMode), out[testNo]);
     }
 }
@@ -389,7 +389,7 @@ TEST(Decimal128Test, TestDecimal128ToInt32Away) {
     int32_t out[6] = {-3, -3, -2, 2, 3, 3};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toInt(roundMode), out[testNo]);
     }
 }
@@ -404,7 +404,7 @@ TEST(Decimal128Test, TestDecimal128ToInt64Even) {
     int64_t out[6] = {-4294967297, -4294967296, -4294967296, 4294967296, 4294967296, 4294967297};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toLong(), out[testNo]);
     }
 }
@@ -420,7 +420,7 @@ TEST(Decimal128Test, TestDecimal128ToInt64Neg) {
     int64_t out[6] = {-4294967297, -4294967297, -4294967297, 4294967296, 4294967296, 4294967296};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toLong(roundMode), out[testNo]);
     }
 }
@@ -436,7 +436,7 @@ TEST(Decimal128Test, TestDecimal128ToInt64Pos) {
     int64_t out[6] = {-4294967296, -4294967296, -4294967296, 4294967297, 4294967297, 4294967297};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toLong(roundMode), out[testNo]);
     }
 }
@@ -452,7 +452,7 @@ TEST(Decimal128Test, TestDecimal128ToInt64Zero) {
     int64_t out[6] = {-4294967296, -4294967296, -4294967296, 4294967296, 4294967296, 4294967296};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toLong(roundMode), out[testNo]);
     }
 }
@@ -468,7 +468,7 @@ TEST(Decimal128Test, TestDecimal128ToInt64Away) {
     int64_t out[6] = {-4294967297, -4294967297, -4294967296, 4294967296, 4294967297, 4294967297};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toLong(roundMode), out[testNo]);
     }
 }
@@ -478,7 +478,7 @@ TEST(Decimal128Test, TestDecimal128ToInt32ExactEven) {
     int32_t out[6] = {-3, -2, -2, 2, 2, 3};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toIntExact(), out[testNo]);
     }
 }
@@ -489,7 +489,7 @@ TEST(Decimal128Test, TestDecimal128ToInt32ExactNeg) {
     int32_t out[6] = {-3, -3, -3, 2, 2, 2};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toIntExact(roundMode), out[testNo]);
     }
 }
@@ -500,7 +500,7 @@ TEST(Decimal128Test, TestDecimal128ToInt32ExactPos) {
     int32_t out[6] = {-2, -2, -2, 3, 3, 3};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toIntExact(roundMode), out[testNo]);
     }
 }
@@ -511,7 +511,7 @@ TEST(Decimal128Test, TestDecimal128ToInt32ExactZero) {
     int32_t out[6] = {-2, -2, -2, 2, 2, 2};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toIntExact(roundMode), out[testNo]);
     }
 }
@@ -522,7 +522,7 @@ TEST(Decimal128Test, TestDecimal128ToInt32ExactAway) {
     int32_t out[6] = {-3, -3, -2, 2, 3, 3};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toIntExact(roundMode), out[testNo]);
     }
 }
@@ -537,7 +537,7 @@ TEST(Decimal128Test, TestDecimal128ToInt64ExactEven) {
     int64_t out[6] = {-4294967297, -4294967296, -4294967296, 4294967296, 4294967296, 4294967297};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toLongExact(), out[testNo]);
     }
 }
@@ -553,7 +553,7 @@ TEST(Decimal128Test, TestDecimal128ToInt64ExactNeg) {
     int64_t out[6] = {-4294967297, -4294967297, -4294967297, 4294967296, 4294967296, 4294967296};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toLongExact(roundMode), out[testNo]);
     }
 }
@@ -569,7 +569,7 @@ TEST(Decimal128Test, TestDecimal128ToInt64ExactPos) {
     int64_t out[6] = {-4294967296, -4294967296, -4294967296, 4294967297, 4294967297, 4294967297};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toLongExact(roundMode), out[testNo]);
     }
 }
@@ -585,7 +585,7 @@ TEST(Decimal128Test, TestDecimal128ToInt64ExactZero) {
     int64_t out[6] = {-4294967296, -4294967296, -4294967296, 4294967296, 4294967296, 4294967296};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toLongExact(roundMode), out[testNo]);
     }
 }
@@ -601,7 +601,7 @@ TEST(Decimal128Test, TestDecimal128ToInt64ExactAway) {
     int64_t out[6] = {-4294967297, -4294967297, -4294967296, 4294967296, 4294967297, 4294967297};
     std::unique_ptr<Decimal128> decPtr;
     for (int testNo = 0; testNo < 6; ++testNo) {
-        decPtr = stdx::make_unique<Decimal128>(in[testNo]);
+        decPtr = std::make_unique<Decimal128>(in[testNo]);
         ASSERT_EQUALS(decPtr->toLongExact(roundMode), out[testNo]);
     }
 }

@@ -51,7 +51,7 @@ public:
                             const CommandInvocation* invocation,
                             const OpMsgRequest& request) const override {
         const auto prepareConflictBehavior = invocation->canIgnorePrepareConflicts()
-            ? PrepareConflictBehavior::kIgnore
+            ? PrepareConflictBehavior::kIgnoreConflicts
             : PrepareConflictBehavior::kEnforce;
         auto rcStatus = mongo::waitForReadConcern(opCtx,
                                                   repl::ReadConcernArgs::get(opCtx),

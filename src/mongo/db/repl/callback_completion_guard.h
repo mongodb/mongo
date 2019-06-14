@@ -31,8 +31,8 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <functional>
 
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 
@@ -52,12 +52,12 @@ public:
      * Function to cancel remaining work in caller after setting '_result'.
      * This function must be called while holding a lock on the caller's mutex.
      */
-    using CancelRemainingWorkInLockFn = stdx::function<void()>;
+    using CancelRemainingWorkInLockFn = std::function<void()>;
 
     /**
      * Callback function to pass result to caller at destruction.
      */
-    typedef stdx::function<void(const Result& result)> OnCompletionFn;
+    typedef std::function<void(const Result& result)> OnCompletionFn;
 
     /**
      * Constructor for this completion guard.

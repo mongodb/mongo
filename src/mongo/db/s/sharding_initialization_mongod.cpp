@@ -76,10 +76,9 @@ namespace {
 const auto getInstance = ServiceContext::declareDecoration<ShardingInitializationMongoD>();
 
 auto makeEgressHooksList(ServiceContext* service) {
-    auto unshardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    unshardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
-    unshardedHookList->addHook(
-        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>(service));
+    auto unshardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
+    unshardedHookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(service));
+    unshardedHookList->addHook(std::make_unique<rpc::ShardingEgressMetadataHookForMongod>(service));
 
     return unshardedHookList;
 }
@@ -370,24 +369,22 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
 void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
                                             const ConnectionString& configCS,
                                             StringData distLockProcessId) {
-    auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryImpl>();
+    auto targeterFactory = std::make_unique<RemoteCommandTargeterFactoryImpl>();
     auto targeterFactoryPtr = targeterFactory.get();
 
-    ShardFactory::BuilderCallable setBuilder =
-        [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-            return stdx::make_unique<ShardRemote>(
-                shardId, connStr, targeterFactoryPtr->create(connStr));
-        };
+    ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr](
+        const ShardId& shardId, const ConnectionString& connStr) {
+        return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
+    };
 
-    ShardFactory::BuilderCallable masterBuilder =
-        [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-            return stdx::make_unique<ShardRemote>(
-                shardId, connStr, targeterFactoryPtr->create(connStr));
-        };
+    ShardFactory::BuilderCallable masterBuilder = [targeterFactoryPtr](
+        const ShardId& shardId, const ConnectionString& connStr) {
+        return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
+    };
 
     ShardFactory::BuilderCallable localBuilder = [](const ShardId& shardId,
                                                     const ConnectionString& connStr) {
-        return stdx::make_unique<ShardLocal>(shardId);
+        return std::make_unique<ShardLocal>(shardId);
     };
 
     ShardFactory::BuildersMap buildersMap{
@@ -397,20 +394,20 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
     };
 
     auto shardFactory =
-        stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
+        std::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     auto const service = opCtx->getServiceContext();
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         if (storageGlobalParams.readOnly) {
-            CatalogCacheLoader::set(service, stdx::make_unique<ReadOnlyCatalogCacheLoader>());
+            CatalogCacheLoader::set(service, std::make_unique<ReadOnlyCatalogCacheLoader>());
         } else {
             CatalogCacheLoader::set(service,
-                                    stdx::make_unique<ShardServerCatalogCacheLoader>(
-                                        stdx::make_unique<ConfigServerCatalogCacheLoader>()));
+                                    std::make_unique<ShardServerCatalogCacheLoader>(
+                                        std::make_unique<ConfigServerCatalogCacheLoader>()));
         }
     } else {
-        CatalogCacheLoader::set(service, stdx::make_unique<ConfigServerCatalogCacheLoader>());
+        CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
     }
 
     auto validator = LogicalTimeValidator::get(service);
@@ -426,7 +423,7 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         configCS,
         distLockProcessId,
         std::move(shardFactory),
-        stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(opCtx)),
+        std::make_unique<CatalogCache>(CatalogCacheLoader::get(opCtx)),
         [service] { return makeEgressHooksList(service); },
         // We only need one task executor here because sharding task executors aren't used for user
         // queries in mongod.

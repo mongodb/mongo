@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -63,7 +63,7 @@ public:
     void unlockAll(OperationContext* opCtx, const std::string& processID) override;
 
     using LockFunc =
-        stdx::function<void(StringData name, StringData whyMessage, Milliseconds waitFor)>;
+        std::function<void(StringData name, StringData whyMessage, Milliseconds waitFor)>;
 
     void expectLock(LockFunc checkerFunc, Status lockStatus);
 

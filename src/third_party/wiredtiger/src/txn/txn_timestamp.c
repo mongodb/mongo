@@ -928,10 +928,22 @@ __wt_txn_set_read_timestamp(
 			did_roundup_to_oldest = true;
 		} else {
 			__wt_readunlock(session, &txn_global->rwlock);
-			WT_RET_MSG(session, EINVAL, "read timestamp "
+
+			/*
+			 * In some cases, MongoDB sets a read timestamp older
+			 * than the oldest timestamp, relying on WiredTiger's
+			 * concurrency to detect and fail the set. In other
+			 * cases it's a bug and MongoDB wants error context to
+			 * make it easier to find those problems. Don't output
+			 * an error message because that logs a MongoDB error,
+			 * use an informational message to provide the context
+			 * instead.
+			 */
+			WT_RET(__wt_msg(session, "read timestamp "
 			    "%s less than the oldest timestamp %s",
 			    __wt_timestamp_to_string(read_ts, ts_string[0]),
-			    __wt_timestamp_to_string(ts_oldest, ts_string[1]));
+			    __wt_timestamp_to_string(ts_oldest, ts_string[1])));
+			return (EINVAL);
 		}
 	} else
 		txn->read_timestamp = read_ts;

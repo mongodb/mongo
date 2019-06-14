@@ -46,8 +46,8 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <memory>
 
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -144,7 +144,7 @@ private:
 };
 
 std::unique_ptr<SecureRandom> SecureRandom::create() {
-    return stdx::make_unique<WinSecureRandom>();
+    return std::make_unique<WinSecureRandom>();
 }
 
 #elif defined(__linux__) || defined(__sun) || defined(__APPLE__) || defined(__FreeBSD__) || \
@@ -153,7 +153,7 @@ std::unique_ptr<SecureRandom> SecureRandom::create() {
 class InputStreamSecureRandom : public SecureRandom {
 public:
     InputStreamSecureRandom(const char* fn) {
-        _in = stdx::make_unique<std::ifstream>(fn, std::ios::binary | std::ios::in);
+        _in = std::make_unique<std::ifstream>(fn, std::ios::binary | std::ios::in);
         if (!_in->is_open()) {
             error() << "cannot open " << fn << " " << strerror(errno);
             fassertFailed(28839);
@@ -175,7 +175,7 @@ private:
 };
 
 std::unique_ptr<SecureRandom> SecureRandom::create() {
-    return stdx::make_unique<InputStreamSecureRandom>("/dev/urandom");
+    return std::make_unique<InputStreamSecureRandom>("/dev/urandom");
 }
 
 #elif defined(__OpenBSD__)
@@ -190,7 +190,7 @@ public:
 };
 
 std::unique_ptr<SecureRandom> SecureRandom::create() {
-    return stdx::make_unique<Arc4SecureRandom>();
+    return std::make_unique<Arc4SecureRandom>();
 }
 
 #else

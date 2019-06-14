@@ -113,7 +113,10 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                      &multikeyPaths);
 
         if (!descriptor->isMultikey(_opCtx) &&
-            iam->shouldMarkIndexAsMultikey(documentKeySet, multikeyMetadataKeys, multikeyPaths)) {
+            iam->shouldMarkIndexAsMultikey(
+                {documentKeySet.begin(), documentKeySet.end()},
+                {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
+                multikeyPaths)) {
             std::string msg = str::stream() << "Index " << descriptor->indexName()
                                             << " is not multi-key, but a multikey path "
                                             << " is present in document " << recordId;
@@ -167,7 +170,7 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
 
         // We want to use the latest version of KeyString here.
         std::unique_ptr<KeyString> indexKeyString =
-            stdx::make_unique<KeyString>(version, indexEntry->key, ord, indexEntry->loc);
+            std::make_unique<KeyString>(version, indexEntry->key, ord, indexEntry->loc);
         // Ensure that the index entries are in increasing or decreasing order.
         if (!isFirstEntry && *indexKeyString < *prevIndexKeyString) {
             if (results && results->valid) {

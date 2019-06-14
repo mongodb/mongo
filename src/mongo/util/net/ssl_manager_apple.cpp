@@ -33,6 +33,7 @@
 
 #include <boost/optional/optional.hpp>
 #include <fstream>
+#include <memory>
 #include <stdlib.h>
 
 #include "mongo/base/checked_cast.h"
@@ -43,7 +44,6 @@
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
@@ -1676,7 +1676,7 @@ extern SSLManagerInterface* theSSLManager;
 
 std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
-    return stdx::make_unique<SSLManagerApple>(params, isServer);
+    return std::make_unique<SSLManagerApple>(params, isServer);
 }
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))

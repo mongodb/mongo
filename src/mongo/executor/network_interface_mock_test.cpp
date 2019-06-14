@@ -39,7 +39,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/test_network_connection_hook.h"
 #include "mongo/executor/thread_pool_mock.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

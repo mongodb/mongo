@@ -34,6 +34,7 @@
 #include "mongo/db/ftdc/file_manager.h"
 
 #include <boost/filesystem.hpp>
+#include <memory>
 #include <string>
 
 #include "mongo/base/string_data.h"
@@ -42,7 +43,6 @@
 #include "mongo/db/ftdc/constants.h"
 #include "mongo/db/ftdc/file_reader.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"

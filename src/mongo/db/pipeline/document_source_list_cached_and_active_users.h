@@ -49,7 +49,7 @@ public:
     public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec) {
-            return stdx::make_unique<LiteParsed>();
+            return std::make_unique<LiteParsed>();
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {

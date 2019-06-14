@@ -36,6 +36,7 @@
             startClean: true,
             setParameter: {
                 'failpoint.initialSyncHangBeforeListCollections': failPointOptions,
+                'failpoint.skipClearInitialSyncState': tojson({mode: 'alwaysOn'}),
                 numInitialSyncAttempts: 2
             }
         });
@@ -62,8 +63,7 @@
         rst.awaitSecondaryNodes();
         rst.awaitReplication();
 
-        let res =
-            assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+        let res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
         assert.eq(res.initialSyncStatus.failedInitialSyncAttempts, 1);
 
         // We check oplogs and data hashes before we restart the second node.

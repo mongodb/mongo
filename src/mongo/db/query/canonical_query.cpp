@@ -184,7 +184,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* root) {
-    auto qr = stdx::make_unique<QueryRequest>(baseQuery.nss());
+    auto qr = std::make_unique<QueryRequest>(baseQuery.nss());
     BSONObjBuilder builder;
     root->serialize(&builder);
     qr->setFilter(builder.obj());

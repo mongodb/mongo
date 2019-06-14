@@ -36,7 +36,6 @@
 #include <vector>
 
 #include "mongo/base/static_assert.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/decoration_container.h"
 #include "mongo/util/scopeguard.h"
 

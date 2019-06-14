@@ -405,7 +405,7 @@ TEST_F(ChunkManagerQueryTest, CollationStringsMultiShard) {
 TEST_F(ChunkManagerQueryTest, DefaultCollationStringsMultiShard) {
     runQueryTest(
         BSON("a" << 1),
-        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
         false,
         {BSON("a"
               << "x"),
@@ -423,7 +423,7 @@ TEST_F(ChunkManagerQueryTest, DefaultCollationStringsMultiShard) {
 TEST_F(ChunkManagerQueryTest, SimpleCollationStringsMultiShard) {
     runQueryTest(
         BSON("a" << 1),
-        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
         false,
         {BSON("a"
               << "x"),
@@ -441,7 +441,7 @@ TEST_F(ChunkManagerQueryTest, SimpleCollationStringsMultiShard) {
 TEST_F(ChunkManagerQueryTest, CollationNumbersMultiShard) {
     runQueryTest(
         BSON("a" << 1),
-        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
         false,
         {BSON("a"
               << "x"),
@@ -458,7 +458,7 @@ TEST_F(ChunkManagerQueryTest, CollationNumbersMultiShard) {
 TEST_F(ChunkManagerQueryTest, DefaultCollationNumbersMultiShard) {
     runQueryTest(
         BSON("a" << 1),
-        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
         false,
         {BSON("a"
               << "x"),
@@ -474,7 +474,7 @@ TEST_F(ChunkManagerQueryTest, DefaultCollationNumbersMultiShard) {
 TEST_F(ChunkManagerQueryTest, SimpleCollationNumbersMultiShard) {
     runQueryTest(
         BSON("a" << 1),
-        stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
         false,
         {BSON("a"
               << "x"),

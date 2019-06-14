@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -36,7 +37,6 @@
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 

@@ -34,13 +34,13 @@
 #include "mongo/db/commands/plan_cache_commands.h"
 
 #include <algorithm>
+#include <memory>
 
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
@@ -117,7 +117,7 @@ std::unique_ptr<PlanRankingDecision> createDecision(size_t numPlans, size_t work
     unique_ptr<PlanRankingDecision> why(new PlanRankingDecision());
     for (size_t i = 0; i < numPlans; ++i) {
         CommonStats common("COLLSCAN");
-        auto stats = stdx::make_unique<PlanStageStats>(common, STAGE_COLLSCAN);
+        auto stats = std::make_unique<PlanStageStats>(common, STAGE_COLLSCAN);
         stats->specific.reset(new CollectionScanStats());
         why->stats.push_back(std::move(stats));
         why->stats[i]->common.works = works;
@@ -138,7 +138,7 @@ TEST(PlanCacheCommandsTest, planCacheListQueryShapesOneKey) {
     auto opCtx = serviceContext.makeOperationContext();
 
     // Create a canonical query
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 1}"));
     qr->setSort(fromjson("{a: -1}"));
     qr->setProj(fromjson("{_id: 0}"));
@@ -175,7 +175,7 @@ TEST(PlanCacheCommandsTest, planCacheClearAllShapes) {
     auto opCtx = serviceContext.makeOperationContext();
 
     // Create a canonical query
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 1}"));
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -312,11 +312,11 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
     auto opCtx = serviceContext.makeOperationContext();
 
     // Create 2 canonical queries.
-    auto qrA = stdx::make_unique<QueryRequest>(nss);
+    auto qrA = std::make_unique<QueryRequest>(nss);
     qrA->setFilter(fromjson("{a: 1}"));
     auto statusWithCQA = CanonicalQuery::canonicalize(opCtx.get(), std::move(qrA));
     ASSERT_OK(statusWithCQA.getStatus());
-    auto qrB = stdx::make_unique<QueryRequest>(nss);
+    auto qrB = std::make_unique<QueryRequest>(nss);
     qrB->setFilter(fromjson("{b: 1}"));
     unique_ptr<CanonicalQuery> cqA = std::move(statusWithCQA.getValue());
     auto statusWithCQB = CanonicalQuery::canonicalize(opCtx.get(), std::move(qrB));
@@ -374,12 +374,12 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKeyCollation) {
     auto opCtx = serviceContext.makeOperationContext();
 
     // Create 2 canonical queries, one with collation.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 'foo'}"));
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-    auto qrCollation = stdx::make_unique<QueryRequest>(nss);
+    auto qrCollation = std::make_unique<QueryRequest>(nss);
     qrCollation->setFilter(fromjson("{a: 'foo'}"));
     qrCollation->setCollation(fromjson("{locale: 'mock_reverse_string'}"));
     auto statusWithCQCollation = CanonicalQuery::canonicalize(opCtx.get(), std::move(qrCollation));
@@ -555,7 +555,7 @@ TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionTrue) {
     auto opCtx = serviceContext.makeOperationContext();
 
     // Create a canonical query
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 1}"));
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -588,7 +588,7 @@ TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionFalse) {
     auto opCtx = serviceContext.makeOperationContext();
 
     // Create a canonical query
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 1}"));
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -624,12 +624,12 @@ TEST(PlanCacheCommandsTest, planCacheListPlansCollation) {
     auto opCtx = serviceContext.makeOperationContext();
 
     // Create 2 canonical queries, one with collation.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 'foo'}"));
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-    auto qrCollation = stdx::make_unique<QueryRequest>(nss);
+    auto qrCollation = std::make_unique<QueryRequest>(nss);
     qrCollation->setFilter(fromjson("{a: 'foo'}"));
     qrCollation->setCollation(fromjson("{locale: 'mock_reverse_string'}"));
     auto statusWithCQCollation = CanonicalQuery::canonicalize(opCtx.get(), std::move(qrCollation));
@@ -684,7 +684,7 @@ TEST(PlanCacheCommandsTest, planCacheListPlansTimeOfCreationIsCorrect) {
     auto opCtx = serviceContext.makeOperationContext();
 
     // Create a canonical query.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 1}"));
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());

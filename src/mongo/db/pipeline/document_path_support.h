@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <vector>
 
 #include "mongo/db/pipeline/document.h"
@@ -36,7 +37,6 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/value_comparator.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 namespace document_path_support {
@@ -50,7 +50,7 @@ namespace document_path_support {
  */
 void visitAllValuesAtPath(const Document& doc,
                           const FieldPath& path,
-                          stdx::function<void(const Value&)> callback);
+                          std::function<void(const Value&)> callback);
 
 /**
  * Returns the element at 'path' in 'doc', or a missing Value if the path does not fully exist.

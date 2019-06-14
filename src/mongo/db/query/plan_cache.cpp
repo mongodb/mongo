@@ -222,7 +222,7 @@ PlanCacheEntry::~PlanCacheEntry() {
 PlanCacheEntry* PlanCacheEntry::clone() const {
     std::vector<std::unique_ptr<QuerySolution>> solutions;
     for (size_t i = 0; i < plannerData.size(); ++i) {
-        auto qs = stdx::make_unique<QuerySolution>();
+        auto qs = std::make_unique<QuerySolution>();
         qs->cacheData.reset(plannerData[i]->clone());
         solutions.push_back(std::move(qs));
     }
@@ -585,7 +585,7 @@ PlanCache::GetResult PlanCache::get(const PlanCacheKey& key) const {
 
     auto state =
         entry->isActive ? CacheEntryState::kPresentActive : CacheEntryState::kPresentInactive;
-    return {state, stdx::make_unique<CachedSolution>(key, *entry)};
+    return {state, std::make_unique<CachedSolution>(key, *entry)};
 }
 
 Status PlanCache::feedback(const CanonicalQuery& cq, double score) {

@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -56,7 +56,7 @@ class SaslClientSession {
     SaslClientSession& operator=(const SaslClientSession&) = delete;
 
 public:
-    typedef stdx::function<SaslClientSession*(const std::string&)> SaslClientSessionFactoryFn;
+    typedef std::function<SaslClientSession*(const std::string&)> SaslClientSessionFactoryFn;
     static SaslClientSessionFactoryFn create;
 
     /**

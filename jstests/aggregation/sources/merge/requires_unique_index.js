@@ -8,8 +8,8 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/out_helpers.js");  // For withEachMergeMode,
-                                                        // assertFailsWithoutUniqueIndex.
+    load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode,
+                                                          // assertMergeFailsWithoutUniqueIndex.
 
     const testDB = db.getSiblingDB("merge_requires_unique_index");
     assert.commandWorked(testDB.dropDatabase());
@@ -74,7 +74,8 @@
     (function basicUniqueIndexWorks() {
         const target = testDB.regular_unique;
         dropWithoutImplicitRecreate(target);
-        assertFailsWithoutUniqueIndex({source: source, onFields: ["_id", "a"], target: target});
+        assertMergeFailsWithoutUniqueIndex(
+            {source: source, onFields: ["_id", "a"], target: target});
 
         assert.commandWorked(testDB.runCommand({create: target.getName()}));
         assert.commandWorked(target.createIndex({a: 1, _id: 1}, {unique: true}));
@@ -95,11 +96,11 @@
             }
         }]));
 
-        assertFailsWithoutUniqueIndex(
+        assertMergeFailsWithoutUniqueIndex(
             {source: source, onFields: ["_id", "a", "b"], target: target});
-        assertFailsWithoutUniqueIndex({source: source, onFields: ["a", "b"], target: target});
-        assertFailsWithoutUniqueIndex({source: source, onFields: ["b"], target: target});
-        assertFailsWithoutUniqueIndex({source: source, onFields: ["a"], target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: ["a", "b"], target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: ["b"], target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: ["a"], target: target});
 
         assert.commandWorked(target.dropIndex({a: 1, _id: 1}));
         assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
@@ -115,8 +116,9 @@
         // Create a non-unique index and make sure that doesn't work.
         assert.commandWorked(target.dropIndex({a: 1}));
         assert.commandWorked(target.createIndex({a: 1}));
-        assertFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
-        assertFailsWithoutUniqueIndex({source: source, onFields: ["_id", "a"], target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
+        assertMergeFailsWithoutUniqueIndex(
+            {source: source, onFields: ["_id", "a"], target: target});
     }());
 
     // Test that a unique index on the "on" fields cannot be used to satisfy the requirement if it
@@ -124,12 +126,13 @@
     (function uniqueButPartialShouldNotWork() {
         const target = testDB.unique_but_partial_indexes;
         dropWithoutImplicitRecreate(target);
-        assertFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
 
         assert.commandWorked(
             target.createIndex({a: 1}, {unique: true, partialFilterExpression: {a: {$gte: 2}}}));
-        assertFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
-        assertFailsWithoutUniqueIndex({source: source, onFields: ["_id", "a"], target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
+        assertMergeFailsWithoutUniqueIndex(
+            {source: source, onFields: ["_id", "a"], target: target});
     }());
 
     // Test that a unique index on the "on" fields cannot be used to satisfy the requirement if it
@@ -137,20 +140,20 @@
     (function indexMustMatchCollationOfOperation() {
         const target = testDB.collation_indexes;
         dropWithoutImplicitRecreate(target);
-        assertFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
 
         assert.commandWorked(
             target.createIndex({a: 1}, {unique: true, collation: {locale: "en_US"}}));
-        assertFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
-        assertFailsWithoutUniqueIndex(
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
+        assertMergeFailsWithoutUniqueIndex(
             {source: source, onFields: "a", target: target, options: {collation: {locale: "en"}}});
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: source,
             onFields: "a",
             target: target,
             options: {collation: {locale: "simple"}}
         });
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: source,
             onFields: "a",
             target: target,
@@ -169,7 +172,7 @@
         // Test that a non-unique index with the same collation cannot be used.
         assert.commandWorked(target.dropIndex({a: 1}));
         assert.commandWorked(target.createIndex({a: 1}, {collation: {locale: "en_US"}}));
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: source,
             onFields: "a",
             target: target,
@@ -184,7 +187,7 @@
         assert.commandWorked(
             testDB.runCommand({create: target.getName(), collation: {locale: "en_US"}}));
         assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: source,
             onFields: "a",
             target: target,
@@ -230,7 +233,7 @@
                                                       }
                                                    }],
                                                    {collation: {locale: "simple"}}));
-        assertFailsWithoutUniqueIndex({
+        assertMergeFailsWithoutUniqueIndex({
             source: source,
             onFields: "a",
             target: target,
@@ -245,32 +248,38 @@
         dropWithoutImplicitRecreate(target);
 
         assert.commandWorked(target.createIndex({a: 1, text: "text"}, {unique: true}));
-        assertFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
-        assertFailsWithoutUniqueIndex({source: source, onFields: ["a", "text"], target: target});
-        assertFailsWithoutUniqueIndex({source: source, onFields: "text", target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
+        assertMergeFailsWithoutUniqueIndex(
+            {source: source, onFields: ["a", "text"], target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: "text", target: target});
 
         dropWithoutImplicitRecreate(target);
         assert.commandWorked(target.createIndex({a: 1, geo: "2dsphere"}, {unique: true}));
-        assertFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
-        assertFailsWithoutUniqueIndex({source: source, onFields: ["a", "geo"], target: target});
-        assertFailsWithoutUniqueIndex({source: source, onFields: ["geo", "a"], target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
+        assertMergeFailsWithoutUniqueIndex(
+            {source: source, onFields: ["a", "geo"], target: target});
+        assertMergeFailsWithoutUniqueIndex(
+            {source: source, onFields: ["geo", "a"], target: target});
 
         dropWithoutImplicitRecreate(target);
         assert.commandWorked(target.createIndex({geo: "2d"}, {unique: true}));
-        assertFailsWithoutUniqueIndex({source: source, onFields: ["a", "geo"], target: target});
-        assertFailsWithoutUniqueIndex({source: source, onFields: "geo", target: target});
+        assertMergeFailsWithoutUniqueIndex(
+            {source: source, onFields: ["a", "geo"], target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: "geo", target: target});
 
         dropWithoutImplicitRecreate(target);
         assert.commandWorked(
             target.createIndex({geo: "geoHaystack", a: 1}, {unique: true, bucketSize: 5}));
-        assertFailsWithoutUniqueIndex({source: source, onFields: ["a", "geo"], target: target});
-        assertFailsWithoutUniqueIndex({source: source, onFields: ["geo", "a"], target: target});
+        assertMergeFailsWithoutUniqueIndex(
+            {source: source, onFields: ["a", "geo"], target: target});
+        assertMergeFailsWithoutUniqueIndex(
+            {source: source, onFields: ["geo", "a"], target: target});
 
         dropWithoutImplicitRecreate(target);
         // MongoDB does not support unique hashed indexes.
         assert.commandFailedWithCode(target.createIndex({a: "hashed"}, {unique: true}), 16764);
         assert.commandWorked(target.createIndex({a: "hashed"}));
-        assertFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
     }());
 
     // Test that a unique index with dotted field names can be used.
@@ -279,7 +288,7 @@
         dropWithoutImplicitRecreate(target);
 
         assert.commandWorked(target.createIndex({a: 1, "b.c.d": -1}, {unique: true}));
-        assertFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
+        assertMergeFailsWithoutUniqueIndex({source: source, onFields: "a", target: target});
         assert.doesNotThrow(() => source.aggregate([
             {$project: {_id: 1, a: 1, b: {c: {d: "x"}}}},
             {

@@ -30,11 +30,11 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/test_harness_helper.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 

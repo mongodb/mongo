@@ -35,6 +35,10 @@
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'alwaysOn'}));
+    // Skip clearing initial sync progress after a successful initial sync attempt so that we
+    // can check initialSyncStatus fields after initial sync is complete.
+    assert.commandWorked(secondary.getDB('admin').runCommand(
+        {configureFailPoint: 'skipClearInitialSyncState', mode: 'alwaysOn'}));
     replSet.reInitiate();
 
     // Wait for fail point message to be logged.
@@ -51,7 +55,7 @@
     checkLog.contains(secondary, 'Fetching missing document');
     checkLog.contains(
         secondary, 'initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled');
-    var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+    var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
     assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
     var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
 
@@ -71,7 +75,7 @@
               secondary.getDB('test').getCollection(name).find().itcount(),
               'collection successfully synced to secondary');
 
-    res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+    res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 
     // Fetch count stays at zero because we are unable to get the document from the sync source.
     assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
