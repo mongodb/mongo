@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
-#include "src/mongo/db/repl/replication_metrics.h"
+#include "mongo/db/repl/replication_metrics.h"
 
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/repl/election_reason_counter.h"
 
 namespace mongo {
 namespace repl {
@@ -46,9 +47,97 @@ ReplicationMetrics& ReplicationMetrics::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
+ReplicationMetrics::ReplicationMetrics()
+    : _electionMetrics(ElectionReasonCounter(),
+                       ElectionReasonCounter(),
+                       ElectionReasonCounter(),
+                       ElectionReasonCounter(),
+                       ElectionReasonCounter()) {}
+
+ReplicationMetrics::~ReplicationMetrics() {}
+
+void ReplicationMetrics::incrementNumElectionsCalledForReason(
+    TopologyCoordinator::StartElectionReason reason) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    switch (reason) {
+        case TopologyCoordinator::StartElectionReason::kStepUpRequest:
+        case TopologyCoordinator::StartElectionReason::kStepUpRequestSkipDryRun: {
+            ElectionReasonCounter& stepUpCmd = _electionMetrics.getStepUpCmd();
+            stepUpCmd.incrementCalled();
+            _electionMetrics.setStepUpCmd(stepUpCmd);
+            break;
+        }
+        case TopologyCoordinator::StartElectionReason::kPriorityTakeover: {
+            ElectionReasonCounter& priorityTakeover = _electionMetrics.getPriorityTakeover();
+            priorityTakeover.incrementCalled();
+            _electionMetrics.setPriorityTakeover(priorityTakeover);
+            break;
+        }
+        case TopologyCoordinator::StartElectionReason::kCatchupTakeover: {
+            ElectionReasonCounter& catchUpTakeover = _electionMetrics.getCatchUpTakeover();
+            catchUpTakeover.incrementCalled();
+            _electionMetrics.setCatchUpTakeover(catchUpTakeover);
+            break;
+        }
+        case TopologyCoordinator::StartElectionReason::kElectionTimeout: {
+            ElectionReasonCounter& electionTimeout = _electionMetrics.getElectionTimeout();
+            electionTimeout.incrementCalled();
+            _electionMetrics.setElectionTimeout(electionTimeout);
+            break;
+        }
+        case TopologyCoordinator::StartElectionReason::kSingleNodePromptElection: {
+            ElectionReasonCounter& freezeTimeout = _electionMetrics.getFreezeTimeout();
+            freezeTimeout.incrementCalled();
+            _electionMetrics.setFreezeTimeout(freezeTimeout);
+            break;
+        }
+    }
+}
+
+int ReplicationMetrics::getNumStepUpCmdsCalled_forTesting() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _electionMetrics.getStepUpCmd().getCalled();
+}
+
+int ReplicationMetrics::getNumPriorityTakeoversCalled_forTesting() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _electionMetrics.getPriorityTakeover().getCalled();
+}
+
+int ReplicationMetrics::getNumCatchUpTakeoversCalled_forTesting() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _electionMetrics.getCatchUpTakeover().getCalled();
+}
+
+int ReplicationMetrics::getNumElectionTimeoutsCalled_forTesting() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _electionMetrics.getElectionTimeout().getCalled();
+}
+
+int ReplicationMetrics::getNumFreezeTimeoutsCalled_forTesting() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _electionMetrics.getFreezeTimeout().getCalled();
+}
+
+BSONObj ReplicationMetrics::getElectionMetricsBSON() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _electionMetrics.toBSON();
+}
+
 class ReplicationMetrics::ElectionMetricsSSS : public ServerStatusSection {
 public:
     ElectionMetricsSSS() : ServerStatusSection("electionMetrics") {}
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        ReplicationMetrics& replicationMetrics = ReplicationMetrics::get(opCtx);
+
+        return replicationMetrics.getElectionMetricsBSON();
+    }
 } electionMetricsSSS;
 
 }  // namespace repl

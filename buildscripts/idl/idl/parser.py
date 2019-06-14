@@ -307,6 +307,7 @@ def _parse_field(ctxt, name, node):
             "supports_doc_sequence": _RuleDesc("bool_scalar"),
             "comparison_order": _RuleDesc("int_scalar"),
             "validator": _RuleDesc('mapping', mapping_parser_func=_parse_validator),
+            "non_const_getter": _RuleDesc("bool_scalar"),
         })
 
     return field

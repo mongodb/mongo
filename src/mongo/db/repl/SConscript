@@ -916,6 +916,7 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/db/repl/replication_metrics',
         'collection_cloner',
         'initial_syncer',
         'data_replicator_external_state_initial_sync',
@@ -1764,9 +1765,33 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/commands/server_status',
+        'topology_coordinator',
+        'election_reason_counter',
+        'election_reason_counter_parser',
+    ],
+)
+
+env.Library(
+    target='election_reason_counter',
+    source=[
+        'election_reason_counter.cpp',
+        env.Idlc('election_reason_counter.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
+    target='election_reason_counter_parser',
+    source=[
+        'election_reason_counter_parser.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'election_reason_counter',
     ],
 )

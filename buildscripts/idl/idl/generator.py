@@ -622,6 +622,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self._writer.write_template(
                     '${const_type}${param_type} ${method_name}() const { ${body} }')
 
+                if field.non_const_getter:
+                    self._writer.write_template('${param_type} ${method_name}() { ${body} }')
+
     def gen_validators(self, field):
         # type: (ast.Field) -> None
         """Generate the C++ validators definition for a field."""

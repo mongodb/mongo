@@ -27,44 +27,16 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/repl/replication_metrics_gen.h"
-#include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/db/repl/election_reason_counter.h"
 
 namespace mongo {
 namespace repl {
 
-/**
- * A service context decoration that stores metrics related to elections and replication health.
- */
-class ReplicationMetrics {
-public:
-    static ReplicationMetrics& get(ServiceContext* svc);
-    static ReplicationMetrics& get(OperationContext* opCtx);
-
-    ReplicationMetrics();
-    ~ReplicationMetrics();
-
-    void incrementNumElectionsCalledForReason(TopologyCoordinator::StartElectionReason reason);
-    int getNumStepUpCmdsCalled_forTesting();
-    int getNumPriorityTakeoversCalled_forTesting();
-    int getNumCatchUpTakeoversCalled_forTesting();
-    int getNumElectionTimeoutsCalled_forTesting();
-    int getNumFreezeTimeoutsCalled_forTesting();
-
-    BSONObj getElectionMetricsBSON();
-
-private:
-    class ElectionMetricsSSS;
-
-    mutable stdx::mutex _mutex;
-    ElectionMetrics _electionMetrics;
-    ElectionCandidateMetrics _electionCandidateMetrics;
-    ElectionParticipantMetrics _electionParticipantMetrics;
-};
+ElectionReasonCounter ElectionReasonCounter::parse(const IDLParserErrorContext& ctxt,
+                                                   const BSONObj& bsonObject) {
+    this->parseProtected(ctxt, bsonObject);
+    return *this;
+}
 
 }  // namespace repl
 }  // namespace mongo

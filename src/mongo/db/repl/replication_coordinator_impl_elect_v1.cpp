@@ -34,6 +34,7 @@
 #include <memory>
 
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/stdx/mutex.h"
@@ -143,7 +144,7 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(
     if (reason == TopologyCoordinator::StartElectionReason::kStepUpRequestSkipDryRun) {
         long long newTerm = term + 1;
         log() << "skipping dry run and running for election in term " << newTerm;
-        _startRealElection_inlock(newTerm);
+        _startRealElection_inlock(newTerm, reason);
         lossGuard.dismiss();
         return;
     }
@@ -169,12 +170,15 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(
     fassert(28685, nextPhaseEvh.getStatus());
     _replExecutor
         ->onEvent(nextPhaseEvh.getValue(),
-                  [=](const executor::TaskExecutor::CallbackArgs&) { _processDryRunResult(term); })
+                  [=](const executor::TaskExecutor::CallbackArgs&) {
+                      _processDryRunResult(term, reason);
+                  })
         .status_with_transitional_ignore();
     lossGuard.dismiss();
 }
 
-void ReplicationCoordinatorImpl::_processDryRunResult(long long originalTerm) {
+void ReplicationCoordinatorImpl::_processDryRunResult(
+    long long originalTerm, TopologyCoordinator::StartElectionReason reason) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     LoseElectionDryRunGuardV1 lossGuard(this);
 
@@ -205,11 +209,14 @@ void ReplicationCoordinatorImpl::_processDryRunResult(long long originalTerm) {
     long long newTerm = originalTerm + 1;
     log() << "dry election run succeeded, running for election in term " << newTerm;
 
-    _startRealElection_inlock(newTerm);
+    _startRealElection_inlock(newTerm, reason);
     lossGuard.dismiss();
 }
 
-void ReplicationCoordinatorImpl::_startRealElection_inlock(long long newTerm) {
+void ReplicationCoordinatorImpl::_startRealElection_inlock(
+    long long newTerm, TopologyCoordinator::StartElectionReason reason) {
+    ReplicationMetrics::get(getServiceContext()).incrementNumElectionsCalledForReason(reason);
+
     LoseElectionDryRunGuardV1 lossGuard(this);
 
     TopologyCoordinator::UpdateTermResult updateTermResult;

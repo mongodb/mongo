@@ -15,6 +15,8 @@ rst.awaitReplication();
 var primary = rst.getPrimary();
 var secondary = rst.getSecondary();
 
+const initialSecondaryStatus = assert.commandWorked(secondary.adminCommand({serverStatus: 1}));
+
 // Step up the primary. Return OK because it's already the primary.
 var res = primary.adminCommand({replSetStepUp: 1});
 assert.commandWorked(res);
@@ -42,6 +44,24 @@ assert.soonNoExcept(function() {
 
 // Make sure the step up succeeded.
 assert.eq(secondary, rst.getPrimary());
+
+// Verifies that the given election reason counter is incremented in the way we expect.
+function verifyServerStatusChange(initialStatus, newStatus, fieldName, expectedIncrement) {
+    assert.eq(
+        initialStatus.electionMetrics[fieldName]["called"] + expectedIncrement,
+        newStatus.electionMetrics[fieldName]["called"],
+        "expected the 'called' field of " + fieldName + " to increase by " + expectedIncrement);
+}
+
+const newSecondaryStatus = assert.commandWorked(secondary.adminCommand({serverStatus: 1}));
+
+// Check that the 'called' field of stepUpCmd has been incremented in serverStatus, and that it
+// has not been incremented in any of the other election reason counters.
+verifyServerStatusChange(initialSecondaryStatus, newSecondaryStatus, "stepUpCmd", 1);
+verifyServerStatusChange(initialSecondaryStatus, newSecondaryStatus, "priorityTakeover", 0);
+verifyServerStatusChange(initialSecondaryStatus, newSecondaryStatus, "catchUpTakeover", 0);
+verifyServerStatusChange(initialSecondaryStatus, newSecondaryStatus, "electionTimeout", 0);
+verifyServerStatusChange(initialSecondaryStatus, newSecondaryStatus, "freezeTimeout", 0);
 
 rst.stopSet();
 })();
