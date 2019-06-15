@@ -107,7 +107,7 @@ public:
 
     /**
      * The create and drop methods on KVEngine are not transactional. Transactional semantics
-     * are provided by the KVStorageEngine code that calls these. For example, drop will be
+     * are provided by the StorageEngine code that calls these. For example, drop will be
      * called if a create is rolled back. A higher-level drop operation will only propagate to a
      * drop call on the KVEngine once the WUOW commits. Therefore drops will never be rolled
      * back and it is safe to immediately reclaim storage.

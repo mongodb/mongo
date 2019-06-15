@@ -31,7 +31,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/kv/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 
@@ -48,10 +48,10 @@ public:
                 "ephemeralForTest does not support --groupCollections",
                 !params.groupCollections);
 
-        KVStorageEngineOptions options;
+        StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
-        return new KVStorageEngine(new EphemeralForTestEngine(), options);
+        return new StorageEngineImpl(new EphemeralForTestEngine(), options);
     }
 
     virtual StringData getCanonicalName() const {

@@ -45,9 +45,9 @@ env.Library(
 
 # Should not be referenced outside this SConscript file.
 env.Library(
-    target='kv_storage_engine',
+    target='storage_engine',
     source=[
-        'kv_storage_engine.cpp',
+        'storage_engine_impl.cpp',
         'temporary_kv_record_store.cpp',
     ],
     LIBDEPS=[
@@ -107,7 +107,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
         '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
         'kv_engine_core',
-        'kv_storage_engine',
+        'storage_engine',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authmocks'
@@ -115,9 +115,9 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='kv_storage_engine_test',
+    target='storage_engine_test',
     source=[
-        'kv_storage_engine_test.cpp',
+        'storage_engine_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog_raii',
@@ -130,6 +130,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         'kv_engine_core',
-        'kv_storage_engine',
+        'storage_engine',
     ],
 )

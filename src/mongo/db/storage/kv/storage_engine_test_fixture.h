@@ -35,18 +35,18 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/kv/storage_engine_impl.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 
 namespace mongo {
 
-class KVStorageEngineTest : public ServiceContextMongoDTest {
+class StorageEngineTest : public ServiceContextMongoDTest {
 public:
-    KVStorageEngineTest(RepairAction repair)
+    StorageEngineTest(RepairAction repair)
         : ServiceContextMongoDTest("ephemeralForTest", repair),
-          _storageEngine(checked_cast<KVStorageEngine*>(getServiceContext()->getStorageEngine())) {}
+          _storageEngine(getServiceContext()->getStorageEngine()) {}
 
-    KVStorageEngineTest() : KVStorageEngineTest(RepairAction::kNoRepair) {}
+    StorageEngineTest() : StorageEngineTest(RepairAction::kNoRepair) {}
 
     /**
      * Create a collection in the catalog and in the KVEngine. Return the storage engine's `ident`.
@@ -168,12 +168,12 @@ public:
         return catalog->_removeEntry(opCtx, NamespaceString(ns));
     }
 
-    KVStorageEngine* _storageEngine;
+    StorageEngine* _storageEngine;
 };
 
-class KVStorageEngineRepairTest : public KVStorageEngineTest {
+class StorageEngineRepairTest : public StorageEngineTest {
 public:
-    KVStorageEngineRepairTest() : KVStorageEngineTest(RepairAction::kRepair) {}
+    StorageEngineRepairTest() : StorageEngineTest(RepairAction::kRepair) {}
 
     void tearDown() {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());

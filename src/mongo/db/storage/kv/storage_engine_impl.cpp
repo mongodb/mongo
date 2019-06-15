@@ -31,7 +31,7 @@
 #define LOG_FOR_RECOVERY(level) \
     MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
 
-#include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/kv/storage_engine_impl.h"
 
 #include <algorithm>
 
@@ -63,7 +63,7 @@ const std::string catalogInfo = "_mdb_catalog";
 const auto kCatalogLogLevel = logger::LogSeverity::Debug(2);
 }
 
-KVStorageEngine::KVStorageEngine(KVEngine* engine, KVStorageEngineOptions options)
+StorageEngineImpl::StorageEngineImpl(KVEngine* engine, StorageEngineOptions options)
     : _engine(engine),
       _options(std::move(options)),
       _dropPendingIdentReaper(engine),
@@ -81,7 +81,7 @@ KVStorageEngine::KVStorageEngine(KVEngine* engine, KVStorageEngineOptions option
     loadCatalog(&opCtx);
 }
 
-void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
+void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
     bool catalogExists = _engine->hasIdent(opCtx, catalogInfo);
     if (_options.forRepair && catalogExists) {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
@@ -235,9 +235,9 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
     startingAfterUncleanShutdown(getGlobalServiceContext()) = false;
 }
 
-void KVStorageEngine::_initCollection(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      bool forRepair) {
+void StorageEngineImpl::_initCollection(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        bool forRepair) {
     auto catalogEntry = _catalog->makeCollectionCatalogEntry(opCtx, nss, forRepair);
     auto uuid = catalogEntry->getCollectionOptions(opCtx).uuid.get();
 
@@ -248,7 +248,7 @@ void KVStorageEngine::_initCollection(OperationContext* opCtx,
     collectionCatalog.registerCollection(uuid, std::move(catalogEntry), std::move(collection));
 }
 
-void KVStorageEngine::closeCatalog(OperationContext* opCtx) {
+void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {
     dassert(opCtx->lockState()->isLocked());
     if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOG_FOR_RECOVERY(kCatalogLogLevel) << "loadCatalog:";
@@ -260,9 +260,9 @@ void KVStorageEngine::closeCatalog(OperationContext* opCtx) {
     _catalogRecordStore.reset();
 }
 
-Status KVStorageEngine::_recoverOrphanedCollection(OperationContext* opCtx,
-                                                   const NamespaceString& collectionName,
-                                                   StringData collectionIdent) {
+Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
+                                                     const NamespaceString& collectionName,
+                                                     StringData collectionIdent) {
     if (!_options.forRepair) {
         return {ErrorCodes::IllegalOperation, "Orphan recovery only supported in repair"};
     }
@@ -303,7 +303,7 @@ Status KVStorageEngine::_recoverOrphanedCollection(OperationContext* opCtx,
  * rebuild the index.
  */
 StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>>
-KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
+StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
     // Gather all tables known to the storage engine and drop those that aren't cross-referenced
     // in the _mdb_catalog. This can happen for two reasons.
     //
@@ -498,11 +498,11 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
     return ret;
 }
 
-std::string KVStorageEngine::getFilesystemPathForDb(const std::string& dbName) const {
+std::string StorageEngineImpl::getFilesystemPathForDb(const std::string& dbName) const {
     return _catalog->getFilesystemPathForDb(dbName);
 }
 
-void KVStorageEngine::cleanShutdown() {
+void StorageEngineImpl::cleanShutdown() {
     if (_timestampMonitor) {
         _timestampMonitor->removeListener(&_minOfCheckpointAndOldestTimestampListener);
     }
@@ -519,9 +519,9 @@ void KVStorageEngine::cleanShutdown() {
     // intentionally not deleting _engine
 }
 
-KVStorageEngine::~KVStorageEngine() {}
+StorageEngineImpl::~StorageEngineImpl() {}
 
-void KVStorageEngine::finishInit() {
+void StorageEngineImpl::finishInit() {
     if (_engine->supportsRecoveryTimestamp()) {
         _timestampMonitor = std::make_unique<TimestampMonitor>(
             _engine.get(), getGlobalServiceContext()->getPeriodicRunner());
@@ -530,7 +530,7 @@ void KVStorageEngine::finishInit() {
     }
 }
 
-RecoveryUnit* KVStorageEngine::newRecoveryUnit() {
+RecoveryUnit* StorageEngineImpl::newRecoveryUnit() {
     if (!_engine) {
         // shutdown
         return nullptr;
@@ -538,16 +538,16 @@ RecoveryUnit* KVStorageEngine::newRecoveryUnit() {
     return _engine->newRecoveryUnit();
 }
 
-std::vector<std::string> KVStorageEngine::listDatabases() const {
+std::vector<std::string> StorageEngineImpl::listDatabases() const {
     return CollectionCatalog::get(getGlobalServiceContext()).getAllDbNames();
 }
 
-Status KVStorageEngine::closeDatabase(OperationContext* opCtx, StringData db) {
+Status StorageEngineImpl::closeDatabase(OperationContext* opCtx, StringData db) {
     // This is ok to be a no-op as there is no database layer in kv.
     return Status::OK();
 }
 
-Status KVStorageEngine::dropDatabase(OperationContext* opCtx, StringData db) {
+Status StorageEngineImpl::dropDatabase(OperationContext* opCtx, StringData db) {
     {
         auto dbs = CollectionCatalog::get(opCtx).getAllDbNames();
         if (std::count(dbs.begin(), dbs.end(), db.toString()) == 0) {
@@ -568,8 +568,8 @@ Status KVStorageEngine::dropDatabase(OperationContext* opCtx, StringData db) {
  * Returns the first `dropCollection` error that this method encounters. This method will attempt
  * to drop all collections, regardless of the error status.
  */
-Status KVStorageEngine::_dropCollectionsNoTimestamp(OperationContext* opCtx,
-                                                    std::vector<NamespaceString>& toDrop) {
+Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
+                                                      std::vector<NamespaceString>& toDrop) {
     // On primaries, this method will be called outside of any `TimestampBlock` state meaning the
     // "commit timestamp" will not be set. For this case, this method needs no special logic to
     // avoid timestamping the upcoming writes.
@@ -611,11 +611,11 @@ Status KVStorageEngine::_dropCollectionsNoTimestamp(OperationContext* opCtx,
     return firstError;
 }
 
-int KVStorageEngine::flushAllFiles(OperationContext* opCtx, bool sync) {
+int StorageEngineImpl::flushAllFiles(OperationContext* opCtx, bool sync) {
     return _engine->flushAllFiles(opCtx, sync);
 }
 
-Status KVStorageEngine::beginBackup(OperationContext* opCtx) {
+Status StorageEngineImpl::beginBackup(OperationContext* opCtx) {
     // We should not proceed if we are already in backup mode
     if (_inBackupMode)
         return Status(ErrorCodes::BadValue, "Already in Backup Mode");
@@ -625,39 +625,40 @@ Status KVStorageEngine::beginBackup(OperationContext* opCtx) {
     return status;
 }
 
-void KVStorageEngine::endBackup(OperationContext* opCtx) {
+void StorageEngineImpl::endBackup(OperationContext* opCtx) {
     // We should never reach here if we aren't already in backup mode
     invariant(_inBackupMode);
     _engine->endBackup(opCtx);
     _inBackupMode = false;
 }
 
-StatusWith<std::vector<std::string>> KVStorageEngine::beginNonBlockingBackup(
+StatusWith<std::vector<std::string>> StorageEngineImpl::beginNonBlockingBackup(
     OperationContext* opCtx) {
     return _engine->beginNonBlockingBackup(opCtx);
 }
 
-void KVStorageEngine::endNonBlockingBackup(OperationContext* opCtx) {
+void StorageEngineImpl::endNonBlockingBackup(OperationContext* opCtx) {
     return _engine->endNonBlockingBackup(opCtx);
 }
 
-StatusWith<std::vector<std::string>> KVStorageEngine::extendBackupCursor(OperationContext* opCtx) {
+StatusWith<std::vector<std::string>> StorageEngineImpl::extendBackupCursor(
+    OperationContext* opCtx) {
     return _engine->extendBackupCursor(opCtx);
 }
 
-bool KVStorageEngine::isDurable() const {
+bool StorageEngineImpl::isDurable() const {
     return _engine->isDurable();
 }
 
-bool KVStorageEngine::isEphemeral() const {
+bool StorageEngineImpl::isEphemeral() const {
     return _engine->isEphemeral();
 }
 
-SnapshotManager* KVStorageEngine::getSnapshotManager() const {
+SnapshotManager* StorageEngineImpl::getSnapshotManager() const {
     return _engine->getSnapshotManager();
 }
 
-Status KVStorageEngine::repairRecordStore(OperationContext* opCtx, const NamespaceString& nss) {
+Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx, const NamespaceString& nss) {
     auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
     invariant(repairObserver->isIncomplete());
 
@@ -680,7 +681,7 @@ Status KVStorageEngine::repairRecordStore(OperationContext* opCtx, const Namespa
     return Status::OK();
 }
 
-std::unique_ptr<TemporaryRecordStore> KVStorageEngine::makeTemporaryRecordStore(
+std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStore(
     OperationContext* opCtx) {
     std::unique_ptr<RecordStore> rs =
         _engine->makeTemporaryRecordStore(opCtx, _catalog->newInternalIdent());
@@ -688,50 +689,50 @@ std::unique_ptr<TemporaryRecordStore> KVStorageEngine::makeTemporaryRecordStore(
     return std::make_unique<TemporaryKVRecordStore>(getEngine(), std::move(rs));
 }
 
-void KVStorageEngine::setJournalListener(JournalListener* jl) {
+void StorageEngineImpl::setJournalListener(JournalListener* jl) {
     _engine->setJournalListener(jl);
 }
 
-void KVStorageEngine::setStableTimestamp(Timestamp stableTimestamp, bool force) {
+void StorageEngineImpl::setStableTimestamp(Timestamp stableTimestamp, bool force) {
     _engine->setStableTimestamp(stableTimestamp, force);
 }
 
-void KVStorageEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
+void StorageEngineImpl::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
     _initialDataTimestamp = initialDataTimestamp;
     _engine->setInitialDataTimestamp(initialDataTimestamp);
 }
 
-void KVStorageEngine::setOldestTimestampFromStable() {
+void StorageEngineImpl::setOldestTimestampFromStable() {
     _engine->setOldestTimestampFromStable();
 }
 
-void KVStorageEngine::setOldestTimestamp(Timestamp newOldestTimestamp) {
+void StorageEngineImpl::setOldestTimestamp(Timestamp newOldestTimestamp) {
     const bool force = true;
     _engine->setOldestTimestamp(newOldestTimestamp, force);
 }
 
-void KVStorageEngine::setOldestActiveTransactionTimestampCallback(
+void StorageEngineImpl::setOldestActiveTransactionTimestampCallback(
     StorageEngine::OldestActiveTransactionTimestampCallback callback) {
     _engine->setOldestActiveTransactionTimestampCallback(callback);
 }
 
-int64_t KVStorageEngine::getCacheOverflowTableInsertCount(OperationContext* opCtx) const {
+int64_t StorageEngineImpl::getCacheOverflowTableInsertCount(OperationContext* opCtx) const {
     return _engine->getCacheOverflowTableInsertCount(opCtx);
 }
 
-void KVStorageEngine::setCacheOverflowTableInsertCountForTest(int insertCount) {
+void StorageEngineImpl::setCacheOverflowTableInsertCountForTest(int insertCount) {
     return _engine->setCacheOverflowTableInsertCountForTest(insertCount);
 }
 
-bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
+bool StorageEngineImpl::supportsRecoverToStableTimestamp() const {
     return _engine->supportsRecoverToStableTimestamp();
 }
 
-bool KVStorageEngine::supportsRecoveryTimestamp() const {
+bool StorageEngineImpl::supportsRecoveryTimestamp() const {
     return _engine->supportsRecoveryTimestamp();
 }
 
-StatusWith<Timestamp> KVStorageEngine::recoverToStableTimestamp(OperationContext* opCtx) {
+StatusWith<Timestamp> StorageEngineImpl::recoverToStableTimestamp(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
 
     // The "feature document" should not be rolled back. Perform a non-timestamped update to the
@@ -757,47 +758,47 @@ StatusWith<Timestamp> KVStorageEngine::recoverToStableTimestamp(OperationContext
     return {swTimestamp.getValue()};
 }
 
-boost::optional<Timestamp> KVStorageEngine::getRecoveryTimestamp() const {
+boost::optional<Timestamp> StorageEngineImpl::getRecoveryTimestamp() const {
     return _engine->getRecoveryTimestamp();
 }
 
-boost::optional<Timestamp> KVStorageEngine::getLastStableRecoveryTimestamp() const {
+boost::optional<Timestamp> StorageEngineImpl::getLastStableRecoveryTimestamp() const {
     return _engine->getLastStableRecoveryTimestamp();
 }
 
-bool KVStorageEngine::supportsReadConcernSnapshot() const {
+bool StorageEngineImpl::supportsReadConcernSnapshot() const {
     return _engine->supportsReadConcernSnapshot();
 }
 
-bool KVStorageEngine::supportsReadConcernMajority() const {
+bool StorageEngineImpl::supportsReadConcernMajority() const {
     return _engine->supportsReadConcernMajority();
 }
 
-bool KVStorageEngine::supportsPendingDrops() const {
+bool StorageEngineImpl::supportsPendingDrops() const {
     return supportsReadConcernMajority();
 }
 
-void KVStorageEngine::clearDropPendingState() {
+void StorageEngineImpl::clearDropPendingState() {
     _dropPendingIdentReaper.clearDropPendingState();
 }
 
-void KVStorageEngine::replicationBatchIsComplete() const {
+void StorageEngineImpl::replicationBatchIsComplete() const {
     return _engine->replicationBatchIsComplete();
 }
 
-Timestamp KVStorageEngine::getAllCommittedTimestamp() const {
+Timestamp StorageEngineImpl::getAllCommittedTimestamp() const {
     return _engine->getAllCommittedTimestamp();
 }
 
-Timestamp KVStorageEngine::getOldestOpenReadTimestamp() const {
+Timestamp StorageEngineImpl::getOldestOpenReadTimestamp() const {
     return _engine->getOldestOpenReadTimestamp();
 }
 
-boost::optional<Timestamp> KVStorageEngine::getOplogNeededForCrashRecovery() const {
+boost::optional<Timestamp> StorageEngineImpl::getOplogNeededForCrashRecovery() const {
     return _engine->getOplogNeededForCrashRecovery();
 }
 
-void KVStorageEngine::_dumpCatalog(OperationContext* opCtx) {
+void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
     auto catalogRs = _catalogRecordStore.get();
     auto cursor = catalogRs->getCursor(opCtx);
     boost::optional<Record> rec = cursor->next();
@@ -811,13 +812,13 @@ void KVStorageEngine::_dumpCatalog(OperationContext* opCtx) {
     opCtx->recoveryUnit()->abandonSnapshot();
 }
 
-void KVStorageEngine::addDropPendingIdent(const Timestamp& dropTimestamp,
-                                          const NamespaceString& nss,
-                                          StringData ident) {
+void StorageEngineImpl::addDropPendingIdent(const Timestamp& dropTimestamp,
+                                            const NamespaceString& nss,
+                                            StringData ident) {
     _dropPendingIdentReaper.addDropPendingIdent(dropTimestamp, nss, ident);
 }
 
-void KVStorageEngine::_onMinOfCheckpointAndOldestTimestampChanged(const Timestamp& timestamp) {
+void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(const Timestamp& timestamp) {
     if (timestamp.isNull()) {
         return;
     }
@@ -838,7 +839,7 @@ void KVStorageEngine::_onMinOfCheckpointAndOldestTimestampChanged(const Timestam
     }
 }
 
-KVStorageEngine::TimestampMonitor::TimestampMonitor(KVEngine* engine, PeriodicRunner* runner)
+StorageEngineImpl::TimestampMonitor::TimestampMonitor(KVEngine* engine, PeriodicRunner* runner)
     : _engine(engine), _running(false), _periodicRunner(runner) {
     _currentTimestamps.checkpoint = _engine->getCheckpointTimestamp();
     _currentTimestamps.oldest = _engine->getOldestTimestamp();
@@ -850,13 +851,13 @@ KVStorageEngine::TimestampMonitor::TimestampMonitor(KVEngine* engine, PeriodicRu
         : _currentTimestamps.checkpoint;
 }
 
-KVStorageEngine::TimestampMonitor::~TimestampMonitor() {
+StorageEngineImpl::TimestampMonitor::~TimestampMonitor() {
     log() << "Timestamp monitor shutting down";
     stdx::lock_guard<stdx::mutex> lock(_monitorMutex);
     invariant(_listeners.empty());
 }
 
-void KVStorageEngine::TimestampMonitor::startup() {
+void StorageEngineImpl::TimestampMonitor::startup() {
     invariant(!_running);
 
     log() << "Timestamp monitor starting";
@@ -925,7 +926,7 @@ void KVStorageEngine::TimestampMonitor::startup() {
     _running = true;
 }
 
-void KVStorageEngine::TimestampMonitor::notifyAll(TimestampType type, Timestamp newTimestamp) {
+void StorageEngineImpl::TimestampMonitor::notifyAll(TimestampType type, Timestamp newTimestamp) {
     stdx::lock_guard<stdx::mutex> lock(_monitorMutex);
     for (auto& listener : _listeners) {
         if (listener->getType() == type) {
@@ -934,7 +935,7 @@ void KVStorageEngine::TimestampMonitor::notifyAll(TimestampType type, Timestamp 
     }
 }
 
-void KVStorageEngine::TimestampMonitor::addListener(TimestampListener* listener) {
+void StorageEngineImpl::TimestampMonitor::addListener(TimestampListener* listener) {
     stdx::lock_guard<stdx::mutex> lock(_monitorMutex);
     if (std::find(_listeners.begin(), _listeners.end(), listener) != _listeners.end()) {
         bool listenerAlreadyRegistered = true;
@@ -943,7 +944,7 @@ void KVStorageEngine::TimestampMonitor::addListener(TimestampListener* listener)
     _listeners.push_back(listener);
 }
 
-void KVStorageEngine::TimestampMonitor::removeListener(TimestampListener* listener) {
+void StorageEngineImpl::TimestampMonitor::removeListener(TimestampListener* listener) {
     stdx::lock_guard<stdx::mutex> lock(_monitorMutex);
     if (std::find(_listeners.begin(), _listeners.end(), listener) == _listeners.end()) {
         bool listenerNotRegistered = true;
@@ -952,7 +953,7 @@ void KVStorageEngine::TimestampMonitor::removeListener(TimestampListener* listen
     _listeners.erase(std::remove(_listeners.begin(), _listeners.end(), listener));
 }
 
-int64_t KVStorageEngine::sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) {
+int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) {
     int64_t size = 0;
 
     catalog::forEachCollectionFromDb(

@@ -102,7 +102,7 @@ if wiredtiger:
             'storage_wiredtiger_core',
             'storage_wiredtiger_customization_hooks',
             '$BUILD_DIR/mongo/db/db_raii',
-            '$BUILD_DIR/mongo/db/storage/kv/kv_storage_engine',
+            '$BUILD_DIR/mongo/db/storage/kv/storage_engine',
             '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
             '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
         ],

@@ -156,7 +156,7 @@ if not has_option('noshell') and usemozjs:
             "$BUILD_DIR/mongo/db/storage/biggie/storage_biggie",
             "$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test",
             "$BUILD_DIR/mongo/db/storage/kv/kv_engine_core",
-            "$BUILD_DIR/mongo/db/storage/kv/kv_storage_engine",
+            "$BUILD_DIR/mongo/db/storage/kv/storage_engine",
             "$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger" if wiredtiger else [],
             "$BUILD_DIR/mongo/transport/transport_layer_manager",
             "$BUILD_DIR/mongo/transport/message_compressor_options_server",
