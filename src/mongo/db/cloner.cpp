@@ -60,6 +60,7 @@
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
@@ -611,8 +612,9 @@ Status Cloner::createCollectionsForDb(
                     // exists on the target, we check if the existing collection's options and
                     // UUID match those of the one we're trying to create. If they do, we treat
                     // the create as a no-op; if they don't match, we return an error.
-                    auto existingOpts =
-                        collection->getCatalogEntry()->getCollectionOptions(opCtx).toBSON();
+                    auto existingOpts = DurableCatalog::get(opCtx)
+                                            ->getCollectionOptions(opCtx, collection->ns())
+                                            .toBSON();
                     UnorderedFieldsBSONObjComparator bsonCmp;
 
                     optionsBuilder.append(params.collectionInfo["info"]["uuid"]);

@@ -50,6 +50,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
@@ -243,7 +244,8 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
                 }
 
                 if (status.isOK() && ret.getValue() == SpecialFormatInserted::LongTypeBitsInserted)
-                    _btreeState->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
+                    DurableCatalog::get(opCtx)->setIndexKeyStringWithLongTypeBitsExistsOnDisk(
+                        opCtx);
             }
             if (isFatalError(opCtx, status, key)) {
                 return status;
@@ -487,7 +489,8 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
                     _newInterface->insert(opCtx, key, recordId, ticket.dupsAllowed);
                 status = ret.getStatus();
                 if (status.isOK() && ret.getValue() == SpecialFormatInserted::LongTypeBitsInserted)
-                    _btreeState->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
+                    DurableCatalog::get(opCtx)->setIndexKeyStringWithLongTypeBitsExistsOnDisk(
+                        opCtx);
             }
             if (isFatalError(opCtx, status, key)) {
                 return status;
@@ -688,7 +691,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
             StatusWith<SpecialFormatInserted> ret = builder->addKey(data.first, data.second);
             status = ret.getStatus();
             if (status.isOK() && ret.getValue() == SpecialFormatInserted::LongTypeBitsInserted)
-                _btreeState->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
+                DurableCatalog::get(opCtx)->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
         }
 
         if (!status.isOK()) {
@@ -726,7 +729,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
     // tracker bit so that downgrade binary which cannot read the long TypeBits fails to
     // start up.
     if (specialFormatInserted == SpecialFormatInserted::LongTypeBitsInserted)
-        _btreeState->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
+        DurableCatalog::get(opCtx)->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
     wunit.commit();
     return Status::OK();
 }

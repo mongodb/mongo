@@ -48,6 +48,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/uuid.h"
 
@@ -154,8 +155,7 @@ public:
                     str::stream() << "ns does not exist: " << ctx.getNss().ns(),
                     collection);
 
-            const CollectionCatalogEntry* cce = collection->getCatalogEntry();
-            invariant(cce);
+            auto durableCatalog = DurableCatalog::get(opCtx);
 
             nss = ctx.getNss();
 
@@ -165,7 +165,7 @@ public:
             vector<string> indexNames;
             writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {
                 indexNames.clear();
-                cce->getAllIndexes(opCtx, &indexNames);
+                durableCatalog->getAllIndexes(opCtx, nss, &indexNames);
             });
 
             auto ws = std::make_unique<WorkingSet>();
@@ -173,16 +173,18 @@ public:
 
             for (size_t i = 0; i < indexNames.size(); i++) {
                 auto indexSpec = writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {
-                    if (includeBuildUUIDs && !cce->isIndexReady(opCtx, indexNames[i])) {
+                    if (includeBuildUUIDs &&
+                        !durableCatalog->isIndexReady(opCtx, nss, indexNames[i])) {
                         BSONObjBuilder builder;
-                        builder.append("spec"_sd, cce->getIndexSpec(opCtx, indexNames[i]));
+                        builder.append("spec"_sd,
+                                       durableCatalog->getIndexSpec(opCtx, nss, indexNames[i]));
 
                         // TODO(SERVER-37980): Replace with index build UUID.
                         auto indexBuildUUID = UUID::gen();
                         indexBuildUUID.appendToBuilder(&builder, "buildUUID"_sd);
                         return builder.obj();
                     }
-                    return cce->getIndexSpec(opCtx, indexNames[i]);
+                    return durableCatalog->getIndexSpec(opCtx, nss, indexNames[i]);
                 });
 
                 WorkingSetID id = ws->allocate();

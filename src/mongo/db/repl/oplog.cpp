@@ -83,6 +83,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_participant.h"
@@ -704,7 +705,7 @@ void createOplog(OperationContext* opCtx,
     if (collection) {
         if (replSettings.getOplogSizeBytes() != 0) {
             const CollectionOptions oplogOpts =
-                collection->getCatalogEntry()->getCollectionOptions(opCtx);
+                DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, oplogCollectionName);
 
             int o = (int)(oplogOpts.cappedSize / (1024 * 1024));
             int n = (int)(replSettings.getOplogSizeBytes() / (1024 * 1024));

@@ -72,6 +72,7 @@
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/s/client/shard_registry.h"
@@ -1227,8 +1228,6 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(uuid);
             invariant(collection);
 
-            auto cce = collection->getCatalogEntry();
-
             auto infoResult = rollbackSource.getCollectionInfoByUUID(nss->db().toString(), uuid);
 
             if (!infoResult.isOK()) {
@@ -1275,7 +1274,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             WriteUnitOfWork wuow(opCtx);
 
             // Set collection to whatever temp status is on the sync source.
-            cce->setIsTemp(opCtx, options.temp);
+            DurableCatalog::get(opCtx)->setIsTemp(opCtx, *nss, options.temp);
 
             // Set any document validation options. We update the validator fields without
             // parsing/validation, since we fetched the options object directly from the sync
@@ -1295,8 +1294,9 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             wuow.commit();
 
             LOG(1) << "Resynced collection metadata for collection: " << *nss << ", UUID: " << uuid
-                   << ", with: " << redact(info)
-                   << ", to: " << redact(cce->getCollectionOptions(opCtx).toBSON());
+                   << ", with: " << redact(info) << ", to: "
+                   << redact(
+                          DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, *nss).toBSON());
         }
 
         // Since we read from the sync source to retrieve the metadata of the

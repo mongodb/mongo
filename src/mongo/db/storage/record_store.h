@@ -231,8 +231,8 @@ public:
  * an OperationContext may throw a WriteConflictException.
  *
  * This class must be thread-safe for document-level locking storage engines. In addition, for
- * storage engines implementing the KVEngine some methods must be thread safe, see KVCatalog. Only
- * for MMAPv1 is this class not thread-safe.
+ * storage engines implementing the KVEngine some methods must be thread safe, see DurableCatalog.
+ * Only for MMAPv1 is this class not thread-safe.
  */
 class RecordStore {
     RecordStore(const RecordStore&) = delete;

@@ -57,7 +57,9 @@ public:
     class FactoryImpl : public Factory {
     public:
         std::unique_ptr<Collection> make(
-            OperationContext* opCtx, CollectionCatalogEntry* collectionCatalogEntry) const final;
+            OperationContext* opCtx,
+            CollectionUUID uuid,
+            CollectionCatalogEntry* collectionCatalogEntry) const final;
     };
 
     bool ok() const final {

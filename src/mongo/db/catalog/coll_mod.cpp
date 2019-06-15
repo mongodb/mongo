@@ -52,6 +52,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/fail_point_service.h"
@@ -329,7 +330,8 @@ Status _collModInternal(OperationContext* opCtx,
     // provide to the OpObserver. TTL index updates aren't a part of collection options so we
     // save the relevant TTL index data in a separate object.
 
-    CollectionOptions oldCollOptions = coll->getCatalogEntry()->getCollectionOptions(opCtx);
+    CollectionOptions oldCollOptions = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, nss);
+
     boost::optional<TTLCollModInfo> ttlInfo;
 
     // Handle collMod operation type appropriately.
@@ -343,8 +345,8 @@ Status _collModInternal(OperationContext* opCtx,
             result->appendAs(oldExpireSecs, "expireAfterSeconds_old");
 
             // Change the value of "expireAfterSeconds" on disk.
-            coll->getCatalogEntry()->updateTTLSetting(
-                opCtx, cmr.idx->indexName(), newExpireSecs.safeNumberLong());
+            DurableCatalog::get(opCtx)->updateTTLSetting(
+                opCtx, coll->ns(), cmr.idx->indexName(), newExpireSecs.safeNumberLong());
 
             // Notify the index catalog that the definition of this index changed.
             cmr.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmr.idx);
@@ -377,7 +379,7 @@ Status _collModInternal(OperationContext* opCtx,
         // upgrade collMod.
         invariant(cmdObj.nFields() == 1);
         std::vector<std::string> indexNames;
-        coll->getCatalogEntry()->getAllUniqueIndexes(opCtx, &indexNames);
+        DurableCatalog::get(opCtx)->getAllUniqueIndexes(opCtx, nss, &indexNames);
 
         for (size_t i = 0; i < indexNames.size(); i++) {
             const IndexDescriptor* desc =
@@ -385,7 +387,7 @@ Status _collModInternal(OperationContext* opCtx,
             invariant(desc);
 
             // Update index metadata in storage engine.
-            coll->getCatalogEntry()->updateIndexMetadata(opCtx, desc);
+            DurableCatalog::get(opCtx)->updateIndexMetadata(opCtx, nss, desc);
 
             // Refresh the in-memory instance of the index.
             desc = coll->getIndexCatalog()->refreshEntry(opCtx, desc);

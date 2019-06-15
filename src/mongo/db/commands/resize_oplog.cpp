@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -115,8 +116,7 @@ public:
         WriteUnitOfWork wunit(opCtx);
         Status status = coll->getRecordStore()->updateCappedSize(opCtx, size);
         uassertStatusOK(status);
-        CollectionCatalogEntry* entry = coll->getCatalogEntry();
-        entry->updateCappedSize(opCtx, size);
+        DurableCatalog::get(opCtx)->updateCappedSize(opCtx, coll->ns(), size);
         wunit.commit();
         LOG(0) << "replSetResizeOplog success, currentSize:" << size;
         return true;

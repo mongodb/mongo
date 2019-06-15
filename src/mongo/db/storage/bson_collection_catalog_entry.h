@@ -51,31 +51,6 @@ public:
 
     virtual ~BSONCollectionCatalogEntry() {}
 
-    virtual CollectionOptions getCollectionOptions(OperationContext* opCtx) const;
-
-    virtual int getTotalIndexCount(OperationContext* opCtx) const;
-
-    virtual int getCompletedIndexCount(OperationContext* opCtx) const;
-
-    virtual BSONObj getIndexSpec(OperationContext* opCtx, StringData idxName) const;
-
-    virtual void getAllIndexes(OperationContext* opCtx, std::vector<std::string>* names) const;
-
-    virtual void getReadyIndexes(OperationContext* opCtx, std::vector<std::string>* names) const;
-
-    virtual void getAllUniqueIndexes(OperationContext* opCtx,
-                                     std::vector<std::string>* names) const;
-
-    virtual bool isIndexMultikey(OperationContext* opCtx,
-                                 StringData indexName,
-                                 MultikeyPaths* multikeyPaths) const;
-
-    virtual bool isIndexReady(OperationContext* opCtx, StringData indexName) const;
-
-    virtual bool isIndexPresent(OperationContext* opCtx, StringData indexName) const;
-
-    virtual KVPrefix getIndexPrefix(OperationContext* opCtx, StringData indexName) const;
-
     // ------ for implementors
 
     struct IndexMetaData {
@@ -128,8 +103,5 @@ public:
         std::vector<IndexMetaData> indexes;
         KVPrefix prefix = KVPrefix::kNotPrefixed;
     };
-
-protected:
-    virtual MetaData _getMetaData(OperationContext* opCtx) const = 0;
 };
 }

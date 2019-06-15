@@ -38,76 +38,16 @@
 
 namespace mongo {
 
-class KVCatalog;
 class StorageEngineInterface;
 
 class KVCollectionCatalogEntry final : public BSONCollectionCatalogEntry {
 public:
     KVCollectionCatalogEntry(StorageEngineInterface* engine,
-                             KVCatalog* catalog,
                              StringData ns,
                              StringData ident,
                              std::unique_ptr<RecordStore> rs);
 
-    ~KVCollectionCatalogEntry() final;
-
-    int getMaxAllowedIndexes() const final {
-        return 64;
-    };
-
-    bool setIndexIsMultikey(OperationContext* opCtx,
-                            StringData indexName,
-                            const MultikeyPaths& multikeyPaths) final;
-
-    // TODO SERVER-36385 Remove this function: we don't set the feature tracker bit in 4.4 because
-    // 4.4 can only downgrade to 4.2 which can read long TypeBits.
-    void setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx) final;
-
-    Status removeIndex(OperationContext* opCtx, StringData indexName) final;
-
-    Status prepareForIndexBuild(OperationContext* opCtx,
-                                const IndexDescriptor* spec,
-                                IndexBuildProtocol indexBuildProtocol,
-                                bool isBackgroundSecondaryBuild) final;
-
-    bool isTwoPhaseIndexBuild(OperationContext* opCtx, StringData indexName) const final;
-
-    long getIndexBuildVersion(OperationContext* opCtx, StringData indexName) const final;
-
-    void setIndexBuildScanning(OperationContext* opCtx,
-                               StringData indexName,
-                               std::string sideWritesIdent,
-                               boost::optional<std::string> constraintViolationsIdent) final;
-
-    bool isIndexBuildScanning(OperationContext* opCtx, StringData indexName) const final;
-
-    void setIndexBuildDraining(OperationContext* opCtx, StringData indexName) final;
-
-    bool isIndexBuildDraining(OperationContext* opCtx, StringData indexName) const final;
-
-    void indexBuildSuccess(OperationContext* opCtx, StringData indexName) final;
-
-    boost::optional<std::string> getSideWritesIdent(OperationContext* opCtx,
-                                                    StringData indexName) const final;
-
-    boost::optional<std::string> getConstraintViolationsIdent(OperationContext* opCtx,
-                                                              StringData indexName) const final;
-    void updateTTLSetting(OperationContext* opCtx,
-                          StringData idxName,
-                          long long newExpireSeconds) final;
-
-    void updateIndexMetadata(OperationContext* opCtx, const IndexDescriptor* desc) final;
-
-    void updateValidator(OperationContext* opCtx,
-                         const BSONObj& validator,
-                         StringData validationLevel,
-                         StringData validationAction) final;
-
-    void setIsTemp(OperationContext* opCtx, bool isTemp);
-
-    void updateCappedSize(OperationContext*, long long int) final;
-
-    bool isEqualToMetadataUUID(OperationContext* opCtx, OptionalCollectionUUID uuid) final;
+    ~KVCollectionCatalogEntry() final {}
 
     RecordStore* getRecordStore() {
         return _recordStore.get();
@@ -116,15 +56,8 @@ public:
         return _recordStore.get();
     }
 
-protected:
-    MetaData _getMetaData(OperationContext* opCtx) const final;
-
 private:
-    class AddIndexChange;
-    class RemoveIndexChange;
-
     StorageEngineInterface* const _engine;  // not owned
-    KVCatalog* _catalog;                    // not owned
     std::string _ident;
     std::unique_ptr<RecordStore> _recordStore;  // owned
 };

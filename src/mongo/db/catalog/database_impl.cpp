@@ -65,7 +65,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/db/storage/kv/kv_catalog.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -191,7 +191,7 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
 
     CollectionCatalog::CollectionInfoFn predicate =
         [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
-            return catalogEntry->getCollectionOptions(opCtx).temp;
+            return DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->ns()).temp;
         };
 
     catalog::forEachCollectionFromDb(opCtx, name(), MODE_X, callback, predicate);
@@ -464,7 +464,7 @@ void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
     LOG(1) << "dropCollection: " << nss << " - dropAllIndexes start";
     collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
 
-    invariant(collection->getCatalogEntry()->getTotalIndexCount(opCtx) == 0);
+    invariant(DurableCatalog::get(opCtx)->getTotalIndexCount(opCtx, nss) == 0);
     LOG(1) << "dropCollection: " << nss << " - dropAllIndexes done";
 }
 
@@ -474,8 +474,7 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
     UUID uuid = *collection->uuid();
     log() << "Finishing collection drop for " << nss << " (" << uuid << ").";
 
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto status = storageEngine->getCatalog()->dropCollection(opCtx, nss);
+    auto status = DurableCatalog::get(opCtx)->dropCollection(opCtx, nss);
     if (!status.isOK())
         return status;
 
@@ -532,8 +531,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     Top::get(opCtx->getServiceContext()).collectionDropped(fromNss);
 
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    Status status = storageEngine->getCatalog()->renameCollection(opCtx, fromNss, toNss, stayTemp);
+    Status status = DurableCatalog::get(opCtx)->renameCollection(opCtx, fromNss, toNss, stayTemp);
 
     // Set the namespace of 'collToRename' from within the CollectionCatalog. This is necessary
     // because
@@ -661,16 +659,15 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
           << " UUID: " << optionsWithUUID.uuid.get() << " and options: " << options.toBSON();
 
     // Create CollectionCatalogEntry
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto statusWithCatalogEntry = storageEngine->getCatalog()->createCollection(
+    auto statusWithCatalogEntry = DurableCatalog::get(opCtx)->createCollection(
         opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/);
     massertStatusOK(statusWithCatalogEntry.getStatus());
     std::unique_ptr<CollectionCatalogEntry> ownedCatalogEntry =
         std::move(statusWithCatalogEntry.getValue());
 
     // Create Collection object
-    std::unique_ptr<Collection> ownedCollection =
-        Collection::Factory::get(opCtx)->make(opCtx, ownedCatalogEntry.get());
+    std::unique_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
+        opCtx, optionsWithUUID.uuid.get(), ownedCatalogEntry.get());
     auto collection = ownedCollection.get();
     ownedCollection->init(opCtx);
 

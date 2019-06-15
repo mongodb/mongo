@@ -56,7 +56,7 @@ struct InsertDeleteOptions;
  */
 class IndexCatalogImpl : public IndexCatalog {
 public:
-    explicit IndexCatalogImpl(Collection* collection, int maxNumIndexesAllowed);
+    explicit IndexCatalogImpl(Collection* collection);
     ~IndexCatalogImpl() override;
 
     // must be called before used
@@ -483,7 +483,6 @@ private:
 
     int _magic;
     Collection* const _collection;
-    const int _maxNumIndexesAllowed;
 
     IndexCatalogEntryContainer _readyIndexes;
     IndexCatalogEntryContainer _buildingIndexes;

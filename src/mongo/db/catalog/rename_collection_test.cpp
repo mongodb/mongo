@@ -57,6 +57,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -370,8 +371,7 @@ CollectionOptions _getCollectionOptions(OperationContext* opCtx, const Namespace
     auto collection = autoColl.getCollection();
     ASSERT_TRUE(collection) << "Unable to get collections options for " << nss
                             << " because collection does not exist.";
-    auto catalogEntry = collection->getCatalogEntry();
-    return catalogEntry->getCollectionOptions(opCtx);
+    return DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, nss);
 }
 
 /**
@@ -399,8 +399,7 @@ bool _isTempCollection(OperationContext* opCtx, const NamespaceString& nss) {
     auto collection = autoColl.getCollection();
     ASSERT_TRUE(collection) << "Unable to check if " << nss
                             << " is a temporary collection because collection does not exist.";
-    auto catalogEntry = collection->getCatalogEntry();
-    auto options = catalogEntry->getCollectionOptions(opCtx);
+    auto options = _getCollectionOptions(opCtx, nss);
     return options.temp;
 }
 

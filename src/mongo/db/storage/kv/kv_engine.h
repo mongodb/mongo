@@ -141,6 +141,7 @@ public:
     }
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
+                                             const CollectionOptions& collOptions,
                                              StringData ident,
                                              const IndexDescriptor* desc) = 0;
 
@@ -155,11 +156,12 @@ public:
      *        share a table. Sharing indexes belonging to different databases is forbidden.
      */
     virtual Status createGroupedSortedDataInterface(OperationContext* opCtx,
+                                                    const CollectionOptions& collOptions,
                                                     StringData ident,
                                                     const IndexDescriptor* desc,
                                                     KVPrefix prefix) {
         invariant(prefix == KVPrefix::kNotPrefixed);
-        return createSortedDataInterface(opCtx, ident, desc);
+        return createSortedDataInterface(opCtx, collOptions, ident, desc);
     }
 
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) = 0;

@@ -38,8 +38,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/journal_listener.h"
-#include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
 #include "mongo/db/storage/kv/storage_engine_interface.h"
@@ -308,10 +309,10 @@ public:
                              const NamespaceString& nss,
                              StringData ident) override;
 
-    KVCatalog* getCatalog() {
+    DurableCatalog* getCatalog() {
         return _catalog.get();
     }
-    const KVCatalog* getCatalog() const {
+    const DurableCatalog* getCatalog() const {
         return _catalog.get();
     }
 

@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -705,7 +706,9 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
             [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
                 ASSERT_TRUE(
                     opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_NONE));
-                return catalogEntry->getCollectionOptions(opCtx).temp;
+                return DurableCatalog::get(opCtx)
+                    ->getCollectionOptions(opCtx, collection->ns())
+                    .temp;
             });
 
         ASSERT_EQUALS(numCollectionsTraversed, 2);
@@ -727,7 +730,9 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
             [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
                 ASSERT_TRUE(
                     opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_NONE));
-                return !catalogEntry->getCollectionOptions(opCtx).temp;
+                return !DurableCatalog::get(opCtx)
+                            ->getCollectionOptions(opCtx, collection->ns())
+                            .temp;
             });
 
         ASSERT_EQUALS(numCollectionsTraversed, 1);

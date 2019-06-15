@@ -96,9 +96,12 @@ public:
         }
     }
 
-    CollectionCatalogEntry* getCollectionCatalogEntry() {
-        return CollectionCatalog::get(getGlobalServiceContext())
-            .lookupCollectionCatalogEntryByNamespace(_nss);
+    NamespaceString ns() {
+        return _nss;
+    }
+
+    DurableCatalog* getCatalog() {
+        return _storageEngine.getCatalog();
     }
 
     std::string createIndex(BSONObj keyPattern,
@@ -116,8 +119,8 @@ public:
         {
             WriteUnitOfWork wuow(opCtx.get());
             const bool isSecondaryBackgroundIndexBuild = false;
-            ASSERT_OK(getCollectionCatalogEntry()->prepareForIndexBuild(
-                opCtx.get(), &desc, protocol, isSecondaryBackgroundIndexBuild));
+            ASSERT_OK(_storageEngine.getCatalog()->prepareForIndexBuild(
+                opCtx.get(), _nss, &desc, protocol, isSecondaryBackgroundIndexBuild));
             wuow.commit();
         }
 
@@ -159,106 +162,100 @@ private:
 
 TEST_F(KVCollectionCatalogEntryTest, MultikeyPathsForBtreeIndexInitializedToVectorOfEmptySets) {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
+    DurableCatalog* catalog = getCatalog();
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(!collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(!catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {std::set<size_t>{}, std::set<size_t>{}});
     }
 }
 
 TEST_F(KVCollectionCatalogEntryTest, CanSetIndividualPathComponentOfBtreeIndexAsMultikey) {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
-    ASSERT(collEntry->setIndexIsMultikey(opCtx.get(), indexName, {std::set<size_t>{}, {0U}}));
+    DurableCatalog* catalog = getCatalog();
+    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, {std::set<size_t>{}, {0U}}));
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {std::set<size_t>{}, {0U}});
     }
 }
 
 TEST_F(KVCollectionCatalogEntryTest, MultikeyPathsAccumulateOnDifferentFields) {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
-    ASSERT(collEntry->setIndexIsMultikey(opCtx.get(), indexName, {std::set<size_t>{}, {0U}}));
+    DurableCatalog* catalog = getCatalog();
+    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, {std::set<size_t>{}, {0U}}));
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {std::set<size_t>{}, {0U}});
     }
 
-    ASSERT(collEntry->setIndexIsMultikey(opCtx.get(), indexName, {{0U}, std::set<size_t>{}}));
+    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, {{0U}, std::set<size_t>{}}));
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {{0U}, {0U}});
     }
 }
 
 TEST_F(KVCollectionCatalogEntryTest, MultikeyPathsAccumulateOnDifferentComponentsOfTheSameField) {
     std::string indexName = createIndex(BSON("a.b" << 1));
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
-    ASSERT(collEntry->setIndexIsMultikey(opCtx.get(), indexName, {{0U}}));
+    DurableCatalog* catalog = getCatalog();
+    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, {{0U}}));
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {{0U}});
     }
 
-    ASSERT(collEntry->setIndexIsMultikey(opCtx.get(), indexName, {{1U}}));
+    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, {{1U}}));
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {{0U, 1U}});
     }
 }
 
 TEST_F(KVCollectionCatalogEntryTest, NoOpWhenSpecifiedPathComponentsAlreadySetAsMultikey) {
     std::string indexName = createIndex(BSON("a" << 1));
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
-    ASSERT(collEntry->setIndexIsMultikey(opCtx.get(), indexName, {{0U}}));
+    DurableCatalog* catalog = getCatalog();
+    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, {{0U}}));
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {{0U}});
     }
 
-    ASSERT(!collEntry->setIndexIsMultikey(opCtx.get(), indexName, {{0U}}));
+    ASSERT(!catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, {{0U}}));
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {{0U}});
     }
 }
 
 TEST_F(KVCollectionCatalogEntryTest, CanSetMultipleFieldsAndComponentsAsMultikey) {
     std::string indexName = createIndex(BSON("a.b.c" << 1 << "a.b.d" << 1));
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
-    ASSERT(collEntry->setIndexIsMultikey(opCtx.get(), indexName, {{0U, 1U}, {0U, 1U}}));
+    DurableCatalog* catalog = getCatalog();
+    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, {{0U, 1U}, {0U, 1U}}));
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {{0U, 1U}, {0U, 1U}});
     }
 }
@@ -267,31 +264,29 @@ DEATH_TEST_F(KVCollectionCatalogEntryTest,
              CannotOmitPathLevelMultikeyInfoWithBtreeIndex,
              "Invariant failure !multikeyPaths.empty()") {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
-    collEntry->setIndexIsMultikey(opCtx.get(), indexName, MultikeyPaths{});
+    DurableCatalog* catalog = getCatalog();
+    catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, MultikeyPaths{});
 }
 
 DEATH_TEST_F(KVCollectionCatalogEntryTest,
              AtLeastOnePathComponentMustCauseIndexToBeMultikey,
              "Invariant failure somePathIsMultikey") {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
-    collEntry->setIndexIsMultikey(opCtx.get(), indexName, {std::set<size_t>{}, std::set<size_t>{}});
+    DurableCatalog* catalog = getCatalog();
+    catalog->setIndexIsMultikey(
+        opCtx.get(), ns(), indexName, {std::set<size_t>{}, std::set<size_t>{}});
 }
 
 TEST_F(KVCollectionCatalogEntryTest, PathLevelMultikeyTrackingIsSupportedBy2dsphereIndexes) {
     std::string indexType = IndexNames::GEO_2DSPHERE;
     std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
+    DurableCatalog* catalog = getCatalog();
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(!collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(!catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {std::set<size_t>{}, std::set<size_t>{}});
     }
 }
@@ -302,12 +297,11 @@ TEST_F(KVCollectionCatalogEntryTest, PathLevelMultikeyTrackingIsNotSupportedByAl
 
     for (auto&& indexType : indexTypes) {
         std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
-        CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
         auto opCtx = newOperationContext();
+        DurableCatalog* catalog = getCatalog();
         {
             MultikeyPaths multikeyPaths;
-            ASSERT(!collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+            ASSERT(!catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
             ASSERT(multikeyPaths.empty());
         }
     }
@@ -316,14 +310,13 @@ TEST_F(KVCollectionCatalogEntryTest, PathLevelMultikeyTrackingIsNotSupportedByAl
 TEST_F(KVCollectionCatalogEntryTest, CanSetEntireTextIndexAsMultikey) {
     std::string indexType = IndexNames::TEXT;
     std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
-    ASSERT(collEntry->setIndexIsMultikey(opCtx.get(), indexName, MultikeyPaths{}));
+    DurableCatalog* catalog = getCatalog();
+    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, MultikeyPaths{}));
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         ASSERT(multikeyPaths.empty());
     }
 }
@@ -331,119 +324,115 @@ TEST_F(KVCollectionCatalogEntryTest, CanSetEntireTextIndexAsMultikey) {
 TEST_F(KVCollectionCatalogEntryTest, NoOpWhenEntireIndexAlreadySetAsMultikey) {
     std::string indexType = IndexNames::TEXT;
     std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
-    ASSERT(collEntry->setIndexIsMultikey(opCtx.get(), indexName, MultikeyPaths{}));
+    DurableCatalog* catalog = getCatalog();
+    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, MultikeyPaths{}));
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         ASSERT(multikeyPaths.empty());
     }
 
-    ASSERT(!collEntry->setIndexIsMultikey(opCtx.get(), indexName, MultikeyPaths{}));
+    ASSERT(!catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, MultikeyPaths{}));
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(collEntry->isIndexMultikey(opCtx.get(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(opCtx.get(), ns(), indexName, &multikeyPaths));
         ASSERT(multikeyPaths.empty());
     }
 }
 
 TEST_F(KVCollectionCatalogEntryTest, SinglePhaseIndexBuild) {
     std::string indexName = createIndex(BSON("a" << 1));
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
+    DurableCatalog* catalog = getCatalog();
 
-    ASSERT_EQ(kExpectedVersion, collEntry->getIndexBuildVersion(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexReady(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isTwoPhaseIndexBuild(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexBuildScanning(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexBuildDraining(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->getSideWritesIdent(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->getConstraintViolationsIdent(opCtx.get(), indexName));
+    ASSERT_EQ(kExpectedVersion, catalog->getIndexBuildVersion(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexReady(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isTwoPhaseIndexBuild(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexBuildScanning(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexBuildDraining(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->getSideWritesIdent(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->getConstraintViolationsIdent(opCtx.get(), ns(), indexName));
 
-    collEntry->indexBuildSuccess(opCtx.get(), indexName);
+    catalog->indexBuildSuccess(opCtx.get(), ns(), indexName);
 
-    ASSERT_EQ(kExpectedVersion, collEntry->getIndexBuildVersion(opCtx.get(), indexName));
-    ASSERT_TRUE(collEntry->isIndexReady(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isTwoPhaseIndexBuild(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexBuildScanning(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexBuildDraining(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->getSideWritesIdent(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->getConstraintViolationsIdent(opCtx.get(), indexName));
+    ASSERT_EQ(kExpectedVersion, catalog->getIndexBuildVersion(opCtx.get(), ns(), indexName));
+    ASSERT_TRUE(catalog->isIndexReady(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isTwoPhaseIndexBuild(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexBuildScanning(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexBuildDraining(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->getSideWritesIdent(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->getConstraintViolationsIdent(opCtx.get(), ns(), indexName));
 }
 
 TEST_F(KVCollectionCatalogEntryTest, TwoPhaseIndexBuild) {
     std::string indexName =
         createIndex(BSON("a" << 1), IndexNames::BTREE, IndexBuildProtocol::kTwoPhase);
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
+    DurableCatalog* catalog = getCatalog();
 
-    ASSERT_EQ(kExpectedVersion, collEntry->getIndexBuildVersion(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexReady(opCtx.get(), indexName));
-    ASSERT_TRUE(collEntry->isTwoPhaseIndexBuild(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexBuildScanning(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexBuildDraining(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->getSideWritesIdent(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->getConstraintViolationsIdent(opCtx.get(), indexName));
+    ASSERT_EQ(kExpectedVersion, catalog->getIndexBuildVersion(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexReady(opCtx.get(), ns(), indexName));
+    ASSERT_TRUE(catalog->isTwoPhaseIndexBuild(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexBuildScanning(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexBuildDraining(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->getSideWritesIdent(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->getConstraintViolationsIdent(opCtx.get(), ns(), indexName));
 
-    collEntry->setIndexBuildScanning(
-        opCtx.get(), indexName, kSideWritesTableIdent, kConstraintViolationsTableIdent);
+    catalog->setIndexBuildScanning(
+        opCtx.get(), ns(), indexName, kSideWritesTableIdent, kConstraintViolationsTableIdent);
 
-    ASSERT_EQ(kExpectedVersion, collEntry->getIndexBuildVersion(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexReady(opCtx.get(), indexName));
-    ASSERT_TRUE(collEntry->isTwoPhaseIndexBuild(opCtx.get(), indexName));
-    ASSERT_TRUE(collEntry->isIndexBuildScanning(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexBuildDraining(opCtx.get(), indexName));
-    ASSERT_EQ(kSideWritesTableIdent, collEntry->getSideWritesIdent(opCtx.get(), indexName));
+    ASSERT_EQ(kExpectedVersion, catalog->getIndexBuildVersion(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexReady(opCtx.get(), ns(), indexName));
+    ASSERT_TRUE(catalog->isTwoPhaseIndexBuild(opCtx.get(), ns(), indexName));
+    ASSERT_TRUE(catalog->isIndexBuildScanning(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexBuildDraining(opCtx.get(), ns(), indexName));
+    ASSERT_EQ(kSideWritesTableIdent, catalog->getSideWritesIdent(opCtx.get(), ns(), indexName));
     ASSERT_EQ(kConstraintViolationsTableIdent,
-              collEntry->getConstraintViolationsIdent(opCtx.get(), indexName));
+              catalog->getConstraintViolationsIdent(opCtx.get(), ns(), indexName));
 
-    collEntry->setIndexBuildDraining(opCtx.get(), indexName);
+    catalog->setIndexBuildDraining(opCtx.get(), ns(), indexName);
 
-    ASSERT_EQ(kExpectedVersion, collEntry->getIndexBuildVersion(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexReady(opCtx.get(), indexName));
-    ASSERT_TRUE(collEntry->isTwoPhaseIndexBuild(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexBuildScanning(opCtx.get(), indexName));
-    ASSERT_TRUE(collEntry->isIndexBuildDraining(opCtx.get(), indexName));
-    ASSERT_EQ(kSideWritesTableIdent, collEntry->getSideWritesIdent(opCtx.get(), indexName));
+    ASSERT_EQ(kExpectedVersion, catalog->getIndexBuildVersion(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexReady(opCtx.get(), ns(), indexName));
+    ASSERT_TRUE(catalog->isTwoPhaseIndexBuild(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexBuildScanning(opCtx.get(), ns(), indexName));
+    ASSERT_TRUE(catalog->isIndexBuildDraining(opCtx.get(), ns(), indexName));
+    ASSERT_EQ(kSideWritesTableIdent, catalog->getSideWritesIdent(opCtx.get(), ns(), indexName));
     ASSERT_EQ(kConstraintViolationsTableIdent,
-              collEntry->getConstraintViolationsIdent(opCtx.get(), indexName));
+              catalog->getConstraintViolationsIdent(opCtx.get(), ns(), indexName));
 
-    collEntry->indexBuildSuccess(opCtx.get(), indexName);
+    catalog->indexBuildSuccess(opCtx.get(), ns(), indexName);
 
-    ASSERT_EQ(kExpectedVersion, collEntry->getIndexBuildVersion(opCtx.get(), indexName));
-    ASSERT(collEntry->isIndexReady(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexBuildScanning(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isIndexBuildDraining(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->isTwoPhaseIndexBuild(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->getSideWritesIdent(opCtx.get(), indexName));
-    ASSERT_FALSE(collEntry->getConstraintViolationsIdent(opCtx.get(), indexName));
+    ASSERT_EQ(kExpectedVersion, catalog->getIndexBuildVersion(opCtx.get(), ns(), indexName));
+    ASSERT(catalog->isIndexReady(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexBuildScanning(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isIndexBuildDraining(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->isTwoPhaseIndexBuild(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->getSideWritesIdent(opCtx.get(), ns(), indexName));
+    ASSERT_FALSE(catalog->getConstraintViolationsIdent(opCtx.get(), ns(), indexName));
 }
 
 DEATH_TEST_F(KVCollectionCatalogEntryTest,
              SinglePhaseIllegalScanPhase,
              "Invariant failure md.indexes[offset].runTwoPhaseBuild") {
     std::string indexName = createIndex(BSON("a" << 1));
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
-    collEntry->setIndexBuildScanning(
-        opCtx.get(), indexName, kSideWritesTableIdent, kConstraintViolationsTableIdent);
+    DurableCatalog* catalog = getCatalog();
+
+    catalog->setIndexBuildScanning(
+        opCtx.get(), ns(), indexName, kSideWritesTableIdent, kConstraintViolationsTableIdent);
 }
 
 DEATH_TEST_F(KVCollectionCatalogEntryTest,
              SinglePhaseIllegalDrainPhase,
              "Invariant failure md.indexes[offset].runTwoPhaseBuild") {
     std::string indexName = createIndex(BSON("a" << 1));
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
-    collEntry->setIndexBuildDraining(opCtx.get(), indexName);
+    DurableCatalog* catalog = getCatalog();
+    catalog->setIndexBuildDraining(opCtx.get(), ns(), indexName);
 }
 
 DEATH_TEST_F(KVCollectionCatalogEntryTest,
@@ -451,10 +440,9 @@ DEATH_TEST_F(KVCollectionCatalogEntryTest,
              "Invariant failure multikeyPaths.empty()") {
     std::string indexType = IndexNames::TEXT;
     std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
-    CollectionCatalogEntry* collEntry = getCollectionCatalogEntry();
-
     auto opCtx = newOperationContext();
-    collEntry->setIndexIsMultikey(opCtx.get(), indexName, {{0U}, {0U}});
+    DurableCatalog* catalog = getCatalog();
+    catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, {{0U}, {0U}});
 }
 
 }  // namespace

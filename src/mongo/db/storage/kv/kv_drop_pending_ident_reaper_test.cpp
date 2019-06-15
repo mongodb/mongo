@@ -86,6 +86,7 @@ public:
         return {};
     }
     Status createSortedDataInterface(OperationContext* opCtx,
+                                     const CollectionOptions& collOptions,
                                      StringData ident,
                                      const IndexDescriptor* desc) override {
         return Status::OK();

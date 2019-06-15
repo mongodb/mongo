@@ -57,6 +57,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
@@ -369,8 +370,8 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
         auto toCollection = db->getCollection(opCtx, toNss);
         ASSERT_TRUE(toCollection);
 
-        auto catalogEntry = toCollection->getCatalogEntry();
-        auto toCollectionOptions = catalogEntry->getCollectionOptions(opCtx);
+        auto toCollectionOptions =
+            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, toCollection->ns());
 
         auto toUuid = toCollectionOptions.uuid;
         ASSERT_TRUE(toUuid);

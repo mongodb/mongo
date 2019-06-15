@@ -178,7 +178,9 @@ public:
          * only constructs an in-memory representation of what already exists on disk.
          */
         virtual std::unique_ptr<Collection> make(
-            OperationContext* opCtx, CollectionCatalogEntry* collectionCatalogEntry) const = 0;
+            OperationContext* opCtx,
+            CollectionUUID uuid,
+            CollectionCatalogEntry* collectionCatalogEntry) const = 0;
     };
 
     /**

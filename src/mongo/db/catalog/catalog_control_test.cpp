@@ -108,10 +108,10 @@ public:
     const KVEngine* getEngine() const {
         return nullptr;
     }
-    KVCatalog* getCatalog() {
+    DurableCatalog* getCatalog() {
         return nullptr;
     }
-    const KVCatalog* getCatalog() const {
+    const DurableCatalog* getCatalog() const {
         return nullptr;
     }
 };

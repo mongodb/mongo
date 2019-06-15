@@ -75,6 +75,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/rollback_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -423,9 +424,8 @@ StatusWith<size_t> StorageInterfaceImpl::getOplogMaxSize(OperationContext* opCtx
     if (!collectionResult.isOK()) {
         return collectionResult.getStatus();
     }
-    auto collection = collectionResult.getValue();
 
-    const auto options = collection->getCatalogEntry()->getCollectionOptions(opCtx);
+    const auto options = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, nss);
     if (!options.capped)
         return {ErrorCodes::BadValue, str::stream() << nss.ns() << " isn't capped"};
 

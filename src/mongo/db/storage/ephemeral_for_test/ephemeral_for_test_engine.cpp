@@ -83,6 +83,7 @@ std::unique_ptr<RecordStore> EphemeralForTestEngine::makeTemporaryRecordStore(
 }
 
 Status EphemeralForTestEngine::createSortedDataInterface(OperationContext* opCtx,
+                                                         const CollectionOptions& collOptions,
                                                          StringData ident,
                                                          const IndexDescriptor* desc) {
     // Register the ident in `_dataMap` (for `getAllIdents`). Remainder of work done in

@@ -18,7 +18,7 @@ env.Library(
     source=[
         'kv_catalog.cpp',
         'kv_collection_catalog_entry.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
@@ -29,8 +29,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         'kv_drop_pending_ident_reaper',
         'kv_prefix',
-        ],
-    )
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/disable_index_spec_namespace_generation',
+    ],
+)
 
 # Should not be referenced outside this SConscript file.
 env.Library(

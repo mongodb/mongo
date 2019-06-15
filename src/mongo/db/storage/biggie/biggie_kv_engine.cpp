@@ -105,6 +105,7 @@ bool KVEngine::trySwapMaster(StringStore& newMaster, uint64_t version) {
 
 
 Status KVEngine::createSortedDataInterface(OperationContext* opCtx,
+                                           const CollectionOptions& collOptions,
                                            StringData ident,
                                            const IndexDescriptor* desc) {
     _idents[ident.toString()] = false;
