@@ -1306,6 +1306,16 @@ Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
                                     int64_t* keysInsertedOut) {
     Status status = Status::OK();
     if (index->isHybridBuilding()) {
+        // The side table interface accepts only records that meet the criteria for this partial
+        // index.
+        // For non-hybrid builds, the decision to use the filter for the partial index is left to
+        // the IndexAccessMethod. See SERVER-28975 for details.
+        if (auto filter = index->getFilterExpression()) {
+            if (!filter->matchesBSON(obj)) {
+                return Status::OK();
+            }
+        }
+
         int64_t inserted;
         status = index->indexBuildInterceptor()->sideWrite(opCtx,
                                                            keys,
