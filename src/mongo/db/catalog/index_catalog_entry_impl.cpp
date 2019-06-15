@@ -48,6 +48,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -68,7 +70,8 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
       _infoCache(infoCache),
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
-      _prefix(collection->getIndexPrefix(opCtx, _descriptor->indexName())) {
+      _prefix(DurableCatalog::get(opCtx)->getIndexPrefix(
+          opCtx, collection->ns(), _descriptor->indexName())) {
     _descriptor->_cachedEntry = this;
 
     _isReady = _catalogIsReady(opCtx);
@@ -264,8 +267,8 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level
     // multikey information in order to avoid unintentionally setting path-level multikey
     // information on an index created before 3.4.
-    const bool indexMetadataHasChanged =
-        _collection->setIndexIsMultikey(opCtx, _descriptor->indexName(), paths);
+    const bool indexMetadataHasChanged = DurableCatalog::get(opCtx)->setIndexIsMultikey(
+        opCtx, _collection->ns(), _descriptor->indexName(), paths);
 
     // When the recovery unit commits, update the multikey paths if needed and clear the plan cache
     // if the index metadata has changed.
@@ -295,10 +298,6 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     }
 }
 
-void IndexCatalogEntryImpl::setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx) {
-    _collection->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
-}
-
 void IndexCatalogEntryImpl::setNs(NamespaceString ns) {
     _ns = ns;
     _descriptor->setNs(std::move(ns));
@@ -307,20 +306,24 @@ void IndexCatalogEntryImpl::setNs(NamespaceString ns) {
 // ----
 
 bool IndexCatalogEntryImpl::_catalogIsReady(OperationContext* opCtx) const {
-    return _collection->isIndexReady(opCtx, _descriptor->indexName());
+    return DurableCatalog::get(opCtx)->isIndexReady(
+        opCtx, _collection->ns(), _descriptor->indexName());
 }
 
 bool IndexCatalogEntryImpl::_catalogIsPresent(OperationContext* opCtx) const {
-    return _collection->isIndexPresent(opCtx, _descriptor->indexName());
+    return DurableCatalog::get(opCtx)->isIndexPresent(
+        opCtx, _collection->ns(), _descriptor->indexName());
 }
 
 bool IndexCatalogEntryImpl::_catalogIsMultikey(OperationContext* opCtx,
                                                MultikeyPaths* multikeyPaths) const {
-    return _collection->isIndexMultikey(opCtx, _descriptor->indexName(), multikeyPaths);
+    return DurableCatalog::get(opCtx)->isIndexMultikey(
+        opCtx, _collection->ns(), _descriptor->indexName(), multikeyPaths);
 }
 
 KVPrefix IndexCatalogEntryImpl::_catalogGetPrefix(OperationContext* opCtx) const {
-    return _collection->getIndexPrefix(opCtx, _descriptor->indexName());
+    return DurableCatalog::get(opCtx)->getIndexPrefix(
+        opCtx, _collection->ns(), _descriptor->indexName());
 }
 
 }  // namespace mongo

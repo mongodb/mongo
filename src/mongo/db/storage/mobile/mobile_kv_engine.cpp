@@ -231,6 +231,7 @@ std::unique_ptr<RecordStore> MobileKVEngine::makeTemporaryRecordStore(OperationC
 
 
 Status MobileKVEngine::createSortedDataInterface(OperationContext* opCtx,
+                                                 const CollectionOptions& collOptions,
                                                  StringData ident,
                                                  const IndexDescriptor* desc) {
     return MobileIndex::create(opCtx, ident.toString());

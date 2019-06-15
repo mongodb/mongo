@@ -33,7 +33,7 @@
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/kv/kv_catalog.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/storage_engine_impl.h"
 #include "mongo/db/storage/storage_repair_observer.h"
@@ -68,7 +68,7 @@ public:
     }
 
     /**
-     * Create a collection table in the KVEngine not reflected in the KVCatalog.
+     * Create a collection table in the KVEngine not reflected in the DurableCatalog.
      */
     Status createCollTable(OperationContext* opCtx, NamespaceString collName) {
         const std::string identName = "collection-" + collName.ns();
@@ -134,11 +134,9 @@ public:
         auto descriptor = std::make_unique<IndexDescriptor>(
             collection.get(), IndexNames::findPluginName(spec), spec);
 
-        CollectionCatalogEntry* cce =
-            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);
         const auto protocol = IndexBuildProtocol::kTwoPhase;
-        auto ret = cce->prepareForIndexBuild(
-            opCtx, descriptor.get(), protocol, isBackgroundSecondaryBuild);
+        auto ret = DurableCatalog::get(opCtx)->prepareForIndexBuild(
+            opCtx, collNs, descriptor.get(), protocol, isBackgroundSecondaryBuild);
         return ret;
     }
 
@@ -147,25 +145,20 @@ public:
                         std::string key,
                         std::string sideWritesIdent,
                         std::string constraintViolationsIdent) {
-        CollectionCatalogEntry* cce =
-            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);
-        cce->setIndexBuildScanning(opCtx, key, sideWritesIdent, constraintViolationsIdent);
+        DurableCatalog::get(opCtx)->setIndexBuildScanning(
+            opCtx, collNs, key, sideWritesIdent, constraintViolationsIdent);
     }
 
     void indexBuildDrain(OperationContext* opCtx, NamespaceString collNs, std::string key) {
-        CollectionCatalogEntry* cce =
-            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);
-        cce->setIndexBuildDraining(opCtx, key);
+        DurableCatalog::get(opCtx)->setIndexBuildDraining(opCtx, collNs, key);
     }
 
     void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, std::string key) {
-        CollectionCatalogEntry* cce =
-            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNs);
-        cce->indexBuildSuccess(opCtx, key);
+        DurableCatalog::get(opCtx)->indexBuildSuccess(opCtx, collNs, key);
     }
 
-    Status removeEntry(OperationContext* opCtx, StringData ns, KVCatalog* catalog) {
-        return catalog->_removeEntry(opCtx, NamespaceString(ns));
+    Status removeEntry(OperationContext* opCtx, StringData ns, DurableCatalog* catalog) {
+        return dynamic_cast<KVCatalog*>(catalog)->_removeEntry(opCtx, NamespaceString(ns));
     }
 
     StorageEngine* _storageEngine;

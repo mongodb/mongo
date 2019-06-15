@@ -67,6 +67,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/update/update_driver.h"
@@ -203,8 +204,7 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
       _needCappedLock(supportsDocLocking() && _recordStore && _recordStore->isCapped() &&
                       _ns.db() != "local"),
       _infoCache(std::make_unique<CollectionInfoCacheImpl>(this, _ns)),
-      _indexCatalog(
-          std::make_unique<IndexCatalogImpl>(this, getCatalogEntry()->getMaxAllowedIndexes())),
+      _indexCatalog(std::make_unique<IndexCatalogImpl>(this)),
       _cappedNotifier(_recordStore && _recordStore->isCapped()
                           ? stdx::make_unique<CappedInsertNotifier>()
                           : nullptr) {
@@ -227,22 +227,22 @@ CollectionImpl::~CollectionImpl() {
 }
 
 std::unique_ptr<Collection> CollectionImpl::FactoryImpl::make(
-    OperationContext* opCtx, CollectionCatalogEntry* collectionCatalogEntry) const {
+    OperationContext* opCtx,
+    CollectionUUID uuid,
+    CollectionCatalogEntry* collectionCatalogEntry) const {
     auto rs = collectionCatalogEntry->getRecordStore();
-    const auto uuid = collectionCatalogEntry->getCollectionOptions(opCtx).uuid;
     const auto nss = collectionCatalogEntry->ns();
     return std::make_unique<CollectionImpl>(opCtx, nss.ns(), uuid, collectionCatalogEntry, rs);
 }
 
 void CollectionImpl::init(OperationContext* opCtx) {
-    _collator = parseCollation(opCtx, _ns, _details->getCollectionOptions(opCtx).collation);
-    _validatorDoc = _details->getCollectionOptions(opCtx).validator.getOwned();
+    auto collectionOptions = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, _ns);
+    _collator = parseCollation(opCtx, _ns, collectionOptions.collation);
+    _validatorDoc = collectionOptions.validator.getOwned();
     _validator = uassertStatusOK(
         parseValidator(opCtx, _validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures));
-    _validationAction = uassertStatusOK(
-        _parseValidationAction(_details->getCollectionOptions(opCtx).validationAction));
-    _validationLevel = uassertStatusOK(
-        _parseValidationLevel(_details->getCollectionOptions(opCtx).validationLevel));
+    _validationAction = uassertStatusOK(_parseValidationAction(collectionOptions.validationAction));
+    _validationLevel = uassertStatusOK(_parseValidationLevel(collectionOptions.validationLevel));
 
     getIndexCatalog()->init(opCtx).transitional_ignore();
     infoCache()->init(opCtx);
@@ -740,7 +740,7 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
 }
 
 bool CollectionImpl::isTemporary(OperationContext* opCtx) const {
-    return _details->getCollectionOptions(opCtx).temp;
+    return DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, _ns).temp;
 }
 
 bool CollectionImpl::isCapped() const {
@@ -851,7 +851,8 @@ Status CollectionImpl::setValidator(OperationContext* opCtx, BSONObj validatorDo
     if (!statusWithMatcher.isOK())
         return statusWithMatcher.getStatus();
 
-    _details->updateValidator(opCtx, validatorDoc, getValidationLevel(), getValidationAction());
+    DurableCatalog::get(opCtx)->updateValidator(
+        opCtx, ns(), validatorDoc, getValidationLevel(), getValidationAction());
 
     opCtx->recoveryUnit()->onRollback([
         this,
@@ -899,7 +900,8 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData ne
     auto oldValidationLevel = _validationLevel;
     _validationLevel = levelSW.getValue();
 
-    _details->updateValidator(opCtx, _validatorDoc, getValidationLevel(), getValidationAction());
+    DurableCatalog::get(opCtx)->updateValidator(
+        opCtx, ns(), _validatorDoc, getValidationLevel(), getValidationAction());
     opCtx->recoveryUnit()->onRollback(
         [this, oldValidationLevel]() { this->_validationLevel = oldValidationLevel; });
 
@@ -917,7 +919,9 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData n
     auto oldValidationAction = _validationAction;
     _validationAction = actionSW.getValue();
 
-    _details->updateValidator(opCtx, _validatorDoc, getValidationLevel(), getValidationAction());
+
+    DurableCatalog::get(opCtx)->updateValidator(
+        opCtx, ns(), _validatorDoc, getValidationLevel(), getValidationAction());
     opCtx->recoveryUnit()->onRollback(
         [this, oldValidationAction]() { this->_validationAction = oldValidationAction; });
 
@@ -943,7 +947,7 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
         this->_validationAction = oldValidationAction;
     });
 
-    _details->updateValidator(opCtx, newValidator, newLevel, newAction);
+    DurableCatalog::get(opCtx)->updateValidator(opCtx, ns(), newValidator, newLevel, newAction);
     _validatorDoc = std::move(newValidator);
 
     auto validatorSW =
@@ -1280,7 +1284,7 @@ void _validateCatalogEntry(OperationContext* opCtx,
                            CollectionImpl* coll,
                            BSONObj validatorDoc,
                            ValidateResults* results) {
-    CollectionOptions options = coll->getCatalogEntry()->getCollectionOptions(opCtx);
+    CollectionOptions options = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, coll->ns());
     addErrorIfUnequal(options.uuid, coll->uuid(), "UUID", results);
     const CollatorInterface* collation = coll->getDefaultCollator();
     addErrorIfUnequal(options.collation.isEmpty(), !collation, "simple collation", results);
@@ -1437,7 +1441,7 @@ void CollectionImpl::setNs(NamespaceString nss) {
 }
 
 void CollectionImpl::indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) {
-    _details->indexBuildSuccess(opCtx, index->descriptor()->indexName());
+    DurableCatalog::get(opCtx)->indexBuildSuccess(opCtx, ns(), index->descriptor()->indexName());
     _indexCatalog->indexBuildSuccess(opCtx, index);
 }
 

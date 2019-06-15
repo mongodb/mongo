@@ -42,6 +42,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -81,8 +82,8 @@ Status IndexCatalogImpl::IndexBuildBlock::init(OperationContext* opCtx, Collecti
 
     // Setup on-disk structures.
     const auto protocol = IndexBuildProtocol::kSinglePhase;
-    Status status = collection->getCatalogEntry()->prepareForIndexBuild(
-        opCtx, descriptor.get(), protocol, isBackgroundSecondaryBuild);
+    Status status = DurableCatalog::get(opCtx)->prepareForIndexBuild(
+        opCtx, _nss, descriptor.get(), protocol, isBackgroundSecondaryBuild);
     if (!status.isOK())
         return status;
 
@@ -103,8 +104,8 @@ Status IndexCatalogImpl::IndexBuildBlock::init(OperationContext* opCtx, Collecti
                       _indexBuildInterceptor->getConstraintViolationsTableIdent())
                 : boost::none;
 
-            collection->getCatalogEntry()->setIndexBuildScanning(
-                opCtx, _entry->descriptor()->indexName(), sideWritesIdent, constraintsIdent);
+            DurableCatalog::get(opCtx)->setIndexBuildScanning(
+                opCtx, _nss, _entry->descriptor()->indexName(), sideWritesIdent, constraintsIdent);
         }
     }
 

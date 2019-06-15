@@ -1240,6 +1240,7 @@ string WiredTigerKVEngine::_uri(StringData ident) const {
 }
 
 Status WiredTigerKVEngine::createGroupedSortedDataInterface(OperationContext* opCtx,
+                                                            const CollectionOptions& collOptions,
                                                             StringData ident,
                                                             const IndexDescriptor* desc,
                                                             KVPrefix prefix) {
@@ -1251,9 +1252,6 @@ Status WiredTigerKVEngine::createGroupedSortedDataInterface(OperationContext* op
     // Treat 'collIndexOptions' as an empty string when the collection member of 'desc' is NULL in
     // order to allow for unit testing WiredTigerKVEngine::createSortedDataInterface().
     if (collection) {
-        const CollectionCatalogEntry* cce = collection->getCatalogEntry();
-        const CollectionOptions collOptions = cce->getCollectionOptions(opCtx);
-
         if (!collOptions.indexOptionDefaults["storageEngine"].eoo()) {
             BSONObj storageEngineOptions = collOptions.indexOptionDefaults["storageEngine"].Obj();
             collIndexOptions =

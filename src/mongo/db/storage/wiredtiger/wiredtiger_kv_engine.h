@@ -117,9 +117,11 @@ public:
                                                           StringData ident) override;
 
     Status createSortedDataInterface(OperationContext* opCtx,
+                                     const CollectionOptions& collOptions,
                                      StringData ident,
                                      const IndexDescriptor* desc) override {
-        return createGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
+        return createGroupedSortedDataInterface(
+            opCtx, collOptions, ident, desc, KVPrefix::kNotPrefixed);
     }
 
     SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
@@ -141,6 +143,7 @@ public:
                                                        KVPrefix prefix) override;
 
     Status createGroupedSortedDataInterface(OperationContext* opCtx,
+                                            const CollectionOptions& collOptions,
                                             StringData ident,
                                             const IndexDescriptor* desc,
                                             KVPrefix prefix) override;

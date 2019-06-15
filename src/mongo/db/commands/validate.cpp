@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/fail_point_service.h"
@@ -169,8 +170,8 @@ public:
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }
 
-        CollectionCatalogEntry* catalogEntry = collection->getCatalogEntry();
-        CollectionOptions opts = catalogEntry->getCollectionOptions(opCtx);
+        CollectionOptions opts =
+            DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->ns());
 
         // All collections must have a UUID.
         if (!opts.uuid) {

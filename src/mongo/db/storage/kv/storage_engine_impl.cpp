@@ -92,7 +92,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
 
         if (status.code() == ErrorCodes::DataModifiedByRepair) {
             warning() << "Catalog data modified by repair: " << status.reason();
-            repairObserver->onModification(str::stream() << "KVCatalog repaired: "
+            repairObserver->onModification(str::stream() << "DurableCatalog repaired: "
                                                          << status.reason());
         } else {
             fassertNoTrace(50926, status);
@@ -239,10 +239,10 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         bool forRepair) {
     auto catalogEntry = _catalog->makeCollectionCatalogEntry(opCtx, nss, forRepair);
-    auto uuid = catalogEntry->getCollectionOptions(opCtx).uuid.get();
+    auto uuid = _catalog->getCollectionOptions(opCtx, nss).uuid.get();
 
     auto collectionFactory = Collection::Factory::get(getGlobalServiceContext());
-    auto collection = collectionFactory->make(opCtx, catalogEntry.get());
+    auto collection = collectionFactory->make(opCtx, uuid, catalogEntry.get());
 
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
     collectionCatalog.registerCollection(uuid, std::move(catalogEntry), std::move(collection));
@@ -291,15 +291,15 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
 
 /**
  * This method reconciles differences between idents the KVEngine is aware of and the
- * KVCatalog. There are three differences to consider:
+ * DurableCatalog. There are three differences to consider:
  *
- * First, a KVEngine may know of an ident that the KVCatalog does not. This method will drop
+ * First, a KVEngine may know of an ident that the DurableCatalog does not. This method will drop
  * the ident from the KVEngine.
  *
- * Second, a KVCatalog may have a collection ident that the KVEngine does not. This is an
+ * Second, a DurableCatalog may have a collection ident that the KVEngine does not. This is an
  * illegal state and this method fasserts.
  *
- * Third, a KVCatalog may have an index ident that the KVEngine does not. This method will
+ * Third, a DurableCatalog may have an index ident that the KVEngine does not. This method will
  * rebuild the index.
  */
 StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>>
@@ -964,7 +964,7 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData d
             size += catalogEntry->getRecordStore()->storageSize(opCtx);
 
             std::vector<std::string> indexNames;
-            catalogEntry->getAllIndexes(opCtx, &indexNames);
+            _catalog->getAllIndexes(opCtx, collection->ns(), &indexNames);
 
             for (size_t i = 0; i < indexNames.size(); i++) {
                 std::string ident =

@@ -56,6 +56,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view_catalog.h"
@@ -187,7 +188,7 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
         return b.obj();
     }
 
-    CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(opCtx);
+    CollectionOptions options = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, nss);
 
     // While the UUID is stored as a collection option, from the user's perspective it is an
     // unsettable read-only property, so put it in the 'info' section.

@@ -42,7 +42,7 @@
 namespace mongo {
 
 class JournalListener;
-class KVCatalog;
+class DurableCatalog;
 class KVEngine;
 class OperationContext;
 class RecoveryUnit;
@@ -534,8 +534,8 @@ public:
 
     virtual KVEngine* getEngine() = 0;
     virtual const KVEngine* getEngine() const = 0;
-    virtual KVCatalog* getCatalog() = 0;
-    virtual const KVCatalog* getCatalog() const = 0;
+    virtual DurableCatalog* getCatalog() = 0;
+    virtual const DurableCatalog* getCatalog() const = 0;
 };
 
 }  // namespace mongo

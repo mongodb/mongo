@@ -53,6 +53,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -65,9 +66,10 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
     IndexNameObjs ret;
     std::vector<std::string>& indexNames = ret.first;
     std::vector<BSONObj>& indexSpecs = ret.second;
+    auto durableCatalog = DurableCatalog::get(opCtx);
     {
         // Fetch all indexes
-        cce->getAllIndexes(opCtx, &indexNames);
+        durableCatalog->getAllIndexes(opCtx, cce->ns(), &indexNames);
         auto newEnd =
             std::remove_if(indexNames.begin(),
                            indexNames.end(),
@@ -76,8 +78,9 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
 
         indexSpecs.reserve(indexNames.size());
 
+
         for (const auto& name : indexNames) {
-            BSONObj spec = cce->getIndexSpec(opCtx, name);
+            BSONObj spec = durableCatalog->getIndexSpec(opCtx, cce->ns(), name);
             using IndexVersion = IndexDescriptor::IndexVersion;
             IndexVersion indexVersion = IndexVersion::kV1;
             if (auto indexVersionElem = spec[IndexDescriptor::kIndexVersionFieldName]) {

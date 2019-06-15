@@ -65,6 +65,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/parallel.h"
 #include "mongo/s/client/shard_connection.h"
@@ -550,7 +551,8 @@ void State::prepTempCollection() {
 
         auto const finalColl = autoGetFinalColl.getCollection();
         if (finalColl) {
-            finalOptions = finalColl->getCatalogEntry()->getCollectionOptions(_opCtx);
+            finalOptions =
+                DurableCatalog::get(_opCtx)->getCollectionOptions(_opCtx, finalColl->ns());
 
             std::unique_ptr<IndexCatalog::IndexIterator> ii =
                 finalColl->getIndexCatalog()->getIndexIterator(_opCtx, true);

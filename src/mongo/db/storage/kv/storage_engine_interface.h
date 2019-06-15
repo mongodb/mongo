@@ -32,7 +32,7 @@
 namespace mongo {
 
 class KVEngine;
-class KVCatalog;
+class DurableCatalog;
 class StorageEngine;
 
 class StorageEngineInterface {
@@ -44,6 +44,6 @@ public:
     virtual void addDropPendingIdent(const Timestamp& dropTimestamp,
                                      const NamespaceString& nss,
                                      StringData ident) = 0;
-    virtual KVCatalog* getCatalog() = 0;
+    virtual DurableCatalog* getCatalog() = 0;
 };
 }

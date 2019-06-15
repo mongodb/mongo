@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/stdx/mutex.h"
 
@@ -47,7 +48,7 @@ class OperationContext;
 class RecordStore;
 class StorageEngineInterface;
 
-class KVCatalog {
+class KVCatalog : public DurableCatalog {
 public:
     class FeatureTracker;
 
@@ -96,19 +97,10 @@ public:
         return _rs;
     }
 
-    /**
-     * Create an entry in the catalog for an orphaned collection found in the
-     * storage engine. Return the generated ns of the collection.
-     * Note that this function does not recreate the _id index on the collection because it does not
-     * have access to index catalog.
-     */
     StatusWith<std::string> newOrphanedIdent(OperationContext* opCtx, std::string ident);
 
     std::string getFilesystemPathForDb(const std::string& dbName) const;
 
-    /**
-     * Generate an internal ident name.
-     */
     std::string newInternalIdent();
 
     std::unique_ptr<CollectionCatalogEntry> makeCollectionCatalogEntry(OperationContext* opCtx,
@@ -128,9 +120,118 @@ public:
 
     Status dropCollection(OperationContext* opCtx, const NamespaceString& nss);
 
+    void updateCappedSize(OperationContext* opCtx, NamespaceString ns, long long size);
+
+    void updateTTLSetting(OperationContext* opCtx,
+                          NamespaceString ns,
+                          StringData idxName,
+                          long long newExpireSeconds);
+
+    bool isEqualToMetadataUUID(OperationContext* opCtx,
+                               NamespaceString ns,
+                               OptionalCollectionUUID uuid);
+
+    void setIsTemp(OperationContext* opCtx, NamespaceString ns, bool isTemp);
+
+    boost::optional<std::string> getSideWritesIdent(OperationContext* opCtx,
+                                                    NamespaceString ns,
+                                                    StringData indexName) const;
+
+    // TODO SERVER-36385 Remove this function: we don't set the feature tracker bit in 4.4 because
+    // 4.4 can only downgrade to 4.2 which can read long TypeBits.
+    void setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx);
+
+    void updateValidator(OperationContext* opCtx,
+                         NamespaceString ns,
+                         const BSONObj& validator,
+                         StringData validationLevel,
+                         StringData validationAction);
+
+    void updateIndexMetadata(OperationContext* opCtx,
+                             NamespaceString ns,
+                             const IndexDescriptor* desc);
+
+    Status removeIndex(OperationContext* opCtx, NamespaceString ns, StringData indexName);
+
+    Status prepareForIndexBuild(OperationContext* opCtx,
+                                NamespaceString ns,
+                                const IndexDescriptor* spec,
+                                IndexBuildProtocol indexBuildProtocol,
+                                bool isBackgroundSecondaryBuild);
+
+    bool isTwoPhaseIndexBuild(OperationContext* opCtx,
+                              NamespaceString ns,
+                              StringData indexName) const;
+
+    void setIndexBuildScanning(OperationContext* opCtx,
+                               NamespaceString ns,
+                               StringData indexName,
+                               std::string sideWritesIdent,
+                               boost::optional<std::string> constraintViolationsIdent);
+
+
+    bool isIndexBuildScanning(OperationContext* opCtx,
+                              NamespaceString ns,
+                              StringData indexName) const;
+
+    void setIndexBuildDraining(OperationContext* opCtx, NamespaceString ns, StringData indexName);
+
+    bool isIndexBuildDraining(OperationContext* opCtx,
+                              NamespaceString ns,
+                              StringData indexName) const;
+
+    void indexBuildSuccess(OperationContext* opCtx, NamespaceString ns, StringData indexName);
+
+    bool isIndexMultikey(OperationContext* opCtx,
+                         NamespaceString ns,
+                         StringData indexName,
+                         MultikeyPaths* multikeyPaths) const;
+
+    bool setIndexIsMultikey(OperationContext* opCtx,
+                            NamespaceString ns,
+                            StringData indexName,
+                            const MultikeyPaths& multikeyPaths);
+
+    boost::optional<std::string> getConstraintViolationsIdent(OperationContext* opCtx,
+                                                              NamespaceString ns,
+                                                              StringData indexName) const;
+
+    long getIndexBuildVersion(OperationContext* opCtx,
+                              NamespaceString ns,
+                              StringData indexName) const;
+
+    CollectionOptions getCollectionOptions(OperationContext* opCtx, NamespaceString ns) const;
+
+    int getTotalIndexCount(OperationContext* opCtx, NamespaceString ns) const;
+
+    int getCompletedIndexCount(OperationContext* opCtx, NamespaceString ns) const;
+
+    BSONObj getIndexSpec(OperationContext* opCtx, NamespaceString ns, StringData indexName) const;
+
+    void getAllIndexes(OperationContext* opCtx,
+                       NamespaceString ns,
+                       std::vector<std::string>* names) const;
+
+    void getReadyIndexes(OperationContext* opCtx,
+                         NamespaceString ns,
+                         std::vector<std::string>* names) const;
+    void getAllUniqueIndexes(OperationContext* opCtx,
+                             NamespaceString ns,
+                             std::vector<std::string>* names) const;
+
+    bool isIndexPresent(OperationContext* opCtx, NamespaceString ns, StringData indexName) const;
+
+    bool isIndexReady(OperationContext* opCtx, NamespaceString ns, StringData indexName) const;
+
+    KVPrefix getIndexPrefix(OperationContext* opCtx,
+                            NamespaceString ns,
+                            StringData indexName) const;
+
 private:
     class AddIdentChange;
     class RemoveIdentChange;
+    class AddIndexChange;
+    class RemoveIndexChange;
 
     friend class StorageEngineImpl;
     friend class KVCatalogTest;

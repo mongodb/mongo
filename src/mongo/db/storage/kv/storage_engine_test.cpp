@@ -41,8 +41,8 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
-#include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/storage_engine_impl.h"
 #include "mongo/db/storage/kv/storage_engine_test_fixture.h"
@@ -59,12 +59,12 @@ namespace {
 TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     auto opCtx = cc().makeOperationContext();
 
-    // Add a collection, `db.coll1` to both the KVCatalog and KVEngine. The returned value is the
-    // `ident` name given to the collection.
+    // Add a collection, `db.coll1` to both the DurableCatalog and KVEngine. The returned value is
+    // the `ident` name given to the collection.
     auto swIdentName = createCollection(opCtx.get(), NamespaceString("db.coll1"));
     ASSERT_OK(swIdentName);
-    // Create a table in the KVEngine not reflected in the KVCatalog. This should be dropped when
-    // reconciling.
+    // Create a table in the KVEngine not reflected in the DurableCatalog. This should be dropped
+    // when reconciling.
     ASSERT_OK(createCollTable(opCtx.get(), NamespaceString("db.coll2")));
     ASSERT_OK(reconcile(opCtx.get()).getStatus());
     auto identsVec = getAllKVEngineIdents(opCtx.get());
@@ -86,7 +86,7 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     ASSERT_EQUALS("db.coll1", toRebuild.first);
     ASSERT_EQUALS("_id", toRebuild.second);
 
-    // Now drop the `db.coll1` table, while leaving the KVCatalog entry.
+    // Now drop the `db.coll1` table, while leaving the DurableCatalog entry.
     ASSERT_OK(dropIdent(opCtx.get(), swIdentName.getValue()));
     ASSERT_EQUALS(static_cast<const unsigned long>(1), getAllKVEngineIdents(opCtx.get()).size());
 

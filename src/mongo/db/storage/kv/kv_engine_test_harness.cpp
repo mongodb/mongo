@@ -33,7 +33,6 @@
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_catalog_test_fixture.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
@@ -181,7 +180,7 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
     unique_ptr<SortedDataInterface> sorted;
     {
         MyOperationContext opCtx(engine);
-        ASSERT_OK(engine->createSortedDataInterface(&opCtx, ident, &desc));
+        ASSERT_OK(engine->createSortedDataInterface(&opCtx, CollectionOptions(), ident, &desc));
         sorted.reset(engine->getSortedDataInterface(&opCtx, ident, &desc));
         ASSERT(sorted);
     }
@@ -724,7 +723,7 @@ DEATH_TEST_F(KVCatalogTest, TerminateOnNonNumericIndexVersion, "Fatal Assertion 
     unique_ptr<SortedDataInterface> sorted;
     {
         MyOperationContext opCtx(engine);
-        ASSERT_OK(engine->createSortedDataInterface(&opCtx, ident, &desc));
+        ASSERT_OK(engine->createSortedDataInterface(&opCtx, CollectionOptions(), ident, &desc));
         sorted.reset(engine->getSortedDataInterface(&opCtx, ident, &desc));
         ASSERT(sorted);
     }
