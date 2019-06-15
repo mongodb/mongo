@@ -911,7 +911,7 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
     std::string eventName = getShutdownSignalName(pid.asUInt32());
 
     HANDLE event = OpenEventA(EVENT_MODIFY_STATE, FALSE, eventName.c_str());
-    if (event == NULL) {
+    if (event == nullptr) {
         int gle = GetLastError();
         if (gle != ERROR_FILE_NOT_FOUND) {
             const auto ewd = errnoWithDescription();

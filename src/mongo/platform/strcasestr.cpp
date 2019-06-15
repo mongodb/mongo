@@ -71,7 +71,7 @@ const char* STRCASESTR_EMULATION_NAME(const char* haystack, const char* needle) 
     // If not found, return NULL
     const char* haystackLowerStart = haystackLower.c_str();
     const char* location = strstr(haystackLowerStart, needleLower.c_str());
-    return location ? (haystack + (location - haystackLowerStart)) : NULL;
+    return location ? (haystack + (location - haystackLowerStart)) : nullptr;
 }
 
 #if defined(__sun)
@@ -99,7 +99,7 @@ namespace mongo {
 MONGO_INITIALIZER_GENERAL(SolarisStrCaseCmp, MONGO_NO_PREREQUISITES, ("default"))
 (InitializerContext* context) {
     void* functionAddress = dlsym(RTLD_DEFAULT, "strcasestr");
-    if (functionAddress != NULL) {
+    if (functionAddress != nullptr) {
         mongo::pal::strcasestr_switcher =
             reinterpret_cast<mongo::pal::StrCaseStrFunc>(functionAddress);
     }

@@ -174,7 +174,7 @@ private:
         while (unwrittenCount > 0) {
             DWORD written;
             BOOL success =
-                WriteConsoleW(_consoleHandle, unwrittenBegin, unwrittenCount, &written, NULL);
+                WriteConsoleW(_consoleHandle, unwrittenBegin, unwrittenCount, &written, nullptr);
             if (!success) {
                 return false;
             }

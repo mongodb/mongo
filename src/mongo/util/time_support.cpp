@@ -874,7 +874,7 @@ static unsigned long long resyncTime() {
 
 unsigned long long curTimeMicros64() {
     // Windows 8/2012 & later support a <1us time function
-    if (GetSystemTimePreciseAsFileTimeFunc != NULL) {
+    if (GetSystemTimePreciseAsFileTimeFunc != nullptr) {
         FILETIME time;
         GetSystemTimePreciseAsFileTimeFunc(&time);
         return fileTimeToMicroseconds(time);

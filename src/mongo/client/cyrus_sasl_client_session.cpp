@@ -136,7 +136,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
                                      ("NativeSaslClientContext", "CyrusSaslAllocatorsAndMutexes"))
 (InitializerContext* context) {
     static sasl_callback_t saslClientGlobalCallbacks[] = {
-        {SASL_CB_LOG, SaslCallbackFn(saslClientLogSwallow), NULL /* context */},
+        {SASL_CB_LOG, SaslCallbackFn(saslClientLogSwallow), nullptr /* context */},
         {SASL_CB_LIST_END}};
 
     // If the client application has previously called sasl_client_init(), the callbacks passed
@@ -147,7 +147,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
     if (result != SASL_OK) {
         return Status(ErrorCodes::UnknownError,
                       str::stream() << "Could not initialize sasl client components ("
-                                    << sasl_errstring(result, NULL, NULL)
+                                    << sasl_errstring(result, nullptr, nullptr)
                                     << ")");
     }
 
@@ -204,7 +204,7 @@ int saslClientGetPassword(sasl_conn_t* conn,
             return SASL_BADPARAM;
 
         sasl_secret_t* secret = session->getPasswordAsSecret();
-        if (secret == NULL) {
+        if (secret == nullptr) {
             saslSetError(conn, "No password data provided");
             return SASL_FAIL;
         }
@@ -221,7 +221,7 @@ int saslClientGetPassword(sasl_conn_t* conn,
 }  // namespace
 
 CyrusSaslClientSession::CyrusSaslClientSession()
-    : SaslClientSession(), _saslConnection(NULL), _step(0), _success(false) {
+    : SaslClientSession(), _saslConnection(nullptr), _step(0), _success(false) {
     const sasl_callback_t callbackTemplate[maxCallbacks] = {
         {SASL_CB_AUTHNAME, SaslCallbackFn(saslClientGetSimple), this},
         {SASL_CB_USER, SaslCallbackFn(saslClientGetSimple), this},
@@ -254,28 +254,28 @@ sasl_secret_t* CyrusSaslClientSession::getPasswordAsSecret() {
 }
 
 Status CyrusSaslClientSession::initialize() {
-    if (_saslConnection != NULL)
+    if (_saslConnection != nullptr)
         return Status(ErrorCodes::AlreadyInitialized,
                       "Cannot reinitialize CyrusSaslClientSession.");
 
     int result = sasl_client_new(getParameter(parameterServiceName).toString().c_str(),
                                  getParameter(parameterServiceHostname).toString().c_str(),
-                                 NULL,
-                                 NULL,
+                                 nullptr,
+                                 nullptr,
                                  _callbacks,
                                  0,
                                  &_saslConnection);
 
     if (SASL_OK != result) {
         return Status(ErrorCodes::UnknownError,
-                      str::stream() << sasl_errstring(result, NULL, NULL));
+                      str::stream() << sasl_errstring(result, nullptr, nullptr));
     }
 
     return Status::OK();
 }
 
 Status CyrusSaslClientSession::step(StringData inputData, std::string* outputData) {
-    const char* output = NULL;
+    const char* output = nullptr;
     unsigned outputSize = 0xFFFFFFFF;
 
     int result;
@@ -283,7 +283,7 @@ Status CyrusSaslClientSession::step(StringData inputData, std::string* outputDat
         const char* actualMechanism;
         result = sasl_client_start(_saslConnection,
                                    getParameter(parameterMechanism).toString().c_str(),
-                                   NULL,
+                                   nullptr,
                                    &output,
                                    &outputSize,
                                    &actualMechanism);
@@ -291,7 +291,7 @@ Status CyrusSaslClientSession::step(StringData inputData, std::string* outputDat
         result = sasl_client_step(_saslConnection,
                                   inputData.rawData(),
                                   static_cast<unsigned>(inputData.size()),
-                                  NULL,
+                                  nullptr,
                                   &output,
                                   &outputSize);
     }

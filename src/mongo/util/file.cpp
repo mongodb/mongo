@@ -66,9 +66,9 @@ File::~File() {
 intmax_t File::freeSpace(const std::string& path) {
     ULARGE_INTEGER avail;
     if (GetDiskFreeSpaceExW(toWideString(path.c_str()).c_str(),
-                            &avail,   // bytes available to caller
-                            NULL,     // ptr to returned total size
-                            NULL)) {  // ptr to returned total free
+                            &avail,      // bytes available to caller
+                            nullptr,     // ptr to returned total size
+                            nullptr)) {  // ptr to returned total free
         return avail.QuadPart;
     }
     DWORD dosError = GetLastError();
@@ -106,10 +106,10 @@ void File::open(const char* filename, bool readOnly, bool direct) {
     _handle = CreateFileW(toNativeString(filename).c_str(),               // filename
                           (readOnly ? 0 : GENERIC_WRITE) | GENERIC_READ,  // desired access
                           FILE_SHARE_WRITE | FILE_SHARE_READ,             // share mode
-                          NULL,                                           // security
+                          nullptr,                                        // security
                           OPEN_ALWAYS,                                    // create or open
                           FILE_ATTRIBUTE_NORMAL,                          // file attributes
-                          NULL);                                          // template
+                          nullptr);                                       // template
     _bad = !is_open();
     if (_bad) {
         DWORD dosError = GetLastError();
@@ -121,7 +121,7 @@ void File::open(const char* filename, bool readOnly, bool direct) {
 void File::read(fileofs o, char* data, unsigned len) {
     LARGE_INTEGER li;
     li.QuadPart = o;
-    if (SetFilePointerEx(_handle, li, NULL, FILE_BEGIN) == 0) {
+    if (SetFilePointerEx(_handle, li, nullptr, FILE_BEGIN) == 0) {
         _bad = true;
         DWORD dosError = GetLastError();
         log() << "In File::read(), SetFilePointerEx for '" << _name
@@ -154,7 +154,7 @@ void File::truncate(fileofs size) {
     }
     LARGE_INTEGER li;
     li.QuadPart = size;
-    if (SetFilePointerEx(_handle, li, NULL, FILE_BEGIN) == 0) {
+    if (SetFilePointerEx(_handle, li, nullptr, FILE_BEGIN) == 0) {
         _bad = true;
         DWORD dosError = GetLastError();
         log() << "In File::truncate(), SetFilePointerEx for '" << _name
@@ -173,7 +173,7 @@ void File::truncate(fileofs size) {
 void File::write(fileofs o, const char* data, unsigned len) {
     LARGE_INTEGER li;
     li.QuadPart = o;
-    if (SetFilePointerEx(_handle, li, NULL, FILE_BEGIN) == 0) {
+    if (SetFilePointerEx(_handle, li, nullptr, FILE_BEGIN) == 0) {
         _bad = true;
         DWORD dosError = GetLastError();
         log() << "In File::write(), SetFilePointerEx for '" << _name
@@ -182,7 +182,7 @@ void File::write(fileofs o, const char* data, unsigned len) {
         return;
     }
     DWORD bytesWritten;
-    if (WriteFile(_handle, data, len, &bytesWritten, NULL) == 0) {
+    if (WriteFile(_handle, data, len, &bytesWritten, nullptr) == 0) {
         _bad = true;
         DWORD dosError = GetLastError();
         log() << "In File::write(), WriteFile for '" << _name << "' tried to write " << len

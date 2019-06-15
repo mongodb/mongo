@@ -780,7 +780,7 @@ int _main(int argc, char* argv[], char** envp) {
     rcGlobalLocation = "/etc/mongorc.js";
 #else
     wchar_t programDataPath[MAX_PATH];
-    if (S_OK == SHGetFolderPathW(NULL, CSIDL_COMMON_APPDATA, NULL, 0, programDataPath)) {
+    if (S_OK == SHGetFolderPathW(nullptr, CSIDL_COMMON_APPDATA, nullptr, 0, programDataPath)) {
         rcGlobalLocation = str::stream() << toUtf8String(programDataPath)
                                          << "\\MongoDB\\mongorc.js";
     }
@@ -861,7 +861,7 @@ int _main(int argc, char* argv[], char** envp) {
             if (getenv("HOME") != nullptr)
                 rcLocation = str::stream() << getenv("HOME") << "/.mongorc.js";
 #else
-            if (getenv("HOMEDRIVE") != NULL && getenv("HOMEPATH") != NULL)
+            if (getenv("HOMEDRIVE") != nullptr && getenv("HOMEPATH") != nullptr)
                 rcLocation = str::stream() << toUtf8String(_wgetenv(L"HOMEDRIVE"))
                                            << toUtf8String(_wgetenv(L"HOMEPATH"))
                                            << "\\.mongorc.js";

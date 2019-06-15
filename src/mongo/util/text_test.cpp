@@ -56,16 +56,17 @@ TEST(WindowsCommandLineConstruction, EmptyCommandLine) {
 }
 
 TEST(WindowsCommandLineConstruction, NothingToQuote) {
-    ASSERT_EQUALS("abc d \"\" e", constructUtf8WindowsCommandLine(svec("abc", "d", "", "e", NULL)));
+    ASSERT_EQUALS("abc d \"\" e",
+                  constructUtf8WindowsCommandLine(svec("abc", "d", "", "e", nullptr)));
 }
 
 TEST(WindowsCommandLineConstruction, ThingsToQuote) {
     ASSERT_EQUALS("a\\\\\\b \"de fg\" h",
-                  constructUtf8WindowsCommandLine(svec("a\\\\\\b", "de fg", "h", NULL)));
+                  constructUtf8WindowsCommandLine(svec("a\\\\\\b", "de fg", "h", nullptr)));
     ASSERT_EQUALS("\"a\\\\b c\" d e",
-                  constructUtf8WindowsCommandLine(svec("a\\\\b c", "d", "e", NULL)));
-    ASSERT_EQUALS("\"a \\\\\" \\", constructUtf8WindowsCommandLine(svec("a \\", "\\", NULL)));
-    ASSERT_EQUALS("\"\\\\\\\\\\\"\"", constructUtf8WindowsCommandLine(svec("\\\\\"", NULL)));
+                  constructUtf8WindowsCommandLine(svec("a\\\\b c", "d", "e", nullptr)));
+    ASSERT_EQUALS("\"a \\\\\" \\", constructUtf8WindowsCommandLine(svec("a \\", "\\", nullptr)));
+    ASSERT_EQUALS("\"\\\\\\\\\\\"\"", constructUtf8WindowsCommandLine(svec("\\\\\"", nullptr)));
 }
 
 TEST(WindowsCommandLineConstruction, RegressionSERVER_7252) {
@@ -88,5 +89,5 @@ TEST(WindowsCommandLineConstruction, RegressionSERVER_7252) {
                                              "C:\\mongo\\logs\\mongo_config.log.txt",
                                              "--configsvr",
                                              "--service",
-                                             NULL)));
+                                             nullptr)));
 }

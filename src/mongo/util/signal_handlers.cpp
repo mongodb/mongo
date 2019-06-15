@@ -131,8 +131,8 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
 void eventProcessingThread() {
     std::string eventName = getShutdownSignalName(ProcessId::getCurrent().asUInt32());
 
-    HANDLE event = CreateEventA(NULL, TRUE, FALSE, eventName.c_str());
-    if (event == NULL) {
+    HANDLE event = CreateEventA(nullptr, TRUE, FALSE, eventName.c_str());
+    if (event == nullptr) {
         warning() << "eventProcessingThread CreateEvent failed: " << errnoWithDescription();
         return;
     }

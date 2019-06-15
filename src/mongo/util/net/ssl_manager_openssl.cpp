@@ -184,7 +184,7 @@ bool enableECDHE(SSL_CTX* const ctx) {
     // this call could actually enable auto ecdh. We also ensure the OpenSSL version is sufficiently
     // old to protect against future versions where SSL_CTX_set_ecdh_auto could be removed and 94
     // ctrl code could be repurposed.
-    if (SSL_CTX_ctrl(ctx, 94, 1, NULL) != 1) {
+    if (SSL_CTX_ctrl(ctx, 94, 1, nullptr) != 1) {
         // If manually setting the configuration option failed, use a hard coded curve
         if (!useDefaultECKey(ctx)) {
             warning() << "Failed to enable ECDHE due to a lack of support from system libraries.";
@@ -1206,20 +1206,20 @@ Status importCertStoreToX509_STORE(const wchar_t* storeName,
                                    X509_STORE* verifyStore) {
     HCERTSTORE systemStore = CertOpenStore(CERT_STORE_PROV_SYSTEM_W,
                                            0,
-                                           NULL,
+                                           nullptr,
                                            storeLocation | CERT_STORE_READONLY_FLAG,
                                            const_cast<LPWSTR>(storeName));
-    if (systemStore == NULL) {
+    if (systemStore == nullptr) {
         return {ErrorCodes::InvalidSSLConfiguration,
                 str::stream() << "error opening system CA store: " << errnoWithDescription()};
     }
     auto systemStoreGuard = makeGuard([systemStore]() { CertCloseStore(systemStore, 0); });
 
-    PCCERT_CONTEXT certCtx = NULL;
-    while ((certCtx = CertEnumCertificatesInStore(systemStore, certCtx)) != NULL) {
+    PCCERT_CONTEXT certCtx = nullptr;
+    while ((certCtx = CertEnumCertificatesInStore(systemStore, certCtx)) != nullptr) {
         auto certBytes = static_cast<const unsigned char*>(certCtx->pbCertEncoded);
-        X509* x509Obj = d2i_X509(NULL, &certBytes, certCtx->cbCertEncoded);
-        if (x509Obj == NULL) {
+        X509* x509Obj = d2i_X509(nullptr, &certBytes, certCtx->cbCertEncoded);
+        if (x509Obj == nullptr) {
             return {ErrorCodes::InvalidSSLConfiguration,
                     str::stream() << "Error parsing X509 object from Windows certificate store"
                                   << SSLManagerInterface::getSSLErrorMessage(ERR_get_error())};

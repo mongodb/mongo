@@ -57,7 +57,7 @@ int posix_fadvise(int fd, off_t offset, off_t len, int advice) {
 MONGO_INITIALIZER_GENERAL(SolarisPosixFadvise, MONGO_NO_PREREQUISITES, ("default"))
 (InitializerContext* context) {
     void* functionAddress = dlsym(RTLD_DEFAULT, "posix_fadvise");
-    if (functionAddress != NULL) {
+    if (functionAddress != nullptr) {
         mongo::pal::posix_fadvise_switcher =
             reinterpret_cast<mongo::pal::PosixFadviseFunc>(functionAddress);
     }

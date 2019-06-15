@@ -595,7 +595,7 @@ StatusWith<NearStage::CoveredInterval*>  //
                                  const Collection* collection) {
     // The search is finished if we searched at least once and all the way to the edge
     if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
-        return StatusWith<CoveredInterval*>(NULL);
+        return StatusWith<CoveredInterval*>(nullptr);
     }
 
     //
@@ -1015,7 +1015,7 @@ StatusWith<NearStage::CoveredInterval*>  //
                                        const Collection* collection) {
     // The search is finished if we searched at least once and all the way to the edge
     if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
-        return StatusWith<CoveredInterval*>(NULL);
+        return StatusWith<CoveredInterval*>(nullptr);
     }
 
     //

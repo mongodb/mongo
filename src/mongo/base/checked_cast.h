@@ -61,7 +61,7 @@ struct checked_cast_impl<true> {
     template <typename T, typename U>
     static T cast(U* u) {
         if (!u) {
-            return NULL;
+            return nullptr;
         }
         T t = dynamic_cast<T>(u);
         invariant(t);

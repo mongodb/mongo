@@ -57,9 +57,9 @@ namespace mongo {
 namespace ntservice {
 namespace {
 bool _startService = false;
-SERVICE_STATUS_HANDLE _statusHandle = NULL;
+SERVICE_STATUS_HANDLE _statusHandle = nullptr;
 wstring _serviceName;
-ServiceCallback _serviceCallback = NULL;
+ServiceCallback _serviceCallback = nullptr;
 }  // namespace
 
 static void installServiceOrDie(const wstring& serviceName,
@@ -279,19 +279,19 @@ void installServiceOrDie(const wstring& serviceName,
     std::vector<std::string> serviceArgv = constructServiceArgv(argv);
 
     char exePath[1024];
-    GetModuleFileNameA(NULL, exePath, sizeof exePath);
+    GetModuleFileNameA(nullptr, exePath, sizeof exePath);
     serviceArgv.at(0) = exePath;
 
     std::string commandLine = constructUtf8WindowsCommandLine(serviceArgv);
 
-    SC_HANDLE schSCManager = ::OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
-    if (schSCManager == NULL) {
+    SC_HANDLE schSCManager = ::OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
+    if (schSCManager == nullptr) {
         DWORD err = ::GetLastError();
         log() << "Error connecting to the Service Control Manager: " << windows::GetErrMsg(err);
         quickExit(EXIT_NTSERVICE_ERROR);
     }
 
-    SC_HANDLE schService = NULL;
+    SC_HANDLE schService = nullptr;
     int retryCount = 10;
 
     while (true) {
@@ -299,7 +299,7 @@ void installServiceOrDie(const wstring& serviceName,
         // TODO: Check to see if service is in "Deleting" status, suggest the user close down
         // Services MMC snap-ins.
         schService = ::OpenService(schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS);
-        if (schService != NULL) {
+        if (schService != nullptr) {
             log() << "There is already a service named '" << toUtf8String(serviceName)
                   << (retryCount > 0 ? "', sleeping and retrying" : "', aborting");
             ::CloseServiceHandle(schService);
@@ -329,12 +329,12 @@ void installServiceOrDie(const wstring& serviceName,
                                   SERVICE_AUTO_START,         // start type
                                   SERVICE_ERROR_NORMAL,       // error control
                                   commandLineWide.c_str(),    // command line
-                                  NULL,                       // load order group
-                                  NULL,                       // tag id
+                                  nullptr,                    // load order group
+                                  nullptr,                    // tag id
                                   L"\0\0",                    // dependencies
-                                  NULL,                       // user account
-                                  NULL);                      // user account password
-    if (schService == NULL) {
+                                  nullptr,                    // user account
+                                  nullptr);                   // user account password
+    if (schService == nullptr) {
         DWORD err = ::GetLastError();
         log() << "Error creating service: " << windows::GetErrMsg(err);
         ::CloseServiceHandle(schSCManager);
@@ -364,13 +364,13 @@ void installServiceOrDie(const wstring& serviceName,
                                                  SERVICE_NO_CHANGE,          // service type
                                                  SERVICE_NO_CHANGE,          // start type
                                                  SERVICE_NO_CHANGE,          // error control
-                                                 NULL,                       // path
-                                                 NULL,                       // load order group
-                                                 NULL,                       // tag id
-                                                 NULL,                       // dependencies
+                                                 nullptr,                    // path
+                                                 nullptr,                    // load order group
+                                                 nullptr,                    // tag id
+                                                 nullptr,                    // dependencies
                                                  actualServiceUser.c_str(),  // user account
                                                  servicePassword.c_str(),  // user account password
-                                                 NULL);                    // service display name
+                                                 nullptr);                 // service display name
         if (!serviceInstalled) {
             log() << "Setting service login failed, service has 'LocalService' permissions";
         }
@@ -438,15 +438,15 @@ void installServiceOrDie(const wstring& serviceName,
 void removeServiceOrDie(const wstring& serviceName) {
     log() << "Trying to remove Windows service '" << toUtf8String(serviceName) << "'";
 
-    SC_HANDLE schSCManager = ::OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
-    if (schSCManager == NULL) {
+    SC_HANDLE schSCManager = ::OpenSCManager(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
+    if (schSCManager == nullptr) {
         DWORD err = ::GetLastError();
         log() << "Error connecting to the Service Control Manager: " << windows::GetErrMsg(err);
         quickExit(EXIT_NTSERVICE_ERROR);
     }
 
     SC_HANDLE schService = ::OpenService(schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS);
-    if (schService == NULL) {
+    if (schService == nullptr) {
         log() << "Could not find a service named '" << toUtf8String(serviceName) << "' to remove";
         ::CloseServiceHandle(schSCManager);
         quickExit(EXIT_NTSERVICE_ERROR);
@@ -484,7 +484,7 @@ void removeServiceOrDie(const wstring& serviceName) {
 }
 
 bool reportStatus(DWORD reportState, DWORD waitHint, DWORD exitCode) {
-    if (_statusHandle == NULL)
+    if (_statusHandle == nullptr)
         return false;
 
     static DWORD checkPoint = 1;
@@ -551,7 +551,7 @@ static void serviceStop() {
 }
 
 static void WINAPI initService(DWORD argc, LPTSTR* argv) {
-    _statusHandle = RegisterServiceCtrlHandlerEx(_serviceName.c_str(), serviceCtrl, NULL);
+    _statusHandle = RegisterServiceCtrlHandlerEx(_serviceName.c_str(), serviceCtrl, nullptr);
     if (!_statusHandle)
         return;
 
@@ -615,7 +615,7 @@ void startService() {
 
     SERVICE_TABLE_ENTRYW dispTable[] = {
         {const_cast<LPWSTR>(_serviceName.c_str()), (LPSERVICE_MAIN_FUNCTION)initService},
-        {NULL, NULL}};
+        {nullptr, nullptr}};
 
     log() << "Trying to start Windows service '" << toUtf8String(_serviceName) << "'";
     if (StartServiceCtrlDispatcherW(dispTable)) {

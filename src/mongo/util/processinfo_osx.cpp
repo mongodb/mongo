@@ -145,11 +145,11 @@ Variant getSysctlByName(const char* sysctlName) {
     // NB: sysctlbyname is called once to determine the buffer length, and once to copy
     //     the sysctl value.  Retry if the buffer length grows between calls.
     do {
-        status = sysctlbyname(sysctlName, NULL, &len, NULL, 0);
+        status = sysctlbyname(sysctlName, nullptr, &len, nullptr, 0);
         if (status == -1)
             break;
         value.resize(len);
-        status = sysctlbyname(sysctlName, &*value.begin(), &len, NULL, 0);
+        status = sysctlbyname(sysctlName, &*value.begin(), &len, nullptr, 0);
     } while (status == -1 && errno == ENOMEM);
     if (status == -1) {
         // unrecoverable error from sysctlbyname
@@ -168,7 +168,7 @@ template <>
 long long getSysctlByName<NumberVal>(const char* sysctlName) {
     long long value = 0;
     size_t len = sizeof(value);
-    if (sysctlbyname(sysctlName, &value, &len, NULL, 0) < 0) {
+    if (sysctlbyname(sysctlName, &value, &len, nullptr, 0) < 0) {
         log() << "Unable to resolve sysctl " << sysctlName << " (number) ";
     }
     if (len > 8) {

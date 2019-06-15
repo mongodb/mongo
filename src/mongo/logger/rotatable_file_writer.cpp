@@ -138,10 +138,10 @@ bool Win32FileStreambuf::open(StringData fileName, bool append) {
     _fileHandle = CreateFileW(utf8ToWide(fileName).c_str(),         // lpFileName
                               GENERIC_WRITE,                        // dwDesiredAccess
                               FILE_SHARE_DELETE | FILE_SHARE_READ,  // dwShareMode
-                              NULL,                                 // lpSecurityAttributes
+                              nullptr,                              // lpSecurityAttributes
                               OPEN_ALWAYS,                          // dwCreationDisposition
                               FILE_ATTRIBUTE_NORMAL,                // dwFlagsAndAttributes
-                              NULL                                  // hTemplateFile
+                              nullptr                               // hTemplateFile
                               );
 
 
@@ -152,11 +152,11 @@ bool Win32FileStreambuf::open(StringData fileName, bool append) {
     zero.QuadPart = 0LL;
 
     if (append) {
-        if (SetFilePointerEx(_fileHandle, zero, NULL, FILE_END)) {
+        if (SetFilePointerEx(_fileHandle, zero, nullptr, FILE_END)) {
             return true;
         }
     } else {
-        if (SetFilePointerEx(_fileHandle, zero, NULL, FILE_BEGIN) && SetEndOfFile(_fileHandle)) {
+        if (SetFilePointerEx(_fileHandle, zero, nullptr, FILE_BEGIN) && SetEndOfFile(_fileHandle)) {
             return true;
         }
     }
@@ -171,7 +171,7 @@ std::streamsize Win32FileStreambuf::xsputn(const char* s, std::streamsize count)
 
     while (count > totalBytesWritten) {
         DWORD bytesWritten;
-        if (!WriteFile(_fileHandle, s, count - totalBytesWritten, &bytesWritten, NULL)) {
+        if (!WriteFile(_fileHandle, s, count - totalBytesWritten, &bytesWritten, nullptr)) {
             break;
         }
 

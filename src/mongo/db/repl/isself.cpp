@@ -275,7 +275,7 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
                                    GAA_FLAG_SKIP_ANYCAST |  // only want unicast addrs
                                        GAA_FLAG_SKIP_MULTICAST |
                                        GAA_FLAG_SKIP_DNS_SERVER,
-                                   NULL,
+                                   nullptr,
                                    adapters,
                                    &adaptersLen);
 
@@ -293,8 +293,8 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
         return out;
     }
 
-    for (IP_ADAPTER_ADDRESSES* adapter = adapters; adapter != NULL; adapter = adapter->Next) {
-        for (IP_ADAPTER_UNICAST_ADDRESS* addr = adapter->FirstUnicastAddress; addr != NULL;
+    for (IP_ADAPTER_ADDRESSES* adapter = adapters; adapter != nullptr; adapter = adapter->Next) {
+        for (IP_ADAPTER_UNICAST_ADDRESS* addr = adapter->FirstUnicastAddress; addr != nullptr;
              addr = addr->Next) {
             short family = reinterpret_cast<SOCKADDR_STORAGE*>(addr->Address.lpSockaddr)->ss_family;
 

@@ -337,7 +337,7 @@ StatusWith<int64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
     }
 
     int64_t value;
-    ret = cursor->get_value(cursor, NULL, NULL, &value);
+    ret = cursor->get_value(cursor, nullptr, nullptr, &value);
     if (ret != 0) {
         return StatusWith<int64_t>(
             ErrorCodes::BadValue,
@@ -627,7 +627,7 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
     std::map<string, BSONObjBuilder*> subs;
     const char* desc;
     uint64_t value;
-    while (c->next(c) == 0 && c->get_value(c, &desc, NULL, &value) == 0) {
+    while (c->next(c) == 0 && c->get_value(c, &desc, nullptr, &value) == 0) {
         StringData key(desc);
 
         StringData prefix;

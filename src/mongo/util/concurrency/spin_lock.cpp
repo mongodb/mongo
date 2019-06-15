@@ -69,7 +69,7 @@ void SpinLock::_lockSlowPath() {
     t.tv_nsec = 5000000;
 
     while (!_tryLock()) {
-        nanosleep(&t, NULL);
+        nanosleep(&t, nullptr);
     }
 }
 

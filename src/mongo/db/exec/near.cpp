@@ -146,7 +146,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
             return PlanStage::FAILURE;
         }
 
-        if (NULL == intervalStatus.getValue()) {
+        if (nullptr == intervalStatus.getValue()) {
             _searchState = SearchState_Finished;
             return PlanStage::IS_EOF;
         }

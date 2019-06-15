@@ -2792,7 +2792,7 @@ mongo::Status linenoiseHistorySave(const char* filename) {
     }
 #else
     fp = fopen(filename, "wt");
-    if (fp == NULL) {
+    if (fp == nullptr) {
         const auto ewd = mongo::errnoWithDescription();
         return linenoiseFileError(mongo::ErrorCodes::FileOpenFailed, "fopen()", filename, ewd);
     }

@@ -110,7 +110,7 @@ public:
                                                       WorkingSet* workingSet,
                                                       const Collection* collection) {
         if (_pos == static_cast<int>(_intervals.size()))
-            return StatusWith<CoveredInterval*>(NULL);
+            return StatusWith<CoveredInterval*>(nullptr);
 
         const MockInterval& interval = *_intervals[_pos++];
 

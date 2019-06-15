@@ -39,7 +39,7 @@ namespace mongo {
 
 typedef int(WSAAPI* WSAPollFunction)(pollfd* fdarray, ULONG nfds, INT timeout);
 
-static WSAPollFunction wsaPollFunction = NULL;
+static WSAPollFunction wsaPollFunction = nullptr;
 
 MONGO_INITIALIZER(DynamicLinkWin32Poll)(InitializerContext* context) {
     HINSTANCE wsaPollLib = LoadLibraryW(L"Ws2_32.dll");
@@ -51,7 +51,7 @@ MONGO_INITIALIZER(DynamicLinkWin32Poll)(InitializerContext* context) {
 }
 
 bool isPollSupported() {
-    return wsaPollFunction != NULL;
+    return wsaPollFunction != nullptr;
 }
 
 int socketPoll(pollfd* fdarray, unsigned long nfds, int timeout) {

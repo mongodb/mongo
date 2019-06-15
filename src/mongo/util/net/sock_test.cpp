@@ -62,7 +62,7 @@ SocketPair socketPair(const int type, const int protocol = 0);
 namespace detail {
 void awaitAccept(SOCKET* acceptSock, SOCKET listenSock, Notification<void>& notify) {
     *acceptSock = INVALID_SOCKET;
-    const SOCKET result = ::accept(listenSock, NULL, 0);
+    const SOCKET result = ::accept(listenSock, nullptr, 0);
     if (result != INVALID_SOCKET) {
         *acceptSock = result;
     }
@@ -98,7 +98,7 @@ SocketPair socketPair(const int type, const int protocol) {
     hints.ai_socktype = type;
     hints.ai_flags = AI_PASSIVE;
 
-    int result = ::getaddrinfo(NULL, "0", &hints, &res);
+    int result = ::getaddrinfo(nullptr, "0", &hints, &res);
     if (result != 0) {
         closesocket(listenSock);
         return SocketPair();
@@ -135,7 +135,7 @@ SocketPair socketPair(const int type, const int protocol) {
     connectHints.ai_socktype = type;
     std::stringstream portStream;
     portStream << ntohs(bindAddr.sin_port);
-    result = ::getaddrinfo(NULL, portStream.str().c_str(), &connectHints, &connectRes);
+    result = ::getaddrinfo(nullptr, portStream.str().c_str(), &connectHints, &connectRes);
     if (result != 0) {
         closesocket(listenSock);
         ::freeaddrinfo(res);
