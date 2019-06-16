@@ -227,7 +227,9 @@ private:
  */
 class ReadSourceScope {
 public:
-    ReadSourceScope(OperationContext* opCtx);
+    ReadSourceScope(OperationContext* opCtx,
+                    RecoveryUnit::ReadSource readSource = RecoveryUnit::ReadSource::kUnset,
+                    boost::optional<Timestamp> provided = boost::none);
     ~ReadSourceScope();
 
 private:
