@@ -372,11 +372,10 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     // `multikeyMetadataKeys` when inserting.
     *numKeysOut = keys.size() + (op == Op::kInsert ? multikeyMetadataKeys.size() : 0);
 
-    if (*numKeysOut == 0) {
-        return Status::OK();
-    }
-
     if (op == Op::kInsert) {
+        // SERVER-39705: It's worth noting that a document may not generate any keys, but be
+        // described as being multikey. This step must be done to maintain parity with `validate`s
+        // expectations.
         stdx::unique_lock<stdx::mutex> lk(_multikeyPathMutex);
         if (_multikeyPaths) {
             MultikeyPathTracker::mergeMultikeyPaths(&_multikeyPaths.get(), multikeyPaths);
@@ -385,6 +384,10 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
             // "shape". Initialize `_multikeyPaths` with the right shape from the first result.
             _multikeyPaths = multikeyPaths;
         }
+    }
+
+    if (*numKeysOut == 0) {
+        return Status::OK();
     }
 
     std::vector<BSONObj> toInsert;
