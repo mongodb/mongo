@@ -1220,10 +1220,6 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
     _opTimeWaiterList.signalIf_inlock(
         [opTime](Waiter* waiter) { return waiter->opTime <= opTime; });
 
-    if (opTime.isNull()) {
-        return;
-    }
-
     // Update the local snapshot before updating the stable timestamp on the storage engine. New
     // transactions reading from the local snapshot should start before the oldest timestamp is
     // advanced to avoid races.
@@ -1231,6 +1227,10 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
 
     // Notify the oplog waiters after updating the local snapshot.
     signalOplogWaiters();
+
+    if (opTime.isNull()) {
+        return;
+    }
 
     // Add the new applied optime to the list of stable optime candidates and then set the last
     // stable optime. Stable optimes are used to determine the last optime that it is safe to revert

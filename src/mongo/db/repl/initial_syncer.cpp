@@ -101,6 +101,9 @@ MONGO_FAIL_POINT_DEFINE(rsSyncApplyStop);
 // Failpoint which causes the initial sync function to hang afte cloning all databases.
 MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterDataCloning);
 
+// Failpoint which causes the initial sync function to fail and hang before starting a new attempt.
+MONGO_FAIL_POINT_DEFINE(failAndHangInitialSync);
+
 namespace {
 using namespace executor;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -1383,6 +1386,12 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
     auto runTime = _initialSyncState ? _initialSyncState->timer.millis() : 0;
     _stats.initialSyncAttemptInfos.emplace_back(
         InitialSyncer::InitialSyncAttemptInfo{runTime, result.getStatus(), _syncSource});
+
+    if (MONGO_FAIL_POINT(failAndHangInitialSync)) {
+        log() << "failAndHangInitialSync fail point enabled.";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(failAndHangInitialSync);
+        result = Status(ErrorCodes::InternalError, "failAndHangInitialSync fail point enabled");
+    }
 
     if (result.isOK()) {
         // Scope guard will invoke _finishCallback().

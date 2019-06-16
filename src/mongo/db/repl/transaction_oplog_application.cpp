@@ -397,8 +397,11 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
         log() << "Hit skipReconstructPreparedTransactions failpoint";
         return;
     }
-    // Read the transactions table with its own snapshot and read timestamp.
-    ReadSourceScope readSourceScope(opCtx);
+    // Read the transactions table and the oplog collection without a timestamp.
+    // The below DBDirectClient read uses AutoGetCollectionForRead which could implicitly change the
+    // read source to kLastApplied. So we need to explicitly set the read source to kNoTimestamp to
+    // force reads in this scope to be untimestamped.
+    ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
 
     DBDirectClient client(opCtx);
     const auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,

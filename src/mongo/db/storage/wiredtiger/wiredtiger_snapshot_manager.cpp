@@ -50,7 +50,10 @@ void WiredTigerSnapshotManager::setCommittedSnapshot(const Timestamp& timestamp)
 
 void WiredTigerSnapshotManager::setLocalSnapshot(const Timestamp& timestamp) {
     stdx::lock_guard<stdx::mutex> lock(_localSnapshotMutex);
-    _localSnapshot = timestamp;
+    if (timestamp.isNull())
+        _localSnapshot = boost::none;
+    else
+        _localSnapshot = timestamp;
 }
 
 boost::optional<Timestamp> WiredTigerSnapshotManager::getLocalSnapshot() {
