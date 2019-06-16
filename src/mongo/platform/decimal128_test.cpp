@@ -31,7 +31,6 @@
 
 #include <array>
 #include <cmath>
-#include <fmt/format.h>
 #include <memory>
 #include <string>
 #include <utility>
@@ -41,68 +40,80 @@
 
 namespace mongo {
 
-using namespace fmt::literals;
-
 // Tests for Decimal128 constructors
 TEST(Decimal128Test, TestDefaultConstructor) {
     Decimal128 d;
     ASSERT_TRUE(d.isBinaryEqual(Decimal128(0)));
 }
 
-template <typename T>
-using Lim = std::numeric_limits<T>;
+TEST(Decimal128Test, TestInt32ConstructorZero) {
+    int32_t intZero = 0;
+    Decimal128 d(intZero);
+    Decimal128::Value val = d.getValue();
+    // 0x3040000000000000 0000000000000000 = +0E+0
+    uint64_t highBytes = 0x3040000000000000ull;
+    uint64_t lowBytes = 0x0000000000000000ull;
+    ASSERT_EQUALS(val.high64, highBytes);
+    ASSERT_EQUALS(val.low64, lowBytes);
+}
 
-TEST(Decimal128Test, TestConstructor) {
-    // High bits of a positive Decimal128 with exponent 1.
-    constexpr uint64_t posHigh = 0x3040000000000000;
-    // High bits of a negative Decimal128 with exponent 1.
-    constexpr uint64_t negHigh = 0xb040000000000000;
+TEST(Decimal128Test, TestInt32ConstructorMax) {
+    int32_t intMax = std::numeric_limits<int32_t>::max();
+    Decimal128 d(intMax);
+    Decimal128::Value val = d.getValue();
+    // 0x3040000000000000 000000007fffffff = +2147483647E+0
+    uint64_t highBytes = 0x3040000000000000ull;
+    uint64_t lowBytes = 0x000000007fffffffull;
+    ASSERT_EQUALS(val.high64, highBytes);
+    ASSERT_EQUALS(val.low64, lowBytes);
+}
 
-#define TEST_CTOR(N, HIGH64, LOW64)                                            \
-    ASSERT_EQ(Decimal128{N}.getValue().high64, static_cast<uint64_t>(HIGH64)); \
-    ASSERT_EQ(Decimal128{N}.getValue().low64, static_cast<uint64_t>(LOW64));
+TEST(Decimal128Test, TestInt32ConstructorMin) {
+    int32_t intMin = std::numeric_limits<int32_t>::lowest();
+    Decimal128 d(intMin);
+    Decimal128::Value val = d.getValue();
+    // 0xb040000000000000 000000007fffffff = -2147483648E+0
+    uint64_t highBytes = 0xb040000000000000ull;
+    uint64_t lowBytes = 0x0000000080000000ull;
+    ASSERT_EQUALS(val.high64, highBytes);
+    ASSERT_EQUALS(val.low64, lowBytes);
+}
 
-    TEST_CTOR(int8_t{0}, posHigh, 0);  // +0E+0
-    TEST_CTOR(Lim<int8_t>::lowest(), negHigh, uint64_t{1} << 7);
-    TEST_CTOR(Lim<int8_t>::max(), posHigh, (uint64_t{1} << 7) - 1);
-    TEST_CTOR(int8_t{5}, posHigh, 0x5);
+TEST(Decimal128Test, TestInt64ConstructorZero) {
+    int64_t longZero = 0;
+    Decimal128 d(longZero);
+    Decimal128::Value val = d.getValue();
+    // 0x3040000000000000 0000000000000000 = +0E+0
+    uint64_t highBytes = 0x3040000000000000ull;
+    uint64_t lowBytes = 0x0000000000000000ull;
+    ASSERT_EQUALS(val.high64, highBytes);
+    ASSERT_EQUALS(val.low64, lowBytes);
+}
 
-    TEST_CTOR(uint8_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<uint8_t>::max(), posHigh, (uint64_t{1} << 8) - 1);
-    TEST_CTOR(uint8_t{5}, posHigh, 0x5);
+TEST(Decimal128Test, TestInt64ConstructorMax) {
+    int64_t longMax = std::numeric_limits<long long>::max();
+    Decimal128 d(longMax);
+    Decimal128::Value val = d.getValue();
+    // 0x3040000000000000 7fffffffffffffff = +9223372036854775807E+0
+    uint64_t highBytes = 0x3040000000000000ull;
+    uint64_t lowBytes = 0x7fffffffffffffffull;
+    ASSERT_EQUALS(val.high64, highBytes);
+    ASSERT_EQUALS(val.low64, lowBytes);
+}
 
-    TEST_CTOR(int16_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<int16_t>::lowest(), negHigh, uint64_t{1} << 15);
-    TEST_CTOR(Lim<int16_t>::max(), posHigh, (uint64_t{1} << 15) - 1);
-    TEST_CTOR(int16_t{5}, posHigh, 0x5);
-
-    TEST_CTOR(uint16_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<uint16_t>::max(), posHigh, (uint64_t{1} << 16) - 1);
-    TEST_CTOR(uint16_t{5}, posHigh, 0x5);
-
-    TEST_CTOR(int32_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<int32_t>::lowest(), negHigh, uint64_t{1} << 31);
-    TEST_CTOR(Lim<int32_t>::max(), posHigh, (uint64_t{1} << 31) - 1);
-    TEST_CTOR(int32_t{5}, posHigh, 0x5);
-
-    TEST_CTOR(uint32_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<uint32_t>::max(), posHigh, (uint64_t{1} << 32) - 1);
-    TEST_CTOR(uint32_t{5}, posHigh, 0x5);
-
-    TEST_CTOR(int64_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<int64_t>::lowest(), negHigh, uint64_t{1} << 63);
-    TEST_CTOR(Lim<int64_t>::max(), posHigh, (uint64_t{1} << 63) - 1);
-    TEST_CTOR(int64_t{5}, posHigh, 0x5);
-
-    TEST_CTOR(uint64_t{0}, posHigh, 0);
-    TEST_CTOR(Lim<uint64_t>::max(), posHigh, Lim<uint64_t>::max());
-    TEST_CTOR(uint64_t{5}, posHigh, 0x5);
-
-#undef TEST_CTOR
+TEST(Decimal128Test, TestInt64ConstructorMin) {
+    int64_t longMin = std::numeric_limits<long long>::lowest();
+    Decimal128 d(longMin);
+    Decimal128::Value val = d.getValue();
+    // 0xb040000000000000 8000000000000000 = -9223372036854775808E+0
+    uint64_t highBytes = 0xb040000000000000;
+    uint64_t lowBytes = 0x8000000000000000;
+    ASSERT_EQUALS(val.high64, highBytes);
+    ASSERT_EQUALS(val.low64, lowBytes);
 }
 
 TEST(Decimal128Test, TestPartsConstructor) {
-    constexpr Decimal128 expected(10);
+    Decimal128 expected(10);
     Decimal128 val(0LL, Decimal128::kExponentBias, 0LL, 10LL);
     ASSERT_EQUALS(val.getValue().low64, expected.getValue().low64);
     ASSERT_EQUALS(val.getValue().low64, expected.getValue().low64);
@@ -287,19 +298,17 @@ TEST(Decimal128Test, TestNonCanonicalDecimal) {
     // when encountered. However, the exponent and sign still matter.
 
     // 0x6c10000000000000 0000000000000000 = non-canonical 0, all ignored bits clear
-    constexpr Decimal128 nonCanonical0E0(Decimal128::Value{0, 0x6c10000000000000ull});
+    Decimal128 nonCanonical0E0(Decimal128::Value{0, 0x6c10000000000000ull});
     std::string zeroE0 = nonCanonical0E0.toString();
     ASSERT_EQUALS(zeroE0, "0");
 
     // 0xec100000deadbeef 0123456789abcdef = non-canonical -0, random stuff in ignored bits
-    constexpr Decimal128 nonCanonicalM0E0(
-        Decimal128::Value{0x0123456789abcdefull, 0xec100000deadbeefull});
+    Decimal128 nonCanonicalM0E0(Decimal128::Value{0x0123456789abcdefull, 0xec100000deadbeefull});
     std::string minusZeroE0 = nonCanonicalM0E0.toString();
     ASSERT_EQUALS(minusZeroE0, "-0");
 
     // 0x6c11fffffffffffff ffffffffffffffff = non-canonical 0.000, all ignored bits set
-    constexpr Decimal128 nonCanonical0E3(
-        Decimal128::Value{0xffffffffffffffffull, 0x6c11ffffffffffffull});
+    Decimal128 nonCanonical0E3(Decimal128::Value{0xffffffffffffffffull, 0x6c11ffffffffffffull});
     std::string zeroE3 = nonCanonical0E3.toString();
     ASSERT_EQUALS(zeroE3, "0E+3");
 
@@ -318,13 +327,13 @@ TEST(Decimal128Test, TestNonCanonicalDecimal) {
 
 // Tests for absolute value function
 TEST(Decimal128Test, TestAbsValuePos) {
-    constexpr Decimal128 d(25);
+    Decimal128 d(25);
     Decimal128 dAbs = d.toAbs();
     ASSERT_TRUE(dAbs.isEqual(d));
 }
 
 TEST(Decimal128Test, TestAbsValueNeg) {
-    constexpr Decimal128 d(-25);
+    Decimal128 d(-25);
     Decimal128 dAbs = d.toAbs();
     ASSERT_TRUE(dAbs.isEqual(Decimal128(25)));
 }
@@ -949,8 +958,8 @@ TEST(Decimal128Test, TestDecimal128DivideSignaling) {
 
 // Test Decimal128 special comparisons
 TEST(Decimal128Test, TestDecimal128IsZero) {
-    constexpr Decimal128 d1(0);
-    constexpr Decimal128 d2(500);
+    Decimal128 d1(0);
+    Decimal128 d2(500);
     ASSERT_TRUE(d1.isZero());
     ASSERT_FALSE(d2.isZero());
 }
