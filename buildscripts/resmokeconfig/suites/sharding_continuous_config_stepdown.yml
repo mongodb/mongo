@@ -197,6 +197,8 @@ selector:
   # prepared to work correctly in this situation. This should be fixed by a future
   # improvement in sharding infrastructure, and can be unblacklisted by SERVER-40172.
   - jstests/sharding/merge_to_existing.js
+  # Sets a failpoint on find commands which can lead to a hang when a config steps down.
+  - jstests/sharding/sharding_statistics_server_status.js
 
 executor:
   config:
