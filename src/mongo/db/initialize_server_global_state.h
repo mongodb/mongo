@@ -34,11 +34,23 @@ namespace mongo {
 class ServiceContext;
 
 /**
+ * Enum which controls whether the pid file is written at startup.
+ */
+enum class PidFileWrite {
+    // Open PID file and write PID to disk
+    kWrite,
+
+    // Do not open or write PID file
+    kNoWrite,
+};
+
+/**
  * Perform initialization activity common across all mongo server types.
  *
  * Set up logging, daemonize the process, configure SSL, etc.
  */
-bool initializeServerGlobalState(ServiceContext* service);
+bool initializeServerGlobalState(ServiceContext* service,
+                                 PidFileWrite pidWrite = PidFileWrite::kWrite);
 
 /**
  * Forks and detaches the server, on platforms that support it, if serverGlobalParams.doFork is

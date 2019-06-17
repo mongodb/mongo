@@ -33,6 +33,8 @@
 
 #include "mongo/db/storage/storage_engine_lock_file.h"
 
+#include "mongo/platform/process_id.h"
+
 namespace mongo {
 namespace {
 
@@ -42,6 +44,15 @@ auto getLockFile = ServiceContext::declareDecoration<boost::optional<StorageEngi
 
 boost::optional<StorageEngineLockFile>& StorageEngineLockFile::get(ServiceContext* service) {
     return getLockFile(service);
+}
+
+Status StorageEngineLockFile::writePid() {
+    ProcessId pid = ProcessId::getCurrent();
+    std::stringstream ss;
+    ss << pid << std::endl;
+    std::string pidStr = ss.str();
+
+    return writeString(pidStr);
 }
 
 }  // namespace mongo
