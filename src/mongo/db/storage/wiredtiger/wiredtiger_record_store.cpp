@@ -1854,6 +1854,7 @@ WiredTigerRecordStoreCursorBase::WiredTigerRecordStoreCursorBase(OperationContex
 }
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
+    invariant(_hasRestored);
     if (_eof)
         return {};
 
@@ -1908,6 +1909,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
 }
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordId& id) {
+    invariant(_hasRestored);
     if (_oplogVisibleTs && id.repr() > *_oplogVisibleTs) {
         _eof = true;
         return {};
@@ -1939,6 +1941,7 @@ void WiredTigerRecordStoreCursorBase::save() {
         if (_cursor)
             _cursor->reset();
         _oplogVisibleTs = boost::none;
+        _hasRestored = false;
     } catch (const WriteConflictException&) {
         // Ignore since this is only called when we are about to kill our transaction
         // anyway.
@@ -1963,6 +1966,7 @@ bool WiredTigerRecordStoreCursorBase::restore() {
     // This will ensure an active session exists, so any restored cursors will bind to it
     invariant(WiredTigerRecoveryUnit::get(_opCtx)->getSession() == _cursor->getSession());
     _skipNextAdvance = false;
+    _hasRestored = true;
 
     // If we've hit EOF, then this iterator is done and need not be restored.
     if (_eof)

@@ -456,6 +456,7 @@ protected:
     boost::optional<WiredTigerCursor> _cursor;
     bool _eof = false;
     RecordId _lastReturnedId;  // If null, need to seek to first/last record.
+    bool _hasRestored = true;
 
 private:
     bool isVisible(const RecordId& id);
