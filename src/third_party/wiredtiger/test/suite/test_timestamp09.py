@@ -165,10 +165,9 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         # Read timestamp >= Oldest timestamp
         self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(7) +
             ',stable_timestamp=' + timestamp_str(7))
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.begin_transaction('read_timestamp=' +
-                timestamp_str(6)),
-                '/less than the oldest timestamp/')
+        with self.expectedStdoutPattern('less than the oldest timestamp'):
+            self.assertRaisesException(wiredtiger.WiredTigerError,
+                lambda: self.session.begin_transaction('read_timestamp=' + timestamp_str(6)))
 
         # c[8] is not visible at read_timestamp < 8
         self.session.begin_transaction('read_timestamp=' + timestamp_str(7))
@@ -189,10 +188,9 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         # We can move the oldest timestamp backwards with "force"
         self.conn.set_timestamp(
             'oldest_timestamp=' + timestamp_str(5) + ',force')
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.begin_transaction('read_timestamp=' +
-                timestamp_str(4)),
-                '/less than the oldest timestamp/')
+        with self.expectedStdoutPattern('less than the oldest timestamp'):
+            self.assertRaisesException(wiredtiger.WiredTigerError,
+                lambda: self.session.begin_transaction('read_timestamp=' + timestamp_str(4)))
         self.session.begin_transaction('read_timestamp=' + timestamp_str(6))
         self.assertTimestampsEqual(
             self.conn.query_timestamp('get=oldest_reader'), timestamp_str(6))

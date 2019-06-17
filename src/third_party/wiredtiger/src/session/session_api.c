@@ -1115,6 +1115,65 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __session_import --
+ *	WT_SESSION->import method.
+ */
+static int
+__session_import(WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	char *value;
+
+	WT_UNUSED(config);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL_NOCONF(session, import);
+
+	WT_ERR(__wt_inmem_unsupported_op(session, NULL));
+
+	if (!WT_PREFIX_MATCH(uri, "file:"))
+		WT_ERR(__wt_bad_object_type(session, uri));
+
+	if ((ret = __wt_metadata_search(session, uri, &value)) == 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "an object named \"%s\" already exists in the database",
+		    uri);
+	WT_ERR_NOTFOUND_OK(ret);
+
+	WT_ERR(__wt_import(session, uri));
+
+err:
+	if (ret != 0)
+		WT_STAT_CONN_INCR(session, session_table_import_fail);
+	else
+		WT_STAT_CONN_INCR(session, session_table_import_success);
+	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_import_readonly --
+ *	WT_SESSION->import method; readonly version.
+ */
+static int
+__session_import_readonly(
+    WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	WT_UNUSED(uri);
+	WT_UNUSED(config);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL_NOCONF(session, import);
+
+	WT_STAT_CONN_INCR(session, session_table_import_fail);
+	ret = __wt_session_notsup(session);
+err:	API_END_RET(session, ret);
+}
+
+/*
  * __session_join --
  *	WT_SESSION->join method.
  */
@@ -2092,6 +2151,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_open_cursor,
 		__session_alter,
 		__session_create,
+		__session_import,
 		__wt_session_compact,
 		__session_drop,
 		__session_join,
@@ -2124,6 +2184,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_open_cursor,
 		__session_alter_readonly,
 		__session_create_readonly,
+		__session_import_readonly,
 		__wt_session_compact_readonly,
 		__session_drop_readonly,
 		__session_join,

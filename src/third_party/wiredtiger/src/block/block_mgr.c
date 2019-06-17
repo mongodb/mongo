@@ -69,6 +69,18 @@ __bm_checkpoint(WT_BM *bm, WT_SESSION_IMPL *session,
 }
 
 /*
+ * __bm_checkpoint_last --
+ *	Return information for the last known file checkpoint.
+ */
+static int
+__bm_checkpoint_last(WT_BM *bm, WT_SESSION_IMPL *session,
+    char **metadatap, char **checkpoint_listp, WT_ITEM *checkpoint)
+{
+	return (__wt_block_checkpoint_last(
+	    session, bm->block, metadatap, checkpoint_listp, checkpoint));
+}
+
+/*
  * __bm_checkpoint_readonly --
  *	Write a buffer into a block, creating a checkpoint; readonly version.
  */
@@ -562,6 +574,7 @@ __bm_method_set(WT_BM *bm, bool readonly)
 	bm->addr_string = __bm_addr_string;
 	bm->block_header = __bm_block_header;
 	bm->checkpoint = __bm_checkpoint;
+	bm->checkpoint_last = __bm_checkpoint_last;
 	bm->checkpoint_load = __bm_checkpoint_load;
 	bm->checkpoint_resolve = __bm_checkpoint_resolve;
 	bm->checkpoint_start = __bm_checkpoint_start;

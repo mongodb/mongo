@@ -106,7 +106,7 @@ config_setup(void)
 			 * cache problems, don't configure LSM if those set.
 			 *
 			 * XXX
-			 * Remove the timestamp test when WT-4067 resolved.
+			 * Remove the timestamp test when WT-4162 resolved.
 			 */
 			if (g.type != ROW || g.c_in_memory)
 				break;
@@ -563,8 +563,7 @@ config_lsm_reset(void)
 	 * LSM doesn't currently play nicely with timestamps, don't choose the
 	 * pair unless forced to. If we turn off timestamps, make sure we turn
 	 * off prepare as well, it requires timestamps. Remove this code with
-	 * WT-4067.
-	 *
+	 * WT-4162.
 	 */
 	if (!config_is_perm("prepare") &&
 	    !config_is_perm("transaction_timestamps")) {

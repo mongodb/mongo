@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2019 MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
+# Public Domain 2034-2039 MongoDB, Inc.
+# Public Domain 2008-2034 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -26,31 +26,33 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
 import wiredtiger, wttest
-from wtscenario import make_scenarios
 
-# test_empty.py
-#       Test that empty objects don't write anything other than a single sector.
-class test_empty(wttest.WiredTigerTestCase):
-    name = 'test_empty'
+# test_debug_mode04.py
+#    Test the debug mode settings. Test eviction use.
+class test_debug_mode04(wttest.WiredTigerTestCase):
+    conn_config = 'log=(enabled=true,file_max=100K),debug_mode=(eviction=true)'
+    uri = 'file:test_debug'
+    entries = 100
+    value = b'\x01\x02abcd\x03\x04'
 
-    scenarios = make_scenarios([
-        ('file-r', dict(type='file:', fmt='r')),
-        ('file-S', dict(type='file:', fmt='S')),
-        ('table-r', dict(type='table:', fmt='r')),
-        ('table-S', dict(type='table:', fmt='S'))
-    ])
+    def add_data(self):
+        keys = range(0, self.entries)
+        c = self.session.open_cursor(self.uri, None)
+        for k in keys:
+            c[k] = self.value
+        c.close()
 
-    # Creating an object and then closing it shouldn't write any blocks.
-    def test_empty_create(self):
-        uri = self.type + self.name
-        self.session.create(uri, 'key_format=' + self.fmt + ',value_format=S')
-        self.session.close()
-        name = self.name
-        if self.type == "table:":
-            name = name + '.wt'
-        self.assertEquals(os.stat(name).st_size, 4*1024)
+    # Just test turning it on and off. There really isn't something
+    # specific to verify.
+    def test_table_logging(self):
+        self.session.create(self.uri, 'key_format=i,value_format=u')
+        self.add_data()
+
+    def test_table_logging_off(self):
+        self.conn.reconfigure("debug_mode=(eviction=false)")
+        self.session.create(self.uri, 'key_format=i,value_format=u')
+        self.add_data()
 
 if __name__ == '__main__':
     wttest.run()

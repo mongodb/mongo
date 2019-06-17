@@ -1448,6 +1448,21 @@ struct __wt_session {
 	int __F(create)(WT_SESSION *session,
 	    const char *name, const char *config);
 
+#if !defined(SWIG) && !defined(DOXYGEN)
+	/*!
+	 * Import a file.
+	 *
+	 * @snippet ex_all.c Import a file
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the object to import
+	 * @configempty{WT_SESSION.import, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(import)(WT_SESSION *session,
+	    const char *name, const char *config);
+#endif
+
 	/*!
 	 * Compact a live row- or column-store btree or LSM tree.
 	 *
@@ -2284,16 +2299,23 @@ struct __wt_connection {
 	 * checkpoints.  Zero or one means perform normal archiving., an integer
 	 * between 0 and 1024; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * rollback_error, return a WT_ROLLBACK error from a transaction
-	 * operation about every Nth operation to simulate a collision., an
-	 * integer between 0 and 10M; default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write
-	 * transaction related information to the log for all operations\, even
-	 * operations for tables with logging turned off.  This setting
-	 * introduces a log format change that may break older versions of
-	 * WiredTiger.  These operations are informational and skipped in
-	 * recovery., a boolean flag; default \c false.}
-	 * @config{ ),,}
+	 * eviction, if true\, modify internal algorithms to change skew to
+	 * force lookaside eviction to happen more aggressively.  This includes
+	 * but is not limited to not skewing newest\, not favoring leaf pages\,
+	 * and modifying the eviction score mechanism., a boolean flag; default
+	 * \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a
+	 * WT_ROLLBACK error from a transaction operation about every Nth
+	 * operation to simulate a collision., an integer between 0 and 10M;
+	 * default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if
+	 * true\, write transaction related information to the log for all
+	 * operations\, even operations for tables with logging turned off.
+	 * This setting introduces a log format change that may break older
+	 * versions of WiredTiger.  These operations are informational and
+	 * skipped in recovery., a boolean flag; default \c false.}
+	 * @config{
+	 * ),,}
 	 * @config{error_prefix, prefix string for error messages., a string;
 	 * default empty.}
 	 * @config{eviction = (, eviction configuration options., a set of
@@ -2928,14 +2950,21 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;checkpoint_retention, adjust log archiving to
  * retain the log records of this number of checkpoints.  Zero or one means
  * perform normal archiving., an integer between 0 and 1024; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error
- * from a transaction operation about every Nth operation to simulate a
- * collision., an integer between 0 and 10M; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write transaction
- * related information to the log for all operations\, even operations for
- * tables with logging turned off.  This setting introduces a log format change
- * that may break older versions of WiredTiger.  These operations are
- * informational and skipped in recovery., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction, if true\, modify internal
+ * algorithms to change skew to force lookaside eviction to happen more
+ * aggressively.  This includes but is not limited to not skewing newest\, not
+ * favoring leaf pages\, and modifying the eviction score mechanism., a boolean
+ * flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error,
+ * return a WT_ROLLBACK error from a transaction operation about every Nth
+ * operation to simulate a collision., an integer between 0 and 10M; default \c
+ * 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write
+ * transaction related information to the log for all operations\, even
+ * operations for tables with logging turned off.  This setting introduces a log
+ * format change that may break older versions of WiredTiger.  These operations
+ * are informational and skipped in recovery., a boolean flag; default \c
+ * false.}
  * @config{ ),,}
  * @config{direct_io, Use \c O_DIRECT on POSIX systems\, and \c
  * FILE_FLAG_NO_BUFFERING on Windows to access files.  Options are given as a
@@ -5697,201 +5726,205 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_SESSION_TABLE_DROP_FAIL		1307
 /*! session: table drop successful calls */
 #define	WT_STAT_CONN_SESSION_TABLE_DROP_SUCCESS		1308
+/*! session: table import failed calls */
+#define	WT_STAT_CONN_SESSION_TABLE_IMPORT_FAIL		1309
+/*! session: table import successful calls */
+#define	WT_STAT_CONN_SESSION_TABLE_IMPORT_SUCCESS	1310
 /*! session: table rebalance failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_REBALANCE_FAIL	1309
+#define	WT_STAT_CONN_SESSION_TABLE_REBALANCE_FAIL	1311
 /*! session: table rebalance successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_REBALANCE_SUCCESS	1310
+#define	WT_STAT_CONN_SESSION_TABLE_REBALANCE_SUCCESS	1312
 /*! session: table rename failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_RENAME_FAIL		1311
+#define	WT_STAT_CONN_SESSION_TABLE_RENAME_FAIL		1313
 /*! session: table rename successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_RENAME_SUCCESS	1312
+#define	WT_STAT_CONN_SESSION_TABLE_RENAME_SUCCESS	1314
 /*! session: table salvage failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_FAIL		1313
+#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_FAIL		1315
 /*! session: table salvage successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_SUCCESS	1314
+#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_SUCCESS	1316
 /*! session: table truncate failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_FAIL	1315
+#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_FAIL	1317
 /*! session: table truncate successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_SUCCESS	1316
+#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_SUCCESS	1318
 /*! session: table verify failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_FAIL		1317
+#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_FAIL		1319
 /*! session: table verify successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_SUCCESS	1318
+#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_SUCCESS	1320
 /*! thread-state: active filesystem fsync calls */
-#define	WT_STAT_CONN_THREAD_FSYNC_ACTIVE		1319
+#define	WT_STAT_CONN_THREAD_FSYNC_ACTIVE		1321
 /*! thread-state: active filesystem read calls */
-#define	WT_STAT_CONN_THREAD_READ_ACTIVE			1320
+#define	WT_STAT_CONN_THREAD_READ_ACTIVE			1322
 /*! thread-state: active filesystem write calls */
-#define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1321
+#define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1323
 /*! thread-yield: application thread time evicting (usecs) */
-#define	WT_STAT_CONN_APPLICATION_EVICT_TIME		1322
+#define	WT_STAT_CONN_APPLICATION_EVICT_TIME		1324
 /*! thread-yield: application thread time waiting for cache (usecs) */
-#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1323
+#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1325
 /*!
  * thread-yield: connection close blocked waiting for transaction state
  * stabilization
  */
-#define	WT_STAT_CONN_TXN_RELEASE_BLOCKED		1324
+#define	WT_STAT_CONN_TXN_RELEASE_BLOCKED		1326
 /*! thread-yield: connection close yielded for lsm manager shutdown */
-#define	WT_STAT_CONN_CONN_CLOSE_BLOCKED_LSM		1325
+#define	WT_STAT_CONN_CONN_CLOSE_BLOCKED_LSM		1327
 /*! thread-yield: data handle lock yielded */
-#define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1326
+#define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1328
 /*!
  * thread-yield: get reference for page index and slot time sleeping
  * (usecs)
  */
-#define	WT_STAT_CONN_PAGE_INDEX_SLOT_REF_BLOCKED	1327
+#define	WT_STAT_CONN_PAGE_INDEX_SLOT_REF_BLOCKED	1329
 /*! thread-yield: log server sync yielded for log write */
-#define	WT_STAT_CONN_LOG_SERVER_SYNC_BLOCKED		1328
+#define	WT_STAT_CONN_LOG_SERVER_SYNC_BLOCKED		1330
 /*! thread-yield: page access yielded due to prepare state change */
-#define	WT_STAT_CONN_PREPARED_TRANSITION_BLOCKED_PAGE	1329
+#define	WT_STAT_CONN_PREPARED_TRANSITION_BLOCKED_PAGE	1331
 /*! thread-yield: page acquire busy blocked */
-#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1330
+#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1332
 /*! thread-yield: page acquire eviction blocked */
-#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1331
+#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1333
 /*! thread-yield: page acquire locked blocked */
-#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1332
+#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1334
 /*! thread-yield: page acquire read blocked */
-#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1333
+#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1335
 /*! thread-yield: page acquire time sleeping (usecs) */
-#define	WT_STAT_CONN_PAGE_SLEEP				1334
+#define	WT_STAT_CONN_PAGE_SLEEP				1336
 /*!
  * thread-yield: page delete rollback time sleeping for state change
  * (usecs)
  */
-#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1335
+#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1337
 /*! thread-yield: page reconciliation yielded due to child modification */
-#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1336
+#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1338
 /*! transaction: Number of prepared updates */
-#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_COUNT		1337
+#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_COUNT		1339
 /*! transaction: Number of prepared updates added to cache overflow */
-#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_LOOKASIDE_INSERTS	1338
+#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_LOOKASIDE_INSERTS	1340
 /*! transaction: Number of prepared updates resolved */
-#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_RESOLVED	1339
+#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_RESOLVED	1341
 /*! transaction: commit timestamp queue entries walked */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_WALKED		1340
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_WALKED		1342
 /*! transaction: commit timestamp queue insert to empty */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_EMPTY		1341
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_EMPTY		1343
 /*! transaction: commit timestamp queue inserts to head */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_HEAD		1342
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_HEAD		1344
 /*! transaction: commit timestamp queue inserts total */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_INSERTS		1343
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_INSERTS		1345
 /*! transaction: commit timestamp queue length */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_LEN		1344
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_LEN		1346
 /*! transaction: number of named snapshots created */
-#define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1345
+#define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1347
 /*! transaction: number of named snapshots dropped */
-#define	WT_STAT_CONN_TXN_SNAPSHOTS_DROPPED		1346
+#define	WT_STAT_CONN_TXN_SNAPSHOTS_DROPPED		1348
 /*! transaction: prepared transactions */
-#define	WT_STAT_CONN_TXN_PREPARE			1347
+#define	WT_STAT_CONN_TXN_PREPARE			1349
 /*! transaction: prepared transactions committed */
-#define	WT_STAT_CONN_TXN_PREPARE_COMMIT			1348
+#define	WT_STAT_CONN_TXN_PREPARE_COMMIT			1350
 /*! transaction: prepared transactions currently active */
-#define	WT_STAT_CONN_TXN_PREPARE_ACTIVE			1349
+#define	WT_STAT_CONN_TXN_PREPARE_ACTIVE			1351
 /*! transaction: prepared transactions rolled back */
-#define	WT_STAT_CONN_TXN_PREPARE_ROLLBACK		1350
+#define	WT_STAT_CONN_TXN_PREPARE_ROLLBACK		1352
 /*! transaction: query timestamp calls */
-#define	WT_STAT_CONN_TXN_QUERY_TS			1351
+#define	WT_STAT_CONN_TXN_QUERY_TS			1353
 /*! transaction: read timestamp queue entries walked */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_WALKED		1352
+#define	WT_STAT_CONN_TXN_READ_QUEUE_WALKED		1354
 /*! transaction: read timestamp queue insert to empty */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_EMPTY		1353
+#define	WT_STAT_CONN_TXN_READ_QUEUE_EMPTY		1355
 /*! transaction: read timestamp queue inserts to head */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_HEAD		1354
+#define	WT_STAT_CONN_TXN_READ_QUEUE_HEAD		1356
 /*! transaction: read timestamp queue inserts total */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_INSERTS		1355
+#define	WT_STAT_CONN_TXN_READ_QUEUE_INSERTS		1357
 /*! transaction: read timestamp queue length */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_LEN			1356
+#define	WT_STAT_CONN_TXN_READ_QUEUE_LEN			1358
 /*! transaction: rollback to stable calls */
-#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE		1357
+#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE		1359
 /*! transaction: rollback to stable updates aborted */
-#define	WT_STAT_CONN_TXN_ROLLBACK_UPD_ABORTED		1358
+#define	WT_STAT_CONN_TXN_ROLLBACK_UPD_ABORTED		1360
 /*! transaction: rollback to stable updates removed from cache overflow */
-#define	WT_STAT_CONN_TXN_ROLLBACK_LAS_REMOVED		1359
+#define	WT_STAT_CONN_TXN_ROLLBACK_LAS_REMOVED		1361
 /*! transaction: set timestamp calls */
-#define	WT_STAT_CONN_TXN_SET_TS				1360
+#define	WT_STAT_CONN_TXN_SET_TS				1362
 /*! transaction: set timestamp commit calls */
-#define	WT_STAT_CONN_TXN_SET_TS_COMMIT			1361
+#define	WT_STAT_CONN_TXN_SET_TS_COMMIT			1363
 /*! transaction: set timestamp commit updates */
-#define	WT_STAT_CONN_TXN_SET_TS_COMMIT_UPD		1362
+#define	WT_STAT_CONN_TXN_SET_TS_COMMIT_UPD		1364
 /*! transaction: set timestamp oldest calls */
-#define	WT_STAT_CONN_TXN_SET_TS_OLDEST			1363
+#define	WT_STAT_CONN_TXN_SET_TS_OLDEST			1365
 /*! transaction: set timestamp oldest updates */
-#define	WT_STAT_CONN_TXN_SET_TS_OLDEST_UPD		1364
+#define	WT_STAT_CONN_TXN_SET_TS_OLDEST_UPD		1366
 /*! transaction: set timestamp stable calls */
-#define	WT_STAT_CONN_TXN_SET_TS_STABLE			1365
+#define	WT_STAT_CONN_TXN_SET_TS_STABLE			1367
 /*! transaction: set timestamp stable updates */
-#define	WT_STAT_CONN_TXN_SET_TS_STABLE_UPD		1366
+#define	WT_STAT_CONN_TXN_SET_TS_STABLE_UPD		1368
 /*! transaction: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				1367
+#define	WT_STAT_CONN_TXN_BEGIN				1369
 /*! transaction: transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1368
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1370
 /*! transaction: transaction checkpoint generation */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1369
+#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1371
 /*! transaction: transaction checkpoint max time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1370
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1372
 /*! transaction: transaction checkpoint min time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1371
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1373
 /*! transaction: transaction checkpoint most recent time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1372
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1374
 /*! transaction: transaction checkpoint scrub dirty target */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1373
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1375
 /*! transaction: transaction checkpoint scrub time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1374
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1376
 /*! transaction: transaction checkpoint total time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1375
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1377
 /*! transaction: transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1376
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1378
 /*!
  * transaction: transaction checkpoints skipped because database was
  * clean
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1377
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1379
 /*! transaction: transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1378
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1380
 /*!
  * transaction: transaction fsync calls for checkpoint after allocating
  * the transaction ID
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1379
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1381
 /*!
  * transaction: transaction fsync duration for checkpoint after
  * allocating the transaction ID (usecs)
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1380
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1382
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1381
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1383
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1382
+#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1384
 /*!
  * transaction: transaction range of IDs currently pinned by named
  * snapshots
  */
-#define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1383
+#define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1385
 /*! transaction: transaction range of timestamps currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1384
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1386
 /*! transaction: transaction range of timestamps pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT	1385
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT	1387
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * active read timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER	1386
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER	1388
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1387
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1389
 /*! transaction: transaction read timestamp of the oldest active reader */
-#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	1388
+#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	1390
 /*! transaction: transaction sync calls */
-#define	WT_STAT_CONN_TXN_SYNC				1389
+#define	WT_STAT_CONN_TXN_SYNC				1391
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1390
+#define	WT_STAT_CONN_TXN_COMMIT				1392
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1391
+#define	WT_STAT_CONN_TXN_ROLLBACK			1393
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1392
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1394
 
 /*!
  * @}

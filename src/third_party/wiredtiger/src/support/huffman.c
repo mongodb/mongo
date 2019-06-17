@@ -261,8 +261,9 @@ static void
 make_table(WT_SESSION_IMPL *session, uint8_t *code2symbol,
     uint16_t max_depth, WT_HUFFMAN_CODE *codes, u_int symcnt)
 {
+	u_int i;
 	uint32_t j, c1, c2;	/* Exceeds uint16_t bounds at loop boundary. */
-	uint16_t c, i;
+	uint16_t c;
 	uint8_t len, shift;
 
 	/* Zero out, for assertion below. */
@@ -321,8 +322,8 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_FREQTREE_NODE *node, *node2, **refnode, *tempnode;
 	WT_HUFFMAN_OBJ *huffman;
+	u_int i;
 	uint64_t w1, w2;
-	uint16_t i;
 
 	indexed_freqs = NULL;
 	combined_nodes = leaves = NULL;

@@ -495,6 +495,12 @@ connection_runtime_config = [
             adjust log archiving to retain the log records of this number
             of checkpoints. Zero or one means perform normal archiving.''',
             min='0', max='1024'),
+        Config('eviction', 'false', r'''
+            if true, modify internal algorithms to change skew to force
+            lookaside eviction to happen more aggressively. This includes but
+            is not limited to not skewing newest, not favoring leaf pages,
+            and modifying the eviction score mechanism.''',
+            type='boolean'),
         Config('rollback_error', '0', r'''
             return a WT_ROLLBACK error from a transaction operation about
             every Nth operation to simulate a collision''',
@@ -1108,6 +1114,8 @@ methods = {
         if the underlying files should be removed''',
         type='boolean'),
 ]),
+
+'WT_SESSION.import' : Method([]),
 
 'WT_SESSION.join' : Method([
     Config('compare', '"eq"', r'''

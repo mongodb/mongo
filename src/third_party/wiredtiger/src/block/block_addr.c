@@ -206,7 +206,7 @@ __wt_block_ckpt_decode(WT_SESSION *wt_session,
  */
 int
 __wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, uint8_t **pp, WT_BLOCK_CKPT *ci)
+    WT_BLOCK *block, uint8_t **pp, WT_BLOCK_CKPT *ci, bool skip_avail)
 {
 	uint64_t a;
 
@@ -220,8 +220,11 @@ __wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session,
 	    ci->root_offset, ci->root_size, ci->root_checksum));
 	WT_RET(__wt_block_addr_to_buffer(block, pp,
 	    ci->alloc.offset, ci->alloc.size, ci->alloc.checksum));
-	WT_RET(__wt_block_addr_to_buffer(block, pp,
-	    ci->avail.offset, ci->avail.size, ci->avail.checksum));
+	if (skip_avail)
+		WT_RET(__wt_block_addr_to_buffer(block, pp, 0, 0, 0));
+	else
+		WT_RET(__wt_block_addr_to_buffer(block, pp,
+		    ci->avail.offset, ci->avail.size, ci->avail.checksum));
 	WT_RET(__wt_block_addr_to_buffer(block, pp,
 	    ci->discard.offset, ci->discard.size, ci->discard.checksum));
 	a = (uint64_t)ci->file_size;
@@ -230,4 +233,82 @@ __wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session,
 	WT_RET(__wt_vpack_uint(pp, 0, a));
 
 	return (0);
+}
+
+/*
+ * __wt_ckpt_verbose --
+ *	Display a printable string representation of a checkpoint.
+ */
+void
+__wt_ckpt_verbose(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    const char *tag, const char *ckpt_name, const uint8_t *ckpt_string)
+{
+	WT_BLOCK_CKPT *ci, _ci;
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+
+	if (ckpt_string == NULL) {
+		__wt_verbose_worker(session,
+		    "%s: %s: %s%s[Empty]", block->name, tag,
+		    ckpt_name ? ckpt_name : "",
+		    ckpt_name ? ": " : "");
+		return;
+	}
+
+	/* Initialize the checkpoint, crack the cookie. */
+	ci = &_ci;
+	WT_ERR(__wt_block_ckpt_init(session, ci, "string"));
+	WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt_string, ci));
+
+	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+	WT_ERR(__wt_buf_fmt(session, tmp, "version=%" PRIu8, ci->version));
+	if (ci->root_offset == WT_BLOCK_INVALID_OFFSET)
+		WT_ERR(__wt_buf_catfmt(session, tmp, ", root=[Empty]"));
+	else
+		WT_ERR(__wt_buf_catfmt(session, tmp,
+		    ", root=[%"
+		    PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
+		    (uintmax_t)ci->root_offset,
+		    (uintmax_t)(ci->root_offset + ci->root_size),
+		    ci->root_size, ci->root_checksum));
+	if (ci->alloc.offset == WT_BLOCK_INVALID_OFFSET)
+		WT_ERR(__wt_buf_catfmt(session, tmp, ", alloc=[Empty]"));
+	else
+		WT_ERR(__wt_buf_catfmt(session, tmp,
+		    ", alloc=[%"
+		    PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
+		    (uintmax_t)ci->alloc.offset,
+		    (uintmax_t)(ci->alloc.offset + ci->alloc.size),
+		    ci->alloc.size, ci->alloc.checksum));
+	if (ci->avail.offset == WT_BLOCK_INVALID_OFFSET)
+		WT_ERR(__wt_buf_catfmt(session, tmp, ", avail=[Empty]"));
+	else
+		WT_ERR(__wt_buf_catfmt(session, tmp,
+		    ", avail=[%"
+		    PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
+		    (uintmax_t)ci->avail.offset,
+		    (uintmax_t)(ci->avail.offset + ci->avail.size),
+		    ci->avail.size, ci->avail.checksum));
+	if (ci->discard.offset == WT_BLOCK_INVALID_OFFSET)
+		WT_ERR(__wt_buf_catfmt(session, tmp, ", discard=[Empty]"));
+	else
+		WT_ERR(__wt_buf_catfmt(session, tmp,
+		    ", discard=[%"
+		    PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
+		    (uintmax_t)ci->discard.offset,
+		    (uintmax_t)(ci->discard.offset + ci->discard.size),
+		    ci->discard.size, ci->discard.checksum));
+	WT_ERR(__wt_buf_catfmt(session, tmp,
+	    ", file size=%" PRIuMAX, (uintmax_t)ci->file_size));
+	WT_ERR(__wt_buf_catfmt(session, tmp,
+	    ", checkpoint size=%" PRIu64, ci->ckpt_size));
+
+	__wt_verbose_worker(session,
+	    "%s: %s: %s%s%s",
+	    block->name, tag,
+	    ckpt_name ? ckpt_name : "",
+	    ckpt_name ? ": " : "", (const char *)tmp->data);
+
+err:	__wt_scr_free(session, &tmp);
+	__wt_block_ckpt_destroy(session, ci);
 }

@@ -44,6 +44,7 @@ testutil_parse_opts(int argc, char * const *argv, TEST_OPTS *opts)
 	opts->running = true;
 	opts->verbose = false;
 
+	opts->argv0 = argv[0];
 	opts->progname = testutil_set_progname(argv);
 
 	testutil_print_command_line(argc, argv);

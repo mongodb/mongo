@@ -457,6 +457,11 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 		r->nfiles = fileid + 1;
 	}
 
+	if (r->files[fileid].uri != NULL)
+		WT_PANIC_RET(r->session, WT_PANIC,
+		    "metadata corruption: files %s and %s have the same "
+		    "file ID %u",
+		    uri, r->files[fileid].uri, fileid);
 	WT_RET(__wt_strdup(r->session, uri, &r->files[fileid].uri));
 	WT_RET(
 	    __wt_config_getones(r->session, config, "checkpoint_lsn", &cval));
