@@ -6,7 +6,7 @@ def __lldb_init_module(debugger, dict):
     ############################
     debugger.HandleCommand("command script add -f lldb_commands.PrintGlobalServiceContext mongodb-service-context")
     debugger.HandleCommand("command script add -f lldb_commands.PrintGlobalServiceContext mongodb-dump-locks")
-    debugger.HandleCommand("command script alias mongodb-help help")
+    debugger.HandleCommand("command alias mongodb-help help")
 
 
 #######################
