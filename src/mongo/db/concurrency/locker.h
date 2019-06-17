@@ -595,7 +595,7 @@ private:
 };
 
 /**
- * RAII-style class to opt out of replication's use of ParallelBatchWriterMode.
+ * RAII-style class to opt out of replication's use of the ParallelBatchWriterMode lock.
  */
 class ShouldNotConflictWithSecondaryBatchApplicationBlock {
     ShouldNotConflictWithSecondaryBatchApplicationBlock(

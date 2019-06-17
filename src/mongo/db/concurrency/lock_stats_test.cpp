@@ -215,7 +215,7 @@ TEST_F(LockStatsTest, ServerStatus) {
     ASSERT_EQUALS(
         1, lockingStats.getObjectField("Global").getObjectField("acquireCount").getIntField("w"));
     ASSERT_EQUALS(1,
-                  lockingStats.getObjectField("ParallelBatchWriter")
+                  lockingStats.getObjectField("ParallelBatchWriterMode")
                       .getObjectField("acquireCount")
                       .getIntField("w"));
     ASSERT_EQUALS(1,
