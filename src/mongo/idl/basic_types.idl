@@ -136,8 +136,14 @@ types:
 
     object:
         bson_serialization_type: object
-        description: "A BSONObj without custom deserialization or serialization"
+        description: "An unowned BSONObj without custom deserialization or serialization"
         cpp_type: "mongo::BSONObj"
+
+    object_owned:
+        bson_serialization_type: object
+        description: "An owned BSONObj"
+        cpp_type: "mongo::BSONObj"
+        deserializer: "BSONObj::getOwned"
 
     date:
         bson_serialization_type: date

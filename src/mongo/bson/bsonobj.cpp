@@ -110,6 +110,10 @@ BSONObj BSONObj::getOwned() const {
     return copy();
 }
 
+BSONObj BSONObj::getOwned(const BSONObj& obj) {
+    return obj.getOwned();
+}
+
 std::string BSONObj::jsonString(JsonStringFormat format, int pretty, bool isArray) const {
     std::stringstream s;
     BSONObj::jsonStringStream(format, pretty, isArray, s);

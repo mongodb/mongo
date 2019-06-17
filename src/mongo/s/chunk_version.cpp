@@ -131,6 +131,10 @@ BSONObj ChunkVersion::toBSON() const {
     return b.arr();
 }
 
+void ChunkVersion::legacyToBSON(StringData field, BSONObjBuilder* out) const {
+    out->appendTimestamp(field, this->toLong());
+}
+
 std::string ChunkVersion::toString() const {
     return str::stream() << majorVersion() << "|" << minorVersion() << "||" << _epoch;
 }

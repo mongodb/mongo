@@ -85,21 +85,23 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          const CollectionAndChangedChunks& collAndChunks) {
     // Update the collections collection entry for 'nss' in case there are any new updates.
-    ShardCollectionType update = ShardCollectionType(nss,
-                                                     collAndChunks.uuid,
-                                                     collAndChunks.epoch,
-                                                     collAndChunks.shardKeyPattern,
-                                                     collAndChunks.defaultCollation,
-                                                     collAndChunks.shardKeyIsUnique);
+    ShardCollectionType update = ShardCollectionType(
+        nss, collAndChunks.epoch, collAndChunks.shardKeyPattern, collAndChunks.shardKeyIsUnique);
+
+    update.setUuid(collAndChunks.uuid);
+    if (!collAndChunks.defaultCollation.isEmpty()) {
+        update.setDefaultCollation(collAndChunks.defaultCollation.getOwned());
+    }
 
     // Mark the chunk metadata as refreshing, so that secondaries are aware of refresh.
     update.setRefreshing(true);
 
-    Status status = updateShardCollectionsEntry(opCtx,
-                                                BSON(ShardCollectionType::ns() << nss.ns()),
-                                                update.toBSON(),
-                                                BSONObj(),
-                                                true /*upsert*/);
+    Status status =
+        updateShardCollectionsEntry(opCtx,
+                                    BSON(ShardCollectionType::kNssFieldName << nss.ns()),
+                                    update.toBSON(),
+                                    BSONObj(),
+                                    true /*upsert*/);
     if (!status.isOK()) {
         return status;
     }
@@ -211,7 +213,7 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
     auto changedChunks = uassertStatusOK(
         readShardChunks(opCtx, nss, diff.query, diff.sort, boost::none, startingVersion.epoch()));
 
-    return CollectionAndChangedChunks{shardCollectionEntry.getUUID(),
+    return CollectionAndChangedChunks{shardCollectionEntry.getUuid(),
                                       shardCollectionEntry.getEpoch(),
                                       shardCollectionEntry.getKeyPattern().toBSON(),
                                       shardCollectionEntry.getDefaultCollation(),
@@ -1040,7 +1042,7 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
     }
 
     uassertStatusOKWithContext(
-        persistCollectionAndChangedChunks(opCtx, nss, task.collectionAndChangedChunks.get()),
+        persistCollectionAndChangedChunks(opCtx, nss, *task.collectionAndChangedChunks),
         str::stream() << "Failed to update the persisted chunk metadata for collection '"
                       << nss.ns()
                       << "' from '"
@@ -1271,7 +1273,7 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
         } else {
             if (task.collectionAndChangedChunks->epoch != collAndChunks.epoch) {
                 // An epoch change should reset the metadata and start from the new.
-                collAndChunks = task.collectionAndChangedChunks.get();
+                collAndChunks = *task.collectionAndChangedChunks;
             } else {
                 // Epochs match, so the new results should be appended.
 

@@ -29,158 +29,58 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <string>
-
-#include "mongo/db/jsobj.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/util/uuid.h"
+#include "mongo/s/catalog/type_shard_collection_gen.h"
 
 namespace mongo {
 
-class CollectionType;
-class Status;
-template <typename T>
-class StatusWith;
-
-/**
- * This class represents the layout and contents of documents contained in the shard server's
- * config.collections collection. All manipulation of documents coming from that collection should
- * be done with this class.
- *
- * Expected shard server config.collections collection format:
- *   {
- *      "_id" : "foo.bar",
- *      "uuid" : UUID,                                   // optional in 3.6
- *      "epoch" : ObjectId("58b6fd76132358839e409e47"),  // will remove when UUID becomes available
- *      "key" : {
- *          "_id" : 1
- *      },
- *      "defaultCollation" : {
- *          "locale" : "fr_CA"
- *      },
- *      "unique" : false,
- *      "refreshing" : true,                                 // optional
- *      "lastRefreshedCollectionVersion" : Timestamp(1, 0),  // optional
- *      "enterCriticalSectionCounter" : 4                    // optional
- *   }
- *
- * enterCriticalSectionCounter is currently just an OpObserver signal, thus otherwise ignored here.
- */
-class ShardCollectionType {
+class ShardCollectionType : private ShardCollectionTypeBase {
 public:
-    static const BSONField<std::string> ns;  // "_id"
-    static const BSONField<UUID> uuid;
-    static const BSONField<OID> epoch;
-    static const BSONField<BSONObj> keyPattern;
-    static const BSONField<BSONObj> defaultCollation;
-    static const BSONField<bool> unique;
-    static const BSONField<bool> refreshing;
-    static const BSONField<Date_t> lastRefreshedCollectionVersion;
-    static const BSONField<int> enterCriticalSectionCounter;
+    // Make field names accessible.
+    using ShardCollectionTypeBase::kDefaultCollationFieldName;
+    using ShardCollectionTypeBase::kEnterCriticalSectionCounterFieldName;
+    using ShardCollectionTypeBase::kEpochFieldName;
+    using ShardCollectionTypeBase::kKeyPatternFieldName;
+    using ShardCollectionTypeBase::kLastRefreshedCollectionVersionFieldName;
+    using ShardCollectionTypeBase::kNssFieldName;
+    using ShardCollectionTypeBase::kRefreshingFieldName;
+    using ShardCollectionTypeBase::kUniqueFieldName;
+    using ShardCollectionTypeBase::kUuidFieldName;
 
-    ShardCollectionType(NamespaceString nss,
-                        boost::optional<UUID> uuid,
-                        OID epoch,
-                        const KeyPattern& keyPattern,
-                        const BSONObj& defaultCollation,
-                        bool unique);
+    // Make getters and setters accessible.
+    using ShardCollectionTypeBase::getNss;
+    using ShardCollectionTypeBase::setNss;
+    using ShardCollectionTypeBase::getUuid;
+    using ShardCollectionTypeBase::setUuid;
+    using ShardCollectionTypeBase::getEpoch;
+    using ShardCollectionTypeBase::setEpoch;
+    using ShardCollectionTypeBase::getKeyPattern;
+    using ShardCollectionTypeBase::setKeyPattern;
+    using ShardCollectionTypeBase::getDefaultCollation;
+    using ShardCollectionTypeBase::setDefaultCollation;
+    using ShardCollectionTypeBase::getUnique;
+    using ShardCollectionTypeBase::setUnique;
+    using ShardCollectionTypeBase::getRefreshing;
+    using ShardCollectionTypeBase::setRefreshing;
+    using ShardCollectionTypeBase::getLastRefreshedCollectionVersion;
+    using ShardCollectionTypeBase::setLastRefreshedCollectionVersion;
+    using ShardCollectionTypeBase::getEnterCriticalSectionCounter;
+    using ShardCollectionTypeBase::setEnterCriticalSectionCounter;
 
-    /**
-     * Constructs a new ShardCollectionType object from BSON. Also does validation of the contents.
-     */
-    static StatusWith<ShardCollectionType> fromBSON(const BSONObj& source);
+    ShardCollectionType() : ShardCollectionTypeBase() {}
 
-    /**
-     * Returns the BSON representation of this shard collection type object.
-     */
+    ShardCollectionType(NamespaceString nss, OID epoch, KeyPattern keyPattern, bool unique)
+        : ShardCollectionTypeBase(std::move(nss), std::move(epoch), std::move(keyPattern), unique) {
+    }
+
+    explicit ShardCollectionType(const BSONObj& obj);
+
+    // A wrapper around the IDL generated 'ShardCollectionTypeBase::parse' to ensure backwards
+    // compatibility.
+    static StatusWith<ShardCollectionType> fromBSON(const BSONObj& obj);
+
+    // A wrapper around the IDL generated 'ShardCollectionTypeBase::toBSON' to ensure backwards
+    // compatibility.
     BSONObj toBSON() const;
-
-    /**
-     * Returns a std::string representation of the current internal state.
-     */
-    std::string toString() const;
-
-    const NamespaceString& getNss() const {
-        return _nss;
-    }
-    void setNss(NamespaceString nss);
-
-    const boost::optional<UUID> getUUID() const {
-        return _uuid;
-    }
-    void setUUID(UUID uuid);
-
-    const OID& getEpoch() const {
-        return _epoch;
-    }
-    void setEpoch(OID epoch);
-
-    const KeyPattern& getKeyPattern() const {
-        return _keyPattern;
-    }
-    void setKeyPattern(const KeyPattern& keyPattern);
-
-    const BSONObj& getDefaultCollation() const {
-        return _defaultCollation;
-    }
-    void setDefaultCollation(const BSONObj& collation) {
-        _defaultCollation = collation.getOwned();
-    }
-
-    bool getUnique() const {
-        return _unique;
-    }
-    void setUnique(bool unique) {
-        _unique = unique;
-    }
-
-    bool hasRefreshing() const {
-        return _refreshing.is_initialized();
-    }
-    bool getRefreshing() const;
-    void setRefreshing(bool refreshing) {
-        _refreshing = refreshing;
-    }
-
-    bool hasLastRefreshedCollectionVersion() const {
-        return _lastRefreshedCollectionVersion.is_initialized();
-    }
-    const ChunkVersion& getLastRefreshedCollectionVersion() const;
-    void setLastRefreshedCollectionVersion(const ChunkVersion& version) {
-        _lastRefreshedCollectionVersion = version;
-    }
-
-private:
-    // The full namespace (with the database prefix).
-    NamespaceString _nss;
-
-    // The UUID of the collection, if known.
-    boost::optional<UUID> _uuid;
-
-    // Uniquely identifies this instance of the collection, in case of drop/create.
-    OID _epoch;
-
-    // Sharding key. If collection is dropped, this is no longer required.
-    KeyPattern _keyPattern;
-
-    // Optional collection default collation. If empty, implies simple collation.
-    BSONObj _defaultCollation;
-
-    // Uniqueness of the sharding key.
-    bool _unique;
-
-    // Refresh fields set by primaries and used by shard secondaries to safely refresh chunk
-    // metadata. '_refreshing' indicates whether the chunks collection is currently being updated,
-    // which means read results won't provide a complete view of the chunk metadata.
-    // '_lastRefreshedCollectionVersion' indicates the collection version of the last complete chunk
-    // metadata refresh, and is used to indicate a refresh occurred if the value is different than
-    // when the caller last checked -- because 'refreshing' will be false both before and after a
-    // refresh occurs.
-    boost::optional<bool> _refreshing{boost::none};
-    boost::optional<ChunkVersion> _lastRefreshedCollectionVersion{boost::none};
 };
 
 }  // namespace mongo

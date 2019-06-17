@@ -342,12 +342,12 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
     // time inclusive of the migration config commit update from accessing secondary data.
     // Note: this write must occur after the critSec flag is set, to ensure the secondary refresh
     // will stall behind the flag.
-    Status signalStatus =
-        updateShardCollectionsEntry(opCtx,
-                                    BSON(ShardCollectionType::ns() << getNss().ns()),
-                                    BSONObj(),
-                                    BSON(ShardCollectionType::enterCriticalSectionCounter() << 1),
-                                    false /*upsert*/);
+    Status signalStatus = updateShardCollectionsEntry(
+        opCtx,
+        BSON(ShardCollectionType::kNssFieldName << getNss().ns()),
+        BSONObj(),
+        BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1),
+        false /*upsert*/);
     if (!signalStatus.isOK()) {
         return {
             ErrorCodes::OperationFailed,

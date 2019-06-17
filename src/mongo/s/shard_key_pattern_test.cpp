@@ -48,7 +48,7 @@ TEST(ShardKeyPattern, SingleFieldShardKeyPatternsValidityCheck) {
     ShardKeyPattern(BSON("a"
                          << "hashed"));
 
-    ASSERT_THROWS(ShardKeyPattern({}), DBException);
+    ASSERT_THROWS(ShardKeyPattern(BSONObj()), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << -1)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a" << -1.0)), DBException);
     ASSERT_THROWS(ShardKeyPattern(BSON("a"

@@ -94,12 +94,12 @@ Status unsetPersistedRefreshFlags(OperationContext* opCtx,
                                   const ChunkVersion& refreshedVersion) {
     // Set 'refreshing' to false and update the last refreshed collection version.
     BSONObjBuilder updateBuilder;
-    updateBuilder.append(ShardCollectionType::refreshing(), false);
-    updateBuilder.appendTimestamp(ShardCollectionType::lastRefreshedCollectionVersion(),
+    updateBuilder.append(ShardCollectionType::kRefreshingFieldName, false);
+    updateBuilder.appendTimestamp(ShardCollectionType::kLastRefreshedCollectionVersionFieldName,
                                   refreshedVersion.toLong());
 
     return updateShardCollectionsEntry(opCtx,
-                                       BSON(ShardCollectionType::ns() << nss.ns()),
+                                       BSON(ShardCollectionType::kNssFieldName << nss.ns()),
                                        updateBuilder.obj(),
                                        BSONObj(),
                                        false /*upsert*/);
@@ -114,14 +114,14 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
     ShardCollectionType entry = statusWithCollectionEntry.getValue();
 
     // Ensure the results have not been incorrectly set somehow.
-    if (entry.hasRefreshing()) {
+    if (entry.getRefreshing()) {
         // If 'refreshing' is present and false, a refresh must have occurred (otherwise the field
         // would never have been added to the document) and there should always be a refresh
         // version.
-        invariant(entry.getRefreshing() ? true : entry.hasLastRefreshedCollectionVersion());
+        invariant(*entry.getRefreshing() ? true : !!entry.getLastRefreshedCollectionVersion());
     } else {
         // If 'refreshing' is not present, no refresh version should exist.
-        invariant(!entry.hasLastRefreshedCollectionVersion());
+        invariant(!entry.getLastRefreshedCollectionVersion());
     }
 
     return RefreshState{entry.getEpoch(),
@@ -129,16 +129,16 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
                         // refresh has started, but no chunks have ever yet been applied, around
                         // which these flags are set. So default to refreshing true because the
                         // chunk metadata is being updated and is not yet ready to be read.
-                        entry.hasRefreshing() ? entry.getRefreshing() : true,
-                        entry.hasLastRefreshedCollectionVersion()
-                            ? entry.getLastRefreshedCollectionVersion()
+                        entry.getRefreshing() ? *entry.getRefreshing() : true,
+                        entry.getLastRefreshedCollectionVersion()
+                            ? *entry.getLastRefreshedCollectionVersion()
                             : ChunkVersion(0, 0, entry.getEpoch())};
 }
 
 StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
 
-    Query fullQuery(BSON(ShardCollectionType::ns() << nss.ns()));
+    Query fullQuery(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
 
     try {
         DBDirectClient client(opCtx);
@@ -158,12 +158,7 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
         }
 
         BSONObj document = cursor->nextSafe();
-        auto statusWithCollectionEntry = ShardCollectionType::fromBSON(document);
-        if (!statusWithCollectionEntry.isOK()) {
-            return statusWithCollectionEntry.getStatus();
-        }
-
-        return statusWithCollectionEntry.getValue();
+        return ShardCollectionType::fromBSON(document);
     } catch (const DBException& ex) {
         return ex.toStatus(str::stream() << "Failed to read the '" << nss.ns()
                                          << "' entry locally from config.collections");
@@ -212,7 +207,7 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
     if (upsert) {
         // If upserting, this should be an update from the config server that does not have shard
         // refresh / migration inc signal information.
-        invariant(!update.hasField(ShardCollectionType::lastRefreshedCollectionVersion()));
+        invariant(!update.hasField(ShardCollectionType::kLastRefreshedCollectionVersionFieldName));
         invariant(inc.isEmpty());
     }
 
@@ -411,7 +406,7 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
             write_ops::Delete deleteOp(NamespaceString::kShardConfigCollectionsNamespace);
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON(ShardCollectionType::ns << nss.ns()));
+                entry.setQ(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
                 entry.setMulti(true);
                 return entry;
             }()});

@@ -240,6 +240,9 @@ public:
     */
     BSONObj getOwned() const;
 
+    /** Returns an owned copy of the given BSON object. */
+    static BSONObj getOwned(const BSONObj& obj);
+
     /** @return a new full (and owned) copy of the object. */
     BSONObj copy() const;
 

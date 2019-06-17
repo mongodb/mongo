@@ -26,25 +26,17 @@
 # it in the license file.
 #
 
-# ChunkVersion IDL type definition
+# KeyPattern IDL type definition
 
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/s/chunk_version.h"
+        - "mongo/db/keypattern.h"
 
 types:
-    ChunkVersion:
+    KeyPattern:
         bson_serialization_type: object
-        description: An object representing a chunk version for a collection.
-        cpp_type: ChunkVersion
-        serializer: ChunkVersion::toBSON
-        deserializer: ChunkVersion::fromBSONThrowing
-
-    ChunkVersionLegacy:
-        bson_serialization_type: any
-        description: An object representing a chunk version for a collection. Ignores the epoch 
-                     component in the chunk version for legacy reasons.
-        cpp_type: ChunkVersion
-        serializer: ChunkVersion::legacyToBSON
-        deserializer: ChunkVersion::legacyFromBSONThrowing
+        description: An expression describing a transformation of a document into a document key.
+        cpp_type: KeyPattern
+        serializer: KeyPattern::toBSON
+        deserializer: KeyPattern::fromBSON
