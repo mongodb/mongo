@@ -109,6 +109,12 @@ public:
     virtual void onStepUp() = 0;
 
     /**
+     * Transitions into shut down and cleans up state. Once this transitions to shut down, should
+     * not be able to transition back to normal. Should be safe to be called more than once.
+     */
+    virtual void shutDown() = 0;
+
+    /**
      * Notifies the loader that the persisted collection version for 'nss' has been updated.
      */
     virtual void notifyOfCollectionVersionUpdate(const NamespaceString& nss) = 0;

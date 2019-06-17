@@ -108,6 +108,7 @@ void ShardServerCatalogCacheLoaderTest::setUp() {
 }
 
 void ShardServerCatalogCacheLoaderTest::tearDown() {
+    _shardLoader->shutDown();
     _shardLoader.reset();
     ShardServerTestFixture::tearDown();
 }

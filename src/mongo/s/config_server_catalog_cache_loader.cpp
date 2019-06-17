@@ -142,8 +142,7 @@ ConfigServerCatalogCacheLoader::ConfigServerCatalogCacheLoader()
 }
 
 ConfigServerCatalogCacheLoader::~ConfigServerCatalogCacheLoader() {
-    _threadPool.shutdown();
-    _threadPool.join();
+    shutDown();
 }
 
 void ConfigServerCatalogCacheLoader::initializeReplicaSetRole(bool isPrimary) {
@@ -156,6 +155,20 @@ void ConfigServerCatalogCacheLoader::onStepDown() {
 
 void ConfigServerCatalogCacheLoader::onStepUp() {
     MONGO_UNREACHABLE;
+}
+
+void ConfigServerCatalogCacheLoader::shutDown() {
+    {
+        stdx::lock_guard lg(_mutex);
+        if (_inShutdown) {
+            return;
+        }
+
+        _inShutdown = true;
+    }
+
+    _threadPool.shutdown();
+    _threadPool.join();
 }
 
 void ConfigServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
