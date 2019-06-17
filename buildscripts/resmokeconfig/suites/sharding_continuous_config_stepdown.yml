@@ -171,6 +171,8 @@ selector:
   - jstests/sharding/database_and_shard_versioning_all_commands.js
   # Enable when SERVER-36634 is fixed.
   - jstests/sharding/shard_collection_existing_zones.js
+  # Enable when SERVER-34647 is backported.
+  - jstests/sharding/shard_kill_and_pooling.js
 
 executor:
   config:
