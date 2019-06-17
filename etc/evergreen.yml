@@ -262,6 +262,7 @@ variables:
   - func: "set up credentials"
   - func: "fetch and build OpenSSL"
   - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+  - func: "set up win mount script"
   - func: "generate compile expansions"
   teardown_group:
   - func: "scons cache pruning"
@@ -638,6 +639,18 @@ functions:
         build_phase='${task_name}_${execution}'
         END_OF_CREDS
 
+  "set up win mount script": &set_up_win_mount_script
+    command: shell.exec
+    params:
+      working_dir: src
+      shell: bash
+      silent: true
+      script: |
+        cat <<EOF > win_mount.sh
+        net use X: '\\\\${win_scons_endpoint}\\share' /USER:${win_scons_user} '${win_scons_pass}'
+        EOF
+        chmod +x win_mount.sh
+
   "set up notary client credentials": &set_up_notary_client_credentials
     command: shell.exec
     params:
@@ -906,24 +919,38 @@ functions:
 
 
           set +o errexit
-          mount | grep "\/efs" > /dev/null
+
+          if [ "Windows_NT" = "$OS" ]; then
+            ./win_mount.sh
+          else
+            mount | grep "\/efs" > /dev/null
+          fi
           if [ $? -eq 0 ]; then
             echo "Shared cache is already mounted"
           else
             echo "Shared cache - mounting file system"
-            sudo mount /efs
+            if [ "Windows_NT" = "$OS" ]; then
+              ./win_mount.sh
+            else
+              sudo mount /efs
+            fi
           fi
           set -o errexit
 
-          dirs=$(ls -l /efs | grep -v total | awk '{print $NF}')
+          if [ "Windows_NT" = "$OS" ]; then
+            cache_folder=/cygdrive/x
+          else
+            cache_folder=/efs
+          fi
+          dirs=$(ls -l $cache_folder | grep -v total | awk '{print $NF}')
 
           echo "Pruning shared SCons directories"
 
           for dir in $dirs; do
-            echo "Pruning /efs/$dir/scons-cache"
+            echo "Pruning $cache_folder/$dir/scons-cache"
 
-            if [ -e /efs/$dir/info/distro_name ]; then
-              distro=$(cat /efs/$dir/info/distro_name)
+            if [ -e $cache_folder/$dir/info/distro_name ]; then
+              distro=$(cat $cache_folder/$dir/info/distro_name)
             fi
 
             # Set cache sizes by distro
@@ -937,11 +964,20 @@ functions:
                       ;;
             esac
 
-            sudo python buildscripts/scons_cache_prune.py --cache-dir /efs/$dir/scons-cache --cache-size $cache_size --prune-ratio 1.0
+            if [ "Windows_NT" = "$OS" ]; then
+              echo "dir="$dir
+              python buildscripts/scons_cache_prune.py --cache-dir x:/$dir/scons-cache --cache-size $cache_size --prune-ratio 1.0
+            else
+              sudo python buildscripts/scons_cache_prune.py --cache-dir /efs/$dir/scons-cache --cache-size $cache_size --prune-ratio 1.0
+            fi
             echo ""
           done
 
-          sudo umount /efs || true
+          if [ "Windows_NT" = "$OS" ]; then
+            net use X: /delete || true
+          else
+            sudo umount /efs || true
+          fi
 
         else
           echo "Not on master, shared SCons cache pruning skipped"
@@ -971,8 +1007,12 @@ functions:
         set -o verbose
 
         if [ "${scons_cache_scope}" = "shared" ]; then
-            ${set_sudo}
-            $sudo umount /efs || true
+            if [ "Windows_NT" = "$OS" ]; then
+                net use X: /delete || true
+            else
+                ${set_sudo}
+                $sudo umount /efs || true
+            fi
         fi
 
   "build new tools":
@@ -1655,13 +1695,17 @@ functions:
 
           if [ "$scons_cache_scope" = "shared" ]; then
             set +o errexit
-            mount | grep "\/efs" > /dev/null
-            if [ $? -eq 0 ]; then
-              echo "Shared cache is already mounted"
+            if [ "Windows_NT" = "$OS" ]; then
+              ./win_mount.sh
             else
-              echo "Shared cache - mounting file system"
-              ${set_sudo}
-              $sudo mount /efs
+              mount | grep "\/efs" > /dev/null
+              if [ $? -eq 0 ]; then
+                echo "Shared cache is already mounted"
+              else
+                echo "Shared cache - mounting file system"
+                ${set_sudo}
+                $sudo mount /efs
+              fi
             fi
             set -o errexit
           fi
@@ -4005,6 +4049,7 @@ tasks:
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
     - func: "set task expansion macros"
     - func: "set up virtualenv"
+    - func: "set up win mount script"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
     - command: s3.get
@@ -4097,6 +4142,7 @@ tasks:
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
     - func: "set task expansion macros"
     - func: "set up virtualenv"
+    - func: "set up win mount script"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
     - command: s3.get
@@ -4666,6 +4712,7 @@ tasks:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+    - func: "set up win mount script"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions
     - func: "apply compile expansions"
@@ -5937,6 +5984,7 @@ tasks:
   - command: manifest.load
   - func: "git get project"
   - func: "do setup"
+  - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
   - func: "apply compile expansions"
   - func: "scons compile"
@@ -5956,6 +6004,7 @@ tasks:
   - command: manifest.load
   - func: "git get project"
   - func: "do setup"
+  - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
   - func: "apply compile expansions"
   - func: "scons compile"
@@ -5975,6 +6024,7 @@ tasks:
   - command: manifest.load
   - func: "git get project"
   - func: "do setup"
+  - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
   - func: "apply compile expansions"
   - func: "scons compile"
@@ -5994,6 +6044,7 @@ tasks:
   - command: manifest.load
   - func: "git get project"
   - func: "do setup"
+  - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
   - func: "apply compile expansions"
   - func: "scons compile"
@@ -8125,6 +8176,15 @@ tasks:
   - func: "git get project"
   - func: "shared scons cache pruning"
 
+- name: win_shared_scons_cache_pruning
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on: []
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "set up win mount script"
+  - func: "shared scons cache pruning"
+
 #######################################
 #             Task Groups             #
 #######################################
@@ -8157,6 +8217,7 @@ task_groups:
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
     - func: "set task expansion macros"
     - func: "set up virtualenv"
+    - func: "set up win mount script"
     - func: "generate compile expansions"
   teardown_group:
     - func: "scons cache pruning"
@@ -9169,7 +9230,7 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
-    use_scons_cache: true
+    scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
     tooltags: "ssl sasl gssapi"
@@ -9206,7 +9267,7 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
-    use_scons_cache: true
+    scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
     tooltags: ""
@@ -9370,7 +9431,7 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
-    use_scons_cache: true
+    scons_cache_scope: shared
     test_flags: |- # Use the ServiceExecutorAdaptive with a reasonable number of starting threads
         --serviceExecutor=adaptive \
         --mongodSetParameters="adaptiveServiceExecutorReservedThreads: 8" \
@@ -9404,7 +9465,7 @@ buildvariants:
     python: '/cygdrive/c/python/python37/python.exe'
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     ext: zip
-    use_scons_cache: true
+    scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
     tooltags: "ssl sasl gssapi"
@@ -9461,7 +9522,7 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
-    use_scons_cache: true
+    scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: false
     large_distro_name: windows-64-vs2017-compile
@@ -9522,7 +9583,7 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
-    use_scons_cache: true
+    scons_cache_scope: shared
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: false
   tasks:
@@ -12239,3 +12300,13 @@ buildvariants:
   stepback: false
   tasks:
   - name: shared_scons_cache_pruning
+
+
+- name: windows-shared-scons-cache-pruning
+  display_name: "Windows shared SCons Cache Pruning"
+  run_on:
+  - windows-64-vs2017-test
+  batchtime: 1440 # 1 day
+  stepback: false
+  tasks:
+  - name: win_shared_scons_cache_pruning
