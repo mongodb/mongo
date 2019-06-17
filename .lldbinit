@@ -2,5 +2,6 @@
 #
 #     settings set target.load-cwd-lldbinit true
 #
+# Note: these will only work on XCode lldb with macOS.  Linux lldb is not supported at this time.
 command script import buildscripts/lldb/lldb_printers.py
 command script import buildscripts/lldb/lldb_commands.py
