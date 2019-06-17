@@ -92,7 +92,7 @@ public:
      * which this adaptor was constructed.
      */
     template <typename Mgr>
-    void operator()(Mgr& mgr) {
+    void operator()(Mgr& mgr) noexcept {
         LogicalSessionIdSet activeSessions;
         mgr.appendActiveSessions(&activeSessions);
 
@@ -105,8 +105,13 @@ public:
                     try {
                         _eraser(mgr, id);
                         _cursorsKilled++;
-                    } catch (...) {
-                        _failures.push_back(exceptionToStatus());
+                    } catch (const ExceptionFor<ErrorCodes::CursorNotFound>&) {
+                        // Cursor was killed separately after this command was initiated. Still
+                        // count the cursor as killed here, since the user's request is
+                        // technically satisfied.
+                        _cursorsKilled++;
+                    } catch (const DBException& ex) {
+                        _failures.push_back(ex.toStatus());
                     }
                 }
             }
