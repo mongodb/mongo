@@ -69,6 +69,8 @@ public:
      */
     void onStepUp() override;
 
+    void shutDown() override;
+
     /**
      * Sets any notifications waiting for this version to arrive and invalidates the catalog cache's
      * chunk metadata for collection 'nss' so that the next caller provokes a refresh.
@@ -473,7 +475,7 @@ private:
 
     // Loader used by the shard primary to retrieve the authoritative routing metadata from the
     // config server
-    const std::unique_ptr<CatalogCacheLoader> _configServerLoader;
+    std::unique_ptr<CatalogCacheLoader> _configServerLoader;
 
     // Thread pool used to run blocking tasks which perform disk reads and writes
     ThreadPool _threadPool;
@@ -483,6 +485,9 @@ private:
 
     // Protects the class state below
     stdx::mutex _mutex;
+
+    // True if shutDown was called.
+    bool _inShutdown{false};
 
     // This value is bumped every time the set of currently scheduled tasks should no longer be
     // running. This includes, replica set state transitions and shutdown.

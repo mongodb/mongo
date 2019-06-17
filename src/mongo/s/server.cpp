@@ -237,6 +237,10 @@ void cleanupTask(ServiceContext* serviceContext) {
             shardRegistry->shutdown();
         }
 
+        if (Grid::get(serviceContext)->isShardingInitialized()) {
+            CatalogCacheLoader::get(serviceContext).shutDown();
+        }
+
 #if __has_feature(address_sanitizer)
         // When running under address sanitizer, we get false positive leaks due to disorder around
         // the lifecycle of a connection and request. When we are running under ASAN, we try a lot

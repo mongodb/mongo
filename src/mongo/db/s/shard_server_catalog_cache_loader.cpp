@@ -342,16 +342,7 @@ ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
 }
 
 ShardServerCatalogCacheLoader::~ShardServerCatalogCacheLoader() {
-    // Prevent further scheduling, then interrupt ongoing tasks.
-    _threadPool.shutdown();
-    {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        _contexts.interrupt(ErrorCodes::InterruptedAtShutdown);
-        ++_term;
-    }
-
-    _threadPool.join();
-    invariant(_contexts.isEmpty());
+    shutDown();
 }
 
 void ShardServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
@@ -382,6 +373,30 @@ void ShardServerCatalogCacheLoader::onStepUp() {
     invariant(_role != ReplicaSetRole::None);
     ++_term;
     _role = ReplicaSetRole::Primary;
+}
+
+void ShardServerCatalogCacheLoader::shutDown() {
+    {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        if (_inShutdown) {
+            return;
+        }
+
+        _inShutdown = true;
+    }
+
+    // Prevent further scheduling, then interrupt ongoing tasks.
+    _threadPool.shutdown();
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _contexts.interrupt(ErrorCodes::InterruptedAtShutdown);
+        ++_term;
+    }
+
+    _threadPool.join();
+    invariant(_contexts.isEmpty());
+
+    _configServerLoader->shutDown();
 }
 
 std::shared_ptr<Notification<void>> ShardServerCatalogCacheLoader::getChunksSince(

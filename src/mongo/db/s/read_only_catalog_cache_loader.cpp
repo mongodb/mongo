@@ -35,6 +35,10 @@ namespace mongo {
 
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 
+ReadOnlyCatalogCacheLoader::~ReadOnlyCatalogCacheLoader() {
+    shutDown();
+}
+
 void ReadOnlyCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
                                                         const NamespaceString& nss) {
     MONGO_UNREACHABLE;
@@ -42,6 +46,10 @@ void ReadOnlyCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
 
 void ReadOnlyCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) {
     MONGO_UNREACHABLE;
+}
+
+void ReadOnlyCatalogCacheLoader::shutDown() {
+    _configServerLoader.shutDown();
 }
 
 std::shared_ptr<Notification<void>> ReadOnlyCatalogCacheLoader::getChunksSince(

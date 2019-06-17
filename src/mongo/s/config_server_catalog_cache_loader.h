@@ -45,6 +45,7 @@ public:
     void initializeReplicaSetRole(bool isPrimary) override;
     void onStepDown() override;
     void onStepUp() override;
+    void shutDown() override;
     void notifyOfCollectionVersionUpdate(const NamespaceString& nss) override;
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
     void waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) override;
@@ -61,6 +62,12 @@ public:
 private:
     // Thread pool to be used to perform metadata load
     ThreadPool _threadPool;
+
+    // Protects the class state below
+    stdx::mutex _mutex;
+
+    // True if shutDown was called.
+    bool _inShutdown{false};
 };
 
 }  // namespace mongo

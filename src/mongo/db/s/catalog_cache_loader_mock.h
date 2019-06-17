@@ -52,6 +52,7 @@ public:
     void initializeReplicaSetRole(bool isPrimary) override;
     void onStepDown() override;
     void onStepUp() override;
+    void shutDown() override;
     void notifyOfCollectionVersionUpdate(const NamespaceString& nss) override;
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
     void waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) override;
