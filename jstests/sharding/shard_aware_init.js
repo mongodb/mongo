@@ -20,8 +20,17 @@
      * Runs a series of test on the mongod instance mongodConn is pointing to. Notes that the
      * test can restart the mongod instance several times so mongodConn can end up with a broken
      * connection after.
+     *
+     * awaitVersionUpdate is used with the replset invocation of this test to ensure that our
+     * initial write to the admin.system.version collection is fully flushed out of the oplog before
+     * restarting.  That allows our standalone corrupting update to see the write (and cause us to
+     * fail on startup).
+     *
+     * TODO: Remove awaitVersionUpdate after SERVER-41005, where we figure out how to wait until
+     *       after replication is started before reading our shard identity from
+     *       admin.system.version
      */
-    var runTest = function(mongodConn, configConnStr) {
+    var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
         var shardIdentityDoc = {
             _id: 'shardIdentity',
             configsvrConnectionString: configConnStr,
@@ -79,6 +88,8 @@
             {$set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString}},
             {upsert: true}));
 
+        awaitVersionUpdate();
+
         var res = mongodConn.getDB('admin').runCommand({shardingState: 1});
 
         assert(res.enabled);
@@ -93,7 +104,13 @@
         // Test normal startup
         //
 
-        var newMongodOptions = Object.extend(mongodConn.savedOptions, {restart: true});
+        var newMongodOptions = Object.extend(mongodConn.savedOptions, {
+            restart: true,
+            // disable snapshotting to force the stable timestamp forward with or without the
+            // majority commit point.  This simplifies forcing out our corrupted write to
+            // admin.system.version
+            setParameter: {"failpoint.disableSnapshotting": "{'mode':'alwaysOn'}"}
+        });
         MongoRunner.stopMongod(mongodConn);
         mongodConn = MongoRunner.runMongod(newMongodOptions);
         waitForMaster(mongodConn);
@@ -118,8 +135,9 @@
         mongodConn = MongoRunner.runMongod(newMongodOptions);
         waitForMaster(mongodConn);
 
-        assert.writeOK(mongodConn.getDB('admin').system.version.update(
+        let writeResult = assert.commandWorked(mongodConn.getDB('admin').system.version.update(
             {_id: 'shardIdentity'}, {_id: 'shardIdentity', shardName: 'x', clusterId: ObjectId()}));
+        assert.eq(writeResult.nModified, 1);
 
         MongoRunner.stopMongod(mongodConn);
 
@@ -146,7 +164,7 @@
 
     {
         var mongod = MongoRunner.runMongod({shardsvr: ''});
-        runTest(mongod, st.configRS.getURL());
+        runTest(mongod, st.configRS.getURL(), function() {});
         MongoRunner.stopMongod(mongod);
     }
 
@@ -154,7 +172,9 @@
         var replTest = new ReplSetTest({nodes: 1});
         replTest.startSet({shardsvr: ''});
         replTest.initiate();
-        runTest(replTest.getPrimary(), st.configRS.getURL());
+        runTest(replTest.getPrimary(), st.configRS.getURL(), function() {
+            replTest.awaitLastStableRecoveryTimestamp();
+        });
         replTest.stopSet();
     }
 
