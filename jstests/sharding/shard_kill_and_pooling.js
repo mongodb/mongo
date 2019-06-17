@@ -16,7 +16,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     for (var test = 0; test < 2; test++) {
         var killWith = (test == 0 ? 15 : 9);
 
-        var st = new ShardingTest({shards: 2});
+        var st = new ShardingTest({shards: 1});
 
         var mongos = st.s0;
         var coll = mongos.getCollection("foo.bar");
