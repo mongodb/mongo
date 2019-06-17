@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/crypto/sha_block.h"
+#include "mongo/crypto/hash_block.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 
 namespace mongo {

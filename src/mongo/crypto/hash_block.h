@@ -52,20 +52,20 @@ class BSONObjBuilder;
  * computation.
  */
 template <typename Traits>
-class SHABlock {
+class HashBlock {
 public:
     using HashType = typename Traits::HashType;
     static constexpr size_t kHashLength = sizeof(HashType);
     static constexpr auto kName = Traits::name;
 
-    SHABlock() = default;
+    HashBlock() = default;
 
-    SHABlock(HashType rawHash) : _hash(rawHash) {}
+    HashBlock(HashType rawHash) : _hash(rawHash) {}
 
     /**
-     * Constructs a SHABlock from a buffer of specified size.
+     * Constructs a HashBlock from a buffer of specified size.
      */
-    static StatusWith<SHABlock> fromBuffer(const uint8_t* input, size_t inputLen) {
+    static StatusWith<HashBlock> fromBuffer(const uint8_t* input, size_t inputLen) {
         if (inputLen != kHashLength) {
             return {
                 ErrorCodes::InvalidLength,
@@ -74,59 +74,59 @@ public:
 
         HashType newHash;
         memcpy(newHash.data(), input, inputLen);
-        return SHABlock(newHash);
+        return HashBlock(newHash);
     }
 
     /**
      * Computes a hash of 'input' from multiple contigous buffers.
      */
-    static SHABlock computeHash(std::initializer_list<ConstDataRange> input) {
-        return SHABlock{Traits::computeHash(input)};
+    static HashBlock computeHash(std::initializer_list<ConstDataRange> input) {
+        return HashBlock{Traits::computeHash(input)};
     }
 
     /**
      * Computes a hash of 'input' from one buffer.
      */
-    static SHABlock computeHash(const uint8_t* input, size_t inputLen) {
+    static HashBlock computeHash(const uint8_t* input, size_t inputLen) {
         return computeHash({ConstDataRange(input, inputLen)});
     }
 
     /**
      * Computes a HMAC keyed hash of 'input' using the key 'key'.
      */
-    static SHABlock computeHmac(const uint8_t* key,
-                                size_t keyLen,
-                                const uint8_t* input,
-                                size_t inputLen) {
-        SHABlock output;
-        SHABlock::computeHmac(key, keyLen, {ConstDataRange(input, inputLen)}, &output);
+    static HashBlock computeHmac(const uint8_t* key,
+                                 size_t keyLen,
+                                 const uint8_t* input,
+                                 size_t inputLen) {
+        HashBlock output;
+        HashBlock::computeHmac(key, keyLen, {ConstDataRange(input, inputLen)}, &output);
         return output;
     }
 
     /**
      * Computes a HMAC keyed hash of 'input' using the key 'key'. Writes the results into
-     * a pre-allocated SHABlock. This lets us allocate SHABlocks with the SecureAllocator.
+     * a pre-allocated HashBlock. This lets us allocate HashBlocks with the SecureAllocator.
      */
     static void computeHmac(const uint8_t* key,
                             size_t keyLen,
                             const uint8_t* input,
                             size_t inputLen,
-                            SHABlock* const output) {
-        SHABlock::computeHmac(key, keyLen, {ConstDataRange(input, inputLen)}, output);
+                            HashBlock* const output) {
+        HashBlock::computeHmac(key, keyLen, {ConstDataRange(input, inputLen)}, output);
     }
 
-    static SHABlock computeHmac(const uint8_t* key,
-                                size_t keyLen,
-                                std::initializer_list<ConstDataRange> input) {
-        SHABlock output;
-        SHABlock::computeHmac(key, keyLen, input, &output);
+    static HashBlock computeHmac(const uint8_t* key,
+                                 size_t keyLen,
+                                 std::initializer_list<ConstDataRange> input) {
+        HashBlock output;
+        HashBlock::computeHmac(key, keyLen, input, &output);
         return output;
     }
 
     static void computeHmac(const uint8_t* key,
                             size_t keyLen,
                             std::initializer_list<ConstDataRange> input,
-                            SHABlock* const output) {
+                            HashBlock* const output) {
         Traits::computeHmac(key, keyLen, input, &(output->_hash));
     }
 
@@ -147,9 +147,9 @@ public:
     }
 
     /**
-     * Make a new SHABlock from a BSON BinData value.
+     * Make a new HashBlock from a BSON BinData value.
      */
-    static StatusWith<SHABlock> fromBinData(const BSONBinData& binData) {
+    static StatusWith<HashBlock> fromBinData(const BSONBinData& binData) {
         if (binData.type != BinDataGeneral) {
             return {ErrorCodes::UnsupportedFormat,
                     str::stream() << Traits::name << " only accepts BinDataGeneral type"};
@@ -163,19 +163,19 @@ public:
 
         HashType newHash;
         memcpy(newHash.data(), binData.data, binData.length);
-        return SHABlock(newHash);
+        return HashBlock(newHash);
     }
 
     /**
-     * Make a new SHABlock from a vector of bytes representing bindata. For IDL.
+     * Make a new HashBlock from a vector of bytes representing bindata. For IDL.
      */
-    static SHABlock fromBinData(const std::vector<unsigned char>& bytes) {
+    static HashBlock fromBinData(const std::vector<unsigned char>& bytes) {
         HashType newHash;
         uassert(ErrorCodes::UnsupportedFormat,
                 str::stream() << "Unsupported " << Traits::name << " hash length: " << bytes.size(),
                 bytes.size() == kHashLength);
         memcpy(newHash.data(), bytes.data(), bytes.size());
-        return SHABlock(newHash);
+        return HashBlock(newHash);
     }
 
     /**
@@ -186,10 +186,10 @@ public:
     }
 
     /**
-     * Do a bitwise xor against another SHABlock and replace the current contents of this block
+     * Do a bitwise xor against another HashBlock and replace the current contents of this block
      * with the result.
      */
-    void xorInline(const SHABlock& other) {
+    void xorInline(const HashBlock& other) {
         for (size_t x = 0; x < _hash.size(); x++) {
             _hash[x] ^= other._hash[x];
         }
@@ -202,23 +202,23 @@ public:
         return base64::encode(reinterpret_cast<const char*>(_hash.data()), _hash.size());
     }
 
-    bool operator==(const SHABlock& other) const {
+    bool operator==(const HashBlock& other) const {
         return consttimeMemEqual(this->_hash.data(), other._hash.data(), kHashLength);
     }
 
-    bool operator!=(const SHABlock& other) const {
+    bool operator!=(const HashBlock& other) const {
         return !(*this == other);
     }
 
     /**
-     * Custom hasher so SHABlocks can be used in unordered data structures.
+     * Custom hasher so HashBlocks can be used in unordered data structures.
      *
-     * ex: std::unordered_set<SHABlock, SHABlock::Hash> shaSet;
+     * ex: std::unordered_set<HashBlock, HashBlock::Hash> shaSet;
      */
     struct Hash {
-        std::size_t operator()(const SHABlock& shaBlock) const {
+        std::size_t operator()(const HashBlock& HashBlock) const {
             uint32_t hash;
-            MurmurHash3_x86_32(shaBlock.data(), SHABlock::kHashLength, 0, &hash);
+            MurmurHash3_x86_32(HashBlock.data(), HashBlock::kHashLength, 0, &hash);
             return hash;
         }
     };
@@ -228,11 +228,9 @@ private:
     HashType _hash;
 };
 
-template <typename T>
-constexpr size_t SHABlock<T>::kHashLength;
 
 template <typename Traits>
-std::ostream& operator<<(std::ostream& os, const SHABlock<Traits>& sha) {
+std::ostream& operator<<(std::ostream& os, const HashBlock<Traits>& sha) {
     return os << sha.toString();
 }
 

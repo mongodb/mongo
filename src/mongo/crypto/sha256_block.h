@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include "mongo/crypto/sha_block.h"
+#include "mongo/crypto/hash_block.h"
 
 #include "mongo/util/make_array_type.h"
 
 namespace mongo {
 
 /**
- * A Traits type for adapting SHABlock to sha256 hashes.
+ * A Traits type for adapting HashBlock to sha256 hashes.
  */
 struct SHA256BlockTraits {
     using HashType = MakeArrayType<std::uint8_t, 32, SHA256BlockTraits>;
@@ -51,6 +51,6 @@ struct SHA256BlockTraits {
                             HashType* const output);
 };
 
-using SHA256Block = SHABlock<SHA256BlockTraits>;
+using SHA256Block = HashBlock<SHA256BlockTraits>;
 
 }  // namespace mongo
