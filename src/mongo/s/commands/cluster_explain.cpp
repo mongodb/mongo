@@ -304,25 +304,10 @@ void ClusterExplain::buildExecStats(const vector<Strategy::CommandResult>& shard
     BSONArrayBuilder execShardsBuilder(executionStagesBob.subarrayStart("shards"));
     for (size_t i = 0; i < shardResults.size(); i++) {
         BSONObjBuilder singleShardBob(execShardsBuilder.subobjStart());
-
         BSONObj execStats = shardResults[i].result["executionStats"].Obj();
-        BSONObj execStages = execStats["executionStages"].Obj();
 
         singleShardBob.append("shardName", shardResults[i].shardTargetId.toString());
-
-        // Append error-related fields, if present.
-        if (!execStats["executionSuccess"].eoo()) {
-            singleShardBob.append(execStats["executionSuccess"]);
-        }
-        if (!execStats["errorMessage"].eoo()) {
-            singleShardBob.append(execStats["errorMessage"]);
-        }
-        if (!execStats["errorCode"].eoo()) {
-            singleShardBob.append(execStats["errorCode"]);
-        }
-
-        appendIfRoom(&singleShardBob, execStages, "executionStages");
-
+        appendElementsIfRoom(&singleShardBob, execStats);
         singleShardBob.doneFast();
     }
     execShardsBuilder.doneFast();
