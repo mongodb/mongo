@@ -155,7 +155,7 @@ enum LockResult {
 enum ResourceType {
     RESOURCE_INVALID = 0,
 
-    /** Parallel batch writer mutex */
+    /** Parallel batch writer mode lock */
     RESOURCE_PBWM,
 
     /** Replication state transition lock. */
@@ -180,7 +180,7 @@ enum ResourceType {
  * Maps the resource id to a human-readable string.
  */
 static const char* ResourceTypeNames[] = {"Invalid",
-                                          "ParallelBatchWriter",
+                                          "ParallelBatchWriterMode",
                                           "ReplicationStateTransition",
                                           "Global",
                                           "Database",

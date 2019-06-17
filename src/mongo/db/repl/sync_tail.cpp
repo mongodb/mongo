@@ -1381,7 +1381,7 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
 
     Timestamp firstTimeInBatch = ops.front().getTimestamp();
     // Set any indexes to multikey that this batch ignored. This must be done while holding the
-    // parallel batch writer mutex.
+    // parallel batch writer mode lock.
     for (WorkerMultikeyPathInfo infoVector : multikeyVector) {
         for (MultikeyPathInfo info : infoVector) {
             // We timestamp every multikey write with the first timestamp in the batch. It is always
