@@ -86,6 +86,12 @@ public:
     Status writePid();
 
     /**
+     * Writes the string to file.
+     * Fails if lock file has not been opened.
+     */
+    Status writeString(StringData str);
+
+    /**
      * Truncates file contents and releases file locks.
      */
     void clearPidAndUnlock();
