@@ -7,6 +7,8 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/fixture_helpers.js");  // For runCommandOnEachPrimary.
+
     // Asserts that the expected operation type and documentKey are found on the change stream
     // cursor. Returns the change stream document.
     function assertWriteVisible({cursor, opType, docKey}) {
@@ -56,11 +58,15 @@
     assert.eq(st.rs0.getPrimary().getCollection(coll0.getFullName()).count(), 10);
     assert.eq(st.rs1.getPrimary().getCollection(coll1.getFullName()).count(), 10);
 
+    // Re-enable 'writePeriodicNoops' to ensure that all change stream events are returned.
+    FixtureHelpers.runCommandOnEachPrimary(
+        {db: adminDB, cmdObj: {setParameter: 1, writePeriodicNoops: true}});
+
     // Read the stream of events, capture them in 'changeList', and confirm that all events occurred
     // at or later than the clusterTime of the first event. Unfortunately, we cannot guarantee that
     // corresponding events occurred at the same clusterTime on both shards; we expect, however,
     // that this will be true in the vast majority of runs, and so there is value in testing.
-    for (let i = 0; i < 19; ++i) {
+    for (let i = 0; i < 20; ++i) {
         assert.soon(() => changeStreamCursor.hasNext());
         changeList.push(changeStreamCursor.next());
     }
