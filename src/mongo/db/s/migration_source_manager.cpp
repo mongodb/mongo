@@ -126,6 +126,10 @@ MigrationSourceManager* MigrationSourceManager::get(CollectionShardingRuntime* c
     return msmForCsr(csr);
 }
 
+MigrationSourceManager* MigrationSourceManager::get_UNSAFE(CollectionShardingRuntime* csr) {
+    return msmForCsr(csr);
+}
+
 MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                                                MoveChunkRequest request,
                                                ConnectionString donorConnStr,

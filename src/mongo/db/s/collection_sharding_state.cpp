@@ -148,6 +148,12 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
     return &collectionsMap->getOrCreate(nss);
 }
 
+CollectionShardingState* CollectionShardingState::get_UNSAFE(ServiceContext* svcCtx,
+                                                             const NamespaceString& nss) {
+    auto& collectionsMap = CollectionShardingStateMap::get(svcCtx);
+    return &collectionsMap->getOrCreate(nss);
+}
+
 void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* builder) {
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
     collectionsMap->report(opCtx, builder);

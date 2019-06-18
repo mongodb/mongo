@@ -77,6 +77,11 @@ public:
      */
     static MigrationSourceManager* get(CollectionShardingRuntime* csr,
                                        CollectionShardingRuntime::CSRLock& csrLock);
+    /**
+     * It is the caller's responsibility to ensure that the collection locks for this namespace are
+     * held when this is called. The returned pointer should never be stored.
+     */
+    static MigrationSourceManager* get_UNSAFE(CollectionShardingRuntime* csr);
 
     /**
      * Instantiates a new migration source manager with the specified migration parameters. Must be
