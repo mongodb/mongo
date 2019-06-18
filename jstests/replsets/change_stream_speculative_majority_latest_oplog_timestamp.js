@@ -3,11 +3,11 @@
  * to majority commit.
  *
  * If a change stream query returns a batch containing oplog entries no newer than timestamp T, the
- * server may still report the latest majority committed oplog timestamp that it observed while
- * scanning the oplog, which may be greater than T. A mongoS will use this timestamp as a guarantee
- * that no new change events will occur at a lesser timestamp. This guarantee is only valid if the
- * timestamp is actually majority committed, so we need to make sure that guarantee holds, even when
- * using speculative majority.
+ * server may still report a high-water-mark postBatchResumeToken representing the latest majority
+ * committed oplog timestamp that it observed while scanning the oplog, which may be greater than T.
+ * A mongoS will use this PBRT as a guarantee that no new change events will occur at a lesser
+ * timestamp. This guarantee is only valid if the timestamp is actually majority committed, so we
+ * need to make sure that guarantee holds, even when using speculative majority.
  *
  * @tags: [uses_speculative_majority]
  */
@@ -37,20 +37,18 @@
 
     assert.commandWorked(primaryColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
-    let res = primaryDB.runCommand({
-        aggregate: collName,
-        pipeline: [{$changeStream: {}}],
-        cursor: {},
-        maxTimeMS: 5000,
-        needsMerge: true,
-        fromMongos: true
-    });
+    let res = primaryDB.runCommand(
+        {aggregate: collName, pipeline: [{$changeStream: {}}], cursor: {}, maxTimeMS: 5000});
 
     assert.commandWorked(res);
     let cursorId = res.cursor.id;
 
     // Insert a document on primary and let it majority commit.
     assert.commandWorked(primaryColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+
+    // Pause replication on the secondary so that further writes won't majority commit.
+    jsTestLog("Stopping replication to secondary.");
+    stopServerReplication(secondary);
 
     // Receive the first change event.
     res = primary.getDB(dbName).runCommand({getMore: cursorId, collection: collName});
@@ -59,9 +57,9 @@
     assert.eq(changes[0]["fullDocument"], {_id: 1});
     assert.eq(changes[0]["operationType"], "insert");
 
-    // Pause replication on the secondary so that writes won't majority commit.
-    jsTestLog("Stopping replication to secondary.");
-    stopServerReplication(secondary);
+    // Extract the postBatchResumeToken from the first batch.
+    const initialPostBatchResumeToken = res.cursor.postBatchResumeToken;
+    assert.neq(initialPostBatchResumeToken, undefined);
 
     // Do a write on a collection that we are not watching changes for.
     let otherWriteRes = primaryDB.runCommand({insert: otherCollName, documents: [{_id: 1}]});
@@ -81,11 +79,13 @@
     replTest.awaitReplication();
 
     // Now that writes can replicate again, the previous operation should have majority committed,
-    // making it safe to return as the latest oplog timestamp.
+    // making it safe to advance the postBatchResumeToken. Note that no further events are returned,
+    // indicating that the new PBRT is a high water mark generated at the latest oplog timestamp.
     res = primary.getDB(dbName).runCommand(
         {getMore: cursorId, collection: collName, maxTimeMS: 5000});
+    assert.commandWorked(res);
     assert.eq(res.cursor.nextBatch, []);
-    assert.eq(otherWriteOpTime, res.$_internalLatestOplogTimestamp);
+    assert.gt(bsonWoCompare(res.cursor.postBatchResumeToken, initialPostBatchResumeToken), 0);
 
     replTest.stopSet();
 })();

@@ -53,7 +53,6 @@ constexpr StringData AggregationRequest::kCursorName;
 constexpr StringData AggregationRequest::kBatchSizeName;
 constexpr StringData AggregationRequest::kFromMongosName;
 constexpr StringData AggregationRequest::kNeedsMergeName;
-constexpr StringData AggregationRequest::kMergeByPBRTName;
 constexpr StringData AggregationRequest::kPipelineName;
 constexpr StringData AggregationRequest::kCollationName;
 constexpr StringData AggregationRequest::kExplainName;
@@ -183,14 +182,6 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
 
             hasNeedsMergeElem = true;
             request.setNeedsMerge(elem.Bool());
-        } else if (kMergeByPBRTName == fieldName) {
-            if (elem.type() != BSONType::Bool) {
-                return {ErrorCodes::TypeMismatch,
-                        str::stream() << kMergeByPBRTName << " must be a boolean, not a "
-                                      << typeName(elem.type())};
-            }
-
-            request.setMergeByPBRT(elem.Bool());
         } else if (kAllowDiskUseName == fieldName) {
             if (storageGlobalParams.readOnly) {
                 return {ErrorCodes::IllegalOperation,
@@ -228,6 +219,11 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
+        } else if (fieldName == "mergeByPBRT"_sd) {
+            // TODO SERVER-41900: we must retain the ability to ingest the 'mergeByPBRT' field for
+            // 4.4 upgrade purposes, since a 4.2 mongoS will always send {mergeByPBRT:true} to the
+            // shards. We do nothing with it because mergeByPBRT is the only mode available in 4.4.
+            // Remove this final vestige of mergeByPBRT during the 4.5 development cycle.
         } else if (!isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
@@ -307,7 +303,6 @@ Document AggregationRequest::serializeToCommandObj() const {
         {kAllowDiskUseName, _allowDiskUse ? Value(true) : Value()},
         {kFromMongosName, _fromMongos ? Value(true) : Value()},
         {kNeedsMergeName, _needsMerge ? Value(true) : Value()},
-        {kMergeByPBRTName, _mergeByPBRT ? Value(true) : Value()},
         {bypassDocumentValidationCommandOption(),
          _bypassDocumentValidation ? Value(true) : Value()},
         // Only serialize a collation if one was specified.

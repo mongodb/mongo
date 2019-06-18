@@ -41,8 +41,7 @@
 namespace mongo {
 
 /**
- * Builds the cursor field and the _latestOplogTimestamp field for a reply to a cursor-generating
- * command in place.
+ * Builds the cursor field for a reply to a cursor-generating command in-place.
  */
 class CursorResponseBuilder {
     CursorResponseBuilder(const CursorResponseBuilder&) = delete;
@@ -88,10 +87,6 @@ public:
         _numDocs++;
     }
 
-    void setLatestOplogTimestamp(Timestamp ts) {
-        _latestOplogTimestamp = ts;
-    }
-
     void setPostBatchResumeToken(BSONObj token) {
         _postBatchResumeToken = token.getOwned();
     }
@@ -124,7 +119,6 @@ private:
 
     bool _active = true;
     long long _numDocs = 0;
-    Timestamp _latestOplogTimestamp;
     BSONObj _postBatchResumeToken;
 };
 
@@ -202,7 +196,6 @@ public:
                    CursorId cursorId,
                    std::vector<BSONObj> batch,
                    boost::optional<long long> numReturnedSoFar = boost::none,
-                   boost::optional<Timestamp> latestOplogTimestamp = boost::none,
                    boost::optional<BSONObj> postBatchResumeToken = boost::none,
                    boost::optional<BSONObj> writeConcernError = boost::none);
 
@@ -242,10 +235,6 @@ public:
         return _numReturnedSoFar;
     }
 
-    boost::optional<Timestamp> getLastOplogTimestamp() const {
-        return _latestOplogTimestamp;
-    }
-
     boost::optional<BSONObj> getPostBatchResumeToken() const {
         return _postBatchResumeToken;
     }
@@ -268,7 +257,6 @@ private:
     CursorId _cursorId;
     std::vector<BSONObj> _batch;
     boost::optional<long long> _numReturnedSoFar;
-    boost::optional<Timestamp> _latestOplogTimestamp;
     boost::optional<BSONObj> _postBatchResumeToken;
     boost::optional<BSONObj> _writeConcernError;
 };

@@ -287,9 +287,8 @@ public:
 
                     // As soon as we get a result, this operation no longer waits.
                     awaitDataState(opCtx).shouldWaitForInserts = false;
-                    // TODO SERVER-38539: We need to set both the latestOplogTimestamp and the
-                    // postBatchResumeToken until the former is removed in a future release.
-                    nextBatch->setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
+
+                    // If this executor produces a postBatchResumeToken, add it to the response.
                     nextBatch->setPostBatchResumeToken(exec->getPostBatchResumeToken());
                     nextBatch->append(obj);
                     (*numResults)++;
@@ -313,11 +312,8 @@ public:
                     return status;
                 }
                 case PlanExecutor::IS_EOF:
-                    // This causes the reported latest oplog timestamp to advance even when there
-                    // are no results for this particular query.
-                    // TODO SERVER-38539: We need to set both the latestOplogTimestamp and the
-                    // postBatchResumeToken until the former is removed in a future release.
-                    nextBatch->setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
+                    // The latest oplog timestamp may advance even when there are no results. Ensure
+                    // that we have the latest postBatchResumeToken produced by the plan executor.
                     nextBatch->setPostBatchResumeToken(exec->getPostBatchResumeToken());
                 default:
                     return Status::OK();

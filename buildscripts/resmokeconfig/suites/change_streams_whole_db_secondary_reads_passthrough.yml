@@ -7,8 +7,6 @@ selector:
   # This test starts a parallel shell which we want to read from the same node as the change stream,
   # but the parallel shell performs an insert which will not work against the secondary.
   - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
-  # This test is not expected to work when run against a mongos.
-  - jstests/change_streams/report_latest_observed_oplog_timestamp.js
   # Only relevant for single-collection change streams.
   - jstests/change_streams/metadata_notifications.js
   exclude_with_any_tags:

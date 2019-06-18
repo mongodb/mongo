@@ -696,7 +696,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     }
 
     return CursorResponse(
-        request.nss, idToReturn, std::move(batch), startingFrom, boost::none, postBatchResumeToken);
+        request.nss, idToReturn, std::move(batch), startingFrom, postBatchResumeToken);
 }
 
 }  // namespace mongo

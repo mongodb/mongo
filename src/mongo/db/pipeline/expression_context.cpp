@@ -53,7 +53,6 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     comment = request.getComment();
     fromMongos = request.isFromMongos();
     needsMerge = request.needsMerge();
-    mergeByPBRT = request.mergeByPBRT();
     allowDiskUse = request.shouldAllowDiskUse();
     bypassDocumentValidation = request.shouldBypassDocumentValidation();
     ns = request.getNamespaceString();
@@ -155,7 +154,6 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->explain = explain;
     expCtx->comment = comment;
     expCtx->needsMerge = needsMerge;
-    expCtx->mergeByPBRT = mergeByPBRT;
     expCtx->fromMongos = fromMongos;
     expCtx->inMongos = inMongos;
     expCtx->allowDiskUse = allowDiskUse;

@@ -146,11 +146,6 @@ TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMongosIsTrue) 
     ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
 }
 
-TEST_F(ClusterAggregateTest, ShouldFailWhenMergeByPBRTIsTrue) {
-    const BSONObj inputBson = fromjson("{pipeline: [], cursor: {}, mergeByPBRT: true}");
-    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
-}
-
 TEST_F(ClusterAggregateTest, ShouldFailWhenExchengeIsPresent) {
     const BSONObj inputBson = fromjson(
         "{pipeline: [], cursor: {}, exchange: {policy: 'roundrobin', consumers: NumberInt(2)}}");

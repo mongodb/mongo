@@ -72,16 +72,6 @@
         fromMongos: false
     }));
 
-    // Test that 'mergeByPBRT: true' cannot be specified in a command sent to mongoS.
-    assert.commandFailedWithCode(
-        mongosDB.runCommand(
-            {aggregate: mongosColl.getName(), pipeline: [], cursor: {}, mergeByPBRT: true}),
-        51089);
-
-    // Test that 'mergeByPBRT: false' can be specified in a command sent to mongoS.
-    assert.commandWorked(mongosDB.runCommand(
-        {aggregate: mongosColl.getName(), pipeline: [], cursor: {}, mergeByPBRT: false}));
-
     // Test that the 'exchange' parameter cannot be specified in a command sent to mongoS.
     assert.commandFailedWithCode(mongosDB.runCommand({
         aggregate: mongosColl.getName(),
@@ -98,7 +88,6 @@
         cursor: {},
         needsMerge: true,
         fromMongos: true,
-        mergeByPBRT: true,
         exchange: {policy: 'roundrobin', consumers: NumberInt(2)}
     }),
                                  51028);
@@ -109,8 +98,7 @@
         pipeline: [],
         cursor: {},
         needsMerge: true,
-        fromMongos: true,
-        mergeByPBRT: true
+        fromMongos: true
     }),
                                  51089);
 

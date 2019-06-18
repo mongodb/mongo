@@ -178,11 +178,6 @@ BSONObj createCommandForTargetedShards(
     if (needsMerge) {
         targetedCmd[AggregationRequest::kNeedsMergeName] = Value(true);
 
-        // If this is a change stream aggregation, set the 'mergeByPBRT' flag on the command. This
-        // notifies the shards that the mongoS is capable of merging streams based on resume token.
-        // TODO SERVER-38539: the 'mergeByPBRT' flag is no longer necessary in 4.4.
-        targetedCmd[AggregationRequest::kMergeByPBRTName] = Value(litePipe.hasChangeStream());
-
         // If there aren't any stages like $out in the pipeline being sent to the shards, remove the
         // write concern. The write concern should only be applied when there are writes performed
         // to avoid mistakenly waiting for writes which didn't happen.

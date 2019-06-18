@@ -56,7 +56,6 @@ TEST(CursorResponseTest, parseFromBSONFirstBatch) {
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
-    ASSERT_FALSE(response.getLastOplogTimestamp());
 }
 
 TEST(CursorResponseTest, parseFromBSONNextBatch) {
@@ -75,7 +74,6 @@ TEST(CursorResponseTest, parseFromBSONNextBatch) {
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
-    ASSERT_FALSE(response.getLastOplogTimestamp());
 }
 
 TEST(CursorResponseTest, parseFromBSONCursorIdZero) {
@@ -110,25 +108,6 @@ TEST(CursorResponseTest, parseFromBSONEmptyBatch) {
     ASSERT_EQ(response.getCursorId(), CursorId(123));
     ASSERT_EQ(response.getNSS().ns(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 0U);
-}
-
-TEST(CursorResponseTest, parseFromBSONLatestOplogEntry) {
-    StatusWith<CursorResponse> result =
-        CursorResponse::parseFromBSON(BSON("cursor" << BSON("id" << CursorId(123) << "ns"
-                                                                 << "db.coll"
-                                                                 << "nextBatch"
-                                                                 << BSONArrayBuilder().arr())
-                                                    << "$_internalLatestOplogTimestamp"
-                                                    << Timestamp(1, 2)
-                                                    << "ok"
-                                                    << 1));
-    ASSERT_OK(result.getStatus());
-
-    CursorResponse response = std::move(result.getValue());
-    ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
-    ASSERT_EQ(response.getBatch().size(), 0U);
-    ASSERT_EQ(*response.getLastOplogTimestamp(), Timestamp(1, 2));
 }
 
 TEST(CursorResponseTest, parseFromBSONMissingCursorField) {
@@ -210,19 +189,6 @@ TEST(CursorResponseTest, parseFromBSONNextBatchFieldWrongType) {
                                                                  << "db.coll"
                                                                  << "nextBatch"
                                                                  << BSON("_id" << 1))
-                                                    << "ok"
-                                                    << 1));
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(CursorResponseTest, parseFromBSONLatestOplogEntryWrongType) {
-    StatusWith<CursorResponse> result =
-        CursorResponse::parseFromBSON(BSON("cursor" << BSON("id" << CursorId(123) << "ns"
-                                                                 << "db.coll"
-                                                                 << "nextBatch"
-                                                                 << BSON_ARRAY(BSON("_id" << 1)))
-                                                    << "$_internalLatestOplogTimestamp"
-                                                    << 1
                                                     << "ok"
                                                     << 1));
     ASSERT_NOT_OK(result.getStatus());
@@ -310,40 +276,12 @@ TEST(CursorResponseTest, addToBSONSubsequentResponse) {
     ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);
 }
 
-TEST(CursorResponseTest, serializeLatestOplogEntry) {
-    std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
-    CursorResponse response(
-        NamespaceString("db.coll"), CursorId(123), batch, boost::none, Timestamp(1, 2));
-    auto serialized = response.toBSON(CursorResponse::ResponseType::SubsequentResponse);
-    ASSERT_BSONOBJ_EQ(serialized,
-                      BSON("cursor"
-                           << BSON("id" << CursorId(123) << "ns"
-                                        << "db.coll"
-                                        << "nextBatch"
-                                        << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
-                           << "$_internalLatestOplogTimestamp"
-                           << Timestamp(1, 2)
-                           << "ok"
-                           << 1));
-    auto reparsed = CursorResponse::parseFromBSON(serialized);
-    ASSERT_OK(reparsed.getStatus());
-    CursorResponse reparsedResponse = std::move(reparsed.getValue());
-    ASSERT_EQ(reparsedResponse.getCursorId(), CursorId(123));
-    ASSERT_EQ(reparsedResponse.getNSS().ns(), "db.coll");
-    ASSERT_EQ(reparsedResponse.getBatch().size(), 2U);
-    ASSERT_EQ(*reparsedResponse.getLastOplogTimestamp(), Timestamp(1, 2));
-}
-
 TEST(CursorResponseTest, serializePostBatchResumeToken) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
     auto postBatchResumeToken =
         ResumeToken::makeHighWaterMarkToken(Timestamp(1, 2)).toDocument().toBson();
-    CursorResponse response(NamespaceString("db.coll"),
-                            CursorId(123),
-                            batch,
-                            boost::none,
-                            boost::none,
-                            postBatchResumeToken);
+    CursorResponse response(
+        NamespaceString("db.coll"), CursorId(123), batch, boost::none, postBatchResumeToken);
     auto serialized = response.toBSON(CursorResponse::ResponseType::SubsequentResponse);
     ASSERT_BSONOBJ_EQ(serialized,
                       BSON("cursor" << BSON("id" << CursorId(123) << "ns"

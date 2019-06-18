@@ -212,9 +212,7 @@ bool handleCursorCommand(OperationContext* opCtx,
             break;
         }
 
-        // TODO SERVER-38539: We need to set both the latestOplogTimestamp and the PBRT until the
-        // former is removed in a future release.
-        responseBuilder.setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
+        // If this executor produces a postBatchResumeToken, add it to the cursor response.
         responseBuilder.setPostBatchResumeToken(exec->getPostBatchResumeToken());
         responseBuilder.append(next);
     }
@@ -225,9 +223,6 @@ bool handleCursorCommand(OperationContext* opCtx,
         // For empty batches, or in the case where the final result was added to the batch rather
         // than being stashed, we update the PBRT to ensure that it is the most recent available.
         if (!stashedResult) {
-            // TODO SERVER-38539: We need to set both the latestOplogTimestamp and the PBRT until
-            // the former is removed in a future release.
-            responseBuilder.setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
             responseBuilder.setPostBatchResumeToken(exec->getPostBatchResumeToken());
         }
         // If a time limit was set on the pipeline, remaining time is "rolled over" to the

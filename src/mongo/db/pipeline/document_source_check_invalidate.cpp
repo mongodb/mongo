@@ -94,18 +94,12 @@ DocumentSource::GetNextResult DocumentSourceCheckInvalidate::getNext() {
         MutableDocument result(Document{{DSCS::kIdField, resumeTokenDoc},
                                         {DSCS::kOperationTypeField, DSCS::kInvalidateOpType},
                                         {DSCS::kClusterTimeField, doc[DSCS::kClusterTimeField]}});
+        result.copyMetaDataFrom(doc);
 
         // We set the resume token as the document's sort key in both the sharded and non-sharded
         // cases, since we will later rely upon it to generate a correct postBatchResumeToken. We
         // must therefore update the sort key to match the new resume token that we generated above.
-        // TODO SERVER-38539: when returning results for merging, we check whether 'mergeByPBRT' has
-        // been set. If not, then the request was sent from an older mongoS which cannot merge by
-        // raw resume tokens, and the sort key should therefore be left alone. The 'mergeByPBRT'
-        // flag is no longer necessary in 4.4; all change streams will be merged by resume token.
-        result.copyMetaDataFrom(doc);
-        if (!pExpCtx->needsMerge || pExpCtx->mergeByPBRT) {
-            result.setSortKeyMetaField(resumeTokenDoc.toBson());
-        }
+        result.setSortKeyMetaField(resumeTokenDoc.toBson());
 
         _queuedInvalidate = result.freeze();
     }

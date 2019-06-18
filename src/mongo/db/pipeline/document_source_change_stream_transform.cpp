@@ -328,15 +328,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
 
     // We set the resume token as the document's sort key in both the sharded and non-sharded cases,
     // since we will subsequently rely upon it to generate a correct postBatchResumeToken.
-    // TODO SERVER-38539: when returning results for merging, we first check whether 'mergeByPBRT'
-    // has been set. If not, then the request was sent from an older mongoS which cannot merge by
-    // raw resume tokens, and we must use the old sort key format. This check, and the 'mergeByPBRT'
-    // flag, are no longer necessary in 4.4; all change streams will be merged by resume token.
-    if (pExpCtx->needsMerge && !pExpCtx->mergeByPBRT) {
-        doc.setSortKeyMetaField(BSON("" << ts << "" << uuid << "" << documentKey));
-    } else {
-        doc.setSortKeyMetaField(resumeToken.toBson());
-    }
+    doc.setSortKeyMetaField(resumeToken.toBson());
 
     // "invalidate" and "newShardDetected" entries have fewer fields.
     if (operationType == DocumentSourceChangeStream::kInvalidateOpType ||

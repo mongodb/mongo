@@ -205,7 +205,6 @@ public:
 
     bool fromMongos = false;
     bool needsMerge = false;
-    bool mergeByPBRT = false;
     bool inMongos = false;
     bool allowDiskUse = false;
     bool bypassDocumentValidation = false;

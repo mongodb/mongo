@@ -4,9 +4,6 @@ selector:
   roots:
   - jstests/change_streams/**/*.js
   exclude_files:
-  # This test exercises an internal detail of mongos<->mongod communication and is not expected
-  # to work against a mongos.
-  - jstests/change_streams/report_latest_observed_oplog_timestamp.js
   # TODO: SERVER-32088 should fix resuming a change stream when not all shards have data.
   - jstests/change_streams/shell_helper.js
   - jstests/change_streams/lookup_post_image.js

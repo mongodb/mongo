@@ -47,9 +47,7 @@ ChangeStreamProxyStage::ChangeStreamProxyStage(OperationContext* opCtx,
     // pipeline construction, and use it to obtain the starting time for _latestOplogTimestamp.
     invariant(!_pipeline->getContext()->initialPostBatchResumeToken.isEmpty());
     _postBatchResumeToken = _pipeline->getContext()->initialPostBatchResumeToken.getOwned();
-    if (!_pipeline->getContext()->needsMerge || _pipeline->getContext()->mergeByPBRT) {
-        _latestOplogTimestamp = ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
-    }
+    _latestOplogTimestamp = ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
 }
 
 boost::optional<BSONObj> ChangeStreamProxyStage::getNextBson() {
