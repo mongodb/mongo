@@ -106,6 +106,20 @@ public:
     CollectionCatalog() = default;
 
     /**
+     * This function inserts the entry for uuid, coll into the collection catalog. It is called by
+     * the op observer when a collection is created.
+     */
+    void onCreateCollection(OperationContext* opCtx,
+                            std::unique_ptr<Collection> coll,
+                            CollectionUUID uuid);
+
+    /**
+     * This function removes the entry for uuid from the collection catalog. It is called by the op
+     * observer when a collection is dropped.
+     */
+    void onDropCollection(OperationContext* opCtx, CollectionUUID uuid);
+
+    /**
      * This function is responsible for safely setting the namespace string inside 'coll' to the
      * value of 'toCollection'. The caller need not hold locks on the collection.
      *
@@ -117,27 +131,36 @@ public:
                                 const NamespaceString& fromCollection,
                                 const NamespaceString& toCollection);
 
+    /**
+     * Implies onDropCollection for all collections in db, but is not transactional.
+     */
     void onCloseDatabase(OperationContext* opCtx, std::string dbName);
 
     /**
-     * Register the collection object and collection catalog entry with `uuid`.
+     * Register the collection catalog entry with `uuid`. The collection object with `uuid` must not
+     * exist in the CollectionCatalog yet.
      */
-    void registerCollection(CollectionUUID uuid,
-                            std::unique_ptr<CollectionCatalogEntry> collectionCatalogEntry,
-                            std::unique_ptr<Collection> collection);
+    void registerCatalogEntry(CollectionUUID uuid,
+                              std::unique_ptr<CollectionCatalogEntry> collectionCatalogEntry);
 
     /**
-     * Deregister the collection object and collection catalog entry.
+     * Deregister the collection catalog entry. The collection object with `uuid` is already gone,
+     * so this function completely removes any info about uuid.
      */
-    std::tuple<std::unique_ptr<Collection>, std::unique_ptr<CollectionCatalogEntry>>
-    deregisterCollection(CollectionUUID uuid);
+    std::unique_ptr<CollectionCatalogEntry> deregisterCatalogEntry(CollectionUUID uuid);
 
     /**
-     * Returns the RecoveryUnit's Change for dropping the collection
+     * Register the collection object with `uuid`. The collection catalog entry with `uuid` already
+     * exists in the CollectionCatalog.
      */
-    RecoveryUnit::Change* makeFinishDropCollectionChange(std::unique_ptr<Collection>,
-                                                         std::unique_ptr<CollectionCatalogEntry>,
-                                                         CollectionUUID uuid);
+    void registerCollectionObject(CollectionUUID uuid, std::unique_ptr<Collection> coll);
+
+    /**
+     * Deregister the collection object. The collection catalog entry still exists and will be
+     * deregistered later.
+     */
+    std::unique_ptr<Collection> deregisterCollectionObject(CollectionUUID uuid);
+
 
     /**
      * Deregister all the collection objects and catalog entries.
@@ -267,6 +290,7 @@ public:
     void addResource(const ResourceId& rid, const std::string& entry);
 
 private:
+    class FinishDropChange;
     friend class CollectionCatalog::iterator;
 
     Collection* _lookupCollectionByUUID(WithLock, CollectionUUID uuid) const;

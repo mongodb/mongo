@@ -1480,7 +1480,8 @@ TEST_F(QueryRequestTest, ParseFromUUID) {
     auto coll = std::make_unique<CollectionMock>(nss);
     auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
     CollectionCatalog& catalog = CollectionCatalog::get(opCtx.get());
-    catalog.registerCollection(uuid, std::move(catalogEntry), std::move(coll));
+    catalog.registerCatalogEntry(uuid, std::move(catalogEntry));
+    catalog.onCreateCollection(opCtx.get(), std::move(coll), uuid);
     QueryRequest qr(NamespaceStringOrUUID("test", uuid));
     // Ensure a call to refreshNSS succeeds.
     qr.refreshNSS(opCtx.get());

@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/database_impl.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -212,8 +213,10 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns) {
     }
 
     auto db = it->second;
+    repl::oplogCheckCloseDatabase(opCtx, db);
     CollectionCatalog::get(opCtx).onCloseDatabase(opCtx, dbName.toString());
 
+    db->close(opCtx);
     delete db;
     db = nullptr;
 
@@ -251,7 +254,9 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
         LOG(2) << "DatabaseHolder::closeAll name:" << name;
 
         Database* db = _dbs[name];
+        repl::oplogCheckCloseDatabase(opCtx, db);
         CollectionCatalog::get(opCtx).onCloseDatabase(opCtx, name);
+        db->close(opCtx);
         delete db;
 
         _dbs.erase(name);

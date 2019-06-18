@@ -34,7 +34,6 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
@@ -115,11 +114,10 @@ public:
                                                                        const NamespaceString& nss,
                                                                        bool forRepair);
 
-    StatusWith<std::unique_ptr<CollectionCatalogEntry>> createCollection(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const CollectionOptions& options,
-        bool allocateDefaultSpace);
+    Status createCollection(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const CollectionOptions& options,
+                            bool allocateDefaultSpace);
 
     Status renameCollection(OperationContext* opCtx,
                             const NamespaceString& fromNss,
@@ -131,6 +129,7 @@ public:
 private:
     class AddIdentChange;
     class RemoveIdentChange;
+    class FinishDropCatalogEntryChange;
 
     friend class KVStorageEngine;
     friend class KVCatalogTest;

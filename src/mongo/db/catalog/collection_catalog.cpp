@@ -43,35 +43,28 @@ namespace mongo {
 namespace {
 const ServiceContext::Decoration<CollectionCatalog> getCatalog =
     ServiceContext::declareDecoration<CollectionCatalog>();
+}  // namespace
 
-class FinishDropCollectionChange : public RecoveryUnit::Change {
+class CollectionCatalog::FinishDropChange : public RecoveryUnit::Change {
 public:
-    FinishDropCollectionChange(CollectionCatalog* catalog,
-                               std::unique_ptr<Collection> coll,
-                               std::unique_ptr<CollectionCatalogEntry> catalogEntry,
-                               CollectionUUID uuid)
-        : _catalog(catalog),
-          _coll(std::move(coll)),
-          _catalogEntry(std::move(catalogEntry)),
-          _uuid(uuid) {}
+    FinishDropChange(CollectionCatalog& catalog,
+                     std::unique_ptr<Collection> coll,
+                     CollectionUUID uuid)
+        : _catalog(catalog), _coll(std::move(coll)), _uuid(uuid) {}
 
     void commit(boost::optional<Timestamp>) override {
         _coll.reset();
-        _catalogEntry.reset();
     }
 
     void rollback() override {
-        _catalog->registerCollection(_uuid, std::move(_catalogEntry), std::move(_coll));
+        _catalog.registerCollectionObject(_uuid, std::move(_coll));
     }
 
 private:
-    CollectionCatalog* _catalog;
+    CollectionCatalog& _catalog;
     std::unique_ptr<Collection> _coll;
-    std::unique_ptr<CollectionCatalogEntry> _catalogEntry;
     CollectionUUID _uuid;
 };
-
-}  // namespace
 
 CollectionCatalog::iterator::iterator(StringData dbName,
                                       uint64_t genNum,
@@ -203,6 +196,18 @@ CollectionCatalog& CollectionCatalog::get(OperationContext* opCtx) {
     return getCatalog(opCtx->getServiceContext());
 }
 
+void CollectionCatalog::onCreateCollection(OperationContext* opCtx,
+                                           std::unique_ptr<Collection> coll,
+                                           CollectionUUID uuid) {
+    registerCollectionObject(uuid, std::move(coll));
+    opCtx->recoveryUnit()->onRollback([this, uuid] { deregisterCollectionObject(uuid); });
+}
+
+void CollectionCatalog::onDropCollection(OperationContext* opCtx, CollectionUUID uuid) {
+    auto coll = deregisterCollectionObject(uuid);
+    opCtx->recoveryUnit()->registerChange(new FinishDropChange(*this, std::move(coll), uuid));
+}
+
 void CollectionCatalog::setCollectionNamespace(OperationContext* opCtx,
                                                Collection* coll,
                                                const NamespaceString& fromCollection,
@@ -250,6 +255,10 @@ void CollectionCatalog::setCollectionNamespace(OperationContext* opCtx,
 
 void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, std::string dbName) {
     invariant(opCtx->lockState()->isW());
+    for (auto it = begin(dbName); it != end(); ++it) {
+        deregisterCollectionObject(it.uuid().get());
+    }
+
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
     removeResource(rid, dbName);
 }
@@ -404,14 +413,11 @@ std::vector<std::string> CollectionCatalog::getAllDbNames() const {
     return ret;
 }
 
-void CollectionCatalog::registerCollection(
-    CollectionUUID uuid,
-    std::unique_ptr<CollectionCatalogEntry> collectionCatalogEntry,
-    std::unique_ptr<Collection> coll) {
+void CollectionCatalog::registerCatalogEntry(
+    CollectionUUID uuid, std::unique_ptr<CollectionCatalogEntry> collectionCatalogEntry) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
 
     LOG(0) << "Registering catalog entry " << collectionCatalogEntry->ns() << " with UUID " << uuid;
-    LOG(0) << "Registering collection object " << coll->ns() << " with UUID " << uuid;
 
     auto ns = collectionCatalogEntry->ns();
     auto dbName = ns.db().toString();
@@ -422,12 +428,41 @@ void CollectionCatalog::registerCollection(
     invariant(_collections.find(ns) == _collections.end());
     invariant(_orderedCollections.find(dbIdPair) == _orderedCollections.end());
 
-    auto collPtr = coll.get();
-    CollectionInfo collectionInfo = {std::move(coll), collPtr, std::move(collectionCatalogEntry)};
+    CollectionInfo collectionInfo = {nullptr, /* std::unique_ptr<Collection> */
+                                     nullptr,
+                                     std::move(collectionCatalogEntry)};
 
     _catalog[uuid] = std::move(collectionInfo);
     _collections[ns] = &_catalog[uuid];
     _orderedCollections[dbIdPair] = &_catalog[uuid];
+}
+
+void CollectionCatalog::registerCollectionObject(CollectionUUID uuid,
+                                                 std::unique_ptr<Collection> coll) {
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+
+    LOG(0) << "Registering collection object " << coll->ns() << " with UUID " << uuid;
+
+    auto ns = coll->ns();
+    auto dbName = ns.db().toString();
+    auto dbIdPair = std::make_pair(dbName, uuid);
+
+    // Make sure catalog entry associated with this uuid already exists.
+    invariant(_catalog.find(uuid) != _catalog.end());
+    invariant(_collections.find(ns) != _collections.end());
+    invariant(_orderedCollections.find(dbIdPair) != _orderedCollections.end());
+    invariant(_catalog[uuid].collectionCatalogEntry);
+    invariant(_collections[ns]->collectionCatalogEntry);
+    invariant(_orderedCollections[dbIdPair]->collectionCatalogEntry);
+
+    // Make sure collection object does not exist.
+    invariant(_catalog[uuid].collection == nullptr);
+    invariant(_collections[ns]->collection == nullptr);
+    invariant(_orderedCollections[dbIdPair]->collection == nullptr);
+
+
+    _catalog[uuid].collection = std::move(coll);
+    _catalog[uuid].collectionPtr = _catalog[uuid].collection.get();
 
     auto dbRid = ResourceId(RESOURCE_DATABASE, dbName);
     addResource(dbRid, dbName);
@@ -436,30 +471,28 @@ void CollectionCatalog::registerCollection(
     addResource(collRid, ns.ns());
 }
 
-std::tuple<std::unique_ptr<Collection>, std::unique_ptr<CollectionCatalogEntry>>
-CollectionCatalog::deregisterCollection(CollectionUUID uuid) {
+std::unique_ptr<Collection> CollectionCatalog::deregisterCollectionObject(CollectionUUID uuid) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
 
     invariant(_catalog.find(uuid) != _catalog.end());
     invariant(_catalog[uuid].collection);
-    invariant(_catalog[uuid].collectionCatalogEntry);
 
     auto coll = std::move(_catalog[uuid].collection);
-    auto catalogEntry = std::move(_catalog[uuid].collectionCatalogEntry);
     auto ns = coll->ns();
     auto dbName = ns.db().toString();
     auto dbIdPair = std::make_pair(dbName, uuid);
 
     LOG(0) << "Deregistering collection object " << ns << " with UUID " << uuid;
-    LOG(0) << "Deregistering catalog entry " << ns << " with UUID " << uuid;
 
     // Make sure collection object exists.
     invariant(_collections.find(ns) != _collections.end());
     invariant(_orderedCollections.find(dbIdPair) != _orderedCollections.end());
 
-    _orderedCollections.erase(dbIdPair);
-    _collections.erase(ns);
-    _catalog.erase(uuid);
+    _catalog[uuid].collection = nullptr;
+    _catalog[uuid].collectionPtr = nullptr;
+
+    // Make sure collection catalog entry still exists.
+    invariant(_catalog[uuid].collectionCatalogEntry);
 
     auto collRid = ResourceId(RESOURCE_COLLECTION, ns.ns());
     removeResource(collRid, ns.ns());
@@ -468,14 +501,40 @@ CollectionCatalog::deregisterCollection(CollectionUUID uuid) {
     // references to the erased element.
     _generationNumber++;
 
-    return std::make_tuple(std::move(coll), std::move(catalogEntry));
+    return coll;
 }
 
-RecoveryUnit::Change* CollectionCatalog::makeFinishDropCollectionChange(
-    std::unique_ptr<Collection> coll,
-    std::unique_ptr<CollectionCatalogEntry> catalogEntry,
+std::unique_ptr<CollectionCatalogEntry> CollectionCatalog::deregisterCatalogEntry(
     CollectionUUID uuid) {
-    return new FinishDropCollectionChange(this, std::move(coll), std::move(catalogEntry), uuid);
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+
+    invariant(_catalog.find(uuid) != _catalog.end());
+    invariant(_catalog[uuid].collectionCatalogEntry);
+
+    auto catalogEntry = std::move(_catalog[uuid].collectionCatalogEntry);
+    auto ns = catalogEntry->ns();
+    auto dbName = ns.db().toString();
+    auto dbIdPair = std::make_pair(dbName, uuid);
+
+    LOG(0) << "Deregistering catalog entry " << ns << " with UUID " << uuid;
+
+    // Make sure collection object is already gone.
+    invariant(_catalog[uuid].collection == nullptr);
+    invariant(_catalog[uuid].collectionPtr == nullptr);
+
+    // Make sure catalog entry exist.
+    invariant(_collections.find(ns) != _collections.end());
+    invariant(_orderedCollections.find(dbIdPair) != _orderedCollections.end());
+
+    _orderedCollections.erase(dbIdPair);
+    _collections.erase(ns);
+    _catalog.erase(uuid);
+
+    // Removal from an ordered map will invalidate iterators and potentially references to the
+    // references to the erased element.
+    _generationNumber++;
+
+    return catalogEntry;
 }
 
 void CollectionCatalog::deregisterAllCatalogEntriesAndCollectionObjects() {

@@ -41,6 +41,10 @@ public:
 
     void init(OperationContext*) const final;
 
+
+    // closes files and other cleanup see below.
+    void close(OperationContext* opCtx) const final;
+
     const std::string& name() const final {
         return _name;
     }
