@@ -86,6 +86,12 @@ CollectionShardingRuntime* CollectionShardingRuntime::get(OperationContext* opCt
     return checked_cast<CollectionShardingRuntime*>(css);
 }
 
+CollectionShardingRuntime* CollectionShardingRuntime::get_UNSAFE(ServiceContext* svcCtx,
+                                                                 const NamespaceString& nss) {
+    auto* const css = CollectionShardingState::get_UNSAFE(svcCtx, nss);
+    return checked_cast<CollectionShardingRuntime*>(css);
+}
+
 void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
                                                      CollectionMetadata newMetadata) {
     invariant(!newMetadata.isSharded() || !isNamespaceAlwaysUnsharded(_nss),

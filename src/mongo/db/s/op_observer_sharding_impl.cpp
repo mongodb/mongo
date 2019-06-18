@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_source_manager.h"
 
 namespace mongo {
@@ -166,43 +167,8 @@ void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
     const std::vector<repl::ReplOperation>& stmts,
     const repl::OpTime& prepareOrCommitOptime) {
 
-    std::set<NamespaceString> namespacesTouchedByTransaction;
-
-    for (const auto& stmt : stmts) {
-        const auto& nss = stmt.getNss();
-
-        invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
-
-        auto csr = CollectionShardingRuntime::get(opCtx, nss);
-        auto csrLock = CollectionShardingRuntime::CSRLock::lock(opCtx, csr);
-        auto msm = MigrationSourceManager::get(csr, csrLock);
-        if (!msm) {
-            continue;
-        }
-
-        if (namespacesTouchedByTransaction.find(nss) == namespacesTouchedByTransaction.end()) {
-            msm->getCloner()->onTransactionPrepareOrUnpreparedCommit(opCtx, prepareOrCommitOptime);
-            namespacesTouchedByTransaction.insert(nss);
-        }
-
-        const auto& opType = stmt.getOpType();
-
-        // We pass an empty opTime to observers because retryable write history doesn't care about
-        // writes in transactions.
-        if (opType == repl::OpTypeEnum::kInsert) {
-            msm->getCloner()->onInsertOp(opCtx, stmt.getObject(), {});
-        } else if (opType == repl::OpTypeEnum::kUpdate) {
-            if (auto updateDoc = stmt.getObject2()) {
-                msm->getCloner()->onUpdateOp(
-                    opCtx, stmt.getPreImageDocumentKey(), *updateDoc, {}, {});
-            }
-        } else if (opType == repl::OpTypeEnum::kDelete) {
-            if (isMigratingWithCSRLock(csr, csrLock, stmt.getObject())) {
-                msm->getCloner()->onDeleteOp(
-                    opCtx, getDocumentKey(opCtx, nss, stmt.getObject()), {}, {});
-            }
-        }
-    }
+    opCtx->recoveryUnit()->registerChange(new LogTransactionOperationsForShardingHandler(
+        opCtx->getServiceContext(), stmts, prepareOrCommitOptime));
 }
 
 }  // namespace mongo
