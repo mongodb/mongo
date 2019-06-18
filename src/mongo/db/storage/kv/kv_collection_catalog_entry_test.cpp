@@ -84,8 +84,14 @@ public:
             const bool allocateDefaultSpace = true;
             CollectionOptions options;
             options.uuid = UUID::gen();
-            ASSERT_OK(_storageEngine.getCatalog()->createCollection(
-                opCtx.get(), _nss, options, allocateDefaultSpace));
+            auto statusWithCatalogEntry = _storageEngine.getCatalog()->createCollection(
+                opCtx.get(), _nss, options, allocateDefaultSpace);
+            ASSERT_OK(statusWithCatalogEntry.getStatus());
+            auto collection = std::make_unique<CollectionMock>(_nss);
+            CollectionCatalog::get(opCtx.get())
+                .registerCollection(options.uuid.get(),
+                                    std::move(statusWithCatalogEntry.getValue()),
+                                    std::move(collection));
             wuow.commit();
         }
     }

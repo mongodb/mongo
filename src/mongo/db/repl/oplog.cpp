@@ -1990,13 +1990,6 @@ void initTimestampFromOplog(OperationContext* opCtx, const NamespaceString& oplo
     }
 }
 
-void oplogCheckCloseDatabase(OperationContext* opCtx, const Database* db) {
-    invariant(opCtx->lockState()->isW());
-    if (db->name() == "local") {
-        LocalOplogInfo::get(opCtx)->resetCollection();
-    }
-}
-
 void clearLocalOplogPtr() {
     LocalOplogInfo::get(getGlobalServiceContext())->resetCollection();
 }
