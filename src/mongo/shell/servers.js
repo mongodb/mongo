@@ -1118,8 +1118,14 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                             argArrayContains("logComponentVerbosity")) {
                             continue;
                         }
-                        const paramVal = params[paramName];
-                        const setParamStr = paramName + "=" + JSON.stringify(paramVal);
+                        const paramVal = ((param) => {
+                            if (typeof param === "object") {
+                                return JSON.stringify(param);
+                            }
+
+                            return param;
+                        })(params[paramName]);
+                        const setParamStr = paramName + "=" + paramVal;
                         argArray.push(...['--setParameter', setParamStr]);
                     }
                 }
@@ -1214,8 +1220,15 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                                 argArrayContains("logComponentVerbosity")) {
                                 continue;
                             }
-                            const paramVal = params[paramName];
-                            const setParamStr = paramName + "=" + JSON.stringify(paramVal);
+
+                            const paramVal = ((param) => {
+                                if (typeof param === "object") {
+                                    return JSON.stringify(param);
+                                }
+
+                                return param;
+                            })(params[paramName]);
+                            const setParamStr = paramName + "=" + paramVal;
                             argArray.push(...['--setParameter', setParamStr]);
                         }
                     }
