@@ -1406,22 +1406,26 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
         str::stream() << "definition of index '" << indexName << "' changed");
 
     // Delete the IndexCatalogEntry that owns this descriptor.  After deletion, 'oldDesc' is
-    // invalid and should not be dereferenced.
+    // invalid and should not be dereferenced. Also, invalidate the index from the
+    // CollectionInfoCache.
     IndexCatalogEntry* oldEntry = _entries.release(oldDesc);
     opCtx->recoveryUnit()->registerChange(
         new IndexRemoveChange(opCtx, _collection, &_entries, oldEntry));
+    _collection->infoCache()->droppedIndex(opCtx, indexName);
 
     // Ask the CollectionCatalogEntry for the new index spec.
     BSONObj spec = _collection->getCatalogEntry()->getIndexSpec(opCtx, indexName).getOwned();
     BSONObj keyPattern = spec.getObjectField("key");
 
-    // Re-register this index in the index catalog with the new spec.
+    // Re-register this index in the index catalog with the new spec. Also, add the new index
+    // to the CollectionInfoCache.
     auto newDesc = stdx::make_unique<IndexDescriptor>(
         _collection, _getAccessMethodName(opCtx, keyPattern), spec);
     const bool initFromDisk = false;
     const IndexCatalogEntry* newEntry =
         _setupInMemoryStructures(opCtx, std::move(newDesc), initFromDisk);
     invariant(newEntry->isReady(opCtx));
+    _collection->infoCache()->addedIndex(opCtx, newEntry->descriptor());
 
     // Return the new descriptor.
     return newEntry->descriptor();
