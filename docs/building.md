@@ -15,7 +15,7 @@ To build MongoDB, you will need:
       * `libcurl4-gnutls-dev`
 * Python 3.7.x and Pip modules:
   * See the section "Python Prerequisites" below.
-* About 600 GB of free disk space (for source code and to build all components).
+* About 13 GB of free disk space for the core binaries (`mongod`, `mongos`, and `mongo`) and about 600 GB for the all target.
 
 
 MongoDB supports the following architectures: arm64, ppc64le, s390x, and x86-64.
@@ -101,7 +101,7 @@ To install dependencies on Debian or Ubuntu systems:
 
 To run tests as well, you will need PyMongo:
 
-    # apt-get install python-pymongo
+    # apt-get install python3-pymongo
 
 OS X
 --------------
