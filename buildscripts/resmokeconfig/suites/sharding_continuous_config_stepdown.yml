@@ -199,6 +199,8 @@ selector:
   - jstests/sharding/merge_to_existing.js
   # Sets a failpoint on find commands which can lead to a hang when a config steps down.
   - jstests/sharding/sharding_statistics_server_status.js
+  # setShardVersion is not robust during config server stepdown.
+  - jstests/sharding/mongos_no_detect_sharding.js
 
 executor:
   config:
