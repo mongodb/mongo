@@ -91,8 +91,9 @@ public:
      * metadata object.
      *
      * The intended users of this method are callers which need to perform orphan filtering. Use
-     * 'getCurrentMetadata' for all other cases, where just sharding-related properties of the
-     * collection are necessary (e.g., isSharded or the shard key).
+     * 'getCurrentMetadata' for other cases, like obtaining information about sharding-related
+     * properties of the collection are necessary that won't change under collection IX/IS lock
+     * (e.g., isSharded or the shard key).
      *
      * The returned object is safe to access even after the collection lock has been dropped.
      */
@@ -154,6 +155,13 @@ protected:
 
 private:
     friend CSRLock;
+
+    /**
+     * Returns the latest version of collection metadata with filtering configured for
+     * atClusterTime if specified.
+     */
+    boost::optional<ScopedCollectionMetadata> _getMetadataWithVersionCheckAt(
+        OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime);
 
     // Object-wide ResourceMutex to protect changes to the CollectionShardingRuntime or objects
     // held within. Use only the CollectionShardingRuntimeLock to lock this mutex.

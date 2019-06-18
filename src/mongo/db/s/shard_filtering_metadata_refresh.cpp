@@ -153,8 +153,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     if (!cm) {
         // No chunk manager, so unsharded.
 
-        // Exclusive collection lock needed since we're now changing the metadata
-        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         CollectionShardingRuntime::get(opCtx, nss)
             ->setFilteringMetadata(opCtx, CollectionMetadata());
 
@@ -181,7 +180,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     }
 
     // Exclusive collection lock needed since we're now changing the metadata
-    AutoGetCollection autoColl(opCtx, nss, MODE_X);
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
     auto* const css = CollectionShardingRuntime::get(opCtx, nss);
 
     {

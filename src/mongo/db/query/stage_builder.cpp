@@ -307,11 +307,9 @@ PlanStage* buildStages(OperationContext* opCtx,
             if (nullptr == childStage) {
                 return nullptr;
             }
-            return new ShardFilterStage(
-                opCtx,
-                CollectionShardingState::get(opCtx, collection->ns())->getOrphansFilter(opCtx),
-                ws,
-                childStage);
+
+            auto css = CollectionShardingState::get(opCtx, collection->ns());
+            return new ShardFilterStage(opCtx, css->getOrphansFilter(opCtx), ws, childStage);
         }
         case STAGE_DISTINCT_SCAN: {
             const DistinctNode* dn = static_cast<const DistinctNode*>(root);

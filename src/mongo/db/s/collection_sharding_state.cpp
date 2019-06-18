@@ -160,12 +160,8 @@ void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* bu
 }
 
 ScopedCollectionMetadata CollectionShardingState::getOrphansFilter(OperationContext* opCtx) {
-    const auto receivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
-    if (!receivedShardVersion)
-        return {kUnshardedCollection};
-
     const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-    auto optMetadata = _getMetadata(atClusterTime);
+    auto optMetadata = _getMetadataWithVersionCheckAt(opCtx, atClusterTime);
 
     if (!optMetadata)
         return {kUnshardedCollection};
@@ -199,26 +195,34 @@ boost::optional<ChunkVersion> CollectionShardingState::getCurrentShardVersionIfK
 }
 
 void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) {
+    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none);
+}
+
+boost::optional<ScopedCollectionMetadata> CollectionShardingState::_getMetadataWithVersionCheckAt(
+    OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime) {
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
 
     if (!optReceivedShardVersion)
-        return;
+        return ScopedCollectionMetadata(kUnshardedCollection);
 
     const auto& receivedShardVersion = *optReceivedShardVersion;
     if (ChunkVersion::isIgnoredVersion(receivedShardVersion)) {
-        return;
+        return boost::none;
     }
 
     // An operation with read concern 'available' should never have shardVersion set.
     invariant(repl::ReadConcernArgs::get(opCtx).getLevel() !=
               repl::ReadConcernLevel::kAvailableReadConcern);
 
-    const auto metadata = getCurrentMetadata();
-    const auto wantedShardVersion =
-        metadata->isSharded() ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
+    auto csrLock = CSRLock::lockShared(opCtx, this);
+
+    auto metadata = _getMetadata(atClusterTime);
+    auto wantedShardVersion = ChunkVersion::UNSHARDED();
+    if (metadata && (*metadata)->isSharded()) {
+        wantedShardVersion = (*metadata)->getShardVersion();
+    }
 
     auto criticalSectionSignal = [&] {
-        auto csrLock = CSRLock::lockShared(opCtx, this);
         return _critSec.getSignal(opCtx->lockState()->isWriteLocked()
                                       ? ShardingMigrationCriticalSection::kWrite
                                       : ShardingMigrationCriticalSection::kRead);
@@ -235,7 +239,7 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
     }
 
     if (receivedShardVersion.isWriteCompatibleWith(wantedShardVersion)) {
-        return;
+        return metadata;
     }
 
     //

@@ -42,9 +42,10 @@ namespace {
 const auto getIsMigrating = OperationContext::declareDecoration<bool>();
 
 /**
- * Write operations do shard version checking, but do not perform orphan document filtering. Because
- * of this, if an update operation runs as part of a 'readConcern:snapshot' transaction, it might
- * get routed to a shard which no longer owns the chunk being written to. In such cases, throw a
+ * Write operations do shard version checking, but if an update operation runs as part of a
+ * 'readConcern:snapshot' transaction, the router could have used the metadata at the snapshot
+ * time and yet set the latest shard version on the request. This is why the write can get routed
+ * to a shard which no longer owns the chunk being written to. In such cases, throw a
  * MigrationConflict exception to indicate that the transaction needs to be rolled-back and
  * restarted.
  */
