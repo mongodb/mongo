@@ -49,7 +49,7 @@ using boost::intrusive_ptr;
 
 namespace dps = ::mongo::dotted_path_support;
 
-std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceGraphLookUp::liteParse(
+std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp::liteParse(
     const AggregationRequest& request, const BSONElement& spec) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "the $graphLookup stage specification must be an object, but found "
@@ -75,8 +75,7 @@ std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceGraphL
     PrivilegeVector privileges{
         Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)};
 
-    return std::make_unique<LiteParsedDocumentSourceForeignCollections>(std::move(nss),
-                                                                        std::move(privileges));
+    return std::make_unique<LiteParsed>(std::move(nss), std::move(privileges));
 }
 
 REGISTER_DOCUMENT_SOURCE(graphLookup,

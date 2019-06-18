@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because unsupported use of sharded collection
+// for target collection of $lookup and $graphLookup.
+// @tags: [assumes_unsharded_collection]
+
 /**
  * Tests that the $graphLookup stage respects the collation when matching between the
  * 'connectFromField' and the 'connectToField'.  $graphLookup should use the collation
@@ -56,11 +60,10 @@
     assert.eq("erica", res[0].username);
     assert.eq(0, res[0].friendUsers.length);
 
-    assert.commandWorked(db.runCommand({drop: coll.getName()}));
+    coll.drop();
     assert.commandWorked(db.createCollection(coll.getName(), caseInsensitiveUS));
     assert.writeOK(coll.insert({username: "erica", friends: ["jeremy", "jimmy"]}));
-    assert.commandWorkedOrFailedWithCode(db.runCommand({drop: foreignColl.getName()}),
-                                         ErrorCodes.NamespaceNotFound);
+    foreignColl.drop();
     assert.commandWorked(db.createCollection(foreignColl.getName(), caseSensitiveUS));
     assert.writeOK(foreignColl.insert([{username: "JEREMY"}, {username: "JIMMY"}]));
 
