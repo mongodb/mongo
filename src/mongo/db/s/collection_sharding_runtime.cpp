@@ -182,7 +182,6 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, Na
     : _nss(std::move(ns)), _opCtx(opCtx) {
     AutoGetCollection autoColl(_opCtx,
                                _nss,
-                               MODE_IX,
                                MODE_X,
                                AutoGetCollection::ViewMode::kViewsForbidden,
                                opCtx->getServiceContext()->getPreciseClockSource()->now() +
@@ -195,7 +194,7 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, Na
 
 CollectionCriticalSection::~CollectionCriticalSection() {
     UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX);
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
 
@@ -205,7 +204,6 @@ CollectionCriticalSection::~CollectionCriticalSection() {
 void CollectionCriticalSection::enterCommitPhase() {
     AutoGetCollection autoColl(_opCtx,
                                _nss,
-                               MODE_IX,
                                MODE_X,
                                AutoGetCollection::ViewMode::kViewsForbidden,
                                _opCtx->getServiceContext()->getPreciseClockSource()->now() +

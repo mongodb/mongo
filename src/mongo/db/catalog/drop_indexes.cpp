@@ -200,7 +200,7 @@ Status dropIndexes(OperationContext* opCtx,
                    const BSONObj& cmdObj,
                    BSONObjBuilder* result) {
     return writeConflictRetry(opCtx, "dropIndexes", nss.db(), [opCtx, &nss, &cmdObj, result] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
 
         bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);

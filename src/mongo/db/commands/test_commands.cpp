@@ -141,7 +141,7 @@ public:
         }
 
         // Lock the database in mode IX and lock the collection exclusively.
-        AutoGetCollection autoColl(opCtx, fullNs, MODE_IX, MODE_X);
+        AutoGetCollection autoColl(opCtx, fullNs, MODE_X);
         Collection* collection = autoColl.getCollection();
         if (!collection) {
             uasserted(ErrorCodes::NamespaceNotFound,

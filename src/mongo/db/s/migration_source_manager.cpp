@@ -255,14 +255,12 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
             autoColl.emplace(opCtx,
                              getNss(),
                              MODE_IX,
-                             MODE_IX,
                              AutoGetCollection::ViewMode::kViewsForbidden,
                              opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                  Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
         } else {
             autoColl.emplace(opCtx,
                              getNss(),
-                             MODE_IX,
                              MODE_X,
                              AutoGetCollection::ViewMode::kViewsForbidden,
                              opCtx->getServiceContext()->getPreciseClockSource()->now() +
@@ -474,7 +472,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         // this node can accept writes for this collection as a proxy for it being primary.
         if (!status.isOK()) {
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-            AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_IX);
+            AutoGetCollection autoColl(opCtx, getNss(), MODE_IX);
             if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, getNss())) {
                 CollectionShardingRuntime::get(opCtx, getNss())->clearFilteringMetadata();
                 uassertStatusOK(status.withContext(
@@ -510,7 +508,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
 
     if (!refreshStatus.isOK()) {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_IX);
+        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX);
 
         CollectionShardingRuntime::get(opCtx, getNss())->clearFilteringMetadata();
 
@@ -709,7 +707,7 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
     auto cloneDriver = [&]() {
         // Unregister from the collection's sharding state and exit the migration critical section.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_IX);
+        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX);
         auto* const csr = CollectionShardingRuntime::get(opCtx, getNss());
         auto csrLock = CollectionShardingState::CSRLock::lockExclusive(opCtx, csr);
 

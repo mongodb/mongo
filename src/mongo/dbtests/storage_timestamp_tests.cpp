@@ -463,7 +463,7 @@ public:
             static_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine())
                 ->getCatalog();
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
 
         // getCollectionIdent() returns the ident for the given namespace in the KVCatalog.
         // getAllIdents() actually looks in the RecordStore for a list of all idents, and is thus
@@ -692,7 +692,7 @@ public:
         NamespaceString nss("unittests.timestampedUpdates");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
         const std::uint32_t docsToInsert = 10;
         const LogicalTime firstInsertTime = _clock->reserveTicks(docsToInsert);
@@ -745,7 +745,7 @@ public:
         NamespaceString nss("unittests.timestampedUpdates");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
         const std::uint32_t docsToInsert = 10;
         const LogicalTime firstInsertTime = _clock->reserveTicks(docsToInsert);
@@ -802,7 +802,7 @@ public:
         NamespaceString nss("unittests.timestampedDeletes");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
         // Insert some documents.
         const std::int32_t docsToInsert = 10;
@@ -856,7 +856,7 @@ public:
         NamespaceString nss("unittests.timestampedUpdates");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
         // Insert one document that will go through a series of updates.
         const LogicalTime insertTime = _clock->reserveTicks(1);
@@ -926,7 +926,7 @@ public:
         NamespaceString nss("unittests.insertToUpsert");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
         const LogicalTime insertTime = _clock->reserveTicks(2);
 
@@ -985,7 +985,7 @@ public:
         NamespaceString nss("unittests.insertToUpsert");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
         // Reserve a timestamp before the inserts should happen.
         const LogicalTime preInsertTimestamp = _clock->reserveTicks(1);
@@ -1045,7 +1045,7 @@ public:
         NamespaceString nss("unitteTsts.insertToUpsert");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
         const LogicalTime preInsertTimestamp = _clock->reserveTicks(1);
         auto swResult = doAtomicApplyOps(nss.db().toString(),
@@ -1203,7 +1203,7 @@ public:
 
         {
             reset(nss1);
-            AutoGetCollection autoColl(_opCtx, nss1, LockMode::MODE_X, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss1, LockMode::MODE_IX);
 
             ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss2));
             { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection()); }
@@ -1325,7 +1325,7 @@ public:
         reset(nss);
         UUID uuid = UUID::gen();
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             uuid = autoColl.getCollection()->uuid().get();
         }
         auto indexName = "a_1";
@@ -1387,7 +1387,7 @@ public:
             writerPool.get());
         ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(oplogApplier.multiApply(_opCtx, ops)));
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         assertMultikeyPaths(
             _opCtx, autoColl.getCollection(), indexName, pastTime.asTimestamp(), false, {{}});
         assertMultikeyPaths(
@@ -1410,7 +1410,7 @@ public:
         reset(nss);
         UUID uuid = UUID::gen();
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             uuid = autoColl.getCollection()->uuid().get();
         }
         auto indexName = "a_1";
@@ -1500,7 +1500,7 @@ public:
         // Wait for the index build to finish before making any assertions.
         IndexBuildsCoordinator::get(_opCtx)->awaitNoIndexBuildInProgressForCollection(uuid);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
         // It is not valid to read the multikey state earlier than the 'minimumVisibleTimestamp',
         // so at least assert that it has been updated due to the index creation.
@@ -1531,7 +1531,7 @@ public:
         NamespaceString nss("unittests.PrimarySetIndexMultikeyOnInsert");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         auto indexName = "a_1";
         auto indexSpec =
             BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1) << "v"
@@ -1561,7 +1561,7 @@ public:
         NamespaceString nss("unittests.system.profile");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         auto indexName = "a_1";
         auto indexSpec =
             BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1) << "v"
@@ -1588,7 +1588,7 @@ public:
     void run() {
         NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
         reset(nss);
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         auto minValidColl = autoColl.getCollection();
 
         repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
@@ -1611,7 +1611,7 @@ public:
     void run() {
         NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
         reset(nss);
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         auto minValidColl = autoColl.getCollection();
 
         repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
@@ -1649,7 +1649,7 @@ public:
     void run() {
         NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
         reset(nss);
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         auto minValidColl = autoColl.getCollection();
 
         repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
@@ -1698,7 +1698,7 @@ public:
     void run() {
         NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
         reset(nss);
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         auto minValidColl = autoColl.getCollection();
 
         repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
@@ -1768,7 +1768,7 @@ public:
         std::string sysProfileIndexIdent;
         for (auto& tuple : {std::tie(nss, collIdent, indexIdent),
                             std::tie(sysProfile, sysProfileIdent, sysProfileIndexIdent)}) {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
 
             // Save the pre-state idents so we can capture the specific idents related to collection
             // creation.
@@ -1865,7 +1865,7 @@ public:
         NamespaceString nss("unittests.timestampIndexBuilds");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
 
         const LogicalTime insertTimestamp = _clock->reserveTicks(1);
         {
@@ -1988,7 +1988,7 @@ public:
         NamespaceString nss("unittests.timestampIndexBuildDrain");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
 
         // Build an index on `{a: 1}`.
         MultiIndexBlock indexer;
@@ -2133,7 +2133,7 @@ public:
 
         std::vector<std::string> origIdents;
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
 
             const LogicalTime insertTimestamp = _clock->reserveTicks(1);
 
@@ -2217,7 +2217,7 @@ public:
         reset(nss);
 
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
 
             const LogicalTime insertTimestamp = _clock->reserveTicks(1);
 
@@ -2244,7 +2244,7 @@ public:
             client.createIndexes(nss.ns(), indexes);
         }
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
 
         NamespaceString renamedNss("unittestsRename.timestampMultiIndexBuildsDuringRename");
         reset(renamedNss);
@@ -2325,7 +2325,7 @@ public:
         NamespaceString nss("unittests.timestampIndexDrops");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
 
         const LogicalTime insertTimestamp = _clock->reserveTicks(1);
         {
@@ -2510,7 +2510,7 @@ public:
         {
             // Create the collection and insert a document.
             reset(nss);
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             collUUID = *(autoColl.getCollection()->uuid());
             WriteUnitOfWork wuow(_opCtx);
             insertDocument(autoColl.getCollection(),
@@ -2541,7 +2541,7 @@ public:
             KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
             std::vector<std::string> origIdents;
             {
-                AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
+                AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
                 origIdents = kvCatalog->getAllIdents(_opCtx);
             }
 
@@ -2563,7 +2563,7 @@ public:
 
             ASSERT_OK(doAtomicApplyOps(nss.db().toString(), {createIndexOp}));
 
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
             const std::string indexIdent =
                 getNewIndexIdentAtTime(kvCatalog, origIdents, Timestamp::min());
             assertIdentsMissingAtTimestamp(
@@ -2681,7 +2681,7 @@ public:
         repl::OplogEntry indexOp(result);
         ASSERT_EQ(indexOp.getObject()["name"].str(), "user_1_db_1");
         ASSERT_GT(indexOp.getTimestamp(), futureTs) << op.toBSON();
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
         auto kvStorageEngine =
             dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
         KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
@@ -2708,7 +2708,7 @@ public:
         reset(nss);
         UUID ui = UUID::gen();
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             auto coll = autoColl.getCollection();
             ASSERT(coll);
             ui = coll->uuid().get();
@@ -2736,13 +2736,13 @@ public:
             _opCtx, *_opCtx->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             insertDocument(autoColl.getCollection(), InsertStatement(doc));
         }
         txnParticipant.stashTransactionResources(_opCtx);
 
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
             auto coll = autoColl.getCollection();
             assertDocumentAtTimestamp(coll, presentTs, BSONObj());
             assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
@@ -2808,7 +2808,7 @@ public:
         txnParticipant.stashTransactionResources(_opCtx);
         assertNoStartOpTime();
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             auto coll = autoColl.getCollection();
             assertDocumentAtTimestamp(coll, presentTs, BSONObj());
             assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
@@ -2858,14 +2858,14 @@ public:
 
         const BSONObj doc2 = BSON("_id" << 2 << "TestValue" << 2);
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             insertDocument(autoColl.getCollection(), InsertStatement(doc2));
         }
         txnParticipant.commitUnpreparedTransaction(_opCtx);
 
         txnParticipant.stashTransactionResources(_opCtx);
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             const BSONObj query1 = BSON("_id" << 1);
             const BSONObj query2 = BSON("_id" << 2);
             auto coll = autoColl.getCollection();
@@ -2973,7 +2973,7 @@ public:
         const auto prepareFilter = BSON("ts" << prepareEntryTs);
         const auto commitFilter = BSON("ts" << commitEntryTs);
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
             auto coll = autoColl.getCollection();
             assertDocumentAtTimestamp(coll, presentTs, BSONObj());
             assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
@@ -3003,7 +3003,7 @@ public:
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
         const BSONObj doc2 = BSON("_id" << 2 << "TestValue" << 2);
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             insertDocument(autoColl.getCollection(), InsertStatement(doc2));
         }
         txnParticipant.prepareTransaction(_opCtx, {});
@@ -3013,7 +3013,7 @@ public:
 
         txnParticipant.stashTransactionResources(_opCtx);
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
             auto coll = autoColl.getCollection();
             assertDocumentAtTimestamp(coll, presentTs, BSONObj());
             assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
@@ -3061,7 +3061,7 @@ public:
 
         txnParticipant.stashTransactionResources(_opCtx);
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             auto coll = autoColl.getCollection();
             assertDocumentAtTimestamp(coll, presentTs, BSONObj());
             assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
@@ -3225,7 +3225,7 @@ public:
 
             UUID ui = UUID::gen();
             {
-                AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+                AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
                 auto coll = autoColl.getCollection();
                 ASSERT(coll);
                 ui = coll->uuid().get();
@@ -3285,7 +3285,7 @@ public:
         logTimestamps();
 
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
             auto coll = autoColl.getCollection();
             assertDocumentAtTimestamp(coll, prepareTs, BSONObj());
             assertDocumentAtTimestamp(coll, commitEntryTs, BSONObj());
@@ -3339,7 +3339,7 @@ public:
 
         txnParticipant.stashTransactionResources(_opCtx);
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             auto coll = autoColl.getCollection();
             assertDocumentAtTimestamp(coll, presentTs, BSONObj());
             assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
@@ -3386,7 +3386,7 @@ public:
         logTimestamps();
 
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
             auto coll = autoColl.getCollection();
             assertDocumentAtTimestamp(coll, prepareTs, BSONObj());
             assertDocumentAtTimestamp(coll, abortEntryTs, BSONObj());
@@ -3436,7 +3436,7 @@ public:
 
         txnParticipant.stashTransactionResources(_opCtx);
         {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             auto coll = autoColl.getCollection();
             assertDocumentAtTimestamp(coll, presentTs, BSONObj());
             assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());

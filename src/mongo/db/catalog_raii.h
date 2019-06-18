@@ -73,8 +73,15 @@ private:
 };
 
 /**
- * RAII-style class, which acquires a locks on the specified database and collection in the
- * requested modes and obtains references to both.
+ * RAII-style class, which acquires global, database, and collection locks according to the chart
+ * below.
+ *
+ * | modeColl | Global Lock Result | DB Lock Result | Collection Lock Result |
+ * |----------+--------------------+----------------+------------------------|
+ * | MODE_IX  | MODE_IX            | MODE_IX        | MODE_IX                |
+ * | MODE_X   | MODE_IX            | MODE_IX        | MODE_X                 |
+ * | MODE_IS  | MODE_IS            | MODE_IS        | MODE_IS                |
+ * | MODE_S   | MODE_IS            | MODE_IS        | MODE_S                 |
  *
  * NOTE: Throws NamespaceNotFound if the collection UUID cannot be resolved to a name.
  *
@@ -90,14 +97,6 @@ public:
 
     AutoGetCollection(OperationContext* opCtx,
                       const NamespaceStringOrUUID& nsOrUUID,
-                      LockMode modeAll,
-                      ViewMode viewMode = kViewsForbidden,
-                      Date_t deadline = Date_t::max())
-        : AutoGetCollection(opCtx, nsOrUUID, modeAll, modeAll, viewMode, deadline) {}
-
-    AutoGetCollection(OperationContext* opCtx,
-                      const NamespaceStringOrUUID& nsOrUUID,
-                      LockMode modeDB,
                       LockMode modeColl,
                       ViewMode viewMode = kViewsForbidden,
                       Date_t deadline = Date_t::max());

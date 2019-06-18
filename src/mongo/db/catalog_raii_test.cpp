@@ -139,7 +139,6 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionCollLockDeadline) {
         [&] {
             AutoGetCollection coll(client2.second.get(),
                                    nss,
-                                   MODE_IX,
                                    MODE_X,
                                    AutoGetCollection::ViewMode::kViewsForbidden,
                                    Date_t::now() + timeoutMs);
@@ -155,7 +154,6 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDBLockDeadline) {
             AutoGetCollection coll(client2.second.get(),
                                    nss,
                                    MODE_X,
-                                   MODE_X,
                                    AutoGetCollection::ViewMode::kViewsForbidden,
                                    Date_t::now() + timeoutMs);
         },
@@ -170,7 +168,6 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionGlobalLockDeadline) {
         [&] {
             AutoGetCollection coll(client2.second.get(),
                                    nss,
-                                   MODE_X,
                                    MODE_X,
                                    AutoGetCollection::ViewMode::kViewsForbidden,
                                    Date_t::now() + timeoutMs);
@@ -188,7 +185,6 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineNow) {
         [&] {
             AutoGetCollection coll(client2.second.get(),
                                    nss,
-                                   MODE_IX,
                                    MODE_X,
                                    AutoGetCollection::ViewMode::kViewsForbidden,
                                    Date_t::now());
@@ -206,12 +202,18 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineMin) {
         [&] {
             AutoGetCollection coll(client2.second.get(),
                                    nss,
-                                   MODE_IX,
                                    MODE_X,
                                    AutoGetCollection::ViewMode::kViewsForbidden,
                                    Date_t());
         },
         Milliseconds(0));
+}
+
+TEST_F(CatalogRAIITestFixture, AutoGetCollectionDBLockCompatibleX) {
+    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+
+    AutoGetCollection coll(client2.second.get(), nss, MODE_X);
 }
 
 using ReadSource = RecoveryUnit::ReadSource;

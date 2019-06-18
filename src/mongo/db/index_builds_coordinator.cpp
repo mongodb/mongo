@@ -557,7 +557,7 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
                                     << "' because the collection no longer exists.");
     }
 
-    AutoGetCollection autoColl(opCtx, *nss, /*modeDB=*/MODE_IX, /*modeColl=*/MODE_X);
+    AutoGetCollection autoColl(opCtx, *nss, MODE_X);
     if (!autoColl.getDb()) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "Failed to create index(es) on collection '" << *nss
