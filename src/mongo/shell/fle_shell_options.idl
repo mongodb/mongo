@@ -1,0 +1,37 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+
+global:
+    cpp_namespace: "mongo"
+    configs:
+        section: 'FLE AWS Options'
+        source: [ cli ]
+    cpp_includes:
+        - mongo/shell/encrypted_shell_options.h
+
+configs:
+    "awsAccessKeyId":
+        description: "AWS Access Key for FLE Amazon KMS"
+        arg_vartype: String
+        cpp_varname: encryptedShellGlobalParams.awsAccessKeyId
+        requires: [ "awsSecretAccessKey", "keyVaultNamespace" ]
+    "awsSecretAccessKey":
+        description: "AWS Secret Key for FLE Amazon KMS"
+        arg_vartype: String
+        cpp_varname: encryptedShellGlobalParams.awsSecretAccessKey
+        redact: true
+        requires: [ "awsAccessKeyId", "keyVaultNamespace" ]
+    "awsSessionToken":
+        description: "Optional AWS Session Token ID"
+        arg_vartype: String
+        cpp_varname: encryptedShellGlobalParams.awsSessionToken
+        requires: [ "awsAccessKeyId", "awsSecretAccessKey", "keyVaultNamespace" ]
+    "keyVaultNamespace":
+        description: "database.collection to store encrypted FLE parameters"
+        arg_vartype: String
+        cpp_varname: encryptedShellGlobalParams.keyVaultNamespace
+        requires: [ "awsAccessKeyId", "awsSecretAccessKey" ]
+    "kmsURL":
+        description: "Test parameter to override the URL for KMS"
+        arg_vartype: String
+        cpp_varname: encryptedShellGlobalParams.awsKmsURL
+        requires: [ "awsAccessKeyId", "awsSecretAccessKey", "keyVaultNamespace" ]

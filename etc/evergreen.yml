@@ -7110,6 +7110,16 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
+  name: client_encrypt
+  tags: ["ssl"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=client_encrypt --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
   name: fle
   tags: ["encrypt"]
   commands:
@@ -10566,7 +10576,6 @@ buildvariants:
     distros:
       - rhel62-large
   - name: disk_wiredtiger
-  - name: fle
   - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common

@@ -76,3 +76,36 @@ env.CppUnitTest('mechanism_scram_test',
                     '$BUILD_DIR/mongo/base/secure_allocator',
                     'sha_block_${MONGO_CRYPTO}',
                 ])
+
+
+env.Library(target='symmetric_crypto',
+            source=[
+                'symmetric_crypto.cpp',
+                'symmetric_crypto_${MONGO_CRYPTO}.cpp',
+                'symmetric_key.cpp',
+            ],
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/base/secure_allocator',
+                '$BUILD_DIR/mongo/util/net/ssl_manager',
+                '$BUILD_DIR/mongo/util/secure_zero_memory',
+            ],
+)
+
+env.Library(
+    target="aead_encryption",
+    source=[
+        "aead_encryption.cpp",
+    ],
+    LIBDEPS=[
+        'symmetric_crypto',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+    ],
+)
+
+env.CppUnitTest(
+    target='aead_encryption_test',
+    source='aead_encryption_test.cpp',
+    LIBDEPS=[
+        'aead_encryption',
+    ]
+)

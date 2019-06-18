@@ -170,14 +170,12 @@ Status StorageEngineLockFile::writeString(StringData str) {
                     NULL) == FALSE) {
         int errorcode = GetLastError();
         return Status(ErrorCodes::FileStreamFailed,
-                      str::stream() << "Unable to write string " << str << " to file: "
-                                    << _filespec
+                      str::stream() << "Unable to write string " << str << " to file: " << _filespec
                                     << ' '
                                     << errnoWithDescription(errorcode));
     } else if (bytesWritten == 0) {
         return Status(ErrorCodes::FileStreamFailed,
-                      str::stream() << "Unable to write string " << str << " to file: "
-                                    << _filespec
+                      str::stream() << "Unable to write string " << str << " to file: " << _filespec
                                     << " no data written.");
     }
 
