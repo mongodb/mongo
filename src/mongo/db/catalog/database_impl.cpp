@@ -104,13 +104,6 @@ void uassertNamespaceNotIndex(StringData ns, StringData caller) {
             NamespaceString::normal(ns));
 }
 
-void DatabaseImpl::close(OperationContext* opCtx) const {
-    invariant(opCtx->lockState()->isW());
-
-    // Clear cache of oplog Collection pointer.
-    repl::oplogCheckCloseDatabase(opCtx, this);
-}
-
 Status DatabaseImpl::validateDBName(StringData dbname) {
     if (dbname.size() <= 0)
         return Status(ErrorCodes::BadValue, "db name is empty");
@@ -481,12 +474,19 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
     UUID uuid = *collection->uuid();
     log() << "Finishing collection drop for " << nss << " (" << uuid << ").";
 
-    CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
-    catalog.onDropCollection(opCtx, uuid);
-
     auto storageEngine =
         checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
-    return storageEngine->getCatalog()->dropCollection(opCtx, nss);
+    auto status = storageEngine->getCatalog()->dropCollection(opCtx, nss);
+    if (!status.isOK())
+        return status;
+
+    auto[removedColl, removedCatalogEntry] =
+        CollectionCatalog::get(opCtx).deregisterCollection(uuid);
+    opCtx->recoveryUnit()->registerChange(
+        CollectionCatalog::get(opCtx).makeFinishDropCollectionChange(
+            std::move(removedColl), std::move(removedCatalogEntry), uuid));
+
+    return Status::OK();
 }
 
 Collection* DatabaseImpl::getCollection(OperationContext* opCtx, const NamespaceString& nss) const {
@@ -665,22 +665,32 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     // Create CollectionCatalogEntry
     auto storageEngine =
         checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
-    massertStatusOK(storageEngine->getCatalog()->createCollection(
-        opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
+    auto statusWithCatalogEntry = storageEngine->getCatalog()->createCollection(
+        opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/);
+    massertStatusOK(statusWithCatalogEntry.getStatus());
+    std::unique_ptr<CollectionCatalogEntry> ownedCatalogEntry =
+        std::move(statusWithCatalogEntry.getValue());
 
     // Create Collection object
-    auto& catalog = CollectionCatalog::get(opCtx);
-    auto catalogEntry = catalog.lookupCollectionCatalogEntryByUUID(optionsWithUUID.uuid.get());
-    auto ownedCollection = Collection::Factory::get(opCtx)->make(opCtx, catalogEntry);
+    std::unique_ptr<Collection> ownedCollection =
+        Collection::Factory::get(opCtx)->make(opCtx, ownedCatalogEntry.get());
+    auto collection = ownedCollection.get();
     ownedCollection->init(opCtx);
-    Collection* collection = ownedCollection.get();
-    catalog.onCreateCollection(opCtx, std::move(ownedCollection), *(collection->uuid()));
+
     opCtx->recoveryUnit()->onCommit([collection](auto commitTime) {
         // Ban reading from this collection on committed reads on snapshots before now.
         if (commitTime)
             collection->setMinimumVisibleSnapshot(commitTime.get());
     });
 
+    auto& catalog = CollectionCatalog::get(opCtx);
+    auto uuid = ownedCollection->uuid().get();
+    catalog.registerCollection(uuid, std::move(ownedCatalogEntry), std::move(ownedCollection));
+    opCtx->recoveryUnit()->onRollback([uuid, &catalog] {
+        auto[removedColl, removedCatalogEntry] = catalog.deregisterCollection(uuid);
+        removedColl.reset();
+        removedCatalogEntry.reset();
+    });
 
     BSONObj fullIdIndexSpec;
 

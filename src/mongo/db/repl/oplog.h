@@ -145,8 +145,6 @@ OpTime logOp(OperationContext* opCtx,
              const OplogSlot& oplogSlot);
 
 // Flush out the cached pointer to the oplog.
-// Used by the closeDatabase command to ensure we don't cache closed things.
-void oplogCheckCloseDatabase(OperationContext* opCtx, const Database* db);
 void clearLocalOplogPtr();
 
 /**
