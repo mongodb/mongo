@@ -29,6 +29,9 @@ selector:
   # Expects DocumentValidationFailure which causes transaction to abort and retry indefinitely.
   - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
 
+  # Extracts error code from write error, which is obscured by runInsideTransaction.
+  - jstests/concurrency/fsm_workloads/access_collection_in_transaction_after_catalog_changes.js
+
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - requires_sharding
