@@ -128,11 +128,6 @@ add_option('lto',
     nargs=0,
 )
 
-add_option('dynamic-windows',
-    help='dynamically link on Windows',
-    nargs=0,
-)
-
 add_option('endian',
     choices=['big', 'little', 'auto'],
     default='auto',
@@ -1609,8 +1604,6 @@ elif env.TargetOSIs('openbsd'):
     env.Append( LIBS=[ "kvm" ] )
 
 elif env.TargetOSIs('windows'):
-    dynamicCRT = has_option("dynamic-windows")
-
     env['DIST_ARCHIVE_SUFFIX'] = '.zip'
 
     # If tools configuration fails to set up 'cl' in the path, fall back to importing the whole
@@ -1755,20 +1748,9 @@ elif env.TargetOSIs('windows'):
     env.Append( LINKFLAGS=["/DEBUG"] )
 
     # /MD:  use the multithreaded, DLL version of the run-time library (MSVCRT.lib/MSVCR###.DLL)
-    # /MT:  use the multithreaded, static version of the run-time library (LIBCMT.lib)
     # /MDd: Defines _DEBUG, _MT, _DLL, and uses MSVCRTD.lib/MSVCRD###.DLL
-    # /MTd: Defines _DEBUG, _MT, and causes your application to use the
-    #       debug multithread version of the run-time library (LIBCMTD.lib)
 
-    winRuntimeLibMap = {
-          #dyn   #dbg
-        ( False, False ) : "/MT",
-        ( False, True  ) : "/MTd",
-        ( True,  False ) : "/MD",
-        ( True,  True  ) : "/MDd",
-    }
-
-    env.Append(CCFLAGS=[winRuntimeLibMap[(dynamicCRT, debugBuild)]])
+    env.Append(CCFLAGS=["/MDd" if debugBuild else "/MD"])
 
     if optBuild:
         # /O1:  optimize for size
