@@ -622,6 +622,8 @@ if not has_option('noshell') and usemozjs:
             "shell_core",
             "db/server_options_core",
             "client/clientdriver_network",
+            "shell/kms_shell" if get_option('ssl') == 'on' else '',
+            "shell/encrypted_dbclient" if get_option('ssl') == 'on' else '',
             "$BUILD_DIR/mongo/util/password",
             '$BUILD_DIR/mongo/db/storage/duplicate_key_error_info',
             "$BUILD_DIR/mongo/db/views/resolved_view",

@@ -1,0 +1,19 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/client_encrypt/*.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands
+      ssl: ''
+      tlsAllowInvalidHostnames: ''
+      tlsAllowInvalidCertificates: ''
+      tlsCAFile: jstests/libs/ca.pem
+      tlsCertificateKeyFile: jstests/libs/client.pem
+  hooks:
+  - class: CleanEveryN
+    n: 20

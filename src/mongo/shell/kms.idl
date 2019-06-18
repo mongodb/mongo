@@ -1,0 +1,164 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+enums:
+    KMSProvider:
+        description: "Enumeration of supported KMS Providers"
+        type: string
+        values:
+            aws: "aws"
+            local: "local"
+
+structs:
+    awsKMSError:
+        description: "AWS KMS error"
+        fields:
+          __type:
+            type: string
+            cpp_name: type
+          message: string
+
+    # Options passed to Mongo() javascript constructor
+    awsKMS:
+        description: "AWS KMS config"
+        fields:
+          accessKeyId: string
+          secretAccessKey: string
+          sessionToken:
+            type: string
+            optional: true
+          url:
+            type: string
+            optional: true
+
+    # Options passed to Mongo() javascript constructor
+    localKMS:
+        description: "Local KMS config"
+        fields:
+          key: bindata_generic
+
+    kmsProviders:
+      description: "Supported KMS Providers"
+      strict: true
+      fields:
+        aws:
+          type: awsKMS
+          optional: true
+        local:
+          type: localKMS
+          optional: true
+
+    clientSideFLEOptions:
+        description: "FLE Options inputted through the Mongo constructor in the shell"
+        fields:
+          keyVaultClient: #Parsed as a JSHandleValue, not through IDL
+            type: void
+            ignore: true
+          keyVaultNamespace:
+            type: string
+          kmsProviders: kmsProviders
+          schemaMap:
+            type: object
+          bypassAutoEncryption:
+            type: bool
+            optional: true
+
+    awsEncryptResponse:
+        description: "Response from AWS KMS Encrypt request, i.e. TrentService.Encrypt"
+        fields:
+          CiphertextBlob:
+            type: string
+          KeyId:
+            type: string
+
+    awsDecryptResponse:
+        description: "Response from AWS KMS Decrypt request, i.e. TrentService.Decrypt"
+        fields:
+          Plaintext:
+            type: string
+          KeyId:
+            type: string
+
+    awsMasterKey:
+        description: "AWS KMS Key Store Description"
+        fields:
+          provider:
+            type: string
+            default: '"aws"'
+          key:
+            type: string
+          region:
+            type: string
+          endpoint:
+            type: string
+
+    awsMasterKeyAndMaterial:
+        description: "AWS KMS Key Material Description"
+        fields:
+          keyMaterial:
+            type: bindata_generic
+          masterKey:
+            type: awsMasterKey
+
+    localMasterKey:
+        description: "Local KMS Key Store Description"
+        fields:
+          provider:
+            type: string
+            default: '"local"'
+
+    localMasterKeyAndMaterial:
+        description: "Local KMS Key Material Description"
+        fields:
+          keyMaterial:
+            type: bindata_generic
+          masterKey:
+            type: localMasterKey
+
+    keyStoreRecord:
+        description: "A V0 Key Store Record"
+        fields:
+          _id: uuid
+          keyMaterial: bindata_generic
+          creationDate: date
+          updateDate: date
+          status: int
+          version:
+            type: long
+            default: 0
+          masterKey: object
+          keyAltNames:
+              type: array<string>
+              ignore: true
+

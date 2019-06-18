@@ -1,6 +1,9 @@
 # -*- mode: python; -*-
 
-Import("env")
+Import([
+    'env',
+    'get_option'
+])
 
 env = env.Clone()
 
@@ -61,7 +64,8 @@ env.JSHeader(
         "shardingtest.js",
         "servers_misc.js",
         "replsettest.js",
-        "bridge.js"
+        "bridge.js",
+        "keyvault.js",
     ],
 )
 
@@ -146,4 +150,70 @@ env.CppUnitTest(
         'shell_utils',
         '$BUILD_DIR/mongo/util/signal_handlers',
     ]
+)
+
+kmsEnv = env.Clone()
+
+kmsEnv.InjectThirdParty(libraries=['kms-message'])
+
+kmsEnv.Library(
+    target="kms",
+    source=[
+        "kms.cpp",
+        "kms_aws.cpp",
+        "kms_local.cpp",
+        kmsEnv.Idlc("kms.idl")[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base/secure_allocator',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/crypto/aead_encryption',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/net/socket',
+        '$BUILD_DIR/mongo/util/net/ssl_manager',
+        '$BUILD_DIR/mongo/util/net/ssl_options',
+        '$BUILD_DIR/third_party/shim_kms_message',
+    ],
+)
+
+env.CppUnitTest(
+    target='kms_test',
+    source='kms_test.cpp',
+    LIBDEPS=[
+        'kms',
+    ]
+)
+
+env.Library(
+    target="kms_shell",
+    source=[
+        "kms_shell.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/shell_core',
+        'kms',
+    ],
+)
+
+scriptingEnv = env.Clone()
+scriptingEnv.InjectMozJS()
+
+scriptingEnv.Library(
+    target="encrypted_dbclient",
+    source=[
+        "encrypted_dbclient_base.cpp",
+        scriptingEnv.Idlc("fle_shell_options.idl")[0],
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/crypto/aead_encryption',
+        '$BUILD_DIR/mongo/crypto/symmetric_crypto',
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
+        '$BUILD_DIR/mongo/scripting/scripting',
+        '$BUILD_DIR/mongo/shell/shell_options_register',
+        '$BUILD_DIR/third_party/shim_mozjs',
+        'kms',
+    ],
 )
