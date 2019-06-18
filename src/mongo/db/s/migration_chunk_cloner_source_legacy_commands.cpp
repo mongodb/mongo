@@ -76,7 +76,7 @@ public:
 
         {
             auto csr = CollectionShardingRuntime::get(opCtx, *nss);
-            auto csrLock = CollectionShardingRuntime::CSRLock::lock(opCtx, csr);
+            auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
             if (auto msm = MigrationSourceManager::get(csr, csrLock)) {
                 // It is now safe to access the cloner

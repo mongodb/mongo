@@ -218,7 +218,7 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
         metadata->isSharded() ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
     auto criticalSectionSignal = [&] {
-        auto csrLock = CSRLock::lock(opCtx, this);
+        auto csrLock = CSRLock::lockShared(opCtx, this);
         return _critSec.getSignal(opCtx->lockState()->isWriteLocked()
                                       ? ShardingMigrationCriticalSection::kWrite
                                       : ShardingMigrationCriticalSection::kRead);

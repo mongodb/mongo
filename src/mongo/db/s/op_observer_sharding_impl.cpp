@@ -80,7 +80,7 @@ bool OpObserverShardingImpl::isMigrating(OperationContext* opCtx,
                                          NamespaceString const& nss,
                                          BSONObj const& docToDelete) {
     auto csr = CollectionShardingRuntime::get(opCtx, nss);
-    auto csrLock = CollectionShardingRuntime::CSRLock::lock(opCtx, csr);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
     return isMigratingWithCSRLock(csr, csrLock, docToDelete);
 }
 
@@ -111,7 +111,7 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
         return;
     }
 
-    auto csrLock = CollectionShardingRuntime::CSRLock::lock(opCtx, csr);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
     auto msm = MigrationSourceManager::get(csr, csrLock);
     if (msm) {
         msm->getCloner()->onInsertOp(opCtx, insertedDoc, opTime);
@@ -133,7 +133,7 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
         return;
     }
 
-    auto csrLock = CollectionShardingRuntime::CSRLock::lock(opCtx, csr);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
     auto msm = MigrationSourceManager::get(csr, csrLock);
     if (msm) {
         msm->getCloner()->onUpdateOp(opCtx, preImageDoc, postImageDoc, opTime, prePostImageOpTime);
@@ -154,7 +154,7 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
         return;
     }
 
-    auto csrLock = CollectionShardingRuntime::CSRLock::lock(opCtx, csr);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
     auto msm = MigrationSourceManager::get(csr, csrLock);
 
     if (msm && getIsMigrating(opCtx)) {

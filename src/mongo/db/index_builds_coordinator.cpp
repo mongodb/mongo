@@ -919,7 +919,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, nss.db());
     if (db) {
         auto& dss = DatabaseShardingState::get(db);
-        auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
         dss.checkDbVersion(opCtx, dssLock);
     }
 

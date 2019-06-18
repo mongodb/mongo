@@ -47,7 +47,8 @@ public:
      * Locks the sharding state object with the sharding state object's ResourceMutex in MODE_IS.
      * When the object goes out of scope, the ResourceMutex will be unlocked.
      */
-    static ShardingStateLock<ShardingState> lock(OperationContext* opCtx, ShardingState* state);
+    static ShardingStateLock<ShardingState> lockShared(OperationContext* opCtx,
+                                                       ShardingState* state);
 
     /**
      * Follows the same functionality as the ShardingStateLock lock method, except that
@@ -81,8 +82,8 @@ ShardingStateLock<ShardingState>::ShardingStateLock(OperationContext* opCtx,
       }()) {}
 
 template <class ShardingState>
-ShardingStateLock<ShardingState> ShardingStateLock<ShardingState>::lock(OperationContext* opCtx,
-                                                                        ShardingState* state) {
+ShardingStateLock<ShardingState> ShardingStateLock<ShardingState>::lockShared(
+    OperationContext* opCtx, ShardingState* state) {
     return ShardingStateLock(opCtx, state, MODE_IS);
 }
 
