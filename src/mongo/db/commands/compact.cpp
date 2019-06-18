@@ -42,8 +42,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/views/view_catalog.h"
@@ -117,34 +115,7 @@ public:
         if (cmdObj.hasElement("validate"))
             compactOptions.validateDocuments = cmdObj["validate"].trueValue();
 
-        AutoGetDb autoDb(opCtx, db, MODE_X);
-        Database* const collDB = autoDb.getDb();
-
-        Collection* collection = collDB ? collDB->getCollection(opCtx, nss) : nullptr;
-        auto view =
-            collDB && !collection ? ViewCatalog::get(collDB)->lookup(opCtx, nss.ns()) : nullptr;
-
-        // If db/collection does not exist, short circuit and return.
-        if (!collDB || !collection) {
-            if (view)
-                uasserted(ErrorCodes::CommandNotSupportedOnView, "can't compact a view");
-            else
-                uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
-        }
-
-        OldClientContext ctx(opCtx, nss.ns());
-        BackgroundOperation::assertNoBgOpInProgForNs(nss.ns());
-        invariant(collection->uuid());
-        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-            collection->uuid().get());
-
-        log() << "compact " << nss.ns() << " begin, options: " << compactOptions;
-
-        StatusWith<CompactStats> status = compactCollection(opCtx, collection, &compactOptions);
-        uassertStatusOK(status.getStatus());
-
-        log() << "compact " << nss.ns() << " end";
-
+        uassertStatusOK(compactCollection(opCtx, nss, &compactOptions));
         return true;
     }
 };

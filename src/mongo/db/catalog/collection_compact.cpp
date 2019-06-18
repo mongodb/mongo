@@ -31,22 +31,58 @@
 
 #include "mongo/db/catalog/collection_compact.h"
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/multi_index_block.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
-                                           Collection* collection,
-                                           const CompactOptions* compactOptions) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
+using logger::LogComponent;
 
+namespace {
+
+Collection* getCollectionForCompact(OperationContext* opCtx,
+                                    Database* database,
+                                    const NamespaceString& collectionNss) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(collectionNss, MODE_IX));
+
+    CollectionCatalog& collectionCatalog = CollectionCatalog::get(opCtx);
+    Collection* collection = collectionCatalog.lookupCollectionByNamespace(collectionNss);
+
+    if (!collection) {
+        std::shared_ptr<ViewDefinition> view =
+            ViewCatalog::get(database)->lookup(opCtx, collectionNss.ns());
+        uassert(ErrorCodes::CommandNotSupportedOnView, "can't compact a view", !view);
+        uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
+    }
+
+    return collection;
+}
+
+}  // namespace
+
+StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
+                                           const NamespaceString& collectionNss,
+                                           const CompactOptions* compactOptions) {
+    AutoGetDb autoDb(opCtx, collectionNss.db(), MODE_IX);
+    Database* database = autoDb.getDb();
+    uassert(ErrorCodes::NamespaceNotFound, "database does not exist", database);
+
+    // The collection lock will be downgraded to an intent lock if the record store supports
+    // online compaction.
+    boost::optional<Lock::CollectionLock> collLk;
+    collLk.emplace(opCtx, collectionNss, MODE_X);
+
+    Collection* collection = getCollectionForCompact(opCtx, database, collectionNss);
     DisableDocumentValidation validationDisabler(opCtx);
 
     auto recordStore = collection->getRecordStore();
@@ -57,6 +93,19 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
                                         str::stream()
                                             << "cannot compact collection with record store: "
                                             << recordStore->name());
+
+    if (recordStore->supportsOnlineCompaction()) {
+        // Storage engines that allow online compaction should do so using an intent lock on the
+        // collection.
+        collLk.emplace(opCtx, collectionNss, MODE_IX);
+
+        // Ensure the collection was not dropped during the re-lock.
+        collection = getCollectionForCompact(opCtx, database, collectionNss);
+    }
+
+    OldClientContext ctx(opCtx, collectionNss.ns());
+    log(LogComponent::kCommand) << "compact " << collectionNss
+                                << " begin, options: " << *compactOptions;
 
     if (recordStore->compactsInPlace()) {
         CompactStats stats;
@@ -69,12 +118,17 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
         if (!status.isOK())
             return StatusWith<CompactStats>(status);
 
+        log() << "compact " << collectionNss << " end";
         return StatusWith<CompactStats>(stats);
     }
 
-    if (indexCatalog->numIndexesInProgress(opCtx))
-        return StatusWith<CompactStats>(ErrorCodes::BadValue,
-                                        "cannot compact when indexes in progress");
+    invariant(opCtx->lockState()->isCollectionLockedForMode(collectionNss, MODE_X));
+
+    // If the storage engine doesn't support compacting in place, make sure no background operations
+    // or indexes are running.
+    const UUID collectionUUID = collection->uuid().get();
+    BackgroundOperation::assertNoBgOpInProgForNs(collectionNss);
+    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collectionUUID);
 
     std::vector<BSONObj> indexSpecs;
     {
@@ -148,6 +202,7 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
         wunit.commit();
     }
 
+    log() << "compact " << collectionNss << " end";
     return StatusWith<CompactStats>(stats);
 }
 

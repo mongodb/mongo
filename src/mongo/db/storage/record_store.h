@@ -488,6 +488,15 @@ public:
     }
 
     /**
+     * If compact() supports online compaction.
+     *
+     * Only called if compactSupported() returns true.
+     */
+    virtual bool supportsOnlineCompaction() const {
+        MONGO_UNREACHABLE;
+    }
+
+    /**
      * Attempt to reduce the storage space used by this RecordStore.
      *
      * Only called if compactSupported() returns true.

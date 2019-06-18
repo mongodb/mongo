@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {
@@ -40,7 +39,7 @@ namespace mongo {
   * See record_store.h for CompactStats and CompactOptions definitions.
   */
 StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
-                                           Collection* collection,
+                                           const NamespaceString& collectionNss,
                                            const CompactOptions* options);
 
 }  // namespace mongo

@@ -55,7 +55,7 @@ selector:
 
   # compact can only be run against a standalone mongod
   - jstests/concurrency/fsm_workloads/compact.js
-  - jstests/concurrency/fsm_workloads/compact_simultaneous_padding_bytes.js
+  - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
   # convertToCapped can't be run on mongos processes
   - jstests/concurrency/fsm_workloads/convert_to_capped_collection.js

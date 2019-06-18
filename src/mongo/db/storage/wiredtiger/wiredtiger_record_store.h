@@ -178,6 +178,9 @@ public:
     virtual bool compactsInPlace() const {
         return true;
     }
+    virtual bool supportsOnlineCompaction() const {
+        return true;
+    }
 
     virtual Timestamp getPinnedOplog() const final;
 
