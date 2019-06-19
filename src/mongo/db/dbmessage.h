@@ -445,11 +445,8 @@ Message makeGetMoreMessage(StringData ns, long long cursorId, int nToReturn, int
 struct DbResponse {
     Message response;       // If empty, nothing will be returned to the client.
     std::string exhaustNS;  // Namespace of cursor if exhaust mode, else "".
-
-    /**
-     * Cursor ID when running on exhaust mode. Defaults to '0', indicating
-     * that the cursor is exhausted.
-     */
+    // Cursor ID when running on exhaust mode. Defaults to '0', indicating
+    // that the cursor is exhausted.
     long long exhaustCursorId = 0;
 };
 
