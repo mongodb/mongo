@@ -87,10 +87,12 @@ Status ViewCatalog::reloadIfNeeded(OperationContext* opCtx) {
         NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
         MODE_IS);
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    return _reloadIfNeeded(lk, opCtx);
+    return _reloadIfNeeded(lk, opCtx, ViewCatalogLookupBehavior::kValidateDurableViews);
 }
 
-Status ViewCatalog::_reloadIfNeeded(WithLock lk, OperationContext* opCtx) {
+Status ViewCatalog::_reloadIfNeeded(WithLock lk,
+                                    OperationContext* opCtx,
+                                    ViewCatalogLookupBehavior lookupBehavior) {
     if (_valid.load())
         return Status::OK();
 
@@ -99,7 +101,7 @@ Status ViewCatalog::_reloadIfNeeded(WithLock lk, OperationContext* opCtx) {
     // Need to reload, first clear our cache.
     _viewMap.clear();
 
-    Status status = _durable->iterate(opCtx, [&](const BSONObj& view) -> Status {
+    auto reloadCallback = [&](const BSONObj& view) -> Status {
         BSONObj collationSpec = view.hasField("collation") ? view["collation"].Obj() : BSONObj();
         auto collator = parseCollator(opCtx, collationSpec);
         if (!collator.isOK()) {
@@ -125,15 +127,25 @@ Status ViewCatalog::_reloadIfNeeded(WithLock lk, OperationContext* opCtx) {
                                                                    pipeline,
                                                                    std::move(collator.getValue()));
         return Status::OK();
-    });
-    _valid.store(status.isOK());
+    };
 
-    if (!status.isOK()) {
+    try {
+        if (lookupBehavior == ViewCatalogLookupBehavior::kValidateDurableViews) {
+            _durable->iterate(opCtx, reloadCallback);
+        } else if (lookupBehavior == ViewCatalogLookupBehavior::kAllowInvalidDurableViews) {
+            _durable->iterateIgnoreInvalidEntries(opCtx, reloadCallback);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    } catch (const DBException& ex) {
+        auto status = ex.toStatus();
         LOG(0) << "could not load view catalog for database " << _durable->getName() << ": "
                << status;
+        return status;
     }
 
-    return status;
+    _valid.store(true);
+    return Status::OK();
 }
 
 void ViewCatalog::iterate(OperationContext* opCtx, ViewIteratorCallback callback) {
@@ -142,7 +154,7 @@ void ViewCatalog::iterate(OperationContext* opCtx, ViewIteratorCallback callback
         NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
         MODE_IS);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    uassertStatusOK(_reloadIfNeeded(lk, opCtx));
+    uassertStatusOK(_reloadIfNeeded(lk, opCtx, ViewCatalogLookupBehavior::kValidateDurableViews));
     for (auto&& view : _viewMap) {
         callback(*view.second);
     }
@@ -324,7 +336,8 @@ Status ViewCatalog::_validateCollation(WithLock lk,
                                        const ViewDefinition& view,
                                        const std::vector<NamespaceString>& refs) {
     for (auto&& potentialViewNss : refs) {
-        auto otherView = _lookup(lk, opCtx, potentialViewNss.ns());
+        auto otherView = _lookup(
+            lk, opCtx, potentialViewNss.ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
         if (otherView &&
             !CollatorInterface::collatorsMatch(view.defaultCollator(),
                                                otherView->defaultCollator())) {
@@ -354,7 +367,8 @@ Status ViewCatalog::createView(OperationContext* opCtx,
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
-    if (_lookup(lk, opCtx, StringData(viewName.ns())))
+    if (_lookup(
+            lk, opCtx, StringData(viewName.ns()), ViewCatalogLookupBehavior::kValidateDurableViews))
         return Status(ErrorCodes::NamespaceExists, "Namespace already exists");
 
     if (!NamespaceString::validCollectionName(viewOn.coll()))
@@ -386,7 +400,8 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
-    auto viewPtr = _lookup(lk, opCtx, viewName.ns());
+    auto viewPtr =
+        _lookup(lk, opCtx, viewName.ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
     if (!viewPtr)
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "cannot modify missing view " << viewName.ns());
@@ -418,7 +433,8 @@ Status ViewCatalog::dropView(OperationContext* opCtx, const NamespaceString& vie
     _requireValidCatalog(lk, opCtx);
 
     // Save a copy of the view definition in case we need to roll back.
-    auto viewPtr = _lookup(lk, opCtx, viewName.ns());
+    auto viewPtr =
+        _lookup(lk, opCtx, viewName.ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
     if (!viewPtr) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "cannot drop missing view: " << viewName.ns()};
@@ -443,7 +459,8 @@ Status ViewCatalog::dropView(OperationContext* opCtx, const NamespaceString& vie
 
 std::shared_ptr<ViewDefinition> ViewCatalog::_lookup(WithLock lk,
                                                      OperationContext* opCtx,
-                                                     StringData ns) {
+                                                     StringData ns,
+                                                     ViewCatalogLookupBehavior lookupBehavior) {
     // We expect the catalog to be valid, so short-circuit other checks for best performance.
     if (MONGO_unlikely(!_valid.load())) {
         // If the catalog is invalid, we want to avoid references to virtualized or other invalid
@@ -451,7 +468,7 @@ std::shared_ptr<ViewDefinition> ViewCatalog::_lookup(WithLock lk,
         // invalid view definitions.
         if (!NamespaceString::validCollectionName(ns))
             return nullptr;
-        Status status = _reloadIfNeeded(lk, opCtx);
+        Status status = _reloadIfNeeded(lk, opCtx, lookupBehavior);
         // In case of errors we've already logged a message. Only uassert if there actually is
         // a user connection, as otherwise we'd crash the server. The catalog will remain invalid,
         // and any views after the first invalid one are ignored.
@@ -472,7 +489,17 @@ std::shared_ptr<ViewDefinition> ViewCatalog::lookup(OperationContext* opCtx, Str
         NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
         MODE_IS);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _lookup(lk, opCtx, ns);
+    return _lookup(lk, opCtx, ns, ViewCatalogLookupBehavior::kValidateDurableViews);
+}
+
+std::shared_ptr<ViewDefinition> ViewCatalog::lookupWithoutValidatingDurableViews(
+    OperationContext* opCtx, StringData ns) {
+    Lock::CollectionLock systemViewsLock(
+        opCtx,
+        NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
+        MODE_IS);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _lookup(lk, opCtx, ns, ViewCatalogLookupBehavior::kAllowInvalidDurableViews);
 }
 
 StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
@@ -504,11 +531,13 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
         for (; depth < ViewGraph::kMaxViewDepth; depth++) {
             // If the catalog has been invalidated, bail and restart.
             if (!_valid.load()) {
-                uassertStatusOK(_reloadIfNeeded(lock, opCtx));
+                uassertStatusOK(
+                    _reloadIfNeeded(lock, opCtx, ViewCatalogLookupBehavior::kValidateDurableViews));
                 break;
             }
 
-            auto view = _lookup(lock, opCtx, resolvedNss->ns());
+            auto view = _lookup(
+                lock, opCtx, resolvedNss->ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
             if (!view) {
                 // Return error status if pipeline is too large.
                 int pipelineSize = 0;

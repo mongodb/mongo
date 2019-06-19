@@ -78,10 +78,12 @@ public:
     explicit DurableViewCatalogDummy() : _upsertCount(0), _iterateCount(0) {}
     static const std::string name;
 
-    using Callback = stdx::function<Status(const BSONObj& view)>;
-    virtual Status iterate(OperationContext* opCtx, Callback callback) {
+    using Callback = std::function<Status(const BSONObj& view)>;
+    virtual void iterate(OperationContext* opCtx, Callback callback) {
         ++_iterateCount;
-        return Status::OK();
+    }
+    virtual void iterateIgnoreInvalidEntries(OperationContext* opCtx, Callback callback) {
+        ++_iterateCount;
     }
     virtual void upsert(OperationContext* opCtx, const NamespaceString& name, const BSONObj& view) {
         ++_upsertCount;

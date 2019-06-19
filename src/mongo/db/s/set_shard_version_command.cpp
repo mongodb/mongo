@@ -222,14 +222,16 @@ public:
                     repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
                                                                                          nss.db()));
 
-            // Views do not require a shard version check.
-            if (autoDb->getDb() && !autoDb->getDb()->getCollection(opCtx, nss) &&
-                ViewCatalog::get(autoDb->getDb())->lookup(opCtx, nss.ns())) {
-                return true;
-            }
-
             boost::optional<Lock::CollectionLock> collLock;
             collLock.emplace(opCtx, nss, MODE_IS);
+
+            // Views do not require a shard version check. We do not care about invalid system views
+            // for this check, only to validate if a view already exists for this namespace.
+            if (autoDb->getDb() && !autoDb->getDb()->getCollection(opCtx, nss) &&
+                ViewCatalog::get(autoDb->getDb())
+                    ->lookupWithoutValidatingDurableViews(opCtx, nss.ns())) {
+                return true;
+            }
 
             auto* const css = CollectionShardingState::get(opCtx, nss);
             const ChunkVersion collectionShardVersion = [&] {

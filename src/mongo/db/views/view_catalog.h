@@ -119,6 +119,13 @@ public:
     std::shared_ptr<ViewDefinition> lookup(OperationContext* opCtx, StringData nss);
 
     /**
+     * Same functionality as above, except this function skips validating durable views in the view
+     * catalog.
+     */
+    std::shared_ptr<ViewDefinition> lookupWithoutValidatingDurableViews(OperationContext* opCtx,
+                                                                        StringData nss);
+
+    /**
      * Resolve the views on 'nss', transforming the pipeline appropriately. This function returns a
      * fully-resolved view definition containing the backing namespace, the resolved pipeline and
      * the collation to use for the operation.
@@ -172,11 +179,17 @@ private:
                               const ViewDefinition& view,
                               const std::vector<NamespaceString>& refs);
 
-    std::shared_ptr<ViewDefinition> _lookup(WithLock, OperationContext* opCtx, StringData ns);
-    Status _reloadIfNeeded(WithLock, OperationContext* opCtx);
+    std::shared_ptr<ViewDefinition> _lookup(WithLock,
+                                            OperationContext* opCtx,
+                                            StringData ns,
+                                            ViewCatalogLookupBehavior lookupBehavior);
+    Status _reloadIfNeeded(WithLock,
+                           OperationContext* opCtx,
+                           ViewCatalogLookupBehavior lookupBehavior);
 
     void _requireValidCatalog(WithLock lk, OperationContext* opCtx) {
-        uassertStatusOK(_reloadIfNeeded(lk, opCtx));
+        uassertStatusOK(
+            _reloadIfNeeded(lk, opCtx, ViewCatalogLookupBehavior::kValidateDurableViews));
         invariant(_valid.load());
     }
 

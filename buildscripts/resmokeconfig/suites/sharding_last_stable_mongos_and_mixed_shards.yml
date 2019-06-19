@@ -60,6 +60,7 @@ selector:
   - jstests/sharding/failcommand_ignores_internal.js
   - jstests/sharding/geo_near_random1.js
   - jstests/sharding/geo_near_random2.js
+  - jstests/sharding/invalid_system_views_sharded_collection.js
   - jstests/sharding/lookup.js
   - jstests/sharding/lookup_mongod_unaware.js
   - jstests/sharding/lookup_on_shard.js
