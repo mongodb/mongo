@@ -754,7 +754,18 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
         return {};  // Don't reply.
     }
 
-    return DbResponse{reply->done()};
+    DbResponse dbResponse;
+    if (OpMsg::isFlagSet(m, OpMsg::kExhaustSupported)) {
+        auto responseObj = reply->getBodyBuilder().asTempObj();
+        auto cursorObj = responseObj.getObjectField("cursor");
+        if (responseObj.getField("ok").trueValue() && !cursorObj.isEmpty()) {
+            dbResponse.exhaustNS = cursorObj.getField("ns").String();
+            dbResponse.exhaustCursorId = cursorObj.getField("id").numberLong();
+        }
+    }
+    dbResponse.response = reply->done();
+
+    return dbResponse;
 }
 
 void Strategy::commandOp(OperationContext* opCtx,

@@ -1006,11 +1006,21 @@ DbResponse receivedCommands(OperationContext* opCtx,
         return {};  // Don't reply.
     }
 
-    auto response = replyBuilder->done();
-    CurOp::get(opCtx)->debug().responseLength = response.header().dataLen();
+    DbResponse dbResponse;
 
-    // TODO exhaust
-    return DbResponse{std::move(response)};
+    if (OpMsg::isFlagSet(message, OpMsg::kExhaustSupported)) {
+        auto responseObj = replyBuilder->getBodyBuilder().asTempObj();
+        auto cursorObj = responseObj.getObjectField("cursor");
+        if (responseObj.getField("ok").trueValue() && !cursorObj.isEmpty()) {
+            dbResponse.exhaustNS = cursorObj.getField("ns").String();
+            dbResponse.exhaustCursorId = cursorObj.getField("id").numberLong();
+        }
+    }
+
+    dbResponse.response = replyBuilder->done();
+    CurOp::get(opCtx)->debug().responseLength = dbResponse.response.header().dataLen();
+
+    return dbResponse;
 }
 
 DbResponse receivedQuery(OperationContext* opCtx,
