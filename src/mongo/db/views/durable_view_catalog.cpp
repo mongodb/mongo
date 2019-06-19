@@ -70,68 +70,85 @@ const std::string& DurableViewCatalogImpl::getName() const {
     return _db->name();
 }
 
-Status DurableViewCatalogImpl::iterate(OperationContext* opCtx, Callback callback) {
+void DurableViewCatalogImpl::iterate(OperationContext* opCtx, Callback callback) {
+    _iterate(opCtx, callback, ViewCatalogLookupBehavior::kValidateDurableViews);
+}
+
+void DurableViewCatalogImpl::iterateIgnoreInvalidEntries(OperationContext* opCtx,
+                                                         Callback callback) {
+    _iterate(opCtx, callback, ViewCatalogLookupBehavior::kAllowInvalidDurableViews);
+}
+
+void DurableViewCatalogImpl::_iterate(OperationContext* opCtx,
+                                      Callback callback,
+                                      ViewCatalogLookupBehavior lookupBehavior) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_db->getSystemViewsName(), MODE_IS));
 
     Collection* systemViews = _db->getCollection(opCtx, _db->getSystemViewsName());
-    if (!systemViews)
-        return Status::OK();
+    if (!systemViews) {
+        return;
+    }
 
     auto cursor = systemViews->getCursor(opCtx);
     while (auto record = cursor->next()) {
-        RecordData& data = record->data;
-
-        // Check the document is valid BSON, with only the expected fields.
-        // Use the latest BSON validation version. Existing view definitions are allowed to contain
-        // decimal data even if decimal is disabled.
-        fassert(40224, validateBSON(data.data(), data.size(), BSONVersion::kLatest));
-        BSONObj viewDef = data.toBson();
-
-        // Check read definitions for correct structure, and refuse reading past invalid
-        // definitions. Ignore any further view definitions.
-        bool valid = true;
-        for (const BSONElement& e : viewDef) {
-            std::string name(e.fieldName());
-            valid &= name == "_id" || name == "viewOn" || name == "pipeline" || name == "collation";
-        }
-
-        const auto viewName = viewDef["_id"].str();
-        const auto viewNameIsValid = NamespaceString::validCollectionComponent(viewName) &&
-            NamespaceString::validDBName(nsToDatabaseSubstring(viewName));
-        valid &= viewNameIsValid;
-
-        // Only perform validation via NamespaceString if the collection name has been determined to
-        // be valid. If not valid then the NamespaceString constructor will uassert.
-        if (viewNameIsValid) {
-            NamespaceString viewNss(viewName);
-            valid &= viewNss.isValid() && viewNss.db() == _db->name();
-        }
-
-        valid &= NamespaceString::validCollectionName(viewDef["viewOn"].str());
-
-        const bool hasPipeline = viewDef.hasField("pipeline");
-        valid &= hasPipeline;
-        if (hasPipeline) {
-            valid &= viewDef["pipeline"].type() == mongo::Array;
-        }
-
-        valid &=
-            (!viewDef.hasField("collation") || viewDef["collation"].type() == BSONType::Object);
-
-        if (!valid) {
-            return {ErrorCodes::InvalidViewDefinition,
-                    str::stream() << "found invalid view definition " << viewDef["_id"]
-                                  << " while reading '"
-                                  << _db->getSystemViewsName()
-                                  << "'"};
-        }
-
-        Status callbackStatus = callback(viewDef);
-        if (!callbackStatus.isOK()) {
-            return callbackStatus;
+        BSONObj viewDefinition;
+        try {
+            viewDefinition = _validateViewDefinition(opCtx, record->data);
+            uassertStatusOK(callback(viewDefinition));
+        } catch (const ExceptionFor<ErrorCodes::InvalidViewDefinition>& ex) {
+            if (lookupBehavior == ViewCatalogLookupBehavior::kValidateDurableViews) {
+                throw ex;
+            }
         }
     }
-    return Status::OK();
+}
+
+BSONObj DurableViewCatalogImpl::_validateViewDefinition(OperationContext* opCtx,
+                                                        const RecordData& recordData) {
+    // Check the document is valid BSON, with only the expected fields.
+    // Use the latest BSON validation version. Existing view definitions are allowed to contain
+    // decimal data even if decimal is disabled.
+    fassert(40224, validateBSON(recordData.data(), recordData.size(), BSONVersion::kLatest));
+    BSONObj viewDefinition = recordData.toBson();
+
+    bool valid = true;
+
+    for (const BSONElement& e : viewDefinition) {
+        std::string name(e.fieldName());
+        valid &= name == "_id" || name == "viewOn" || name == "pipeline" || name == "collation";
+    }
+
+    const auto viewName = viewDefinition["_id"].str();
+    const auto viewNameIsValid = NamespaceString::validCollectionComponent(viewName) &&
+        NamespaceString::validDBName(nsToDatabaseSubstring(viewName));
+    valid &= viewNameIsValid;
+
+    // Only perform validation via NamespaceString if the collection name has been determined to
+    // be valid. If not valid then the NamespaceString constructor will uassert.
+    if (viewNameIsValid) {
+        NamespaceString viewNss(viewName);
+        valid &= viewNss.isValid() && viewNss.db() == _db->name();
+    }
+
+    valid &= NamespaceString::validCollectionName(viewDefinition["viewOn"].str());
+
+    const bool hasPipeline = viewDefinition.hasField("pipeline");
+    valid &= hasPipeline;
+    if (hasPipeline) {
+        valid &= viewDefinition["pipeline"].type() == mongo::Array;
+    }
+
+    valid &= (!viewDefinition.hasField("collation") ||
+              viewDefinition["collation"].type() == BSONType::Object);
+
+    uassert(ErrorCodes::InvalidViewDefinition,
+            str::stream() << "found invalid view definition " << viewDefinition["_id"]
+                          << " while reading '"
+                          << _db->getSystemViewsName()
+                          << "'",
+            valid);
+
+    return viewDefinition;
 }
 
 void DurableViewCatalogImpl::upsert(OperationContext* opCtx,

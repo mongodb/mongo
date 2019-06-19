@@ -41,6 +41,14 @@ namespace mongo {
 class BSONObj;
 class Database;
 class OperationContext;
+class RecordData;
+
+/**
+ * ViewCatalogLookupBehavior specifies whether a lookup into the view catalog should attempt to
+ * validate the durable entries that currently exist within the catalog. This validation should
+ * rarely be skipped.
+ */
+enum class ViewCatalogLookupBehavior { kValidateDurableViews, kAllowInvalidDurableViews };
 
 /**
  * Interface for system.views collection operations associated with view catalog management.
@@ -60,7 +68,8 @@ public:
     static void onExternalChange(OperationContext* opCtx, const NamespaceString& name);
 
     using Callback = std::function<Status(const BSONObj& view)>;
-    virtual Status iterate(OperationContext* opCtx, Callback callback) = 0;
+    virtual void iterate(OperationContext* opCtx, Callback callback) = 0;
+    virtual void iterateIgnoreInvalidEntries(OperationContext* opCtx, Callback callback) = 0;
     virtual void upsert(OperationContext* opCtx,
                         const NamespaceString& name,
                         const BSONObj& view) = 0;
@@ -77,12 +86,21 @@ class DurableViewCatalogImpl final : public DurableViewCatalog {
 public:
     explicit DurableViewCatalogImpl(Database* db) : _db(db) {}
 
-    Status iterate(OperationContext* opCtx, Callback callback);
+    void iterate(OperationContext* opCtx, Callback callback);
+
+    void iterateIgnoreInvalidEntries(OperationContext* opCtx, Callback callback);
+
     void upsert(OperationContext* opCtx, const NamespaceString& name, const BSONObj& view);
     void remove(OperationContext* opCtx, const NamespaceString& name);
     const std::string& getName() const;
 
 private:
+    void _iterate(OperationContext* opCtx,
+                  Callback callback,
+                  ViewCatalogLookupBehavior lookupBehavior);
+
+    BSONObj _validateViewDefinition(OperationContext* opCtx, const RecordData& recordData);
+
     Database* const _db;
 };
 }  // namespace mongo

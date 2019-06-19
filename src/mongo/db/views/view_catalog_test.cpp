@@ -78,9 +78,11 @@ public:
     static const std::string name;
 
     using Callback = std::function<Status(const BSONObj& view)>;
-    virtual Status iterate(OperationContext* opCtx, Callback callback) {
+    virtual void iterate(OperationContext* opCtx, Callback callback) {
         ++_iterateCount;
-        return Status::OK();
+    }
+    virtual void iterateIgnoreInvalidEntries(OperationContext* opCtx, Callback callback) {
+        ++_iterateCount;
     }
     virtual void upsert(OperationContext* opCtx, const NamespaceString& name, const BSONObj& view) {
         ++_upsertCount;
