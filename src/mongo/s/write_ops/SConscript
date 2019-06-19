@@ -33,6 +33,7 @@ env.Library(
         'write_op.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         'batch_write_types',
     ],
