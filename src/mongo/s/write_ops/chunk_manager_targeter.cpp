@@ -34,6 +34,8 @@
 
 #include "mongo/s/write_ops/chunk_manager_targeter.h"
 
+#include "mongo/base/counter.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -52,6 +54,18 @@ enum UpdateType { UpdateType_Replacement, UpdateType_OpStyle, UpdateType_Unknown
 enum CompareResult { CompareResult_Unknown, CompareResult_GTE, CompareResult_LT };
 
 const ShardKeyPattern virtualIdShardKey(BSON("_id" << 1));
+
+// Tracks the number of {multi:false} updates with an exact match on _id that are broadcasted to
+// multiple shards.
+Counter64 updateOneOpStyleBroadcastWithExactIDCount;
+ServerStatusMetricField<Counter64> updateOneOpStyleBroadcastWithExactIDStats(
+    "query.updateOneOpStyleBroadcastWithExactIDCount", &updateOneOpStyleBroadcastWithExactIDCount);
+
+// Tracks the number of replacement-style upserts which do not have an exact shard key match in the
+// query.
+Counter64 upsertReplacementCannotTargetByQueryCount;
+ServerStatusMetricField<Counter64> upsertReplacementCannotTargetByQueryStats(
+    "query.upsertReplacementCannotTargetByQueryCount", &upsertReplacementCannotTargetByQueryCount);
 
 /**
  * There are two styles of update expressions:
@@ -384,8 +398,23 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
     // Target the shard key, query, or replacement doc
     if (!shardKey.isEmpty()) {
         try {
-            return std::vector<ShardEndpoint>{
-                _targetShardKey(shardKey, collation, (query.objsize() + updateExpr.objsize()))};
+            auto targetShard =
+                _targetShardKey(shardKey, collation, (query.objsize() + updateExpr.objsize()));
+
+            // If the request is a replacement-style upsert and we were able to target based on
+            // replacement doc, we want to track the requests for which shard key is not present in
+            // the query.
+            if (updateDoc.getUpsert() && updateType == UpdateType_Replacement) {
+                auto swShardKey =
+                    _routingInfo->cm()->getShardKeyPattern().extractShardKeyFromQuery(opCtx, query);
+
+                // If the query is valid and the shard key extracted is empty, record the event in
+                // our serverStatus metrics.
+                if (swShardKey.isOK() && swShardKey.getValue().isEmpty()) {
+                    upsertReplacementCannotTargetByQueryCount.increment(1);
+                }
+            }
+            return std::vector<ShardEndpoint>{std::move(targetShard)};
         } catch (const DBException&) {
             // This update is potentially not constrained to a single shard
         }
@@ -443,6 +472,11 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
     }
 
     if (updateType == UpdateType_OpStyle) {
+        // If the request is {multi:false}, then this is an update which we are broadcasting to
+        // multiple shards by exact _id. Record this event in our serverStatus metrics.
+        if (_routingInfo->cm() && !updateDoc.getMulti()) {
+            updateOneOpStyleBroadcastWithExactIDCount.increment(1);
+        }
         return _targetQuery(opCtx, query, collation);
     } else {
         return _targetDoc(opCtx, updateExpr, collation);

@@ -32,6 +32,7 @@ env.Library(
         'write_op.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/commands/cluster_commands_helpers',
         'batch_write_types',
