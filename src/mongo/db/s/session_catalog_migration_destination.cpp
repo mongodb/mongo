@@ -319,8 +319,13 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
             // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post image, because the
             // next oplog will contain the real operation
             if (!result.isPrePostImage) {
-                txnParticipant.onMigrateCompletedOnPrimary(
-                    opCtx, result.txnNum, {stmtId}, oplogOpTime, *oplogEntry.getWallClockTime());
+                SessionTxnRecord sessionTxnRecord;
+                sessionTxnRecord.setSessionId(result.sessionId);
+                sessionTxnRecord.setTxnNum(result.txnNum);
+                sessionTxnRecord.setLastWriteOpTime(oplogOpTime);
+                sessionTxnRecord.setLastWriteDate(*oplogEntry.getWallClockTime());
+                // We do not migrate transaction oplog entries so don't set the txn state.
+                txnParticipant.onMigrateCompletedOnPrimary(opCtx, {stmtId}, sessionTxnRecord);
             }
 
             wunit.commit();

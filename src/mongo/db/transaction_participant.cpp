@@ -1956,51 +1956,48 @@ void TransactionParticipant::Participant::refreshFromStorageIfNeeded(OperationCo
 
 void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
     OperationContext* opCtx,
-    TxnNumber txnNumber,
     std::vector<StmtId> stmtIdsWritten,
-    const repl::OpTime& lastStmtIdWriteOpTime,
-    Date_t lastStmtIdWriteDate,
-    boost::optional<DurableTxnStateEnum> txnState,
-    boost::optional<repl::OpTime> startOpTime) {
+    const SessionTxnRecord& sessionTxnRecord) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
-    invariant(txnNumber == o().activeTxnNumber);
+    invariant(sessionTxnRecord.getSessionId() == _sessionId());
+    invariant(sessionTxnRecord.getTxnNum() == o().activeTxnNumber);
 
     // Sanity check that we don't double-execute statements
     for (const auto stmtId : stmtIdsWritten) {
         const auto stmtOpTime = _checkStatementExecuted(stmtId);
         if (stmtOpTime) {
-            fassertOnRepeatedExecution(
-                _sessionId(), txnNumber, stmtId, *stmtOpTime, lastStmtIdWriteOpTime);
+            fassertOnRepeatedExecution(_sessionId(),
+                                       sessionTxnRecord.getTxnNum(),
+                                       stmtId,
+                                       *stmtOpTime,
+                                       sessionTxnRecord.getLastWriteOpTime());
         }
     }
 
-    const auto updateRequest =
-        _makeUpdateRequest(lastStmtIdWriteOpTime, lastStmtIdWriteDate, txnState, startOpTime);
+    const auto updateRequest = _makeUpdateRequest(sessionTxnRecord);
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
     updateSessionEntry(opCtx, updateRequest);
-    _registerUpdateCacheOnCommit(opCtx, std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
+    _registerUpdateCacheOnCommit(
+        opCtx, std::move(stmtIdsWritten), sessionTxnRecord.getLastWriteOpTime());
 }
 
 void TransactionParticipant::Participant::onMigrateCompletedOnPrimary(
     OperationContext* opCtx,
-    TxnNumber txnNumber,
     std::vector<StmtId> stmtIdsWritten,
-    const repl::OpTime& lastStmtIdWriteOpTime,
-    Date_t oplogLastStmtIdWriteDate) {
+    const SessionTxnRecord& sessionTxnRecord) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
-    invariant(txnNumber == o().activeTxnNumber);
+    invariant(sessionTxnRecord.getSessionId() == _sessionId());
+    invariant(sessionTxnRecord.getTxnNum() == o().activeTxnNumber);
 
-    // We do not migrate transaction oplog entries so don't set the txn state
-    const auto txnState = boost::none;
-    const auto updateRequest = _makeUpdateRequest(
-        lastStmtIdWriteOpTime, oplogLastStmtIdWriteDate, txnState, boost::none /* startOpTime */);
+    const auto updateRequest = _makeUpdateRequest(sessionTxnRecord);
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
     updateSessionEntry(opCtx, updateRequest);
-    _registerUpdateCacheOnCommit(opCtx, std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
+    _registerUpdateCacheOnCommit(
+        opCtx, std::move(stmtIdsWritten), sessionTxnRecord.getLastWriteOpTime());
 }
 
 void TransactionParticipant::Participant::_invalidate(WithLock wl) {
@@ -2114,23 +2111,10 @@ boost::optional<repl::OpTime> TransactionParticipant::Participant::_checkStateme
 }
 
 UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
-    const repl::OpTime& newLastWriteOpTime,
-    Date_t newLastWriteDate,
-    boost::optional<DurableTxnStateEnum> newState,
-    boost::optional<repl::OpTime> startOpTime) const {
+    const SessionTxnRecord& sessionTxnRecord) const {
     UpdateRequest updateRequest(NamespaceString::kSessionTransactionsTableNamespace);
 
-    const auto updateBSON = [&] {
-        SessionTxnRecord newTxnRecord;
-        newTxnRecord.setSessionId(_sessionId());
-        newTxnRecord.setTxnNum(o().activeTxnNumber);
-        newTxnRecord.setLastWriteOpTime(newLastWriteOpTime);
-        newTxnRecord.setLastWriteDate(newLastWriteDate);
-        newTxnRecord.setState(newState);
-        newTxnRecord.setStartOpTime(startOpTime);
-        return newTxnRecord.toBSON();
-    }();
-    updateRequest.setUpdateModification(updateBSON);
+    updateRequest.setUpdateModification(sessionTxnRecord.toBSON());
     updateRequest.setQuery(BSON(SessionTxnRecord::kSessionIdFieldName << _sessionId().toBSON()));
     updateRequest.setUpsert(true);
 
