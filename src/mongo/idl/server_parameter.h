@@ -168,6 +168,7 @@ public:
     Status setFromString(const std::string& str) final;
 
 private:
+    std::once_flag _warnOnce;
     ServerParameter* _sp;
 };
 
