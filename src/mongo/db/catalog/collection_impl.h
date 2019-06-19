@@ -31,7 +31,6 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 
@@ -47,31 +46,22 @@ public:
     enum ValidationLevel { OFF, MODERATE, STRICT_V };
 
     explicit CollectionImpl(OperationContext* opCtx,
-                            StringData fullNS,
+                            const NamespaceString& nss,
                             OptionalCollectionUUID uuid,
-                            CollectionCatalogEntry* details,
-                            RecordStore* recordStore);
+                            std::unique_ptr<RecordStore> recordStore);
 
     ~CollectionImpl();
 
     class FactoryImpl : public Factory {
     public:
-        std::unique_ptr<Collection> make(
-            OperationContext* opCtx,
-            CollectionUUID uuid,
-            CollectionCatalogEntry* collectionCatalogEntry) const final;
+        std::unique_ptr<Collection> make(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         CollectionUUID uuid,
+                                         std::unique_ptr<RecordStore> rs) const final;
     };
 
     bool ok() const final {
         return _magic == kMagicNumber;
-    }
-
-    CollectionCatalogEntry* getCatalogEntry() final {
-        return _details;
-    }
-
-    const CollectionCatalogEntry* getCatalogEntry() const final {
-        return _details;
     }
 
     CollectionInfoCache* infoCache() final {
@@ -101,11 +91,11 @@ public:
     }
 
     const RecordStore* getRecordStore() const final {
-        return _recordStore;
+        return _recordStore.get();
     }
 
     RecordStore* getRecordStore() final {
-        return _recordStore;
+        return _recordStore.get();
     }
 
     bool requiresIdIndex() const final;
@@ -401,10 +391,9 @@ private:
 
     NamespaceString _ns;
     OptionalCollectionUUID _uuid;
-    CollectionCatalogEntry* const _details;
 
     // The RecordStore may be null during a repair operation.
-    RecordStore* const _recordStore;
+    std::unique_ptr<RecordStore> _recordStore;  // owned
     const bool _needCappedLock;
     std::unique_ptr<CollectionInfoCache> _infoCache;
     std::unique_ptr<IndexCatalog> _indexCatalog;

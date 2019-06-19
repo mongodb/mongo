@@ -39,7 +39,6 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -321,11 +320,7 @@ public:
                     }
                 } else {
                     mongo::catalog::forEachCollectionFromDb(
-                        opCtx,
-                        dbname,
-                        MODE_IS,
-                        [&](const Collection* collection,
-                            const CollectionCatalogEntry* catalogEntry) {
+                        opCtx, dbname, MODE_IS, [&](const Collection* collection) {
                             if (authorizedCollections &&
                                 (!as->isAuthorizedForAnyActionOnResource(
                                     ResourcePattern::forExactNamespace(collection->ns())))) {

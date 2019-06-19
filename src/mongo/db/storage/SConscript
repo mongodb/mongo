@@ -394,7 +394,6 @@ env.Library(
     target='durable_catalog_impl',
     source=[
         'durable_catalog_impl.cpp',
-        'kv/kv_collection_catalog_entry.cpp', # TODO: SERVER-40717 Avoid source under kv sub-directory
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',

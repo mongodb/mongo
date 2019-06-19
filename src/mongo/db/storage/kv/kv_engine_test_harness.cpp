@@ -29,7 +29,6 @@
 
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
-#include "mongo/db/catalog/collection_catalog_entry_mock.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_noop.h"
@@ -146,7 +145,7 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
     ASSERT(engine);
 
     std::string ident = "abc";
-    std::string ns = "mydb.mycoll";
+    auto ns = NamespaceString("mydb.mycoll");
 
     std::unique_ptr<RecordStore> rs;
     {
@@ -158,22 +157,20 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
     }
 
 
-    std::unique_ptr<CollectionCatalogEntryMock> catalogEntry =
-        std::make_unique<CollectionCatalogEntryMock>(ns);
     std::unique_ptr<CollectionImpl> collection;
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        collection =
-            std::make_unique<CollectionImpl>(&opCtx, ns, UUID::gen(), catalogEntry.get(), rs.get());
+        collection = std::make_unique<CollectionImpl>(&opCtx, ns, UUID::gen(), std::move(rs));
         uow.commit();
     }
 
-    IndexDescriptor desc(
-        collection.get(),
-        "",
-        BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "ns" << ns << "key"
-                 << BSON("a" << 1)));
+    IndexDescriptor desc(collection.get(),
+                         "",
+                         BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "ns"
+                                  << ns.ns()
+                                  << "key"
+                                  << BSON("a" << 1)));
     std::unique_ptr<SortedDataInterface> sorted;
     {
         MyOperationContext opCtx(engine);
@@ -686,7 +683,7 @@ DEATH_TEST_F(DurableCatalogImplTest, TerminateOnNonNumericIndexVersion, "Fatal A
     ASSERT(engine);
 
     std::string ident = "abc";
-    std::string ns = "mydb.mycoll";
+    auto ns = NamespaceString("mydb.mycoll");
 
     std::unique_ptr<RecordStore> rs;
     {
@@ -697,14 +694,11 @@ DEATH_TEST_F(DurableCatalogImplTest, TerminateOnNonNumericIndexVersion, "Fatal A
         uow.commit();
     }
 
-    std::unique_ptr<CollectionCatalogEntryMock> catalogEntry =
-        std::make_unique<CollectionCatalogEntryMock>(ns);
     std::unique_ptr<CollectionImpl> collection;
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        collection =
-            std::make_unique<CollectionImpl>(&opCtx, ns, UUID::gen(), catalogEntry.get(), rs.get());
+        collection = std::make_unique<CollectionImpl>(&opCtx, ns, UUID::gen(), std::move(rs));
         uow.commit();
     }
 
@@ -713,7 +707,7 @@ DEATH_TEST_F(DurableCatalogImplTest, TerminateOnNonNumericIndexVersion, "Fatal A
                          BSON("v"
                               << "1"
                               << "ns"
-                              << ns
+                              << ns.ns()
                               << "key"
                               << BSON("a" << 1)));
     std::unique_ptr<SortedDataInterface> sorted;

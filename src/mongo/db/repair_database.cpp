@@ -42,7 +42,6 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -52,6 +51,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -61,7 +61,7 @@
 namespace mongo {
 
 StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
-                                           CollectionCatalogEntry* cce,
+                                           const NamespaceString& nss,
                                            std::function<bool(const std::string&)> filter) {
     IndexNameObjs ret;
     std::vector<std::string>& indexNames = ret.first;
@@ -69,7 +69,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
     auto durableCatalog = DurableCatalog::get(opCtx);
     {
         // Fetch all indexes
-        durableCatalog->getAllIndexes(opCtx, cce->ns(), &indexNames);
+        durableCatalog->getAllIndexes(opCtx, nss, &indexNames);
         auto newEnd =
             std::remove_if(indexNames.begin(),
                            indexNames.end(),
@@ -80,7 +80,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
 
 
         for (const auto& name : indexNames) {
-            BSONObj spec = durableCatalog->getIndexSpec(opCtx, cce->ns(), name);
+            BSONObj spec = durableCatalog->getIndexSpec(opCtx, nss, name);
             using IndexVersion = IndexDescriptor::IndexVersion;
             IndexVersion indexVersion = IndexVersion::kV1;
             if (auto indexVersionElem = spec[IndexDescriptor::kIndexVersionFieldName]) {
@@ -111,7 +111,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
 }
 
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  CollectionCatalogEntry* cce,
+                                  Collection* collection,
                                   const std::vector<BSONObj>& indexSpecs) {
     // Skip the rest if there are no indexes to rebuild.
     if (indexSpecs.empty())
@@ -120,15 +120,15 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
     // Rebuild the indexes provided by 'indexSpecs'.
     IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     UUID buildUUID = UUID::gen();
-    auto swRebuild =
-        indexBuildsCoord->startIndexRebuildForRecovery(opCtx, cce, indexSpecs, buildUUID);
+    auto swRebuild = indexBuildsCoord->startIndexRebuildForRecovery(
+        opCtx, collection->ns(), indexSpecs, buildUUID);
     if (!swRebuild.isOK()) {
         return swRebuild.getStatus();
     }
 
     auto[numRecords, dataSize] = swRebuild.getValue();
 
-    auto rs = cce->getRecordStore();
+    auto rs = collection->getRecordStore();
 
     // Update the record store stats after finishing and committing the index builds.
     WriteUnitOfWork wuow(opCtx);
@@ -157,15 +157,13 @@ Status repairCollections(OperationContext* opCtx,
 
     for (const auto& nss : colls) {
         opCtx->checkForInterrupt();
-
-        CollectionCatalogEntry* cce =
-            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
-        auto swIndexNameObjs = getIndexNameObjs(opCtx, cce);
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+        auto swIndexNameObjs = getIndexNameObjs(opCtx, nss);
         if (!swIndexNameObjs.isOK())
             return swIndexNameObjs.getStatus();
 
         std::vector<BSONObj> indexSpecs = swIndexNameObjs.getValue().second;
-        Status status = rebuildIndexesOnCollection(opCtx, cce, indexSpecs);
+        Status status = rebuildIndexesOnCollection(opCtx, collection, indexSpecs);
         if (!status.isOK())
             return status;
 

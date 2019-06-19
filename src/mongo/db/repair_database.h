@@ -35,10 +35,11 @@
 #include "mongo/bson/bsonobj.h"
 
 namespace mongo {
-class CollectionCatalogEntry;
+class Collection;
+class StorageEngine;
+class NamespaceString;
 class OperationContext;
 class Status;
-class StorageEngine;
 class StringData;
 
 typedef std::pair<std::vector<std::string>, std::vector<BSONObj>> IndexNameObjs;
@@ -51,7 +52,7 @@ typedef std::pair<std::vector<std::string>, std::vector<BSONObj>> IndexNameObjs;
  *               should be included in the result.
  */
 StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
-                                           CollectionCatalogEntry* cce,
+                                           const NamespaceString& nss,
                                            std::function<bool(const std::string&)> filter =
                                                [](const std::string& indexName) { return true; });
 
@@ -60,7 +61,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
  * One example usage is when a 'dropIndex' command is rolled back. The dropped index must be remade.
  */
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  CollectionCatalogEntry* cce,
+                                  Collection* collection,
                                   const std::vector<BSONObj>& indexSpecs);
 
 /**

@@ -103,15 +103,10 @@ public:
 
     std::string newInternalIdent();
 
-    std::unique_ptr<CollectionCatalogEntry> makeCollectionCatalogEntry(OperationContext* opCtx,
-                                                                       const NamespaceString& nss,
-                                                                       bool forRepair);
-
-    StatusWith<std::unique_ptr<CollectionCatalogEntry>> createCollection(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const CollectionOptions& options,
-        bool allocateDefaultSpace);
+    StatusWith<std::unique_ptr<RecordStore>> createCollection(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              const CollectionOptions& options,
+                                                              bool allocateDefaultSpace);
 
     Status renameCollection(OperationContext* opCtx,
                             const NamespaceString& fromNss,

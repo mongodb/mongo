@@ -30,7 +30,6 @@
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 
 namespace mongo {
@@ -63,11 +62,10 @@ void forEachCollectionFromDb(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
 
         auto collection = catalog.lookupCollectionByUUID(uuid);
-        auto catalogEntry = catalog.lookupCollectionCatalogEntryByUUID(uuid);
-        if (!collection || !catalogEntry || catalogEntry->ns() != *nss)
+        if (!collection || collection->ns() != *nss)
             continue;
 
-        if (!callback(collection, catalogEntry))
+        if (!callback(collection))
             break;
 
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeGettingNextCollection);

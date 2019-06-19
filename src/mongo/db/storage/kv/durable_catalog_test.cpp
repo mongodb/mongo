@@ -34,7 +34,6 @@
 #include <string>
 
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -57,15 +56,15 @@ static std::string kConstraintViolationsTableIdent("constraintViolations");
 // Update version as breaking changes are introduced into the index build procedure.
 static const long kExpectedVersion = 1;
 
-class KVCollectionCatalogEntryTest : public ServiceContextTest {
+class DurableCatalogTest : public ServiceContextTest {
 public:
-    KVCollectionCatalogEntryTest()
-        : _nss("unittests.kv_collection_catalog_entry"),
+    DurableCatalogTest()
+        : _nss("unittests.durable_catalog"),
           _storageEngine(new DevNullKVEngine(), StorageEngineOptions()) {
         _storageEngine.finishInit();
     }
 
-    ~KVCollectionCatalogEntryTest() {
+    ~DurableCatalogTest() {
         _storageEngine.cleanShutdown();
     }
 
@@ -84,14 +83,12 @@ public:
             const bool allocateDefaultSpace = true;
             CollectionOptions options;
             options.uuid = UUID::gen();
-            auto statusWithCatalogEntry = _storageEngine.getCatalog()->createCollection(
+            auto statusWithRecordStore = _storageEngine.getCatalog()->createCollection(
                 opCtx.get(), _nss, options, allocateDefaultSpace);
-            ASSERT_OK(statusWithCatalogEntry.getStatus());
+            ASSERT_OK(statusWithRecordStore.getStatus());
             auto collection = std::make_unique<CollectionMock>(_nss);
             CollectionCatalog::get(opCtx.get())
-                .registerCollection(options.uuid.get(),
-                                    std::move(statusWithCatalogEntry.getValue()),
-                                    std::move(collection));
+                .registerCollection(options.uuid.get(), std::move(collection));
             wuow.commit();
         }
     }
@@ -160,7 +157,7 @@ private:
     size_t numIndexesCreated = 0;
 };
 
-TEST_F(KVCollectionCatalogEntryTest, MultikeyPathsForBtreeIndexInitializedToVectorOfEmptySets) {
+TEST_F(DurableCatalogTest, MultikeyPathsForBtreeIndexInitializedToVectorOfEmptySets) {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
     auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
@@ -171,7 +168,7 @@ TEST_F(KVCollectionCatalogEntryTest, MultikeyPathsForBtreeIndexInitializedToVect
     }
 }
 
-TEST_F(KVCollectionCatalogEntryTest, CanSetIndividualPathComponentOfBtreeIndexAsMultikey) {
+TEST_F(DurableCatalogTest, CanSetIndividualPathComponentOfBtreeIndexAsMultikey) {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
     auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
@@ -184,7 +181,7 @@ TEST_F(KVCollectionCatalogEntryTest, CanSetIndividualPathComponentOfBtreeIndexAs
     }
 }
 
-TEST_F(KVCollectionCatalogEntryTest, MultikeyPathsAccumulateOnDifferentFields) {
+TEST_F(DurableCatalogTest, MultikeyPathsAccumulateOnDifferentFields) {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
     auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
@@ -205,7 +202,7 @@ TEST_F(KVCollectionCatalogEntryTest, MultikeyPathsAccumulateOnDifferentFields) {
     }
 }
 
-TEST_F(KVCollectionCatalogEntryTest, MultikeyPathsAccumulateOnDifferentComponentsOfTheSameField) {
+TEST_F(DurableCatalogTest, MultikeyPathsAccumulateOnDifferentComponentsOfTheSameField) {
     std::string indexName = createIndex(BSON("a.b" << 1));
     auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
@@ -226,7 +223,7 @@ TEST_F(KVCollectionCatalogEntryTest, MultikeyPathsAccumulateOnDifferentComponent
     }
 }
 
-TEST_F(KVCollectionCatalogEntryTest, NoOpWhenSpecifiedPathComponentsAlreadySetAsMultikey) {
+TEST_F(DurableCatalogTest, NoOpWhenSpecifiedPathComponentsAlreadySetAsMultikey) {
     std::string indexName = createIndex(BSON("a" << 1));
     auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
@@ -247,7 +244,7 @@ TEST_F(KVCollectionCatalogEntryTest, NoOpWhenSpecifiedPathComponentsAlreadySetAs
     }
 }
 
-TEST_F(KVCollectionCatalogEntryTest, CanSetMultipleFieldsAndComponentsAsMultikey) {
+TEST_F(DurableCatalogTest, CanSetMultipleFieldsAndComponentsAsMultikey) {
     std::string indexName = createIndex(BSON("a.b.c" << 1 << "a.b.d" << 1));
     auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
@@ -260,7 +257,7 @@ TEST_F(KVCollectionCatalogEntryTest, CanSetMultipleFieldsAndComponentsAsMultikey
     }
 }
 
-DEATH_TEST_F(KVCollectionCatalogEntryTest,
+DEATH_TEST_F(DurableCatalogTest,
              CannotOmitPathLevelMultikeyInfoWithBtreeIndex,
              "Invariant failure !multikeyPaths.empty()") {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
@@ -269,7 +266,7 @@ DEATH_TEST_F(KVCollectionCatalogEntryTest,
     catalog->setIndexIsMultikey(opCtx.get(), ns(), indexName, MultikeyPaths{});
 }
 
-DEATH_TEST_F(KVCollectionCatalogEntryTest,
+DEATH_TEST_F(DurableCatalogTest,
              AtLeastOnePathComponentMustCauseIndexToBeMultikey,
              "Invariant failure somePathIsMultikey") {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
@@ -279,7 +276,7 @@ DEATH_TEST_F(KVCollectionCatalogEntryTest,
         opCtx.get(), ns(), indexName, {std::set<size_t>{}, std::set<size_t>{}});
 }
 
-TEST_F(KVCollectionCatalogEntryTest, PathLevelMultikeyTrackingIsSupportedBy2dsphereIndexes) {
+TEST_F(DurableCatalogTest, PathLevelMultikeyTrackingIsSupportedBy2dsphereIndexes) {
     std::string indexType = IndexNames::GEO_2DSPHERE;
     std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
     auto opCtx = newOperationContext();
@@ -291,7 +288,7 @@ TEST_F(KVCollectionCatalogEntryTest, PathLevelMultikeyTrackingIsSupportedBy2dsph
     }
 }
 
-TEST_F(KVCollectionCatalogEntryTest, PathLevelMultikeyTrackingIsNotSupportedByAllIndexTypes) {
+TEST_F(DurableCatalogTest, PathLevelMultikeyTrackingIsNotSupportedByAllIndexTypes) {
     std::string indexTypes[] = {
         IndexNames::GEO_2D, IndexNames::GEO_HAYSTACK, IndexNames::TEXT, IndexNames::HASHED};
 
@@ -307,7 +304,7 @@ TEST_F(KVCollectionCatalogEntryTest, PathLevelMultikeyTrackingIsNotSupportedByAl
     }
 }
 
-TEST_F(KVCollectionCatalogEntryTest, CanSetEntireTextIndexAsMultikey) {
+TEST_F(DurableCatalogTest, CanSetEntireTextIndexAsMultikey) {
     std::string indexType = IndexNames::TEXT;
     std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
     auto opCtx = newOperationContext();
@@ -321,7 +318,7 @@ TEST_F(KVCollectionCatalogEntryTest, CanSetEntireTextIndexAsMultikey) {
     }
 }
 
-TEST_F(KVCollectionCatalogEntryTest, NoOpWhenEntireIndexAlreadySetAsMultikey) {
+TEST_F(DurableCatalogTest, NoOpWhenEntireIndexAlreadySetAsMultikey) {
     std::string indexType = IndexNames::TEXT;
     std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
     auto opCtx = newOperationContext();
@@ -343,7 +340,7 @@ TEST_F(KVCollectionCatalogEntryTest, NoOpWhenEntireIndexAlreadySetAsMultikey) {
     }
 }
 
-TEST_F(KVCollectionCatalogEntryTest, SinglePhaseIndexBuild) {
+TEST_F(DurableCatalogTest, SinglePhaseIndexBuild) {
     std::string indexName = createIndex(BSON("a" << 1));
     auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
@@ -367,7 +364,7 @@ TEST_F(KVCollectionCatalogEntryTest, SinglePhaseIndexBuild) {
     ASSERT_FALSE(catalog->getConstraintViolationsIdent(opCtx.get(), ns(), indexName));
 }
 
-TEST_F(KVCollectionCatalogEntryTest, TwoPhaseIndexBuild) {
+TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
     std::string indexName =
         createIndex(BSON("a" << 1), IndexNames::BTREE, IndexBuildProtocol::kTwoPhase);
     auto opCtx = newOperationContext();
@@ -415,7 +412,7 @@ TEST_F(KVCollectionCatalogEntryTest, TwoPhaseIndexBuild) {
     ASSERT_FALSE(catalog->getConstraintViolationsIdent(opCtx.get(), ns(), indexName));
 }
 
-DEATH_TEST_F(KVCollectionCatalogEntryTest,
+DEATH_TEST_F(DurableCatalogTest,
              SinglePhaseIllegalScanPhase,
              "Invariant failure md.indexes[offset].runTwoPhaseBuild") {
     std::string indexName = createIndex(BSON("a" << 1));
@@ -426,7 +423,7 @@ DEATH_TEST_F(KVCollectionCatalogEntryTest,
         opCtx.get(), ns(), indexName, kSideWritesTableIdent, kConstraintViolationsTableIdent);
 }
 
-DEATH_TEST_F(KVCollectionCatalogEntryTest,
+DEATH_TEST_F(DurableCatalogTest,
              SinglePhaseIllegalDrainPhase,
              "Invariant failure md.indexes[offset].runTwoPhaseBuild") {
     std::string indexName = createIndex(BSON("a" << 1));
@@ -435,7 +432,7 @@ DEATH_TEST_F(KVCollectionCatalogEntryTest,
     catalog->setIndexBuildDraining(opCtx.get(), ns(), indexName);
 }
 
-DEATH_TEST_F(KVCollectionCatalogEntryTest,
+DEATH_TEST_F(DurableCatalogTest,
              CannotSetIndividualPathComponentsOfTextIndexAsMultikey,
              "Invariant failure multikeyPaths.empty()") {
     std::string indexType = IndexNames::TEXT;

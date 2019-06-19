@@ -153,7 +153,7 @@ IndexBuildsCoordinator::~IndexBuildsCoordinator() {
 
 StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRebuildForRecovery(
     OperationContext* opCtx,
-    CollectionCatalogEntry* cce,
+    const NamespaceString& nss,
     const std::vector<BSONObj>& specs,
     const UUID& buildUUID) {
     // Index builds in recovery mode have the global write lock.
@@ -170,8 +170,6 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
         }
         indexNames.push_back(name);
     }
-
-    const NamespaceString nss(cce->ns());
 
     ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
 

@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -102,10 +103,7 @@ public:
      */
     virtual std::string newInternalIdent() = 0;
 
-    virtual std::unique_ptr<CollectionCatalogEntry> makeCollectionCatalogEntry(
-        OperationContext* opCtx, const NamespaceString& nss, bool forRepair) = 0;
-
-    virtual StatusWith<std::unique_ptr<CollectionCatalogEntry>> createCollection(
+    virtual StatusWith<std::unique_ptr<RecordStore>> createCollection(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const CollectionOptions& options,

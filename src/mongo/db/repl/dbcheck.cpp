@@ -31,7 +31,6 @@
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/health_log.h"

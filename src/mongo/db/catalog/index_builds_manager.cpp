@@ -35,7 +35,6 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -139,8 +138,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     OperationContext* opCtx, NamespaceString ns, const UUID& buildUUID) {
     auto builder = _getBuilder(buildUUID);
 
-    auto cce = CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(ns);
-    auto rs = cce ? cce->getRecordStore() : nullptr;
+    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(ns);
+    auto rs = coll ? coll->getRecordStore() : nullptr;
 
     // Iterate all records in the collection. Delete them if they aren't valid BSON. Index them
     // if they are.

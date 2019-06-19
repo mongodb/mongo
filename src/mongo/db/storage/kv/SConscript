@@ -45,7 +45,7 @@ env.Library(
 env.CppUnitTest(
     target='db_storage_kv_engine_test',
     source=[
-        'kv_collection_catalog_entry_test.cpp',
+        'durable_catalog_test.cpp',
         'kv_drop_pending_ident_reaper_test.cpp',
         'storage_engine_test.cpp',
     ],

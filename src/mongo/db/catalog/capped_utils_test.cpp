@@ -32,7 +32,6 @@
 #include <memory>
 
 #include "mongo/db/catalog/capped_utils.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/repl/replication_coordinator.h"
