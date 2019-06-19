@@ -133,6 +133,8 @@ selector:
   - jstests/sharding/sharding_statistics_server_status.js
   # Enable if SERVER-36966 is backported or 4.2 becomes last-stable
   - jstests/sharding/mr_output_sharded_validation.js
+  # Enable when BACKPORT-4651 is released into 4.0
+  - jstests/sharding/server_status.js
 
 executor:
   config:

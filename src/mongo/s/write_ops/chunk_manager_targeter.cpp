@@ -33,6 +33,8 @@
 
 #include "mongo/s/write_ops/chunk_manager_targeter.h"
 
+#include "mongo/base/counter.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -53,6 +55,12 @@ constexpr auto kIdFieldName = "_id"_sd;
 const ShardKeyPattern kVirtualIdShardKey(BSON(kIdFieldName << 1));
 
 using UpdateType = ChunkManagerTargeter::UpdateType;
+
+// Tracks the number of {multi:false} updates with an exact match on _id that are broadcasted to
+// multiple shards.
+Counter64 updateOneOpStyleBroadcastWithExactIDCount;
+ServerStatusMetricField<Counter64> updateOneOpStyleBroadcastWithExactIDStats(
+    "query.updateOneOpStyleBroadcastWithExactIDCount", &updateOneOpStyleBroadcastWithExactIDCount);
 
 /**
  * Update expressions are bucketed into one of two types for the purposes of shard targeting:
@@ -500,6 +508,12 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
                               << updateDoc.toBSON()
                               << ", shard key pattern: "
                               << shardKeyPattern.toString()};
+    }
+
+    // If the request is {multi:false}, then this is a single op-style update which we are
+    // broadcasting to multiple shards by exact _id. Record this event in our serverStatus metrics.
+    if (!updateDoc.getMulti()) {
+        updateOneOpStyleBroadcastWithExactIDCount.increment(1);
     }
     return shardEndPoints;
 }
