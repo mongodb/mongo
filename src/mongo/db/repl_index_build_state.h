@@ -35,7 +35,6 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
@@ -45,6 +44,22 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+// Indicates which protocol an index build is using.
+enum class IndexBuildProtocol {
+    /**
+     * Refers to the pre-FCV 4.2 index build protocol for building indexes in replica sets.
+     * Index builds must complete on the primary before replicating, and are not resumable in
+     * any scenario.
+     */
+    kSinglePhase,
+    /**
+     * Refers to the FCV 4.2 two-phase index build protocol for building indexes in replica
+     * sets. Indexes are built simultaneously on all nodes and are resumable during the draining
+     * phase.
+     */
+    kTwoPhase
+};
 
 /**
  * Tracks the cross replica set progress of a particular index build identified by a build UUID.

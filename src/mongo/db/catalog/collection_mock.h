@@ -60,13 +60,6 @@ public:
         std::abort();
     }
 
-    CollectionCatalogEntry* getCatalogEntry() {
-        std::abort();
-    }
-    const CollectionCatalogEntry* getCatalogEntry() const {
-        std::abort();
-    }
-
     CollectionInfoCache* infoCache() {
         std::abort();
     }

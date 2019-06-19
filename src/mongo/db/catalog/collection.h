@@ -57,7 +57,6 @@
 
 namespace mongo {
 class CappedCallback;
-class CollectionCatalogEntry;
 class ExtentManager;
 class IndexCatalog;
 class IndexCatalogEntry;
@@ -177,10 +176,10 @@ public:
          * Constructs a Collection object. This does not persist any state to the storage engine,
          * only constructs an in-memory representation of what already exists on disk.
          */
-        virtual std::unique_ptr<Collection> make(
-            OperationContext* opCtx,
-            CollectionUUID uuid,
-            CollectionCatalogEntry* collectionCatalogEntry) const = 0;
+        virtual std::unique_ptr<Collection> make(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 CollectionUUID uuid,
+                                                 std::unique_ptr<RecordStore> rs) const = 0;
     };
 
     /**
@@ -192,9 +191,6 @@ public:
     virtual ~Collection() = default;
 
     virtual bool ok() const = 0;
-
-    virtual CollectionCatalogEntry* getCatalogEntry() = 0;
-    virtual const CollectionCatalogEntry* getCatalogEntry() const = 0;
 
     virtual CollectionInfoCache* infoCache() = 0;
     virtual const CollectionInfoCache* infoCache() const = 0;

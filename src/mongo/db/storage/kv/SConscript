@@ -54,9 +54,9 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='kv_collection_catalog_entry_test',
+    target='durable_catalog_test',
     source=[
-        'kv_collection_catalog_entry_test.cpp',
+        'durable_catalog_test.cpp',
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/collection_options',

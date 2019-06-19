@@ -41,7 +41,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog_feature_tracker.h"
-#include "mongo/db/storage/kv/kv_collection_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -770,31 +769,7 @@ StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(OperationContext* o
     return StatusWith<std::string>(std::move(ns));
 }
 
-std::unique_ptr<CollectionCatalogEntry> DurableCatalogImpl::makeCollectionCatalogEntry(
-    OperationContext* opCtx, const NamespaceString& nss, bool forRepair) {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, nss);
-    uassert(ErrorCodes::MustDowngrade,
-            str::stream() << "Collection does not have UUID in DurableCatalogImpl. Collection: "
-                          << nss,
-            md.options.uuid);
-
-    auto ident = getCollectionIdent(nss);
-
-    std::unique_ptr<RecordStore> rs;
-    if (forRepair) {
-        // Using a NULL rs since we don't want to open this record store before it has been
-        // repaired. This also ensures that if we try to use it, it will blow up.
-        rs = nullptr;
-    } else {
-        rs = _engine->getEngine()->getGroupedRecordStore(
-            opCtx, nss.ns(), ident, md.options, md.prefix);
-        invariant(rs);
-    }
-
-    return std::make_unique<KVCollectionCatalogEntry>(_engine, nss.ns(), ident, std::move(rs));
-}
-
-StatusWith<std::unique_ptr<CollectionCatalogEntry>> DurableCatalogImpl::createCollection(
+StatusWith<std::unique_ptr<RecordStore>> DurableCatalogImpl::createCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionOptions& options,
@@ -802,14 +777,13 @@ StatusWith<std::unique_ptr<CollectionCatalogEntry>> DurableCatalogImpl::createCo
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     invariant(nss.coll().size() > 0);
 
-    if (CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss)) {
+    if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss)) {
         return Status(ErrorCodes::NamespaceExists,
                       str::stream() << "collection already exists " << nss);
     }
 
     KVPrefix prefix = KVPrefix::getNextPrefix(nss);
 
-    // need to create it
     Status status = _addEntry(opCtx, nss, options, prefix);
     if (!status.isOK())
         return status;
@@ -838,7 +812,7 @@ StatusWith<std::unique_ptr<CollectionCatalogEntry>> DurableCatalogImpl::createCo
     auto rs = _engine->getEngine()->getGroupedRecordStore(opCtx, nss.ns(), ident, options, prefix);
     invariant(rs);
 
-    return std::make_unique<KVCollectionCatalogEntry>(_engine, nss.ns(), ident, std::move(rs));
+    return std::move(rs);
 }
 
 Status DurableCatalogImpl::renameCollection(OperationContext* opCtx,
@@ -868,9 +842,7 @@ Status DurableCatalogImpl::renameCollection(OperationContext* opCtx,
 Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
-    CollectionCatalogEntry* const entry =
-        CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
-    if (!entry) {
+    if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(nss)) {
         return Status(ErrorCodes::NamespaceNotFound, "cannnot find collection to drop");
     }
 
@@ -897,8 +869,7 @@ Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, const Namespa
         return status;
     }
 
-    // This will lazily delete the KVCollectionCatalogEntry and notify the storageEngine to
-    // drop the collection only on WUOW::commit().
+    // This will notify the storageEngine to drop the collection only on WUOW::commit().
     opCtx->recoveryUnit()->onCommit(
         [ opCtx, catalog = this, nss, uuid, ident ](boost::optional<Timestamp> commitTimestamp) {
             StorageEngineInterface* engine = catalog->_engine;

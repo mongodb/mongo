@@ -32,7 +32,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 
@@ -42,12 +42,18 @@ namespace mongo {
  * This is a helper class for any storage engine that wants to store catalog information
  * as BSON. It is totally optional to use this.
  */
-class BSONCollectionCatalogEntry : public CollectionCatalogEntry {
+class BSONCollectionCatalogEntry {
 public:
     static const StringData kIndexBuildScanning;
     static const StringData kIndexBuildDraining;
 
-    BSONCollectionCatalogEntry(StringData ns);
+    /**
+     * Incremented when breaking changes are made to the index build procedure so that other servers
+     * know whether or not to resume or discard unfinished index builds.
+     */
+    static constexpr int kIndexBuildVersion = 1;
+
+    BSONCollectionCatalogEntry() = default;
 
     virtual ~BSONCollectionCatalogEntry() {}
 

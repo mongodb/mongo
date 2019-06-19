@@ -238,14 +238,30 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
 void StorageEngineImpl::_initCollection(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         bool forRepair) {
-    auto catalogEntry = _catalog->makeCollectionCatalogEntry(opCtx, nss, forRepair);
+    BSONCollectionCatalogEntry::MetaData md = _catalog->getMetaData(opCtx, nss);
+    uassert(ErrorCodes::MustDowngrade,
+            str::stream() << "Collection does not have UUID in KVCatalog. Collection: " << nss,
+            md.options.uuid);
+
+    auto ident = _catalog->getCollectionIdent(nss);
+
+    std::unique_ptr<RecordStore> rs;
+    if (forRepair) {
+        // Using a NULL rs since we don't want to open this record store before it has been
+        // repaired. This also ensures that if we try to use it, it will blow up.
+        rs = nullptr;
+    } else {
+        rs = _engine->getGroupedRecordStore(opCtx, nss.ns(), ident, md.options, md.prefix);
+        invariant(rs);
+    }
+
     auto uuid = _catalog->getCollectionOptions(opCtx, nss).uuid.get();
 
     auto collectionFactory = Collection::Factory::get(getGlobalServiceContext());
-    auto collection = collectionFactory->make(opCtx, uuid, catalogEntry.get());
+    auto collection = collectionFactory->make(opCtx, nss, uuid, std::move(rs));
 
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
-    collectionCatalog.registerCollection(uuid, std::move(catalogEntry), std::move(collection));
+    collectionCatalog.registerCollection(uuid, std::move(collection));
 }
 
 void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {
@@ -254,7 +270,7 @@ void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {
         LOG_FOR_RECOVERY(kCatalogLogLevel) << "loadCatalog:";
         _dumpCatalog(opCtx);
     }
-    CollectionCatalog::get(opCtx).deregisterAllCatalogEntriesAndCollectionObjects();
+    CollectionCatalog::get(opCtx).deregisterAllCollections();
 
     _catalog.reset();
     _catalogRecordStore.reset();
@@ -507,8 +523,7 @@ void StorageEngineImpl::cleanShutdown() {
         _timestampMonitor->removeListener(&_minOfCheckpointAndOldestTimestampListener);
     }
 
-    CollectionCatalog::get(getGlobalServiceContext())
-        .deregisterAllCatalogEntriesAndCollectionObjects();
+    CollectionCatalog::get(getGlobalServiceContext()).deregisterAllCollections();
 
     _catalog.reset();
     _catalogRecordStore.reset();
@@ -600,11 +615,10 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
             firstError = result;
         }
 
-        auto[removedColl, removedCatalogEntry] =
-            CollectionCatalog::get(opCtx).deregisterCollection(uuid);
+        auto removedColl = CollectionCatalog::get(opCtx).deregisterCollection(uuid);
         opCtx->recoveryUnit()->registerChange(
-            CollectionCatalog::get(opCtx).makeFinishDropCollectionChange(
-                std::move(removedColl), std::move(removedCatalogEntry), uuid));
+            CollectionCatalog::get(opCtx).makeFinishDropCollectionChange(std::move(removedColl),
+                                                                         uuid));
     }
 
     untimestampedDropWuow.commit();
@@ -956,24 +970,19 @@ void StorageEngineImpl::TimestampMonitor::removeListener(TimestampListener* list
 int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) {
     int64_t size = 0;
 
-    catalog::forEachCollectionFromDb(
-        opCtx,
-        dbName,
-        MODE_IS,
-        [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
-            size += catalogEntry->getRecordStore()->storageSize(opCtx);
+    catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, [&](const Collection* collection) {
+        size += collection->getRecordStore()->storageSize(opCtx);
 
-            std::vector<std::string> indexNames;
-            _catalog->getAllIndexes(opCtx, collection->ns(), &indexNames);
+        std::vector<std::string> indexNames;
+        _catalog->getAllIndexes(opCtx, collection->ns(), &indexNames);
 
-            for (size_t i = 0; i < indexNames.size(); i++) {
-                std::string ident =
-                    _catalog->getIndexIdent(opCtx, catalogEntry->ns(), indexNames[i]);
-                size += _engine->getIdentSize(opCtx, ident);
-            }
+        for (size_t i = 0; i < indexNames.size(); i++) {
+            std::string ident = _catalog->getIndexIdent(opCtx, collection->ns(), indexNames[i]);
+            size += _engine->getIdentSize(opCtx, ident);
+        }
 
-            return true;
-        });
+        return true;
+    });
 
     return size;
 }

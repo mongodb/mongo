@@ -34,7 +34,6 @@
 #include <memory>
 
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"

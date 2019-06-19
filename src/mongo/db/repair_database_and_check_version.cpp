@@ -34,7 +34,6 @@
 #include "repair_database_and_check_version.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -138,11 +137,11 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
  * Returns true if the collection associated with the given CollectionCatalogEntry has an index on
  * the _id field
  */
-bool checkIdIndexExists(OperationContext* opCtx, const CollectionCatalogEntry* catalogEntry) {
+bool checkIdIndexExists(OperationContext* opCtx, const NamespaceString& nss) {
     auto durableCatalog = DurableCatalog::get(opCtx);
-    auto indexCount = durableCatalog->getTotalIndexCount(opCtx, catalogEntry->ns());
+    auto indexCount = durableCatalog->getTotalIndexCount(opCtx, nss);
     auto indexNames = std::vector<std::string>(indexCount);
-    durableCatalog->getAllIndexes(opCtx, catalogEntry->ns(), &indexNames);
+    durableCatalog->getAllIndexes(opCtx, nss, &indexNames);
 
     for (auto name : indexNames) {
         if (name == "_id_") {
@@ -211,14 +210,13 @@ Status ensureCollectionProperties(OperationContext* opCtx,
 
             // All user-created replicated collections created since MongoDB 4.0 have _id indexes.
             auto requiresIndex = coll->requiresIdIndex() && coll->ns().isReplicated();
-            auto catalogEntry = coll->getCatalogEntry();
             auto collOptions = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, coll->ns());
             auto hasAutoIndexIdField = collOptions.autoIndexId == CollectionOptions::YES;
 
             // Even if the autoIndexId field is not YES, the collection may still have an _id index
             // that was created manually by the user. Check the list of indexes to confirm index
             // does not exist before attempting to build it or returning an error.
-            if (requiresIndex && !hasAutoIndexIdField && !checkIdIndexExists(opCtx, catalogEntry)) {
+            if (requiresIndex && !hasAutoIndexIdField && !checkIdIndexExists(opCtx, coll->ns())) {
                 log() << "collection " << coll->ns() << " is missing an _id index; building it now";
                 auto status = buildMissingIdIndex(opCtx, coll);
                 if (!status.isOK()) {
@@ -279,15 +277,8 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
     for (auto&& indexNamespace : indexesToRebuild) {
         NamespaceString collNss(indexNamespace.first);
         const std::string& indexName = indexNamespace.second;
-
-        CollectionCatalogEntry* cce =
-            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
-        invariant(cce,
-                  str::stream() << "couldn't get collection catalog entry for collection "
-                                << collNss.toString());
-
         auto swIndexSpecs = getIndexNameObjs(
-            opCtx, cce, [&indexName](const std::string& name) { return name == indexName; });
+            opCtx, collNss, [&indexName](const std::string& name) { return name == indexName; });
         if (!swIndexSpecs.isOK() || swIndexSpecs.getValue().first.empty()) {
             fassert(40590,
                     {ErrorCodes::InternalError,
@@ -309,14 +300,13 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
     for (const auto& entry : nsToIndexNameObjMap) {
         NamespaceString collNss(entry.first);
 
-        auto collCatalogEntry =
-            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(collNss);
         for (const auto& indexName : entry.second.first) {
             log() << "Rebuilding index. Collection: " << collNss << " Index: " << indexName;
         }
 
         std::vector<BSONObj> indexSpecs = entry.second.second;
-        fassert(40592, rebuildIndexesOnCollection(opCtx, collCatalogEntry, indexSpecs));
+        fassert(40592, rebuildIndexesOnCollection(opCtx, collection, indexSpecs));
     }
 }
 

@@ -119,17 +119,8 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     for (auto indexNamespace : indexesToRebuild.getValue()) {
         NamespaceString collNss(indexNamespace.first);
         auto indexName = indexNamespace.second;
-
-        auto collCatalogEntry =
-            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
-        invariant(collCatalogEntry,
-                  str::stream() << "couldn't get collection catalog entry for collection "
-                                << collNss.toString());
-
-        auto indexSpecs =
-            getIndexNameObjs(opCtx, collCatalogEntry, [&indexName](const std::string& name) {
-                return name == indexName;
-            });
+        auto indexSpecs = getIndexNameObjs(
+            opCtx, collNss, [&indexName](const std::string& name) { return name == indexName; });
         if (!indexSpecs.isOK() || indexSpecs.getValue().first.empty()) {
             fassert(40689,
                     {ErrorCodes::InternalError,
@@ -155,11 +146,8 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     for (const auto& entry : nsToIndexNameObjMap) {
         NamespaceString collNss(entry.first);
 
-        auto collCatalogEntry =
-            CollectionCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(collNss);
-        invariant(collCatalogEntry,
-                  str::stream() << "couldn't get collection catalog entry for collection "
-                                << collNss.toString());
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(collNss);
+        invariant(collection, str::stream() << "couldn't get collection " << collNss.toString());
 
         for (const auto& indexName : entry.second.first) {
             log() << "openCatalog: rebuilding index: collection: " << collNss.toString()
@@ -167,7 +155,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         }
 
         std::vector<BSONObj> indexSpecs = entry.second.second;
-        fassert(40690, rebuildIndexesOnCollection(opCtx, collCatalogEntry, indexSpecs));
+        fassert(40690, rebuildIndexesOnCollection(opCtx, collection, indexSpecs));
     }
 
     // Open all databases and repopulate the CollectionCatalog.

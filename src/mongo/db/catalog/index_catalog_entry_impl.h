@@ -46,7 +46,6 @@
 namespace mongo {
 
 class CollatorInterface;
-class CollectionCatalogEntry;
 class CollectionInfoCache;
 class IndexAccessMethod;
 class IndexDescriptor;
@@ -60,8 +59,7 @@ class IndexCatalogEntryImpl : public IndexCatalogEntry {
 public:
     explicit IndexCatalogEntryImpl(
         OperationContext* opCtx,
-        StringData ns,
-        CollectionCatalogEntry* collection,           // not owned
+        const NamespaceString& nss,
         std::unique_ptr<IndexDescriptor> descriptor,  // ownership passes to me
         CollectionInfoCache* infoCache);              // not owned, optional
 
@@ -195,8 +193,6 @@ private:
     // -----
 
     NamespaceString _ns;
-
-    CollectionCatalogEntry* _collection;  // not owned here
 
     std::unique_ptr<IndexDescriptor> _descriptor;  // owned here
 

@@ -103,10 +103,6 @@ void parseMultikeyPathsFromBytes(BSONObj multikeyPathsObj, MultikeyPaths* multik
 const StringData BSONCollectionCatalogEntry::kIndexBuildScanning = "scanning"_sd;
 const StringData BSONCollectionCatalogEntry::kIndexBuildDraining = "draining"_sd;
 
-BSONCollectionCatalogEntry::BSONCollectionCatalogEntry(StringData ns)
-    : CollectionCatalogEntry(ns) {}
-
-
 // --------------------------
 
 void BSONCollectionCatalogEntry::IndexMetaData::updateTTLSetting(long long newExpireSeconds) {

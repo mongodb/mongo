@@ -43,7 +43,6 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_info_cache_impl.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -192,15 +191,13 @@ using std::vector;
 using logger::LogComponent;
 
 CollectionImpl::CollectionImpl(OperationContext* opCtx,
-                               StringData fullNS,
+                               const NamespaceString& nss,
                                OptionalCollectionUUID uuid,
-                               CollectionCatalogEntry* details,
-                               RecordStore* recordStore)
+                               std::unique_ptr<RecordStore> recordStore)
     : _magic(kMagicNumber),
-      _ns(fullNS),
+      _ns(nss),
       _uuid(uuid),
-      _details(details),
-      _recordStore(recordStore),
+      _recordStore(std::move(recordStore)),
       _needCappedLock(supportsDocLocking() && _recordStore && _recordStore->isCapped() &&
                       _ns.db() != "local"),
       _infoCache(std::make_unique<CollectionInfoCacheImpl>(this, _ns)),
@@ -228,11 +225,10 @@ CollectionImpl::~CollectionImpl() {
 
 std::unique_ptr<Collection> CollectionImpl::FactoryImpl::make(
     OperationContext* opCtx,
+    const NamespaceString& nss,
     CollectionUUID uuid,
-    CollectionCatalogEntry* collectionCatalogEntry) const {
-    auto rs = collectionCatalogEntry->getRecordStore();
-    const auto nss = collectionCatalogEntry->ns();
-    return std::make_unique<CollectionImpl>(opCtx, nss.ns(), uuid, collectionCatalogEntry, rs);
+    std::unique_ptr<RecordStore> rs) const {
+    return std::make_unique<CollectionImpl>(opCtx, nss, uuid, std::move(rs));
 }
 
 void CollectionImpl::init(OperationContext* opCtx) {
@@ -1328,7 +1324,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
     try {
         ValidateResultsMap indexNsResultsMap;
         BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe
-        IndexConsistency indexConsistency(opCtx, this, ns(), _recordStore, background);
+        IndexConsistency indexConsistency(opCtx, this, ns(), _recordStore.get(), background);
         RecordStoreValidateAdaptor indexValidator = RecordStoreValidateAdaptor(
             opCtx, &indexConsistency, level, _indexCatalog.get(), &indexNsResultsMap);
 
@@ -1337,7 +1333,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
             << " (UUID: " << (uuid() ? uuid()->toString() : "none") << ")";
         log(LogComponent::kIndex) << "validating collection " << ns() << uuidString;
         _validateRecordStore(
-            opCtx, _recordStore, level, background, &indexValidator, results, output);
+            opCtx, _recordStore.get(), level, background, &indexValidator, results, output);
 
         // Validate in-memory catalog information with the persisted info.
         _validateCatalogEntry(opCtx, this, _validatorDoc, results);
@@ -1357,7 +1353,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
                     << "Index inconsistencies were detected on collection " << ns()
                     << ". Starting the second phase of index validation to gather concise errors.";
                 _gatherIndexEntryErrors(opCtx,
-                                        _recordStore,
+                                        _recordStore.get(),
                                         _indexCatalog.get(),
                                         &indexConsistency,
                                         &indexValidator,
@@ -1368,8 +1364,11 @@ Status CollectionImpl::validate(OperationContext* opCtx,
 
         // Validate index key count.
         if (results->valid) {
-            _validateIndexKeyCount(
-                opCtx, _indexCatalog.get(), _recordStore, &indexValidator, &indexNsResultsMap);
+            _validateIndexKeyCount(opCtx,
+                                   _indexCatalog.get(),
+                                   _recordStore.get(),
+                                   &indexValidator,
+                                   &indexNsResultsMap);
         }
 
         // Report the validation results for the user to see
@@ -1400,7 +1399,7 @@ Status CollectionImpl::touch(OperationContext* opCtx,
                              BSONObjBuilder* output) const {
     if (touchData) {
         BSONObjBuilder b;
-        Status status = _recordStore->touch(opCtx, &b);
+        Status status = _recordStore.get()->touch(opCtx, &b);
         if (!status.isOK())
             return status;
         output->append("data", b.obj());
@@ -1437,7 +1436,7 @@ void CollectionImpl::setNs(NamespaceString nss) {
     _ns = std::move(nss);
     _indexCatalog->setNs(_ns);
     _infoCache->setNs(_ns);
-    _recordStore->setNs(_ns);
+    _recordStore.get()->setNs(_ns);
 }
 
 void CollectionImpl::indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) {

@@ -32,7 +32,6 @@
 #include <boost/optional/optional_io.hpp>
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/collection_catalog_entry_mock.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -64,10 +63,9 @@ public:
         ASSERT_GT(nextUUID, colUUID);
 
         auto collection = std::make_unique<CollectionMock>(nss);
-        auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
         col = collection.get();
         // Register dummy collection in catalog.
-        catalog.registerCollection(colUUID, std::move(catalogEntry), std::move(collection));
+        catalog.registerCollection(colUUID, std::move(collection));
     }
 
 protected:
@@ -89,16 +87,14 @@ public:
 
             auto fooUuid = CollectionUUID::gen();
             auto fooColl = std::make_unique<CollectionMock>(fooNss);
-            auto fooCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(fooNss.ns());
 
             auto barUuid = CollectionUUID::gen();
             auto barColl = std::make_unique<CollectionMock>(barNss);
-            auto barCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(barNss.ns());
 
             dbMap["foo"].insert(std::make_pair(fooUuid, fooColl.get()));
             dbMap["bar"].insert(std::make_pair(barUuid, barColl.get()));
-            catalog.registerCollection(fooUuid, std::move(fooCatalogEntry), std::move(fooColl));
-            catalog.registerCollection(barUuid, std::move(barCatalogEntry), std::move(barColl));
+            catalog.registerCollection(fooUuid, std::move(fooColl));
+            catalog.registerCollection(barUuid, std::move(barColl));
         }
     }
 
@@ -273,10 +269,9 @@ public:
         for (int i = 0; i < 5; i++) {
             NamespaceString nss("resourceDb", "coll" + std::to_string(i));
             auto coll = std::make_unique<CollectionMock>(nss);
-            auto newCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
             auto uuid = coll->uuid();
 
-            catalog.registerCollection(uuid.get(), std::move(newCatalogEntry), std::move(coll));
+            catalog.registerCollection(uuid.get(), std::move(coll));
         }
 
         int numEntries = 0;
@@ -317,7 +312,7 @@ protected:
 namespace {
 
 TEST_F(CollectionCatalogResourceTest, RemoveAllResources) {
-    catalog.deregisterAllCatalogEntriesAndCollectionObjects();
+    catalog.deregisterAllCollections();
 
     const std::string dbName = "resourceDb";
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
@@ -498,13 +493,12 @@ TEST_F(CollectionCatalogTest, InsertAfterLookup) {
     auto newUUID = CollectionUUID::gen();
     NamespaceString newNss(nss.db(), "newcol");
     auto newCollUnique = std::make_unique<CollectionMock>(newNss);
-    auto newCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(newNss.ns());
     auto newCol = newCollUnique.get();
 
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
     ASSERT(catalog.lookupCollectionByUUID(newUUID) == nullptr);
     ASSERT_EQUALS(catalog.lookupNSSByUUID(newUUID), boost::none);
-    catalog.registerCollection(newUUID, std::move(newCatalogEntry), std::move(newCollUnique));
+    catalog.registerCollection(newUUID, std::move(newCollUnique));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(newUUID), newCol);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
 }
@@ -519,9 +513,8 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
     auto uuid = CollectionUUID::gen();
     NamespaceString oldNss(nss.db(), "oldcol");
     auto collUnique = std::make_unique<CollectionMock>(oldNss);
-    auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(oldNss.ns());
     auto collection = collUnique.get();
-    catalog.registerCollection(uuid, std::move(catalogEntry), std::move(collUnique));
+    catalog.registerCollection(uuid, std::move(collUnique));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(uuid), collection);
 
     NamespaceString newNss(nss.db(), "newcol");
@@ -543,14 +536,13 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreated
     auto newUUID = CollectionUUID::gen();
     NamespaceString newNss(nss.db(), "newcol");
     auto newCollUnique = std::make_unique<CollectionMock>(newNss);
-    auto newCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(newNss.ns());
     auto newCol = newCollUnique.get();
 
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
     catalog.onCloseCatalog(&opCtx);
     ASSERT(catalog.lookupCollectionByUUID(newUUID) == nullptr);
     ASSERT_EQUALS(catalog.lookupNSSByUUID(newUUID), boost::none);
-    catalog.registerCollection(newUUID, std::move(newCatalogEntry), std::move(newCollUnique));
+    catalog.registerCollection(newUUID, std::move(newCollUnique));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(newUUID), newCol);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
 
@@ -563,14 +555,13 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreated
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS) {
     NamespaceString newNss(nss.db(), "newcol");
     auto newCollUnique = std::make_unique<CollectionMock>(newNss);
-    auto newCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(newNss.ns());
     auto newCol = newCollUnique.get();
 
     catalog.onCloseCatalog(&opCtx);
     catalog.deregisterCollection(colUUID);
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == nullptr);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), nss);
-    catalog.registerCollection(colUUID, std::move(newCatalogEntry), std::move(newCollUnique));
+    catalog.registerCollection(colUUID, std::move(newCollUnique));
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(colUUID), newCol);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(colUUID), newNss);
 
@@ -597,9 +588,8 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     std::vector<NamespaceString> nsss = {aColl, b1Coll, b2Coll, cColl, d1Coll, d2Coll, d3Coll};
     for (auto& nss : nsss) {
         auto newColl = std::make_unique<CollectionMock>(nss);
-        auto newCatalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
         auto uuid = CollectionUUID::gen();
-        catalog.registerCollection(uuid, std::move(newCatalogEntry), std::move(newColl));
+        catalog.registerCollection(uuid, std::move(newColl));
     }
 
     std::vector<NamespaceString> dCollList = {d1Coll, d2Coll, d3Coll};
@@ -610,7 +600,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     std::vector<std::string> dbNames = {"dbA", "dbB", "dbC", "dbD", "testdb"};
     ASSERT(catalog.getAllDbNames() == dbNames);
 
-    catalog.deregisterAllCatalogEntriesAndCollectionObjects();
+    catalog.deregisterAllCollections();
 }
 
 class ForEachCollectionFromDbTest : public CatalogTestFixture {
@@ -639,16 +629,11 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDb) {
     {
         auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db", MODE_IX);
         int numCollectionsTraversed = 0;
-        catalog::forEachCollectionFromDb(
-            opCtx,
-            "db",
-            MODE_X,
-            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
-                ASSERT_TRUE(
-                    opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
-                numCollectionsTraversed++;
-                return true;
-            });
+        catalog::forEachCollectionFromDb(opCtx, "db", MODE_X, [&](const Collection* collection) {
+            ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
+            numCollectionsTraversed++;
+            return true;
+        });
 
         ASSERT_EQUALS(numCollectionsTraversed, 3);
     }
@@ -656,16 +641,11 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDb) {
     {
         auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db2", MODE_IX);
         int numCollectionsTraversed = 0;
-        catalog::forEachCollectionFromDb(
-            opCtx,
-            "db2",
-            MODE_IS,
-            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
-                ASSERT_TRUE(
-                    opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IS));
-                numCollectionsTraversed++;
-                return true;
-            });
+        catalog::forEachCollectionFromDb(opCtx, "db2", MODE_IS, [&](const Collection* collection) {
+            ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IS));
+            numCollectionsTraversed++;
+            return true;
+        });
 
         ASSERT_EQUALS(numCollectionsTraversed, 1);
     }
@@ -673,14 +653,10 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDb) {
     {
         auto dbLock = std::make_unique<Lock::DBLock>(opCtx, "db3", MODE_IX);
         int numCollectionsTraversed = 0;
-        catalog::forEachCollectionFromDb(
-            opCtx,
-            "db3",
-            MODE_S,
-            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
-                numCollectionsTraversed++;
-                return true;
-            });
+        catalog::forEachCollectionFromDb(opCtx, "db3", MODE_S, [&](const Collection* collection) {
+            numCollectionsTraversed++;
+            return true;
+        });
 
         ASSERT_EQUALS(numCollectionsTraversed, 0);
     }
@@ -697,13 +673,13 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
             opCtx,
             "db",
             MODE_X,
-            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
+            [&](const Collection* collection) {
                 ASSERT_TRUE(
                     opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
                 numCollectionsTraversed++;
                 return true;
             },
-            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
+            [&](const Collection* collection) {
                 ASSERT_TRUE(
                     opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_NONE));
                 return DurableCatalog::get(opCtx)
@@ -721,13 +697,13 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
             opCtx,
             "db",
             MODE_IX,
-            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
+            [&](const Collection* collection) {
                 ASSERT_TRUE(
                     opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
                 numCollectionsTraversed++;
                 return true;
             },
-            [&](const Collection* collection, const CollectionCatalogEntry* catalogEntry) {
+            [&](const Collection* collection) {
                 ASSERT_TRUE(
                     opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_NONE));
                 return !DurableCatalog::get(opCtx)
