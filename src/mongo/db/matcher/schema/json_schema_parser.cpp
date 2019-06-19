@@ -1311,16 +1311,6 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
     auto encryptElt = keywordMap[JSONSchemaParser::kSchemaEncryptKeyword];
     auto encryptMetadataElt = keywordMap[JSONSchemaParser::kSchemaEncryptMetadataKeyword];
 
-    if ((encryptElt || encryptMetadataElt) && expCtx->maxFeatureCompatibilityVersion &&
-        expCtx->maxFeatureCompatibilityVersion <
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
-        return Status(ErrorCodes::QueryFeatureNotAllowed,
-                      str::stream() << "The featureCompatiblityVersion must be 4.2 to use "
-                                       "encryption keywords in $jsonSchema. See "
-                                    << feature_compatibility_version_documentation::kUpgradeLink
-                                    << ".");
-    }
-
     if (encryptElt && encryptMetadataElt) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Cannot specify both $jsonSchema keywords '"

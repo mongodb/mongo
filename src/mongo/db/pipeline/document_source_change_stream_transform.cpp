@@ -156,14 +156,6 @@ ResumeTokenData DocumentSourceChangeStreamTransform::getResumeToken(Value ts,
     if (!uuid.missing())
         resumeTokenData.uuid = uuid.getUuid();
 
-    // If 'needsMerge' is true, 'mergeByPBRT' is false, and FCV is less than 4.2, then we are
-    // running on a sharded cluster that is mid-upgrade, and so we generate v0 resume tokens.
-    // Otherwise, we always generate v1 resume tokens whether the FCV is 4.0 or 4.2.
-    if (pExpCtx->needsMerge && !pExpCtx->mergeByPBRT &&
-        _fcv < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
-        resumeTokenData.version = 0;
-    }
-
     return resumeTokenData;
 }
 

@@ -1988,20 +1988,6 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(
         const StringData varName = fieldPath.substr(0, fieldPath.find('.'));
         Variables::uassertValidNameForUserRead(varName);
         auto varId = vps.getVariable(varName);
-        // $$NOW and $$CLUSTER_TIME are available only in 4.2 and up.
-        // The check should be removed when 4.2 becomes the last stable version.
-        if (varId == Variables::kNowId || varId == Variables::kClusterTimeId) {
-            uassert(ErrorCodes::QueryFeatureNotAllowed,
-                    str::stream()
-                        << "'$$"
-                        << varName
-                        << "' is not allowed in the current feature compatibility version. See "
-                        << feature_compatibility_version_documentation::kCompatibilityLink
-                        << " for more information.",
-                    !expCtx->maxFeatureCompatibilityVersion ||
-                        (ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 <=
-                         *expCtx->maxFeatureCompatibilityVersion));
-        }
         return new ExpressionFieldPath(expCtx, fieldPath.toString(), varId);
     } else {
         return new ExpressionFieldPath(expCtx,
@@ -4946,10 +4932,7 @@ Value ExpressionRound::evaluate(const Document& root, Variables* variables) cons
         root, _children, getOpName(), Decimal128::kRoundTiesToEven, &std::round, variables);
 }
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    round,
-    ExpressionRound::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
+REGISTER_EXPRESSION(round, ExpressionRound::parse);
 const char* ExpressionRound::getOpName() const {
     return "$round";
 }
@@ -4962,24 +4945,6 @@ Value ExpressionTrunc::evaluate(const Document& root, Variables* variables) cons
 intrusive_ptr<Expression> ExpressionTrunc::parse(const intrusive_ptr<ExpressionContext>& expCtx,
                                                  BSONElement elem,
                                                  const VariablesParseState& vps) {
-    // In version 4.2 we added new arguments. In all previous versions the expression existed but
-    // only supported a single argument.
-    const bool newArgumentsAllowed =
-        (!expCtx->maxFeatureCompatibilityVersion ||
-         (*expCtx->maxFeatureCompatibilityVersion >=
-          ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42));
-    uassert(
-        ErrorCodes::QueryFeatureNotAllowed,
-        // TODO SERVER-31968 we would like to include the current version and the required minimum
-        // version in this error message, but using FeatureCompatibilityVersion::toString() would
-        // introduce a dependency cycle.
-        str::stream()
-            << elem.fieldNameStringData()
-            << " with >1 argument is not allowed in the current feature compatibility version. See "
-            << feature_compatibility_version_documentation::kCompatibilityLink
-            << " for more information.",
-        // Allow non-arrays since they will be rejected anyway by the parser below.
-        elem.type() != BSONType::Array || elem.Array().size() <= 1 || newArgumentsAllowed);
     return ExpressionRangedArity<ExpressionTrunc, 1, 2>::parse(expCtx, elem, vps);
 }
 
@@ -6067,10 +6032,7 @@ void ExpressionRegex::_doAddDependencies(DepsTracker* deps) const {
 
 /* -------------------------- ExpressionRegexFind ------------------------------ */
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    regexFind,
-    ExpressionRegexFind::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
+REGISTER_EXPRESSION(regexFind, ExpressionRegexFind::parse);
 boost::intrusive_ptr<Expression> ExpressionRegexFind::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement expr,
@@ -6091,10 +6053,7 @@ Value ExpressionRegexFind::evaluate(const Document& root, Variables* variables) 
 
 /* -------------------------- ExpressionRegexFindAll ------------------------------ */
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    regexFindAll,
-    ExpressionRegexFindAll::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
+REGISTER_EXPRESSION(regexFindAll, ExpressionRegexFindAll::parse);
 boost::intrusive_ptr<Expression> ExpressionRegexFindAll::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement expr,
@@ -6155,10 +6114,7 @@ Value ExpressionRegexFindAll::evaluate(const Document& root, Variables* variable
 
 /* -------------------------- ExpressionRegexMatch ------------------------------ */
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    regexMatch,
-    ExpressionRegexMatch::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
+REGISTER_EXPRESSION(regexMatch, ExpressionRegexMatch::parse);
 boost::intrusive_ptr<Expression> ExpressionRegexMatch::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement expr,
