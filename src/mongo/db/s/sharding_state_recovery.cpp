@@ -60,8 +60,6 @@ namespace {
 const char kRecoveryDocumentId[] = "minOpTimeRecovery";
 const char kMinOpTime[] = "minOpTime";
 const char kMinOpTimeUpdaters[] = "minOpTimeUpdaters";
-const char kConfigsvrConnString[] = "configsvrConnectionString";  // TODO SERVER-34166: Remove.
-const char kShardName[] = "shardName";                            // TODO SERVER-34166: Remove.
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
@@ -92,16 +90,11 @@ public:
         return recDoc;
     }
 
-    static BSONObj createChangeObj(ConnectionString configsvr,
-                                   std::string shardName,
-                                   repl::OpTime minOpTime,
-                                   ChangeType change) {
+    static BSONObj createChangeObj(repl::OpTime minOpTime, ChangeType change) {
         BSONObjBuilder cmdBuilder;
 
         {
             BSONObjBuilder setBuilder(cmdBuilder.subobjStart("$set"));
-            setBuilder.append(kConfigsvrConnString, configsvr.toString());
-            setBuilder.append(kShardName, shardName);
             minOpTime.append(&setBuilder, kMinOpTime);
         }
 
@@ -157,14 +150,8 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
 
         // The config server connection string and shard name are no longer parsed in 4.0, but 3.6
         // nodes still expect to find them, so we must include them until after 4.0 ships.
-        //
-        // TODO SERVER-34166: Stop writing config server connection string and shard name.
         auto const grid = Grid::get(opCtx);
-        BSONObj updateObj = RecoveryDocument::createChangeObj(
-            grid->shardRegistry()->getConfigServerConnectionString(),
-            ShardingState::get(opCtx)->shardId().toString(),
-            grid->configOpTime(),
-            change);
+        BSONObj updateObj = RecoveryDocument::createChangeObj(grid->configOpTime(), change);
 
         LOG(1) << "Changing sharding recovery document " << redact(updateObj);
 

@@ -12,8 +12,6 @@
 
     var recoveryDoc = {
         _id: 'minOpTimeRecovery',
-        configsvrConnectionString: st.configRS.getURL(),
-        shardName: st.shard0.shardName,
         minOpTime: {ts: Timestamp(0, 0), t: 0},
         minOpTimeUpdaters: 2
     };
