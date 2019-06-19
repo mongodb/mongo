@@ -58,11 +58,12 @@ Status _createView(OperationContext* opCtx,
                    const BSONObj& idIndex) {
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+        // Operations all lock system.views in the end to prevent deadlock.
         Lock::CollectionLock systemViewsLock(
             opCtx,
             NamespaceString(nss.db(), NamespaceString::kSystemDotViewsCollectionName),
             MODE_X);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
 
         Database* db = autoDb.getDb();
 
