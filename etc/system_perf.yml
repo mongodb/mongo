@@ -216,12 +216,17 @@ functions:
           storageEngine: ${storageEngine}
           test_control: ${test}
           production: true
-          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz"
-          workloads_dir: ../src/workloads/workloads
-          ycsb_dir: ../src/YCSB/YCSB
-          linkbench_dir: ../src/linkbench/linkbench
-          genny_dir: ../src/genny/genny
           authentication: ${authentication}
+          overrides:
+            workload_setup:
+              local_repos:
+                workloads: ../src/workloads/workloads
+                ycsb: ../src/YCSB/YCSB
+                linkbench: ../src/linkbench/linkbench
+                tpcc: ../src/tpcc/tpcc
+                genny: ../src/genny/genny
+            mongodb_setup:
+              mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz"
           EOF
 
           cat > runtime.yml <<EOF
