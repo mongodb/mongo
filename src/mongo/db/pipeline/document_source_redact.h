@@ -67,6 +67,10 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    boost::intrusive_ptr<Expression> getExpression() {
+        return _expression;
+    }
+
 private:
     DocumentSourceRedact(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const boost::intrusive_ptr<Expression>& previsit);
