@@ -109,16 +109,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='shell_options_test',
-    source=[
-        "shell_options_test.cpp",
-    ],
-    LIBDEPS=[
-        'shell_options_register',
-    ],
-)
-
 env.Library(
     target='shell_utils',
     source=[
@@ -138,17 +128,6 @@ env.Library(
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/util/password',
         'shell_options_storage',
-    ]
-)
-
-env.CppUnitTest(
-    target='shell_utils_test',
-    source=[
-        'shell_utils_test.cpp'
-    ],
-    LIBDEPS=[
-        'shell_utils',
-        '$BUILD_DIR/mongo/util/signal_handlers',
     ]
 )
 
@@ -179,14 +158,6 @@ kmsEnv.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='kms_test',
-    source='kms_test.cpp',
-    LIBDEPS=[
-        'kms',
-    ]
-)
-
 env.Library(
     target="kms_shell",
     source=[
@@ -215,5 +186,20 @@ scriptingEnv.Library(
         '$BUILD_DIR/mongo/shell/shell_options_register',
         '$BUILD_DIR/third_party/shim_mozjs',
         'kms',
+    ],
+)
+
+env.CppUnitTest(
+    target='shell_test',
+    source=[
+        'kms_test.cpp',
+        'shell_options_test.cpp',
+        'shell_utils_test.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/signal_handlers',
+        'kms',
+        'shell_options_register',
+        'shell_utils',
     ],
 )

@@ -15,7 +15,7 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target="dotted_path_support_test",
+    target="db_bson_test",
     source=[
         "dotted_path_support_test.cpp",
     ],

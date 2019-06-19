@@ -23,29 +23,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='shard_remote_test',
-    source=[
-        'shard_remote_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
-        '$BUILD_DIR/mongo/s/query/async_results_merger',
-        'sharding_client',
-    ],
-)
-
-env.CppUnitTest(
-    target='shard_registry_test',
-    source=[
-        'shard_registry_data_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
-    ],
-)
-
 env.Library(
     target='shard_interface',
     source=[
@@ -85,7 +62,23 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='shard_local_test',
+    target='mongos_client_test',
+    source=[
+        'shard_registry_data_test.cpp',
+        'shard_remote_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/query/async_results_merger',
+        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        'sharding_client',
+    ],
+)
+
+# The shard local test globally sets server options into the config
+# server state, which is incompatible with the other tests.
+env.CppUnitTest(
+    target='mongos_client_local_test',
     source=[
         'shard_local_test.cpp',
     ],

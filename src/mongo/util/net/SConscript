@@ -195,7 +195,7 @@ else:
     )
 
 env.CppUnitTest(
-    target='network_test',
+    target='util_net_test',
     source=[
         'cidr_test.cpp',
         'hostandport_test.cpp',
@@ -207,7 +207,7 @@ env.CppUnitTest(
 
 if get_option('ssl') == 'on':
     env.CppUnitTest(
-        target='ssl_manager_test',
+        target='util_net_ssl_test',
         source=[
             'ssl_manager_test.cpp',
             'ssl_options_test.cpp',

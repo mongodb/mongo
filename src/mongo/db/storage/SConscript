@@ -262,14 +262,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target= 'storage_engine_lock_file_test',
-    source = 'storage_engine_lock_file_test.cpp',
-    LIBDEPS=[
-        'storage_engine_lock_file',
-    ],
-)
-
 env.Library(
     target='storage_engine_metadata',
     source=[
@@ -303,41 +295,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
         'storage_file_util',
-    ],
-)
-
-env.CppUnitTest(
-    target='storage_repair_observer_test',
-    source=[
-        'storage_repair_observer_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/dbhelpers',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
-        '$BUILD_DIR/mongo/executor/network_interface_factory',
-        '$BUILD_DIR/mongo/executor/network_interface_mock',
-        'storage_repair_observer',
-    ],
-)
-
-env.CppUnitTest(
-    target= 'storage_engine_metadata_test',
-    source = 'storage_engine_metadata_test.cpp',
-    LIBDEPS=[
-        'storage_engine_metadata',
-    ],
-)
-
-env.CppUnitTest(
-    target='storage_key_string_test',
-    source='key_string_test.cpp',
-    LIBDEPS=[
-        'key_string',
-        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -393,17 +350,31 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='flow_control_test',
+    target='db_storage_test',
     source=[
         'flow_control_test.cpp',
+        'key_string_test.cpp',
+        'storage_engine_lock_file_test.cpp',
+        'storage_engine_metadata_test.cpp',
+        'storage_repair_observer_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/topology_coordinator',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/executor/network_interface_mock',
         'flow_control',
         'flow_control_parameters',
+        'key_string',
+        'storage_engine_lock_file',
+        'storage_engine_metadata',
+        'storage_repair_observer',
     ],
 )

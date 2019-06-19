@@ -95,30 +95,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='connection_pool_test',
-    source=[
-        'connection_pool_test.cpp',
-        'connection_pool_test_fixture.cpp',
-    ],
-    LIBDEPS=[
-        'connection_pool_executor',
-    ],
-    LIBDEPS_PRIVATE=[
-        'egress_tag_closer_manager',
-    ],
-)
-
-env.CppUnitTest(
-    target='network_interface_mock_test',
-    source=[
-        'network_interface_mock_test.cpp'
-    ],
-    LIBDEPS=[
-        'network_interface_mock',
-    ],
-)
-
 env.Library(target='network_test_env',
             source=['network_test_env.cpp',],
             LIBDEPS=[
@@ -168,19 +144,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/version_impl',
     ]
-)
-
-env.CppIntegrationTest(
-    target='network_interface_integration_test',
-    source=[
-        'network_interface_integration_test.cpp',
-    ],
-    LIBDEPS=[
-        'network_interface_fixture',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/wire_version',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-    ],
 )
 
 env.Library(
@@ -247,16 +210,6 @@ env.Library(
     ]
 )
 
-env.CppUnitTest(
-    target='thread_pool_task_executor_test',
-    source=[
-        'thread_pool_task_executor_test.cpp',
-    ],
-    LIBDEPS=[
-        'thread_pool_task_executor_test_fixture',
-    ]
-)
-
 env.Library(
     target='task_executor_pool',
     source=[
@@ -281,35 +234,6 @@ env.Library(
     ],
 )
 
-env.CppIntegrationTest(
-    target='task_executor_cursor_integration_test',
-    source=[
-        'task_executor_cursor_integration_test.cpp',
-    ],
-    LIBDEPS=[
-        'task_executor_cursor',
-        '$BUILD_DIR/mongo/client/clientdriver_network',
-        '$BUILD_DIR/mongo/db/wire_version',
-        '$BUILD_DIR/mongo/executor/network_interface_factory',
-        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        '$BUILD_DIR/mongo/util/version_impl',
-    ],
-)
-
-env.CppUnitTest(
-    target='task_executor_cursor_test',
-    source=[
-        'task_executor_cursor_test.cpp',
-    ],
-    LIBDEPS=[
-        'task_executor_cursor',
-        'thread_pool_task_executor_test_fixture',
-    ],
-)
-
 env.Library(
     target='non_auth_task_executor',
     source=[
@@ -324,27 +248,46 @@ env.Library(
     ],
 )
 
-env.CppIntegrationTest(
-    target='non_auth_task_executor_integration_test',
+env.CppUnitTest(
+    target='executor_test',
     source=[
-        'non_auth_task_executor_integration_test.cpp',
+        'connection_pool_test.cpp',
+        'connection_pool_test_fixture.cpp',
+        'network_interface_mock_test.cpp',
+        'scoped_task_executor_test.cpp',
+        'task_executor_cursor_test.cpp',
+        'thread_pool_task_executor_test.cpp',
     ],
     LIBDEPS=[
-        'non_auth_task_executor',
-        '$BUILD_DIR/mongo/db/wire_version',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-        '$BUILD_DIR/mongo/util/version_impl',
+        'connection_pool_executor',
+        'egress_tag_closer_manager',
+        'network_interface_mock',
+        'scoped_task_executor',
+        'task_executor_cursor',
+        'thread_pool_task_executor',
+        'thread_pool_task_executor_test_fixture',
     ],
 )
 
-env.CppUnitTest(
-    target='scoped_task_executor_test',
+env.CppIntegrationTest(
+    target='executor_integration_test',
     source=[
-        'scoped_task_executor_test.cpp',
+        'network_interface_integration_test.cpp',
+        'task_executor_cursor_integration_test.cpp',
+        'non_auth_task_executor_integration_test.cpp',
     ],
     LIBDEPS=[
-        'scoped_task_executor',
-        'network_interface_mock',
-        'thread_pool_task_executor',
+        '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/wire_version',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/mongo/util/version_impl',
+        'network_interface_fixture',
+        'non_auth_task_executor',
+        'task_executor_cursor',
     ],
 )

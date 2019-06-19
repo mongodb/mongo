@@ -26,14 +26,6 @@ env.Library(
         ]
     )
 
-env.CppUnitTest(
-    target='field_path_test',
-    source='field_path_test.cpp',
-    LIBDEPS=[
-        'field_path',
-        ],
-    )
-
 env.Library(
     target='document_value',
     source=[
@@ -62,22 +54,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='document_value_test',
-    source=[
-        'document_comparator_test.cpp',
-        'document_value_test.cpp',
-        'document_path_support_test.cpp',
-        'document_value_test_util_self_test.cpp',
-        'value_comparator_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        'document_value',
-        'document_value_test_util',
-        ],
-    )
-
 env.Library(
     target='aggregation_request',
     source=[
@@ -95,15 +71,6 @@ env.Library(
         'document_sources_idl',
         'document_value',
     ]
-)
-
-env.CppUnitTest(
-    target='aggregation_request_test',
-    source='aggregation_request_test.cpp',
-    LIBDEPS=[
-        'aggregation_request',
-        'document_value_test_util',
-    ],
 )
 
 env.Library(
@@ -206,70 +173,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/query/cluster_aggregation_planner',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
-    ],
-)
-
-env.CppUnitTest(
-    target='document_source_test',
-    source=[
-        'document_source_add_fields_test.cpp',
-        'document_source_bucket_auto_test.cpp',
-        'document_source_bucket_test.cpp',
-        'document_source_change_stream_test.cpp',
-        'document_source_check_resume_token_test.cpp',
-        'document_source_count_test.cpp',
-        'document_source_current_op_test.cpp',
-        'document_source_exchange_test.cpp',
-        'document_source_geo_near_test.cpp',
-        'document_source_graph_lookup_test.cpp',
-        'document_source_group_test.cpp',
-        'document_source_internal_split_pipeline_test.cpp',
-        'document_source_limit_test.cpp',
-        'document_source_lookup_change_post_image_test.cpp',
-        'document_source_lookup_test.cpp',
-        'document_source_match_test.cpp',
-        'document_source_merge_cursors_test.cpp',
-        'document_source_merge_test.cpp',
-        'document_source_mock_test.cpp',
-        'document_source_out_test.cpp',
-        'document_source_plan_cache_stats_test.cpp',
-        'document_source_project_test.cpp',
-        'document_source_redact_test.cpp',
-        'document_source_replace_root_test.cpp',
-        'document_source_sample_test.cpp',
-        'document_source_internal_shard_filter_test.cpp',
-        'document_source_skip_test.cpp',
-        'document_source_sort_by_count_test.cpp',
-        'document_source_sort_test.cpp',
-        'document_source_test.cpp',
-        'document_source_unwind_test.cpp',
-        'sequential_document_cache_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/repl/oplog_entry',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/s/query/router_exec_stage',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
-        'document_source_mock',
-        'document_value_test_util',
-        'pipeline',
-    ],
-)
-
-env.CppUnitTest(
-    target='document_source_facet_test',
-    source='document_source_facet_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/s/is_mongos',
-        'pipeline',
-        'document_source_mock',
-        'document_value_test_util',
     ],
 )
 
@@ -459,76 +362,6 @@ pipelineeEnv.Library(
     ]
 )
 
-env.CppUnitTest(
-    target='tee_buffer_test',
-    source='tee_buffer_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/s/is_mongos',
-        'document_source_mock',
-        'document_value_test_util',
-    ],
-)
-
-env.CppUnitTest(
-    target='agg_expression_test',
-    source=[
-        'expression_convert_test.cpp',
-        'expression_date_test.cpp',
-        'expression_test.cpp',
-        'expression_trigonometric_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'accumulator',
-        'document_value_test_util',
-        'expression',
-        ],
-    )
-
-env.CppUnitTest(
-    target='accumulator_test',
-    source='accumulator_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'accumulator',
-        'document_value_test_util',
-        ],
-    )
-
-env.CppUnitTest(
-    target='pipeline_test',
-    source=[
-        'dependencies_test.cpp',
-        'pipeline_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/s/is_mongos',
-        '$BUILD_DIR/mongo/s/query/cluster_aggregate',
-        'document_source_mock',
-        'document_value_test_util',
-        'pipeline',
-        ],
-    )
-
-env.CppUnitTest(
-    target='lookup_set_cache_test',
-    source=[
-        'lookup_set_cache_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        'document_value',
-    ]
-)
-
 env.Library(
     target='parsed_aggregation_projection',
     source=[
@@ -543,58 +376,6 @@ env.Library(
         'field_path',
         '$BUILD_DIR/mongo/db/matcher/expressions',
     ]
-)
-
-env.CppUnitTest(
-    target='parsed_exclusion_projection_test',
-    source='parsed_exclusion_projection_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'document_value_test_util',
-        'parsed_aggregation_projection',
-    ],
-)
-
-env.CppUnitTest(
-    target='parsed_aggregation_projection_test',
-    source='parsed_aggregation_projection_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'parsed_aggregation_projection',
-    ],
-)
-
-env.CppUnitTest(
-    target='parsed_inclusion_projection_test',
-    source='parsed_inclusion_projection_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'document_value_test_util',
-        'parsed_aggregation_projection',
-    ],
-)
-
-env.CppUnitTest(
-    target='granularity_rounder_test',
-    source=[
-        'granularity_rounder_powers_of_two_test.cpp',
-        'granularity_rounder_preferred_numbers_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'document_value_test_util',
-        'granularity_rounder',
-    ],
-)
-
-env.CppUnitTest(
-    target='parsed_add_fields_test',
-    source='parsed_add_fields_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'document_value_test_util',
-        'parsed_aggregation_projection',
-    ],
 )
 
 env.Library(
@@ -631,44 +412,99 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='resume_token_test',
-    source='resume_token_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        'document_sources_idl',
-    ],
-)
-
-env.CppUnitTest(
-    target='pipeline_metadata_tree_test',
-    source='pipeline_metadata_tree_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'pipeline',
-    ],
-)
-
-env.CppUnitTest(
-    target='expression_walker_test',
-    source='expression_walker_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'expression',
-    ],
-)
-
-env.CppUnitTest(
-    target='process_interface_test',
+    target='db_pipeline_test',
     source=[
+        'accumulator_test.cpp',
+        'aggregation_request_test.cpp',
+        'dependencies_test.cpp',
+        'document_comparator_test.cpp',
+        'document_path_support_test.cpp',
+        'document_source_add_fields_test.cpp',
+        'document_source_bucket_auto_test.cpp',
+        'document_source_bucket_test.cpp',
+        'document_source_change_stream_test.cpp',
+        'document_source_check_resume_token_test.cpp',
+        'document_source_count_test.cpp',
+        'document_source_current_op_test.cpp',
+        'document_source_exchange_test.cpp',
+        'document_source_facet_test.cpp',
+        'document_source_geo_near_test.cpp',
+        'document_source_graph_lookup_test.cpp',
+        'document_source_group_test.cpp',
+        'document_source_internal_shard_filter_test.cpp',
+        'document_source_internal_split_pipeline_test.cpp',
+        'document_source_limit_test.cpp',
+        'document_source_lookup_change_post_image_test.cpp',
+        'document_source_lookup_test.cpp',
+        'document_source_match_test.cpp',
+        'document_source_merge_cursors_test.cpp',
+        'document_source_merge_test.cpp',
+        'document_source_mock_test.cpp',
+        'document_source_out_test.cpp',
+        'document_source_plan_cache_stats_test.cpp',
+        'document_source_project_test.cpp',
+        'document_source_redact_test.cpp',
+        'document_source_replace_root_test.cpp',
+        'document_source_sample_test.cpp',
+        'document_source_skip_test.cpp',
+        'document_source_sort_by_count_test.cpp',
+        'document_source_sort_test.cpp',
+        'document_source_test.cpp',
+        'document_source_unwind_test.cpp',
+        'document_value_test.cpp',
+        'document_value_test_util_self_test.cpp',
+        'expression_convert_test.cpp',
+        'expression_date_test.cpp',
+        'expression_test.cpp',
+        'expression_trigonometric_test.cpp',
+        'expression_walker_test.cpp',
+        'field_path_test.cpp',
+        'granularity_rounder_powers_of_two_test.cpp',
+        'granularity_rounder_preferred_numbers_test.cpp',
+        'lookup_set_cache_test.cpp',
         'mongos_process_interface_test.cpp',
-        'process_interface_standalone_test.cpp'
+        'parsed_add_fields_test.cpp',
+        'parsed_aggregation_projection_test.cpp',
+        'parsed_exclusion_projection_test.cpp',
+        'parsed_inclusion_projection_test.cpp',
+        'pipeline_metadata_tree_test.cpp',
+        'pipeline_test.cpp',
+        'process_interface_standalone_test.cpp',
+        'resume_token_test.cpp',
+        'sequential_document_cache_test.cpp',
+        'tee_buffer_test.cpp',
+        'value_comparator_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/repl/oplog_entry',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/s/is_mongos',
+        '$BUILD_DIR/mongo/s/query/cluster_aggregate',
+        '$BUILD_DIR/mongo/s/query/router_exec_stage',
+        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        'accumulator',
+        'aggregation_request',
+        'document_source_mock',
+        'document_sources_idl',
+        'document_value',
+        'document_value_test_util',
+        'expression',
+        'field_path',
+        'granularity_rounder',
         'mongo_process_common',
         'mongo_process_interface',
         'mongos_process_interface',
+        'parsed_aggregation_projection',
+        'pipeline',
         'process_interface_shardsvr',
-        'process_interface_standalone'
-        ],
-    )
+        'process_interface_standalone',
+    ],
+)

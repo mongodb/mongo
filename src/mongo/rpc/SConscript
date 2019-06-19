@@ -118,64 +118,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target=[
-        'rpc_metadata_test',
-    ],
-    source=[
-        'metadata_test.cpp',
-        'metadata/egress_metadata_hook_list_test.cpp',
-        'metadata/logical_time_metadata_test.cpp',
-        'metadata/sharding_metadata_test.cpp',
-        'metadata/tracking_metadata_test.cpp',
-    ],
-    LIBDEPS=[
-        'metadata',
-    ],
-)
-
-env.CppUnitTest(
-    target=[
-        'rpc_test',
-    ],
-    source=[
-        'get_status_from_command_result_test.cpp',
-        'legacy_request_test.cpp',
-        'object_check_test.cpp',
-        'op_msg_test.cpp',
-        'protocol_test.cpp',
-        'reply_builder_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        '$BUILD_DIR/third_party/wiredtiger/wiredtiger_checksum',
-        'rpc',
-    ],
-)
-
-env.CppUnitTest(
-    target='repl_set_metadata_test',
-    source=[
-        'metadata/repl_set_metadata_test.cpp',
-    ],
-    LIBDEPS=['metadata']
-)
-
-env.CppUnitTest(
-    target='oplog_query_metadata_test',
-    source=[
-        'metadata/oplog_query_metadata_test.cpp',
-    ],
-    LIBDEPS=['metadata']
-)
-
-env.CppUnitTest(
-    target='config_server_metadata_test',
-    source=[
-        'metadata/config_server_metadata_test.cpp',
-    ],
-    LIBDEPS=['metadata']
-)
 
 env.Library(
     target='client_metadata',
@@ -195,17 +137,35 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='client_metadata_test',
+    target='rpc_test',
     source=[
+        'get_status_from_command_result_test.cpp',
+        'legacy_request_test.cpp',
         'metadata/client_metadata_test.cpp',
+        'metadata/config_server_metadata_test.cpp',
+        'metadata/egress_metadata_hook_list_test.cpp',
+        'metadata/logical_time_metadata_test.cpp',
+        'metadata/oplog_query_metadata_test.cpp',
+        'metadata/repl_set_metadata_test.cpp',
+        'metadata/sharding_metadata_test.cpp',
+        'metadata/tracking_metadata_test.cpp',
+        'metadata_test.cpp',
+        'object_check_test.cpp',
+        'op_msg_test.cpp',
+        'protocol_test.cpp',
+        'reply_builder_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
+        '$BUILD_DIR/third_party/wiredtiger/wiredtiger_checksum',
         'client_metadata',
+        'metadata',
+        'rpc',
     ]
 )
 
 env.CppIntegrationTest(
-    target='op_msg_integration_test',
+    target='rpc_integration_test',
     source=[
         'op_msg_integration_test.cpp',
     ],

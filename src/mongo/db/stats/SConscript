@@ -15,16 +15,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='timer_stats_test',
-    source=[
-        'timer_stats_test.cpp',
-    ],
-    LIBDEPS=[
-        'timer_stats',
-    ],
-)
-
 env.Library(
     target='top',
     source=[
@@ -35,26 +25,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
     ],
 )
-
-env.CppUnitTest(
-    target='top_test',
-    source=[
-        'top_test.cpp',
-    ],
-    LIBDEPS=[
-        'top',
-    ],
-)
-
-env.CppUnitTest(
-    target='operation_latency_histogram_test',
-    source=[
-        'operation_latency_histogram_test.cpp'
-        ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/stats/top',
-        ])
 
 env.Library(
     target='counters',
@@ -98,16 +68,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='fill_locker_info_test',
-    source=[
-        'fill_locker_info_test.cpp',
-    ],
-    LIBDEPS=[
-        'fill_locker_info',
-    ],
-)
-
 env.Library(
     target='serveronly_stats',
     source=[
@@ -124,5 +84,21 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status',
+    ],
+)
+
+env.CppUnitTest(
+    target='db_stats_test',
+    source=[
+        'fill_locker_info_test.cpp',
+        'operation_latency_histogram_test.cpp',
+        'timer_stats_test.cpp',
+        'top_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'fill_locker_info',
+        'timer_stats',
+        'top',
     ],
 )

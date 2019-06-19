@@ -70,7 +70,7 @@ else:
 
 
 fmEnv.CppUnitTest(
-    target='free_mon_test',
+    target='db_free_mon_test',
     source=[
         'free_mon_controller_test.cpp',
         'free_mon_queue_test.cpp',

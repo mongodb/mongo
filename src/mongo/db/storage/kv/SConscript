@@ -85,50 +85,25 @@ env.Library(
     )
 
 env.CppUnitTest(
-    target='kv_drop_pending_ident_reaper_test',
-    source=[
-        'kv_drop_pending_ident_reaper_test.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'kv_drop_pending_ident_reaper',
-    ],
-)
-
-env.CppUnitTest(
-    target='kv_collection_catalog_entry_test',
+    target='db_storage_kv_engine_test',
     source=[
         'kv_collection_catalog_entry_test.cpp',
-        ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
-        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
-        'kv_engine_core',
-        'storage_engine',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authmocks'
-    ],
-)
-
-env.CppUnitTest(
-    target='storage_engine_test',
-    source=[
+        'kv_drop_pending_ident_reaper_test.cpp',
         'storage_engine_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
+        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
         '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
+        'kv_drop_pending_ident_reaper',
         'kv_engine_core',
         'storage_engine',
     ],

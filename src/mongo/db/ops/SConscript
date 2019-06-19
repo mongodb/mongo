@@ -63,32 +63,28 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='write_ops_parsers_test',
-    source='write_ops_parsers_test.cpp',
-    LIBDEPS=[
-        'write_ops_parsers',
-        'write_ops_parsers_test_helpers',
+    target='db_ops_test',
+    source=[
+        'write_ops_parsers_test.cpp',
+        'write_ops_retryability_test.cpp',
     ],
-)
-
-env.CppIntegrationTest(
-    target='write_ops_document_stream_integration_test',
-    source='write_ops_document_stream_integration_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_network',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-        '$BUILD_DIR/mongo/util/version_impl',
-    ],
-)
-
-env.CppUnitTest(
-    target='write_ops_retryability_test',
-    source='write_ops_retryability_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
         '$BUILD_DIR/mongo/db/write_ops',
+        'write_ops_parsers',
+        'write_ops_parsers_test_helpers',
+    ],
+)
+
+env.CppIntegrationTest(
+    target='db_ops_integration_test',
+    source='write_ops_document_stream_integration_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/mongo/util/version_impl',
     ],
 )

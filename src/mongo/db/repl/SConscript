@@ -73,38 +73,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='apply_ops_test',
-    source=[
-        'apply_ops_test.cpp',
-    ],
-    LIBDEPS=[
-        'oplog',
-        'oplog_entry',
-        'replmocks',
-        'storage_interface_impl',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/rpc/command_status',
-    ],
-)
-
-env.CppUnitTest(
-    target='oplog_test',
-    source=[
-        'oplog_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        'oplog',
-        'oplog_entry',
-        'oplog_interface_local',
-        'replmocks',
-    ],
-)
-
 env.Library(
     target='timestamp_block',
     source=[
@@ -113,25 +81,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-    ],
-)
-
-env.CppUnitTest(
-    target='do_txn_test',
-    source=[
-        'do_txn_test.cpp',
-    ],
-    LIBDEPS=[
-        'oplog',
-        'oplog_entry',
-        'oplog_interface_local',
-        'replmocks',
-        'storage_interface_impl',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/s/op_observer_sharding_impl',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/db/transaction',
-        '$BUILD_DIR/mongo/rpc/command_status',
     ],
 )
 
@@ -217,18 +166,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='abstract_async_component_test',
-    source=[
-        'abstract_async_component_test.cpp',
-    ],
-    LIBDEPS=[
-        'abstract_async_component',
-        'task_executor_mock',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-    ],
-)
-
 env.Library(
     target='dbcheck',
     source=[
@@ -295,21 +232,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='storage_interface_impl_test',
-    source=[
-        'storage_interface_impl_test.cpp',
-    ],
-    LIBDEPS=[
-        'oplog_interface_local',
-        'replmocks',
-        'storage_interface_impl',
-        'sync_tail_test_fixture',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-    ],
-)
-
 env.Library(
     target='replication_consistency_markers_idl',
     source=[
@@ -335,20 +257,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='replication_consistency_markers_impl_test',
-    source=[
-        'replication_consistency_markers_impl_test.cpp',
-    ],
-    LIBDEPS=[
-        'replication_consistency_markers_impl',
-        'replmocks',
-        'storage_interface_impl',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-    ],
-)
-
 env.Library(
     target='replication_recovery',
     source=[
@@ -360,25 +268,6 @@ env.Library(
         'oplog',
         'oplog_application',
         '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
-    target='replication_recovery_test',
-    source=[
-        'replication_recovery_test.cpp',
-    ],
-    LIBDEPS=[
-        'drop_pending_collection_reaper',
-        'oplog_interface_local',
-        'replication_recovery',
-        'replmocks',
-        'storage_interface_impl',
-        'sync_tail_test_fixture',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/op_observer',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/db/transaction',
     ],
 )
 
@@ -396,21 +285,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='replication_process_test',
-    source=[
-        'replication_process_test.cpp',
-    ],
-    LIBDEPS=[
-        'replication_consistency_markers_impl',
-        'replication_process',
-        'replmocks',
-        'storage_interface_impl',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-    ],
-)
-
 env.Library(
     target='drop_pending_collection_reaper',
     source=[
@@ -422,20 +296,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/service_context',
-    ],
-)
-
-env.CppUnitTest(
-    target='drop_pending_collection_reaper_test',
-    source=[
-        'drop_pending_collection_reaper_test.cpp',
-    ],
-    LIBDEPS=[
-        'drop_pending_collection_reaper',
-        'replmocks',
-        'storage_interface_impl',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
 )
 
@@ -484,32 +344,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='oplog_buffer_collection_test',
-    source=[
-        'oplog_buffer_collection_test.cpp',
-    ],
-    LIBDEPS=[
-        'oplog_buffer_collection',
-        'oplog_interface_local',
-        'replmocks',
-        'storage_interface_impl',
-        'sync_tail_test_fixture',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-    ],
-    NO_CRUTCH = True,
-)
-
-env.CppUnitTest(
-    target='oplog_buffer_proxy_test',
-    source=[
-        'oplog_buffer_proxy_test.cpp',
-    ],
-    LIBDEPS=[
-        'oplog_buffer_proxy',
-    ],
-)
 
 env.Library(
     target='oplog_interface_local',
@@ -613,19 +447,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='rs_rollback_test',
-    source=[
-        'rs_rollback_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        'oplog_interface_local',
-        'rollback_test_fixture',
-        'rs_rollback',
-    ],
-)
-
 env.Library(
     target='rollback_impl',
     source=[
@@ -647,23 +468,6 @@ env.Library(
         'drop_pending_collection_reaper',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/idl/server_parameter',
-    ],
-)
-
-env.CppUnitTest(
-    target='rollback_impl_test',
-    source=[
-        'rollback_impl_test.cpp',
-    ],
-    LIBDEPS=[
-        'oplog_interface_local',
-        'oplog_interface_mock',
-        'rollback_impl',
-        'rollback_test_fixture',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
     ],
 )
 
@@ -696,19 +500,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'repl_server_parameters',
-    ],
-)
-
-env.CppUnitTest(
-    target='oplog_applier_test',
-    source=[
-        'oplog_applier_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        'oplog_application_interface',
-        'oplog_buffer_blocking_queue',
     ],
 )
 
@@ -773,26 +564,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='sync_tail_test',
-    source=[
-        'sync_tail_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/catalog_raii',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/commands/mongod_fcv',
-        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
-        '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
-        'idempotency_test_fixture',
-        'oplog_buffer_blocking_queue',
-        'oplog_interface_local',
-        'sync_tail_test_fixture',
-    ],
-)
-
 env.Library(
     target='idempotency_test_util',
     source=[
@@ -807,47 +578,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='idempotency_test',
-    source=[
-        'idempotency_test.cpp',
-    ],
-    LIBDEPS=[
-        'idempotency_test_fixture',
-        'idempotency_test_util',
-    ],
-)
-
-env.CppUnitTest(
-    target='oplog_entry_test',
-    source=[
-        'oplog_entry_test.cpp',
-    ],
-    LIBDEPS=[
-        'idempotency_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='idempotency_document_structure_test',
-    source=[
-        'idempotency_document_structure_test.cpp',
-    ],
-    LIBDEPS=[
-        'idempotency_test_util',
-    ],
-)
-
-env.CppUnitTest(
-    target='idempotency_update_sequence_test',
-    source=[
-        'idempotency_update_sequence_test.cpp',
-    ],
-    LIBDEPS=[
-        'idempotency_test_util',
-    ],
-)
-
 env.Library(
     target='split_horizon',
     source=[
@@ -859,17 +589,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
-
-env.CppUnitTest(
-    target='split_horizon_test',
-    source=[
-        'split_horizon_test.cpp',
-    ],
-    LIBDEPS=[
-        'split_horizon',
-    ],
-)
-
 
 env.Library('topology_coordinator',
             [
@@ -892,25 +611,6 @@ env.Library('topology_coordinator',
                 '$BUILD_DIR/mongo/idl/server_parameter',
                 'split_horizon',
             ])
-
-env.CppUnitTest('repl_set_heartbeat_response_test',
-                'repl_set_heartbeat_response_test.cpp',
-                LIBDEPS=['replica_set_messages'])
-
-env.CppUnitTest(
-    target='topology_coordinator_v1_test',
-    source=[
-        'topology_coordinator_v1_test.cpp',
-    ],
-    LIBDEPS=[
-        'topology_coordinator',
-        'replica_set_messages',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/executor/network_interface_factory',
-        '$BUILD_DIR/mongo/executor/network_interface_mock',
-        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
-    ],
-)
 
 env.Library(
     target='repl_coordinator_impl',
@@ -979,78 +679,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
     ],
 )
-
-env.CppUnitTest(
-    target='replication_coordinator_impl_test',
-    source=[
-        'replication_coordinator_impl_test.cpp',
-    ],
-    LIBDEPS=[
-        'repl_coordinator_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='repl_set_config_checks_test',
-    source=[
-        'repl_set_config_checks_test.cpp',
-    ],
-    LIBDEPS=[
-        'repl_coordinator_impl',
-        'replmocks',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='scatter_gather_test',
-    source=[
-        'scatter_gather_test.cpp',
-    ],
-    LIBDEPS=[
-        'scatter_gather',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='check_quorum_for_config_change_test',
-    source=[
-        'check_quorum_for_config_change_test.cpp',
-    ],
-    LIBDEPS=[
-        'repl_coordinator_impl',
-        'replmocks',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='vote_requester_test',
-    source=[
-        'vote_requester_test.cpp',
-    ],
-    LIBDEPS=[
-        'repl_coordinator_impl',
-        'replica_set_messages',
-        'replmocks',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-    ],
-)
-
-env.CppUnitTest('replication_coordinator_impl_elect_v1_test',
-                'replication_coordinator_impl_elect_v1_test.cpp',
-                LIBDEPS=['repl_coordinator_test_fixture'])
-
-env.CppUnitTest('replication_coordinator_impl_heartbeat_v1_test',
-                'replication_coordinator_impl_heartbeat_v1_test.cpp',
-                LIBDEPS=['repl_coordinator_test_fixture'])
-
-env.CppUnitTest('replication_coordinator_impl_reconfig_test',
-                'replication_coordinator_impl_reconfig_test.cpp',
-                LIBDEPS=['repl_coordinator_test_fixture'])
 
 env.Library(
     target='repl_coordinator_interface',
@@ -1137,29 +765,6 @@ env.Library('replica_set_messages',
                 'split_horizon',
             ])
 
-env.CppUnitTest('repl_set_config_test',
-                [
-                    'member_config_test.cpp',
-                    'repl_set_config_test.cpp',
-                    'repl_set_tag_test.cpp',
-                ],
-                LIBDEPS=[
-                    '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-                    'replica_set_messages',
-                ])
-
-env.CppUnitTest('isself_test',
-                [
-                    'isself_test.cpp',
-                ],
-                LIBDEPS=[
-                    '$BUILD_DIR/mongo/db/auth/authmocks',
-                    '$BUILD_DIR/mongo/db/service_context_d',
-                    '$BUILD_DIR/mongo/db/service_context_test_fixture',
-                    'isself',
-                ],
-                )
-
 env.Library(
     target='repl_set_status_commands',
     source=[
@@ -1233,17 +838,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='abstract_oplog_fetcher_test',
-    source='abstract_oplog_fetcher_test.cpp',
-    LIBDEPS=[
-        'abstract_oplog_fetcher',
-        'abstract_oplog_fetcher_test_fixture',
-        'oplog_entry',
-        'task_executor_mock',
-    ],
-)
-
 env.Library(
     target='oplog_fetcher',
     source=[
@@ -1264,17 +858,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='oplog_fetcher_test',
-    source='oplog_fetcher_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        'oplog_fetcher',
-        'data_replicator_external_state_mock',
-        'abstract_oplog_fetcher_test_fixture',
-    ],
-)
-
 env.Library(
     target='reporter',
     source=[
@@ -1287,17 +870,6 @@ env.Library(
         '$BUILD_DIR/mongo/executor/remote_command',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/rpc/command_status',
-    ],
-)
-
-env.CppUnitTest(
-    target='reporter_test',
-    source='reporter_test.cpp',
-    LIBDEPS=[
-        'reporter',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
 )
 
@@ -1328,17 +900,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/util/net/network',
-    ],
-)
-
-env.CppUnitTest(
-    target='sync_source_resolver_test',
-    source='sync_source_resolver_test.cpp',
-    LIBDEPS=[
-        'sync_source_resolver',
-        'sync_source_selector_mock',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
 )
 
@@ -1378,19 +939,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='collection_cloner_test',
-    source='collection_cloner_test.cpp',
-    LIBDEPS=[
-        'collection_cloner',
-        'base_cloner_test_fixture',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-        '$BUILD_DIR/mongo/dbtests/mocklib',
-        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
-    ],
-)
-
 env.Library(
     target='database_cloner',
     source=[
@@ -1403,19 +951,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'repl_server_parameters',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
-    ],
-)
-
-env.CppUnitTest(
-    target='database_cloner_test',
-    source='database_cloner_test.cpp',
-    LIBDEPS=[
-        'database_cloner',
-        'base_cloner_test_fixture',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/commands/list_collections_filter',
-        '$BUILD_DIR/mongo/dbtests/mocklib',
-        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
 )
 
@@ -1435,20 +970,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='databases_cloner_test',
-    source='databases_cloner_test.cpp',
-    LIBDEPS=[
-        'databases_cloner',
-        'oplog_entry',
-        'replmocks',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
-    ],
-)
-
 env.Library(
     target='task_runner',
     source=[
@@ -1458,43 +979,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
     ],
-)
-
-env.CppUnitTest(
-    target='task_runner_test',
-    source=[
-        'task_runner_test.cpp',
-        'task_runner_test_fixture.cpp',
-    ],
-    LIBDEPS=[
-        'replmocks',
-        'task_runner',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/unittest/unittest',
-    ],
-)
-
-env.CppUnitTest(
-    target='read_concern_args_test',
-    source=[
-        'read_concern_args_test.cpp',
-    ],
-    LIBDEPS=[
-        'replica_set_messages',
-        '$BUILD_DIR/mongo/db/logical_time',
-   ],
-)
-
-env.CppUnitTest(
-    target='speculative_majority_read_info_test',
-    source=[
-        'speculative_majority_read_info_test.cpp',
-    ],
-    LIBDEPS=[
-        'speculative_majority_read_info',
-   ],
 )
 
 env.Library(target='optime',
@@ -1508,16 +992,6 @@ env.Library(target='optime',
             ],
 )
 
-env.CppUnitTest(
-    target='optime_extract_test',
-    source=[
-        'optime_extract_test.cpp'
-    ],
-    LIBDEPS=[
-        'optime',
-    ],
-)
-
 env.Library(
     target='multiapplier',
     source=[
@@ -1527,18 +1001,6 @@ env.Library(
         'oplog_entry',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
-    ],
-)
-
-env.CppUnitTest(
-    target='multiapplier_test',
-    source='multiapplier_test.cpp',
-    LIBDEPS=[
-        'multiapplier',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
 )
 
@@ -1615,28 +1077,6 @@ env.Library(
     ]
 )
 
-env.CppUnitTest(
-    target='initial_syncer_test',
-    source=[
-        'initial_syncer_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
-        '$BUILD_DIR/mongo/db/index/index_access_methods',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        'base_cloner_test_fixture',
-        'data_replicator_external_state_mock',
-        'initial_syncer',
-        'replication_process',
-        'replmocks',
-        'sync_source_selector_mock',
-        'task_executor_mock',
-    ],
-)
-
 env.Library(
     target='rollback_checker',
     source=[
@@ -1644,17 +1084,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/task_executor_interface',
-    ],
-)
-
-env.CppUnitTest(
-    target='rollback_checker_test',
-    source=[
-        'rollback_checker_test.cpp',
-    ],
-    LIBDEPS=[
-        'rollback_checker',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
     ],
 )
 
@@ -1668,16 +1097,6 @@ env.Library(
         'optime',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/fail_point',
-    ],
-)
-
-env.CppUnitTest(
-    target='roll_back_local_operations_test',
-    source='roll_back_local_operations_test.cpp',
-    LIBDEPS=[
-        'oplog_interface_mock',
-        'oplog_interface_remote',
-        'roll_back_local_operations',
     ],
 )
 
@@ -1774,4 +1193,164 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ]
+)
+
+env.CppUnitTest(
+    target='db_repl_test',
+    source=[
+        'abstract_async_component_test.cpp',
+        'abstract_oplog_fetcher_test.cpp',
+        'apply_ops_test.cpp',
+        'check_quorum_for_config_change_test.cpp',
+        'do_txn_test.cpp',
+        'drop_pending_collection_reaper_test.cpp',
+        'idempotency_document_structure_test.cpp',
+        'idempotency_test.cpp',
+        'idempotency_update_sequence_test.cpp',
+        'initial_syncer_test.cpp',
+        'isself_test.cpp',
+        'member_config_test.cpp',
+        'multiapplier_test.cpp',
+        'oplog_applier_test.cpp',
+        'oplog_buffer_collection_test.cpp',
+        'oplog_buffer_proxy_test.cpp',
+        'oplog_entry_test.cpp',
+        'oplog_fetcher_test.cpp',
+        'oplog_test.cpp',
+        'optime_extract_test.cpp',
+        'read_concern_args_test.cpp',
+        'repl_set_config_checks_test.cpp',
+        'repl_set_config_test.cpp',
+        'repl_set_heartbeat_response_test.cpp',
+        'repl_set_tag_test.cpp',
+        'replication_consistency_markers_impl_test.cpp',
+        'replication_process_test.cpp',
+        'replication_recovery_test.cpp',
+        'reporter_test.cpp',
+        'roll_back_local_operations_test.cpp',
+        'rollback_checker_test.cpp',
+        'rollback_impl_test.cpp',
+        'rs_rollback_test.cpp',
+        'scatter_gather_test.cpp',
+        'speculative_majority_read_info_test.cpp',
+        'split_horizon_test.cpp',
+        'storage_interface_impl_test.cpp',
+        'sync_source_resolver_test.cpp',
+        'sync_tail_test.cpp',
+        'task_runner_test.cpp',
+        'task_runner_test_fixture.cpp',
+        'vote_requester_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
+        '$BUILD_DIR/mongo/db/commands/mongod_fcv',
+        '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/index/index_access_methods',
+        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
+        '$BUILD_DIR/mongo/db/logical_time',
+        '$BUILD_DIR/mongo/db/op_observer',
+        '$BUILD_DIR/mongo/db/query/command_request_response',
+        '$BUILD_DIR/mongo/db/s/op_observer_sharding_impl',
+        '$BUILD_DIR/mongo/db/service_context_d',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/stats/counters',
+        '$BUILD_DIR/mongo/db/transaction',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/executor/network_interface_mock',
+        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'abstract_async_component',
+        'abstract_oplog_fetcher',
+        'abstract_oplog_fetcher_test_fixture',
+        'data_replicator_external_state_mock',
+        'drop_pending_collection_reaper',
+        'idempotency_test_fixture',
+        'idempotency_test_util',
+        'initial_syncer',
+        'isself',
+        'multiapplier',
+        'oplog',
+        'oplog_application_interface',
+        'oplog_buffer_blocking_queue',
+        'oplog_buffer_collection',
+        'oplog_buffer_proxy',
+        'oplog_entry',
+        'oplog_fetcher',
+        'oplog_interface_local',
+        'oplog_interface_mock',
+        'oplog_interface_remote',
+        'optime',
+        'repl_coordinator_impl',
+        'replica_set_messages',
+        'replication_consistency_markers_impl',
+        'replication_process',
+        'replication_recovery',
+        'replmocks',
+        'reporter',
+        'roll_back_local_operations',
+        'rollback_checker',
+        'rollback_impl',
+        'rollback_test_fixture',
+        'rs_rollback',
+        'scatter_gather',
+        'speculative_majority_read_info',
+        'split_horizon',
+        'storage_interface_impl',
+        'sync_source_resolver',
+        'sync_source_selector_mock',
+        'sync_tail_test_fixture',
+        'task_executor_mock',
+        'task_runner',
+    ],
+)
+
+# The following two tests appear to clash when combined with the above list.
+
+env.CppUnitTest(
+    target='db_repl_coordinator_test',
+    source=[
+        'replication_coordinator_impl_elect_v1_test.cpp',
+        'replication_coordinator_impl_heartbeat_v1_test.cpp',
+        'replication_coordinator_impl_reconfig_test.cpp',
+        'replication_coordinator_impl_test.cpp',
+        'topology_coordinator_v1_test.cpp',
+    ],
+    LIBDEPS=[
+        'repl_coordinator_impl',
+        'repl_coordinator_test_fixture',
+        'topology_coordinator',
+    ]
+)
+
+env.CppUnitTest(
+    target='db_repl_cloners_test',
+    source=[
+        'collection_cloner_test.cpp',
+        'database_cloner_test.cpp',
+        'databases_cloner_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/db/commands/list_collections_filter',
+        '$BUILD_DIR/mongo/dbtests/mocklib',
+        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
+        'base_cloner_test_fixture',
+        'collection_cloner',
+        'database_cloner',
+        'databases_cloner',
+    ],
 )

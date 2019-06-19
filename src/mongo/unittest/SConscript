@@ -70,9 +70,24 @@ bmEnv.Library(
     ],
 )
 
-env.CppUnitTest('unittest_test', 'unittest_test.cpp')
-env.CppUnitTest('fixture_test', 'fixture_test.cpp')
-env.CppUnitTest('temp_dir_test', 'temp_dir_test.cpp')
+env.Library(
+    target='task_executor_proxy',
+    source=[
+        'task_executor_proxy.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+    ],
+)
+
+env.CppUnitTest(
+    target='unittest_test',
+    source=[
+        'unittest_test.cpp',
+        'fixture_test.cpp',
+        'temp_dir_test.cpp',
+    ],
+)
 
 env.Benchmark(
     target='system_resource_canary_bm',
@@ -81,15 +96,5 @@ env.Benchmark(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/processinfo',
-    ],
-)
-
-env.Library(
-    target='task_executor_proxy',
-    source=[
-        'task_executor_proxy.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/executor/task_executor_interface',
     ],
 )

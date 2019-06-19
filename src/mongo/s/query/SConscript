@@ -51,20 +51,6 @@ env.Library(
     ]
 )
 
-env.CppUnitTest(
-    target="cluster_aggregate_test",
-    source=[
-        "cluster_aggregate_test.cpp",
-        "cluster_aggregation_planner_test.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/auth/saslauth',
-        '$BUILD_DIR/mongo/s/commands/cluster_command_test_fixture',
-        'cluster_aggregate',
-    ],
-)
-
 env.Library(
     target="cluster_client_cursor",
     source=[
@@ -89,19 +75,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         'async_results_merger',
-    ],
-)
-
-env.CppUnitTest(
-    target="router_exec_stage_test",
-    source=[
-        "router_stage_limit_test.cpp",
-        "router_stage_remove_metadata_fields_test.cpp",
-        "router_stage_skip_test.cpp",
-    ],
-    LIBDEPS=[
-        'router_exec_stage',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
     ],
 )
 
@@ -133,35 +106,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target="results_merger_test",
-    source=[
-        "blocking_results_merger_test.cpp",
-        "async_results_merger_test.cpp",
-        "results_merger_test_fixture.cpp",
-    ],
-    LIBDEPS=[
-        'async_results_merger',
-        'cluster_client_cursor',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/query/query_request',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target="establish_cursors_test",
-    source=[
-        "establish_cursors_test.cpp",
-    ],
-    LIBDEPS=[
-        'async_results_merger',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/query/query_request',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
-    ],
-)
 env.Library(
     target="store_possible_cursor",
     source=[
@@ -173,19 +117,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/query/command_request_response",
         "cluster_client_cursor",
         "cluster_cursor_manager",
-    ],
-)
-
-env.CppUnitTest(
-    target="store_possible_cursor_test",
-    source=[
-        "store_possible_cursor_test.cpp",
-    ],
-    LIBDEPS=[
-        'store_possible_cursor',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )
 
@@ -205,20 +136,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target="cluster_cursor_manager_test",
-    source=[
-        "cluster_cursor_manager_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/logical_session_id",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        "cluster_client_cursor_mock",
-        "cluster_cursor_manager",
-    ],
-)
-
 env.Library(
     target="cluster_cursor_cleanup_job",
     source=[
@@ -232,13 +149,38 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target="cluster_client_cursor_impl_test",
+    target="s_query_test",
     source=[
+        "async_results_merger_test.cpp",
+        "blocking_results_merger_test.cpp",
+        "cluster_aggregate_test.cpp",
+        "cluster_aggregation_planner_test.cpp",
         "cluster_client_cursor_impl_test.cpp",
+        "cluster_cursor_manager_test.cpp",
+        "establish_cursors_test.cpp",
+        "results_merger_test_fixture.cpp",
+        "router_stage_limit_test.cpp",
+        "router_stage_remove_metadata_fields_test.cpp",
+        "router_stage_skip_test.cpp",
+        "store_possible_cursor_test.cpp",
     ],
     LIBDEPS=[
-        'cluster_client_cursor',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/auth/saslauth",
+        "$BUILD_DIR/mongo/db/logical_session_id",
+        "$BUILD_DIR/mongo/db/query/query_request",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
+        "$BUILD_DIR/mongo/s/commands/cluster_command_test_fixture",
+        "$BUILD_DIR/mongo/s/sharding_router_test_fixture",
+        "$BUILD_DIR/mongo/util/clock_source_mock",
+        "async_results_merger",
+        "cluster_aggregate",
+        "cluster_client_cursor",
+        "cluster_client_cursor_mock",
+        "cluster_cursor_manager",
+        "router_exec_stage",
+        "store_possible_cursor",
     ],
 )

@@ -28,17 +28,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='restriction_test',
-    source=[
-        'restriction_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'authentication_restriction',
-    ],
-)
-
 # The Auth library should consist only of the shimmed API for Auth usage and the implementations of
 # the data structures used in that API.  No actual Auth subsystem implementation should exist in
 # this library.
@@ -71,20 +60,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/op_observer_util',
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
     ]
-)
-
-env.CppUnitTest(
-    target='auth_op_observer_test',
-    source='auth_op_observer_test.cpp',
-    LIBDEPS=[
-        'authmocks',
-        'auth_op_observer',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/repl/oplog_interface_local',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-    ],
 )
 
 env.Library(
@@ -249,19 +224,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='security_key_test',
-    source=[
-        'security_key_test.cpp',
-    ],
-    LIBDEPS=[
-        'auth',
-        'security_file',
-        'security_key',
-        'user',
-    ],
-)
-
 env.Library(
     target='authservercommon',
     source=[
@@ -324,7 +286,7 @@ env.Library(
        '$BUILD_DIR/mongo/util/options_parser/options_parser',
        '$BUILD_DIR/mongo/util/net/network',
   ],
-)     
+)
 
 env.Library(
     target='saslauth',
@@ -347,16 +309,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
-
-env.CppUnitTest(target='sasl_mechanism_registry_test',
-                source=[
-                    'sasl_mechanism_registry_test.cpp',
-                ],
-                LIBDEPS=[
-                    '$BUILD_DIR/mongo/db/service_context_test_fixture',
-                    'authmocks',
-                    'saslauth',
-                ])
 
 env.Library(
     target='authmongod',
@@ -411,97 +363,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='action_set_test',
-    source=[
-        'action_set_test.cpp'
-    ],
-    LIBDEPS=[
-        'auth',
-        'authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='privilege_parser_test',
-    source=[
-        'privilege_parser_test.cpp',
-    ],
-    LIBDEPS=[
-        'auth',
-        'authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='role_graph_test',
-    source=[
-        'role_graph_test.cpp',
-    ],
-    LIBDEPS=[
-        'auth',
-        'authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='user_document_parser_test',
-    source=[
-        'user_document_parser_test.cpp',
-    ],
-    LIBDEPS=[
-        'auth',
-        'authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='user_set_test',
-    source=[
-        'user_set_test.cpp',
-    ],
-    LIBDEPS=[
-        'auth',
-        'authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='authorization_manager_test',
-    source=[
-        'authorization_manager_test.cpp',
-    ],
-    LIBDEPS=[
-        'auth',
-        'authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/transport/transport_layer_common',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
-    ],
-)
-
-env.CppUnitTest(
-    target='authorization_session_test',
-    source=[
-        'authorization_session_test.cpp',
-        'authorization_session_for_test.cpp',
-    ],
-    LIBDEPS=[
-        'auth',
-        'authmocks',
-        'auth_impl_internal',
-        'saslauth',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
-    ],
-)
-
 env.Library(
     target='address_restriction',
     source=[
@@ -517,29 +378,46 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='address_restriction_test',
+    target='db_auth_test',
     source=[
+        'action_set_test.cpp',
         'address_restriction_test.cpp',
+        'auth_op_observer_test.cpp',
+        'authorization_manager_test.cpp',
+        'authorization_session_for_test.cpp',
+        'authorization_session_test.cpp',
+        'privilege_parser_test.cpp',
+        'restriction_test.cpp',
+        'role_graph_test.cpp',
+        'sasl_authentication_session_test.cpp',
+        'sasl_mechanism_registry_test.cpp',
+        'sasl_scram_test.cpp',
+        'security_key_test.cpp',
+        'user_document_parser_test.cpp',
+        'user_set_test.cpp',
     ],
     LIBDEPS=[
-        'address_restriction',
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/sasl_client',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/repl/oplog',
+        '$BUILD_DIR/mongo/db/repl/oplog_interface_local',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/net/network',
-    ],
-)
-
-env.CppUnitTest(
-    target='sasl_scram_test',
-    source=[
-        'sasl_authentication_session_test.cpp',
-        'sasl_scram_test.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
+        'address_restriction',
+        'auth',
+        'auth_impl_internal',
+        'auth_op_observer',
+        'authentication_restriction',
         'authmocks',
         'saslauth',
-        '$BUILD_DIR/mongo/client/sasl_client',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'security_file',
+        'security_key',
+        'user',
     ],
 )
-

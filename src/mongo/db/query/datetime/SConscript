@@ -30,7 +30,7 @@ timeZoneEnv.Library(
 )
 
 timeZoneEnv.CppUnitTest(
-    target='date_time_support_test',
+    target='query_datetime_test',
     source=[
         'date_time_support_test.cpp',
     ],

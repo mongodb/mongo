@@ -57,27 +57,6 @@ else:
             'sha256_block',
         ])
 
-env.CppUnitTest('sha1_block_test',
-                ['sha1_block_test.cpp'],
-                LIBDEPS=['sha_block_${MONGO_CRYPTO}'])
-
-env.CppUnitTest('sha256_block_test',
-                ['sha256_block_test.cpp'],
-                LIBDEPS=['sha_block_${MONGO_CRYPTO}'])
-
-env.CppUnitTest('sha512_block_test',
-                ['sha512_block_test.cpp'],
-                LIBDEPS=['sha_block_${MONGO_CRYPTO}'])
-
-env.CppUnitTest('mechanism_scram_test',
-                ['mechanism_scram_test.cpp'],
-                LIBDEPS_PRIVATE=[
-                    '$BUILD_DIR/mongo/base',
-                    '$BUILD_DIR/mongo/base/secure_allocator',
-                    'sha_block_${MONGO_CRYPTO}',
-                ])
-
-
 env.Library(target='symmetric_crypto',
             source=[
                 'symmetric_crypto.cpp',
@@ -103,9 +82,18 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='aead_encryption_test',
-    source='aead_encryption_test.cpp',
+    target='crypto_test',
+    source=[
+        'aead_encryption_test.cpp',
+        'mechanism_scram_test.cpp',
+        'sha1_block_test.cpp',
+        'sha256_block_test.cpp',
+        'sha512_block_test.cpp',
+    ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/base/secure_allocator',
         'aead_encryption',
-    ]
+        'sha_block_${MONGO_CRYPTO}',
+    ],
 )

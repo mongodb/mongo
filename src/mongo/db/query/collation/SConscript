@@ -17,16 +17,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target="collation_spec_test",
-    source=[
-        "collation_spec_test.cpp",
-    ],
-    LIBDEPS=[
-        "collator_interface",
-    ],
-)
-
 env.Library(
     target="collator_interface_mock",
     source=[
@@ -34,37 +24,6 @@ env.Library(
     ],
     LIBDEPS=[
         "collator_interface",
-    ],
-)
-
-env.CppUnitTest(
-    target="collator_interface_mock_test",
-    source=[
-        "collator_interface_mock_test.cpp",
-    ],
-    LIBDEPS=[
-        "collator_interface_mock",
-    ],
-)
-
-env.CppUnitTest(
-    target="collation_bson_comparison_test",
-    source=[
-        "collation_bson_comparison_test.cpp",
-    ],
-    LIBDEPS=[
-        "collator_interface_mock",
-    ],
-)
-
-env.CppUnitTest(
-    target="collation_index_key_test",
-    source=[
-        "collation_index_key_test.cpp",
-    ],
-    LIBDEPS=[
-        "collator_interface",
-        "collator_interface_mock",
     ],
 )
 
@@ -90,31 +49,10 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target="collator_factory_mock_test",
-    source=[
-        "collator_factory_mock_test.cpp",
-    ],
-    LIBDEPS=[
-        "collator_factory_mock",
-    ],
-)
-
 env.Library(
     target="collator_factory_icu",
     source=[
         "collator_factory_icu_decoration.cpp",
-    ],
-    LIBDEPS=[
-        "collator_icu",
-    ],
-)
-
-env.CppUnitTest(
-    target="collator_factory_icu_test",
-    source=[
-        "collator_factory_icu_locales_test.cpp",
-        "collator_factory_icu_test.cpp",
     ],
     LIBDEPS=[
         "collator_icu",
@@ -159,11 +97,21 @@ icuEnv.Library(
 )
 
 icuEnv.CppUnitTest(
-    target="collator_interface_icu_test",
+    target="db_query_collation_test",
     source=[
+        "collation_bson_comparison_test.cpp",
+        "collation_index_key_test.cpp",
+        "collation_spec_test.cpp",
+        "collator_factory_icu_locales_test.cpp",
+        "collator_factory_icu_test.cpp",
+        "collator_factory_mock_test.cpp",
         "collator_interface_icu_test.cpp",
+        "collator_interface_mock_test.cpp",
     ],
     LIBDEPS=[
+        "collator_factory_mock",
         "collator_icu",
+        "collator_interface",
+        "collator_interface_mock",
     ],
 )

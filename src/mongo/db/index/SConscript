@@ -75,24 +75,6 @@ env.Library(
         ]
 )
 
-env.CppUnitTest(
-        target='key_generator_test',
-        source=[
-            '2d_key_generator_test.cpp',
-            'btree_key_generator_test.cpp',
-            'hash_key_generator_test.cpp',
-            's2_key_generator_test.cpp',
-            'sort_key_generator_test.cpp',
-            'wildcard_key_generator_test.cpp',
-        ],
-        LIBDEPS=[
-            'key_generator',
-            "$BUILD_DIR/mongo/db/matcher/expressions",
-            '$BUILD_DIR/mongo/db/mongohasher',
-            '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        ],
-)
-
 env.Library(
     target='index_access_method_factory',
         source=[
@@ -163,5 +145,23 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/index_timestamp_helper',
         '$BUILD_DIR/mongo/db/multi_key_path_tracker',
         'index_access_methods',
+    ],
+)
+
+env.CppUnitTest(
+    target='db_index_test',
+    source=[
+        '2d_key_generator_test.cpp',
+        'btree_key_generator_test.cpp',
+        'hash_key_generator_test.cpp',
+        's2_key_generator_test.cpp',
+        'sort_key_generator_test.cpp',
+        'wildcard_key_generator_test.cpp',
+    ],
+    LIBDEPS=[
+        'key_generator',
+        "$BUILD_DIR/mongo/db/matcher/expressions",
+        '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
     ],
 )

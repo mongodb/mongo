@@ -20,28 +20,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='connection_string_test',
-    source=[
-        'connection_string_test.cpp',
-    ],
-    LIBDEPS=[
-        'connection_string',
-    ],
-)
-
-env.CppUnitTest(
-    target='mongo_uri_test',
-    source=[
-        'mongo_uri_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'clientdriver_network',
-    ],
-)
-
 env.Library(
     target=[
         'read_preference',
@@ -52,18 +30,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/service_context'
-    ],
-)
-
-env.CppUnitTest(
-    target=[
-        'read_preference_test',
-    ],
-    source=[
-        'read_preference_test.cpp',
-    ],
-    LIBDEPS=[
-        'read_preference',
     ],
 )
 
@@ -120,21 +86,6 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/executor/remote_command',
         'sasl_client'
-    ],
-)
-
-env.CppUnitTest(
-    target=[
-        'authenticate_test',
-    ],
-    source=[
-        'authenticate_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/md5',
-        'authentication',
     ],
 )
 
@@ -208,30 +159,6 @@ clientDriverEnv.Library(
     ]
 )
 
-env.CppIntegrationTest(
-    target='connpool_integration_test',
-    source=[
-        'connpool_integration_test.cpp',
-    ],
-    LIBDEPS=[
-        'clientdriver_network',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-        '$BUILD_DIR/mongo/util/version_impl',
-    ],
-)
-
-env.CppIntegrationTest(
-    target='dbclient_connection_integration_test',
-    source=[
-        'dbclient_connection_integration_test.cpp',
-    ],
-    LIBDEPS=[
-        'clientdriver_network',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-        '$BUILD_DIR/mongo/util/version_impl',
-    ],
-)
-
 env.Library(
     target='async_client',
     source=[
@@ -288,43 +215,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='replica_set_monitor_test',
-    source=[
-        'replica_set_monitor_test_fixture.cpp',
-        'replica_set_monitor_internal_test.cpp',
-        'replica_set_monitor_read_preference_test.cpp',
-        'replica_set_monitor_scan_test.cpp',
-        'replica_set_monitor_test_concurrent.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/write_concern_options',
-        '$BUILD_DIR/mongo/dbtests/mocklib',
-        '$BUILD_DIR/mongo/executor/network_interface_mock',
-        '$BUILD_DIR/mongo/executor/task_executor_test_fixture',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        'clientdriver_network',
-    ],
-)
-
-env.CppUnitTest('dbclient_rs_test',
-                ['dbclient_rs_test.cpp'],
-                LIBDEPS=[
-                    'clientdriver_network',
-                    '$BUILD_DIR/mongo/dbtests/mocklib',
-                ],
-)
-
-env.CppUnitTest(
-    target='index_spec_test',
-    source=[
-        'index_spec_test.cpp',
-    ],
-    LIBDEPS=[
-        'clientdriver_minimal',
-    ],
-)
-
 env.Library(
     target='fetcher',
     source=[
@@ -336,16 +226,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/rpc/command_status',
-    ],
-)
-
-env.CppUnitTest(
-    target='fetcher_test',
-    source='fetcher_test.cpp',
-    LIBDEPS=[
-        'fetcher',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
     ],
 )
 
@@ -361,21 +241,68 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='remote_command_retry_scheduler_test',
-    source='remote_command_retry_scheduler_test.cpp',
-    LIBDEPS=[
-        'remote_command_retry_scheduler',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
-    ],
-)
-
-env.CppUnitTest(
-    target='dbclient_cursor_test',
+    target='client_test',
     source=[
+        'authenticate_test.cpp',
+        'connection_string_test.cpp',
         'dbclient_cursor_test.cpp',
+        'fetcher_test.cpp',
+        'index_spec_test.cpp',
+        'mongo_uri_test.cpp',
+        'read_preference_test.cpp',
+        'remote_command_retry_scheduler_test.cpp',
+        'replica_set_monitor_internal_test.cpp',
+        'replica_set_monitor_read_preference_test.cpp',
+        'replica_set_monitor_scan_test.cpp',
+        'replica_set_monitor_test_concurrent.cpp',
+        'replica_set_monitor_test_fixture.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/write_concern_options',
+        '$BUILD_DIR/mongo/dbtests/mocklib',
+        '$BUILD_DIR/mongo/executor/network_interface_mock',
+        '$BUILD_DIR/mongo/executor/task_executor_test_fixture',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
+        '$BUILD_DIR/mongo/util/md5',
+        '$BUILD_DIR/mongo/util/net/network',
+        'authentication',
+        'clientdriver_minimal',
+        'clientdriver_network',
+        'connection_string',
+        'fetcher',
+        'read_preference',
+        'remote_command_retry_scheduler',
+    ],
+)
+
+# Cannot be combined with the above unit test due to an explicit call to
+# ReplicaSetMonitor::disableRefreshRetries_forTest.
+env.CppUnitTest(
+    target='client_rs_test',
+    source=[
+        'dbclient_rs_test.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/dbtests/mocklib',
+        'clientdriver_network',
+    ],
+)
+
+env.CppIntegrationTest(
+    target='client_integration_test',
+    source=[
+        'connpool_integration_test.cpp',
+        'dbclient_connection_integration_test.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver_network',
+        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/mongo/util/version_impl',
     ],
 )

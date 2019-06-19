@@ -470,61 +470,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target="list_collections_filter_test",
-    source=[
-        "list_collections_filter_test.cpp"
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands/list_collections_filter',
-    ],
-)
-
-env.CppUnitTest(
-    target="index_filter_commands_test",
-    source=[
-        "index_filter_commands_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query/query_planner",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "standalone",
-    ],
-)
-
-env.CppUnitTest(
-    target="mr_test",
-    source=[
-        "mr_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper",
-        "$BUILD_DIR/mongo/db/repl/replmocks",
-        "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
-        "mongod",
-        "servers",
-    ],
-)
-
-env.CppUnitTest(
-    target="plan_cache_commands_test",
-    source=[
-        "plan_cache_commands_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/query/query_planner",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/service_context_d",
-        "standalone",
-    ],
-)
-
 env.Library(
     target='txn_cmd_request',
     source=[
@@ -553,3 +498,27 @@ if has_option('use-cpu-profiler'):
             '$BUILD_DIR/mongo/mongod',
         ],
     )
+
+env.CppUnitTest(
+    target="db_commands_test",
+    source=[
+        "index_filter_commands_test.cpp",
+        "list_collections_filter_test.cpp",
+        "mr_test.cpp",
+        "plan_cache_commands_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/commands/list_collections_filter",
+        "$BUILD_DIR/mongo/db/query/query_planner",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper",
+        "$BUILD_DIR/mongo/db/repl/replmocks",
+        "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
+        "$BUILD_DIR/mongo/db/service_context_d",
+        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
+        "mongod",
+        "servers",
+        "standalone",
+    ],
+)

@@ -270,59 +270,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='cluster_last_error_info_test',
-    source=[
-        'cluster_last_error_info_test.cpp',
-    ],
-    LIBDEPS=[
-        'cluster_last_error_info',
-        'sharding_router_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='sharding_common_test',
-    source=[
-        'catalog/type_changelog_test.cpp',
-        'catalog/type_chunk_test.cpp',
-        'catalog/type_collection_test.cpp',
-        'catalog/type_config_version_test.cpp',
-        'catalog/type_database_test.cpp',
-        'catalog/type_lockpings_test.cpp',
-        'catalog/type_locks_test.cpp',
-        'catalog/type_mongos_test.cpp',
-        'catalog/type_shard_collection_test.cpp',
-        'catalog/type_shard_test.cpp',
-        'catalog/type_tags_test.cpp',
-        'chunk_version_test.cpp',
-        'shard_id_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'common_s',
-    ]
-)
-
-env.CppUnitTest('request_types_test',
-    source=[
-        'request_types/add_shard_request_test.cpp',
-        'request_types/add_shard_to_zone_request_test.cpp',
-        'request_types/balance_chunk_request_test.cpp',
-        'request_types/commit_chunk_migration_request_test.cpp',
-        'request_types/merge_chunk_request_test.cpp',
-        'request_types/migration_secondary_throttle_options_test.cpp',
-        'request_types/move_chunk_request_test.cpp',
-        'request_types/remove_shard_from_zone_request_test.cpp',
-        'request_types/set_shard_version_request_test.cpp',
-        'request_types/split_chunk_request_test.cpp',
-        'request_types/update_zone_key_range_request_test.cpp',
-    ],
-    LIBDEPS=[
-        'common_s',
-    ],
-)
-
 env.Library(
     target='sharding_task_executor',
     source=[
@@ -338,17 +285,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='sharding_task_executor_test',
-    source=[
-        'sharding_task_executor_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        'sharding_task_executor',
-        'shard_server_test_fixture',
-    ],
-)
 
 # This library contains sharding functionality used by both mongod and mongos
 env.Library(
@@ -397,21 +333,6 @@ env.Benchmark(
     ],
 )
 
-env.CppUnitTest(
-    target='sharding_routing_table_test',
-    source=[
-        'catalog_cache_refresh_test.cpp',
-        'chunk_manager_index_bounds_test.cpp',
-        'chunk_manager_query_test.cpp',
-        'chunk_test.cpp',
-        'routing_table_history_test.cpp',
-        'shard_key_pattern_test.cpp',
-    ],
-    LIBDEPS=[
-        'catalog_cache_test_fixture',
-    ]
-)
-
 env.Library(
     target='chunk_writes_tracker',
     source=[
@@ -420,16 +341,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],
-)
-
-env.CppUnitTest(
-    target='chunk_writes_tracker_test',
-    source=[
-        'chunk_writes_tracker_test.cpp',
-    ],
-    LIBDEPS=[
-        'chunk_writes_tracker',
-    ]
 )
 
 env.Library(
@@ -490,60 +401,62 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='cluster_commands_helpers_test',
+    target='s_test',
     source=[
         'append_raw_responses_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
-        'shard_server_test_fixture',
-        'sharding_router_api',
-    ]
-)
-
-env.CppUnitTest(
-    target='balancer_configuration_test',
-    source=[
         'balancer_configuration_test.cpp',
-    ],
-    LIBDEPS=[
-        'coreshard',
-        'sharding_router_test_fixture',
-    ]
-)
-
-env.CppUnitTest(
-    target='cluster_identity_loader_test',
-    source=[
-        'cluster_identity_loader_test.cpp',
-    ],
-    LIBDEPS=[
-        'coreshard',
-        'sharding_router_test_fixture',
-    ]
-)
-
-env.CppUnitTest(
-    target='sharding_legacy_api_test',
-    source=[
+        'catalog/type_changelog_test.cpp',
+        'catalog/type_chunk_test.cpp',
+        'catalog/type_collection_test.cpp',
+        'catalog/type_config_version_test.cpp',
+        'catalog/type_database_test.cpp',
+        'catalog/type_lockpings_test.cpp',
+        'catalog/type_locks_test.cpp',
+        'catalog/type_mongos_test.cpp',
+        'catalog/type_shard_collection_test.cpp',
+        'catalog/type_shard_test.cpp',
+        'catalog/type_tags_test.cpp',
+        'catalog_cache_refresh_test.cpp',
+        'chunk_manager_index_bounds_test.cpp',
+        'chunk_manager_query_test.cpp',
+        'chunk_test.cpp',
+        'chunk_version_test.cpp',
+        'chunk_writes_tracker_test.cpp',
         'client/shard_connection_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/dbtests/mocklib',
-        '$BUILD_DIR/mongo/util/net/network',
-        'sharding_legacy_api',
-    ]
-)
-
-env.CppUnitTest(
-    target='transaction_router_test',
-    source=[
+        'cluster_identity_loader_test.cpp',
+        'cluster_last_error_info_test.cpp',
+        'request_types/add_shard_request_test.cpp',
+        'request_types/add_shard_to_zone_request_test.cpp',
+        'request_types/balance_chunk_request_test.cpp',
+        'request_types/commit_chunk_migration_request_test.cpp',
+        'request_types/merge_chunk_request_test.cpp',
+        'request_types/migration_secondary_throttle_options_test.cpp',
+        'request_types/move_chunk_request_test.cpp',
+        'request_types/remove_shard_from_zone_request_test.cpp',
+        'request_types/set_shard_version_request_test.cpp',
+        'request_types/split_chunk_request_test.cpp',
+        'request_types/update_zone_key_range_request_test.cpp',
+        'routing_table_history_test.cpp',
+        'shard_id_test.cpp',
+        'shard_key_pattern_test.cpp',
+        'sharding_task_executor_test.cpp',
         'transaction_router_test.cpp',
     ],
     LIBDEPS=[
-        'sharding_router_api',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/dbtests/mocklib',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
+        '$BUILD_DIR/mongo/util/net/network',
+        'catalog_cache_test_fixture',
+        'chunk_writes_tracker',
+        'cluster_last_error_info',
+        'common_s',
+        'coreshard',
+        'shard_server_test_fixture',
+        'sharding_legacy_api',
         'sharding_router_test_fixture',
-    ]
+        'sharding_task_executor',
+    ],
 )

@@ -40,16 +40,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='bson_template_evaluator_test',
-    source=[
-        'bson_template_evaluator_test.cpp',
-    ],
-    LIBDEPS=[
-        'bson_template_evaluator',
-    ],
-)
-
 env.Library(
     target='scripting_none',
     source=[
@@ -157,11 +147,13 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='deadline_monitor_test',
+    target='scripting_test',
     source=[
+        'bson_template_evaluator_test.cpp',
         'deadline_monitor_test.cpp',
     ],
     LIBDEPS=[
+        'bson_template_evaluator',
         'scripting_common',
     ],
 )

@@ -16,16 +16,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='path_test',
-    source=[
-        'path_test.cpp',
-    ],
-    LIBDEPS=[
-        'path',
-    ],
-)
-
 env.Library(
     target='expressions',
     source=[
@@ -85,96 +75,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='encrypt_schema_types_test',
-    source=[
-        'schema/encrypt_schema_types_test.cpp'
-    ],
-    LIBDEPS=[
-        'expressions',
-    ],
-)
-
-env.CppUnitTest(
-    target='json_pointer_test',
-    source=['schema/json_pointer_test.cpp'],
-    LIBDEPS=[
-        'expressions'
-    ]
-)
-
-env.CppUnitTest(
-    target='expression_test',
-    source=[
-        'expression_always_boolean_test.cpp',
-        'expression_array_test.cpp',
-        'expression_expr_test.cpp',
-        'expression_geo_test.cpp',
-        'expression_internal_expr_eq_test.cpp',
-        'expression_leaf_test.cpp',
-        'expression_optimize_test.cpp',
-        'expression_parser_geo_test.cpp',
-        'expression_test.cpp',
-        'expression_tree_test.cpp',
-        'expression_type_test.cpp',
-        'expression_with_placeholder_test.cpp',
-        'path_accepting_keyword_test.cpp',
-        'schema/expression_internal_schema_all_elem_match_from_index_test.cpp',
-        'schema/expression_internal_schema_allowed_properties_test.cpp',
-        'schema/expression_internal_schema_cond_test.cpp',
-        'schema/expression_internal_schema_eq_test.cpp',
-        'schema/expression_internal_schema_fmod_test.cpp',
-        'schema/expression_internal_schema_match_array_index_test.cpp',
-        'schema/expression_internal_schema_max_items_test.cpp',
-        'schema/expression_internal_schema_max_length_test.cpp',
-        'schema/expression_internal_schema_max_properties_test.cpp',
-        'schema/expression_internal_schema_min_items_test.cpp',
-        'schema/expression_internal_schema_min_length_test.cpp',
-        'schema/expression_internal_schema_min_properties_test.cpp',
-        'schema/expression_internal_schema_object_match_test.cpp',
-        'schema/expression_internal_schema_root_doc_eq_test.cpp',
-        'schema/expression_internal_schema_unique_items_test.cpp',
-        'schema/expression_internal_schema_xor_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_planner',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'expressions',
-    ],
-)
-
-env.CppUnitTest(
-    target='expression_parser_test',
-    source=[
-        'expression_parser_array_test.cpp',
-        'expression_parser_leaf_test.cpp',
-        'expression_parser_test.cpp',
-        'expression_parser_tree_test.cpp',
-        'matcher_type_set_test.cpp',
-        'schema/expression_parser_schema_test.cpp',
-        'schema/json_schema_parser_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'expressions',
-    ],
-)
-
-env.CppUnitTest(
-    target='expression_algo_test',
-    source=[
-        'expression_algo_test.cpp',
-        'rewrite_expr_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'expressions',
-    ],
-)
-
 env.Library(
     target='expressions_mongod_only',
     source=[
@@ -194,12 +94,56 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='expression_serialization_test',
+    target='db_matcher_test',
     source=[
+        'expression_algo_test.cpp',
+        'expression_always_boolean_test.cpp',
+        'expression_array_test.cpp',
+        'expression_expr_test.cpp',
+        'expression_geo_test.cpp',
+        'expression_internal_expr_eq_test.cpp',
+        'expression_leaf_test.cpp',
+        'expression_optimize_test.cpp',
+        'expression_parser_array_test.cpp',
+        'expression_parser_geo_test.cpp',
+        'expression_parser_leaf_test.cpp',
+        'expression_parser_test.cpp',
+        'expression_parser_tree_test.cpp',
         'expression_serialization_test.cpp',
+        'expression_test.cpp',
+        'expression_tree_test.cpp',
+        'expression_type_test.cpp',
+        'expression_with_placeholder_test.cpp',
+        'matcher_type_set_test.cpp',
+        'path_accepting_keyword_test.cpp',
+        'path_test.cpp',
+        'rewrite_expr_test.cpp',
+        'schema/encrypt_schema_types_test.cpp',
+        'schema/expression_internal_schema_all_elem_match_from_index_test.cpp',
+        'schema/expression_internal_schema_allowed_properties_test.cpp',
+        'schema/expression_internal_schema_cond_test.cpp',
+        'schema/expression_internal_schema_eq_test.cpp',
+        'schema/expression_internal_schema_fmod_test.cpp',
+        'schema/expression_internal_schema_match_array_index_test.cpp',
+        'schema/expression_internal_schema_max_items_test.cpp',
+        'schema/expression_internal_schema_max_length_test.cpp',
+        'schema/expression_internal_schema_max_properties_test.cpp',
+        'schema/expression_internal_schema_min_items_test.cpp',
+        'schema/expression_internal_schema_min_length_test.cpp',
+        'schema/expression_internal_schema_min_properties_test.cpp',
+        'schema/expression_internal_schema_object_match_test.cpp',
+        'schema/expression_internal_schema_root_doc_eq_test.cpp',
+        'schema/expression_internal_schema_unique_items_test.cpp',
+        'schema/expression_internal_schema_xor_test.cpp',
+        'schema/expression_parser_schema_test.cpp',
+        'schema/json_pointer_test.cpp',
+        'schema/json_schema_parser_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'expressions',
+        'path',
     ],
 )

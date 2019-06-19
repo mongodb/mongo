@@ -20,50 +20,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='field_checker_test',
-    source=[
-        'field_checker_test.cpp',
-    ],
-    LIBDEPS=[
-        'update_common',
-    ],
-)
-
-env.CppUnitTest(
-    target='log_builder_test',
-    source=[
-        'log_builder_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
-        'update_common',
-    ],
-)
-
-env.CppUnitTest(
-    target='path_support_test',
-    source=[
-        'path_support_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'update_common',
-    ],
-)
-
-env.CppUnitTest(
-    target='push_sorter_test',
-    source='push_sorter_test.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-    ],
-)
-
 env.Library(
     target='update',
     source=[
@@ -98,45 +54,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='update_nodes_test',
-    source=[
-        'addtoset_node_test.cpp',
-        'arithmetic_node_test.cpp',
-        'bit_node_test.cpp',
-        'compare_node_test.cpp',
-        'current_date_node_test.cpp',
-        'object_replace_executor_test.cpp',
-        'pipeline_executor_test.cpp',
-        'pop_node_test.cpp',
-        'pull_node_test.cpp',
-        'pullall_node_test.cpp',
-        'push_node_test.cpp',
-        'rename_node_test.cpp',
-        'set_node_test.cpp',
-        'unset_node_test.cpp',
-        'update_array_node_test.cpp',
-        'update_object_node_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/db/logical_clock',
-        '$BUILD_DIR/mongo/db/pipeline/document_value_test_util',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'update',
-    ],
-)
-
-env.CppUnitTest(
-    target='modifier_table_test',
-    source='modifier_table_test.cpp',
-    LIBDEPS=[
-        'update',
-    ],
-)
-
 env.Library(
     target='update_driver',
     source=[
@@ -153,15 +70,44 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='update_driver_test',
+    target='db_update_test',
     source=[
+        'addtoset_node_test.cpp',
+        'arithmetic_node_test.cpp',
+        'bit_node_test.cpp',
+        'compare_node_test.cpp',
+        'current_date_node_test.cpp',
+        'field_checker_test.cpp',
+        'log_builder_test.cpp',
+        'modifier_table_test.cpp',
+        'object_replace_executor_test.cpp',
+        'path_support_test.cpp',
+        'pipeline_executor_test.cpp',
+        'pop_node_test.cpp',
+        'pull_node_test.cpp',
+        'pullall_node_test.cpp',
+        'push_node_test.cpp',
+        'push_sorter_test.cpp',
+        'rename_node_test.cpp',
+        'set_node_test.cpp',
+        'unset_node_test.cpp',
+        'update_array_node_test.cpp',
         'update_driver_test.cpp',
+        'update_object_node_test.cpp',
         'update_serialization_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
+        '$BUILD_DIR/mongo/db/logical_clock',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/pipeline/document_value_test_util',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'update',
+        'update_common',
         'update_driver',
     ],
 )

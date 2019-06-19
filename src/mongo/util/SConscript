@@ -79,56 +79,6 @@ debuggerEnv.Library(
     ]
 )
 
-env.CppUnitTest(
-    target='decorable_test',
-    source=[
-        'decorable_test.cpp'
-        ],
-    LIBDEPS=[
-        ]
-    )
-
-env.CppUnitTest(
-    target='unique_function_test',
-    source=[
-        'unique_function_test.cpp'
-    ],
-    LIBDEPS=[
-    ],
-    LIBDEPS_PRIVATE=[
-    ],
-)
-
-env.CppUnitTest(
-    target='represent_as_test',
-    source=[
-        'represent_as_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/third_party/shim_boost',
-    ],
-)
-
-env.CppUnitTest(
-    target='lru_cache_test',
-    source=[
-        'lru_cache_test.cpp',
-    ],
-    LIBDEPS=[
-    ],
-)
-
-env.CppUnitTest(
-    target='invalidating_lru_cache_test',
-    source=[
-        'invalidating_lru_cache_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
 env.Library(
     target='summation',
     source=[
@@ -136,18 +86,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
-    target='summation_test',
-    source=[
-        'summation_test.cpp',
-    ],
-    LIBDEPS=[
-        'summation',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/third_party/shim_boost',
     ],
 )
 
@@ -162,32 +100,11 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='progress_meter_test',
-    source=[
-        'progress_meter_test.cpp',
-    ],
-    LIBDEPS=[
-        'progress_meter',
-    ],
-)
-
 env.Library(
     target='md5',
     source=[
         'md5.cpp',
         'password_digest.cpp',
-    ],
-)
-
-env.CppUnitTest(
-    target="md5_test",
-    source=[
-        "md5_test.cpp",
-        "md5main.cpp",
-    ],
-    LIBDEPS=[
-        "md5",
     ],
 )
 
@@ -198,16 +115,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
-    target='clock_source_mock_test',
-    source=[
-        'clock_source_mock_test.cpp',
-    ],
-    LIBDEPS=[
-        'clock_source_mock',
     ],
 )
 
@@ -223,55 +130,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='alarm_test',
-    source=[
-        'alarm_test.cpp',
-    ],
-    LIBDEPS=[
-        'alarm',
-        'clock_source_mock',
-    ]
-)
-
-env.CppUnitTest(
-    target='tick_source_test',
-    source=[
-        'tick_source_test.cpp',
-    ],
-    LIBDEPS=[],
-)
-
-env.CppUnitTest(
-    target='text_test',
-    source=[
-        'text_test.cpp'
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
-    target='time_support_test',
-    source=[
-        'time_support_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
-    target="str_test",
-    source=[
-        "str_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
 env.Library(
     target="processinfo",
     source=[
@@ -280,16 +138,6 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.CppUnitTest(
-    target="processinfo_test",
-    source=[
-        "processinfo_test.cpp",
-    ],
-    LIBDEPS=[
-        "processinfo",
     ],
 )
 
@@ -305,16 +153,6 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/bson/util/bson_extract",
         "$BUILD_DIR/mongo/idl/server_parameter",
-    ],
-)
-
-env.CppUnitTest(
-    target="fail_point_test",
-    source=[
-        "fail_point_test.cpp",
-    ],
-    LIBDEPS=[
-        "fail_point",
     ],
 )
 
@@ -339,18 +177,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target="periodic_runner_impl_test",
-    source=[
-        "periodic_runner_impl_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "clock_source_mock",
-        "periodic_runner_impl",
-    ],
-)
-
 env.Library(
     target='periodic_runner_factory',
     source=[
@@ -371,16 +197,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'concurrency/spin_lock',
-    ],
-)
-
-env.CppUnitTest(
-    target="background_job_test",
-    source=[
-        "background_job_test.cpp",
-    ],
-    LIBDEPS=[
-        "background_job",
     ],
 )
 
@@ -457,17 +273,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='background_thread_clock_source_test',
-    source=[
-        'background_thread_clock_source_test.cpp',
-    ],
-    LIBDEPS=[
-        'clock_source_mock',
-        'clock_sources',
-    ],
-)
-
 env.Library(
     target='diagnostic_info',
     source= [
@@ -477,17 +282,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         "$BUILD_DIR/mongo/db/service_context",
     ],
-)
-
-env.CppUnitTest(
-    target='diagnostic_info_test',
-    source=[
-        'diagnostic_info_test.cpp'
-        ],
-    LIBDEPS=[
-        'diagnostic_info',
-        'clock_source_mock',
-        ]
 )
 
 env.Benchmark(
@@ -500,21 +294,6 @@ env.Benchmark(
         'processinfo',
     ],
 )
-
-if env.TargetOSIs('windows'):
-    env.CppUnitTest(
-        target='ntservice_test',
-        source=[
-            'ntservice_test.cpp',
-        ],
-        LIBDEPS=[
-            'ntservice',
-        ],
-        LIBS=[
-            'shell32',
-            env['LIBS']
-        ],
-    )
 
 env.Library(
     target='elapsed_tracker',
@@ -578,23 +357,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='dns_query_test',
-    source=['dns_query_test.cpp'],
-    LIBDEPS=[
-        'dns_query',
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.CppUnitTest(
-    target='dns_name_test',
-    source=['dns_name_test.cpp'],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
 env.Library(
     target="secure_zero_memory",
     source=[
@@ -604,25 +366,6 @@ env.Library(
         "$BUILD_DIR/mongo/base",
     ],
 )
-
-env.CppUnitTest(
-    target='secure_zero_memory_test',
-    source=['secure_zero_memory_test.cpp'],
-    LIBDEPS=[
-        'secure_zero_memory'
-    ],
-)
-
-if not env.TargetOSIs('windows'):
-    env.CppUnitTest(
-        target='signal_handlers_synchronous_test',
-        source=[
-            'signal_handlers_synchronous_test.cpp',
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-        ],
-    )
 
 env.Library(
     target="signal_handlers",
@@ -638,41 +381,10 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target="unowned_ptr_test",
-    source=[
-        "unowned_ptr_test.cpp",
-    ],
-    LIBDEPS=[
-        # None since unowned_ptr is header-only.
-    ],
-)
-
 env.Library(
     target='safe_num',
     source=[
         'safe_num.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
-    target='safe_num_test',
-    source=[
-        'safe_num_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'safe_num',
-    ],
-)
-
-env.CppUnitTest(
-    target='string_map_test',
-    source=[
-        'string_map_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -693,106 +405,6 @@ env.Library(
     ]
 )
 
-env.CppUnitTest(
-    target='decimal_counter_test',
-    source=[
-        'decimal_counter_test.cpp',
-    ],
-)
-
-env.CppUnitTest(
-    target='itoa_test',
-    source=[
-        'itoa_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ]
-)
-
-env.CppUnitTest(
-    target='producer_consumer_queue_test',
-    source=[
-        'producer_consumer_queue_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
-    ]
-)
-
-env.CppUnitTest(
-    target='duration_test',
-    source=[
-        'duration_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ])
-
-env.CppUnitTest(
-    target='assert_util_test',
-    source=[
-        'assert_util_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ]
-)
-
-env.CppUnitTest(
-    target='base64_test',
-    source=[
-        'base64_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
-    target='future_test',
-    source=[
-        # This list of targets is reverse speed order, to facilitate better ninja performance.
-        'future_test_future_void.cpp',
-        'future_test_future_int.cpp',
-        'future_test_future_move_only.cpp',
-        'future_test_executor_future.cpp',
-        'future_test_shared_future.cpp',
-        'future_test_edge_cases.cpp',
-        'future_test_promise_int.cpp',
-        'future_test_promise_void.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
-    target='strong_weak_finish_line_test',
-    source=[
-        'strong_weak_finish_line_test.cpp'
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
-    target="concepts_test",
-    source=[
-        "concepts_test.cpp",
-    ],
-    LIBDEPS=[
-    ],
-)
-
-env.CppUnitTest(
-    target='errno_util_test',
-    source=[
-        'errno_util_test.cpp',
-    ],
-)
 
 env.Benchmark(
     target='decimal_counter_bm',
@@ -830,15 +442,6 @@ if env.TargetOSIs('linux'):
         ],
     )
 
-    env.CppUnitTest(
-        target='procparser_test',
-        source=[
-            'procparser_test.cpp',
-        ],
-        LIBDEPS=[
-            'procparser',
-        ])
-
 if env.TargetOSIs('windows'):
     env.Library(
         target='perfctr_collect',
@@ -849,15 +452,6 @@ if env.TargetOSIs('windows'):
             '$BUILD_DIR/mongo/base',
         ],
     )
-
-    env.CppUnitTest(
-        target='perfctr_collect_test',
-        source=[
-            'perfctr_collect_test.cpp',
-        ],
-        LIBDEPS=[
-            'perfctr_collect',
-        ])
 
 icuEnv = env.Clone()
 
@@ -918,11 +512,92 @@ icuEnv.Library(
 )
 
 icuEnv.CppUnitTest(
-    target='icu_test',
+    target='util_test',
     source=[
+        'alarm_test.cpp',
+        'assert_util_test.cpp',
+        'background_job_test.cpp',
+        'background_thread_clock_source_test.cpp',
+        'base64_test.cpp',
+        'clock_source_mock_test.cpp',
+        'concepts_test.cpp',
+        'decimal_counter_test.cpp',
+        'decorable_test.cpp',
+        'diagnostic_info_test.cpp',
+        'dns_name_test.cpp',
+        'dns_query_test.cpp',
+        'duration_test.cpp',
+        'errno_util_test.cpp',
+        'fail_point_test.cpp',
+        'future_test_edge_cases.cpp',
+        'future_test_executor_future.cpp',
+        'future_test_future_int.cpp',
+        'future_test_future_move_only.cpp',
+        'future_test_future_void.cpp',
+        'future_test_promise_int.cpp',
+        'future_test_promise_void.cpp',
+        'future_test_shared_future.cpp',
         'icu_test.cpp',
+        'invalidating_lru_cache_test.cpp',
+        'itoa_test.cpp',
+        'lru_cache_test.cpp',
+        'md5_test.cpp',
+        'md5main.cpp',
+        'periodic_runner_impl_test.cpp',
+        'processinfo_test.cpp',
+        'procparser_test.cpp' if env.TargetOSIs('linux') else [],
+        'producer_consumer_queue_test.cpp',
+        'progress_meter_test.cpp',
+        'represent_as_test.cpp',
+        'safe_num_test.cpp',
+        'secure_zero_memory_test.cpp',
+        'signal_handlers_synchronous_test.cpp' if not env.TargetOSIs('windows') else [],
+        'str_test.cpp',
+        'string_map_test.cpp',
+        'strong_weak_finish_line_test.cpp',
+        'summation_test.cpp',
+        'text_test.cpp',
+        'tick_source_test.cpp',
+        'time_support_test.cpp',
+        'unique_function_test.cpp',
+        'unowned_ptr_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'alarm',
+        'background_job',
+        'clock_source_mock',
+        'clock_sources',
+        'diagnostic_info',
+        'dns_query',
+        'fail_point',
         'icu',
+        'md5',
+        'periodic_runner_impl',
+        'processinfo',
+        'procparser' if env.TargetOSIs('linux') else [],
+        'progress_meter',
+        'safe_num',
+        'secure_zero_memory',
+        'summation',
     ],
 )
+
+if env.TargetOSIs('windows'):
+    env.CppUnitTest(
+        target='util_windows_test',
+        source=[
+            'ntservice_test.cpp',
+            'perfctr_collect_test.cpp',
+        ],
+        LIBDEPS=[
+            'ntservice',
+            'perfctr_collect',
+        ],
+        LIBS=[
+            'shell32',
+            env['LIBS']
+        ],
+    )

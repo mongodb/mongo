@@ -45,7 +45,7 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='views_test',
+    target='db_views_test',
     source=[
         'resolved_view_test.cpp',
         'view_catalog_test.cpp',

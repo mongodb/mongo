@@ -72,72 +72,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target= 'field_ref_test',
-    source= 'field_ref_test.cpp',
-    LIBDEPS=[
-        'common',
-    ],
-)
-
-env.CppUnitTest(
-    target= 'field_ref_set_test',
-    source = 'field_ref_set_test.cpp',
-    LIBDEPS=[
-        'common',
-    ],
-)
-
-env.CppUnitTest(
-    target= 'field_parser_test',
-    source= 'field_parser_test.cpp',
-    LIBDEPS=[
-        'common',
-    ],
-)
-
-env.CppUnitTest(
-    target= 'hasher_test',
-    source= [
-        'hasher_test.cpp',
-    ],
-    LIBDEPS=[
-        'common',
-        '$BUILD_DIR/mongo/db/mongohasher',
-    ],
-)
-
-env.CppUnitTest(
-    target= 'keypattern_test',
-    source= 'keypattern_test.cpp',
-    LIBDEPS=[
-        'common'
-    ],
-)
-
-env.CppUnitTest(
-    target= 'op_observer_registry_test',
-    source= 'op_observer_registry_test.cpp',
-    LIBDEPS=[
-        'common',
-        'op_observer',
-        'service_context',
-    ],
-)
-
-env.CppUnitTest(
-    target='op_observer_impl_test',
-    source='op_observer_impl_test.cpp',
-    LIBDEPS=[
-        'auth/authmocks',
-        'common',
-        'op_observer_impl',
-        'repl/oplog_interface_local',
-        'repl/replmocks',
-        'service_context_d_test_fixture',
-        'transaction',
-    ],
-)
 
 env.Library(
     target="dbmessage",
@@ -150,17 +84,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
     ]
 )
-
-env.CppUnitTest(
-    target="dbmessage_test",
-    source=[
-        "dbmessage_test.cpp"
-    ],
-    LIBDEPS=[
-        "dbmessage",
-    ],
-)
-env.CppUnitTest('record_id_test', 'record_id_test.cpp', LIBDEPS=[])
 
 env.Library(
     target='startup_warnings_common',
@@ -186,16 +109,6 @@ env.Library(
     ]
 )
 
-env.CppUnitTest(
-    target='startup_warnings_mongod_test',
-    source=[
-        'startup_warnings_mongod_test.cpp',
-    ],
-    LIBDEPS=[
-        'startup_warnings_mongod',
-    ],
-)
-
 env.Library(
     target='curop',
     source=[
@@ -216,17 +129,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='curop_test',
-    source=[
-        'curop_test.cpp',
-    ],
-    LIBDEPS=[
-        'curop',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-    ],
-)
-
 env.Library(
     target='curop_failpoint_helpers',
     source=[
@@ -235,20 +137,6 @@ env.Library(
     LIBDEPS=[
         'curop',
         '$BUILD_DIR/mongo/util/fail_point',
-    ],
-)
-
-env.CppUnitTest(
-    target='operation_context_test',
-    source=[
-        'operation_context_test.cpp',
-    ],
-    LIBDEPS=[
-        'logical_session_id',
-        'logical_session_id_helpers',
-        'service_context',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )
 
@@ -285,16 +173,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='range_arithmetic_test',
-    source=[
-        'range_arithmetic_test.cpp',
-    ],
-    LIBDEPS=[
-        'range_arithmetic',
-    ],
-)
-
 env.Library(
     target='namespace_string',
     source=[
@@ -303,16 +181,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/repl/optime',
-    ],
-)
-
-env.CppUnitTest(
-    target='namespace_string_test',
-    source=[
-        'namespace_string_test.cpp',
-    ],
-    LIBDEPS=[
-        'namespace_string',
     ],
 )
 
@@ -326,18 +194,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='update_index_data_test',
-    source=[
-        'update_index_data_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'common',
-        'update_index_data',
-    ],
-)
-
 env.Library(
     target='collection_index_usage_tracker',
     source=[
@@ -345,17 +201,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.CppUnitTest(
-    target='collection_index_usage_tracker_test',
-    source=[
-        'collection_index_usage_tracker_test.cpp',
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/clock_source_mock",
-        'collection_index_usage_tracker',
     ],
 )
 
@@ -434,17 +279,6 @@ env.Clone().InjectModule("enterprise").Library(
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         'server_options',
         'server_options_base',
-    ],
-)
-
-env.CppUnitTest(
-    target='server_options_test',
-    source=[
-        'server_options_test.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        'server_options_servers',
-        '$BUILD_DIR/mongo/util/net/ssl_options_server',
     ],
 )
 
@@ -527,14 +361,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target= 'write_concern_options_test',
-    source= 'write_concern_options_test.cpp',
-    LIBDEPS=[
-        'write_concern_options',
-    ],
-)
-
 env.Library(
     target='service_context',
     source=[
@@ -569,20 +395,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
-    ],
-)
-
-env.CppUnitTest(
-    target= 'thread_client_test',
-    source= 'thread_client_test.cpp',
-    LIBDEPS=[
-        'common',
-    ],
-    LIBDEPS_PRIVATE=[
-        'service_context_test_fixture',
-        '$BUILD_DIR/mongo/transport/transport_layer_common',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
-        '$BUILD_DIR/mongo/unittest/unittest',
     ],
 )
 
@@ -656,23 +468,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         'commands/test_commands_enabled',
         'service_context',
-    ],
-)
-
-
-env.CppUnitTest(
-    target="commands_test",
-    source=[
-        "commands_test.cpp",
-        env.Idlc('commands_test_example.idl')[0],
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/rpc/rpc',
-        "commands",
-        "auth/authmocks",
-        "repl/replmocks",
-        "service_context_test_fixture",
     ],
 )
 
@@ -762,20 +557,6 @@ env.Library(
         'stats/top',
         'update/update_driver',
     ]
-)
-
-env.CppUnitTest(
-    target='catalog_raii_test',
-    source=[
-        'catalog_raii_test.cpp',
-    ],
-    LIBDEPS=[
-        'auth/authmocks',
-        'catalog_raii',
-        'catalog/database_holder',
-        'service_context_test_fixture',
-        'stats/fill_locker_info',
-    ],
 )
 
 env.Library(
@@ -988,18 +769,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target="index_builds_coordinator_mongod_test",
-    source=[
-        "index_builds_coordinator_mongod_test.cpp",
-    ],
-    LIBDEPS=[
-        "index_builds_coordinator_mongod",
-        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
-    ]
-)
-
-
 env.Library(
     target='index_build_entry_helpers',
     source=[
@@ -1020,19 +789,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/query/query_request",
         "$BUILD_DIR/mongo/db/query/query_planner",
         "$BUILD_DIR/mongo/util/net/network",
-    ],
-)
-
-env.CppUnitTest(
-    target='index_build_entry_helpers_test',
-    source=[
-        'index_build_entry_helpers_test.cpp',
-    ],
-    LIBDEPS=[
-        'index_build_entry_helpers',
-        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
-        '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
-        '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 
@@ -1360,26 +1116,6 @@ env.Library(
 envWithAsio = env.Clone()
 envWithAsio.InjectThirdParty(libraries=['asio'])
 
-envWithAsio.CppUnitTest(
-    target='logical_session_id_test',
-    source=[
-        'logical_session_id_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
-        'logical_session_cache',
-        'logical_session_cache_impl',
-        'logical_session_id',
-        'logical_session_id_helpers',
-        'service_context_test_fixture',
-        'service_liaison_mock',
-        'sessions_collection_mock',
-    ],
-)
-
 envWithAsio.Library(
     target='service_liaison_mock',
     source=[
@@ -1558,30 +1294,6 @@ env.Library(
     ],
 )
 
-envWithAsio.CppUnitTest(
-    target='logical_session_cache_test',
-    source=[
-        'logical_session_cache_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/executor/async_timer_mock',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
-        'auth/authmocks',
-        'dbdirectclient',
-        'keys_collection_document',
-        'keys_collection_manager',
-        'logical_clock',
-        'logical_session_cache_impl',
-        'logical_session_id_helpers',
-        'logical_session_id',
-        'repl/replmocks',
-        'service_context_d_test_fixture',
-        'service_liaison_mock',
-        'sessions_collection_mock',
-        'transaction',
-    ],
-)
-
 envWithAsio.Library(
     target='logical_session_cache_factory_mongod',
     source=[
@@ -1693,19 +1405,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='snapshot_window_util_test',
-    source=[
-        'snapshot_window_util_test.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        'service_context_d',
-        'service_context_devnull_test_fixture',
-        'snapshot_window_options',
-        'snapshot_window_util',
-    ],
-)
-
 env.Library(
     target='signed_logical_time',
     source=[
@@ -1811,62 +1510,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='keys_collection_document_test',
-    source=[
-        'keys_collection_document_test.cpp',
-    ],
-    LIBDEPS=[
-        'keys_collection_document',
-    ],
-)
-
-env.CppUnitTest(
-    target='operation_time_tracker_test',
-    source=[
-        'operation_time_tracker_test.cpp',
-    ],
-    LIBDEPS=[
-        'logical_time',
-    ],
-)
-
-env.CppUnitTest(
-    target='logical_time_test',
-    source=[
-        'logical_time_test.cpp',
-    ],
-    LIBDEPS=[
-        'logical_time',
-        'signed_logical_time',
-        'time_proof_service',
-    ],
-)
-
-env.CppUnitTest(
-    target='logical_clock_test',
-    source=[
-        'logical_clock_test.cpp',
-    ],
-    LIBDEPS=[
-        'logical_clock_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='logical_time_validator_test',
-    source=[
-        'logical_time_validator_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
-        '$BUILD_DIR/mongo/s/config_server_test_fixture',
-        'auth/authmocks',
-        'keys_collection_manager',
-        'logical_time_validator',
-    ],
-)
-
 env.Library(
     target= 'logical_time_metadata_hook',
     source= [
@@ -1890,31 +1533,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
         '$BUILD_DIR/mongo/util/clock_source_mock'
-    ],
-)
-
-env.CppUnitTest(
-    target='time_proof_service_test',
-    source=[
-        'time_proof_service_test.cpp',
-    ],
-    LIBDEPS=[
-        'time_proof_service',
-    ],
-)
-
-env.CppUnitTest(
-    target='keys_collection_manager_sharding_test',
-    source=[
-        'key_generator_update_test.cpp',
-        'keys_collection_cache_test.cpp',
-        'keys_collection_manager_sharding_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
-        '$BUILD_DIR/mongo/s/config_server_test_fixture',
-        'keys_collection_manager',
     ],
 )
 
@@ -2029,17 +1647,6 @@ env.Library(
 asioEnv = env.Clone()
 asioEnv.InjectThirdParty('asio')
 
-asioEnv.CppIntegrationTest(
-    target='nesting_depth_test',
-    source=[
-        'nesting_depth_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/executor/network_interface_fixture',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-    ],
-)
-
 env.Library(
     target='write_ops',
     source=[
@@ -2061,81 +1668,6 @@ env.Library(
         'repl/repl_coordinator_interface',
         'service_context',
         'update/update_driver',
-    ],
-)
-
-env.CppUnitTest(
-    target='session_catalog_test',
-    source=[
-        'session_catalog_test.cpp',
-    ],
-    LIBDEPS=[
-        'auth/authmocks',
-        'service_context_test_fixture',
-        'session_catalog',
-    ],
-)
-
-env.CppUnitTest(
-    target='transaction_participant_test',
-    source=[
-        'transaction_participant_test.cpp',
-        'transaction_participant_retryable_writes_test.cpp',
-        'session_catalog_mongod_test.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/client/read_preference',
-        '$BUILD_DIR/mongo/idl/server_parameter',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
-        'auth/authmocks',
-        'dbdirectclient',
-        'logical_session_id',
-        'op_observer',
-        'query_exec',
-        'repl/mock_repl_coord_server_fixture',
-        'repl/repl_coordinator_interface',
-        'service_liaison_mock',
-        'sessions_collection_mock',
-        'sessions_collection',
-        'transaction',
-        'write_ops',
-    ],
-)
-
-env.CppUnitTest(
-    target='transaction_history_iterator_test',
-    source=[
-        'transaction_history_iterator_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
-        'query_exec',
-        'service_context_d',
-        'write_ops',
-    ],
-)
-
-env.CppUnitTest(
-    target='multi_key_path_tracker_test',
-    source=[
-        'multi_key_path_tracker_test.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        'service_context',
-    ],
-)
-
-env.CppIntegrationTest(
-    target='exhaust_cursor_currentop_integration_test',
-    source=[
-        'exhaust_cursor_currentop_integration_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_network',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-        '$BUILD_DIR/mongo/rpc/protocol',
-        '$BUILD_DIR/mongo/util/version_impl',
     ],
 )
 
@@ -2168,5 +1700,154 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/rpc/protocol',
         "$BUILD_DIR/mongo/rpc/rpc",
+    ],
+)
+
+envWithAsio = env.Clone()
+envWithAsio.InjectThirdParty(libraries=['asio'])
+
+envWithAsio.CppUnitTest(
+    target='db_test',
+    source=[
+        'catalog_raii_test.cpp',
+        'collection_index_usage_tracker_test.cpp',
+        'commands_test.cpp',
+        'curop_test.cpp',
+        'dbmessage_test.cpp',
+        'field_parser_test.cpp',
+        'field_ref_set_test.cpp',
+        'field_ref_test.cpp',
+        'hasher_test.cpp',
+        'index_build_entry_helpers_test.cpp',
+        'index_builds_coordinator_mongod_test.cpp',
+        'keypattern_test.cpp',
+        'keys_collection_document_test.cpp',
+        'logical_clock_test.cpp',
+        'logical_session_cache_test.cpp',
+        'logical_session_id_test.cpp',
+        'logical_time_test.cpp',
+        'multi_key_path_tracker_test.cpp',
+        'namespace_string_test.cpp',
+        'op_observer_impl_test.cpp',
+        'op_observer_registry_test.cpp',
+        'operation_context_test.cpp',
+        'operation_time_tracker_test.cpp',
+        'range_arithmetic_test.cpp',
+        'record_id_test.cpp',
+        'server_options_test.cpp',
+        'session_catalog_mongod_test.cpp',
+        'session_catalog_test.cpp',
+        'snapshot_window_util_test.cpp',
+        'startup_warnings_mongod_test.cpp',
+        'thread_client_test.cpp',
+        'time_proof_service_test.cpp',
+        'transaction_history_iterator_test.cpp',
+        'transaction_participant_retryable_writes_test.cpp',
+        'transaction_participant_test.cpp',
+        'update_index_data_test.cpp',
+        'write_concern_options_test.cpp',
+        env.Idlc('commands_test_example.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
+        '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
+        '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/executor/async_timer_mock',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/rpc/rpc',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/net/ssl_options_server',
+        'auth/authmocks',
+        'catalog/database_holder',
+        'catalog_raii',
+        'collection_index_usage_tracker',
+        'commands',
+        'common',
+        'curop',
+        'dbdirectclient',
+        'dbmessage',
+        'index_build_entry_helpers',
+        'index_builds_coordinator_mongod',
+        'keys_collection_document',
+        'keys_collection_manager',
+        'logical_clock',
+        'logical_clock_test_fixture',
+        'logical_session_cache',
+        'logical_session_cache_impl',
+        'logical_session_id',
+        'logical_session_id_helpers',
+        'logical_time',
+        'namespace_string',
+        'op_observer',
+        'op_observer_impl',
+        'query_exec',
+        'range_arithmetic',
+        'repl/mock_repl_coord_server_fixture',
+        'repl/oplog_interface_local',
+        'repl/repl_coordinator_interface',
+        'repl/replmocks',
+        'server_options_servers',
+        'service_context',
+        'service_context_d',
+        'service_context_d_test_fixture',
+        'service_context_devnull_test_fixture',
+        'service_context_test_fixture',
+        'service_liaison_mock',
+        'session_catalog',
+        'sessions_collection',
+        'sessions_collection_mock',
+        'signed_logical_time',
+        'snapshot_window_options',
+        'snapshot_window_util',
+        'startup_warnings_mongod',
+        'stats/fill_locker_info',
+        'time_proof_service',
+        'transaction',
+        'update_index_data',
+        'write_concern_options',
+        'write_ops',
+    ],
+)
+
+# These unit tests rely on the config_server_test_fixture, which
+# globally alters the state of the system to be in config server
+# mode. The other tests are not compatible with that setting.
+envWithAsio.CppUnitTest(
+    target='db_test_with_config_server_test_fixture',
+    source=[
+        'key_generator_update_test.cpp',
+        'keys_collection_cache_test.cpp',
+        'keys_collection_manager_sharding_test.cpp',
+        'logical_time_validator_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
+        '$BUILD_DIR/mongo/s/config_server_test_fixture',
+        'auth/authmocks',
+        'keys_collection_manager',
+        'logical_time_validator',
+    ],
+)
+
+asioEnv.CppIntegrationTest(
+    target='db_integration_test',
+    source=[
+        'nesting_depth_test.cpp',
+        'exhaust_cursor_currentop_integration_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/network_interface_fixture',
+        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/util/version_impl',
     ],
 )

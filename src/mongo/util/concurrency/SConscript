@@ -25,14 +25,6 @@ env.Library(
     ]
 )
 
-env.CppUnitTest(
-    target='thread_pool_test',
-    source=['thread_pool_test.cpp'],
-    LIBDEPS=[
-        'thread_pool',
-        'thread_pool_test_fixture',
-    ])
-
 env.Library('ticketholder',
             ['ticketholder.cpp'],
             LIBDEPS=[
@@ -40,15 +32,6 @@ env.Library('ticketholder',
                 '$BUILD_DIR/mongo/db/service_context',
                 '$BUILD_DIR/third_party/shim_boost',
             ])
-
-
-env.CppUnitTest(
-    target='ticketholder_test',
-    source=['ticketholder_test.cpp'],
-    LIBDEPS=[
-        'ticketholder',
-        '$BUILD_DIR/mongo/unittest/unittest',
-    ])
 
 env.Library(
     target='spin_lock',
@@ -58,18 +41,17 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='spin_lock_test',
+    target='util_concurrency_test',
     source=[
         'spin_lock_test.cpp',
+        'thread_pool_test.cpp',
+        'ticketholder_test.cpp',
+        'with_lock_test.cpp',
     ],
     LIBDEPS=[
         'spin_lock',
-        '$BUILD_DIR/third_party/shim_boost',
-    ],
+        'thread_pool',
+        'thread_pool_test_fixture',
+        'ticketholder',
+    ]
 )
-
-env.CppUnitTest(
-    target='with_lock_test',
-    source=[
-        'with_lock_test.cpp',
-    ])

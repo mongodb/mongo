@@ -78,38 +78,6 @@ env.Library(
     ]
 )
 
-tlEnv.CppUnitTest(
-    target='transport_layer_asio_test',
-    source=[
-        'transport_layer_asio_test.cpp',
-    ],
-    LIBDEPS=[
-        'transport_layer',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/rpc/protocol',
-        '$BUILD_DIR/mongo/util/net/socket',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/third_party/shim_asio',
-    ],
-)
-
-tlEnv.CppIntegrationTest(
-    target='transport_layer_asio_integration_test',
-    source=[
-        'transport_layer_asio_integration_test.cpp',
-    ],
-    LIBDEPS=[
-        'transport_layer_egress_init',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/async_client',
-        '$BUILD_DIR/mongo/executor/task_executor_interface',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/version_impl',
-        '$BUILD_DIR/third_party/shim_asio',
-    ],
-)
-
 tlEnv.Library(
     target='service_executor',
     source=[
@@ -128,36 +96,6 @@ tlEnv.Library(
         'transport_layer_common',
     ],
 )
-
-tlEnv.CppUnitTest(
-    target='service_executor_test',
-    source=[
-        'service_executor_test.cpp',
-    ],
-    LIBDEPS=[
-        'service_executor',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        '$BUILD_DIR/third_party/shim_asio',
-    ],
-)
-
-# Disable this test until SERVER-30475 and associated build failure tickets
-# are resolved.
-#
-# tlEnv.CppUnitTest(
-#     target='service_executor_adaptive_test',
-#     source=[
-#         'service_executor_adaptive_test.cpp',
-#     ],
-#     LIBDEPS=[
-#         'service_executor',
-#         '$BUILD_DIR/mongo/db/service_context',
-#         '$BUILD_DIR/mongo/unittest/unittest',
-#         '$BUILD_DIR/mongo/util/clock_source_mock',
-#         '$BUILD_DIR/third_party/shim_asio',
-#     ],
-# )
 
 env.Library(
     target='service_entry_point',
@@ -178,35 +116,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/traffic_recorder',
         '$BUILD_DIR/mongo/transport/message_compressor',
-    ],
-)
-
-env.CppUnitTest(
-    target='max_conns_override_test',
-    source=[
-        'max_conns_override_test.cpp',
-    ],
-    LIBDEPS=[
-        'service_entry_point',
-        'transport_layer_mock',
-        '$BUILD_DIR/mongo/unittest/unittest'
-    ],
-)
-
-env.CppUnitTest(
-    target='service_state_machine_test',
-    source=[
-        'service_state_machine_test.cpp',
-    ],
-    LIBDEPS=[
-        'service_entry_point',
-        'transport_layer_common',
-        'transport_layer_mock',
-        '$BUILD_DIR/mongo/db/dbmessage',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/rpc/rpc',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )
 
@@ -253,15 +162,50 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='message_compressor_test',
+tlEnv.CppUnitTest(
+    target='transport_test',
     source=[
         'message_compressor_manager_test.cpp',
         'message_compressor_registry_test.cpp',
+        'transport_layer_asio_test.cpp',
+        'service_executor_test.cpp',
+        # Disable this test until SERVER-30475 and associated build failure tickets are resolved.
+        # 'service_executor_adaptive_test.cpp',
+        'max_conns_override_test.cpp',
+        'service_state_machine_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/dbmessage',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/rpc/rpc',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/mongo/util/net/socket',
+        '$BUILD_DIR/third_party/shim_asio',
         'message_compressor',
         'message_compressor_options_server',
-    ]
+        'service_entry_point',
+        'service_executor',
+        'transport_layer',
+        'transport_layer_common',
+        'transport_layer_mock',
+    ],
 )
 
+tlEnv.CppIntegrationTest(
+    target='transport_integration_test',
+    source=[
+        'transport_layer_asio_integration_test.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_egress_init',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/async_client',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/version_impl',
+        '$BUILD_DIR/third_party/shim_asio',
+    ],
+)

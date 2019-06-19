@@ -49,38 +49,22 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='batch_write_types_test',
+    target='s_write_ops_test',
     source=[
-        'batched_command_request_test.cpp',
-        'batched_command_response_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/ops/write_ops_parsers_test_helpers',
-        'batch_write_types',
-    ]
-)
-
-env.CppUnitTest(
-    target='cluster_write_op_test',
-    source=[
+        'batch_downconvert_test.cpp',
         'batch_write_exec_test.cpp',
         'batch_write_op_test.cpp',
+        'batched_command_request_test.cpp',
+        'batched_command_response_test.cpp',
         'write_op_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/logical_clock',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers_test_helpers',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        'batch_write_types',
         'cluster_write_op',
-    ]
-)
-
-env.CppUnitTest(
-    target='cluster_write_op_conversion_test',
-    source=[
-        'batch_downconvert_test.cpp',
-    ],
-    LIBDEPS=[
         'cluster_write_op_conversion',
-    ]
+    ],
 )

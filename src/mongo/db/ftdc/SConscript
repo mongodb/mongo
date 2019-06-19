@@ -92,7 +92,7 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='ftdc_test',
+    target='db_ftdc_test',
     source=[
         'compressor_test.cpp',
         'controller_test.cpp',

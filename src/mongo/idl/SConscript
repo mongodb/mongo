@@ -14,20 +14,6 @@ env.Library(
     ]
 )
 
-env.CppUnitTest(
-    target='idl_test',
-    source=[
-        'idl_test.cpp',
-        env.Idlc('unittest_import.idl')[0],
-        env.Idlc('unittest.idl')[0],
-	],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-)
-
 env.Library(
     target='server_parameter',
     source=[
@@ -43,29 +29,25 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='idl_server_parameter_test',
-    source=[
-        'server_parameter_with_storage_test.cpp',
-        env.Idlc('server_parameter_with_storage_test.idl')[0],
-        'server_parameter_specialized_test.cpp',
-        env.Idlc('server_parameter_specialized_test.idl')[0],
-    ],
-    LIBDEPS=[
-        'server_parameter',
-        'idl_parser',
-    ],
-)
-
-env.CppUnitTest(
-    target='idl_config_option_test',
+    target='idl_test',
     source=[
         'config_option_test.cpp',
+        'idl_test.cpp',
+        'server_parameter_specialized_test.cpp',
+        'server_parameter_with_storage_test.cpp',
         env.Idlc('config_option_no_init_test.idl')[0],
         env.Idlc('config_option_test.idl')[0],
+        env.Idlc('server_parameter_specialized_test.idl')[0],
+        env.Idlc('server_parameter_with_storage_test.idl')[0],
+        env.Idlc('unittest.idl')[0],
+        env.Idlc('unittest_import.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'server_parameter',
     ],
 )

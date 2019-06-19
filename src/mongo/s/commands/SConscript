@@ -142,7 +142,7 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target="cluster_commands_test",
+    target="s_commands_test",
     source=[
         "cluster_delete_test.cpp",
         "cluster_distinct_test.cpp",
@@ -150,6 +150,7 @@ env.CppUnitTest(
         "cluster_find_test.cpp",
         "cluster_insert_test.cpp",
         "cluster_update_test.cpp",
+        "document_shard_key_update_test.cpp",
     ],
     LIBDEPS=[
         'cluster_commands',
@@ -157,15 +158,4 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/saslauth',
     ],
-)
-
-env.CppUnitTest(
-    target='document_shard_key_update_test',
-    source=[
-        'document_shard_key_update_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'cluster_commands',
-    ]
 )

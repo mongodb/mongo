@@ -29,30 +29,6 @@ generateErrorCodes = env_for_error_codes.Command(
 
 env.Alias('generated-sources', generateErrorCodes)
 
-env.CppUnitTest('base_test',
-                ['counter_test.cpp',
-                 'data_builder_test.cpp',
-                 'data_cursor_test.cpp',
-                 'data_range_cursor_test.cpp',
-                 'data_range_test.cpp',
-                 'data_type_string_data_test.cpp',
-                 'data_type_terminated_test.cpp',
-                 'data_type_validated_test.cpp',
-                 'data_view_test.cpp',
-                 'encoded_value_storage_test.cpp',
-                 'initializer_dependency_graph_test.cpp',
-                 'initializer_test.cpp',
-                 'murmurhash3_test.cpp',
-                 'owned_pointer_map_test.cpp',
-                 'owned_pointer_vector_test.cpp',
-                 'parse_number_test.cpp',
-                 'status_test.cpp',
-                 'status_with_test.cpp',
-                 'string_data_test.cpp',
-                 'transaction_error_test.cpp',
-                 'uuid_test.cpp',
-                ])
-
 env.Library(
     target=[
         'system_error'
@@ -79,27 +55,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target=[
-        'system_error_test',
-    ],
-    source=[
-        'system_error_test.cpp',
-    ],
-    LIBDEPS=[
-        'system_error',
-    ],
-)
-
-env.CppUnitTest(
-    target=[
-        'clonable_ptr_test',
-    ],
-    source=[
-        'clonable_ptr_test.cpp',
-    ],
-)
-
 env.Library(
     target=[
         'secure_allocator'
@@ -116,13 +71,35 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target=[
-        'secure_allocator_test',
-    ],
+    target='base_test',
     source=[
+        'clonable_ptr_test.cpp',
+        'counter_test.cpp',
+        'data_builder_test.cpp',
+        'data_cursor_test.cpp',
+        'data_range_cursor_test.cpp',
+        'data_range_test.cpp',
+        'data_type_string_data_test.cpp',
+        'data_type_terminated_test.cpp',
+        'data_type_validated_test.cpp',
+        'data_view_test.cpp',
+        'encoded_value_storage_test.cpp',
+        'initializer_dependency_graph_test.cpp',
+        'initializer_test.cpp',
+        'murmurhash3_test.cpp',
+        'owned_pointer_map_test.cpp',
+        'owned_pointer_vector_test.cpp',
+        'parse_number_test.cpp',
         'secure_allocator_test.cpp',
+        'status_test.cpp',
+        'status_with_test.cpp',
+        'string_data_test.cpp',
+        'system_error_test.cpp',
+        'transaction_error_test.cpp',
+        'uuid_test.cpp',
     ],
     LIBDEPS=[
         'secure_allocator',
+        'system_error',
     ],
 )

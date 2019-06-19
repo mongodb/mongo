@@ -4,11 +4,18 @@ env = env.Clone()
 
 sorterEnv = env.Clone()
 sorterEnv.InjectThirdParty(libraries=['snappy'])
-sorterEnv.CppUnitTest('sorter_test',
-                      'sorter_test.cpp',
-                       LIBDEPS=['$BUILD_DIR/mongo/db/service_context',
-                                '$BUILD_DIR/mongo/db/service_context_test_fixture',
-                                '$BUILD_DIR/mongo/db/storage/encryption_hooks',
-                                '$BUILD_DIR/mongo/db/storage/storage_options',
-                                '$BUILD_DIR/mongo/s/is_mongos',
-                                '$BUILD_DIR/third_party/shim_snappy'])
+
+sorterEnv.CppUnitTest(
+    target='db_sorter_test',
+    source=[
+        'sorter_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/storage/encryption_hooks',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/s/is_mongos',
+        '$BUILD_DIR/third_party/shim_snappy'
+    ],
+)

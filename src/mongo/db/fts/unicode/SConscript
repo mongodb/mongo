@@ -38,8 +38,8 @@ env.Command(
 env.Alias('generated-sources', "codepoints_diacritic_list.cpp")
 
 env.Library(
-    target='unicode', 
-	source=[
+    target='unicode',
+    source=[
         'codepoints_casefold.cpp',
         'codepoints_delimiter_list.cpp',
         'codepoints_diacritic_list.cpp',
@@ -53,30 +53,13 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='string_test',
+    target='db_fts_unicode_test',
     source=[
-        'string_test.cpp'
+        'byte_vector_test.cpp',
+        'codepoints_test.cpp',
+        'string_test.cpp',
     ],
     LIBDEPS=[
-        'unicode', 
-    ]
-)
-
-env.CppUnitTest(
-    target='codepoints_test',
-    source=[
-        'codepoints_test.cpp'
+        'unicode',
     ],
-    LIBDEPS=[
-        'unicode', 
-    ]
-)
-
-env.CppUnitTest(
-    target='byte_vector_test',
-    source=[
-        'byte_vector_test.cpp'
-    ],
-    LIBDEPS=[
-    ]
 )
