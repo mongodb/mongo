@@ -1204,9 +1204,10 @@ inline Status checkX509_STORE_error() {
 Status importCertStoreToX509_STORE(const wchar_t* storeName,
                                    DWORD storeLocation,
                                    X509_STORE* verifyStore) {
+    // Use NULL for argument 3, nullptr is not convertible to HCRYPTPROV_LEGACY type.
     HCERTSTORE systemStore = CertOpenStore(CERT_STORE_PROV_SYSTEM_W,
                                            0,
-                                           nullptr,
+                                           NULL,
                                            storeLocation | CERT_STORE_READONLY_FLAG,
                                            const_cast<LPWSTR>(storeName));
     if (systemStore == nullptr) {
