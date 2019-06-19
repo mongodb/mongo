@@ -214,15 +214,27 @@ DocumentSourceChangeStream::ChangeStreamType DocumentSourceChangeStream::getChan
 }
 
 std::string DocumentSourceChangeStream::getNsRegexForChangeStream(const NamespaceString& nss) {
+    auto regexEscape = [](const std::string& source) {
+        std::string result = "";
+        std::string escapes = "*+|()^?[]./\\$";
+        for (const char& c : source) {
+            if (escapes.find(c) != std::string::npos) {
+                result.append("\\");
+            }
+            result += c;
+        }
+        return result;
+    };
+
     auto type = getChangeStreamType(nss);
     switch (type) {
         case ChangeStreamType::kSingleCollection:
             // Match the target namespace exactly.
-            return "^" + nss.ns() + "$";
+            return "^" + regexEscape(nss.ns()) + "$";
         case ChangeStreamType::kSingleDatabase:
             // Match all namespaces that start with db name, followed by ".", then NOT followed by
             // '$' or 'system.'
-            return "^" + nss.db() + "\\." + kRegexAllCollections;
+            return "^" + regexEscape(nss.db().toString()) + "\\." + kRegexAllCollections;
         case ChangeStreamType::kAllChangesForCluster:
             // Match all namespaces that start with any db name other than admin, config, or local,
             // followed by ".", then NOT followed by '$' or 'system.'.
