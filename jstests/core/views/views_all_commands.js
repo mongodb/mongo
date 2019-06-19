@@ -133,7 +133,6 @@
             skip: "Tested in views/views_sharded.js",
         },
         clearLog: {skip: isUnrelated},
-        cloneCollection: {skip: "Tested in noPassthroughWithMongod/clonecollection.js"},
         cloneCollectionAsCapped: {
             command: {cloneCollectionAsCapped: "view", toCollection: "testcapped", size: 10240},
             expectFailure: true,

@@ -40,7 +40,6 @@ var kCommandsSupportingWriteConcern = new Set([
     "captrunc",
     "cleanupOrphaned",
     "clone",
-    "cloneCollection",
     "cloneCollectionAsCapped",
     "collMod",
     "commitTransaction",

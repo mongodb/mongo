@@ -342,7 +342,6 @@ env.Library(
     target="mongod",
     source=[
         "apply_ops_cmd.cpp",
-        "clone_collection.cpp",
         "collection_to_capped.cpp",
         "compact.cpp",
         "cpuload.cpp",

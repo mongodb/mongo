@@ -88,7 +88,6 @@
         "captrunc",
         "cleanupOrphaned",
         "clone",
-        "cloneCollection",
         "cloneCollectionAsCapped",
         "collMod",
         "convertToCapped",

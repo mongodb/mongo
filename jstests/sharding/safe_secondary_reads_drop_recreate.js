@@ -95,7 +95,6 @@
         cleanupOrphaned: {skip: "primary only"},
         clearLog: {skip: "does not return user data"},
         clone: {skip: "primary only"},
-        cloneCollection: {skip: "primary only"},
         cloneCollectionAsCapped: {skip: "primary only"},
         collMod: {skip: "primary only"},
         collStats: {skip: "does not return user data"},

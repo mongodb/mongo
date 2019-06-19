@@ -122,19 +122,5 @@
         return coll;
     }, false);
 
-    // Test that the "cloneCollection" command doesn't upgrade existing indexes to the latest
-    // version.
-    var cloneConn = MongoRunner.runMongod({});
-    assert.neq(null, cloneConn, "mongod was unable to start up");
-    testIndexVersionAutoUpgrades(function(coll) {
-        var cloneDB = cloneConn.getDB(coll.getDB().getName());
-        assert.commandWorked(cloneDB.runCommand({
-            cloneCollection: coll.getFullName(),
-            from: conn.host,
-        }));
-        return cloneDB[coll.getName()];
-    }, false);
-    MongoRunner.stopMongod(cloneConn);
-
     MongoRunner.stopMongod(conn);
 })();

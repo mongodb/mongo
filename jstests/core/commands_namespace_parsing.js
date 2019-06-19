@@ -243,12 +243,6 @@
         "create", {create: ""}, isNotFullyQualified, isNotAdminCommand);
 
     if (!isMongos) {
-        // Test cloneCollection fails with an invalid collection name.
-        assertFailsWithInvalidNamespacesForField("cloneCollection",
-                                                 {cloneCollection: "", from: "fakehost"},
-                                                 isNotFullyQualified,
-                                                 isNotAdminCommand);
-
         // Test cloneCollectionAsCapped fails with an invalid source collection name.
         assertFailsWithInvalidNamespacesForField(
             "cloneCollectionAsCapped",

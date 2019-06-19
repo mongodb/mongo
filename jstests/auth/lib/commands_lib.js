@@ -2034,34 +2034,6 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "cloneCollection_1",
-          command: {cloneCollection: firstDbName + ".x"},
-          skipSharded: true,
-          testcases: [{
-              runOnDb: firstDbName,
-              roles: roles_write,
-              privileges: [{
-                  resource: {db: firstDbName, collection: "x"},
-                  actions: ["insert", "createIndex"]
-              }],
-              expectFail: true
-          }]
-        },
-        {
-          testname: "cloneCollection_2",
-          command: {cloneCollection: secondDbName + ".x"},
-          skipSharded: true,
-          testcases: [{
-              runOnDb: secondDbName,
-              roles: {readWriteAnyDatabase: 1, restore: 1, root: 1, __system: 1},
-              privileges: [{
-                  resource: {db: secondDbName, collection: "x"},
-                  actions: ["insert", "createIndex"]
-              }],
-              expectFail: true
-          }]
-        },
-        {
           testname: "cloneCollectionAsCapped",
           command: {cloneCollectionAsCapped: "x", toCollection: "y", size: 1000},
           skipSharded: true,

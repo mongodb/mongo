@@ -462,33 +462,6 @@ var DB;
     };
 
     /**
-     Clone collection on another server to here.
-     <p>
-     Generally, you should drop() first as otherwise the cloned information will MERGE
-     into whatever data is already present in this collection.  (That is however a valid way to use
-     clone if you are trying to do something intentionally, such as union three non-overlapping
-     collections into one.)
-     <p>
-     This is a low level administrative function is not typically used.
-
-     * @param {String} from mongod instance from which to clnoe (dbhostname:port).  May
-     not be this mongod instance, as clone from self is not allowed.
-     * @param {String} collection name of collection to clone.
-     * @param {Object} query query specifying which elements of collection are to be cloned.
-     * @return Object returned has member ok set to true if operation succeeds, false otherwise.
-     * See also: db.cloneDatabase()
-     */
-    DB.prototype.cloneCollection = function(from, collection, query) {
-        print(
-            "WARNING: db.cloneCollection is deprecated. See http://dochub.mongodb.org/core/clonecollection-deprecation");
-        assert(isString(from) && from.length);
-        assert(isString(collection) && collection.length);
-        collection = this._name + "." + collection;
-        query = query || {};
-        return this._dbCommand({cloneCollection: collection, from: from, query: query});
-    };
-
-    /**
       Copy database from one server or name to another server or name. This functionality was
       removed as of MongoDB 4.2. The shell helper is kept to maintain compatibility with previous
       versions of MongoDB.
