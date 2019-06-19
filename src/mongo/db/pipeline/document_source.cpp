@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/util/string_map.h"
 
@@ -96,41 +97,6 @@ intrusive_ptr<DocumentSource> DocumentSource::optimize() {
 namespace {
 
 /**
- * Given a set of paths 'dependencies', determines which of those paths will be modified if all
- * paths except those in 'preservedPaths' are modified.
- *
- * For example, extractModifiedDependencies({'a', 'b', 'c.d', 'e'}, {'a', 'b.c', c'}) returns
- * {'b', 'e'}, since 'b' and 'e' are not preserved (only 'b.c' is preserved).
- */
-std::set<std::string> extractModifiedDependencies(const std::set<std::string>& dependencies,
-                                                  const std::set<std::string>& preservedPaths) {
-    std::set<std::string> modifiedDependencies;
-
-    // The modified dependencies is *almost* the set difference 'dependencies' - 'preservedPaths',
-    // except that if p in 'preservedPaths' is a "path prefix" of d in 'dependencies', then 'd'
-    // should not be included in the modified dependencies.
-    for (auto&& dependency : dependencies) {
-        bool preserved = false;
-        auto firstField = FieldPath::extractFirstFieldFromDottedPath(dependency).toString();
-        // If even a prefix is preserved, the path is preserved, so search for any prefixes of
-        // 'dependency' as well. 'preservedPaths' is an *ordered* set, so we only have to search the
-        // range ['firstField', 'dependency'] to find any prefixes of 'dependency'.
-        for (auto it = preservedPaths.lower_bound(firstField);
-             it != preservedPaths.upper_bound(dependency);
-             ++it) {
-            if (*it == dependency || expression::isPathPrefixOf(*it, dependency)) {
-                preserved = true;
-                break;
-            }
-        }
-        if (!preserved) {
-            modifiedDependencies.insert(dependency);
-        }
-    }
-    return modifiedDependencies;
-}
-
-/**
  * Returns a pair of pointers to $match stages, either of which can be null. The first entry in the
  * pair is a $match stage that can be moved before this stage, the second is a $match stage that
  * must remain after this stage.
@@ -158,56 +124,11 @@ splitMatchByModifiedFields(const boost::intrusive_ptr<DocumentSourceMatch>& matc
             for (auto&& rename : modifiedPathsRet.renames) {
                 preservedPaths.insert(rename.first);
             }
-            modifiedPaths = extractModifiedDependencies(depsTracker.fields, preservedPaths);
+            modifiedPaths =
+                semantic_analysis::extractModifiedDependencies(depsTracker.fields, preservedPaths);
         }
     }
     return match->splitSourceBy(modifiedPaths, modifiedPathsRet.renames);
-}
-
-/**
- * If 'pathOfInterest' or some path prefix of 'pathOfInterest' is renamed, returns the new name for
- * 'pathOfInterest', otherwise returns boost::none.
- * For example, if 'renamedPaths' is {"c.d", "c"}, and 'pathOfInterest' is "c.d.f", returns "c.f".
- */
-boost::optional<std::string> findNewName(const StringMap<std::string>& renamedPaths,
-                                         std::string pathOfInterest) {
-    FieldPath fullPathOfInterest(pathOfInterest);
-    StringBuilder toLookup;
-    std::size_t pathIndex = 0;
-    while (pathIndex < fullPathOfInterest.getPathLength()) {
-        if (pathIndex != 0) {
-            toLookup << ".";
-        }
-        toLookup << fullPathOfInterest.getFieldName(pathIndex++);
-
-        auto it = renamedPaths.find(toLookup.stringData());
-        if (it != renamedPaths.end()) {
-            const auto& newPathOfPrefix = it->second;
-            // We found a rename! Note this might be a rename of the prefix of the path, so we have
-            // to add back on the suffix that was unchanged.
-            StringBuilder renamedPath;
-            renamedPath << newPathOfPrefix;
-            while (pathIndex < fullPathOfInterest.getPathLength()) {
-                renamedPath << "." << fullPathOfInterest.getFieldName(pathIndex++);
-            }
-            return {renamedPath.str()};
-        }
-    }
-    return boost::none;
-}
-
-StringMap<std::string> computeNewNamesAssumingAnyPathsNotRenamedAreUnmodified(
-    const StringMap<std::string>& renamedPaths, const std::set<std::string>& pathsOfInterest) {
-    StringMap<std::string> renameOut;
-    for (auto&& ofInterest : pathsOfInterest) {
-        if (auto newName = findNewName(renamedPaths, ofInterest)) {
-            renameOut[ofInterest] = *newName;
-        } else {
-            // This path was not renamed, assume it was unchanged and map it to itself.
-            renameOut[ofInterest] = ofInterest;
-        }
-    }
-    return renameOut;
 }
 
 /**
@@ -290,53 +211,6 @@ Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
     }
 
     return doOptimizeAt(itr, container);
-}
-
-boost::optional<StringMap<std::string>> DocumentSource::renamedPaths(
-    const std::set<std::string>& pathsOfInterest) const {
-    auto modifiedPathsRet = this->getModifiedPaths();
-    switch (modifiedPathsRet.type) {
-        case DocumentSource::GetModPathsReturn::Type::kNotSupported:
-        case DocumentSource::GetModPathsReturn::Type::kAllPaths:
-            return boost::none;
-        case DocumentSource::GetModPathsReturn::Type::kFiniteSet: {
-            for (auto&& modified : modifiedPathsRet.paths) {
-                for (auto&& ofInterest : pathsOfInterest) {
-                    // Any overlap of the path means the path of interest is not preserved. For
-                    // example, if the path of interest is "a.b", then a modified path of "a",
-                    // "a.b", or "a.b.c" would all signal that "a.b" is not preserved.
-                    if (ofInterest == modified ||
-                        expression::isPathPrefixOf(ofInterest, modified) ||
-                        expression::isPathPrefixOf(modified, ofInterest)) {
-                        // This stage modifies at least one of the fields which the caller is
-                        // interested in, bail out.
-                        return boost::none;
-                    }
-                }
-            }
-
-            // None of the paths of interest were modified, construct the result map, mapping
-            // the names after this stage to the names before this stage.
-            return computeNewNamesAssumingAnyPathsNotRenamedAreUnmodified(modifiedPathsRet.renames,
-                                                                          pathsOfInterest);
-        }
-        case DocumentSource::GetModPathsReturn::Type::kAllExcept: {
-            auto preservedPaths = modifiedPathsRet.paths;
-            for (auto&& rename : modifiedPathsRet.renames) {
-                // For the purposes of checking which paths are modified, consider renames to
-                // preserve the path. We'll circle back later to figure out the new name if
-                // appropriate.
-                preservedPaths.insert(rename.first);
-            }
-            auto modifiedPaths = extractModifiedDependencies(pathsOfInterest, preservedPaths);
-            if (modifiedPaths.empty()) {
-                return computeNewNamesAssumingAnyPathsNotRenamedAreUnmodified(
-                    modifiedPathsRet.renames, pathsOfInterest);
-            }
-            return boost::none;
-        }
-    }
-    MONGO_UNREACHABLE;
 }
 
 void DocumentSource::serializeToArray(vector<Value>& array,

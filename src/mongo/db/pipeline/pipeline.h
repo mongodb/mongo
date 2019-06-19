@@ -133,19 +133,6 @@ public:
      */
     static bool aggHasWriteStage(const BSONObj& cmd);
 
-    /**
-     * Given 'pathsOfInterest' which describes a set of paths which the caller is interested in,
-     * returns boost::none if any of those paths are modified by the section of a pipeline
-     * described by 'rstart' and 'rend', or a mapping from their name at the end of the pipeline to
-     * their name at the beginning of the pipeline if they are preserved but possibly renamed by
-     * this pipeline. Note that the analysis proceeds backwards, so the iterators must be reverse
-     * iterators.
-     */
-    static boost::optional<StringMap<std::string>> renamedPaths(
-        SourceContainer::const_reverse_iterator rstart,
-        SourceContainer::const_reverse_iterator rend,
-        std::set<std::string> pathsOfInterest);
-
     const boost::intrusive_ptr<ExpressionContext>& getContext() const {
         return pCtx;
     }
@@ -265,14 +252,6 @@ public:
      */
     DepsTracker getDependencies(DepsTracker::MetadataAvailable metadataAvailable) const;
 
-    /**
-     * Given 'pathsOfInterest' which describes a set of paths which the caller is interested in,
-     * returns boost::none if any of those paths are modified by this pipeline, or a mapping from
-     * their name at the end of the pipeline to their name at the beginning of the pipeline if they
-     * are preserved but possibly renamed by this pipeline.
-     */
-    boost::optional<StringMap<std::string>> renamedPaths(
-        std::set<std::string> pathsOfInterest) const;
 
     const SourceContainer& getSources() const {
         return _sources;

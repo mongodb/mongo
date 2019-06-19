@@ -500,48 +500,6 @@ void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
     _sources.push_back(source);
 }
 
-boost::optional<StringMap<std::string>> Pipeline::renamedPaths(
-    SourceContainer::const_reverse_iterator rstart,
-    SourceContainer::const_reverse_iterator rend,
-    std::set<std::string> pathsOfInterest) {
-    // Use a vector to give a path id to each input path. A path's id is its index in the vector.
-    const std::vector<string> inputPaths(pathsOfInterest.begin(), pathsOfInterest.end());
-    std::vector<string> currentPaths(pathsOfInterest.begin(), pathsOfInterest.end());
-
-    // Loop backwards over the stages. We will re-use 'pathsOfInterest', modifying that set each
-    // time to be the current set of field's we're interested in. At the same time, we will maintain
-    // 'currentPaths'. 'pathsOfInterest' is used to compute the renames, while 'currentPaths' is
-    // used to tie a path back to its id.
-    //
-    // Interestingly, 'currentPaths' may contain duplicates. For example, if a stage like
-    // {$addFields: {a: "$b"}} duplicates the value of "a" and both paths are of interest, then
-    // 'currentPaths' may begin as ["a", "b"] representing the paths after the $addFields stage, but
-    // becomes ["a", "a"] via the rename.
-    for (auto it = rstart; it != rend; ++it) {
-        boost::optional<StringMap<string>> renamed = (*it)->renamedPaths(pathsOfInterest);
-        if (!renamed) {
-            return boost::none;
-        }
-        pathsOfInterest.clear();
-        for (std::size_t pathId = 0; pathId < inputPaths.size(); ++pathId) {
-            currentPaths[pathId] = (*renamed)[currentPaths[pathId]];
-            pathsOfInterest.insert(currentPaths[pathId]);
-        }
-    }
-
-    // We got all the way through the pipeline via renames! Construct the mapping from path at the
-    // end of the pipeline to path at the beginning.
-    StringMap<string> renameMap;
-    for (std::size_t pathId = 0; pathId < currentPaths.size(); ++pathId) {
-        renameMap[inputPaths[pathId]] = currentPaths[pathId];
-    }
-    return renameMap;
-}
-
-boost::optional<StringMap<string>> Pipeline::renamedPaths(std::set<string> pathsOfInterest) const {
-    return renamedPaths(_sources.rbegin(), _sources.rend(), std::move(pathsOfInterest));
-}
-
 DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAvailable) const {
     DepsTracker deps(metadataAvailable);
     const bool scopeHasVariables = pCtx->variablesParseState.hasDefinedVariables();

@@ -54,6 +54,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -2986,13 +2987,28 @@ TEST(PipelineRenameTracking, ReportsIdentityMapWhenEmpty) {
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
     auto pipeline =
         unittest::assertGet(Pipeline::create({DocumentSourceMock::createForTest()}, expCtx));
-    auto renames = pipeline->renamedPaths({"a", "b", "c.d"});
-    ASSERT(static_cast<bool>(renames));
-    auto nameMap = *renames;
-    ASSERT_EQ(nameMap.size(), 3UL);
-    ASSERT_EQ(nameMap["a"], "a");
-    ASSERT_EQ(nameMap["b"], "b");
-    ASSERT_EQ(nameMap["c.d"], "c.d");
+    {
+        // Tracking renames backwards.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().crbegin(), pipeline->getSources().crend(), {"a", "b", "c.d"});
+        ASSERT(static_cast<bool>(renames));
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 3UL);
+        ASSERT_EQ(nameMap["a"], "a");
+        ASSERT_EQ(nameMap["b"], "b");
+        ASSERT_EQ(nameMap["c.d"], "c.d");
+    }
+    {
+        // Tracking renames forwards.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().cbegin(), pipeline->getSources().cend(), {"a", "b", "c.d"});
+        ASSERT(static_cast<bool>(renames));
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 3UL);
+        ASSERT_EQ(nameMap["a"], "a");
+        ASSERT_EQ(nameMap["b"], "b");
+        ASSERT_EQ(nameMap["c.d"], "c.d");
+    }
 }
 
 class NoModifications : public DocumentSourceTestOptimizations {
@@ -3013,9 +3029,11 @@ public:
 TEST(PipelineRenameTracking, ReportsIdentityWhenNoStageModifiesAnything) {
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
     {
+        // Tracking renames backwards.
         auto pipeline = unittest::assertGet(Pipeline::create(
             {DocumentSourceMock::createForTest(), NoModifications::create()}, expCtx));
-        auto renames = pipeline->renamedPaths({"a", "b", "c.d"});
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().crbegin(), pipeline->getSources().crend(), {"a", "b", "c.d"});
         ASSERT(static_cast<bool>(renames));
         auto nameMap = *renames;
         ASSERT_EQ(nameMap.size(), 3UL);
@@ -3024,13 +3042,42 @@ TEST(PipelineRenameTracking, ReportsIdentityWhenNoStageModifiesAnything) {
         ASSERT_EQ(nameMap["c.d"], "c.d");
     }
     {
+        // Tracking renames forwards.
+        auto pipeline = unittest::assertGet(Pipeline::create(
+            {DocumentSourceMock::createForTest(), NoModifications::create()}, expCtx));
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().cbegin(), pipeline->getSources().cend(), {"a", "b", "c.d"});
+        ASSERT(static_cast<bool>(renames));
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 3UL);
+        ASSERT_EQ(nameMap["a"], "a");
+        ASSERT_EQ(nameMap["b"], "b");
+        ASSERT_EQ(nameMap["c.d"], "c.d");
+    }
+    {
+        // Tracking renames backwards.
         auto pipeline = unittest::assertGet(Pipeline::create({DocumentSourceMock::createForTest(),
                                                               NoModifications::create(),
                                                               NoModifications::create(),
                                                               NoModifications::create()},
                                                              expCtx));
-        auto renames = pipeline->renamedPaths({"a", "b", "c.d"});
-        ASSERT(static_cast<bool>(renames));
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().crbegin(), pipeline->getSources().crend(), {"a", "b", "c.d"});
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 3UL);
+        ASSERT_EQ(nameMap["a"], "a");
+        ASSERT_EQ(nameMap["b"], "b");
+        ASSERT_EQ(nameMap["c.d"], "c.d");
+    }
+    {
+        // Tracking renames forwards.
+        auto pipeline = unittest::assertGet(Pipeline::create({DocumentSourceMock::createForTest(),
+                                                              NoModifications::create(),
+                                                              NoModifications::create(),
+                                                              NoModifications::create()},
+                                                             expCtx));
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().cbegin(), pipeline->getSources().cend(), {"a", "b", "c.d"});
         auto nameMap = *renames;
         ASSERT_EQ(nameMap.size(), 3UL);
         ASSERT_EQ(nameMap["a"], "a");
@@ -3061,9 +3108,20 @@ TEST(PipelineRenameTracking, DoesNotReportRenamesIfAStageDoesNotSupportTrackingT
                                                           NotSupported::create(),
                                                           NoModifications::create()},
                                                          expCtx));
-    ASSERT_FALSE(static_cast<bool>(pipeline->renamedPaths({"a"})));
-    ASSERT_FALSE(static_cast<bool>(pipeline->renamedPaths({"a", "b"})));
-    ASSERT_FALSE(static_cast<bool>(pipeline->renamedPaths({"x", "yahoo", "c.d"})));
+    // Backwards case.
+    ASSERT_FALSE(static_cast<bool>(semantic_analysis::renamedPaths(
+        pipeline->getSources().crbegin(), pipeline->getSources().crend(), {"a"})));
+    ASSERT_FALSE(static_cast<bool>(semantic_analysis::renamedPaths(
+        pipeline->getSources().crbegin(), pipeline->getSources().crend(), {"a", "b"})));
+    ASSERT_FALSE(static_cast<bool>(semantic_analysis::renamedPaths(
+        pipeline->getSources().crbegin(), pipeline->getSources().crend(), {"x", "yahoo", "c.d"})));
+    // Forwards case.
+    ASSERT_FALSE(static_cast<bool>(semantic_analysis::renamedPaths(
+        pipeline->getSources().cbegin(), pipeline->getSources().cend(), {"a"})));
+    ASSERT_FALSE(static_cast<bool>(semantic_analysis::renamedPaths(
+        pipeline->getSources().cbegin(), pipeline->getSources().cend(), {"a", "b"})));
+    ASSERT_FALSE(static_cast<bool>(semantic_analysis::renamedPaths(
+        pipeline->getSources().cbegin(), pipeline->getSources().cend(), {"x", "yahoo", "c.d"})));
 }
 
 class RenamesAToB : public DocumentSourceTestOptimizations {
@@ -3082,14 +3140,27 @@ TEST(PipelineRenameTracking, ReportsNewNamesWhenSingleStageRenames) {
     auto pipeline = unittest::assertGet(
         Pipeline::create({DocumentSourceMock::createForTest(), RenamesAToB::create()}, expCtx));
     {
-        auto renames = pipeline->renamedPaths({"b"});
+        // Tracking backwards.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().crbegin(), pipeline->getSources().crend(), {"b"});
         ASSERT(static_cast<bool>(renames));
         auto nameMap = *renames;
         ASSERT_EQ(nameMap.size(), 1UL);
         ASSERT_EQ(nameMap["b"], "a");
     }
     {
-        auto renames = pipeline->renamedPaths({"b", "c.d"});
+        // Tracking forwards.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().cbegin(), pipeline->getSources().cend(), {"a"});
+        ASSERT(static_cast<bool>(renames));
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 1UL);
+        ASSERT_EQ(nameMap["a"], "b");
+    }
+    {
+        // Tracking backwards.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().crbegin(), pipeline->getSources().crend(), {"b", "c.d"});
         ASSERT(static_cast<bool>(renames));
         auto nameMap = *renames;
         ASSERT_EQ(nameMap.size(), 2UL);
@@ -3097,14 +3168,36 @@ TEST(PipelineRenameTracking, ReportsNewNamesWhenSingleStageRenames) {
         ASSERT_EQ(nameMap["c.d"], "c.d");
     }
     {
+        // Tracking forwards.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().cbegin(), pipeline->getSources().cend(), {"a", "c.d"});
+        ASSERT(static_cast<bool>(renames));
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 2UL);
+        ASSERT_EQ(nameMap["a"], "b");
+        ASSERT_EQ(nameMap["c.d"], "c.d");
+    }
+
+    {
         // This is strange; the mock stage reports to essentially duplicate the "a" field into "b".
         // Because of this, both "b" and "a" should map to "a".
-        auto renames = pipeline->renamedPaths({"b", "a"});
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().crbegin(), pipeline->getSources().crend(), {"b", "a"});
         ASSERT(static_cast<bool>(renames));
         auto nameMap = *renames;
         ASSERT_EQ(nameMap.size(), 2UL);
         ASSERT_EQ(nameMap["b"], "a");
         ASSERT_EQ(nameMap["a"], "a");
+    }
+    {
+        // Same strangeness as above, but in the forwards direction.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().cbegin(), pipeline->getSources().cend(), {"b", "a"});
+        ASSERT(static_cast<bool>(renames));
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 2UL);
+        ASSERT_EQ(nameMap["a"], "b");
+        ASSERT_EQ(nameMap["b"], "b");
     }
 }
 
@@ -3113,16 +3206,38 @@ TEST(PipelineRenameTracking, ReportsIdentityMapWhenGivenEmptyIteratorRange) {
     auto pipeline = unittest::assertGet(
         Pipeline::create({DocumentSourceMock::createForTest(), RenamesAToB::create()}, expCtx));
     {
-        auto renames = Pipeline::renamedPaths(
-            pipeline->getSources().rbegin(), pipeline->getSources().rbegin(), {"b"});
+        // Tracking backwards.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().crbegin(), pipeline->getSources().crbegin(), {"b"});
         ASSERT(static_cast<bool>(renames));
         auto nameMap = *renames;
         ASSERT_EQ(nameMap.size(), 1UL);
         ASSERT_EQ(nameMap["b"], "b");
     }
     {
-        auto renames = Pipeline::renamedPaths(
-            pipeline->getSources().rbegin(), pipeline->getSources().rbegin(), {"b", "c.d"});
+        // Tracking forwards.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().cbegin(), pipeline->getSources().cbegin(), {"b"});
+        ASSERT(static_cast<bool>(renames));
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 1UL);
+        ASSERT_EQ(nameMap["b"], "b");
+    }
+
+    {
+        // Tracking backwards.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().crbegin(), pipeline->getSources().crbegin(), {"b", "c.d"});
+        ASSERT(static_cast<bool>(renames));
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 2UL);
+        ASSERT_EQ(nameMap["b"], "b");
+        ASSERT_EQ(nameMap["c.d"], "c.d");
+    }
+    {
+        // Tracking forwards.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().cbegin(), pipeline->getSources().cbegin(), {"b", "c.d"});
         ASSERT(static_cast<bool>(renames));
         auto nameMap = *renames;
         ASSERT_EQ(nameMap.size(), 2UL);
@@ -3144,14 +3259,30 @@ public:
 
 TEST(PipelineRenameTracking, ReportsNewNameAcrossMultipleRenames) {
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
-    auto pipeline = unittest::assertGet(Pipeline::create(
-        {DocumentSourceMock::createForTest(), RenamesAToB::create(), RenamesBToC::create()},
-        expCtx));
-    auto renames = pipeline->renamedPaths({"c"});
-    ASSERT(static_cast<bool>(renames));
-    auto nameMap = *renames;
-    ASSERT_EQ(nameMap.size(), 1UL);
-    ASSERT_EQ(nameMap["c"], "a");
+    {
+        // Tracking backwards.
+        auto pipeline = unittest::assertGet(Pipeline::create(
+            {DocumentSourceMock::createForTest(), RenamesAToB::create(), RenamesBToC::create()},
+            expCtx));
+        auto stages = pipeline->getSources();
+        auto renames = semantic_analysis::renamedPaths(stages.crbegin(), stages.crend(), {"c"});
+        ASSERT(static_cast<bool>(renames));
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 1UL);
+        ASSERT_EQ(nameMap["c"], "a");
+    }
+    {
+        // Tracking forwards.
+        auto pipeline = unittest::assertGet(Pipeline::create(
+            {DocumentSourceMock::createForTest(), RenamesAToB::create(), RenamesBToC::create()},
+            expCtx));
+        auto stages = pipeline->getSources();
+        auto renames = semantic_analysis::renamedPaths(stages.cbegin(), stages.cend(), {"a"});
+        ASSERT(static_cast<bool>(renames));
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 1UL);
+        ASSERT_EQ(nameMap["a"], "c");
+    }
 }
 
 class RenamesBToA : public DocumentSourceTestOptimizations {
@@ -3161,20 +3292,36 @@ public:
         return new RenamesBToA();
     }
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {{"b", "a"}}};
+        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {{"a", "b"}}};
     }
 };
 
 TEST(PipelineRenameTracking, CanHandleBackAndForthRename) {
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
-    auto pipeline = unittest::assertGet(Pipeline::create(
-        {DocumentSourceMock::createForTest(), RenamesAToB::create(), RenamesBToA::create()},
-        expCtx));
-    auto renames = pipeline->renamedPaths({"a"});
-    ASSERT(static_cast<bool>(renames));
-    auto nameMap = *renames;
-    ASSERT_EQ(nameMap.size(), 1UL);
-    ASSERT_EQ(nameMap["a"], "a");
+    {
+        // Tracking backwards.
+        auto pipeline = unittest::assertGet(Pipeline::create(
+            {DocumentSourceMock::createForTest(), RenamesAToB::create(), RenamesBToA::create()},
+            expCtx));
+        auto stages = pipeline->getSources();
+        auto renames = semantic_analysis::renamedPaths(stages.crbegin(), stages.crend(), {"a"});
+        ASSERT(static_cast<bool>(renames));
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 1UL);
+        ASSERT_EQ(nameMap["a"], "a");
+    }
+    {
+        // Tracking forwards.
+        auto pipeline = unittest::assertGet(Pipeline::create(
+            {DocumentSourceMock::createForTest(), RenamesAToB::create(), RenamesBToA::create()},
+            expCtx));
+        auto stages = pipeline->getSources();
+        auto renames = semantic_analysis::renamedPaths(stages.cbegin(), stages.cend(), {"a"});
+        ASSERT(static_cast<bool>(renames));
+        auto nameMap = *renames;
+        ASSERT_EQ(nameMap.size(), 1UL);
+        ASSERT_EQ(nameMap["a"], "a");
+    }
 }
 
 TEST(InvolvedNamespacesTest, NoInvolvedNamespacesForMatchSortProject) {

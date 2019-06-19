@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -339,7 +340,7 @@ StringMap<std::string> computeShardKeyRenameMap(const Pipeline* mergePipeline,
         // global groups. Thus we want to exclude this stage from our rename tracking.
         traversalEnd = std::prev(traversalEnd);
     }
-    auto renameMap = Pipeline::renamedPaths(traversalStart, traversalEnd, pathsOfShardKey);
+    auto renameMap = semantic_analysis::renamedPaths(traversalStart, traversalEnd, pathsOfShardKey);
     invariant(renameMap,
               str::stream()
                   << "Analyzed pipeline was thought to preserve the shard key fields, but did not: "
@@ -359,7 +360,8 @@ bool anyStageModifiesShardKeyOrNeedsMerge(std::set<std::string> shardKeyPaths,
     const auto& stages = mergePipeline->getSources();
     for (auto it = stages.crbegin(); it != stages.crend(); ++it) {
         const auto& stage = *it;
-        auto renames = stage->renamedPaths(std::move(shardKeyPaths));
+        auto renames = semantic_analysis::renamedPaths(
+            std::move(shardKeyPaths), *stage, semantic_analysis::Direction::kBackward);
         if (!renames) {
             return true;
         }
@@ -415,7 +417,7 @@ boost::optional<ShardedExchangePolicy> walkPipelineBackwardsTrackingShardKey(
     // chunk has an associated range [from, to); i.e. inclusive lower bound and exclusive upper
     // bound. The chunk ranges must cover all domain without any holes. For the exchange we coalesce
     // ranges into a single vector of points. E.g. chunks [min,5], [5,10], [10,max] will produce
-    // [min,5,10,max] vector. Number of points in the vector is always one grater than number of
+    // [min,5,10,max] vector. Number of points in the vector is always one greater than number of
     // chunks.
     // We also compute consumer indices for every chunk. From the example above (3 chunks) we may
     // get the vector [0,1,2]; i.e. the first chunk goes to the consumer 0 and so on. Note that
@@ -552,9 +554,6 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
     if (internalQueryDisableExchange.load()) {
         return boost::none;
     }
-
-    const auto grid = Grid::get(opCtx);
-    invariant(grid);
 
     if (mergePipeline->getSources().empty()) {
         return boost::none;

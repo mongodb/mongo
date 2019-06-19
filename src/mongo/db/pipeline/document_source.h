@@ -438,14 +438,6 @@ public:
     }
 
     /**
-     * Given 'currentNames' which describes a set of paths which the caller is interested in,
-     * returns boost::none if any of those paths are modified by this stage, or a mapping from
-     * their old name to their new name if they are preserved but possibly renamed by this stage.
-     */
-    boost::optional<StringMap<std::string>> renamedPaths(
-        const std::set<std::string>& currentNames) const;
-
-    /**
      * Get the dependencies this operation needs to do its job. If overridden, subclasses must add
      * all paths needed to apply their transformation to 'deps->fields', and call
      * 'deps->setNeedsMetadata()' to indicate what metadata (e.g. text score), if any, is required.

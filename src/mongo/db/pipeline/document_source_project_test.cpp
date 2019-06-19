@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
+#include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/unittest/unittest.h"
 
@@ -264,6 +265,29 @@ TEST_F(ProjectStageTest, CanUseRemoveSystemVariableToConditionallyExcludeProject
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
 
     ASSERT(project->getNext().isEOF());
+}
+
+TEST_F(ProjectStageTest, ProjectionCorrectlyReportsRenamesForwards) {
+    auto project = DocumentSourceProject::create(fromjson("{'renamedB' : '$b'}"), getExpCtx());
+    auto renames =
+        semantic_analysis::renamedPaths({"b"}, *project, semantic_analysis::Direction::kForward);
+    // renamedPaths should return a mapping of old name->new name for each path in interestingPaths
+    // if the paths are all unmodified (but possibly renamed). Because path b is preserved, but
+    // renamed (to renamedB) we expect a renamedPaths to return a mapping from b->renamedB.
+    auto single_rename = renames->extract("b");
+    ASSERT_FALSE(single_rename.empty());
+    ASSERT_EQUALS(single_rename.mapped(), "renamedB");
+    ASSERT_TRUE(renames->empty());
+}
+
+TEST_F(ProjectStageTest, ProjectionCorrectlyReportsRenamesBackwards) {
+    auto project = DocumentSourceProject::create(fromjson("{'renamedB' : '$b'}"), getExpCtx());
+    auto renames = semantic_analysis::renamedPaths(
+        {"renamedB"}, *project, semantic_analysis::Direction::kBackward);
+    auto single_rename = renames->extract("renamedB");
+    ASSERT_FALSE(single_rename.empty());
+    ASSERT_EQUALS(single_rename.mapped(), "b");
+    ASSERT_TRUE(renames->empty());
 }
 
 /**
