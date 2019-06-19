@@ -289,9 +289,11 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
     return std::move(ops);
 }
 
-StatusWith<OpTime> OplogApplier::multiApply(OperationContext* opCtx, Operations ops) {
+StatusWith<OpTime> OplogApplier::multiApply(OperationContext* opCtx,
+                                            Operations ops,
+                                            boost::optional<repl::OplogApplication::Mode> mode) {
     _observer->onBatchBegin(ops);
-    auto lastApplied = _multiApply(opCtx, std::move(ops));
+    auto lastApplied = _multiApply(opCtx, std::move(ops), mode);
     _observer->onBatchEnd(lastApplied, {});
     return lastApplied;
 }

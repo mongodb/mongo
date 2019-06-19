@@ -100,12 +100,8 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
         ReadSourceScope readSourceScope(opCtx);
 
         // Get the corresponding prepare applyOps oplog entry.
-        const auto prepareOpTime = entry.getPrevWriteOpTimeInTransaction();
-        invariant(prepareOpTime);
-        TransactionHistoryIterator iter(prepareOpTime.get());
-        invariant(iter.hasNext());
-        const auto prepareOplogEntry = iter.nextFatalOnErrors(opCtx);
-        ops = readTransactionOperationsFromOplogChain(opCtx, prepareOplogEntry, {});
+        const auto prepareOplogEntry = getPreviousOplogEntry(opCtx, entry);
+        ops = readTransactionOperationsFromOplogChain(opCtx, prepareOplogEntry, {}, boost::none);
     }
 
     const auto dbName = entry.getNss().db().toString();
@@ -137,6 +133,21 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
 }
 }  // namespace
 
+/**
+ * Helper used to get previous oplog entry from the same transaction.
+ */
+const repl::OplogEntry getPreviousOplogEntry(OperationContext* opCtx,
+                                             const repl::OplogEntry& entry) {
+    const auto prevOpTime = entry.getPrevWriteOpTimeInTransaction();
+    invariant(prevOpTime);
+    TransactionHistoryIterator iter(prevOpTime.get());
+    invariant(iter.hasNext());
+    const auto prevOplogEntry = iter.next(opCtx);
+
+    return prevOplogEntry;
+}
+
+
 Status applyCommitTransaction(OperationContext* opCtx,
                               const OplogEntry& entry,
                               repl::OplogApplication::Mode mode) {
@@ -150,8 +161,7 @@ Status applyCommitTransaction(OperationContext* opCtx,
     auto commitCommand = CommitTransactionOplogObject::parse(ctx, entry.getObject());
     invariant(commitCommand.getCommitTimestamp());
 
-    if (mode == repl::OplogApplication::Mode::kRecovering ||
-        mode == repl::OplogApplication::Mode::kInitialSync) {
+    if (mode == repl::OplogApplication::Mode::kRecovering) {
         return _applyTransactionFromOplogChain(opCtx,
                                                entry,
                                                mode,
@@ -216,7 +226,8 @@ Status applyAbortTransaction(OperationContext* opCtx,
 repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     OperationContext* opCtx,
     const OplogEntry& commitOrPrepare,
-    const std::vector<OplogEntry*>& cachedOps) {
+    const std::vector<OplogEntry*>& cachedOps,
+    boost::optional<Timestamp> commitOplogEntryTS) {
     repl::MultiApplier::Operations ops;
 
     // Get the previous oplog entry.
@@ -245,7 +256,8 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
         const auto& operationEntry = iter.nextFatalOnErrors(opCtx);
         invariant(operationEntry.isPartialTransaction());
         auto prevOpsEnd = ops.size();
-        repl::ApplyOps::extractOperationsTo(operationEntry, commitOrPrepareObj, &ops);
+        repl::ApplyOps::extractOperationsTo(
+            operationEntry, commitOrPrepareObj, &ops, commitOplogEntryTS);
         // Because BSONArrays do not have fast way of determining size without iterating through
         // them, and we also have no way of knowing how many oplog entries are in a transaction
         // without iterating, reversing each applyOps and then reversing the whole array is
@@ -260,12 +272,14 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     for (auto* cachedOp : cachedOps) {
         const auto& operationEntry = *cachedOp;
         invariant(operationEntry.isPartialTransaction());
-        repl::ApplyOps::extractOperationsTo(operationEntry, commitOrPrepareObj, &ops);
+        repl::ApplyOps::extractOperationsTo(
+            operationEntry, commitOrPrepareObj, &ops, commitOplogEntryTS);
     }
 
     // Reconstruct the operations from the commit or prepare oplog entry.
     if (commitOrPrepare.getCommandType() == OplogEntry::CommandType::kApplyOps) {
-        repl::ApplyOps::extractOperationsTo(commitOrPrepare, commitOrPrepareObj, &ops);
+        repl::ApplyOps::extractOperationsTo(
+            commitOrPrepare, commitOrPrepareObj, &ops, commitOplogEntryTS);
     }
     return ops;
 }
@@ -284,7 +298,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     // The prepare time of the transaction is set explicitly below.
     auto ops = [&] {
         ReadSourceScope readSourceScope(opCtx);
-        return readTransactionOperationsFromOplogChain(opCtx, entry, {});
+        return readTransactionOperationsFromOplogChain(opCtx, entry, {}, boost::none);
     }();
 
     if (oplogApplicationMode == repl::OplogApplication::Mode::kRecovering ||

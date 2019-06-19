@@ -55,7 +55,9 @@ public:
 private:
     void _run(OplogBuffer* oplogBuffer) final {}
     void _shutdown() final {}
-    StatusWith<OpTime> _multiApply(OperationContext* opCtx, Operations ops) final {
+    StatusWith<OpTime> _multiApply(OperationContext* opCtx,
+                                   Operations ops,
+                                   boost::optional<repl::OplogApplication::Mode> mode) final {
         return _externalState->multiApplyFn(opCtx, ops, _observer);
     }
 

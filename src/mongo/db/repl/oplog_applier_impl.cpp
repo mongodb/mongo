@@ -61,8 +61,9 @@ void OplogApplierImpl::_shutdown() {
     _syncTail.shutdown();
 }
 
-StatusWith<OpTime> OplogApplierImpl::_multiApply(OperationContext* opCtx, Operations ops) {
-    return _syncTail.multiApply(opCtx, std::move(ops));
+StatusWith<OpTime> OplogApplierImpl::_multiApply(
+    OperationContext* opCtx, Operations ops, boost::optional<repl::OplogApplication::Mode> mode) {
+    return _syncTail.multiApply(opCtx, std::move(ops), mode);
 }
 
 }  // namespace repl

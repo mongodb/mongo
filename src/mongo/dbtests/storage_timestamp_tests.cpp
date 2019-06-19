@@ -1383,7 +1383,8 @@ public:
             storageInterface,
             {},
             writerPool.get());
-        ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(oplogApplier.multiApply(_opCtx, ops)));
+        ASSERT_EQUALS(op2.getOpTime(),
+                      unittest::assertGet(oplogApplier.multiApply(_opCtx, ops, boost::none)));
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
         assertMultikeyPaths(
@@ -1492,7 +1493,7 @@ public:
             storageInterface,
             options,
             writerPool.get());
-        auto lastTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, ops));
+        auto lastTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, ops, boost::none));
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 
         // Wait for the index build to finish before making any assertions.
@@ -2467,7 +2468,7 @@ public:
         auto writerPool = repl::OplogApplier::makeWriterPool(1);
         repl::SyncTail syncTail(
             nullptr, _consistencyMarkers, storageInterface, applyOperationFn, writerPool.get());
-        auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx, {insertOp}));
+        auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx, {insertOp}, boost::none));
         ASSERT_EQ(insertOp.getOpTime(), lastOpTime);
 
         joinGuard.dismiss();

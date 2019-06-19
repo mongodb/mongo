@@ -67,7 +67,9 @@ private:
 
     void _shutdown() override;
 
-    StatusWith<OpTime> _multiApply(OperationContext* opCtx, Operations ops) override;
+    StatusWith<OpTime> _multiApply(OperationContext* opCtx,
+                                   Operations ops,
+                                   boost::optional<repl::OplogApplication::Mode> mode) override;
 
     // Not owned by us.
     ReplicationCoordinator* const _replCoord;
