@@ -455,8 +455,12 @@ public:
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             WriteUnitOfWork wuow(opCtx);
             auto opTime = repl::OpTime(Timestamp(10, 1), 1);  // Dummy timestamp.
-            txnParticipant.onWriteOpCompletedOnPrimary(
-                opCtx, txnNum, {stmtId}, opTime, Date_t::now(), boost::none, boost::none);
+            SessionTxnRecord sessionTxnRecord;
+            sessionTxnRecord.setSessionId(*opCtx->getLogicalSessionId());
+            sessionTxnRecord.setTxnNum(txnNum);
+            sessionTxnRecord.setLastWriteOpTime(opTime);
+            sessionTxnRecord.setLastWriteDate(Date_t::now());
+            txnParticipant.onWriteOpCompletedOnPrimary(opCtx, {stmtId}, sessionTxnRecord);
             wuow.commit();
         }
     }
