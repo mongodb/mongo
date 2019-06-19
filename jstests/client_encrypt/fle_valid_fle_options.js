@@ -32,12 +32,6 @@ load('jstests/ssl/libs/ssl_helpers.js');
           schemaMap: {},
         },
         {
-          kmsProviders: {
-              aws: awsKMS,
-          },
-          keyVaultNamespace: "test.keystore",
-        },
-        {
           keyVaultNamespace: "test.keystore",
           schemaMap: {},
         },

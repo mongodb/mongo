@@ -91,18 +91,21 @@ load('jstests/ssl/libs/ssl_helpers.js');
                 fail = [...failTestCases, ...failDeterministic];
             }
 
+            const clientEncrypt = shell.getClientEncryption();
             for (const passTestCase of pass) {
-                const encPassTestCase = shell.encrypt(keyId, passTestCase, encryptionAlgorithm);
-                assert.eq(passTestCase, shell.decrypt(encPassTestCase));
+                const encPassTestCase =
+                    clientEncrypt.encrypt(keyId, passTestCase, encryptionAlgorithm);
+                assert.eq(passTestCase, clientEncrypt.decrypt(encPassTestCase));
 
                 if (encryptionAlgorithm === deterministicAlgorithm) {
                     assert.eq(encPassTestCase,
-                              shell.encrypt(keyId, passTestCase, encryptionAlgorithm));
+                              clientEncrypt.encrypt(keyId, passTestCase, encryptionAlgorithm));
                 }
             }
 
             for (const failTestCase of fail) {
-                assert.throws(shell.encrypt, [keyId, failTestCase, encryptionAlgorithm]);
+                assert.throws(() =>
+                                  clientEncrypt.encrypt(keyId, failTestCase, encryptionAlgorithm));
             }
         }
     }

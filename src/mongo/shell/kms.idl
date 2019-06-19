@@ -90,6 +90,7 @@ structs:
           kmsProviders: kmsProviders
           schemaMap:
             type: object
+            optional: true
           bypassAutoEncryption:
             type: bool
             optional: true
