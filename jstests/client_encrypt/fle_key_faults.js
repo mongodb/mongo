@@ -65,7 +65,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
 
         const str = "mongo";
         assert.throws(() => {
-            const encStr = shell.encrypt(keyId, str);
+            const encStr = shell.getClientEncryption().encrypt(keyId, str);
         });
     });
 
@@ -75,7 +75,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
 
         const str = "mongo";
         assert.throws(() => {
-            const encStr = shell.encrypt(keyId, str);
+            const encStr = shell.getClientEncryption().encrypt(keyId, str);
         });
     });
 
@@ -85,7 +85,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
 
         const str = "mongo";
         assert.throws(() => {
-            const encStr = shell.encrypt(keyId, str);
+            const encStr = shell.getClientEncryption().encrypt(keyId, str);
         });
     });
 

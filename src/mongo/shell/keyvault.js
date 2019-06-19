@@ -104,3 +104,21 @@ class KeyVault {
         return ret;
     }
 }
+
+class ClientEncryption {
+    constructor(mongo) {
+        this.mongo = mongo;
+    }
+
+    encrypt() {
+        return this.mongo.encrypt.apply(this.mongo, arguments);
+    }
+
+    decrypt() {
+        return this.mongo.decrypt.apply(this.mongo, arguments);
+    }
+}
+
+Mongo.prototype.getClientEncryption = function() {
+    return new ClientEncryption(this);
+};
