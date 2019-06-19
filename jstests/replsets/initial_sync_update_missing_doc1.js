@@ -8,85 +8,46 @@
  * secondary will initially fail to apply the update operation in phase 3 and subsequently have
  * to attempt to check the source for a new copy of the document. The absence of the document on
  * the source indicates that the source is free to ignore the failed update operation.
+ *
  */
 
 (function() {
+    load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
     load("jstests/libs/check_log.js");
 
-    var name = 'initial_sync_update_missing_doc1';
-    var replSet = new ReplSetTest({
+    const name = 'initial_sync_update_missing_doc1';
+    const replSet = new ReplSetTest({
         name: name,
-        nodes: [{}, {rsConfig: {arbiterOnly: true}}],
+        nodes: 1,
     });
 
     replSet.startSet();
     replSet.initiate();
-    var primary = replSet.getPrimary();
+    const primary = replSet.getPrimary();
+    const dbName = 'test';
 
-    var coll = primary.getDB('test').getCollection(name);
-    assert.writeOK(coll.insert({_id: 0, x: 1}));
+    var coll = primary.getDB(dbName).getCollection(name);
+    assert.commandWorked(coll.insert({_id: 0, x: 1}));
 
-    // Add a secondary node but make it hang after retrieving the last op on the source
-    // but before copying databases.
-    var secondary = replSet.add();
-    secondary.setSlaveOk();
+    // Add a secondary node with priority: 0 and votes: 0 so that we prevent elections while
+    // it is syncing from the primary.
+    const secondaryConfig = {rsConfig: {votes: 0, priority: 0}};
+    const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
 
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'alwaysOn'}));
-    // Skip clearing initial sync progress after a successful initial sync attempt so that we
-    // can check initialSyncStatus fields after initial sync is complete.
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'skipClearInitialSyncState', mode: 'alwaysOn'}));
-    replSet.reInitiate();
+    // Update and remove document on primary.
+    assert.commandWorked(coll.update({_id: 0}, {x: 2}, {upsert: false}));
+    assert.commandWorked(coll.remove({_id: 0}, {justOne: true}));
 
-    // Wait for fail point message to be logged.
-    checkLog.contains(secondary,
-                      'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
+    turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
 
-    assert.writeOK(coll.update({_id: 0}, {x: 2}, {upsert: false, writeConcern: {w: 1}}));
-    assert.writeOK(coll.remove({_id: 0}, {justOne: true, writeConcern: {w: 1}}));
-
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
-
-    checkLog.contains(secondary, 'update of non-mod failed');
-    checkLog.contains(secondary, 'Fetching missing document');
-    checkLog.contains(
-        secondary, 'initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled');
     var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
     assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
     var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
 
-    // Insert a document to move forward minValid, even though the document was not found.
-    assert.writeOK(primary.getDB('test').getCollection(name + 'b').insert({_id: 1, y: 1}));
+    turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 0 /* numInserted */);
 
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'off'}));
-    checkLog.contains(secondary,
-                      'Missing document not found on source; presumably deleted later in oplog.');
-    checkLog.contains(secondary, 'initial sync done');
-
-    replSet.awaitReplication();
-    replSet.awaitSecondaryNodes();
-
-    assert.eq(0,
-              secondary.getDB('test').getCollection(name).find().itcount(),
-              'collection successfully synced to secondary');
-
-    res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-
-    // Fetch count stays at zero because we are unable to get the document from the sync source.
-    assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
-
-    var finalOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
-    assert(friendlyEqual(firstOplogEnd, finalOplogEnd),
-           "minValid was moved forward when missing document was not fetched");
-
-    assert.eq(0,
-              secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
-              "Oplog buffer was not dropped after initial sync");
+    finishAndValidate(replSet, name, firstOplogEnd, 0 /* numInserted */, 0 /* numCollections */);
 
     replSet.stopSet();
+
 })();

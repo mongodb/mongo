@@ -56,10 +56,15 @@ public:
      * This variant allows optimization for extracting multiple applyOps operations.  The entry for
      * the non-DurableReplOperation fields of the extracted operation must be specified as
      * 'topLevelDoc', and need not be any of the applyOps operations.
+     *
+     * If a commitOplogEntryTS Timestamp is passed in, then we are extracting applyOps operations
+     * from a prepare oplog entry during initial sync. These operations must be timestamped at the
+     * commit oplog entry timestamp instead of the prepareTimestamp.
      */
     static void extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
                                     const BSONObj& topLevelDoc,
-                                    MultiApplier::Operations* operations);
+                                    MultiApplier::Operations* operations,
+                                    boost::optional<Timestamp> commitOplogEntryTS);
 };
 
 /**

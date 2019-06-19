@@ -15,17 +15,19 @@
 
 (function() {
     load("jstests/libs/check_log.js");
+    load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
     load("jstests/replsets/libs/two_phase_drops.js");  // For TwoPhaseDropCollectionTest.
 
     var name = 'initial_sync_update_missing_doc3';
     var replSet = new ReplSetTest({
         name: name,
-        nodes: [{}, {rsConfig: {arbiterOnly: true}}],
+        nodes: 1,
     });
 
     replSet.startSet();
     replSet.initiate();
-    var primary = replSet.getPrimary();
+    const primary = replSet.getPrimary();
+    const dbName = 'test';
 
     // Check for 'system.drop' two phase drop support.
     if (!TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replSet)) {
@@ -34,38 +36,25 @@
         return;
     }
 
-    var coll = primary.getDB('test').getCollection(name);
-    assert.writeOK(coll.insert({_id: 0, x: 1}));
+    var coll = primary.getDB(dbName).getCollection(name);
+    assert.commandWorked(coll.insert({_id: 0, x: 1}));
 
-    // Add a secondary node but make it hang after retrieving the last op on the source
-    // but before copying databases.
-    var secondary = replSet.add();
-    secondary.setSlaveOk();
+    // Add a secondary node with priority: 0 so that we prevent elections while it is syncing
+    // from the primary.
+    // We cannot give the secondary votes: 0 because then it will not be able to acknowledge
+    // majority writes. That means the sync source can immediately drop it's collection
+    // because it alone determines the majority commit point.
+    const secondaryConfig = {rsConfig: {priority: 0}};
+    const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
 
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'alwaysOn'}));
-    replSet.reInitiate();
+    // Update and remove document on primary.
+    assert.commandWorked(coll.update({_id: 0}, {x: 2}, {upsert: false}));
+    assert.commandWorked(coll.remove({_id: 0}, {justOne: true}));
 
-    // Wait for fail point message to be logged.
-    checkLog.contains(secondary,
-                      'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
+    turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
 
-    assert.writeOK(coll.update({_id: 0}, {x: 2}, {upsert: false, writeConcern: {w: 1}}));
-    assert.writeOK(coll.remove({_id: 0}, {justOne: true, writeConcern: {w: 1}}));
-
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
-
-    checkLog.contains(secondary, 'update of non-mod failed');
-    checkLog.contains(secondary, 'Fetching missing document');
-
-    checkLog.contains(
-        secondary, 'initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled');
-    var doc = {_id: 0, x: 3};
     // Re-insert deleted document.
-    assert.writeOK(coll.insert(doc, {writeConcern: {w: 1}}));
+    assert.commandWorked(coll.insert({_id: 0, x: 3}));
     // Mark the collection as drop pending so it gets renamed, but retains the UUID.
     assert.commandWorked(primary.getDB('test').runCommand({"drop": name}));
 
@@ -74,13 +63,8 @@
     var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
 
     secondary.getDB('test').setLogLevel(1, 'replication');
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'off'}));
-
-    checkLog.contains(secondary, 'Inserted missing document');
+    turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 1);
     secondary.getDB('test').setLogLevel(0, 'replication');
-
-    checkLog.contains(secondary, 'initial sync done');
 
     replSet.awaitReplication();
     replSet.awaitSecondaryNodes();

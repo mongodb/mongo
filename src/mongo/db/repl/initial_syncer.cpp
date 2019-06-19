@@ -1190,7 +1190,8 @@ void InitialSyncer::_getNextApplierBatchCallback(
         _fetchCount.store(0);
         MultiApplier::MultiApplyFn applyBatchOfOperationsFn = [this](OperationContext* opCtx,
                                                                      MultiApplier::Operations ops) {
-            return _oplogApplier->multiApply(opCtx, std::move(ops));
+            return _oplogApplier->multiApply(
+                opCtx, std::move(ops), repl::OplogApplication::Mode::kInitialSync);
         };
         OpTime lastApplied = ops.back().getOpTime();
         invariant(ops.back().getWallClockTime());

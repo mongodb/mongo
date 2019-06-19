@@ -389,7 +389,8 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
     std::vector<MultiApplier::OperationPtrs> writerVectors(1);
     std::vector<MultiApplier::Operations> derivedOps;
     // Derive ops for transactions if necessary.
-    syncTail.fillWriterVectors(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+    syncTail.fillWriterVectors(
+        _opCtx.get(), &ops, &writerVectors, &derivedOps, OplogApplication::Mode::kInitialSync);
 
     const auto& opPtrs = writerVectors[0];
     ASSERT_OK(runOpPtrsInitialSync(opPtrs));

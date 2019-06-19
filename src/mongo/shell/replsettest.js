@@ -2293,6 +2293,10 @@ var ReplSetTest = function(opts) {
         }
         baseOptions = Object.merge(baseOptions, this.nodeOptions["n" + n]);
         options = Object.merge(baseOptions, options);
+        if (options.hasOwnProperty("rsConfig")) {
+            this.nodeOptions["n" + n] =
+                Object.merge(this.nodeOptions["n" + n], {rsConfig: options.rsConfig});
+        }
         delete options.rsConfig;
 
         options.restart = options.restart || restart;

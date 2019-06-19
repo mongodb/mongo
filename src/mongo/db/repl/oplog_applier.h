@@ -195,7 +195,9 @@ public:
      *
      * TODO: remove when enqueue() is implemented.
      */
-    StatusWith<OpTime> multiApply(OperationContext* opCtx, Operations ops);
+    StatusWith<OpTime> multiApply(OperationContext* opCtx,
+                                  Operations ops,
+                                  boost::optional<repl::OplogApplication::Mode> mode);
 
 private:
     /**
@@ -221,7 +223,9 @@ private:
      * Called from multiApply() to apply a batch of operations in parallel.
      * Implemented in subclasses but not visible otherwise.
      */
-    virtual StatusWith<OpTime> _multiApply(OperationContext* opCtx, Operations ops) = 0;
+    virtual StatusWith<OpTime> _multiApply(OperationContext* opCtx,
+                                           Operations ops,
+                                           boost::optional<repl::OplogApplication::Mode> mode) = 0;
 
     // Used to schedule task for oplog application loop.
     // Not owned by us.
