@@ -69,7 +69,7 @@ public:
     MobileSession* getSessionNoTxn(OperationContext* opCtx);
 
     bool inActiveTxn() const {
-        return _active;
+        return _isActive();
     }
 
     void assertInActiveTxn() const;
@@ -90,10 +90,6 @@ private:
     void _txnClose(bool commit);
     void _txnOpen(OperationContext* opCtx, bool readOnly);
     void _upgradeToWriteSession(OperationContext* opCtx);
-
-    bool _areWriteUnitOfWorksBanned = false;
-    bool _inUnitOfWork;
-    bool _active;
 
     static AtomicWord<long long> _nextID;
     uint64_t _id;

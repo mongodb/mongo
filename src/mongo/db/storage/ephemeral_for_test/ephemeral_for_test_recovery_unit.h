@@ -92,8 +92,6 @@ private:
     typedef std::shared_ptr<Change> ChangePtr;
     typedef std::vector<ChangePtr> Changes;
 
-    bool _inUnitOfWork = false;
-
     Changes _changes;
     std::function<void()> _waitUntilDurableCallback;
 

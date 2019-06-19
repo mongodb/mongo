@@ -50,7 +50,7 @@ public:
     void abortUnitOfWork() override final;
 
     bool inActiveTxn() const {
-        return _inUnitOfWork;
+        return _inUnitOfWork();
     }
 
     virtual bool waitUntilDurable() override;
@@ -92,7 +92,6 @@ private:
 
     bool _forked = false;
     bool _dirty = false;  // Whether or not we have written to this _workingCopy.
-    bool _inUnitOfWork = false;
 
     typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;

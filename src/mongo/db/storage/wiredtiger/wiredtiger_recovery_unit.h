@@ -201,53 +201,6 @@ public:
 
     static void appendGlobalStats(BSONObjBuilder& b);
 
-    /**
-     * State transitions:
-     *
-     *   /------------------------> Inactive <-----------------------------\
-     *   |                             |                                   |
-     *   |                             |                                   |
-     *   |              /--------------+--------------\                    |
-     *   |              |                             |                    | abandonSnapshot()
-     *   |              |                             |                    |
-     *   |   beginUOW() |                             | _txnOpen()         |
-     *   |              |                             |                    |
-     *   |              V                             V                    |
-     *   |    InactiveInUnitOfWork          ActiveNotInUnitOfWork ---------/
-     *   |              |                             |
-     *   |              |                             |
-     *   |   _txnOpen() |                             | beginUOW()
-     *   |              |                             |
-     *   |              \--------------+--------------/
-     *   |                             |
-     *   |                             |
-     *   |                             V
-     *   |                           Active
-     *   |                             |
-     *   |                             |
-     *   |              /--------------+--------------\
-     *   |              |                             |
-     *   |              |                             |
-     *   |   abortUOW() |                             | commitUOW()
-     *   |              |                             |
-     *   |              V                             V
-     *   |          Aborting                      Committing
-     *   |              |                             |
-     *   |              |                             |
-     *   |              |                             |
-     *   \--------------+-----------------------------/
-     *
-     */
-    enum class State {
-        kInactive,
-        kInactiveInUnitOfWork,
-        kActiveNotInUnitOfWork,
-        kActive,
-        kAborting,
-        kCommitting,
-    };
-    State getState_forTest() const;
-
 private:
     void _abort();
     void _commit();
@@ -273,30 +226,9 @@ private:
      */
     Timestamp _getTransactionReadTimestamp(WT_SESSION* session);
 
-    /**
-     * Transitions to new state.
-     */
-    void _setState(State newState);
-
-    /**
-     * Returns true if active.
-     */
-    bool _isActive() const;
-
-    /**
-     * Returns true if currently managed by a WriteUnitOfWork.
-     */
-    bool _inUnitOfWork() const;
-
-    /**
-     * Returns true if currently running commit or rollback handlers
-     */
-    bool _isCommittingOrAborting() const;
-
     WiredTigerSessionCache* _sessionCache;  // not owned
     WiredTigerOplogManager* _oplogManager;  // not owned
     UniqueWiredTigerSession _session;
-    State _state = State::kInactive;
     bool _isTimestamped = false;
 
     // Specifies which external source to use when setting read timestamps on transactions.

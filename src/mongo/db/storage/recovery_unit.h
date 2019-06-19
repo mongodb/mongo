@@ -492,8 +492,111 @@ public:
 
     virtual void setOrderedCommit(bool orderedCommit) = 0;
 
+    /**
+     * State transitions:
+     *
+     *   /------------------------> Inactive <-----------------------------\
+     *   |                             |                                   |
+     *   |                             |                                   |
+     *   |              /--------------+--------------\                    |
+     *   |              |                             |                    | abandonSnapshot()
+     *   |              |                             |                    |
+     *   |   beginUOW() |                             | _txnOpen()         |
+     *   |              |                             |                    |
+     *   |              V                             V                    |
+     *   |    InactiveInUnitOfWork          ActiveNotInUnitOfWork ---------/
+     *   |              |                             |
+     *   |              |                             |
+     *   |   _txnOpen() |                             | beginUOW()
+     *   |              |                             |
+     *   |              \--------------+--------------/
+     *   |                             |
+     *   |                             |
+     *   |                             V
+     *   |                           Active
+     *   |                             |
+     *   |                             |
+     *   |              /--------------+--------------\
+     *   |              |                             |
+     *   |              |                             |
+     *   |   abortUOW() |                             | commitUOW()
+     *   |              |                             |
+     *   |              V                             V
+     *   |          Aborting                      Committing
+     *   |              |                             |
+     *   |              |                             |
+     *   |              |                             |
+     *   \--------------+-----------------------------/
+     *
+     */
+    enum class State {
+        kInactive,
+        kInactiveInUnitOfWork,
+        kActiveNotInUnitOfWork,
+        kActive,
+        kAborting,
+        kCommitting,
+    };
+    State getState_forTest() const;
+
+    std::string toString(State state) const {
+        switch (state) {
+            case State::kInactive:
+                return "Inactive";
+            case State::kInactiveInUnitOfWork:
+                return "InactiveInUnitOfWork";
+            case State::kActiveNotInUnitOfWork:
+                return "ActiveNotInUnitOfWork";
+            case State::kActive:
+                return "Active";
+            case State::kCommitting:
+                return "Committing";
+            case State::kAborting:
+                return "Aborting";
+        }
+        MONGO_UNREACHABLE;
+    }
+
 protected:
     RecoveryUnit() {}
+
+    /**
+     * Returns the current state.
+     */
+    State _getState() const {
+        return _state;
+    }
+
+    /**
+     * Transitions to new state.
+     */
+    void _setState(State newState) {
+        _state = newState;
+    }
+
+    /**
+     * Returns true if active.
+     */
+    bool _isActive() const {
+        return State::kActiveNotInUnitOfWork == _state || State::kActive == _state;
+    }
+
+    /**
+     * Returns true if currently managed by a WriteUnitOfWork.
+     */
+    bool _inUnitOfWork() const {
+        return State::kInactiveInUnitOfWork == _state || State::kActive == _state;
+    }
+
+    /**
+     * Returns true if currently running commit or rollback handlers
+     */
+    bool _isCommittingOrAborting() const {
+        return State::kCommitting == _state || State::kAborting == _state;
+    }
+
+private:
+    State _state = State::kInactive;
 };
 
 }  // namespace mongo

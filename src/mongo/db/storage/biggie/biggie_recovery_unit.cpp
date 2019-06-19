@@ -44,17 +44,18 @@ RecoveryUnit::RecoveryUnit(KVEngine* parentKVEngine, std::function<void()> cb)
     : _waitUntilDurableCallback(cb), _KVEngine(parentKVEngine) {}
 
 RecoveryUnit::~RecoveryUnit() {
-    invariant(!_inUnitOfWork);
+    invariant(!_inUnitOfWork(), toString(_getState()));
     _abort();
 }
 
 void RecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
-    invariant(!_inUnitOfWork);
-    _inUnitOfWork = true;
+    invariant(!_inUnitOfWork(), toString(_getState()));
+    _setState(State::kInactiveInUnitOfWork);
 }
 
 void RecoveryUnit::commitUnitOfWork() {
-    invariant(_inUnitOfWork);
+    invariant(_inUnitOfWork(), toString(_getState()));
+
     if (_dirty) {
         invariant(_forked);
         while (true) {
@@ -80,6 +81,7 @@ void RecoveryUnit::commitUnitOfWork() {
     }
 
     try {
+        _setState(State::kCommitting);
         for (auto& change : _changes)
             change->commit(boost::none);
         _changes.clear();
@@ -87,28 +89,27 @@ void RecoveryUnit::commitUnitOfWork() {
         std::terminate();
     }
 
-    _inUnitOfWork = false;
+    _setState(State::kInactive);
 }
 
 void RecoveryUnit::abortUnitOfWork() {
-    invariant(_inUnitOfWork);
-    _inUnitOfWork = false;
+    invariant(_inUnitOfWork(), toString(_getState()));
     _abort();
 }
 
 bool RecoveryUnit::waitUntilDurable() {
-    invariant(!_inUnitOfWork);
+    invariant(!_inUnitOfWork(), toString(_getState()));
     return true;  // This is an in-memory storage engine.
 }
 
 void RecoveryUnit::abandonSnapshot() {
-    invariant(!_inUnitOfWork);
+    invariant(!_inUnitOfWork(), toString(_getState()));
     _forked = false;
     _dirty = false;
 }
 
 void RecoveryUnit::registerChange(Change* change) {
-    invariant(_inUnitOfWork);
+    invariant(_inUnitOfWork(), toString(_getState()));
     _changes.push_back(std::unique_ptr<Change>{change});
 }
 
@@ -137,6 +138,8 @@ void RecoveryUnit::setOrderedCommit(bool orderedCommit) {}
 void RecoveryUnit::_abort() {
     _forked = false;
     _dirty = false;
+    _setState(State::kAborting);
+
     try {
         for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
              it != end;
@@ -149,6 +152,8 @@ void RecoveryUnit::_abort() {
     } catch (...) {
         std::terminate();
     }
+
+    _setState(State::kInactive);
 }
 
 RecoveryUnit* RecoveryUnit::get(OperationContext* opCtx) {

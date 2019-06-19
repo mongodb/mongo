@@ -39,16 +39,18 @@
 namespace mongo {
 
 EphemeralForTestRecoveryUnit::~EphemeralForTestRecoveryUnit() {
-    invariant(!_inUnitOfWork);
+    invariant(!_inUnitOfWork(), toString(_getState()));
 }
 
 void EphemeralForTestRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
-    invariant(!_inUnitOfWork);
-    _inUnitOfWork = true;
+    invariant(!_inUnitOfWork(), toString(_getState()));
+    _setState(State::kInactiveInUnitOfWork);
 }
 
 void EphemeralForTestRecoveryUnit::commitUnitOfWork() {
-    invariant(_inUnitOfWork);
+    invariant(_inUnitOfWork(), toString(_getState()));
+    _setState(State::kCommitting);
+
     try {
         for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
             (*it)->commit(boost::none);
@@ -62,12 +64,13 @@ void EphemeralForTestRecoveryUnit::commitUnitOfWork() {
     // SERVER-22575: Remove this once we add a generic mechanism to periodically wait
     // for durability.
     waitUntilDurable();
-    _inUnitOfWork = false;
+    _setState(State::kInactive);
 }
 
 void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
-    invariant(_inUnitOfWork);
-    _inUnitOfWork = false;
+    invariant(_inUnitOfWork(), toString(_getState()));
+    _setState(State::kAborting);
+
     try {
         for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend(); it != end;
              ++it) {
@@ -79,6 +82,8 @@ void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
     } catch (...) {
         std::terminate();
     }
+
+    _setState(State::kInactive);
 }
 
 bool EphemeralForTestRecoveryUnit::waitUntilDurable() {
@@ -89,11 +94,11 @@ bool EphemeralForTestRecoveryUnit::waitUntilDurable() {
 }
 
 bool EphemeralForTestRecoveryUnit::inActiveTxn() const {
-    return _inUnitOfWork;
+    return _inUnitOfWork();
 }
 
 void EphemeralForTestRecoveryUnit::abandonSnapshot() {
-    invariant(!_inUnitOfWork);
+    invariant(!_inUnitOfWork(), toString(_getState()));
 }
 
 Status EphemeralForTestRecoveryUnit::obtainMajorityCommittedSnapshot() {
