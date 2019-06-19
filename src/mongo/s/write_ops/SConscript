@@ -31,6 +31,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/commands/cluster_write.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         'batch_write_types',
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/s/async_requests_sender',

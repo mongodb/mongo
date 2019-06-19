@@ -111,6 +111,8 @@ selector:
   - jstests/sharding/dump_coll_metadata.js
   # This test should not be run with a mixed cluster environment.
   - jstests/sharding/nonreplicated_uuids_on_shardservers.js
+  # Added metrics only in v3.6
+  - jstests/sharding/server_status_crud_metrics.js
 
 executor:
   config:
