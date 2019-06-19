@@ -134,7 +134,7 @@ void FlowControlTicketholder::getTicket(OperationContext* opCtx,
 
 // Should only be called once, during shutdown.
 void FlowControlTicketholder::setInShutdown() {
-    LOG(4) << "Stopping further Flow Control ticket acquisitions.";
+    LOG(0) << "Stopping further Flow Control ticket acquisitions.";
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _inShutdown = true;
     _cv.notify_all();
