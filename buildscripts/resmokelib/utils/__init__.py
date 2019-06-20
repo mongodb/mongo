@@ -48,11 +48,10 @@ def is_windows():
 
 def remove_if_exists(path):
     """Remove path if it exists."""
-    if path is not None and os.path.exists(path):
-        try:
-            os.remove(path)
-        except OSError:
-            pass
+    try:
+        os.remove(path)
+    except OSError:
+        pass
 
 
 def is_string_list(lst):

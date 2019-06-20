@@ -253,14 +253,12 @@ executor:
           runningWithShardStepdowns: true
           traceExceptions: false
           useStepdownPermittedFile: true
-          useSteppingDownFile: true
           usingReplicaSetShards: true
   hooks:
   - class: ContinuousStepdown
     config_stepdown: true
     shard_stepdown: true
     use_stepdown_permitted_file: true
-    use_stepping_down_file: true
     wait_for_mongos_retarget: true
   - class: CheckReplDBHash
   - class: ValidateCollections
