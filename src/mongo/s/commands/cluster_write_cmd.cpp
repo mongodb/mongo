@@ -215,8 +215,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
             readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            auto txnRouterForShardKeyChange =
-                documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
+            documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
             // Clear the error details from the response object before sending the write again
             response->unsetErrDetails();
             ClusterWriter::write(opCtx, request, &stats, response);
@@ -240,8 +239,8 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             }
 
             // Commit the transaction
-            auto commitResponse = documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(
-                opCtx, txnRouterForShardKeyChange);
+            auto commitResponse =
+                documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
 
             uassertStatusOK(getStatusFromCommandResult(commitResponse));
 
@@ -268,7 +267,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
 
             auto txnRouterForAbort = TransactionRouter::get(opCtx);
             if (txnRouterForAbort)
-                txnRouterForAbort->implicitlyAbortTransaction(opCtx, status);
+                txnRouterForAbort.implicitlyAbortTransaction(opCtx, status);
 
             return false;
         }
@@ -501,7 +500,7 @@ private:
         if (auto txnRouter = TransactionRouter::get(opCtx)) {
             auto writeCmdStatus = response.toStatus();
             if (!writeCmdStatus.isOK()) {
-                txnRouter->implicitlyAbortTransaction(opCtx, writeCmdStatus);
+                txnRouter.implicitlyAbortTransaction(opCtx, writeCmdStatus);
             }
         }
 

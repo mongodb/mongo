@@ -640,9 +640,9 @@ public:
         _scopedSession.emplace(operationContext());
 
         auto txnRouter = TransactionRouter::get(operationContext());
-        txnRouter->beginOrContinueTxn(
+        txnRouter.beginOrContinueTxn(
             operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kStart);
-        txnRouter->setDefaultAtClusterTime(operationContext());
+        txnRouter.setDefaultAtClusterTime(operationContext());
     }
 
     void tearDown() override {

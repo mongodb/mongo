@@ -142,20 +142,21 @@ bool updateShardKeyForDocument(OperationContext* opCtx,
         opCtx, deleteCmdObj, insertCmdObj, nss.db(), documentKeyChangeInfo.getShouldUpsert());
 }
 
-TransactionRouter* startTransactionForShardKeyUpdate(OperationContext* opCtx) {
+void startTransactionForShardKeyUpdate(OperationContext* opCtx) {
     auto txnRouter = TransactionRouter::get(opCtx);
     invariant(txnRouter);
 
     auto txnNumber = opCtx->getTxnNumber();
     invariant(txnNumber);
 
-    txnRouter->beginOrContinueTxn(opCtx, *txnNumber, TransactionRouter::TransactionActions::kStart);
-
-    return txnRouter;
+    txnRouter.beginOrContinueTxn(opCtx, *txnNumber, TransactionRouter::TransactionActions::kStart);
 }
 
-BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx, TransactionRouter* txnRouter) {
-    return txnRouter->commitTransaction(opCtx, boost::none);
+BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    invariant(txnRouter);
+
+    return txnRouter.commitTransaction(opCtx, boost::none);
 }
 
 BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,

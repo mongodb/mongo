@@ -76,7 +76,7 @@ public:
                 "abortTransaction can only be run within a session",
                 txnRouter);
 
-        auto abortRes = txnRouter->abortTransaction(opCtx);
+        auto abortRes = txnRouter.abortTransaction(opCtx);
         CommandHelpers::filterCommandReplyForPassthrough(abortRes, &result);
         return true;
     }

@@ -248,7 +248,7 @@ BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest&
     : _opCtx(opCtx),
       _clientRequest(clientRequest),
       _batchTxnNum(_opCtx->getTxnNumber()),
-      _inTransaction(TransactionRouter::get(opCtx) != nullptr) {
+      _inTransaction(bool(TransactionRouter::get(opCtx))) {
     _writeOps.reserve(_clientRequest.sizeWriteOps());
 
     for (size_t i = 0; i < _clientRequest.sizeWriteOps(); ++i) {

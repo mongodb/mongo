@@ -76,7 +76,7 @@ Status WriteOp::targetWrites(OperationContext* opCtx,
     //
     // NOTE: Index inserts are currently specially targeted only at the current collection to avoid
     // creating collections everywhere.
-    const bool inTransaction = TransactionRouter::get(opCtx) != nullptr;
+    const bool inTransaction = bool(TransactionRouter::get(opCtx));
     if (swEndpoints.isOK() && swEndpoints.getValue().size() > 1u && !inTransaction) {
         swEndpoints = targeter.targetAllShards(opCtx);
     }

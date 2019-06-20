@@ -76,16 +76,16 @@ bool updateShardKeyForDocument(OperationContext* opCtx,
                                int stmtId);
 
 /**
- * Gets the transaction router and starts a transaction on this session. This method is called when
- * WouldChangeOwningShard is thrown for a write that is not in a transaction already.
+ * Starts a transaction on this session. This method is called when WouldChangeOwningShard is thrown
+ * for a write that is not in a transaction already.
  */
-TransactionRouter* startTransactionForShardKeyUpdate(OperationContext* opCtx);
+void startTransactionForShardKeyUpdate(OperationContext* opCtx);
 
 /**
  * Commits the transaction on this session. This method is called to commit the transaction started
  * when WouldChangeOwningShard is thrown for a write that is not in a transaction already.
  */
-BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx, TransactionRouter* txnRouter);
+BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx);
 
 /**
  * Creates the BSONObj that will be used to delete the pre-image document. Will also attach

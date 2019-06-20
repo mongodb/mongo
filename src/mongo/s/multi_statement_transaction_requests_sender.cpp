@@ -50,7 +50,7 @@ std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     for (auto request : requests) {
         newRequests.emplace_back(
             request.shardId,
-            txnRouter->attachTxnFieldsIfNeeded(opCtx, request.shardId, request.cmdObj));
+            txnRouter.attachTxnFieldsIfNeeded(opCtx, request.shardId, request.cmdObj));
     }
 
     return newRequests;
@@ -66,7 +66,8 @@ void processReplyMetadata(OperationContext* opCtx, const AsyncRequestsSender::Re
         return;
     }
 
-    txnRouter->processParticipantResponse(response.shardId, response.swResponse.getValue().data);
+    txnRouter.processParticipantResponse(
+        opCtx, response.shardId, response.swResponse.getValue().data);
 }
 
 }  // unnamed namespace

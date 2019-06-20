@@ -337,7 +337,7 @@ TEST_F(WriteOpTransactionTests, TargetMultiAllShardsAndErrorSingleChildOp) {
     opCtx()->setTxnNumber(kTxnNumber);
 
     auto txnRouter = TransactionRouter::get(opCtx());
-    txnRouter->beginOrContinueTxn(
+    txnRouter.beginOrContinueTxn(
         opCtx(), kTxnNumber, TransactionRouter::TransactionActions::kStart);
 
     // Do multi-target write op
