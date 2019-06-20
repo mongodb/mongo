@@ -110,9 +110,9 @@ SecureVector<uint8_t> LocalKMSService::decrypt(ConstDataRange cdr, BSONObj maste
 
 std::unique_ptr<KMSService> LocalKMSService::create(const LocalKMS& config) {
     uassert(51237,
-            str::stream() << "Local KMS key must be 64 bytes, found " << config.getKey().length()
+            str::stream() << "Local KMS key must be 96 bytes, found " << config.getKey().length()
                           << " bytes instead",
-            config.getKey().length() == crypto::kAeadAesHmacKeySize);
+            config.getKey().length() == crypto::kFieldLevelEncryptionKeySize);
 
     SecureVector<uint8_t> aesVector = SecureVector<uint8_t>(
         config.getKey().data(), config.getKey().data() + config.getKey().length());

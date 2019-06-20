@@ -1858,6 +1858,16 @@ functions:
             exit $(cat jepsen_system_failure_${task_name}_${execution})
           fi
 
+  "load aws test credentials":
+    - command: shell.exec
+      params:
+        silent: true
+        working_dir: src
+        script: |
+          set -o errexit
+          echo "const AWS_KMS_SECRET_ID = '${aws_kms_access_key_id}';" >> src/mongo/db/modules/enterprise/jstests/fle/lib/aws_secrets.js
+          echo "const AWS_KMS_SECRET_KEY = '${aws_kms_secret_access_key}';" >> src/mongo/db/modules/enterprise/jstests/fle/lib/aws_secrets.js
+
   "generate fuzzer tasks":
     - command: manifest.load
     - *git_get_project
@@ -7394,6 +7404,7 @@ tasks:
   tags: ["encrypt"]
   commands:
   - func: "do setup"
+  - func: "load aws test credentials"
   - func: "run tests"
     vars:
       resmoke_args: --suites=fle --storageEngine=wiredTiger
