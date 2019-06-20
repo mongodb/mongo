@@ -35,10 +35,10 @@ class KVEngine;
 class KVCatalog;
 class StorageEngine;
 
-class StorageEngineInterface {
+class KVStorageEngineInterface {
 public:
-    StorageEngineInterface() = default;
-    virtual ~StorageEngineInterface() = default;
+    KVStorageEngineInterface() = default;
+    virtual ~KVStorageEngineInterface() = default;
     virtual StorageEngine* getStorageEngine() = 0;
     virtual KVEngine* getEngine() = 0;
     virtual void addDropPendingIdent(const Timestamp& dropTimestamp,

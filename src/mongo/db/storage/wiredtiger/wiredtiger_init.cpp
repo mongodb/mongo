@@ -39,7 +39,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/kv/storage_engine_impl.h"
+#include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
@@ -126,11 +126,11 @@ public:
             "wiredTigerMaxCacheOverflowSizeGB", ServerParameterType::kRuntimeOnly);
         maxCacheOverflowParam->_data = {wiredTigerGlobalOptions.maxCacheOverflowFileSizeGB, kv};
 
-        StorageEngineOptions options;
+        KVStorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.directoryForIndexes = wiredTigerGlobalOptions.directoryForIndexes;
         options.forRepair = params.repair;
-        return new StorageEngineImpl(kv, options);
+        return new KVStorageEngine(kv, options);
     }
 
     virtual StringData getCanonicalName() const {

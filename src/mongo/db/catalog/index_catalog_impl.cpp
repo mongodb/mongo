@@ -66,7 +66,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
-#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -148,7 +148,8 @@ IndexCatalogEntry* IndexCatalogImpl::_setupInMemoryStructures(
 
     IndexDescriptor* desc = entry->descriptor();
 
-    auto engine = opCtx->getServiceContext()->getStorageEngine();
+    KVStorageEngine* engine =
+        checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
     std::string ident =
         engine->getCatalog()->getIndexIdent(opCtx, _collection->ns(), desc->indexName());
 
@@ -1225,17 +1226,20 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     invariant(_collection->getCatalogEntry()->isIndexReady(opCtx, indexName));
 
     // Delete the IndexCatalogEntry that owns this descriptor.  After deletion, 'oldDesc' is
-    // invalid and should not be dereferenced.
+    // invalid and should not be dereferenced. Also, invalidate the index from the
+    // CollectionInfoCache.
     auto oldEntry = _readyIndexes.release(oldDesc);
     invariant(oldEntry);
     opCtx->recoveryUnit()->registerChange(
         new IndexRemoveChange(opCtx, _collection, &_readyIndexes, std::move(oldEntry)));
+    _collection->infoCache()->droppedIndex(opCtx, indexName);
 
     // Ask the CollectionCatalogEntry for the new index spec.
     BSONObj spec = _collection->getCatalogEntry()->getIndexSpec(opCtx, indexName).getOwned();
     BSONObj keyPattern = spec.getObjectField("key");
 
-    // Re-register this index in the index catalog with the new spec.
+    // Re-register this index in the index catalog with the new spec. Also, add the new index
+    // to the CollectionInfoCache.
     auto newDesc =
         std::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
     const bool initFromDisk = false;
@@ -1243,6 +1247,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     const IndexCatalogEntry* newEntry =
         _setupInMemoryStructures(opCtx, std::move(newDesc), initFromDisk, isReadyIndex);
     invariant(newEntry->isReady(opCtx));
+    _collection->infoCache()->addedIndex(opCtx, newEntry->descriptor());
 
     // Return the new descriptor.
     return newEntry->descriptor();
@@ -1261,6 +1266,16 @@ Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
                                     int64_t* keysInsertedOut) {
     Status status = Status::OK();
     if (index->isHybridBuilding()) {
+        // The side table interface accepts only records that meet the criteria for this partial
+        // index.
+        // For non-hybrid builds, the decision to use the filter for the partial index is left to
+        // the IndexAccessMethod. See SERVER-28975 for details.
+        if (auto filter = index->getFilterExpression()) {
+            if (!filter->matchesBSON(obj)) {
+                return Status::OK();
+            }
+        }
+
         int64_t inserted;
         status = index->indexBuildInterceptor()->sideWrite(opCtx,
                                                            keys,

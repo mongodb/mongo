@@ -69,7 +69,7 @@ env.Library(
     LIBDEPS=[
         'storage_mobile_core',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
-        '$BUILD_DIR/mongo/db/storage/kv/storage_engine',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_storage_engine',
         ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',

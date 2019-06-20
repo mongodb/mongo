@@ -45,7 +45,7 @@ namespace mongo {
 
 class OperationContext;
 class RecordStore;
-class StorageEngineInterface;
+class KVStorageEngineInterface;
 
 class KVCatalog {
 public:
@@ -59,7 +59,7 @@ public:
     KVCatalog(RecordStore* rs,
               bool directoryPerDb,
               bool directoryForIndexes,
-              StorageEngineInterface* engine);
+              KVStorageEngineInterface* engine);
     ~KVCatalog();
 
     void init(OperationContext* opCtx);
@@ -132,9 +132,9 @@ private:
     class AddIdentChange;
     class RemoveIdentChange;
 
-    friend class StorageEngineImpl;
+    friend class KVStorageEngine;
     friend class KVCatalogTest;
-    friend class StorageEngineTest;
+    friend class KVStorageEngineTest;
 
     BSONObj _findEntry(OperationContext* opCtx,
                        const NamespaceString& nss,
@@ -182,6 +182,6 @@ private:
     // guaranteed to be non-null after KVCatalog::init() is called.
     std::unique_ptr<FeatureTracker> _featureTracker;
 
-    StorageEngineInterface* const _engine;
+    KVStorageEngineInterface* const _engine;
 };
 }

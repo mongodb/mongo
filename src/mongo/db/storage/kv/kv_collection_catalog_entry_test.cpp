@@ -43,7 +43,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/storage_engine_impl.h"
+#include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
@@ -61,7 +61,7 @@ class KVCollectionCatalogEntryTest : public ServiceContextTest {
 public:
     KVCollectionCatalogEntryTest()
         : _nss("unittests.kv_collection_catalog_entry"),
-          _storageEngine(new DevNullKVEngine(), StorageEngineOptions()) {
+          _storageEngine(new DevNullKVEngine(), KVStorageEngineOptions()) {
         _storageEngine.finishInit();
     }
 
@@ -153,7 +153,7 @@ private:
     }
 
     const NamespaceString _nss;
-    StorageEngineImpl _storageEngine;
+    KVStorageEngine _storageEngine;
     size_t numIndexesCreated = 0;
 };
 

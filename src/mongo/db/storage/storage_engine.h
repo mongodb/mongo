@@ -42,20 +42,17 @@
 namespace mongo {
 
 class JournalListener;
-class KVCatalog;
-class KVEngine;
 class OperationContext;
 class RecoveryUnit;
 class SnapshotManager;
+struct StorageGlobalParams;
 class StorageEngineLockFile;
 class StorageEngineMetadata;
 
-struct StorageGlobalParams;
-
 /**
- * The StorageEngine class is the top level interface for creating a new storage engine. All
- * StorageEngine(s) must be registered by calling registerFactory in order to possibly be
- * activated.
+ * The StorageEngine class is the top level interface for creating a new storage
+ * engine.  All StorageEngine(s) must be registered by calling registerFactory in order
+ * to possibly be activated.
  */
 class StorageEngine {
 public:
@@ -531,11 +528,6 @@ public:
     virtual Status currentFilesCompatible(OperationContext* opCtx) const = 0;
 
     virtual int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) = 0;
-
-    virtual KVEngine* getEngine() = 0;
-    virtual const KVEngine* getEngine() const = 0;
-    virtual KVCatalog* getCatalog() = 0;
-    virtual const KVCatalog* getCatalog() const = 0;
 };
 
 }  // namespace mongo

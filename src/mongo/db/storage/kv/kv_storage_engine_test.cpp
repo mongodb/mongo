@@ -46,8 +46,8 @@
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/storage_engine_impl.h"
-#include "mongo/db/storage/kv/storage_engine_test_fixture.h"
+#include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/kv/kv_storage_engine_test_fixture.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/unclean_shutdown.h"
 #include "mongo/unittest/barrier.h"
@@ -57,7 +57,7 @@
 namespace mongo {
 namespace {
 
-TEST_F(StorageEngineTest, ReconcileIdentsTest) {
+TEST_F(KVStorageEngineTest, ReconcileIdentsTest) {
     auto opCtx = cc().makeOperationContext();
 
     // Add a collection, `db.coll1` to both the KVCatalog and KVEngine. The returned value is the
@@ -97,7 +97,7 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, reconcileStatus.getStatus());
 }
 
-TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
+TEST_F(KVStorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs("db.coll1");
@@ -120,7 +120,7 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     ASSERT(!collectionExists(opCtx.get(), collNs));
 }
 
-TEST_F(StorageEngineTest, ReconcileDropsTemporary) {
+TEST_F(KVStorageEngineTest, ReconcileDropsTemporary) {
     auto opCtx = cc().makeOperationContext();
 
     Lock::GlobalLock lk(&*opCtx, MODE_IS);
@@ -139,7 +139,7 @@ TEST_F(StorageEngineTest, ReconcileDropsTemporary) {
     rs->deleteTemporaryTable(opCtx.get());
 }
 
-TEST_F(StorageEngineTest, TemporaryDropsItself) {
+TEST_F(KVStorageEngineTest, TemporaryDropsItself) {
     auto opCtx = cc().makeOperationContext();
 
     Lock::GlobalLock lk(&*opCtx, MODE_IS);
@@ -159,7 +159,7 @@ TEST_F(StorageEngineTest, TemporaryDropsItself) {
     ASSERT(!identExists(opCtx.get(), ident));
 }
 
-TEST_F(StorageEngineTest, ReconcileDoesNotDropIndexBuildTempTables) {
+TEST_F(KVStorageEngineTest, ReconcileDoesNotDropIndexBuildTempTables) {
     auto opCtx = cc().makeOperationContext();
 
     Lock::GlobalLock lk(&*opCtx, MODE_IS);
@@ -200,7 +200,7 @@ TEST_F(StorageEngineTest, ReconcileDoesNotDropIndexBuildTempTables) {
     constraintViolations->deleteTemporaryTable(opCtx.get());
 }
 
-TEST_F(StorageEngineTest, ReconcileDoesNotDropIndexBuildTempTablesBackgroundSecondary) {
+TEST_F(KVStorageEngineTest, ReconcileDoesNotDropIndexBuildTempTablesBackgroundSecondary) {
     auto opCtx = cc().makeOperationContext();
 
     Lock::GlobalLock lk(&*opCtx, MODE_IS);
@@ -246,7 +246,7 @@ TEST_F(StorageEngineTest, ReconcileDoesNotDropIndexBuildTempTablesBackgroundSeco
     constraintViolations->deleteTemporaryTable(opCtx.get());
 }
 
-TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
+TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs("db.coll1");
@@ -270,7 +270,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     ASSERT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
 
-TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
+TEST_F(KVStorageEngineRepairTest, ReconcileSucceeds) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs("db.coll1");
@@ -290,7 +290,7 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     ASSERT_EQ(0U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
 
-TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
+TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs("db.coll1");
@@ -318,7 +318,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     ASSERT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
 
-TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
+TEST_F(KVStorageEngineTest, LoadCatalogDropsOrphans) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs("db.coll1");
@@ -377,16 +377,16 @@ public:
 
 class TimestampKVEngineTest : public ServiceContextMongoDTest {
 public:
-    using TimestampType = StorageEngineImpl::TimestampMonitor::TimestampType;
-    using TimestampListener = StorageEngineImpl::TimestampMonitor::TimestampListener;
+    using TimestampType = KVStorageEngine::TimestampMonitor::TimestampType;
+    using TimestampListener = KVStorageEngine::TimestampMonitor::TimestampListener;
 
     /**
      * Create an instance of the KV Storage Engine so that we have a timestamp monitor operating.
      */
     TimestampKVEngineTest() {
-        StorageEngineOptions options{
+        KVStorageEngineOptions options{
             /*directoryPerDB=*/false, /*directoryForIndexes=*/false, /*forRepair=*/false};
-        _storageEngine = std::make_unique<StorageEngineImpl>(new TimestampMockKVEngine, options);
+        _storageEngine = std::make_unique<KVStorageEngine>(new TimestampMockKVEngine, options);
         _storageEngine->finishInit();
     }
 
@@ -399,7 +399,7 @@ public:
         _storageEngine.reset();
     }
 
-    std::unique_ptr<StorageEngineImpl> _storageEngine;
+    std::unique_ptr<KVStorageEngine> _storageEngine;
 
     TimestampType checkpoint = TimestampType::kCheckpoint;
     TimestampType oldest = TimestampType::kOldest;

@@ -42,7 +42,7 @@
 #include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
-#include "mongo/db/storage/kv/storage_engine_interface.h"
+#include "mongo/db/storage/kv/kv_storage_engine_interface.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/temporary_record_store.h"
@@ -54,20 +54,20 @@ namespace mongo {
 class KVCatalog;
 class KVEngine;
 
-struct StorageEngineOptions {
+struct KVStorageEngineOptions {
     bool directoryPerDB = false;
     bool directoryForIndexes = false;
     bool forRepair = false;
 };
 
-class StorageEngineImpl final : public StorageEngineInterface, public StorageEngine {
+class KVStorageEngine final : public KVStorageEngineInterface, public StorageEngine {
 public:
     /**
      * @param engine - ownership passes to me
      */
-    StorageEngineImpl(KVEngine* engine, StorageEngineOptions options = StorageEngineOptions());
+    KVStorageEngine(KVEngine* engine, KVStorageEngineOptions options = KVStorageEngineOptions());
 
-    virtual ~StorageEngineImpl();
+    virtual ~KVStorageEngine();
 
     virtual void finishInit();
 
@@ -380,7 +380,7 @@ private:
     // This must be the first member so it is destroyed last.
     std::unique_ptr<KVEngine> _engine;
 
-    const StorageEngineOptions _options;
+    const KVStorageEngineOptions _options;
 
     // Manages drop-pending idents. Requires access to '_engine'.
     KVDropPendingIdentReaper _dropPendingIdentReaper;

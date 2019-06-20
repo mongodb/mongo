@@ -40,7 +40,7 @@
 #include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/storage_engine_impl.h"
+#include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -113,7 +113,7 @@ public:
 };
 
 
-KVCollectionCatalogEntry::KVCollectionCatalogEntry(StorageEngineInterface* engine,
+KVCollectionCatalogEntry::KVCollectionCatalogEntry(KVStorageEngineInterface* engine,
                                                    KVCatalog* catalog,
                                                    StringData ns,
                                                    StringData ident,
