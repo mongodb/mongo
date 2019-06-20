@@ -48,6 +48,7 @@ namespace mongo {
 
 class BSONObj;
 class ReplicaSetMonitor;
+class ReplicaSetMonitorTest;
 struct ReadPreferenceSetting;
 typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
 
@@ -55,7 +56,7 @@ typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
  * Holds state about a replica set and provides a means to refresh the local view.
  * All methods perform the required synchronization to allow callers from multiple threads.
  */
-class ReplicaSetMonitor : public std::enable_shared_from_this<ReplicaSetMonitor> {
+class ReplicaSetMonitor {
     ReplicaSetMonitor(const ReplicaSetMonitor&) = delete;
     ReplicaSetMonitor& operator=(const ReplicaSetMonitor&) = delete;
 
@@ -262,21 +263,13 @@ public:
 private:
     Future<std::vector<HostAndPort>> _getHostsOrRefresh(const ReadPreferenceSetting& readPref,
                                                         Milliseconds maxWait);
-
     /**
-     * Schedules a refresh via the task executor. (Task is automatically canceled in the d-tor.)
+     * If no scan is in-progress, this function is responsible for setting up a new scan. Otherwise,
+     * does nothing.
      */
-    void _scheduleRefresh(Date_t when, WithLock);
-
-    /**
-     * This function refreshes the replica set and calls _scheduleRefresh() again.
-     */
-    void _doScheduledRefresh(const executor::TaskExecutor::CallbackHandle& currentHandle);
-
-    executor::TaskExecutor::CallbackHandle _refresherHandle;
+    static void _ensureScanInProgress(const SetStatePtr&);
 
     const SetStatePtr _state;
-    AtomicWord<bool> _isRemovedFromManager{false};
 };
 
 
@@ -284,23 +277,11 @@ private:
  * Refreshes the local view of a replica set.
  *
  * All logic related to choosing the hosts to contact and updating the SetState based on replies
- * lives in this class.
+ * lives in this class. Use of this class should always be guarded by SetState::mutex unless in
+ * single-threaded use by ReplicaSetMonitorTest.
  */
 class ReplicaSetMonitor::Refresher {
 public:
-    /**
-     * If no scan is in-progress, this function is responsible for setting up a new scan. Otherwise,
-     * does nothing.
-     */
-    static void ensureScanInProgress(const SetStatePtr&, WithLock);
-
-    //
-    // Remaining methods are only for testing and internal use.
-    // Callers are responsible for holding SetState::mutex before calling any of these methods, but
-    // not all of them take a WithLock because they predate its introduction, and because they are
-    // mostly called from single-threaded unit tests.
-    //
-
     explicit Refresher(const SetStatePtr& setState);
 
     struct NextStep {
@@ -339,9 +320,8 @@ public:
     /**
      * Starts a new scan over the hosts in set.
      */
-    static ScanStatePtr startNewScan(const SetState* set);
+    void startNewScan();
 
-private:
     /**
      * First, checks that the "reply" is not from a stale primary by comparing the electionId of
      * "reply" to the maxElectionId recorded by the SetState and returns OK status if "reply"
@@ -359,10 +339,11 @@ private:
      * Schedules isMaster requests to all hosts that currently need to be contacted.
      * Does nothing if requests have already been sent to all known hosts.
      */
-    void scheduleNetworkRequests(WithLock);
+    void scheduleNetworkRequests();
 
-    void scheduleIsMaster(const HostAndPort& host, WithLock);
+    void scheduleIsMaster(const HostAndPort& host);
 
+private:
     // Both pointers are never NULL
     SetStatePtr _set;
     ScanStatePtr _scan;  // May differ from _set->currentScan if a new scan has started.

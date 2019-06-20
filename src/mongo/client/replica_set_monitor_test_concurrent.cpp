@@ -58,6 +58,12 @@ protected:
         ThreadPoolExecutorTest::setUp();
         launchExecutorThread();
         _startTime = getNet()->now();
+
+        {
+            using namespace logger;
+            globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kNetwork,
+                                                        LogSeverity::Debug(2));
+        }
     }
 
     void tearDown() {
@@ -195,7 +201,7 @@ TEST_F(ReplicaSetMonitorConcurrentTest, RechecksAvailableNodesUntilExpiration) {
 
         if (elapsed() < Milliseconds(5000)) {
             ASSERT(!secondaryFuture.isReady());
-            ASSERT_EQ(getNumChecks(node0), 1 + elapsedMS() / 500);
+            ASSERT_EQ(getNumChecks(node0), 1 + (elapsedMS() / 500));
             ASSERT_EQ(getNumChecks(node1), 1);
         }
 
@@ -208,7 +214,7 @@ TEST_F(ReplicaSetMonitorConcurrentTest, RechecksAvailableNodesUntilExpiration) {
         // Once Node 1 times out, monitoring slows to the usual 30-second interval.
         if (elapsed() >= Milliseconds(5000)) {
             ASSERT_EQ(getNumChecks(node0), 11);
-            ASSERT_EQ(getNumChecks(node1), 2);
+            ASSERT_EQ(getNumChecks(node1), 1);
         }
 
         advanceTime(Milliseconds(100));
@@ -357,8 +363,12 @@ TEST_F(ReplicaSetMonitorConcurrentTest, IsMasterFrequency) {
         ASSERT_EQ(getNumChecks(node1), 1);
     });
 
-    // TODO: advanceTime(Seconds(5)) and getNoThrow() each entry in primaryFutures once
-    // race conditions in RSM expedited scans are fixed
+    advanceTime(Seconds(5));
+    processReadyRequests(replSet);
+
+    for (auto& future : primaryFutures) {
+        ASSERT(future.isReady());
+    }
 }
 }  // namespace
 }  // namespace mongo
