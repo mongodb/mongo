@@ -162,7 +162,7 @@ __huffman_confchk_file(WT_SESSION_IMPL *session,
 
 	/* Optionally return the file handle. */
 	if (fsp == NULL)
-		(void)__wt_fclose(session, &fs);
+		WT_ERR(__wt_fclose(session, &fs));
 	else
 		*fsp = fs;
 
@@ -379,7 +379,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	if (0) {
 err:		__wt_free(session, table);
 	}
-	(void)__wt_fclose(session, &fs);
+	WT_TRET(__wt_fclose(session, &fs));
 
 	__wt_scr_free(session, &tmp);
 	return (ret);

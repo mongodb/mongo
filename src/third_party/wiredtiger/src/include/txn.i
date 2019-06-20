@@ -6,14 +6,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-static inline int __wt_txn_id_check(WT_SESSION_IMPL *session);
-static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
-
-typedef enum {
-	WT_VISIBLE_FALSE=0,     /* Not a visible update */
-	WT_VISIBLE_PREPARE=1,   /* Prepared update */
-	WT_VISIBLE_TRUE=2       /* A visible update */
-} WT_VISIBLE_TYPE;
 /*
  * __wt_ref_cas_state_int --
  *	Try to do a compare and swap, if successful update the ref history in
@@ -1059,7 +1051,7 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
 	/* If the transaction is idle, check that the cache isn't full. */
 	WT_RET(__wt_txn_idle_cache_check(session));
 
-	(void)__wt_txn_id_alloc(session, true);
+	WT_IGNORE_RET(__wt_txn_id_alloc(session, true));
 
 	/*
 	 * If we have used 64-bits of transaction IDs, there is nothing

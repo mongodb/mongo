@@ -564,10 +564,10 @@ __debug_tree_shape_info(WT_REF *ref, char *buf, size_t len)
 		unit = "B";
 	}
 
-	(void)__wt_snprintf(buf, len, "(%p, %" PRIu64
+	WT_IGNORE_RET(__wt_snprintf(buf, len, "(%p, %" PRIu64
 	    "%s, evict gen %" PRIu64 ", create gen %" PRIu64 ")",
 	    (void *)ref, v, unit,
-	    page->evict_pass_gen, page->cache_create_gen);
+	    page->evict_pass_gen, page->cache_create_gen));
 	return (buf);
 }
 

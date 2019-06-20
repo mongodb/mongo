@@ -239,7 +239,7 @@ __wt_block_checkpoint_last(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	bool found;
 
 	*metadatap = *checkpoint_listp = NULL;
-	__wt_buf_init(session, checkpoint, WT_BLOCK_CHECKPOINT_BUFFER);
+	WT_RET(__wt_buf_init(session, checkpoint, WT_BLOCK_CHECKPOINT_BUFFER));
 
 	/*
 	 * Initialize a pair of structures that track the best and current

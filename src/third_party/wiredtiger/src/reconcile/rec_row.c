@@ -798,8 +798,8 @@ __wt_rec_row_leaf(WT_SESSION_IMPL *session,
 		 * set any instantiated key reference.
 		 */
 		copy = WT_ROW_KEY_COPY(rip);
-		(void)__wt_row_leaf_key_info(
-		    page, copy, &ikey, &cell, NULL, NULL);
+		WT_IGNORE_RET_BOOL(__wt_row_leaf_key_info(
+		    page, copy, &ikey, &cell, NULL, NULL));
 		if (cell == NULL)
 			kpack = NULL;
 		else {

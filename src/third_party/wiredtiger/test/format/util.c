@@ -277,15 +277,16 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 
 	if (tinfo == NULL && cnt == 0)
 		testutil_check(__wt_snprintf_len_set(
-		    msg, sizeof(msg), &len, "%4d: %s", g.run_cnt, tag));
+		    msg, sizeof(msg), &len,
+		    "%4" PRIu32 ": %s", g.run_cnt, tag));
 	else if (tinfo == NULL)
 		testutil_check(__wt_snprintf_len_set(
 		    msg, sizeof(msg), &len,
-		    "%4d: %s: %" PRIu64, g.run_cnt, tag, cnt));
+		    "%4" PRIu32 ": %s: %" PRIu64, g.run_cnt, tag, cnt));
 	else
 		testutil_check(__wt_snprintf_len_set(
 		    msg, sizeof(msg), &len,
-		    "%4d: %s: "
+		    "%4" PRIu32 ": %s: "
 		    "search %" PRIu64 "%s, "
 		    "insert %" PRIu64 "%s, "
 		    "update %" PRIu64 "%s, "

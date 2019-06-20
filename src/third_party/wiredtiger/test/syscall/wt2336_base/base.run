@@ -134,6 +134,7 @@ close(fd);
 pwrite64(wt, ""..., 0x1000, 0x1000);
 pwrite64(wt, ""..., 0x1000, 0x2000);
 pwrite64(wt, ""..., 0x1000, 0x3000);
+pwrite64(wt, ""..., 0x1000, 0x4000);
 #ifdef __linux__
 fdatasync(wt);
 #endif /* __linux__ */

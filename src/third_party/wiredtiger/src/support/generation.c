@@ -61,7 +61,7 @@ __wt_gen_next(WT_SESSION_IMPL *session, int which)
  * __wt_gen_next_drain --
  *	Switch the resource to its next generation, then wait for it to drain.
  */
-uint64_t
+void
 __wt_gen_next_drain(WT_SESSION_IMPL *session, int which)
 {
 	uint64_t v;
@@ -69,8 +69,6 @@ __wt_gen_next_drain(WT_SESSION_IMPL *session, int which)
 	v = __wt_atomic_addv64(&S2C(session)->generations[which], 1);
 
 	__wt_gen_drain(session, which, v);
-
-	return (v);
 }
 
 /*

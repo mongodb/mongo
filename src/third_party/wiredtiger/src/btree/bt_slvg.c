@@ -2164,8 +2164,8 @@ __slvg_row_ovfl(WT_SESSION_IMPL *session,
 	 */
 	for (rip = page->pg_row + start; start < stop; ++start, ++rip) {
 		copy = WT_ROW_KEY_COPY(rip);
-		(void)__wt_row_leaf_key_info(
-		    page, copy, NULL, &cell, NULL, NULL);
+		WT_IGNORE_RET_BOOL(__wt_row_leaf_key_info(
+		    page, copy, NULL, &cell, NULL, NULL));
 		if (cell != NULL) {
 			__wt_cell_unpack(session, page, cell, &unpack);
 			WT_RET(__slvg_row_ovfl_single(session, trk, &unpack));
@@ -2364,8 +2364,8 @@ __slvg_trk_compare_key(const void *a, const void *b)
 		 * routine.
 		 */
 		session = a_trk->ss->session;
-		(void)__wt_compare(session, S2BT(session)->collator,
-		    &a_trk->row_start, &b_trk->row_start, &cmp);
+		WT_IGNORE_RET(__wt_compare(session, S2BT(session)->collator,
+		    &a_trk->row_start, &b_trk->row_start, &cmp));
 		if (cmp != 0)
 			return (cmp);
 		break;

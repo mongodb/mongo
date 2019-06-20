@@ -655,7 +655,7 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 
 	/* Update the largest key we've seen to the key just checked. */
 	WT_RET(__wt_buf_set(session, vs->max_key, item.data, item.size));
-	(void)__wt_page_addr_string(session, ref, vs->max_addr);
+	WT_IGNORE_RET_PTR(__wt_page_addr_string(session, ref, vs->max_addr));
 
 	return (0);
 }
@@ -720,7 +720,7 @@ __verify_row_leaf_key_order(
 	/* Update the largest key we've seen to the last key on this page. */
 	WT_RET(__wt_row_leaf_key_copy(session, page,
 	    page->pg_row + (page->entries - 1), vs->max_key));
-	(void)__wt_page_addr_string(session, ref, vs->max_addr);
+	WT_IGNORE_RET_PTR(__wt_page_addr_string(session, ref, vs->max_addr));
 
 	return (0);
 }

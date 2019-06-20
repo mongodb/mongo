@@ -6,8 +6,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-static inline int __wt_log_cmp(WT_LSN *lsn1, WT_LSN *lsn2);
-
 /*
  * __wt_log_cmp --
  *	Compare 2 LSNs, return -1 if lsn1 < lsn2, 0if lsn1 == lsn2
