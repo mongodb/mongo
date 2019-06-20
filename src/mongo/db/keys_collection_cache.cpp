@@ -65,7 +65,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::refresh(OperationContext
                 "Cannot refresh keys collection cache during initial sync"};
     }
 
-    auto refreshStatus = _client->getNewKeys(opCtx, _purpose, newerThanThis);
+    auto refreshStatus = _client->getNewKeys(opCtx, _purpose, newerThanThis, true);
 
     if (!refreshStatus.isOK()) {
         return refreshStatus.getStatus();
