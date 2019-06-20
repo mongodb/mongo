@@ -4526,7 +4526,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "mongo-embedded-sdk-${version}-mongo-c-driver.tgz"
-        remote_file: ${push_path}-STAGE/${push_name}/mongo-c-driver-${version}.tgz
+        remote_file: ${push_path}-STAGE/${push_name}/mongo-c-driver-1.13.0-${version}.tgz
         bucket: build-push-testing
         permissions: public-read
         content_type: application/tar
@@ -4567,8 +4567,8 @@ tasks:
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo-embedded-${version}.tgz', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/${push_name}/mongo-embedded-${version}.tgz', 'bucket': '${push_bucket}'}}
 
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo-c-driver-${version}.tgz', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/${push_name}/mongo-c-driver-${version}.tgz', 'bucket': '${push_bucket}'}}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo-c-driver-1.13.0-${version}.tgz', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/${push_name}/mongo-c-driver-1.13.0-${version}.tgz', 'bucket': '${push_bucket}'}}
 
     - command: shell.exec
       params:
