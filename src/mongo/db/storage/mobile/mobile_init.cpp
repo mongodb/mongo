@@ -33,7 +33,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/kv/storage_engine_impl.h"
 #include "mongo/db/storage/mobile/mobile_kv_engine.h"
 #include "mongo/db/storage/mobile/mobile_options.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -50,14 +50,14 @@ public:
                 "mobile does not support --groupCollections",
                 !params.groupCollections);
 
-        KVStorageEngineOptions options;
+        StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
 
         MobileKVEngine* kvEngine = new MobileKVEngine(
             params.dbpath, embedded::mobileGlobalOptions, getGlobalServiceContext());
 
-        return new KVStorageEngine(kvEngine, options);
+        return new StorageEngineImpl(kvEngine, options);
     }
 
     StringData getCanonicalName() const override {

@@ -32,7 +32,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/kv/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 
@@ -44,10 +44,10 @@ class BiggieStorageEngineFactory : public StorageEngine::Factory {
 public:
     virtual StorageEngine* create(const StorageGlobalParams& params,
                                   const StorageEngineLockFile* lockFile) const {
-        KVStorageEngineOptions options;
+        StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
-        return new KVStorageEngine(new KVEngine(), options);
+        return new StorageEngineImpl(new KVEngine(), options);
     }
 
     virtual StringData getCanonicalName() const {

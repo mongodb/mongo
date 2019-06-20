@@ -74,7 +74,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/kv/storage_engine_impl.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_participant_gen.h"
@@ -459,9 +459,7 @@ public:
      */
     void assertNamespaceInIdents(NamespaceString nss, Timestamp ts, bool shouldExpect) {
         OneOffRead oor(_opCtx, ts);
-        KVCatalog* kvCatalog =
-            static_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine())
-                ->getCatalog();
+        auto kvCatalog = _opCtx->getServiceContext()->getStorageEngine()->getCatalog();
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
 
@@ -1734,7 +1732,7 @@ public:
 /**
  * This KVDropDatabase test only exists in this file for historical reasons, the final phase of
  * timestamping `dropDatabase` side-effects no longer applies. The purpose of this test is to
- * exercise the `KVStorageEngine::dropDatabase` method.
+ * exercise the `StorageEngine::dropDatabase` method.
  */
 template <bool SimulatePrimary>
 class KVDropDatabase : public StorageTimestampTest {
@@ -1745,14 +1743,13 @@ public:
             _opCtx->getServiceContext(),
             stdx::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
 
-        auto kvStorageEngine =
-            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
-        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+        auto kvCatalog = storageEngine->getCatalog();
 
         // Declare the database to be in a "synced" state, i.e: in steady-state replication.
         Timestamp syncTime = _clock->reserveTicks(1).asTimestamp();
         invariant(!syncTime.isNull());
-        kvStorageEngine->setInitialDataTimestamp(syncTime);
+        storageEngine->setInitialDataTimestamp(syncTime);
 
         // This test drops collections piece-wise instead of having the "drop database" algorithm
         // perform this walk. Defensively operate on a separate DB from the other tests to ensure
@@ -1806,7 +1803,7 @@ public:
 
         // If the storage engine is managing drops internally, the ident should not be visible after
         // a drop.
-        if (kvStorageEngine->supportsPendingDrops()) {
+        if (storageEngine->supportsPendingDrops()) {
             assertIdentsMissingAtTimestamp(kvCatalog, collIdent, indexIdent, postRenameTime);
         } else {
             // The namespace has changed, but the ident still exists as-is after the rename.
@@ -1858,9 +1855,8 @@ public:
             ASSERT_OK(_coordinatorMock->setFollowerMode({repl::MemberState::MS::RS_SECONDARY}));
         }
 
-        auto kvStorageEngine =
-            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
-        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+        auto kvCatalog = storageEngine->getCatalog();
 
         NamespaceString nss("unittests.timestampIndexBuilds");
         reset(nss);
@@ -2124,9 +2120,8 @@ public:
 class TimestampMultiIndexBuilds : public StorageTimestampTest {
 public:
     void run() {
-        auto kvStorageEngine =
-            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
-        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+        auto kvCatalog = storageEngine->getCatalog();
 
         NamespaceString nss("unittests.timestampMultiIndexBuilds");
         reset(nss);
@@ -2209,9 +2204,8 @@ public:
 class TimestampMultiIndexBuildsDuringRename : public StorageTimestampTest {
 public:
     void run() {
-        auto kvStorageEngine =
-            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
-        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+        auto kvCatalog = storageEngine->getCatalog();
 
         NamespaceString nss("unittests.timestampMultiIndexBuildsDuringRename");
         reset(nss);
@@ -2318,9 +2312,8 @@ public:
 class TimestampIndexDrops : public StorageTimestampTest {
 public:
     void run() {
-        auto kvStorageEngine =
-            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
-        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+        auto kvCatalog = storageEngine->getCatalog();
 
         NamespaceString nss("unittests.timestampIndexDrops");
         reset(nss);
@@ -2536,9 +2529,8 @@ public:
             const auto startBuildTs = beforeBuildTime.addTicks(1).asTimestamp();
 
             // Grab the existing idents to identify the ident created by the index build.
-            auto kvStorageEngine =
-                dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
-            KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+            auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+            auto kvCatalog = storageEngine->getCatalog();
             std::vector<std::string> origIdents;
             {
                 AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
@@ -2581,9 +2573,8 @@ public:
 class ViewCreationSeparateTransaction : public StorageTimestampTest {
 public:
     void run() {
-        auto kvStorageEngine =
-            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
-        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+        auto kvCatalog = storageEngine->getCatalog();
 
         const NamespaceString backingCollNss("unittests.backingColl");
         reset(backingCollNss);
@@ -2682,9 +2673,8 @@ public:
         ASSERT_EQ(indexOp.getObject()["name"].str(), "user_1_db_1");
         ASSERT_GT(indexOp.getTimestamp(), futureTs) << op.toBSON();
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
-        auto kvStorageEngine =
-            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
-        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+        auto kvCatalog = storageEngine->getCatalog();
         auto indexIdent = kvCatalog->getIndexIdent(_opCtx, nss, "user_1_db_1");
         assertIdentsMissingAtTimestamp(kvCatalog, "", indexIdent, pastTs);
         assertIdentsMissingAtTimestamp(kvCatalog, "", indexIdent, presentTs);

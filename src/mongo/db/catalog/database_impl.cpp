@@ -65,7 +65,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -475,8 +475,7 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
     UUID uuid = *collection->uuid();
     log() << "Finishing collection drop for " << nss << " (" << uuid << ").";
 
-    auto storageEngine =
-        checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto status = storageEngine->getCatalog()->dropCollection(opCtx, nss);
     if (!status.isOK())
         return status;
@@ -534,8 +533,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     Top::get(opCtx->getServiceContext()).collectionDropped(fromNss);
 
-    auto storageEngine =
-        checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     Status status = storageEngine->getCatalog()->renameCollection(opCtx, fromNss, toNss, stayTemp);
 
     // Set the namespace of 'collToRename' from within the CollectionCatalog. This is necessary
@@ -664,8 +662,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
           << " UUID: " << optionsWithUUID.uuid.get() << " and options: " << options.toBSON();
 
     // Create CollectionCatalogEntry
-    auto storageEngine =
-        checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto statusWithCatalogEntry = storageEngine->getCatalog()->createCollection(
         opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/);
     massertStatusOK(statusWithCatalogEntry.getStatus());
