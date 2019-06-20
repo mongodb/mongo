@@ -78,14 +78,26 @@ void setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj)
     warning() << "failpoint: " << failPointName << " set to: " << failPoint->toBSON();
 }
 
-FailPointEnableBlock::FailPointEnableBlock(const std::string& failPointName) {
+FailPointEnableBlock::FailPointEnableBlock(const std::string& failPointName)
+    : _failPointName(failPointName) {
     _failPoint = getGlobalFailPointRegistry()->getFailPoint(failPointName);
     invariant(_failPoint != nullptr);
     _failPoint->setMode(FailPoint::alwaysOn);
+    warning() << "failpoint: " << failPointName << " set to: " << _failPoint->toBSON();
 }
+
+FailPointEnableBlock::FailPointEnableBlock(const std::string& failPointName, const BSONObj& data)
+    : _failPointName(failPointName) {
+    _failPoint = getGlobalFailPointRegistry()->getFailPoint(failPointName);
+    invariant(_failPoint != nullptr);
+    _failPoint->setMode(FailPoint::alwaysOn, 0, data);
+    warning() << "failpoint: " << failPointName << " set to: " << _failPoint->toBSON();
+}
+
 
 FailPointEnableBlock::~FailPointEnableBlock() {
     _failPoint->setMode(FailPoint::off);
+    warning() << "failpoint: " << _failPointName << " set to: " << _failPoint->toBSON();
 }
 
 }  // namespace mongo

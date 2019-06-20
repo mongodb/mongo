@@ -69,10 +69,12 @@ void setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj)
 class FailPointEnableBlock {
 public:
     FailPointEnableBlock(const std::string& failPointName);
+    FailPointEnableBlock(const std::string& failPointName, const BSONObj& cmdObj);
     ~FailPointEnableBlock();
 
 private:
     FailPoint* _failPoint;
+    const std::string _failPointName;
 };
 
 }  // namespace mongo
