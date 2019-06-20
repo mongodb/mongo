@@ -111,8 +111,7 @@ void dropIndexesThatWillBeTooLongAfterDropPendingRename(OperationContext* opCtx,
     // Drop the offending indexes.
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     for (auto&& index : indexesToDrop) {
-        log() << "Collection " << coll->ns() << " contains an index namespace '"
-              << index->indexNamespace()
+        log() << "Collection " << coll->ns() << " contains an index name '" << index->indexName()
               << "' that would be too long after drop-pending rename. Dropping index "
                  "immediately.";
         fassert(50941, coll->getIndexCatalog()->dropIndex(opCtx, index));

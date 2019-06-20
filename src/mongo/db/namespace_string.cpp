@@ -216,12 +216,6 @@ Status NamespaceString::checkLengthForRename(
     return Status::OK();
 }
 
-NamespaceString NamespaceString::makeIndexNamespace(StringData indexName) const {
-    StringBuilder ss;
-    ss << coll() << ".$" << indexName;
-    return NamespaceString(db(), ss.stringData());
-}
-
 bool NamespaceString::isReplicated() const {
     if (isLocal()) {
         return false;

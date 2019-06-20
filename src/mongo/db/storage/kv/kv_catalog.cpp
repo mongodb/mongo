@@ -993,8 +993,8 @@ Status KVCatalog::removeIndex(OperationContext* opCtx, NamespaceString ns, Strin
     putMetaData(opCtx, ns, md);
 
     // Lazily remove to isolate underlying engine from rollback.
-    opCtx->recoveryUnit()->registerChange(new RemoveIndexChange(
-        opCtx, _engine, md.options.uuid, ns.makeIndexNamespace(indexName), indexName, ident));
+    opCtx->recoveryUnit()->registerChange(
+        new RemoveIndexChange(opCtx, _engine, md.options.uuid, ns, indexName, ident));
     return Status::OK();
 }
 

@@ -562,25 +562,6 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
     if (name.empty())
         return Status(ErrorCodes::CannotCreateIndex, "index name cannot be empty");
 
-    // Drop pending collections are internal to the server and will not be exported to another
-    // storage engine. The indexes contained in these collections are not subject to the same
-    // namespace length constraints as the ones in created by users.
-    //
-    // Index names do not limit the maximum allowable length of the target namespace under FCV 4.2
-    // and above.
-    const auto checkIndexNamespace =
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.getVersion() !=
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
-    if (checkIndexNamespace && !nss.isDropPendingNamespace()) {
-        auto indexNamespace = nss.makeIndexNamespace(name);
-        if (indexNamespace.size() > NamespaceString::MaxNsLen)
-            return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream() << "namespace name generated from index name \""
-                                        << indexNamespace
-                                        << "\" is too long (127 byte max)");
-    }
-
     const BSONObj key = spec.getObjectField("key");
     const Status keyStatus = index_key_validate::validateKeyPattern(key, indexVersion);
     if (!keyStatus.isOK()) {
@@ -984,9 +965,8 @@ Status IndexCatalogImpl::_dropIndex(OperationContext* opCtx, IndexCatalogEntry* 
 
     _checkMagic();
 
-    // Pulling indexName/indexNamespace out as they are needed post descriptor release.
+    // Pulling indexName out as it is needed post descriptor release.
     string indexName = entry->descriptor()->indexName();
-    string indexNamespace = entry->descriptor()->indexNamespace();
 
     // --------- START REAL WORK ----------
     audit::logDropIndex(&cc(), indexName, _collection->ns().ns());
@@ -1005,16 +985,14 @@ Status IndexCatalogImpl::_dropIndex(OperationContext* opCtx, IndexCatalogEntry* 
 
     _collection->infoCache()->droppedIndex(opCtx, indexName);
     entry = nullptr;
-    _deleteIndexFromDisk(opCtx, indexName, indexNamespace);
+    _deleteIndexFromDisk(opCtx, indexName);
 
     _checkMagic();
 
     return Status::OK();
 }
 
-void IndexCatalogImpl::_deleteIndexFromDisk(OperationContext* opCtx,
-                                            const string& indexName,
-                                            const string& indexNamespace) {
+void IndexCatalogImpl::_deleteIndexFromDisk(OperationContext* opCtx, const string& indexName) {
     Status status = DurableCatalog::get(opCtx)->removeIndex(opCtx, _collection->ns(), indexName);
     if (status.code() == ErrorCodes::NamespaceNotFound) {
         // this is ok, as we may be partially through index creation

@@ -113,8 +113,6 @@ IndexDescriptor::IndexDescriptor(Collection* collection,
       _unique(_isIdIndex || infoObj[kUniqueFieldName].trueValue()),
       _partial(!infoObj[kPartialFilterExprFieldName].eoo()),
       _cachedEntry(nullptr) {
-    _indexNamespace = NamespaceString(_parentNS).makeIndexNamespace(_indexName).ns();
-
     BSONElement e = _infoObj[IndexDescriptor::kIndexVersionFieldName];
     fassert(50942, e.isNumber());
     _version = static_cast<IndexVersion>(e.numberInt());
@@ -206,7 +204,6 @@ bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) co
 
 void IndexDescriptor::setNs(NamespaceString ns) {
     _parentNS = ns;
-    _indexNamespace = ns.makeIndexNamespace(_indexName).ns();
 
     // Construct a new infoObj with the namespace field replaced.
     _infoObj = renameNsInIndexSpec(_infoObj, ns);

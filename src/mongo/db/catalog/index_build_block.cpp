@@ -69,7 +69,6 @@ Status IndexCatalogImpl::IndexBuildBlock::init(OperationContext* opCtx, Collecti
         collection, IndexNames::findPluginName(keyPattern), _spec);
 
     _indexName = descriptor->indexName();
-    _indexNamespace = descriptor->indexNamespace();
 
     bool isBackgroundIndex =
         _method == IndexBuildMethod::kHybrid || _method == IndexBuildMethod::kBackground;
@@ -146,7 +145,7 @@ void IndexCatalogImpl::IndexBuildBlock::fail(OperationContext* opCtx,
             _entry->setIndexBuildInterceptor(nullptr);
         }
     } else {
-        _catalog->_deleteIndexFromDisk(opCtx, _indexName, _indexNamespace);
+        _catalog->_deleteIndexFromDisk(opCtx, _indexName);
     }
 }
 

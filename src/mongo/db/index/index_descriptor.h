@@ -166,11 +166,6 @@ public:
         return _parentNS;
     }
 
-    // Return the name of this index's storage area (database.table.$index)
-    const std::string& indexNamespace() const {
-        return _indexNamespace;
-    }
-
     // Return the name of the access method we must use to access this index's data.
     const std::string& getAccessMethodName() const {
         return _accessMethodName;
@@ -272,7 +267,6 @@ private:
     BSONObj _projection;
     std::string _indexName;
     NamespaceString _parentNS;
-    std::string _indexNamespace;
     bool _isIdIndex;
     bool _sparse;
     bool _unique;

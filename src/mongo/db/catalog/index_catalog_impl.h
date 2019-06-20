@@ -295,7 +295,6 @@ public:
         IndexBuildMethod _method;
 
         std::string _indexName;
-        std::string _indexNamespace;
 
         IndexCatalogEntry* _entry;
 
@@ -423,9 +422,7 @@ private:
 
     // just does disk hanges
     // doesn't change memory state, etc...
-    void _deleteIndexFromDisk(OperationContext* opCtx,
-                              const std::string& indexName,
-                              const std::string& indexNamespace);
+    void _deleteIndexFromDisk(OperationContext* opCtx, const std::string& indexName);
 
     // descriptor ownership passes to _setupInMemoryStructures
     // initFromDisk: Avoids registering a change to undo this operation when set to true.
