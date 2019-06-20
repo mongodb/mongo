@@ -139,6 +139,7 @@ variables:
   - name: compile
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
   - *run_jstestfuzz_tests
 
@@ -752,103 +753,112 @@ functions:
             exit $(cat jepsen_system_failure_${task_name}_${execution})
           fi
 
-  "run jstestfuzz":
+  # This function should only be called from patch-build-only tasks.
+  "get added and modified patch files":
+    command: shell.exec
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+        git diff HEAD --name-only --line-prefix="${workdir}/src/" --diff-filter=d >> modified_and_created_patch_files.txt
+        if [ -d src/mongo/db/modules/enterprise ]; then
+          pushd src/mongo/db/modules/enterprise
+          git diff HEAD --name-only --line-prefix="${workdir}/src/src/mongo/db/modules/enterprise/" --diff-filter=d >> ~1/modified_and_created_patch_files.txt
+          popd
+        fi
+
+  "setup jstestfuzz":
     - command: shell.exec
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
+
+          ${add_nodejs_to_path}
 
           git clone git@github.com:10gen/jstestfuzz.git
 
-          cp mongodb*/bin/mongod .
+          pushd jstestfuzz
+            npm install
+            npm run prepare
+          popd
 
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
+  "lint fuzzer sanity patch":
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -eo pipefail
+        set -o verbose
 
-          git clone --depth 1 git@github.com:10gen/mongo-enterprise-modules.git jstests/enterprise_tests
-          git clone --depth 1 git@github.com:10gen/QA.git jstests/qa_tests
+        ${add_nodejs_to_path}
 
-    - command: shell.exec
-      params:
-        working_dir: src/jstestfuzz
-        script: |
-          set -o errexit
-          set -o verbose
+        # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
+        # Grep returns 1 if it fails to find a match.
+        (grep "\.js$" modified_and_created_patch_files.txt || true) | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
 
-          # Add node and npm binaries to PATH
-          if [ "Windows_NT" = "$OS" ]; then
-            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
-            # Work around the issue by specifying a different %APPDATA% path.
-            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
-            export APPDATA=${workdir}/npm-app-data
-            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
-          else
-            export PATH="$PATH:/opt/node/bin"
-          fi
+  "lint fuzzer sanity all":
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -eo pipefail
+        set -o verbose
 
-          npm install
+        ${add_nodejs_to_path}
 
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src/jstestfuzz
-        script: |
-          set -o errexit
-          set -o verbose
+        # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
+        find "$PWD/jstests" "$PWD/src/mongo/db/modules/enterprise" -name "*.js" -print | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
 
-          # Add node and npm binaries to PATH
-          if [ "Windows_NT" = "$OS" ]; then
-            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
-            # Work around the issue by specifying a different %APPDATA% path.
-            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
-            export APPDATA=${workdir}/npm-app-data
-            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
-          else
-            export PATH="$PATH:/opt/node/bin"
-          fi
+  "run jstestfuzz":
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
 
-          echo "jstestfuzz self-tests are starting"
-          set +o errexit
-          npm test > npm_test-${task_id}.log 2>&1
-          if [ $? -ne 0 ]; then
-            echo "jstestfuzz self-tests failure"
-            branch=$(git symbolic-ref --short HEAD)
-            commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
-            echo "Git branch: $branch, commit: $commit"
-            which node
-            node --version
-            which npm
-            npm --version
-            cat npm_test-${task_id}.log
-            exit 1
-          fi
-          rm -f npm_test-${task_id}.log
-          set -o errexit
-          echo "jstestfuzz self-tests finished"
+        cp mongodb*/bin/mongod .
 
-          npm start -- --jsTestsDir ../jstests ${jstestfuzz_vars}
-    - command: archive.targz_pack
-      params:
-        target: "jstests.tgz"
-        source_dir: "src/jstestfuzz"
-        include:
-          - "out/*.js"
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: jstests.tgz
-        remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        display_name: Generated Tests - Execution ${execution}
+        git clone --depth 1 git@github.com:10gen/mongo-enterprise-modules.git jstests/enterprise_tests
+        git clone --depth 1 git@github.com:10gen/QA.git jstests/qa_tests
+
+  - command: shell.exec
+    params:
+      working_dir: src/jstestfuzz
+      script: |
+        set -o errexit
+        set -o verbose
+
+        ${add_nodejs_to_path}
+
+        npm run jstestfuzz -- --jsTestsDir ../jstests ${jstestfuzz_vars}
+
+  - command: archive.targz_pack
+    params:
+      target: "jstests.tgz"
+      source_dir: "src/jstestfuzz"
+      include:
+        - "out/*.js"
+
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: jstests.tgz
+      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Generated Tests - Execution ${execution}
 
   "do multiversion setup" :
     command: shell.exec
@@ -1005,6 +1015,18 @@ pre:
           if [ $errexit_on -eq 0 ]; then
             set -o errexit
           fi
+       - key: add_nodejs_to_path
+         value: |
+           # Add node and npm binaries to PATH
+           if [ "Windows_NT" = "$OS" ]; then
+             # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
+             # Work around the issue by specifying a different %APPDATA% path.
+             # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
+             export APPDATA=${workdir}/npm-app-data
+             export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
+           else
+             export PATH="$PATH:/opt/node/bin"
+           fi
   - command: shell.exec
     params:
       system_log: true
@@ -1646,6 +1668,7 @@ tasks:
   name: jstestfuzz
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
@@ -1657,6 +1680,7 @@ tasks:
   name: jstestfuzz_WT
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
@@ -1668,6 +1692,7 @@ tasks:
   name: jstestfuzz_concurrent_WT
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
     vars:
       jstestfuzz_vars: --numGeneratedFiles 75
@@ -1681,6 +1706,7 @@ tasks:
   name: jstestfuzz_concurrent_replication_WT
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
     vars:
       jstestfuzz_vars: --numGeneratedFiles 75
@@ -1694,6 +1720,7 @@ tasks:
   name: jstestfuzz_concurrent_sharded_WT
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
     vars:
       jstestfuzz_vars: --numGeneratedFiles 75
@@ -1707,6 +1734,7 @@ tasks:
   name: jstestfuzz_replication
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
@@ -1718,6 +1746,7 @@ tasks:
   name: jstestfuzz_replication_WT
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
@@ -1729,6 +1758,7 @@ tasks:
   name: jstestfuzz_replication_initsync
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
     vars:
       jstestfuzz_vars: --numGeneratedFiles 75
@@ -1742,6 +1772,7 @@ tasks:
   name: jstestfuzz_replication_initsync_WT
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
     vars:
       jstestfuzz_vars: --numGeneratedFiles 75
@@ -1755,6 +1786,7 @@ tasks:
   name: jstestfuzz_replication_resync
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
     vars:
       jstestfuzz_vars: --numGeneratedFiles 75
@@ -1768,6 +1800,7 @@ tasks:
   name: jstestfuzz_replication_resync_WT
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
     vars:
       jstestfuzz_vars: --numGeneratedFiles 75
@@ -1781,6 +1814,7 @@ tasks:
   name: jstestfuzz_sharded
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
@@ -1792,11 +1826,31 @@ tasks:
   name: jstestfuzz_sharded_WT
   commands:
   - func: "do setup"
+  - func: "setup jstestfuzz"
   - func: "run jstestfuzz"
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_sharded --storageEngine=wiredTiger
+
+# Check that the mutational fuzzer can parse JS files modified in a patch build.
+- name: lint_fuzzer_sanity_patch
+  patch_only: true
+  commands:
+  - command: manifest.load
+  - *git_get_project
+  - func: "get added and modified patch files"
+  - func: "setup jstestfuzz"
+  - func: "lint fuzzer sanity patch"
+
+# Check that the mutational fuzzer can parse all JS filess.
+- name: lint_fuzzer_sanity_all
+  commands:
+  - command: manifest.load
+  - *git_get_project
+  - func: "setup jstestfuzz"
+  - func: "lint fuzzer sanity all"
+
 
 ## integration test suites ##
 
@@ -5472,12 +5526,14 @@ buildvariants:
     requires:
     - name: burn_in_tests
     - name: lint
+    - name: lint_fuzzer_sanity_patch
     distros:
     - rhel62-large
   - name: compile_all
     distros:
     - rhel62-large
   - name: lint
+  - name: lint_fuzzer_sanity_patch
   - name: burn_in_tests
   - name: aggregation
   - name: aggregation_WT
@@ -7838,3 +7894,14 @@ buildvariants:
   - name: write_concern_majority_passthrough_WT
     distros:
     - rhel62-large
+
+- name: tig-daily-cron
+  modules:
+  - enterprise
+  display_name: "~ TIG Daily Cron"
+  run_on:
+  - rhel62-small
+  batchtime: 1440 # 1 day
+  stepback: false
+  tasks:
+  - name: lint_fuzzer_sanity_all
