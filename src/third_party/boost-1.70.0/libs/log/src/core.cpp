@@ -489,6 +489,13 @@ BOOST_LOG_API core_ptr core::get()
     return implementation::get();
 }
 
+//! The method returns a new pointer to a logging system instance
+//! MONGODB MODIFICATION
+BOOST_LOG_API core_ptr core::create()
+{
+    return core_ptr(new core());
+}
+
 //! The method enables or disables logging and returns the previous state of logging flag
 BOOST_LOG_API bool core::set_logging_enabled(bool enabled)
 {
