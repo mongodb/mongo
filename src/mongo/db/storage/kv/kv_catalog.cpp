@@ -42,7 +42,7 @@
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_collection_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/kv_storage_engine_interface.h"
+#include "mongo/db/storage/kv/storage_engine_interface.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/platform/bits.h"
@@ -321,7 +321,7 @@ void KVCatalog::FeatureTracker::putInfo(OperationContext* opCtx, const FeatureBi
 KVCatalog::KVCatalog(RecordStore* rs,
                      bool directoryPerDb,
                      bool directoryForIndexes,
-                     KVStorageEngineInterface* engine)
+                     StorageEngineInterface* engine)
     : _rs(rs),
       _directoryPerDb(directoryPerDb),
       _directoryForIndexes(directoryForIndexes),
@@ -838,7 +838,7 @@ Status KVCatalog::dropCollection(OperationContext* opCtx, const NamespaceString&
     // drop the collection only on WUOW::commit().
     opCtx->recoveryUnit()->onCommit(
         [ opCtx, catalog = this, nss, uuid, ident ](boost::optional<Timestamp> commitTimestamp) {
-            KVStorageEngineInterface* engine = catalog->_engine;
+            StorageEngineInterface* engine = catalog->_engine;
             auto storageEngine = engine->getStorageEngine();
             if (storageEngine->supportsPendingDrops() && commitTimestamp) {
                 log() << "Deferring table drop for collection '" << nss << "' (" << uuid << ")"

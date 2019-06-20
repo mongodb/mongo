@@ -66,7 +66,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -148,8 +148,7 @@ IndexCatalogEntry* IndexCatalogImpl::_setupInMemoryStructures(
 
     IndexDescriptor* desc = entry->descriptor();
 
-    KVStorageEngine* engine =
-        checked_cast<KVStorageEngine*>(opCtx->getServiceContext()->getStorageEngine());
+    auto engine = opCtx->getServiceContext()->getStorageEngine();
     std::string ident =
         engine->getCatalog()->getIndexIdent(opCtx, _collection->ns(), desc->indexName());
 
