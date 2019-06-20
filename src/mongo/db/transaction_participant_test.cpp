@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_noop.h"
@@ -835,6 +836,112 @@ TEST_F(TxnParticipantTest, StepDownDuringPreparedCommitFails) {
     ASSERT_THROWS_CODE(txnParticipant.commitPreparedTransaction(opCtx(), commitTS, {}),
                        AssertionException,
                        ErrorCodes::NotMaster);
+}
+
+TEST_F(TxnParticipantTest, StepDownDuringPreparedAbortReleasesRSTL) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+
+    // Simulate the locking of an insert.
+    {
+        Lock::DBLock dbLock(opCtx(), "test", MODE_IX);
+        Lock::CollectionLock collLock(opCtx(), NamespaceString("test.foo"), MODE_IX);
+    }
+
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+    txnParticipant.stashTransactionResources(opCtx());
+
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+    txnParticipant.prepareTransaction(opCtx(), {});
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+    txnParticipant.stashTransactionResources(opCtx());
+
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+
+    txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
+        repl::MemberState::RS_SECONDARY));
+    ASSERT_THROWS_CODE(
+        txnParticipant.abortActiveTransaction(opCtx()), AssertionException, ErrorCodes::NotMaster);
+
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+
+    // Test that we can acquire the RSTL in mode X, and then immediately release it so the test can
+    // complete successfully.
+    auto func = [&](OperationContext* newOpCtx) {
+        newOpCtx->lockState()->lock(newOpCtx, resourceIdReplicationStateTransitionLock, MODE_X);
+        newOpCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
+    };
+    runFunctionFromDifferentOpCtx(func);
+}
+
+TEST_F(TxnParticipantTest, StepDownDuringPreparedCommitReleasesRSTL) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+
+    // Simulate the locking of an insert.
+    {
+        Lock::DBLock dbLock(opCtx(), "test", MODE_IX);
+        Lock::CollectionLock collLock(opCtx(), NamespaceString("test.foo"), MODE_IX);
+    }
+
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+    txnParticipant.stashTransactionResources(opCtx());
+
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+    auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+    txnParticipant.stashTransactionResources(opCtx());
+
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+
+    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
+        repl::MemberState::RS_SECONDARY));
+    ASSERT_THROWS_CODE(
+        txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, boost::none),
+        AssertionException,
+        ErrorCodes::NotMaster);
+
+    ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+
+    // Test that we can acquire the RSTL in mode X, and then immediately release it so the test can
+    // complete successfully.
+    auto func = [&](OperationContext* newOpCtx) {
+        newOpCtx->lockState()->lock(newOpCtx, resourceIdReplicationStateTransitionLock, MODE_X);
+        newOpCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
+    };
+    runFunctionFromDifferentOpCtx(func);
 }
 
 TEST_F(TxnParticipantTest, ThrowDuringUnpreparedCommitLetsTheAbortAtEntryPointToCleanUp) {

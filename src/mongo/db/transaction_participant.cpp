@@ -1222,10 +1222,25 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     OperationContext* opCtx,
     Timestamp commitTimestamp,
     boost::optional<repl::OpTime> commitOplogEntryOpTime) {
+    // A correctly functioning coordinator could hit this uassert. This could happen if this
+    // participant shard failed over and the new primary majority committed prepare without this
+    // node in its majority. The coordinator could legally send commitTransaction with a
+    // commitTimestamp to this shard but target the old primary (this node) that has yet to prepare
+    // the transaction. We uassert since this node cannot commit the transaction.
+    if (!o().txnState.isPrepared()) {
+        uasserted(ErrorCodes::InvalidOptions,
+                  "commitTransaction cannot provide commitTimestamp to unprepared transaction.");
+    }
+
     // Re-acquire the RSTL to prevent state transitions while committing the transaction. When the
     // transaction was prepared, we dropped the RSTL. We do not need to reacquire the PBWM because
     // if we're not the primary we will uassert anyways.
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+
+    // Prepared transactions cannot hold the RSTL, or else they will deadlock with state
+    // transitions. If we do not commit the transaction we must unlock the RSTL explicitly so two
+    // phase locking doesn't hold onto it.
+    auto unlockGuard = makeGuard([&] { invariant(opCtx->lockState()->unlockRSTLforPrepare()); });
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
@@ -1235,14 +1250,6 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
     }
 
-    // A correctly functioning coordinator could hit this uassert. This could happen if this
-    // participant shard failed over and the new primary majority committed prepare without this
-    // node in its majority. The coordinator could legally send commitTransaction with a
-    // commitTimestamp to this shard but target the old primary (this node) that has yet to prepare
-    // the transaction. We uassert since this node cannot commit the transaction.
-    uassert(ErrorCodes::InvalidOptions,
-            "commitTransaction cannot provide commitTimestamp to unprepared transaction.",
-            o().txnState.isPrepared());
     uassert(
         ErrorCodes::InvalidOptions, "'commitTimestamp' cannot be null", !commitTimestamp.isNull());
 
@@ -1274,6 +1281,9 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     }
 
     try {
+        // We can no longer uassert without terminating.
+        unlockGuard.dismiss();
+
         // Once entering "committing with prepare" we cannot throw an exception.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
@@ -1393,20 +1403,33 @@ bool TransactionParticipant::Observer::expiredAsOf(Date_t when) const {
 }
 
 void TransactionParticipant::Participant::abortActiveTransaction(OperationContext* opCtx) {
-    // Re-acquire the RSTL to prevent state transitions while aborting the transaction. If the
-    // transaction was prepared then we dropped it on preparing the transaction. We do not need to
+    if (o().txnState.isPrepared()) {
+        _abortActivePreparedTransaction(opCtx);
+    } else {
+        _abortActiveTransaction(opCtx, TransactionState::kInProgress, false);
+    }
+}
+
+void TransactionParticipant::Participant::_abortActivePreparedTransaction(OperationContext* opCtx) {
+    // Re-acquire the RSTL to prevent state transitions while aborting the transaction. Since the
+    // transaction was prepared, we dropped it on preparing the transaction. We do not need to
     // reacquire the PBWM because if we're not the primary we will uassert anyways.
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-    if (o().txnState.isPrepared() && opCtx->writesAreReplicated()) {
+
+    // Prepared transactions cannot hold the RSTL, or else they will deadlock with state
+    // transitions. If we do not abort the transaction we must unlock the RSTL explicitly so two
+    // phase locking doesn't hold onto it. Unlocking the RSTL may be a noop if it's already
+    // unlocked.
+    ON_BLOCK_EXIT([&] { opCtx->lockState()->unlockRSTLforPrepare(); });
+
+    if (opCtx->writesAreReplicated()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(ErrorCodes::NotMaster,
                 "Not primary so we cannot abort a prepared transaction",
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
     }
 
-    _abortActiveTransaction(opCtx,
-                            TransactionState::kInProgress | TransactionState::kPrepared,
-                            o().txnState.isPrepared());
+    _abortActiveTransaction(opCtx, TransactionState::kPrepared, true);
 }
 
 void TransactionParticipant::Participant::abortActiveUnpreparedOrStashPreparedTransaction(

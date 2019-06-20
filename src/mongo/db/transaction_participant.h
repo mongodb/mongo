@@ -713,6 +713,9 @@ public:
                                      TransactionState::StateSet expectedStates,
                                      bool writeOplog);
 
+        // Aborts a prepared transaction.
+        void _abortActivePreparedTransaction(OperationContext* opCtx);
+
         // Releases stashed transaction resources to abort the transaction on the session.
         void _abortTransactionOnSession(OperationContext* opCtx);
 
