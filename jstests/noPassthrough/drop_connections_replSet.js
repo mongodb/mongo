@@ -18,7 +18,7 @@
         assert.commandWorked(ret);
         jsTestLog("Connection pool stats by host: " + tojson(ret.hosts));
         return ret.hosts;
-    };
+    }
 
     // To test the dropConnections command, first remove the secondary. This should have no effect
     // on the existing connection pool, but it'll prevent the primary from reconnecting to it after
