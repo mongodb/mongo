@@ -146,13 +146,14 @@ kmsEnv.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='kms_test',
-    source='kms_test.cpp',
-    LIBDEPS=[
-        'kms',
-    ]
-)
+if "tom" not in env["MONGO_CRYPTO"]:
+    env.CppUnitTest(
+        target='kms_test',
+        source='kms_test.cpp',
+        LIBDEPS=[
+            'kms',
+        ]
+    )
 
 env.Library(
     target="kms_shell",

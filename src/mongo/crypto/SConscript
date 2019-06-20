@@ -102,10 +102,11 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='aead_encryption_test',
-    source='aead_encryption_test.cpp',
-    LIBDEPS=[
-        'aead_encryption',
-    ]
-)
+if "tom" not in env["MONGO_CRYPTO"]:
+    env.CppUnitTest(
+        target='aead_encryption_test',
+        source='aead_encryption_test.cpp',
+        LIBDEPS=[
+            'aead_encryption',
+        ]
+    )
