@@ -77,49 +77,6 @@ bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
     return metadata->isSharded();
 }
 
-Status checkAllIndexesCanBeRecreatedInNewNS(OperationContext* opCtx,
-                                            Collection* coll,
-                                            const NamespaceString& newNss) {
-    const auto checkIndexNamespace =
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.getVersion() !=
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
-    std::string::size_type longestIndexNameLength =
-        checkIndexNamespace ? coll->getIndexCatalog()->getLongestIndexNameLength(opCtx) : 0;
-    return newNss.checkLengthForRename(longestIndexNameLength);
-}
-
-void dropIndexesThatWillBeTooLongAfterDropPendingRename(OperationContext* opCtx, Collection* coll) {
-    // Compile a list of any indexes that would become too long following the
-    // drop-pending rename. In the case that this collection drop gets rolled back, this
-    // will incur a performance hit, since those indexes will have to be rebuilt from
-    // scratch, but data integrity is maintained.
-    std::vector<const IndexDescriptor*> indexesToDrop;
-    auto indexIter = coll->getIndexCatalog()->getIndexIterator(opCtx, true);
-
-    // Determine which index names are too long. Since we don't have the collection
-    // rename optime at this time, use the maximum optime to check the index names.
-    auto longDpns = coll->ns().makeDropPendingNamespace(repl::OpTime::max());
-    while (indexIter->more()) {
-        auto index = indexIter->next()->descriptor();
-        auto status = longDpns.checkLengthForRename(index->indexName().size());
-        if (!status.isOK()) {
-            indexesToDrop.push_back(index);
-        }
-    }
-
-    // Drop the offending indexes.
-    auto opObserver = opCtx->getServiceContext()->getOpObserver();
-    for (auto&& index : indexesToDrop) {
-        log() << "Collection " << coll->ns() << " contains an index name '" << index->indexName()
-              << "' that would be too long after drop-pending rename. Dropping index "
-                 "immediately.";
-        fassert(50941, coll->getIndexCatalog()->dropIndex(opCtx, index));
-        opObserver->onDropIndex(
-            opCtx, coll->ns(), coll->uuid(), index->indexName(), index->infoObj());
-    }
-}
-
 // From a replicated to an unreplicated collection or vice versa.
 bool isReplicatedChanged(OperationContext* opCtx,
                          const NamespaceString& source,
@@ -165,10 +122,6 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                           str::stream() << "cannot rename view: " << source);
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
     }
-
-    auto status = checkAllIndexesCanBeRecreatedInNewNS(opCtx, sourceColl, target);
-    if (!status.isOK())
-        return status;
 
     BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
@@ -285,7 +238,6 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
         if (!isOplogDisabledForNamespace) {
             invariant(opCtx->writesAreReplicated());
             invariant(renameOpTimeFromApplyOps.isNull());
-            dropIndexesThatWillBeTooLongAfterDropPendingRename(opCtx, targetColl);
         }
 
         auto numRecords = targetColl->numRecords(opCtx);
@@ -503,10 +455,6 @@ Status renameBetweenDBs(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation,
                 "Cannot rename collections between a replicated and an unreplicated database"};
 
-    auto status = checkAllIndexesCanBeRecreatedInNewNS(opCtx, sourceColl, target);
-    if (!status.isOK())
-        return status;
-
     BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
         sourceColl->uuid().get());
@@ -553,11 +501,6 @@ Status renameBetweenDBs(OperationContext* opCtx,
 
     log() << "Attempting to create temporary collection: " << tmpName
           << " with the contents of collection: " << source;
-
-    // Check if all the source collection's indexes can be recreated in the temporary collection.
-    status = checkAllIndexesCanBeRecreatedInNewNS(opCtx, sourceColl, tmpName);
-    if (!status.isOK())
-        return status;
 
     Collection* tmpColl = nullptr;
     {
@@ -629,7 +572,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
         // allows us to add and commit the index within a single WriteUnitOfWork and avoids the
         // possibility of seeing the index in an unfinished state. For more information on assigning
         // timestamps to multiple index builds, please see SERVER-35780 and SERVER-35070.
-        status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
+        Status status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
             auto tmpIndexCatalog = tmpColl->getIndexCatalog();
             auto opObserver = opCtx->getServiceContext()->getOpObserver();
@@ -683,7 +626,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
             opCtx->checkForInterrupt();
             // Cursor is left one past the end of the batch inside writeConflictRetry.
             auto beginBatchId = record->id;
-            status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
+            Status status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
                 // Need to reset cursor if it gets a WCE midway through.
                 if (!record || (beginBatchId != record->id)) {
@@ -720,7 +663,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
     // Getting here means we successfully built the target copy. We now do the final
     // in-place rename and remove the source collection.
     invariant(tmpName.db() == target.db());
-    status = renameCollectionWithinDB(opCtx, tmpName, target, options);
+    Status status = renameCollectionWithinDB(opCtx, tmpName, target, options);
     if (!status.isOK())
         return status;
 

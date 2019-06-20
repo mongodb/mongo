@@ -319,12 +319,6 @@ public:
     StatusWith<repl::OpTime> getDropPendingNamespaceOpTime() const;
 
     /**
-     * Checks if this namespace is valid as a target namespace for a rename operation, given
-     * the length of the longest index name in the source collection.
-     */
-    Status checkLengthForRename(const std::string::size_type longestIndexNameLength) const;
-
-    /**
      * Returns true if the namespace is valid. Special namespaces for internal use are considered as
      * valid.
      */
