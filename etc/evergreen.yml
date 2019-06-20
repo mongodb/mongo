@@ -10211,7 +10211,6 @@ buildvariants:
     - rhel62-large
   - name: disk_wiredtiger
   - name: .encrypt
-  - name: initial_sync_fuzzer_gen
   - name: .integration
     distros:
     - rhel62-large
