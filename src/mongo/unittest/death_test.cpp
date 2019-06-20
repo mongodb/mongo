@@ -81,10 +81,14 @@ void DeathTestImpl::_doTest() {
         char buf[1000];
         std::ostringstream os;
         ssize_t bytesRead;
+        log() << "========== Beginning Interleaved output of Death Test ==========";
         while (0 < (bytesRead = read(pipes[0], buf, sizeof(buf)))) {
+            std::cerr.write(buf, bytesRead);
+            invariant(std::cerr);
             os.write(buf, bytesRead);
             invariant(os);
         }
+        log() << "========== Beginning Interleaved output of Death Test ==========";
         checkSyscall(bytesRead);
         pid_t pid;
         int stat;
