@@ -56,7 +56,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::refresh(OperationContext
         originalSize = _cache.size();
     }
 
-    auto refreshStatus = _client->getNewKeys(opCtx, _purpose, newerThanThis);
+    auto refreshStatus = _client->getNewKeys(opCtx, _purpose, newerThanThis, true);
 
     if (!refreshStatus.isOK()) {
         return refreshStatus.getStatus();

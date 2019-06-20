@@ -47,10 +47,14 @@ public:
     virtual ~KeysCollectionClient() = default;
 
     /**
-     * Returns keys for the given purpose and with an expiresAt value greater than newerThanThis.
+     * Returns keys for the given purpose and with an expiresAt value greater than newerThanThis,
+     * using readConcern level majority if possible.
      */
     virtual StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
-        OperationContext* opCtx, StringData purpose, const LogicalTime& newerThanThis) = 0;
+        OperationContext* opCtx,
+        StringData purpose,
+        const LogicalTime& newerThanThis,
+        bool useMajority) = 0;
 
     /**
     * Directly inserts a key document to the storage

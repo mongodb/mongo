@@ -82,7 +82,7 @@ Status KeyGenerator::generateNewKeysIfNeeded(OperationContext* opCtx) {
     }
 
     auto currentTime = LogicalClock::get(opCtx)->getClusterTime();
-    auto keyStatus = _client->getNewKeys(opCtx, _purpose, currentTime);
+    auto keyStatus = _client->getNewKeys(opCtx, _purpose, currentTime, false);
 
     if (!keyStatus.isOK()) {
         return keyStatus.getStatus();

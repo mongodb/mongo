@@ -47,10 +47,13 @@ class KeysCollectionClientDirect : public KeysCollectionClient {
 public:
     KeysCollectionClientDirect();
     /**
-     * Returns keys for the given purpose and with an expiresAt value greater than newerThanThis.
+     * Returns keys for the given purpose and with an expiresAt value greater than newerThanThis,
+     * using readConcern level majority if possible.
      */
-    StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
-        OperationContext* opCtx, StringData purpose, const LogicalTime& newerThanThis) override;
+    StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(OperationContext* opCtx,
+                                                               StringData purpose,
+                                                               const LogicalTime& newerThanThis,
+                                                               bool useMajority) override;
 
     /**
     * Directly inserts a key document to the storage

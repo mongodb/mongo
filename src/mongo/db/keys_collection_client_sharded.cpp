@@ -41,7 +41,10 @@ KeysCollectionClientSharded::KeysCollectionClientSharded(ShardingCatalogClient* 
 
 
 StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientSharded::getNewKeys(
-    OperationContext* opCtx, StringData purpose, const LogicalTime& newerThanThis) {
+    OperationContext* opCtx,
+    StringData purpose,
+    const LogicalTime& newerThanThis,
+    bool useMajority) {
 
     return _catalogClient->getNewKeys(
         opCtx, purpose, newerThanThis, repl::ReadConcernLevel::kMajorityReadConcern);
