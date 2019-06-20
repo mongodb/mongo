@@ -74,16 +74,23 @@ bool isRetriableError(ErrorCodes::Error code, Shard::RetryPolicy options) {
 KeysCollectionClientDirect::KeysCollectionClientDirect() : _rsLocalClient() {}
 
 StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientDirect::getNewKeys(
-    OperationContext* opCtx, StringData purpose, const LogicalTime& newerThanThis) {
+    OperationContext* opCtx,
+    StringData purpose,
+    const LogicalTime& newerThanThis,
+    bool useMajority) {
 
 
     BSONObjBuilder queryBuilder;
     queryBuilder.append("purpose", purpose);
     queryBuilder.append("expiresAt", BSON("$gt" << newerThanThis.asTimestamp()));
 
+    auto readConcern = serverGlobalParams.enableMajorityReadConcern && useMajority
+        ? repl::ReadConcernLevel::kMajorityReadConcern
+        : repl::ReadConcernLevel::kLocalReadConcern;
+
     auto findStatus = _query(opCtx,
                              ReadPreferenceSetting(ReadPreference::Nearest, TagSet{}),
-                             repl::ReadConcernLevel::kLocalReadConcern,
+                             readConcern,
                              KeysCollectionDocument::ConfigNS,
                              queryBuilder.obj(),
                              BSON("expiresAt" << 1),
