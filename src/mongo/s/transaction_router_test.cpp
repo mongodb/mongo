@@ -222,7 +222,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        StartTxnShouldBeAttachedOnlyOnFirstStatementToParticipant) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -271,7 +271,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession, BasicStartTxnWithAtClusterTime) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -320,7 +320,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, BasicStartTxnWithAtClusterTime) 
 TEST_F(TransactionRouterTestWithDefaultSession, CannotContiueTxnWithoutStarting) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     ASSERT_THROWS_CODE(
         txnRouter.beginOrContinueTxn(
             operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue),
@@ -331,7 +331,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, CannotContiueTxnWithoutStarting)
 TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndReadConcern) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -416,7 +416,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
 TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -477,7 +477,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) 
 TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -519,7 +519,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
 TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardDoesNotGetSetForReadOnlyTransaction) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -532,12 +532,12 @@ TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardDoesNotGetSetForRea
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 
     // The recovery shard is not set if a participant responds with ok but that it is read-only.
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 
     // The recovery shard is not set even if more read-only participants respond.
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter.processParticipantResponse(shard2, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 
     txnRouter.beginOrContinueTxn(
@@ -561,13 +561,13 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        RecoveryShardIsSetToSingleParticipantIfSingleParticipantDoesWriteOnFirstStatement) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard1);
 }
@@ -576,7 +576,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        RecoveryShardIsSetToSingleParticipantIfSingleParticipantDoesWriteOnLaterStatement) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -584,11 +584,11 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
 
     // Response to first statement says read-only.
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 
     // Response to second statement says not read-only.
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard1);
 }
@@ -597,19 +597,19 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        RecoveryShardIsSetToSecondParticipantIfSecondParticipantIsFirstToDoAWrite) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Shard1's response says read-only.
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 
     // Shard2's response says not read-only.
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter.processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard2);
 }
@@ -618,14 +618,14 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        RecoveryShardIsResetIfRecoveryParticipantIsPendingAndPendingParticipantsAreCleared) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Shard1's response says not read-only.
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard1);
 
@@ -642,14 +642,14 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        RecoveryShardIsNotResetIfRecoveryParticipantIsNotPendingAndPendingParticipantsAreCleared) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Shard1's response says not read-only.
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard1);
 
@@ -661,7 +661,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     // Shard2 responds, it doesn't matter whether it's read-only, just that it's a pending
     // participant.
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter.processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard1);
 
@@ -678,14 +678,14 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardIsResetOnStartingNewTransaction) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Shard1's response says not read-only.
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard1);
 
@@ -700,7 +700,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardIsResetOnStartingNe
 TEST_F(TransactionRouterTestWithDefaultSession, DoesNotAttachTxnNumIfAlreadyThere) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -735,7 +735,7 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
              "invariant") {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -751,7 +751,7 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession, AttachTxnValidatesReadConcernIfAlreadyOnCmd) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -786,7 +786,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, AttachTxnValidatesReadConcernIfA
 TEST_F(TransactionRouterTestWithDefaultSession, CannotSpecifyReadConcernAfterFirstStatement) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -803,7 +803,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, PassesThroughNoReadConcernToPart
 
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -834,7 +834,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -864,7 +864,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RejectUnsupportedReadConcernLeve
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(readConcernLevel);
 
         TxnNumber txnNum{3};
-        auto& txnRouter(*TransactionRouter::get(operationContext()));
+        auto txnRouter = TransactionRouter::get(operationContext());
         ASSERT_THROWS_CODE(
             txnRouter.beginOrContinueTxn(
                 operationContext(), txnNum, TransactionRouter::TransactionActions::kStart),
@@ -879,7 +879,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RejectUnsupportedLevelsWithAfter
             repl::ReadConcernArgs(LogicalTime(Timestamp(10, 1)), readConcernLevel);
 
         TxnNumber txnNum{3};
-        auto& txnRouter(*TransactionRouter::get(operationContext()));
+        auto txnRouter = TransactionRouter::get(operationContext());
         ASSERT_THROWS_CODE(
             txnRouter.beginOrContinueTxn(
                 operationContext(), txnNum, TransactionRouter::TransactionActions::kStart),
@@ -894,7 +894,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RejectUnsupportedLevelsWithAfter
             repl::ReadConcernArgs(repl::OpTime(Timestamp(10, 1), 2), readConcernLevel);
 
         TxnNumber txnNum{3};
-        auto& txnRouter(*TransactionRouter::get(operationContext()));
+        auto txnRouter = TransactionRouter::get(operationContext());
         ASSERT_THROWS_CODE(
             txnRouter.beginOrContinueTxn(
                 operationContext(), txnNum, TransactionRouter::TransactionActions::kStart),
@@ -906,7 +906,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RejectUnsupportedLevelsWithAfter
 TEST_F(TransactionRouterTestWithDefaultSession, CannotCommitWithoutParticipantsOrRecoveryToken) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -946,7 +946,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        CommitTransactionWithNoParticipantsDoesNotSendCommit) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -967,13 +967,13 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        SendCommitDirectlyForSingleParticipantThatIsReadOnly) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
 
     TxnRecoveryToken recoveryToken;
     recoveryToken.setRecoveryShardId(shard1);
@@ -1003,13 +1003,13 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        SendCommitDirectlyForSingleParticipantThatDidAWrite) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
 
     TxnRecoveryToken recoveryToken;
     recoveryToken.setRecoveryShardId(shard1);
@@ -1039,15 +1039,15 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        SendCommitDirectlyForMultipleParticipantsThatAreAllReadOnly) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
-    txnRouter.processParticipantResponse(shard2, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
 
     TxnRecoveryToken recoveryToken;
     recoveryToken.setRecoveryShardId(shard1);
@@ -1088,15 +1088,15 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        SendCommitDirectlyToReadOnlyShardsThenWriteShardForMultipleParticipantsOnlyOneDidAWrite) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
-    txnRouter.processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
 
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
@@ -1139,15 +1139,15 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        SendCoordinateCommitForMultipleParticipantsMoreThanOneDidAWrite) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
-    txnRouter.processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
 
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
@@ -1196,13 +1196,13 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
 
     RouterOperationContextSession scopedSession(opCtx);
     auto txnRouter = TransactionRouter::get(opCtx);
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
 
     TxnRecoveryToken recoveryToken;
     recoveryToken.setRecoveryShardId(shard1);
 
     auto future =
-        launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
+        launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
@@ -1225,10 +1225,10 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
     // Sending commit with a recovery token again should cause the router to use the recovery path
     // again.
 
-    txnRouter->beginOrContinueTxn(
+    txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
 
-    future = launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
+    future = launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
@@ -1262,14 +1262,13 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     auto txnRouter = TransactionRouter::get(opCtx);
     // Simulate recovering a commit with a recovery token and no participants.
     {
-        txnRouter->beginOrContinueTxn(
-            opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+        txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
 
         TxnRecoveryToken recoveryToken;
         recoveryToken.setRecoveryShardId(shard1);
 
         auto future =
-            launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
+            launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(hostAndPort1, request.target);
@@ -1294,23 +1293,23 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     // should be sent with the correct participant list.
     {
         ++txnNum;
-        txnRouter->beginOrContinueTxn(
+        txnRouter.beginOrContinueTxn(
             operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
-        txnRouter->setDefaultAtClusterTime(operationContext());
+        txnRouter.setDefaultAtClusterTime(operationContext());
 
-        txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-        txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-        txnRouter->processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
-        txnRouter->processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+        txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+        txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
 
-        txnRouter->beginOrContinueTxn(
+        txnRouter.beginOrContinueTxn(
             operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
 
         TxnRecoveryToken recoveryToken;
         recoveryToken.setRecoveryShardId(shard1);
 
         auto future =
-            launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
+            launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(hostAndPort1, request.target);
@@ -1352,23 +1351,23 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     // Run a cross-shard transaction with two-phase commit. The commit should be sent with the
     // correct participant list.
     {
-        txnRouter->beginOrContinueTxn(
+        txnRouter.beginOrContinueTxn(
             operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
-        txnRouter->setDefaultAtClusterTime(operationContext());
+        txnRouter.setDefaultAtClusterTime(operationContext());
 
-        txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-        txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-        txnRouter->processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
-        txnRouter->processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+        txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+        txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+        txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
 
-        txnRouter->beginOrContinueTxn(
+        txnRouter.beginOrContinueTxn(
             operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
 
         TxnRecoveryToken recoveryToken;
         recoveryToken.setRecoveryShardId(shard1);
 
         auto future =
-            launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
+            launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(hostAndPort1, request.target);
@@ -1400,14 +1399,13 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     {
         ++txnNum;
 
-        txnRouter->beginOrContinueTxn(
-            opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+        txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
 
         TxnRecoveryToken recoveryToken;
         recoveryToken.setRecoveryShardId(shard1);
 
         auto future =
-            launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
+            launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(hostAndPort1, request.target);
@@ -1442,10 +1440,10 @@ TEST_F(TransactionRouterTest, CommitWithEmptyRecoveryToken) {
 
     RouterOperationContextSession scopedSession(opCtx);
     auto txnRouter = TransactionRouter::get(opCtx);
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
 
     TxnRecoveryToken recoveryToken;
-    ASSERT_THROWS_CODE(txnRouter->commitTransaction(operationContext(), recoveryToken),
+    ASSERT_THROWS_CODE(txnRouter.commitTransaction(operationContext(), recoveryToken),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
 }
@@ -1463,13 +1461,13 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithUnknownShard) {
 
     RouterOperationContextSession scopedSession(opCtx);
     auto txnRouter = TransactionRouter::get(opCtx);
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
 
     TxnRecoveryToken recoveryToken;
     recoveryToken.setRecoveryShardId(ShardId("magicShard"));
 
     auto future =
-        launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
+        launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
     ShardType shardType;
     shardType.setName(shard1.toString());
@@ -1484,7 +1482,7 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithUnknownShard) {
 TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -1534,7 +1532,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        CannotChangeAtClusterTimeAfterStatementThatSelectedIt) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -1597,7 +1595,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsClearsAllParticipants) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -1647,7 +1645,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsClearsAllParticipa
 TEST_F(TransactionRouterTestWithDefaultSession, CannotContinueOnSnapshotErrorAfterFirstCommand) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -1669,7 +1667,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, CannotContinueOnSnapshotErrorAft
 
 TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreatedAt) {
     TxnNumber txnNum{3};
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -1723,7 +1721,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        AllParticipantsAndCoordinatorClearedOnStaleErrorOnFirstCommand) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -1768,7 +1766,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession, OnlyNewlyCreatedParticipantsClearedOnStaleError) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -1812,7 +1810,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        RetriesCannotPickNewAtClusterTimeOnStatementAfterSelected) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
 
@@ -1866,7 +1864,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, WritesCanOnlyBeRetriedIfFirstOve
 
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -1904,11 +1902,11 @@ TEST_F(TransactionRouterTest, AbortThrowsIfNoParticipants) {
 
     RouterOperationContextSession scopedSession(opCtx);
     auto txnRouter = TransactionRouter::get(opCtx);
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
-    txnRouter->setDefaultAtClusterTime(operationContext());
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
 
     ASSERT_THROWS_CODE(
-        txnRouter->abortTransaction(opCtx), DBException, ErrorCodes::NoSuchTransaction);
+        txnRouter.abortTransaction(opCtx), DBException, ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(TransactionRouterTest, AbortForSingleParticipant) {
@@ -1922,11 +1920,11 @@ TEST_F(TransactionRouterTest, AbortForSingleParticipant) {
     RouterOperationContextSession scopedSession(opCtx);
     auto txnRouter = TransactionRouter::get(opCtx);
 
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
-    txnRouter->setDefaultAtClusterTime(operationContext());
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
 
-    auto future = launchAsync([&] { return txnRouter->abortTransaction(operationContext()); });
+    auto future = launchAsync([&] { return txnRouter.abortTransaction(operationContext()); });
 
     onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
@@ -1955,14 +1953,14 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipantsAllReturnSuccess) {
     RouterOperationContextSession scopedSession(opCtx);
     auto txnRouter = TransactionRouter::get(opCtx);
 
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
-    txnRouter->setDefaultAtClusterTime(operationContext());
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter->processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
-    txnRouter->processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
 
-    auto future = launchAsync([&] { return txnRouter->abortTransaction(operationContext()); });
+    auto future = launchAsync([&] { return txnRouter.abortTransaction(operationContext()); });
 
     std::map<HostAndPort, boost::optional<bool>> targets = {{hostAndPort1, true},
                                                             {hostAndPort2, {}}};
@@ -1998,16 +1996,16 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipantsSomeReturnNoSuchTransa
     RouterOperationContextSession scopedSession(opCtx);
     auto txnRouter = TransactionRouter::get(opCtx);
 
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
-    txnRouter->setDefaultAtClusterTime(operationContext());
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard3, {});
-    txnRouter->processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
-    txnRouter->processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
-    txnRouter->processParticipantResponse(shard3, kOkReadOnlyFalseResponse);
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, {});
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard3, kOkReadOnlyFalseResponse);
 
-    auto future = launchAsync([&] { return txnRouter->abortTransaction(operationContext()); });
+    auto future = launchAsync([&] { return txnRouter.abortTransaction(operationContext()); });
 
     std::map<HostAndPort, boost::optional<bool>> targets = {
         {hostAndPort1, true}, {hostAndPort2, {}}, {hostAndPort3, {}}};
@@ -2047,16 +2045,16 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipantsSomeReturnNetworkError
     RouterOperationContextSession scopedSession(opCtx);
     auto txnRouter = TransactionRouter::get(opCtx);
 
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
-    txnRouter->setDefaultAtClusterTime(operationContext());
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard3, {});
-    txnRouter->processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
-    txnRouter->processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
-    txnRouter->processParticipantResponse(shard3, kOkReadOnlyFalseResponse);
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, {});
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard3, kOkReadOnlyFalseResponse);
 
-    auto future = launchAsync([&] { return txnRouter->abortTransaction(operationContext()); });
+    auto future = launchAsync([&] { return txnRouter.abortTransaction(operationContext()); });
 
     std::map<HostAndPort, boost::optional<bool>> targets = {
         {hostAndPort1, true}, {hostAndPort2, {}}, {hostAndPort3, {}}};
@@ -2092,7 +2090,7 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipantsSomeReturnNetworkError
 TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNewParticipants) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -2151,11 +2149,11 @@ TEST_F(TransactionRouterTest, ImplicitAbortIsNoopWithNoParticipants) {
     RouterOperationContextSession scopedSession(opCtx);
     auto txnRouter = TransactionRouter::get(opCtx);
 
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
-    txnRouter->setDefaultAtClusterTime(operationContext());
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Should not throw.
-    txnRouter->implicitlyAbortTransaction(opCtx, kDummyStatus);
+    txnRouter.implicitlyAbortTransaction(opCtx, kDummyStatus);
 }
 
 TEST_F(TransactionRouterTest, ImplicitAbortForSingleParticipant) {
@@ -2169,12 +2167,12 @@ TEST_F(TransactionRouterTest, ImplicitAbortForSingleParticipant) {
     RouterOperationContextSession scopedSession(opCtx);
     auto txnRouter = TransactionRouter::get(opCtx);
 
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
-    txnRouter->setDefaultAtClusterTime(operationContext());
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
 
     auto future = launchAsync(
-        [&] { return txnRouter->implicitlyAbortTransaction(operationContext(), kDummyStatus); });
+        [&] { return txnRouter.implicitlyAbortTransaction(operationContext(), kDummyStatus); });
 
     onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
@@ -2202,13 +2200,13 @@ TEST_F(TransactionRouterTest, ImplicitAbortForMultipleParticipants) {
     RouterOperationContextSession scopedSession(opCtx);
     auto txnRouter = TransactionRouter::get(opCtx);
 
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
-    txnRouter->setDefaultAtClusterTime(operationContext());
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard2, {});
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
 
     auto future = launchAsync(
-        [&] { return txnRouter->implicitlyAbortTransaction(operationContext(), kDummyStatus); });
+        [&] { return txnRouter.implicitlyAbortTransaction(operationContext(), kDummyStatus); });
 
     std::map<HostAndPort, boost::optional<bool>> targets = {{hostAndPort1, true},
                                                             {hostAndPort2, {}}};
@@ -2243,12 +2241,12 @@ TEST_F(TransactionRouterTest, ImplicitAbortIgnoresErrors) {
     RouterOperationContextSession scopedSession(opCtx);
     auto txnRouter = TransactionRouter::get(opCtx);
 
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
-    txnRouter->setDefaultAtClusterTime(operationContext());
-    txnRouter->attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
 
     auto future = launchAsync(
-        [&] { return txnRouter->implicitlyAbortTransaction(operationContext(), kDummyStatus); });
+        [&] { return txnRouter.implicitlyAbortTransaction(operationContext(), kDummyStatus); });
 
     onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
@@ -2270,7 +2268,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        CannotContinueOnSnapshotOrStaleVersionErrorsWithoutFailpoint) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -2291,7 +2289,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 TEST_F(TransactionRouterTestWithDefaultSession, ContinuingTransactionPlacesItsReadConcernOnOpCtx) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -2308,7 +2306,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        SubsequentStatementCanSelectAtClusterTimeIfNotSelectedYet) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
 
@@ -2356,16 +2354,16 @@ TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernHasNoAtClu
     for (auto rcIt : supportedNonSnapshotRCLevels) {
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(rcIt.second);
 
-        auto& txnRouter(*TransactionRouter::get(operationContext()));
+        auto txnRouter = TransactionRouter::get(operationContext());
         txnRouter.beginOrContinueTxn(
             operationContext(), txnNum++, TransactionRouter::TransactionActions::kStart);
 
         // No atClusterTime is placed on the router by default.
-        ASSERT_FALSE(txnRouter.getAtClusterTime());
+        ASSERT_FALSE(txnRouter.mustUseAtClusterTime());
 
         // Can't compute and set an atClusterTime.
         txnRouter.setDefaultAtClusterTime(operationContext());
-        ASSERT_FALSE(txnRouter.getAtClusterTime());
+        ASSERT_FALSE(txnRouter.mustUseAtClusterTime());
 
         // Can't continue on snapshot errors.
         ASSERT_FALSE(txnRouter.canContinueOnSnapshotError());
@@ -2378,7 +2376,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     for (auto rcIt : supportedNonSnapshotRCLevels) {
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(rcIt.second);
 
-        auto& txnRouter(*TransactionRouter::get(operationContext()));
+        auto txnRouter = TransactionRouter::get(operationContext());
         txnRouter.beginOrContinueTxn(
             operationContext(), txnNum++, TransactionRouter::TransactionActions::kStart);
         txnRouter.setDefaultAtClusterTime(operationContext());
@@ -2415,7 +2413,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         repl::ReadConcernArgs::get(operationContext()) =
             repl::ReadConcernArgs(clusterTime, rcIt.second);
 
-        auto& txnRouter(*TransactionRouter::get(operationContext()));
+        auto txnRouter = TransactionRouter::get(operationContext());
         txnRouter.beginOrContinueTxn(
             operationContext(), txnNum++, TransactionRouter::TransactionActions::kStart);
         txnRouter.setDefaultAtClusterTime(operationContext());
@@ -2436,7 +2434,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernLevelsPres
     for (auto rcIt : supportedNonSnapshotRCLevels) {
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(opTime, rcIt.second);
 
-        auto& txnRouter(*TransactionRouter::get(operationContext()));
+        auto txnRouter = TransactionRouter::get(operationContext());
         txnRouter.beginOrContinueTxn(
             operationContext(), txnNum++, TransactionRouter::TransactionActions::kStart);
 
@@ -2456,7 +2454,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        AbortBetweenStatementRetriesIgnoresNoSuchTransaction) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
 
@@ -2486,7 +2484,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        AbortBetweenStatementRetriesUsesIdempotentRetryPolicy) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
 
@@ -2518,7 +2516,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        AbortBetweenStatementRetriesFailsWithNoSuchTransactionOnUnexpectedErrors) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
 
@@ -2550,7 +2548,7 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
              "Participant should exist if processing participant response") {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -2560,20 +2558,20 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, {});
 
     // Simulate response from some participant not in the list.
-    txnRouter.processParticipantResponse(shard3, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard3, kOkReadOnlyTrueResponse);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantResponseDoesNotUpdateParticipantIfResponseStatusIsNotOk) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.processParticipantResponse(shard1, BSON("ok" << 0));
+    txnRouter.processParticipantResponse(operationContext(), shard1, BSON("ok" << 0));
     ASSERT(TransactionRouter::Participant::ReadOnly::kUnset ==
            txnRouter.getParticipant(shard1)->readOnly);
 }
@@ -2582,13 +2580,13 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantResponseMarksParticipantAsReadOnlyIfResponseSaysReadOnlyTrue) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
 
     const auto participant = txnRouter.getParticipant(shard1);
 
@@ -2596,10 +2594,10 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     // Further responses with readOnly: true do not change the participant's readOnly field.
 
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
     ASSERT(TransactionRouter::Participant::ReadOnly::kReadOnly == participant->readOnly);
 
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
     ASSERT(TransactionRouter::Participant::ReadOnly::kReadOnly == participant->readOnly);
 }
 
@@ -2607,23 +2605,23 @@ TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantResponseMarksParticipantAsNotReadOnlyIfFirstResponseSaysReadOnlyFalse) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
 
     const auto participant = txnRouter.getParticipant(shard1);
     ASSERT(TransactionRouter::Participant::ReadOnly::kNotReadOnly == participant->readOnly);
 
     // Further responses with readOnly: false do not change the participant's readOnly field.
 
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT(TransactionRouter::Participant::ReadOnly::kNotReadOnly == participant->readOnly);
 
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT(TransactionRouter::Participant::ReadOnly::kNotReadOnly == participant->readOnly);
 }
 
@@ -2632,7 +2630,7 @@ TEST_F(
     ProcessParticipantResponseUpdatesParticipantToReadOnlyFalseIfLaterResponseSaysReadOnlyFalse) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -2640,23 +2638,25 @@ TEST_F(
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
 
     // First response says readOnly: true.
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
 
-    const auto participant = txnRouter.getParticipant(shard1);
+    const auto oldParticipant = txnRouter.getParticipant(shard1);
 
-    ASSERT(TransactionRouter::Participant::ReadOnly::kReadOnly == participant->readOnly);
+    ASSERT(TransactionRouter::Participant::ReadOnly::kReadOnly == oldParticipant->readOnly);
 
     // Later response says readOnly: false.
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
 
-    ASSERT(TransactionRouter::Participant::ReadOnly::kNotReadOnly == participant->readOnly);
+    const auto newParticipant = txnRouter.getParticipant(shard1);
+
+    ASSERT(TransactionRouter::Participant::ReadOnly::kNotReadOnly == newParticipant->readOnly);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantResponseThrowsIfParticipantClaimsToChangeFromReadOnlyFalseToReadOnlyTrue) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -2664,23 +2664,24 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
 
     // First response says readOnly: false.
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
 
     const auto participant = txnRouter.getParticipant(shard1);
 
     ASSERT(TransactionRouter::Participant::ReadOnly::kNotReadOnly == participant->readOnly);
 
     // Later response says readOnly: true.
-    ASSERT_THROWS_CODE(txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse),
-                       AssertionException,
-                       51113);
+    ASSERT_THROWS_CODE(
+        txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse),
+        AssertionException,
+        51113);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
        ProcessParticipantResponseThrowsIfParticipantReturnsErrorThenSuccessOnLaterStatement) {
     TxnNumber txnNum{3};
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
@@ -2688,7 +2689,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
 
     // First response is an error.
-    txnRouter.processParticipantResponse(shard1, BSON("ok" << 0));
+    txnRouter.processParticipantResponse(operationContext(), shard1, BSON("ok" << 0));
     const auto participant = txnRouter.getParticipant(shard1);
     ASSERT(TransactionRouter::Participant::ReadOnly::kUnset == participant->readOnly);
 
@@ -2703,12 +2704,14 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
 
     // The router should throw regardless of whether the response says readOnly true or false.
-    ASSERT_THROWS_CODE(txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse),
-                       AssertionException,
-                       51112);
-    ASSERT_THROWS_CODE(txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse),
-                       AssertionException,
-                       51112);
+    ASSERT_THROWS_CODE(
+        txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse),
+        AssertionException,
+        51112);
+    ASSERT_THROWS_CODE(
+        txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse),
+        AssertionException,
+        51112);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
@@ -2716,7 +2719,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     TxnNumber txnNum{3};
     auto opCtx = operationContext();
 
-    auto& txnRouter(*TransactionRouter::get(opCtx));
+    auto txnRouter = TransactionRouter::get(opCtx);
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
 
     txnRouter.setDefaultAtClusterTime(opCtx);
@@ -2732,7 +2735,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     future.default_timed_get();
 
     // The participant's response metadata should not be processed since abort has been initiated.
-    txnRouter.processParticipantResponse(shard1, BSON("ok" << 0));
+    txnRouter.processParticipantResponse(operationContext(), shard1, BSON("ok" << 0));
     ASSERT(TransactionRouter::Participant::ReadOnly::kUnset ==
            txnRouter.getParticipant(shard1)->readOnly);
 }
@@ -2742,7 +2745,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     TxnNumber txnNum{3};
     auto opCtx = operationContext();
 
-    auto& txnRouter(*TransactionRouter::get(opCtx));
+    auto txnRouter = TransactionRouter::get(opCtx);
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
 
     txnRouter.setDefaultAtClusterTime(opCtx);
@@ -2754,7 +2757,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     future.default_timed_get();
 
     // The participant's response metadata should not be processed since abort has been initiated.
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
     ASSERT(TransactionRouter::Participant::ReadOnly::kUnset ==
            txnRouter.getParticipant(shard1)->readOnly);
 }
@@ -2764,14 +2767,14 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     TxnNumber txnNum{3};
     auto opCtx = operationContext();
 
-    auto& txnRouter(*TransactionRouter::get(opCtx));
+    auto txnRouter = TransactionRouter::get(opCtx);
     txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
 
     txnRouter.setDefaultAtClusterTime(opCtx);
     txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, {});
 
     // Process !readonly response to set participant state.
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT(TransactionRouter::Participant::ReadOnly::kNotReadOnly ==
            txnRouter.getParticipant(shard1)->readOnly);
 
@@ -2784,7 +2787,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     future.default_timed_get();
 
     // Processing readonly response should not throw since commit has been initiated.
-    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
 }
 
 // Begins a transaction with snapshot level read concern and sets a default cluster time.
@@ -2800,7 +2803,7 @@ protected:
     void setUp() override {
         TransactionRouterTestWithDefaultSession::setUp();
 
-        auto& txnRouter(*TransactionRouter::get(operationContext()));
+        auto txnRouter = TransactionRouter::get(operationContext());
         txnRouter.beginOrContinueTxn(
             operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kStart);
         txnRouter.setDefaultAtClusterTime(operationContext());
@@ -2808,7 +2811,7 @@ protected:
 };
 
 TEST_F(TransactionRouterTestWithDefaultSessionAndStartedSnapshot, AddAtClusterTimeNormal) {
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,
                                                     BSON("aggregate"
@@ -2824,7 +2827,7 @@ TEST_F(TransactionRouterTestWithDefaultSessionAndStartedSnapshot,
        AddingAtClusterTimeOverwritesExistingAfterClusterTime) {
     const Timestamp existingAfterClusterTime(1, 1);
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    auto txnRouter = TransactionRouter::get(operationContext());
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,
                                                     BSON("aggregate"
@@ -2857,8 +2860,8 @@ protected:
         return dynamic_cast<TickSourceMock<Microseconds>*>(getServiceContext()->getTickSource());
     }
 
-    TransactionRouter& txnRouter() {
-        return *TransactionRouter::get(operationContext());
+    TransactionRouter::Router txnRouter() {
+        return TransactionRouter::get(operationContext());
     }
 
     void beginTxnWithDefaultTxnNumber() {
@@ -2909,7 +2912,8 @@ protected:
 
     void explicitAbortInProgress() {
         txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-        txnRouter().processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+        txnRouter().processParticipantResponse(
+            operationContext(), shard1, kOkReadOnlyFalseResponse);
 
         startCapturingLogMessages();
         auto future = launchAsync([&] { txnRouter().abortTransaction(operationContext()); });
@@ -2920,7 +2924,8 @@ protected:
 
     void implicitAbortInProgress() {
         txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-        txnRouter().processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+        txnRouter().processParticipantResponse(
+            operationContext(), shard1, kOkReadOnlyFalseResponse);
 
         startCapturingLogMessages();
         auto future = launchAsync(
@@ -2932,7 +2937,8 @@ protected:
 
     void runCommit(StatusWith<BSONObj> swRes, bool expectRetries = false) {
         txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-        txnRouter().processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+        txnRouter().processParticipantResponse(
+            operationContext(), shard1, kOkReadOnlyFalseResponse);
 
         startCapturingLogMessages();
         auto future = launchAsync([&] {
@@ -2987,7 +2993,7 @@ protected:
 
     void runSingleShardCommit() {
         txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-        txnRouter().processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+        txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
 
         startCapturingLogMessages();
         auto future = launchAsync(
@@ -2999,9 +3005,9 @@ protected:
 
     void runReadOnlyCommit() {
         txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-        txnRouter().processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+        txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
         txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-        txnRouter().processParticipantResponse(shard2, kOkReadOnlyTrueResponse);
+        txnRouter().processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
 
         startCapturingLogMessages();
         auto future = launchAsync(
@@ -3014,9 +3020,10 @@ protected:
 
     void runSingleWriteShardCommit() {
         txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-        txnRouter().processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+        txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
         txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-        txnRouter().processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+        txnRouter().processParticipantResponse(
+            operationContext(), shard2, kOkReadOnlyFalseResponse);
 
         startCapturingLogMessages();
         auto future = launchAsync(
@@ -3029,9 +3036,11 @@ protected:
 
     void runTwoPhaseCommit() {
         txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-        txnRouter().processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+        txnRouter().processParticipantResponse(
+            operationContext(), shard1, kOkReadOnlyFalseResponse);
         txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-        txnRouter().processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+        txnRouter().processParticipantResponse(
+            operationContext(), shard2, kOkReadOnlyFalseResponse);
 
         startCapturingLogMessages();
         auto future = launchAsync(
@@ -3069,7 +3078,8 @@ protected:
     auto beginAndPauseCommit() {
         // Commit after targeting one shard so the commit has to do work and can be paused.
         txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-        txnRouter().processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+        txnRouter().processParticipantResponse(
+            operationContext(), shard1, kOkReadOnlyFalseResponse);
         auto future = launchAsync(
             [&] { txnRouter().commitTransaction(operationContext(), kDummyRecoveryToken); });
 
@@ -3853,15 +3863,15 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalRequestsTargeted) {
 
     // Increases each time transaction fields are attached.
     txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter().processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getTotalRequestsTargeted());
 
     txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter().processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT_EQUALS(2L, routerTxnMetrics()->getTotalRequestsTargeted());
 
     txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter().processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+    txnRouter().processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
     ASSERT_EQUALS(3L, routerTxnMetrics()->getTotalRequestsTargeted());
 }
 
@@ -3901,11 +3911,11 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalParticipantsAtCommit) {
     ASSERT_EQUALS(0L, routerTxnMetrics()->getTotalParticipantsAtCommit());
 
     txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, {});
-    txnRouter().processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
+    txnRouter().processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     ASSERT_EQUALS(0L, routerTxnMetrics()->getTotalParticipantsAtCommit());
 
     txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, {});
-    txnRouter().processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+    txnRouter().processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
     ASSERT_EQUALS(0L, routerTxnMetrics()->getTotalParticipantsAtCommit());
 
     // Increases after commit begins, before it ends.

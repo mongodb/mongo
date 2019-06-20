@@ -563,13 +563,12 @@ StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(
     // Return the latest routing table if not running in a transaction with snapshot level read
     // concern.
     auto txnRouter = TransactionRouter::get(opCtx);
-    if (!txnRouter || !txnRouter->getAtClusterTime()) {
+    if (!txnRouter || !txnRouter.mustUseAtClusterTime()) {
         return catalogCache->getCollectionRoutingInfo(opCtx, nss);
     }
 
-    auto atClusterTime = txnRouter->getAtClusterTime();
-    return catalogCache->getCollectionRoutingInfoAt(
-        opCtx, nss, atClusterTime->getTime().asTimestamp());
+    auto atClusterTime = txnRouter.getSelectedAtClusterTime();
+    return catalogCache->getCollectionRoutingInfoAt(opCtx, nss, atClusterTime.asTimestamp());
 }
 
 }  // namespace mongo

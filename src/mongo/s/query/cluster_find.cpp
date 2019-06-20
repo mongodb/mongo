@@ -452,15 +452,15 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             catalogCache->onStaleShardVersion(std::move(routingInfo));
 
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
-                if (!txnRouter->canContinueOnStaleShardOrDbError(kFindCmdName)) {
+                if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName)) {
                     throw;
                 }
 
                 // Reset the default global read timestamp so the retry's routing table reflects the
                 // chunk placement after the refresh (no-op if the transaction is not running with
                 // snapshot read concern).
-                txnRouter->onStaleShardOrDbError(opCtx, kFindCmdName, ex.toStatus());
-                txnRouter->setDefaultAtClusterTime(opCtx);
+                txnRouter.onStaleShardOrDbError(opCtx, kFindCmdName, ex.toStatus());
+                txnRouter.setDefaultAtClusterTime(opCtx);
             }
         }
     }
