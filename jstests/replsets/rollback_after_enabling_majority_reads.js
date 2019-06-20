@@ -39,7 +39,7 @@
     rollbackTest.restartNode(0, 15, {enableMajorityReadConcern: "true"});
     const replSetGetStatusResponse =
         assert.commandWorked(rollbackNode.adminCommand({replSetGetStatus: 1}));
-    assert.eq(replSetGetStatusResponse.lastStableCheckpointTimestamp,
+    assert.eq(replSetGetStatusResponse.lastStableRecoveryTimestamp,
               operationTime,
               tojson(replSetGetStatusResponse));
 

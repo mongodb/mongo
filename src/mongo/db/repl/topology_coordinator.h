@@ -302,11 +302,6 @@ public:
         const OpTimeAndWallTime readConcernMajorityOpTime;
         const BSONObj initialSyncStatus;
 
-        // boost::none if the storage engine does not support RTT, or if it does but does not
-        // persist data to necessitate taking checkpoints. Timestamp::min() if a checkpoint is yet
-        // to be taken.
-        const boost::optional<Timestamp> lastStableCheckpointTimestampDeprecated;
-
         // boost::none if the storage engine does not support recovery to a timestamp.
         // Timestamp::min() if a stable recovery timestamp is yet to be taken.
         //

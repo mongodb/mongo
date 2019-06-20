@@ -1440,8 +1440,6 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     const BSONObj& initialSyncStatus = rsStatusArgs.initialSyncStatus;
     const boost::optional<Timestamp>& lastStableRecoveryTimestamp =
         rsStatusArgs.lastStableRecoveryTimestamp;
-    const boost::optional<Timestamp>& lastStableCheckpointTimestampDeprecated =
-        rsStatusArgs.lastStableCheckpointTimestampDeprecated;
 
     if (_selfIndex == -1) {
         // We're REMOVED or have an invalid config
@@ -1630,10 +1628,6 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     if (lastStableRecoveryTimestamp) {
         // Only include this field if the storage engine supports RTT.
         response->append("lastStableRecoveryTimestamp", *lastStableRecoveryTimestamp);
-    }
-    if (lastStableCheckpointTimestampDeprecated) {
-        // Only include this field if the storage engine supports RTT and persists data.
-        response->append("lastStableCheckpointTimestamp", *lastStableCheckpointTimestampDeprecated);
     }
 
     if (!initialSyncStatus.isEmpty()) {

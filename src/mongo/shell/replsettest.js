@@ -1352,16 +1352,6 @@ var ReplSetTest = function(opts) {
                           " does not have a stable recovery timestamp yet.");
                     return false;
                 }
-
-                // The `lastStableCheckpointTimestamp` field was added in v4.0, then deprecated and
-                // replaced in v4.2 with `lastStableRecoveryTimestamp`. So we check it, too, for
-                // backwards compatibility with v4.0 mongods.
-                if (res.hasOwnProperty("lastStableCheckpointTimestamp") &&
-                    res.lastStableCheckpointTimestamp.getTime() === 0) {
-                    print("AwaitLastStableRecoveryTimestamp: " + node.host +
-                          " does not have a stable recovery (checkpoint) timestamp yet.");
-                    return false;
-                }
             }
 
             return true;

@@ -338,11 +338,6 @@ public:
         return boost::none;
     }
 
-    boost::optional<Timestamp> getLastStableCheckpointTimestampDeprecated(
-        ServiceContext* serviceCtx) const override {
-        return boost::none;
-    }
-
     Timestamp getPointInTimeReadTimestamp(OperationContext* opCtx) const override {
         return {};
     }

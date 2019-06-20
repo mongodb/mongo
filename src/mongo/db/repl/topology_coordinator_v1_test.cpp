@@ -1695,7 +1695,6 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
             static_cast<unsigned>(durationCount<Seconds>(uptimeSecs)),
             {readConcernMajorityOpTime, readConcernMajorityWallTime},
             initialSyncStatus,
-            lastStableCheckpointTimestampDeprecated,
             lastStableRecoveryTimestamp},
         &statusBuilder,
         &resultStatus);
@@ -1707,8 +1706,6 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(setName, rsStatus["set"].String());
     ASSERT_EQUALS(curTime.asInt64(), rsStatus["date"].Date().asInt64());
     ASSERT_EQUALS(lastStableRecoveryTimestamp, rsStatus["lastStableRecoveryTimestamp"].timestamp());
-    ASSERT_EQUALS(lastStableCheckpointTimestampDeprecated,
-                  rsStatus["lastStableCheckpointTimestamp"].timestamp());
     ASSERT_FALSE(rsStatus.hasField("electionTime"));
     ASSERT_FALSE(rsStatus.hasField("pingMs"));
     {
@@ -1744,7 +1741,6 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(timeoutTime, member0Status["lastHeartbeat"].date());
     ASSERT_EQUALS(Date_t(), member0Status["lastHeartbeatRecv"].date());
     ASSERT_FALSE(member0Status.hasField("lastStableRecoveryTimestamp"));
-    ASSERT_FALSE(member0Status.hasField("lastStableCheckpointTimestamp"));
     ASSERT_FALSE(member0Status.hasField("electionTime"));
     ASSERT_TRUE(member0Status.hasField("pingMs"));
 
@@ -1764,7 +1760,6 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(Date_t(), member1Status["lastHeartbeatRecv"].date());
     ASSERT_EQUALS("", member1Status["lastHeartbeatMessage"].str());
     ASSERT_FALSE(member1Status.hasField("lastStableRecoveryTimestamp"));
-    ASSERT_FALSE(member1Status.hasField("lastStableCheckpointTimestamp"));
     ASSERT_FALSE(member1Status.hasField("electionTime"));
     ASSERT_TRUE(member1Status.hasField("pingMs"));
 
@@ -1780,7 +1775,6 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_FALSE(member2Status.hasField("lastHearbeat"));
     ASSERT_FALSE(member2Status.hasField("lastHearbeatRecv"));
     ASSERT_FALSE(member2Status.hasField("lastStableRecoveryTimestamp"));
-    ASSERT_FALSE(member2Status.hasField("lastStableCheckpointTimestamp"));
     ASSERT_FALSE(member2Status.hasField("electionTime"));
     ASSERT_TRUE(member2Status.hasField("pingMs"));
 
@@ -1799,7 +1793,6 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
                   selfStatus["optimeDate"].Date());
     ASSERT_FALSE(selfStatus.hasField("lastStableRecoveryTimestamp"));
-    ASSERT_FALSE(selfStatus.hasField("lastStableCheckpointTimestamp"));
     ASSERT_EQUALS(electionTime, selfStatus["electionTime"].timestamp());
     ASSERT_FALSE(selfStatus.hasField("pingMs"));
 
@@ -1823,7 +1816,6 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     unittest::log() << rsStatus;
     ASSERT_EQUALS(setName, rsStatus["set"].String());
     ASSERT_FALSE(rsStatus.hasField("lastStableRecoveryTimestamp"));
-    ASSERT_FALSE(rsStatus.hasField("lastStableCheckpointTimestamp"));
 }
 
 TEST_F(TopoCoordTest, ReplSetGetStatusWriteMajorityDifferentFromMajorityVoteCount) {

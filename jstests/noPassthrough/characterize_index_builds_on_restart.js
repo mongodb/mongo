@@ -98,13 +98,13 @@
                     "failpoint. Mimicing shutdown error code.",
                 4);
 
-            // Wait until the secondary has a checkpoint timestamp beyond the index oplog entry. On
+            // Wait until the secondary has a recovery timestamp beyond the index oplog entry. On
             // restart, replication recovery will not replay the createIndex oplog entries.
             jsTest.log("Waiting for unfinished index build to be in checkpoint.");
             assert.soon(() => {
                 let replSetStatus = assert.commandWorked(
                     secondaryDB.getSiblingDB("admin").runCommand({replSetGetStatus: 1}));
-                if (replSetStatus.lastStableCheckpointTimestamp >= res.operationTime)
+                if (replSetStatus.lastStableRecoveryTimestamp >= res.operationTime)
                     return true;
             });
         } finally {

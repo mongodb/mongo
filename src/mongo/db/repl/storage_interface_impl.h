@@ -190,9 +190,6 @@ public:
     boost::optional<Timestamp> getLastStableRecoveryTimestamp(
         ServiceContext* serviceCtx) const override;
 
-    boost::optional<Timestamp> getLastStableCheckpointTimestampDeprecated(
-        ServiceContext* serviceCtx) const override;
-
     Timestamp getPointInTimeReadTimestamp(OperationContext* opCtx) const override;
 
 private:

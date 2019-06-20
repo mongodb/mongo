@@ -439,18 +439,6 @@ public:
         ServiceContext* serviceCtx) const = 0;
 
     /**
-     * DEPRECATED. Use getLastStableRecoveryTimestamp instead!
-     *
-     * Returns a timestamp that is guaranteed to be persisted on disk in a checkpoint. Returns
-     * `Timestamp::min()` if no stable checkpoint has been taken. Returns boost::none if
-     * `supportsRecoverToStableTimestamp` returns false or if this is not a persisted data engine.
-     *
-     * TODO: delete this in v4.4 (SERVER-36194).
-     */
-    virtual boost::optional<Timestamp> getLastStableCheckpointTimestampDeprecated(
-        ServiceContext* serviceCtx) const = 0;
-
-    /**
      * Returns the read timestamp of the recovery unit of the given operation context.
      */
     virtual Timestamp getPointInTimeReadTimestamp(OperationContext* opCtx) const = 0;
