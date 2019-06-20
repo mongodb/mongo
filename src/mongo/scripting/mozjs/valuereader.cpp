@@ -73,7 +73,8 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
                 JS::AutoValueArray<2> args(_context);
 
                 ValueReader(_context, args[0]).fromStringData(elem.codeWScopeCode());
-                ValueReader(_context, args[1]).fromBSON(elem.codeWScopeObject(), nullptr, readOnly);
+                ValueReader(_context, args[1])
+                    .fromBSON(elem.codeWScopeObject().getOwned(), nullptr, readOnly);
 
                 scope->getProto<CodeInfo>().newInstance(args, _value);
             } else {

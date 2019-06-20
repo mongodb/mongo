@@ -285,7 +285,7 @@ BSONObj AWSKMSService::encryptDataKey(ConstDataRange cdr, StringData keyId) {
     AwsMasterKey masterKey;
     masterKey.setKey(keyId);
     masterKey.setRegion(parseCMK(keyId));
-    masterKey.setEndpoint(_server.toString());
+    masterKey.setEndpoint(boost::optional<StringData>(_server.toString()));
 
     AwsMasterKeyAndMaterial keyAndMaterial;
     keyAndMaterial.setKeyMaterial(dataKey);

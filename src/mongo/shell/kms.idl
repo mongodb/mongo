@@ -123,6 +123,7 @@ structs:
             type: string
           endpoint:
             type: string
+            optional: true
 
     awsMasterKeyAndMaterial:
         description: "AWS KMS Key Material Description"
