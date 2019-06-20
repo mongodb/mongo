@@ -88,8 +88,8 @@ LEARN MONGODB
 
 LICENSE
 
-  MongoDB is free and open-source. Versions released prior to October 16,
-  2018 are published under the AGPL. All versions released after October
-  16, 2018, including patch fixes for prior versions, are published under
-  the Server Side Public License (SSPL) v1. See individual files for
+  MongoDB is free and the source is available. Versions released prior to
+  October 16, 2018 are published under the AGPL. All versions released after
+  October 16, 2018, including patch fixes for prior versions, are published
+  under the Server Side Public License (SSPL) v1. See individual files for
   details.
