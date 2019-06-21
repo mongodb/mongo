@@ -80,15 +80,8 @@ void RecoveryUnit::commitUnitOfWork() {
         DEV invariant(_mergeBase == _workingCopy);
     }
 
-    try {
-        _setState(State::kCommitting);
-        for (auto& change : _changes)
-            change->commit(boost::none);
-        _changes.clear();
-    } catch (...) {
-        std::terminate();
-    }
-
+    _setState(State::kCommitting);
+    commitRegisteredChanges(boost::none);
     _setState(State::kInactive);
 }
 
@@ -106,11 +99,6 @@ void RecoveryUnit::abandonSnapshot() {
     invariant(!_inUnitOfWork(), toString(_getState()));
     _forked = false;
     _dirty = false;
-}
-
-void RecoveryUnit::registerChange(Change* change) {
-    invariant(_inUnitOfWork(), toString(_getState()));
-    _changes.push_back(std::unique_ptr<Change>{change});
 }
 
 SnapshotId RecoveryUnit::getSnapshotId() const {
@@ -139,20 +127,7 @@ void RecoveryUnit::_abort() {
     _forked = false;
     _dirty = false;
     _setState(State::kAborting);
-
-    try {
-        for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
-             it != end;
-             ++it) {
-            Change* change = it->get();
-            LOG(2) << "CUSTOM ROLLBACK " << redact(demangleName(typeid(*change)));
-            change->rollback();
-        }
-        _changes.clear();
-    } catch (...) {
-        std::terminate();
-    }
-
+    abortRegisteredChanges();
     _setState(State::kInactive);
 }
 

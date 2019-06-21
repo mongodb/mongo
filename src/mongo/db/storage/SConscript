@@ -49,6 +49,16 @@ env.Library(
     )
 
 env.Library(
+    target='recovery_unit_base',
+    source=[
+        'recovery_unit.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        ],
+    )
+
+env.Library(
     target='key_string',
     source=[
         'key_string.cpp',

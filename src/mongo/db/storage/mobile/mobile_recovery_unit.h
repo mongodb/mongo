@@ -58,8 +58,6 @@ public:
 
     void abandonSnapshot() override;
 
-    void registerChange(Change* change) override;
-
     SnapshotId getSnapshotId() const override {
         return SnapshotId();
     }
@@ -98,9 +96,6 @@ private:
     std::string _path;
     MobileSessionPool* _sessionPool;
     std::unique_ptr<MobileSession> _session;
-
-    using Changes = std::vector<std::unique_ptr<Change>>;
-    Changes _changes;
 };
 
 }  // namespace mongo

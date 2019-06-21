@@ -114,6 +114,8 @@ class RecoveryUnit {
     RecoveryUnit& operator=(const RecoveryUnit&) = delete;
 
 public:
+    void commitRegisteredChanges(boost::optional<Timestamp> commitTimestamp);
+    void abortRegisteredChanges();
     virtual ~RecoveryUnit() {}
 
     /**
@@ -444,7 +446,7 @@ public:
      * The registerChange() method may only be called when a WriteUnitOfWork is active, and
      * may not be called during commit or rollback.
      */
-    virtual void registerChange(Change* change) = 0;
+    virtual void registerChange(Change* change);
 
     /**
      * Registers a callback to be called if the current WriteUnitOfWork rolls back.
@@ -596,6 +598,8 @@ protected:
     }
 
 private:
+    typedef std::vector<std::unique_ptr<Change>> Changes;
+    Changes _changes;
     State _state = State::kInactive;
 };
 

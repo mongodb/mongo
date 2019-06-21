@@ -179,60 +179,36 @@ void WiredTigerRecoveryUnit::_commit() {
     // be boost::none and we'll set the commit time to that.
     auto commitTime = _commitTimestamp.isNull() ? _lastTimestampSet : _commitTimestamp;
 
-    try {
-        bool notifyDone = !_prepareTimestamp.isNull();
-        if (_session && _isActive()) {
-            _txnClose(true);
-        }
-        _setState(State::kCommitting);
+    bool notifyDone = !_prepareTimestamp.isNull();
+    if (_session && _isActive()) {
+        _txnClose(true);
+    }
+    _setState(State::kCommitting);
 
-        if (MONGO_FAIL_POINT(WTAlwaysNotifyPrepareConflictWaiters)) {
-            notifyDone = true;
-        }
-
-        if (notifyDone) {
-            _sessionCache->notifyPreparedUnitOfWorkHasCommittedOrAborted();
-        }
-
-        for (Changes::const_iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
-            (*it)->commit(commitTime);
-        }
-        _changes.clear();
-    } catch (...) {
-        std::terminate();
+    if (MONGO_FAIL_POINT(WTAlwaysNotifyPrepareConflictWaiters)) {
+        notifyDone = true;
     }
 
+    if (notifyDone) {
+        _sessionCache->notifyPreparedUnitOfWorkHasCommittedOrAborted();
+    }
+
+    commitRegisteredChanges(commitTime);
     _setState(State::kInactive);
 }
 
 void WiredTigerRecoveryUnit::_abort() {
-    try {
-        bool notifyDone = !_prepareTimestamp.isNull();
-        if (_session && _isActive()) {
-            _txnClose(false);
-        }
-        _setState(State::kAborting);
+    bool notifyDone = !_prepareTimestamp.isNull();
+    if (_session && _isActive()) {
+        _txnClose(false);
+    }
+    _setState(State::kAborting);
 
-        if (MONGO_FAIL_POINT(WTAlwaysNotifyPrepareConflictWaiters)) {
-            notifyDone = true;
-        }
-
-        if (notifyDone) {
-            _sessionCache->notifyPreparedUnitOfWorkHasCommittedOrAborted();
-        }
-
-        for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
-             it != end;
-             ++it) {
-            Change* change = it->get();
-            LOG(2) << "CUSTOM ROLLBACK " << redact(demangleName(typeid(*change)));
-            change->rollback();
-        }
-        _changes.clear();
-    } catch (...) {
-        std::terminate();
+    if (notifyDone || MONGO_FAIL_POINT(WTAlwaysNotifyPrepareConflictWaiters)) {
+        _sessionCache->notifyPreparedUnitOfWorkHasCommittedOrAborted();
     }
 
+    abortRegisteredChanges();
     _setState(State::kInactive);
 }
 
@@ -291,11 +267,6 @@ bool WiredTigerRecoveryUnit::waitUntilUnjournaledWritesDurable(bool stableCheckp
     // true will lock in stable writes to unjournaled tables.
     _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
     return true;
-}
-
-void WiredTigerRecoveryUnit::registerChange(Change* change) {
-    invariant(_inUnitOfWork(), toString(_getState()));
-    _changes.push_back(std::unique_ptr<Change>{change});
 }
 
 void WiredTigerRecoveryUnit::assertInActiveTxn() const {

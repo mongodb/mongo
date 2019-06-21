@@ -57,8 +57,6 @@ public:
 
     virtual void abandonSnapshot() override;
 
-    virtual void registerChange(Change* change) override;
-
     virtual SnapshotId getSnapshotId() const override;
 
     virtual void setOrderedCommit(bool orderedCommit) override;
@@ -92,9 +90,6 @@ private:
 
     bool _forked = false;
     bool _dirty = false;  // Whether or not we have written to this _workingCopy.
-
-    typedef std::vector<std::unique_ptr<Change>> Changes;
-    Changes _changes;
 };
 
 }  // namespace biggie

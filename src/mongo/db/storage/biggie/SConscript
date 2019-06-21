@@ -18,6 +18,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
         '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
+        '$BUILD_DIR/mongo/db/storage/recovery_unit_base',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/storage/key_string',

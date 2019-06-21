@@ -111,8 +111,6 @@ public:
 
     bool waitUntilUnjournaledWritesDurable(bool stableCheckpoint = true) override;
 
-    void registerChange(Change* change) override;
-
     void abandonSnapshot() override;
     void preallocateSnapshot() override;
 
@@ -255,8 +253,6 @@ private:
     std::unique_ptr<Timer> _timer;
     bool _isOplogReader = false;
     boost::optional<int64_t> _oplogVisibleTs = boost::none;
-    typedef std::vector<std::unique_ptr<Change>> Changes;
-    Changes _changes;
 };
 
 }  // namespace mongo

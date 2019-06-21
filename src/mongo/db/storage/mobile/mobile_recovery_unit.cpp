@@ -68,16 +68,7 @@ void MobileRecoveryUnit::_commit() {
         _txnClose(true);
     }
     _setState(State::kCommitting);
-
-    for (auto& change : _changes) {
-        try {
-            change->commit(boost::none);
-        } catch (...) {
-            std::terminate();
-        }
-    }
-    _changes.clear();
-
+    commitRegisteredChanges(boost::none);
     _setState(State::kInactive);
 }
 
@@ -86,17 +77,9 @@ void MobileRecoveryUnit::_abort() {
         _txnClose(false);
     }
     _setState(State::kAborting);
+    abortRegisteredChanges();
 
-    for (auto it = _changes.rbegin(); it != _changes.rend(); ++it) {
-        try {
-            (*it)->rollback();
-        } catch (...) {
-            std::terminate();
-        }
-    }
-    _changes.clear();
     invariant(!_isActive(), toString(_getState()));
-
     _setState(State::kInactive);
 }
 
@@ -174,11 +157,6 @@ void MobileRecoveryUnit::abandonSnapshot() {
         _txnClose(false);
     }
     _setState(State::kInactive);
-}
-
-void MobileRecoveryUnit::registerChange(Change* change) {
-    invariant(_inUnitOfWork(), toString(_getState()));
-    _changes.push_back(std::unique_ptr<Change>{change});
 }
 
 MobileSession* MobileRecoveryUnit::getSession(OperationContext* opCtx, bool readOnly) {
