@@ -386,6 +386,8 @@ selector:
   - cannot_create_unique_index_when_using_hashed_shard_key
   - assumes_balancer_off
   - requires_fastcount
+  # Retrying a query can change whether a plan cache entry is active.
+  - inspects_whether_plan_cache_entry_is_active
 
 executor:
   archive:

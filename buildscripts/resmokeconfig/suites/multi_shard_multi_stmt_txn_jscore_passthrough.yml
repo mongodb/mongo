@@ -367,6 +367,8 @@ selector:
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
+  # Retrying a query can change whether a plan cache entry is active.
+  - inspects_whether_plan_cache_entry_is_active
 
 executor:
   archive:
