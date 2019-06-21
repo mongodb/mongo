@@ -118,25 +118,9 @@ Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
         return Message();
     }
 
-    auto reply = OpMsg::parse(dbresponse->response);
-
-    // Check for a non-OK response.
-    auto resOk = reply.body["ok"].number();
-    if (resOk != 1.0) {
-        return Message();
-    }
-
-    // Check the validity of the 'cursor' object in the response.
-    auto cursorObj = reply.body.getObjectField("cursor");
-    if (cursorObj.isEmpty()) {
-        return Message();
-    }
-
     // A returned cursor id of '0' indicates that the cursor is exhausted and so the exhaust stream
     // should be terminated. Also make sure the cursor namespace is valid.
-    auto cursorId = cursorObj.getField("id").numberLong();
-    auto cursorNs = cursorObj.getField("ns").str();
-    if (cursorId == 0 || cursorNs.empty()) {
+    if (dbresponse->exhaustCursorId == 0 || dbresponse->exhaustNS.empty()) {
         return Message();
     }
 
