@@ -1464,6 +1464,7 @@ functions:
 
     - command: generate.tasks
       params:
+        optional: true
         files:
           - src/generated_resmoke_config/*.json
 
