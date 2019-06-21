@@ -1,11 +1,18 @@
 /**
  * Test that cached plans which use wildcard indexes work.
  *
- * This test attempts to perform queries and introspect the server's plan cache entries using the
- * $planCacheStats aggregation source. Both operations must be routed to the primary, and the latter
- * only supports 'local' readConcern.
- * @tags: [assumes_read_preference_unchanged, assumes_read_concern_unchanged,
- *         does_not_support_stepdowns, assumes_balancer_off]
+ * @tags: [
+ *   # This test attempts to perform queries and introspect the server's plan cache entries using
+ *   # the $planCacheStats aggregation source. Both operations must be routed to the primary, and
+ *   # the latter only supports 'local' readConcern.
+ *   assumes_read_preference_unchanged,
+ *   assumes_read_concern_unchanged,
+ *   does_not_support_stepdowns,
+ *   # If the balancer is on and chunks are moved, the plan cache can have entries with isActive:
+ *   # false when the test assumes they are true because the query has already been run many times.
+ *   assumes_balancer_off,
+ *   inspects_whether_plan_cache_entry_is_active,
+ * ]
  */
 (function() {
     "use strict";
