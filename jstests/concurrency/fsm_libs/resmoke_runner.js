@@ -100,8 +100,7 @@
 
             // Await replication after running the $config.setup() function when stepdowns are
             // permitted to ensure its effects aren't rolled back.
-            if (cluster.isReplication() &&
-                typeof executionOptions.stepdownPermittedFile === 'string') {
+            if (cluster.isReplication() && executionOptions.stepdownFiles !== undefined) {
                 cluster.awaitReplication();
             }
 
@@ -113,8 +112,8 @@
             // Indicate that the stepdown thread can run. It is unnecessary for the stepdown thread
             // to indicate that it is going to start running because it will eventually after the
             // worker threads have started.
-            if (typeof executionOptions.stepdownPermittedFile === 'string') {
-                writeFile(executionOptions.stepdownPermittedFile, '');
+            if (executionOptions.stepdownFiles !== undefined) {
+                writeFile(executionOptions.stepdownFiles.permitted, '');
             }
 
             // Since the worker threads may be running with causal consistency enabled, we set the
@@ -161,14 +160,14 @@
                 // signal that it has stopped.
                 //
                 // Signal to the stepdown thread to stop stepping down the cluster.
-                if (typeof executionOptions.stepdownPermittedFile === 'string' &&
-                    typeof executionOptions.steppingDownFile === 'string') {
-                    removeFile(executionOptions.stepdownPermittedFile);
-                    // Wait for the steppingDownFile to be removed by the stepdown thread.
+                if (executionOptions.stepdownFiles !== undefined) {
+                    writeFile(executionOptions.stepdownFiles.idleRequest, '');
+
+                    // Wait for the acknowledgement file to be created by the stepdown thread.
                     assert.soonNoExcept(function() {
-                        if (ls().indexOf(executionOptions.steppingDownFile) === -1) {
-                            return true;
-                        }
+                        // The cat() function will throw an exception if the file isn't found.
+                        cat(executionOptions.stepdownFiles.idleAck);
+                        return true;
                     }, "stepdown still in progress");
                 }
             }
@@ -245,13 +244,11 @@
     // The stepdown file names need to match the same construction as found in
     // buildscripts/resmokelib/testing/hooks/stepdown.py.
     if (TestData.useStepdownPermittedFile) {
-        executionOptions.stepdownPermittedFile =
-            resmokeDbPathPrefix + '/concurrency_sharded_stepdown_stepdown_permitted';
-    }
-
-    if (TestData.useSteppingDownFile) {
-        executionOptions.steppingDownFile =
-            resmokeDbPathPrefix + '/concurrency_sharded_stepdown_stepping_down';
+        executionOptions.stepdownFiles = {
+            permitted: resmokeDbPathPrefix + '/permitted',
+            idleRequest: resmokeDbPathPrefix + '/idle_request',
+            idleAck: resmokeDbPathPrefix + '/idle_ack',
+        };
     }
 
     if (Object.keys(sessionOptions).length > 0 || TestData.runningWithSessions) {
