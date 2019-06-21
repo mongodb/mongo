@@ -89,7 +89,18 @@ public:
         if (_uassertInHandler)
             uassert(40469, "Synthetic uassert failure", false);
 
-        return DbResponse{res};
+        DbResponse dbResponse;
+        if (OpMsg::isFlagSet(request, OpMsg::kExhaustSupported)) {
+            auto reply = OpMsg::parse(res);
+            auto cursorObj = reply.body.getObjectField("cursor");
+            if (reply.body["ok"].trueValue() && !cursorObj.isEmpty()) {
+                dbResponse.exhaustCursorId = cursorObj.getField("id").numberLong();
+                dbResponse.exhaustNS = cursorObj.getField("ns").String();
+            }
+        }
+        dbResponse.response = res;
+
+        return dbResponse;
     }
 
     void endAllSessions(transport::Session::TagMask tags) override {}
