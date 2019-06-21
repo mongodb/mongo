@@ -337,8 +337,8 @@ var runner = (function() {
 
             // Special case message when threads all have the same trace
             if (numUniqueTraces === 1) {
-                return pluralize('thread', stackTraces.length) + ' threw\n\n' +
-                    indent(uniqueTraces[0].value, 8);
+                return pluralize('thread', stackTraces.length) + ' with tids ' +
+                    JSON.stringify(stackTids) + ' threw\n\n' + indent(uniqueTraces[0].value, 8);
             }
 
             var summary = pluralize('exception', stackTraces.length) + ' were thrown, ' +
