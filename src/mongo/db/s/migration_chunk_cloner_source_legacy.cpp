@@ -103,7 +103,7 @@ const BSONObj& getDocumentKeyFromReplOperation(repl::ReplOperation replOperation
     MONGO_UNREACHABLE;
 }
 
-const char getOpCharForCrudOpType(repl::OpTypeEnum opType) {
+char getOpCharForCrudOpType(repl::OpTypeEnum opType) {
     switch (opType) {
         case repl::OpTypeEnum::kInsert:
             return 'i';
