@@ -1,6 +1,7 @@
 // Tests the replSetStepUp command.
 
 load("jstests/replsets/rslib.js");
+load('jstests/replsets/libs/election_metrics.js');
 
 (function() {
     "use strict";
@@ -44,23 +45,29 @@ load("jstests/replsets/rslib.js");
     // Make sure the step up succeeded.
     assert.eq(secondary, rst.getPrimary());
 
-    // Verifies that the given election reason counter is incremented in the way we expect.
-    function verifyServerStatusChange(initialStatus, newStatus, fieldName, expectedIncrement) {
-        assert.eq(
-            initialStatus.electionMetrics[fieldName]["called"] + expectedIncrement,
-            newStatus.electionMetrics[fieldName]["called"],
-            "expected the 'called' field of " + fieldName + " to increase by " + expectedIncrement);
-    }
-
     const newSecondaryStatus = assert.commandWorked(secondary.adminCommand({serverStatus: 1}));
 
-    // Check that the 'called' field of stepUpCmd has been incremented in serverStatus, and that it
-    // has not been incremented in any of the other election reason counters.
-    verifyServerStatusChange(initialSecondaryStatus, newSecondaryStatus, "stepUpCmd", 1);
-    verifyServerStatusChange(initialSecondaryStatus, newSecondaryStatus, "priorityTakeover", 0);
-    verifyServerStatusChange(initialSecondaryStatus, newSecondaryStatus, "catchUpTakeover", 0);
-    verifyServerStatusChange(initialSecondaryStatus, newSecondaryStatus, "electionTimeout", 0);
-    verifyServerStatusChange(initialSecondaryStatus, newSecondaryStatus, "freezeTimeout", 0);
+    // Check that both the 'called' and 'successful' fields of stepUpCmd have been incremented in
+    // serverStatus, and that they have not been incremented in any of the other election reason
+    // counters.
+    verifyServerStatusElectionReasonCounterChange(
+        initialSecondaryStatus.electionMetrics, newSecondaryStatus.electionMetrics, "stepUpCmd", 1);
+    verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
+                                                  newSecondaryStatus.electionMetrics,
+                                                  "priorityTakeover",
+                                                  0);
+    verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
+                                                  newSecondaryStatus.electionMetrics,
+                                                  "catchUpTakeover",
+                                                  0);
+    verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
+                                                  newSecondaryStatus.electionMetrics,
+                                                  "electionTimeout",
+                                                  0);
+    verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
+                                                  newSecondaryStatus.electionMetrics,
+                                                  "freezeTimeout",
+                                                  0);
 
     rst.stopSet();
 })();

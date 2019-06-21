@@ -1,10 +1,10 @@
 /**
- * Tests the format of electionMetrics serverStatus section.
+ * Tests the format of 'electionMetrics' serverStatus section.
  */
 (function() {
     "use strict";
 
-    // Verifies that the electionMetrics serverStatus section has the given field.
+    // Verifies that the 'electionMetrics' serverStatus section has the given field.
     function verifyElectionMetricsField(serverStatusResponse, fieldName) {
         assert(serverStatusResponse.electionMetrics.hasOwnProperty(fieldName),
                () => (`The 'electionMetrics' serverStatus section did not have the '${fieldName}' \
@@ -12,7 +12,7 @@ field: \n${tojson(serverStatusResponse.electionMetrics)}`));
         return serverStatusResponse.electionMetrics[fieldName];
     }
 
-    // Verifies that the electionMetrics serverStatus section has a field for the given election
+    // Verifies that the 'electionMetrics' serverStatus section has a field for the given election
     // reason counter and that it has the subfields 'called' and 'successful'.
     function verifyElectionReasonCounterFields(serverStatusResponse, fieldName) {
         const field = verifyElectionMetricsField(serverStatusResponse, fieldName);
@@ -24,7 +24,7 @@ not have the 'called' field: \n${tojson(field)}`));
 not have the 'successful' field: \n${tojson(field)}`));
     }
 
-    // Verifies the format of the electionMetrics serverStatus section.
+    // Verifies the format of the 'electionMetrics' serverStatus section.
     function verifyElectionMetricsSSS(serverStatusResponse) {
         assert(serverStatusResponse.hasOwnProperty("electionMetrics"),
                () => (`Expected the serverStatus response to have an 'electionMetrics' field:

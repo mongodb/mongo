@@ -14,6 +14,7 @@
     'use strict';
 
     load('jstests/replsets/rslib.js');
+    load('jstests/replsets/libs/election_metrics.js');
 
     var name = 'catchup_takeover_two_nodes_ahead';
     var replSet = new ReplSetTest({name: name, nodes: 5});
@@ -29,6 +30,8 @@
     var primary = replSet.getPrimary();
     var writeConcern = {writeConcern: {w: 2, wtimeout: replSet.kDefaultTimeoutMS}};
     assert.writeOK(primary.getDB(name).bar.insert({x: 100}, writeConcern));
+
+    const initialPrimaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
 
     // Write something so that node 0 is ahead of node 1.
     stopServerReplication(nodes[1]);
@@ -51,6 +54,14 @@
     // Confirm that the most up-to-date node becomes primary
     // after the default catchup delay.
     replSet.waitForState(0, ReplSetTest.State.PRIMARY, 60 * 1000);
+
+    // Check that both the 'called' and 'successful' fields of the 'catchUpTakeover' election reason
+    // counter have been incremented in serverStatus.
+    const newPrimaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
+    verifyServerStatusElectionReasonCounterChange(initialPrimaryStatus.electionMetrics,
+                                                  newPrimaryStatus.electionMetrics,
+                                                  "catchUpTakeover",
+                                                  1);
 
     // Wait until the old primary steps down so the connections won't be closed.
     replSet.waitForState(2, ReplSetTest.State.SECONDARY, replSet.kDefaultTimeoutMS);

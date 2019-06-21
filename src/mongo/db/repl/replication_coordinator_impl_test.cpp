@@ -2319,15 +2319,21 @@ TEST_F(ReplCoordTest, SingleNodeReplSetUnfreeze) {
     getNet()->exitNetwork();
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
-    // Check that the numFreezeTimeoutsCalled election metric has been incremented, and that none
-    // of the metrics that track the number of elections called for other reasons has been
-    // incremented.
+    // Check that the numFreezeTimeoutsCalled and the numFreezeTimeoutsSuccessful election metrics
+    // have been incremented, and that none of the metrics that track the number of elections called
+    // or successful for other reasons has been incremented.
     ServiceContext* svcCtx = getServiceContext();
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumStepUpCmdsCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumPriorityTakeoversCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumCatchUpTakeoversCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumElectionTimeoutsCalled_forTesting());
     ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumFreezeTimeoutsCalled_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumStepUpCmdsSuccessful_forTesting());
+    ASSERT_EQUALS(0,
+                  ReplicationMetrics::get(svcCtx).getNumPriorityTakeoversSuccessful_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumCatchUpTakeoversSuccessful_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumElectionTimeoutsSuccessful_forTesting());
+    ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumFreezeTimeoutsSuccessful_forTesting());
 }
 
 TEST_F(ReplCoordTest, NodeBecomesPrimaryAgainWhenStepDownTimeoutExpiresInASingleNodeSet) {
@@ -2344,15 +2350,21 @@ TEST_F(ReplCoordTest, NodeBecomesPrimaryAgainWhenStepDownTimeoutExpiresInASingle
     auto opCtx = makeOperationContext();
     runSingleNodeElection(opCtx.get());
 
-    // Check that the numElectionTimeoutsCalled election metric has been incremented, and that none
-    // of the metrics that track the number of elections called for other reasons has been
-    // incremented.
+    // Check that the numElectionTimeoutsCalled and the numElectionTimeoutsSuccessful election
+    // metrics have been incremented, and that none of the metrics that track the number of
+    // elections called or successful for other reasons has been incremented.
     ServiceContext* svcCtx = getServiceContext();
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumStepUpCmdsCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumPriorityTakeoversCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumCatchUpTakeoversCalled_forTesting());
     ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumElectionTimeoutsCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumFreezeTimeoutsCalled_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumStepUpCmdsSuccessful_forTesting());
+    ASSERT_EQUALS(0,
+                  ReplicationMetrics::get(svcCtx).getNumPriorityTakeoversSuccessful_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumCatchUpTakeoversSuccessful_forTesting());
+    ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumElectionTimeoutsSuccessful_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumFreezeTimeoutsSuccessful_forTesting());
 
     getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
     getNet()->enterNetwork();  // Must do this before inspecting the topocoord
@@ -2369,15 +2381,22 @@ TEST_F(ReplCoordTest, NodeBecomesPrimaryAgainWhenStepDownTimeoutExpiresInASingle
     getNet()->exitNetwork();
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
-    // Check that the numFreezeTimeoutsCalled election metric has been incremented, and that none
-    // of the metrics that track the number of elections called for other reasons has been
-    // incremented. When a stepdown timeout expires in a single node replica set, an election is
-    // called for the same reason as is used when a freeze timeout expires.
+    // Check that the numFreezeTimeoutsCalled and the numFreezeTimeoutsSuccessful election metrics
+    // have been incremented, and that none of the metrics that track the number of elections called
+    // or successful for other reasons has been incremented. When a stepdown timeout expires in a
+    // single node replica set, an election is called for the same reason as is used when a freeze
+    // timeout expires.
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumStepUpCmdsCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumPriorityTakeoversCalled_forTesting());
     ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumCatchUpTakeoversCalled_forTesting());
     ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumElectionTimeoutsCalled_forTesting());
     ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumFreezeTimeoutsCalled_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumStepUpCmdsSuccessful_forTesting());
+    ASSERT_EQUALS(0,
+                  ReplicationMetrics::get(svcCtx).getNumPriorityTakeoversSuccessful_forTesting());
+    ASSERT_EQUALS(0, ReplicationMetrics::get(svcCtx).getNumCatchUpTakeoversSuccessful_forTesting());
+    ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumElectionTimeoutsSuccessful_forTesting());
+    ASSERT_EQUALS(1, ReplicationMetrics::get(svcCtx).getNumFreezeTimeoutsSuccessful_forTesting());
 }
 
 TEST_F(
