@@ -77,6 +77,10 @@ structs:
                 type: ElectionReasonCounter
                 default: "ElectionReasonCounter()"
                 non_const_getter: true
+            numStepDownsCausedByHigherTerm:
+                description: "Number of times this node stepped down because it saw a higher term"
+                type: long
+                default: 0
 
     ElectionCandidateMetrics:
         description: "Stores metrics that are specific to the last election in which the node was a
