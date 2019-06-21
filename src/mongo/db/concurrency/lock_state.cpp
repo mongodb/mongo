@@ -963,11 +963,20 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
         waitTime = (totalBlockTime < timeout) ? std::min(timeout - totalBlockTime, MaxWaitTime)
                                               : Milliseconds(0);
 
-        uassert(ErrorCodes::LockTimeout,
-                str::stream() << "Unable to acquire lock '" << resId.toString() << "' within "
-                              << timeout
-                              << "' milliseconds.",
-                waitTime > Milliseconds(0));
+        // Check if the lock acquisition has timed out. If we have an operation context and client
+        // we can provide additional diagnostics data.
+        if (waitTime == Milliseconds(0)) {
+            std::string timeoutMessage = str::stream() << "Unable to acquire " << modeName(mode)
+                                                       << " lock on '" << resId.toString()
+                                                       << "' within " << timeout << ".";
+            if (opCtx && opCtx->getClient()) {
+                timeoutMessage = str::stream()
+                    << timeoutMessage << " opId: " << opCtx->getOpID()
+                    << ", op: " << opCtx->getClient()->desc()
+                    << ", connId: " << opCtx->getClient()->getConnectionId() << ".";
+            }
+            uasserted(ErrorCodes::LockTimeout, timeoutMessage);
+        }
     }
 
     invariant(result == LOCK_OK);

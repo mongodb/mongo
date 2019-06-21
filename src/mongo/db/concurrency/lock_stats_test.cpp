@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-class LockStatsTest : public unittest::Test, public ScopedGlobalServiceContextForTest {};
+class LockStatsTest : public ServiceContextTest {};
 
 TEST_F(LockStatsTest, NoWait) {
     const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.NoWait"));
@@ -64,16 +64,18 @@ TEST_F(LockStatsTest, Wait) {
     LockerForTests locker(MODE_IX);
     locker.lock(resId, MODE_X);
 
+    auto opCtx = makeOperationContext();
+
     {
         // This will block
         LockerForTests lockerConflict(MODE_IX);
-        ASSERT_EQUALS(LOCK_WAITING, lockerConflict.lockBegin(nullptr, resId, MODE_S));
+        ASSERT_EQUALS(LOCK_WAITING, lockerConflict.lockBegin(opCtx.get(), resId, MODE_S));
 
         // Sleep 1 millisecond so the wait time passes
-        ASSERT_THROWS_CODE(
-            lockerConflict.lockComplete(resId, MODE_S, Date_t::now() + Milliseconds(5)),
-            AssertionException,
-            ErrorCodes::LockTimeout);
+        ASSERT_THROWS_CODE(lockerConflict.lockComplete(
+                               opCtx.get(), resId, MODE_S, Date_t::now() + Milliseconds(5)),
+                           AssertionException,
+                           ErrorCodes::LockTimeout);
     }
 
     // Make sure that the waits/blocks are non-zero
@@ -114,11 +116,14 @@ TEST_F(LockStatsTest, Subtraction) {
     LockerForTests locker(MODE_IX);
     locker.lock(resId, MODE_X);
 
+    auto opCtx = makeOperationContext();
+
     {
         LockerForTests lockerConflict(MODE_IX);
-        ASSERT_THROWS_CODE(lockerConflict.lock(resId, MODE_S, Date_t::now() + Milliseconds(5)),
-                           AssertionException,
-                           ErrorCodes::LockTimeout);
+        ASSERT_THROWS_CODE(
+            lockerConflict.lock(opCtx.get(), resId, MODE_S, Date_t::now() + Milliseconds(5)),
+            AssertionException,
+            ErrorCodes::LockTimeout);
     }
 
     SingleThreadedLockStats stats;
@@ -129,9 +134,10 @@ TEST_F(LockStatsTest, Subtraction) {
 
     {
         LockerForTests lockerConflict(MODE_IX);
-        ASSERT_THROWS_CODE(lockerConflict.lock(resId, MODE_S, Date_t::now() + Milliseconds(5)),
-                           AssertionException,
-                           ErrorCodes::LockTimeout);
+        ASSERT_THROWS_CODE(
+            lockerConflict.lock(opCtx.get(), resId, MODE_S, Date_t::now() + Milliseconds(5)),
+            AssertionException,
+            ErrorCodes::LockTimeout);
     }
 
     SingleThreadedLockStats stats2;

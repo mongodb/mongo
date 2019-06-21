@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-class LockerImplTest : public unittest::Test, public ScopedGlobalServiceContextForTest {};
+class LockerImplTest : public ServiceContextTest {};
 
 TEST_F(LockerImplTest, LockNoConflict) {
     const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
@@ -93,8 +93,11 @@ TEST_F(LockerImplTest, ConflictWithTimeout) {
 
     LockerImpl locker2;
     locker2.lockGlobal(MODE_IX);
-    ASSERT_THROWS_CODE(
-        locker2.lock(resId, MODE_S, Date_t::now()), AssertionException, ErrorCodes::LockTimeout);
+
+    auto opCtx = makeOperationContext();
+    ASSERT_THROWS_CODE(locker2.lock(opCtx.get(), resId, MODE_S, Date_t::now()),
+                       AssertionException,
+                       ErrorCodes::LockTimeout);
 
     ASSERT(locker2.getLockMode(resId) == MODE_NONE);
 
@@ -116,7 +119,8 @@ TEST_F(LockerImplTest, ConflictUpgradeWithTimeout) {
     locker2.lock(resId, MODE_S);
 
     // Try upgrading locker 1, which should block and timeout
-    ASSERT_THROWS_CODE(locker1.lock(resId, MODE_X, Date_t::now() + Milliseconds(1)),
+    auto opCtx = makeOperationContext();
+    ASSERT_THROWS_CODE(locker1.lock(opCtx.get(), resId, MODE_X, Date_t::now() + Milliseconds(1)),
                        AssertionException,
                        ErrorCodes::LockTimeout);
 
@@ -879,7 +883,8 @@ TEST_F(LockerImplTest, OverrideLockRequestTimeout) {
 
     // locker2's attempt to acquire FirstDB with unlimited wait time should timeout after 1000
     // milliseconds and throw because _maxLockRequestTimeout is set to 1000 milliseconds.
-    ASSERT_THROWS_CODE(locker2.lock(resIdFirstDB, MODE_X, Date_t::max()),
+    auto opCtx = makeOperationContext();
+    ASSERT_THROWS_CODE(locker2.lock(opCtx.get(), resIdFirstDB, MODE_X, Date_t::max()),
                        AssertionException,
                        ErrorCodes::LockTimeout);
 
@@ -915,7 +920,8 @@ TEST_F(LockerImplTest, DoNotWaitForLockAcquisition) {
 
     // locker2's attempt to acquire FirstDB with unlimited wait time should fail immediately and
     // throw because _maxLockRequestTimeout was set to 0.
-    ASSERT_THROWS_CODE(locker2.lock(resIdFirstDB, MODE_X, Date_t::max()),
+    auto opCtx = makeOperationContext();
+    ASSERT_THROWS_CODE(locker2.lock(opCtx.get(), resIdFirstDB, MODE_X, Date_t::max()),
                        AssertionException,
                        ErrorCodes::LockTimeout);
 
