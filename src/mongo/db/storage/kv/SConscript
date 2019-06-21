@@ -14,29 +14,6 @@ env.Library(
 
 # Should not be referenced outside this SConscript file.
 env.Library(
-    target='kv_engine_core',
-    source=[
-        'kv_catalog.cpp',
-        'kv_collection_catalog_entry.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/index/index_descriptor',
-        '$BUILD_DIR/mongo/db/index_names',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        'kv_drop_pending_ident_reaper',
-        'kv_prefix',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/disable_index_spec_namespace_generation',
-    ],
-)
-
-# Should not be referenced outside this SConscript file.
-env.Library(
     target='kv_drop_pending_ident_reaper',
     source=['kv_drop_pending_ident_reaper.cpp'],
     LIBDEPS=[
@@ -46,46 +23,24 @@ env.Library(
     ],
 )
 
-# Should not be referenced outside this SConscript file.
-env.Library(
-    target='storage_engine',
-    source=[
-        'storage_engine_impl.cpp',
-        'temporary_kv_record_store.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/catalog_control',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        'kv_drop_pending_ident_reaper',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/logical_clock',
-        '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
-    ],
-)
-
 env.Library(
     target='kv_engine_test_harness',
     source=[
-        'kv_catalog_feature_tracker_test.cpp',
+        'durable_catalog_feature_tracker_test.cpp',
         'kv_engine_test_harness.cpp',
         'kv_engine_timestamps_test.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_impl',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'kv_prefix',
-        'kv_engine_core',
-        ],
-    )
+    ],
+)
 
 env.CppUnitTest(
     target='kv_drop_pending_ident_reaper_test',
@@ -109,8 +64,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
         '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
-        'kv_engine_core',
-        'storage_engine',
+        '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authmocks'
@@ -130,9 +84,11 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
+        '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
+        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
         '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
+        '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
-        'kv_engine_core',
-        'storage_engine',
+        'kv_drop_pending_ident_reaper',
     ],
 )

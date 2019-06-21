@@ -37,13 +37,12 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/durable_catalog_feature_tracker.h"
 #include "mongo/db/storage/journal_listener.h"
-#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
-#include "mongo/db/storage/kv/storage_engine_interface.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_engine_interface.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
@@ -52,7 +51,7 @@
 
 namespace mongo {
 
-class KVCatalog;
+class DurableCatalogImpl;
 class KVEngine;
 
 struct StorageEngineOptions {
@@ -324,8 +323,8 @@ public:
     std::string getFilesystemPathForDb(const std::string& dbName) const override;
 
     /**
-     * When loading after an unclean shutdown, this performs cleanup on the KVCatalog and unsets the
-     * startingAfterUncleanShutdown decoration on the global ServiceContext.
+     * When loading after an unclean shutdown, this performs cleanup on the DurableCatalogImpl and
+     * unsets the startingAfterUncleanShutdown decoration on the global ServiceContext.
      */
     void loadCatalog(OperationContext* opCtx) final;
 
@@ -356,8 +355,8 @@ private:
 
     /**
      * When called in a repair context (_options.forRepair=true), attempts to recover a collection
-     * whose entry is present in the KVCatalog, but missing from the KVEngine. Returns an error
-     * Status if called outside of a repair context or the implementation of
+     * whose entry is present in the DurableCatalogImpl, but missing from the KVEngine. Returns an
+     * error Status if called outside of a repair context or the implementation of
      * KVEngine::recoverOrphanedIdent returns an error other than DataModifiedByRepair.
      *
      * Returns Status::OK if the collection was recovered in the KVEngine and a new record store was
@@ -395,7 +394,7 @@ private:
     Timestamp _initialDataTimestamp = Timestamp::kAllowUnstableCheckpointsSentinel;
 
     std::unique_ptr<RecordStore> _catalogRecordStore;
-    std::unique_ptr<KVCatalog> _catalog;
+    std::unique_ptr<DurableCatalogImpl> _catalog;
 
     // Flag variable that states if the storage engine is in backup mode.
     bool _inBackupMode = false;

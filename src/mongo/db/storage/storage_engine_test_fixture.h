@@ -35,7 +35,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/storage_engine_impl.h"
+#include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 
 namespace mongo {
@@ -158,7 +158,7 @@ public:
     }
 
     Status removeEntry(OperationContext* opCtx, StringData ns, DurableCatalog* catalog) {
-        return dynamic_cast<KVCatalog*>(catalog)->_removeEntry(opCtx, NamespaceString(ns));
+        return dynamic_cast<DurableCatalogImpl*>(catalog)->_removeEntry(opCtx, NamespaceString(ns));
     }
 
     StorageEngine* _storageEngine;
@@ -178,4 +178,4 @@ public:
         }
     }
 };
-}
+}  // namespace mongo

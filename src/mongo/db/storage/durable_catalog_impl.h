@@ -48,20 +48,20 @@ class OperationContext;
 class RecordStore;
 class StorageEngineInterface;
 
-class KVCatalog : public DurableCatalog {
+class DurableCatalogImpl : public DurableCatalog {
 public:
     class FeatureTracker;
 
     /**
      * The RecordStore must be thread-safe, in particular with concurrent calls to
-     * RecordStore::find, updateRecord, insertRecord, deleteRecord and dataFor. The KVCatalog does
-     * not utilize Cursors and those methods may omit further protection.
+     * RecordStore::find, updateRecord, insertRecord, deleteRecord and dataFor. The
+     * DurableCatalogImpl does not utilize Cursors and those methods may omit further protection.
      */
-    KVCatalog(RecordStore* rs,
-              bool directoryPerDb,
-              bool directoryForIndexes,
-              StorageEngineInterface* engine);
-    ~KVCatalog();
+    DurableCatalogImpl(RecordStore* rs,
+                       bool directoryPerDb,
+                       bool directoryForIndexes,
+                       StorageEngineInterface* engine);
+    ~DurableCatalogImpl();
 
     void init(OperationContext* opCtx);
 
@@ -234,7 +234,7 @@ private:
     class RemoveIndexChange;
 
     friend class StorageEngineImpl;
-    friend class KVCatalogTest;
+    friend class DurableCatalogImplTest;
     friend class StorageEngineTest;
 
     BSONObj _findEntry(OperationContext* opCtx,
@@ -279,10 +279,10 @@ private:
     NSToIdentMap _idents;
     mutable stdx::mutex _identsLock;
 
-    // Manages the feature document that may be present in the KVCatalog. '_featureTracker' is
-    // guaranteed to be non-null after KVCatalog::init() is called.
+    // Manages the feature document that may be present in the DurableCatalogImpl. '_featureTracker'
+    // is guaranteed to be non-null after DurableCatalogImpl::init() is called.
     std::unique_ptr<FeatureTracker> _featureTracker;
 
     StorageEngineInterface* const _engine;
 };
-}
+}  // namespace mongo

@@ -32,7 +32,7 @@
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
+#include "mongo/db/storage/durable_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/stdx/memory.h"
@@ -41,12 +41,12 @@
 namespace mongo {
 namespace {
 
-using NonRepairableFeature = KVCatalog::FeatureTracker::NonRepairableFeature;
-using NonRepairableFeatureMask = KVCatalog::FeatureTracker::NonRepairableFeatureMask;
-using RepairableFeature = KVCatalog::FeatureTracker::RepairableFeature;
-using RepairableFeatureMask = KVCatalog::FeatureTracker::RepairableFeatureMask;
+using NonRepairableFeature = DurableCatalogImpl::FeatureTracker::NonRepairableFeature;
+using NonRepairableFeatureMask = DurableCatalogImpl::FeatureTracker::NonRepairableFeatureMask;
+using RepairableFeature = DurableCatalogImpl::FeatureTracker::RepairableFeature;
+using RepairableFeatureMask = DurableCatalogImpl::FeatureTracker::RepairableFeatureMask;
 
-class KVCatalogFeatureTrackerTest : public unittest::Test {
+class DurableCatalogFeatureTrackerTest : public unittest::Test {
 public:
     static const NonRepairableFeature kNonRepairableFeature1 =
         static_cast<NonRepairableFeature>(1 << 0);
@@ -63,7 +63,7 @@ public:
 
     static const RepairableFeature kRepairableFeature3 = static_cast<RepairableFeature>(1 << 2);
 
-    KVCatalogFeatureTrackerTest() : _helper(KVHarnessHelper::create()) {}
+    DurableCatalogFeatureTrackerTest() : _helper(KVHarnessHelper::create()) {}
 
     std::unique_ptr<OperationContext> newOperationContext() {
         return stdx::make_unique<OperationContextNoop>(_helper->getEngine()->newRecoveryUnit());
@@ -80,12 +80,13 @@ public:
             wuow.commit();
         }
 
-        _catalog = stdx::make_unique<KVCatalog>(_rs.get(), false, false, nullptr);
+        _catalog = std::make_unique<DurableCatalogImpl>(_rs.get(), false, false, nullptr);
         _catalog->init(opCtx.get());
 
         {
             WriteUnitOfWork wuow(opCtx.get());
-            _featureTracker = KVCatalog::FeatureTracker::create(opCtx.get(), _catalog.get());
+            _featureTracker =
+                DurableCatalogImpl::FeatureTracker::create(opCtx.get(), _catalog.get());
             wuow.commit();
         }
     }
@@ -94,24 +95,24 @@ public:
         return _rs.get();
     }
 
-    KVCatalog::FeatureTracker* getFeatureTracker() const {
+    DurableCatalogImpl::FeatureTracker* getFeatureTracker() const {
         return _featureTracker.get();
     }
 
 private:
     std::unique_ptr<KVHarnessHelper> _helper;
     std::unique_ptr<RecordStore> _rs;
-    std::unique_ptr<KVCatalog> _catalog;
-    std::unique_ptr<KVCatalog::FeatureTracker> _featureTracker;
+    std::unique_ptr<DurableCatalogImpl> _catalog;
+    std::unique_ptr<DurableCatalogImpl::FeatureTracker> _featureTracker;
 };
 
-TEST_F(KVCatalogFeatureTrackerTest, FeatureDocumentIsNotEagerlyCreated) {
+TEST_F(DurableCatalogFeatureTrackerTest, FeatureDocumentIsNotEagerlyCreated) {
     auto opCtx = newOperationContext();
     auto cursor = getRecordStore()->getCursor(opCtx.get());
     ASSERT_FALSE(static_cast<bool>(cursor->next()));
 }
 
-TEST_F(KVCatalogFeatureTrackerTest, CanMarkNonRepairableFeatureAsInUse) {
+TEST_F(DurableCatalogFeatureTrackerTest, CanMarkNonRepairableFeatureAsInUse) {
     {
         auto opCtx = newOperationContext();
         ASSERT(
@@ -150,7 +151,7 @@ TEST_F(KVCatalogFeatureTrackerTest, CanMarkNonRepairableFeatureAsInUse) {
     }
 }
 
-TEST_F(KVCatalogFeatureTrackerTest, CanMarkNonRepairableFeatureAsNotInUse) {
+TEST_F(DurableCatalogFeatureTrackerTest, CanMarkNonRepairableFeatureAsNotInUse) {
     {
         auto opCtx = newOperationContext();
 
@@ -223,7 +224,7 @@ TEST_F(KVCatalogFeatureTrackerTest, CanMarkNonRepairableFeatureAsNotInUse) {
     }
 }
 
-TEST_F(KVCatalogFeatureTrackerTest, CanMarkRepairableFeatureAsInUse) {
+TEST_F(DurableCatalogFeatureTrackerTest, CanMarkRepairableFeatureAsInUse) {
     {
         auto opCtx = newOperationContext();
         ASSERT(!getFeatureTracker()->isRepairableFeatureInUse(opCtx.get(), kRepairableFeature1));
@@ -257,7 +258,7 @@ TEST_F(KVCatalogFeatureTrackerTest, CanMarkRepairableFeatureAsInUse) {
     }
 }
 
-TEST_F(KVCatalogFeatureTrackerTest, CanMarkRepairableFeatureAsNotInUse) {
+TEST_F(DurableCatalogFeatureTrackerTest, CanMarkRepairableFeatureAsNotInUse) {
     {
         auto opCtx = newOperationContext();
 
@@ -322,7 +323,7 @@ TEST_F(KVCatalogFeatureTrackerTest, CanMarkRepairableFeatureAsNotInUse) {
     }
 }
 
-TEST_F(KVCatalogFeatureTrackerTest, DataFileAreCompatibleWithRecognizedNonRepairableFeature) {
+TEST_F(DurableCatalogFeatureTrackerTest, DataFileAreCompatibleWithRecognizedNonRepairableFeature) {
     getFeatureTracker()->setUsedNonRepairableFeaturesMaskForTestingOnly(0ULL);
     getFeatureTracker()->setUsedRepairableFeaturesMaskForTestingOnly(0ULL);
 
@@ -347,7 +348,7 @@ TEST_F(KVCatalogFeatureTrackerTest, DataFileAreCompatibleWithRecognizedNonRepair
     }
 }
 
-TEST_F(KVCatalogFeatureTrackerTest,
+TEST_F(DurableCatalogFeatureTrackerTest,
        DataFilesAreIncompatibleWithAnUnrecognizedNonRepairableFeature) {
     getFeatureTracker()->setUsedNonRepairableFeaturesMaskForTestingOnly(0ULL);
     getFeatureTracker()->setUsedRepairableFeaturesMaskForTestingOnly(0ULL);
@@ -375,7 +376,7 @@ TEST_F(KVCatalogFeatureTrackerTest,
     }
 }
 
-TEST_F(KVCatalogFeatureTrackerTest,
+TEST_F(DurableCatalogFeatureTrackerTest,
        DataFilesAreIncompatibleWithMultipleUnrecognizedNonRepairableFeatures) {
     getFeatureTracker()->setUsedNonRepairableFeaturesMaskForTestingOnly(
         static_cast<NonRepairableFeatureMask>(kNonRepairableFeature1));
@@ -411,7 +412,7 @@ TEST_F(KVCatalogFeatureTrackerTest,
     }
 }
 
-TEST_F(KVCatalogFeatureTrackerTest, DataFilesAreCompatibleWithRecognizedRepairableFeature) {
+TEST_F(DurableCatalogFeatureTrackerTest, DataFilesAreCompatibleWithRecognizedRepairableFeature) {
     getFeatureTracker()->setUsedNonRepairableFeaturesMaskForTestingOnly(0ULL);
     getFeatureTracker()->setUsedRepairableFeaturesMaskForTestingOnly(0ULL);
 
@@ -435,7 +436,8 @@ TEST_F(KVCatalogFeatureTrackerTest, DataFilesAreCompatibleWithRecognizedRepairab
     }
 }
 
-TEST_F(KVCatalogFeatureTrackerTest, DataFilesAreIncompatibleWithAnUnrecognizedRepairableFeature) {
+TEST_F(DurableCatalogFeatureTrackerTest,
+       DataFilesAreIncompatibleWithAnUnrecognizedRepairableFeature) {
     getFeatureTracker()->setUsedNonRepairableFeaturesMaskForTestingOnly(0ULL);
     getFeatureTracker()->setUsedRepairableFeaturesMaskForTestingOnly(0ULL);
 
@@ -461,7 +463,7 @@ TEST_F(KVCatalogFeatureTrackerTest, DataFilesAreIncompatibleWithAnUnrecognizedRe
     }
 }
 
-TEST_F(KVCatalogFeatureTrackerTest,
+TEST_F(DurableCatalogFeatureTrackerTest,
        DataFilesAreIncompatibleWithMultipleUnrecognizedRepairableFeatures) {
     getFeatureTracker()->setUsedNonRepairableFeaturesMaskForTestingOnly(0ULL);
     getFeatureTracker()->setUsedRepairableFeaturesMaskForTestingOnly(
