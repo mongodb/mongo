@@ -3257,7 +3257,7 @@ def doConfigure(myenv):
         ]
     )
 
-    if link_model.startswith("dynamic"):
+    if link_model.startswith("dynamic") and not link_model == 'dynamic-sdk':
         conf.env.AppendUnique(
             CPPDEFINES=[
                 "BOOST_LOG_DYN_LINK",
