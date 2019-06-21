@@ -94,6 +94,12 @@ void ReplicationMetrics::incrementNumElectionsCalledForReason(
     }
 }
 
+void ReplicationMetrics::incrementNumStepDownsCausedByHigherTerm() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _electionMetrics.setNumStepDownsCausedByHigherTerm(
+        _electionMetrics.getNumStepDownsCausedByHigherTerm() + 1);
+}
+
 int ReplicationMetrics::getNumStepUpCmdsCalled_forTesting() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _electionMetrics.getStepUpCmd().getCalled();
@@ -122,6 +128,11 @@ int ReplicationMetrics::getNumFreezeTimeoutsCalled_forTesting() {
 BSONObj ReplicationMetrics::getElectionMetricsBSON() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _electionMetrics.toBSON();
+}
+
+int ReplicationMetrics::getNumStepDownsCausedByHigherTerm_forTesting() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _electionMetrics.getNumStepDownsCausedByHigherTerm();
 }
 
 class ReplicationMetrics::ElectionMetricsSSS : public ServerStatusSection {

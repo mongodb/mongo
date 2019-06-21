@@ -68,6 +68,7 @@
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_impl_gen.h"
+#include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -3834,6 +3835,7 @@ EventHandle ReplicationCoordinatorImpl::_updateTerm_inlock(
         }
         if (_topCoord->prepareForUnconditionalStepDown()) {
             log() << "stepping down from primary, because a new term has begun: " << term;
+            ReplicationMetrics::get(getServiceContext()).incrementNumStepDownsCausedByHigherTerm();
             return _stepDownStart();
         } else {
             LOG(2) << "Updated term but not triggering stepdown because we are already in the "
