@@ -31,7 +31,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
-#include "mongo/db/storage/kv/storage_engine_impl.h"
+#include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 

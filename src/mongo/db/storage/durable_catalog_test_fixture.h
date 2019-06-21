@@ -29,30 +29,30 @@
 
 #pragma once
 
-#include "mongo/db/storage/kv/kv_catalog.h"
+#include "mongo/db/storage/durable_catalog_impl.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-class KVCatalogTest : public unittest::Test {
+class DurableCatalogImplTest : public unittest::Test {
 protected:
     Status newCollection(OperationContext* opCtx,
                          const NamespaceString& ns,
                          const CollectionOptions& options,
                          KVPrefix prefix,
-                         KVCatalog* catalog) {
+                         DurableCatalogImpl* catalog) {
         return catalog->_addEntry(opCtx, ns, options, prefix);
     }
     Status renameCollection(OperationContext* opCtx,
                             StringData fromNS,
                             StringData toNS,
                             bool stayTemp,
-                            KVCatalog* catalog) {
+                            DurableCatalogImpl* catalog) {
         return catalog->_replaceEntry(
             opCtx, NamespaceString(fromNS), NamespaceString(toNS), stayTemp);
     }
 
-    Status dropCollection(OperationContext* opCtx, StringData ns, KVCatalog* catalog) {
+    Status dropCollection(OperationContext* opCtx, StringData ns, DurableCatalogImpl* catalog) {
         return catalog->_removeEntry(opCtx, NamespaceString(ns));
     }
 };
-}
+}  // namespace mongo

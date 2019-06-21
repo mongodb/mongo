@@ -246,6 +246,7 @@ env.Library(
         'storage_options',
     ],
 )
+
 env.Library(
     target="storage_init_d",
     source=[
@@ -388,3 +389,47 @@ env.CppUnitTest(
         'storage_repair_observer',
     ],
 )
+
+env.Library(
+    target='durable_catalog_impl',
+    source=[
+        'durable_catalog_impl.cpp',
+        'kv/kv_collection_catalog_entry.cpp', # TODO: SERVER-40717 Avoid source under kv sub-directory
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/db/index_names',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_drop_pending_ident_reaper',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/disable_index_spec_namespace_generation',
+    ]
+)
+
+env.Library(
+    target='storage_engine_impl',
+    source=[
+        'storage_engine_impl.cpp',
+        'kv/temporary_kv_record_store.cpp', # TODO: SERVER-41892 Avoid source under kv sub-directory
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/catalog_control',
+        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_drop_pending_ident_reaper',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/logical_clock',
+        '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
+    ],
+)
+

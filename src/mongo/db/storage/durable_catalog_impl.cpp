@@ -29,7 +29,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/storage/kv/kv_catalog.h"
+#include "mongo/db/storage/durable_catalog_impl.h"
 
 #include <memory>
 #include <stdlib.h>
@@ -41,12 +41,12 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
+#include "mongo/db/storage/durable_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_collection_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/storage_engine_interface.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine_interface.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/log.h"
@@ -140,12 +140,12 @@ bool indexTypeSupportsPathLevelMultikeyTracking(StringData accessMethod) {
 
 }  // namespace
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 
-class KVCatalog::AddIdentChange : public RecoveryUnit::Change {
+class DurableCatalogImpl::AddIdentChange : public RecoveryUnit::Change {
 public:
-    AddIdentChange(KVCatalog* catalog, StringData ident)
+    AddIdentChange(DurableCatalogImpl* catalog, StringData ident)
         : _catalog(catalog), _ident(ident.toString()) {}
 
     virtual void commit(boost::optional<Timestamp>) {}
@@ -154,13 +154,13 @@ public:
         _catalog->_idents.erase(_ident);
     }
 
-    KVCatalog* const _catalog;
+    DurableCatalogImpl* const _catalog;
     const std::string _ident;
 };
 
-class KVCatalog::RemoveIdentChange : public RecoveryUnit::Change {
+class DurableCatalogImpl::RemoveIdentChange : public RecoveryUnit::Change {
 public:
-    RemoveIdentChange(KVCatalog* catalog, StringData ident, const Entry& entry)
+    RemoveIdentChange(DurableCatalogImpl* catalog, StringData ident, const Entry& entry)
         : _catalog(catalog), _ident(ident.toString()), _entry(entry) {}
 
     virtual void commit(boost::optional<Timestamp>) {}
@@ -169,12 +169,12 @@ public:
         _catalog->_idents[_ident] = _entry;
     }
 
-    KVCatalog* const _catalog;
+    DurableCatalogImpl* const _catalog;
     const std::string _ident;
     const Entry _entry;
 };
 
-class KVCatalog::AddIndexChange : public RecoveryUnit::Change {
+class DurableCatalogImpl::AddIndexChange : public RecoveryUnit::Change {
 public:
     AddIndexChange(OperationContext* opCtx, StorageEngineInterface* engine, StringData ident)
         : _opCtx(opCtx), _engine(engine), _ident(ident.toString()) {}
@@ -191,7 +191,7 @@ public:
     const std::string _ident;
 };
 
-class KVCatalog::RemoveIndexChange : public RecoveryUnit::Change {
+class DurableCatalogImpl::RemoveIndexChange : public RecoveryUnit::Change {
 public:
     RemoveIndexChange(OperationContext* opCtx,
                       StorageEngineInterface* engine,
@@ -229,7 +229,7 @@ public:
     const std::string _ident;
 };
 
-bool KVCatalog::FeatureTracker::isFeatureDocument(BSONObj obj) {
+bool DurableCatalogImpl::FeatureTracker::isFeatureDocument(BSONObj obj) {
     BSONElement firstElem = obj.firstElement();
     if (firstElem.fieldNameStringData() == kIsFeatureDocumentFieldName) {
         return firstElem.booleanSafe();
@@ -237,7 +237,8 @@ bool KVCatalog::FeatureTracker::isFeatureDocument(BSONObj obj) {
     return false;
 }
 
-Status KVCatalog::FeatureTracker::isCompatibleWithCurrentCode(OperationContext* opCtx) const {
+Status DurableCatalogImpl::FeatureTracker::isCompatibleWithCurrentCode(
+    OperationContext* opCtx) const {
     FeatureBits versionInfo = getInfo(opCtx);
 
     uint64_t unrecognizedNonRepairableFeatures =
@@ -265,62 +266,62 @@ Status KVCatalog::FeatureTracker::isCompatibleWithCurrentCode(OperationContext* 
     return Status::OK();
 }
 
-std::unique_ptr<KVCatalog::FeatureTracker> KVCatalog::FeatureTracker::get(OperationContext* opCtx,
-                                                                          KVCatalog* catalog,
-                                                                          RecordId rid) {
+std::unique_ptr<DurableCatalogImpl::FeatureTracker> DurableCatalogImpl::FeatureTracker::get(
+    OperationContext* opCtx, DurableCatalogImpl* catalog, RecordId rid) {
     auto record = catalog->_rs->dataFor(opCtx, rid);
     BSONObj obj = record.toBson();
     invariant(isFeatureDocument(obj));
-    return std::unique_ptr<KVCatalog::FeatureTracker>(new KVCatalog::FeatureTracker(catalog, rid));
+    return std::unique_ptr<DurableCatalogImpl::FeatureTracker>(
+        new DurableCatalogImpl::FeatureTracker(catalog, rid));
 }
 
-std::unique_ptr<KVCatalog::FeatureTracker> KVCatalog::FeatureTracker::create(
-    OperationContext* opCtx, KVCatalog* catalog) {
-    return std::unique_ptr<KVCatalog::FeatureTracker>(
-        new KVCatalog::FeatureTracker(catalog, RecordId()));
+std::unique_ptr<DurableCatalogImpl::FeatureTracker> DurableCatalogImpl::FeatureTracker::create(
+    OperationContext* opCtx, DurableCatalogImpl* catalog) {
+    return std::unique_ptr<DurableCatalogImpl::FeatureTracker>(
+        new DurableCatalogImpl::FeatureTracker(catalog, RecordId()));
 }
 
-bool KVCatalog::FeatureTracker::isNonRepairableFeatureInUse(OperationContext* opCtx,
-                                                            NonRepairableFeature feature) const {
+bool DurableCatalogImpl::FeatureTracker::isNonRepairableFeatureInUse(
+    OperationContext* opCtx, NonRepairableFeature feature) const {
     FeatureBits versionInfo = getInfo(opCtx);
     return versionInfo.nonRepairableFeatures & static_cast<NonRepairableFeatureMask>(feature);
 }
 
-void KVCatalog::FeatureTracker::markNonRepairableFeatureAsInUse(OperationContext* opCtx,
-                                                                NonRepairableFeature feature) {
+void DurableCatalogImpl::FeatureTracker::markNonRepairableFeatureAsInUse(
+    OperationContext* opCtx, NonRepairableFeature feature) {
     FeatureBits versionInfo = getInfo(opCtx);
     versionInfo.nonRepairableFeatures |= static_cast<NonRepairableFeatureMask>(feature);
     putInfo(opCtx, versionInfo);
 }
 
-void KVCatalog::FeatureTracker::markNonRepairableFeatureAsNotInUse(OperationContext* opCtx,
-                                                                   NonRepairableFeature feature) {
+void DurableCatalogImpl::FeatureTracker::markNonRepairableFeatureAsNotInUse(
+    OperationContext* opCtx, NonRepairableFeature feature) {
     FeatureBits versionInfo = getInfo(opCtx);
     versionInfo.nonRepairableFeatures &= ~static_cast<NonRepairableFeatureMask>(feature);
     putInfo(opCtx, versionInfo);
 }
 
-bool KVCatalog::FeatureTracker::isRepairableFeatureInUse(OperationContext* opCtx,
-                                                         RepairableFeature feature) const {
+bool DurableCatalogImpl::FeatureTracker::isRepairableFeatureInUse(OperationContext* opCtx,
+                                                                  RepairableFeature feature) const {
     FeatureBits versionInfo = getInfo(opCtx);
     return versionInfo.repairableFeatures & static_cast<RepairableFeatureMask>(feature);
 }
 
-void KVCatalog::FeatureTracker::markRepairableFeatureAsInUse(OperationContext* opCtx,
-                                                             RepairableFeature feature) {
+void DurableCatalogImpl::FeatureTracker::markRepairableFeatureAsInUse(OperationContext* opCtx,
+                                                                      RepairableFeature feature) {
     FeatureBits versionInfo = getInfo(opCtx);
     versionInfo.repairableFeatures |= static_cast<RepairableFeatureMask>(feature);
     putInfo(opCtx, versionInfo);
 }
 
-void KVCatalog::FeatureTracker::markRepairableFeatureAsNotInUse(OperationContext* opCtx,
-                                                                RepairableFeature feature) {
+void DurableCatalogImpl::FeatureTracker::markRepairableFeatureAsNotInUse(
+    OperationContext* opCtx, RepairableFeature feature) {
     FeatureBits versionInfo = getInfo(opCtx);
     versionInfo.repairableFeatures &= ~static_cast<RepairableFeatureMask>(feature);
     putInfo(opCtx, versionInfo);
 }
 
-KVCatalog::FeatureTracker::FeatureBits KVCatalog::FeatureTracker::getInfo(
+DurableCatalogImpl::FeatureTracker::FeatureBits DurableCatalogImpl::FeatureTracker::getInfo(
     OperationContext* opCtx) const {
     if (_rid.isNull()) {
         return {};
@@ -354,7 +355,8 @@ KVCatalog::FeatureTracker::FeatureBits KVCatalog::FeatureTracker::getInfo(
     return versionInfo;
 }
 
-void KVCatalog::FeatureTracker::putInfo(OperationContext* opCtx, const FeatureBits& versionInfo) {
+void DurableCatalogImpl::FeatureTracker::putInfo(OperationContext* opCtx,
+                                                 const FeatureBits& versionInfo) {
     BSONObjBuilder bob;
     bob.appendBool(kIsFeatureDocumentFieldName, true);
     // We intentionally include the "ns" field with a null value in the feature document to prevent
@@ -379,25 +381,25 @@ void KVCatalog::FeatureTracker::putInfo(OperationContext* opCtx, const FeatureBi
     }
 }
 
-KVCatalog::KVCatalog(RecordStore* rs,
-                     bool directoryPerDb,
-                     bool directoryForIndexes,
-                     StorageEngineInterface* engine)
+DurableCatalogImpl::DurableCatalogImpl(RecordStore* rs,
+                                       bool directoryPerDb,
+                                       bool directoryForIndexes,
+                                       StorageEngineInterface* engine)
     : _rs(rs),
       _directoryPerDb(directoryPerDb),
       _directoryForIndexes(directoryForIndexes),
       _rand(_newRand()),
       _engine(engine) {}
 
-KVCatalog::~KVCatalog() {
+DurableCatalogImpl::~DurableCatalogImpl() {
     _rs = nullptr;
 }
 
-std::string KVCatalog::_newRand() {
+std::string DurableCatalogImpl::_newRand() {
     return str::stream() << std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64();
 }
 
-bool KVCatalog::_hasEntryCollidingWithRand() const {
+bool DurableCatalogImpl::_hasEntryCollidingWithRand() const {
     // Only called from init() so don't need to lock.
     for (NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it) {
         if (StringData(it->first).endsWith(_rand))
@@ -406,14 +408,14 @@ bool KVCatalog::_hasEntryCollidingWithRand() const {
     return false;
 }
 
-std::string KVCatalog::newInternalIdent() {
+std::string DurableCatalogImpl::newInternalIdent() {
     StringBuilder buf;
     buf << kInternalIdentPrefix;
     buf << _next.fetchAndAdd(1) << '-' << _rand;
     return buf.str();
 }
 
-std::string KVCatalog::getFilesystemPathForDb(const std::string& dbName) const {
+std::string DurableCatalogImpl::getFilesystemPathForDb(const std::string& dbName) const {
     if (_directoryPerDb) {
         return storageGlobalParams.dbpath + '/' + escapeDbName(dbName);
     } else {
@@ -421,7 +423,7 @@ std::string KVCatalog::getFilesystemPathForDb(const std::string& dbName) const {
     }
 }
 
-std::string KVCatalog::_newUniqueIdent(const NamespaceString& nss, const char* kind) {
+std::string DurableCatalogImpl::_newUniqueIdent(const NamespaceString& nss, const char* kind) {
     // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
     StringBuilder buf;
     if (_directoryPerDb) {
@@ -433,7 +435,7 @@ std::string KVCatalog::_newUniqueIdent(const NamespaceString& nss, const char* k
     return buf.str();
 }
 
-void KVCatalog::init(OperationContext* opCtx) {
+void DurableCatalogImpl::init(OperationContext* opCtx) {
     // No locking needed since called single threaded.
     auto cursor = _rs->getCursor(opCtx);
     while (auto record = cursor->next()) {
@@ -458,7 +460,7 @@ void KVCatalog::init(OperationContext* opCtx) {
     if (!_featureTracker) {
         // If there wasn't a feature document, then just an initialize a feature tracker that
         // doesn't manage a feature document yet.
-        _featureTracker = KVCatalog::FeatureTracker::create(opCtx, this);
+        _featureTracker = DurableCatalogImpl::FeatureTracker::create(opCtx, this);
     }
 
     // In the unlikely event that we have used this _rand before generate a new one.
@@ -467,7 +469,7 @@ void KVCatalog::init(OperationContext* opCtx) {
     }
 }
 
-std::vector<NamespaceString> KVCatalog::getAllCollections() const {
+std::vector<NamespaceString> DurableCatalogImpl::getAllCollections() const {
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
     std::vector<NamespaceString> result;
     for (NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it) {
@@ -476,10 +478,10 @@ std::vector<NamespaceString> KVCatalog::getAllCollections() const {
     return result;
 }
 
-Status KVCatalog::_addEntry(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            const CollectionOptions& options,
-                            KVPrefix prefix) {
+Status DurableCatalogImpl::_addEntry(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const CollectionOptions& options,
+                                     KVPrefix prefix) {
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
 
     const string ident = _newUniqueIdent(nss, "collection");
@@ -513,24 +515,24 @@ Status KVCatalog::_addEntry(OperationContext* opCtx,
     return Status::OK();
 }
 
-std::string KVCatalog::getCollectionIdent(const NamespaceString& nss) const {
+std::string DurableCatalogImpl::getCollectionIdent(const NamespaceString& nss) const {
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
     NSToIdentMap::const_iterator it = _idents.find(nss.toString());
     invariant(it != _idents.end());
     return it->second.ident;
 }
 
-std::string KVCatalog::getIndexIdent(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     StringData idxName) const {
+std::string DurableCatalogImpl::getIndexIdent(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              StringData idxName) const {
     BSONObj obj = _findEntry(opCtx, nss);
     BSONObj idxIdent = obj["idxIdent"].Obj();
     return idxIdent[idxName].String();
 }
 
-BSONObj KVCatalog::_findEntry(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              RecordId* out) const {
+BSONObj DurableCatalogImpl::_findEntry(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       RecordId* out) const {
     RecordId dl;
     {
         stdx::lock_guard<stdx::mutex> lk(_identsLock);
@@ -554,8 +556,8 @@ BSONObj KVCatalog::_findEntry(OperationContext* opCtx,
     return data.releaseToBson().getOwned();
 }
 
-BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData(OperationContext* opCtx,
-                                                            const NamespaceString& nss) const {
+BSONCollectionCatalogEntry::MetaData DurableCatalogImpl::getMetaData(
+    OperationContext* opCtx, const NamespaceString& nss) const {
     BSONObj obj = _findEntry(opCtx, nss);
     LOG(3) << " fetched CCE metadata: " << obj;
     BSONCollectionCatalogEntry::MetaData md;
@@ -567,9 +569,9 @@ BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData(OperationContext* op
     return md;
 }
 
-void KVCatalog::putMetaData(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            BSONCollectionCatalogEntry::MetaData& md) {
+void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     BSONCollectionCatalogEntry::MetaData& md) {
     RecordId loc;
     BSONObj obj = _findEntry(opCtx, nss, &loc);
 
@@ -606,10 +608,10 @@ void KVCatalog::putMetaData(OperationContext* opCtx,
     fassert(28521, status.isOK());
 }
 
-Status KVCatalog::_replaceEntry(OperationContext* opCtx,
-                                const NamespaceString& fromNss,
-                                const NamespaceString& toNss,
-                                bool stayTemp) {
+Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
+                                         const NamespaceString& fromNss,
+                                         const NamespaceString& toNss,
+                                         bool stayTemp) {
     RecordId loc;
     BSONObj old = _findEntry(opCtx, fromNss, &loc).getOwned();
     {
@@ -645,7 +647,7 @@ Status KVCatalog::_replaceEntry(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status KVCatalog::_removeEntry(OperationContext* opCtx, const NamespaceString& nss) {
+Status DurableCatalogImpl::_removeEntry(OperationContext* opCtx, const NamespaceString& nss) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
     const NSToIdentMap::iterator it = _idents.find(nss.toString());
@@ -662,7 +664,7 @@ Status KVCatalog::_removeEntry(OperationContext* opCtx, const NamespaceString& n
     return Status::OK();
 }
 
-std::vector<std::string> KVCatalog::getAllIdentsForDB(StringData db) const {
+std::vector<std::string> DurableCatalogImpl::getAllIdentsForDB(StringData db) const {
     std::vector<std::string> v;
 
     {
@@ -678,7 +680,7 @@ std::vector<std::string> KVCatalog::getAllIdentsForDB(StringData db) const {
     return v;
 }
 
-std::vector<std::string> KVCatalog::getAllIdents(OperationContext* opCtx) const {
+std::vector<std::string> DurableCatalogImpl::getAllIdents(OperationContext* opCtx) const {
     std::vector<std::string> v;
 
     auto cursor = _rs->getCursor(opCtx);
@@ -706,7 +708,7 @@ std::vector<std::string> KVCatalog::getAllIdents(OperationContext* opCtx) const 
     return v;
 }
 
-bool KVCatalog::isUserDataIdent(StringData ident) const {
+bool DurableCatalogImpl::isUserDataIdent(StringData ident) const {
     // Indexes and collections are candidates for dropping when the storage engine's metadata does
     // not align with the catalog metadata.
     return ident.find("index-") != std::string::npos || ident.find("index/") != std::string::npos ||
@@ -714,18 +716,19 @@ bool KVCatalog::isUserDataIdent(StringData ident) const {
         ident.find("collection/") != std::string::npos;
 }
 
-bool KVCatalog::isInternalIdent(StringData ident) const {
+bool DurableCatalogImpl::isInternalIdent(StringData ident) const {
     return ident.find(kInternalIdentPrefix) != std::string::npos;
 }
 
-bool KVCatalog::isCollectionIdent(StringData ident) const {
+bool DurableCatalogImpl::isCollectionIdent(StringData ident) const {
     // Internal idents prefixed "internal-" should not be considered collections, because
     // they are not eligible for orphan recovery through repair.
     return ident.find("collection-") != std::string::npos ||
         ident.find("collection/") != std::string::npos;
 }
 
-StatusWith<std::string> KVCatalog::newOrphanedIdent(OperationContext* opCtx, std::string ident) {
+StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(OperationContext* opCtx,
+                                                             std::string ident) {
     // The collection will be named local.orphan.xxxxx.
     std::string identNs = ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
@@ -767,11 +770,12 @@ StatusWith<std::string> KVCatalog::newOrphanedIdent(OperationContext* opCtx, std
     return StatusWith<std::string>(std::move(ns));
 }
 
-std::unique_ptr<CollectionCatalogEntry> KVCatalog::makeCollectionCatalogEntry(
+std::unique_ptr<CollectionCatalogEntry> DurableCatalogImpl::makeCollectionCatalogEntry(
     OperationContext* opCtx, const NamespaceString& nss, bool forRepair) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, nss);
     uassert(ErrorCodes::MustDowngrade,
-            str::stream() << "Collection does not have UUID in KVCatalog. Collection: " << nss,
+            str::stream() << "Collection does not have UUID in DurableCatalogImpl. Collection: "
+                          << nss,
             md.options.uuid);
 
     auto ident = getCollectionIdent(nss);
@@ -790,7 +794,7 @@ std::unique_ptr<CollectionCatalogEntry> KVCatalog::makeCollectionCatalogEntry(
     return std::make_unique<KVCollectionCatalogEntry>(_engine, nss.ns(), ident, std::move(rs));
 }
 
-StatusWith<std::unique_ptr<CollectionCatalogEntry>> KVCatalog::createCollection(
+StatusWith<std::unique_ptr<CollectionCatalogEntry>> DurableCatalogImpl::createCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionOptions& options,
@@ -819,7 +823,7 @@ StatusWith<std::unique_ptr<CollectionCatalogEntry>> KVCatalog::createCollection(
 
     // Mark collation feature as in use if the collection has a non-simple default collation.
     if (!options.collation.isEmpty()) {
-        const auto feature = KVCatalog::FeatureTracker::NonRepairableFeature::kCollation;
+        const auto feature = DurableCatalogImpl::FeatureTracker::NonRepairableFeature::kCollation;
         if (getFeatureTracker()->isNonRepairableFeatureInUse(opCtx, feature)) {
             getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx, feature);
         }
@@ -837,10 +841,10 @@ StatusWith<std::unique_ptr<CollectionCatalogEntry>> KVCatalog::createCollection(
     return std::make_unique<KVCollectionCatalogEntry>(_engine, nss.ns(), ident, std::move(rs));
 }
 
-Status KVCatalog::renameCollection(OperationContext* opCtx,
-                                   const NamespaceString& fromNss,
-                                   const NamespaceString& toNss,
-                                   bool stayTemp) {
+Status DurableCatalogImpl::renameCollection(OperationContext* opCtx,
+                                            const NamespaceString& fromNss,
+                                            const NamespaceString& toNss,
+                                            bool stayTemp) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(fromNss, MODE_X));
     invariant(opCtx->lockState()->isCollectionLockedForMode(toNss, MODE_X));
 
@@ -861,7 +865,7 @@ Status KVCatalog::renameCollection(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status KVCatalog::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
+Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
     CollectionCatalogEntry* const entry =
@@ -914,16 +918,18 @@ Status KVCatalog::dropCollection(OperationContext* opCtx, const NamespaceString&
     return Status::OK();
 }
 
-void KVCatalog::updateCappedSize(OperationContext* opCtx, NamespaceString ns, long long size) {
+void DurableCatalogImpl::updateCappedSize(OperationContext* opCtx,
+                                          NamespaceString ns,
+                                          long long size) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     md.options.cappedSize = size;
     putMetaData(opCtx, ns, md);
 }
 
-void KVCatalog::updateTTLSetting(OperationContext* opCtx,
-                                 NamespaceString ns,
-                                 StringData idxName,
-                                 long long newExpireSeconds) {
+void DurableCatalogImpl::updateTTLSetting(OperationContext* opCtx,
+                                          NamespaceString ns,
+                                          StringData idxName,
+                                          long long newExpireSeconds) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     int offset = md.findIndexOffset(idxName);
     invariant(offset >= 0);
@@ -931,40 +937,40 @@ void KVCatalog::updateTTLSetting(OperationContext* opCtx,
     putMetaData(opCtx, ns, md);
 }
 
-bool KVCatalog::isEqualToMetadataUUID(OperationContext* opCtx,
-                                      NamespaceString ns,
-                                      OptionalCollectionUUID uuid) {
+bool DurableCatalogImpl::isEqualToMetadataUUID(OperationContext* opCtx,
+                                               NamespaceString ns,
+                                               OptionalCollectionUUID uuid) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     return md.options.uuid && md.options.uuid == uuid;
 }
 
-void KVCatalog::setIsTemp(OperationContext* opCtx, NamespaceString ns, bool isTemp) {
+void DurableCatalogImpl::setIsTemp(OperationContext* opCtx, NamespaceString ns, bool isTemp) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     md.options.temp = isTemp;
     putMetaData(opCtx, ns, md);
 }
 
-boost::optional<std::string> KVCatalog::getSideWritesIdent(OperationContext* opCtx,
-                                                           NamespaceString ns,
-                                                           StringData indexName) const {
+boost::optional<std::string> DurableCatalogImpl::getSideWritesIdent(OperationContext* opCtx,
+                                                                    NamespaceString ns,
+                                                                    StringData indexName) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     return md.indexes[offset].sideWritesIdent;
 }
 
-void KVCatalog::setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx) {
+void DurableCatalogImpl::setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx) {
     const auto feature = FeatureTracker::RepairableFeature::kIndexKeyStringWithLongTypeBits;
     if (!getFeatureTracker()->isRepairableFeatureInUse(opCtx, feature)) {
         getFeatureTracker()->markRepairableFeatureAsInUse(opCtx, feature);
     }
 }
 
-void KVCatalog::updateValidator(OperationContext* opCtx,
-                                NamespaceString ns,
-                                const BSONObj& validator,
-                                StringData validationLevel,
-                                StringData validationAction) {
+void DurableCatalogImpl::updateValidator(OperationContext* opCtx,
+                                         NamespaceString ns,
+                                         const BSONObj& validator,
+                                         StringData validationLevel,
+                                         StringData validationAction) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     md.options.validator = validator;
     md.options.validationLevel = validationLevel.toString();
@@ -972,16 +978,18 @@ void KVCatalog::updateValidator(OperationContext* opCtx,
     putMetaData(opCtx, ns, md);
 }
 
-void KVCatalog::updateIndexMetadata(OperationContext* opCtx,
-                                    NamespaceString ns,
-                                    const IndexDescriptor* desc) {
+void DurableCatalogImpl::updateIndexMetadata(OperationContext* opCtx,
+                                             NamespaceString ns,
+                                             const IndexDescriptor* desc) {
     // Update any metadata Ident has for this index
     const string ident = getIndexIdent(opCtx, ns, desc->indexName());
     auto kvEngine = _engine->getEngine();
     kvEngine->alterIdentMetadata(opCtx, ident, desc);
 }
 
-Status KVCatalog::removeIndex(OperationContext* opCtx, NamespaceString ns, StringData indexName) {
+Status DurableCatalogImpl::removeIndex(OperationContext* opCtx,
+                                       NamespaceString ns,
+                                       StringData indexName) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
 
     if (md.findIndexOffset(indexName) < 0)
@@ -998,11 +1006,11 @@ Status KVCatalog::removeIndex(OperationContext* opCtx, NamespaceString ns, Strin
     return Status::OK();
 }
 
-Status KVCatalog::prepareForIndexBuild(OperationContext* opCtx,
-                                       NamespaceString ns,
-                                       const IndexDescriptor* spec,
-                                       IndexBuildProtocol indexBuildProtocol,
-                                       bool isBackgroundSecondaryBuild) {
+Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
+                                                NamespaceString ns,
+                                                const IndexDescriptor* spec,
+                                                IndexBuildProtocol indexBuildProtocol,
+                                                bool isBackgroundSecondaryBuild) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
 
     KVPrefix prefix = KVPrefix::getNextPrefix(ns);
@@ -1024,7 +1032,7 @@ Status KVCatalog::prepareForIndexBuild(OperationContext* opCtx,
 
     // Mark collation feature as in use if the index has a non-simple collation.
     if (imd.spec["collation"]) {
-        const auto feature = KVCatalog::FeatureTracker::NonRepairableFeature::kCollation;
+        const auto feature = DurableCatalogImpl::FeatureTracker::NonRepairableFeature::kCollation;
         if (!getFeatureTracker()->isNonRepairableFeatureInUse(opCtx, feature)) {
             getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx, feature);
         }
@@ -1045,20 +1053,21 @@ Status KVCatalog::prepareForIndexBuild(OperationContext* opCtx,
     return status;
 }
 
-bool KVCatalog::isTwoPhaseIndexBuild(OperationContext* opCtx,
-                                     NamespaceString ns,
-                                     StringData indexName) const {
+bool DurableCatalogImpl::isTwoPhaseIndexBuild(OperationContext* opCtx,
+                                              NamespaceString ns,
+                                              StringData indexName) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     return md.indexes[offset].runTwoPhaseBuild;
 }
 
-void KVCatalog::setIndexBuildScanning(OperationContext* opCtx,
-                                      NamespaceString ns,
-                                      StringData indexName,
-                                      std::string sideWritesIdent,
-                                      boost::optional<std::string> constraintViolationsIdent) {
+void DurableCatalogImpl::setIndexBuildScanning(
+    OperationContext* opCtx,
+    NamespaceString ns,
+    StringData indexName,
+    std::string sideWritesIdent,
+    boost::optional<std::string> constraintViolationsIdent) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
@@ -1072,9 +1081,9 @@ void KVCatalog::setIndexBuildScanning(OperationContext* opCtx,
     putMetaData(opCtx, ns, md);
 }
 
-bool KVCatalog::isIndexBuildScanning(OperationContext* opCtx,
-                                     NamespaceString ns,
-                                     StringData indexName) const {
+bool DurableCatalogImpl::isIndexBuildScanning(OperationContext* opCtx,
+                                              NamespaceString ns,
+                                              StringData indexName) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
@@ -1082,9 +1091,9 @@ bool KVCatalog::isIndexBuildScanning(OperationContext* opCtx,
         BSONCollectionCatalogEntry::kIndexBuildScanning.toString();
 }
 
-void KVCatalog::setIndexBuildDraining(OperationContext* opCtx,
-                                      NamespaceString ns,
-                                      StringData indexName) {
+void DurableCatalogImpl::setIndexBuildDraining(OperationContext* opCtx,
+                                               NamespaceString ns,
+                                               StringData indexName) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
@@ -1097,9 +1106,9 @@ void KVCatalog::setIndexBuildDraining(OperationContext* opCtx,
     putMetaData(opCtx, ns, md);
 }
 
-bool KVCatalog::isIndexBuildDraining(OperationContext* opCtx,
-                                     NamespaceString ns,
-                                     StringData indexName) const {
+bool DurableCatalogImpl::isIndexBuildDraining(OperationContext* opCtx,
+                                              NamespaceString ns,
+                                              StringData indexName) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
@@ -1107,9 +1116,9 @@ bool KVCatalog::isIndexBuildDraining(OperationContext* opCtx,
         BSONCollectionCatalogEntry::kIndexBuildDraining.toString();
 }
 
-void KVCatalog::indexBuildSuccess(OperationContext* opCtx,
-                                  NamespaceString ns,
-                                  StringData indexName) {
+void DurableCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
+                                           NamespaceString ns,
+                                           StringData indexName) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
@@ -1121,10 +1130,10 @@ void KVCatalog::indexBuildSuccess(OperationContext* opCtx,
     putMetaData(opCtx, ns, md);
 }
 
-bool KVCatalog::isIndexMultikey(OperationContext* opCtx,
-                                NamespaceString ns,
-                                StringData indexName,
-                                MultikeyPaths* multikeyPaths) const {
+bool DurableCatalogImpl::isIndexMultikey(OperationContext* opCtx,
+                                         NamespaceString ns,
+                                         StringData indexName,
+                                         MultikeyPaths* multikeyPaths) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
 
     int offset = md.findIndexOffset(indexName);
@@ -1137,10 +1146,10 @@ bool KVCatalog::isIndexMultikey(OperationContext* opCtx,
     return md.indexes[offset].multikey;
 }
 
-bool KVCatalog::setIndexIsMultikey(OperationContext* opCtx,
-                                   NamespaceString ns,
-                                   StringData indexName,
-                                   const MultikeyPaths& multikeyPaths) {
+bool DurableCatalogImpl::setIndexIsMultikey(OperationContext* opCtx,
+                                            NamespaceString ns,
+                                            StringData indexName,
+                                            const MultikeyPaths& multikeyPaths) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
 
     int offset = md.findIndexOffset(indexName);
@@ -1192,37 +1201,36 @@ bool KVCatalog::setIndexIsMultikey(OperationContext* opCtx,
     return true;
 }
 
-boost::optional<std::string> KVCatalog::getConstraintViolationsIdent(OperationContext* opCtx,
-                                                                     NamespaceString ns,
-                                                                     StringData indexName) const {
+boost::optional<std::string> DurableCatalogImpl::getConstraintViolationsIdent(
+    OperationContext* opCtx, NamespaceString ns, StringData indexName) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     return md.indexes[offset].constraintViolationsIdent;
 }
 
-long KVCatalog::getIndexBuildVersion(OperationContext* opCtx,
-                                     NamespaceString ns,
-                                     StringData indexName) const {
+long DurableCatalogImpl::getIndexBuildVersion(OperationContext* opCtx,
+                                              NamespaceString ns,
+                                              StringData indexName) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     return md.indexes[offset].versionOfBuild;
 }
 
-CollectionOptions KVCatalog::getCollectionOptions(OperationContext* opCtx,
-                                                  NamespaceString ns) const {
+CollectionOptions DurableCatalogImpl::getCollectionOptions(OperationContext* opCtx,
+                                                           NamespaceString ns) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     return md.options;
 }
 
-int KVCatalog::getTotalIndexCount(OperationContext* opCtx, NamespaceString ns) const {
+int DurableCatalogImpl::getTotalIndexCount(OperationContext* opCtx, NamespaceString ns) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
 
     return static_cast<int>(md.indexes.size());
 }
 
-int KVCatalog::getCompletedIndexCount(OperationContext* opCtx, NamespaceString ns) const {
+int DurableCatalogImpl::getCompletedIndexCount(OperationContext* opCtx, NamespaceString ns) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
 
     int num = 0;
@@ -1233,9 +1241,9 @@ int KVCatalog::getCompletedIndexCount(OperationContext* opCtx, NamespaceString n
     return num;
 }
 
-BSONObj KVCatalog::getIndexSpec(OperationContext* opCtx,
-                                NamespaceString ns,
-                                StringData indexName) const {
+BSONObj DurableCatalogImpl::getIndexSpec(OperationContext* opCtx,
+                                         NamespaceString ns,
+                                         StringData indexName) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
 
     int offset = md.findIndexOffset(indexName);
@@ -1251,9 +1259,9 @@ BSONObj KVCatalog::getIndexSpec(OperationContext* opCtx,
     return spec;
 }
 
-void KVCatalog::getAllIndexes(OperationContext* opCtx,
-                              NamespaceString ns,
-                              std::vector<std::string>* names) const {
+void DurableCatalogImpl::getAllIndexes(OperationContext* opCtx,
+                                       NamespaceString ns,
+                                       std::vector<std::string>* names) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
 
     for (unsigned i = 0; i < md.indexes.size(); i++) {
@@ -1261,9 +1269,9 @@ void KVCatalog::getAllIndexes(OperationContext* opCtx,
     }
 }
 
-void KVCatalog::getReadyIndexes(OperationContext* opCtx,
-                                NamespaceString ns,
-                                std::vector<std::string>* names) const {
+void DurableCatalogImpl::getReadyIndexes(OperationContext* opCtx,
+                                         NamespaceString ns,
+                                         std::vector<std::string>* names) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
 
     for (unsigned i = 0; i < md.indexes.size(); i++) {
@@ -1272,9 +1280,9 @@ void KVCatalog::getReadyIndexes(OperationContext* opCtx,
     }
 }
 
-void KVCatalog::getAllUniqueIndexes(OperationContext* opCtx,
-                                    NamespaceString ns,
-                                    std::vector<std::string>* names) const {
+void DurableCatalogImpl::getAllUniqueIndexes(OperationContext* opCtx,
+                                             NamespaceString ns,
+                                             std::vector<std::string>* names) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
 
     for (unsigned i = 0; i < md.indexes.size(); i++) {
@@ -1285,17 +1293,17 @@ void KVCatalog::getAllUniqueIndexes(OperationContext* opCtx,
     }
 }
 
-bool KVCatalog::isIndexPresent(OperationContext* opCtx,
-                               NamespaceString ns,
-                               StringData indexName) const {
+bool DurableCatalogImpl::isIndexPresent(OperationContext* opCtx,
+                                        NamespaceString ns,
+                                        StringData indexName) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     int offset = md.findIndexOffset(indexName);
     return offset >= 0;
 }
 
-bool KVCatalog::isIndexReady(OperationContext* opCtx,
-                             NamespaceString ns,
-                             StringData indexName) const {
+bool DurableCatalogImpl::isIndexReady(OperationContext* opCtx,
+                                      NamespaceString ns,
+                                      StringData indexName) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
 
     int offset = md.findIndexOffset(indexName);
@@ -1303,12 +1311,12 @@ bool KVCatalog::isIndexReady(OperationContext* opCtx,
     return md.indexes[offset].ready;
 }
 
-KVPrefix KVCatalog::getIndexPrefix(OperationContext* opCtx,
-                                   NamespaceString ns,
-                                   StringData indexName) const {
+KVPrefix DurableCatalogImpl::getIndexPrefix(OperationContext* opCtx,
+                                            NamespaceString ns,
+                                            StringData indexName) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     return md.indexes[offset].prefix;
 }
-}
+}  // namespace mongo

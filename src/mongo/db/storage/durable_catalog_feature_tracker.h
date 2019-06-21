@@ -33,7 +33,7 @@
 #include <memory>
 #include <type_traits>
 
-#include "mongo/db/storage/kv/kv_catalog.h"
+#include "mongo/db/storage/durable_catalog_impl.h"
 
 namespace mongo {
 
@@ -42,7 +42,8 @@ class RecordId;
 class RecordStore;
 
 /**
- * Manages the contents of a document in the KVCatalog used to restrict downgrade compatibility.
+ * Manages the contents of a document in the DurableCatalogImpl used to restrict downgrade
+ * compatibility.
  *
  * When a new feature is enabled on a collection or index in the data files, a bit is set in one of
  * the fields of the document. Older versions won't recognize this bit and will fail to start up as
@@ -51,7 +52,7 @@ class RecordStore;
  * The inserted document serves a similar purpose to the DataFileVersion class used with the MMAPv1
  * storage engine.
  */
-class KVCatalog::FeatureTracker {
+class DurableCatalogImpl::FeatureTracker {
 public:
     /**
      * Bit flags representing whether a particular feature is enabled on a least one collection or
@@ -89,9 +90,9 @@ public:
 
     /**
      * Returns true if 'obj' represents the contents of the feature document that was previously
-     * inserted into the KVCatalog, and returns false otherwise.
+     * inserted into the DurableCatalogImpl, and returns false otherwise.
      *
-     * This function should return true for at most one document in the KVCatalog.
+     * This function should return true for at most one document in the DurableCatalogImpl.
      */
     static bool isFeatureDocument(BSONObj obj);
 
@@ -103,7 +104,7 @@ public:
      * data associated with 'rid'.
      */
     static std::unique_ptr<FeatureTracker> get(OperationContext* opCtx,
-                                               KVCatalog* catalog,
+                                               DurableCatalogImpl* catalog,
                                                RecordId rid);
 
     /**
@@ -114,7 +115,8 @@ public:
      * It is invalid to call this function when isFeatureDocument() returns true for some document
      * in the record store 'catalog->_rs'.
      */
-    static std::unique_ptr<FeatureTracker> create(OperationContext* opCtx, KVCatalog* catalog);
+    static std::unique_ptr<FeatureTracker> create(OperationContext* opCtx,
+                                                  DurableCatalogImpl* catalog);
 
     /**
      * Returns whethers the data files are compatible with the current code:
@@ -183,9 +185,9 @@ public:
 
 private:
     // Must go through FeatureTracker::get() or FeatureTracker::create().
-    FeatureTracker(KVCatalog* catalog, RecordId rid) : _catalog(catalog), _rid(rid) {}
+    FeatureTracker(DurableCatalogImpl* catalog, RecordId rid) : _catalog(catalog), _rid(rid) {}
 
-    KVCatalog* _catalog;
+    DurableCatalogImpl* _catalog;
     RecordId _rid;
 
     NonRepairableFeatureMask _usedNonRepairableFeaturesMask =

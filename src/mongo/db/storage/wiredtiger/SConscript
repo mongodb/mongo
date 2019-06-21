@@ -103,7 +103,7 @@ if wiredtiger:
             'storage_wiredtiger_core',
             'storage_wiredtiger_customization_hooks',
             '$BUILD_DIR/mongo/db/db_raii',
-            '$BUILD_DIR/mongo/db/storage/kv/storage_engine',
+            '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
             '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
             '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
         ],
@@ -165,7 +165,7 @@ if wiredtiger:
             'wiredtiger_record_store_test.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+            '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
             '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
             '$BUILD_DIR/mongo/util/clock_source_mock',
             'storage_wiredtiger_mock',
@@ -178,7 +178,7 @@ if wiredtiger:
             'wiredtiger_index_test.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+            '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
             '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
             'storage_wiredtiger_mock',
         ],
@@ -267,7 +267,7 @@ if wiredtiger:
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/db/service_context',
-                '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+                '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
                 'storage_wiredtiger_mock',
             ],
         )
@@ -286,7 +286,7 @@ if wiredtiger:
             source='wiredtiger_begin_transaction_block_bm.cpp',
             LIBDEPS=[
                 '$BUILD_DIR/mongo/db/service_context',
-                '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+                '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
                 '$BUILD_DIR/mongo/unittest/unittest',
                 '$BUILD_DIR/mongo/util/clock_source_mock',
                 'storage_wiredtiger_mock',

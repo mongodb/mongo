@@ -31,7 +31,7 @@
 #define LOG_FOR_RECOVERY(level) \
     MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
 
-#include "mongo/db/storage/kv/storage_engine_impl.h"
+#include "mongo/db/storage/storage_engine_impl.h"
 
 #include <algorithm>
 
@@ -43,7 +43,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
+#include "mongo/db/storage/durable_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
 #include "mongo/db/storage/storage_repair_observer.h"
@@ -61,7 +61,7 @@ using std::vector;
 namespace {
 const std::string catalogInfo = "_mdb_catalog";
 const auto kCatalogLogLevel = logger::LogSeverity::Debug(2);
-}
+}  // namespace
 
 StorageEngineImpl::StorageEngineImpl(KVEngine* engine, StorageEngineOptions options)
     : _engine(engine),
@@ -121,7 +121,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
         _dumpCatalog(opCtx);
     }
 
-    _catalog.reset(new KVCatalog(
+    _catalog.reset(new DurableCatalogImpl(
         _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes, this));
     _catalog->init(opCtx);
 
@@ -737,7 +737,7 @@ StatusWith<Timestamp> StorageEngineImpl::recoverToStableTimestamp(OperationConte
 
     // The "feature document" should not be rolled back. Perform a non-timestamped update to the
     // feature document to lock in the current state.
-    KVCatalog::FeatureTracker::FeatureBits featureInfo;
+    DurableCatalogImpl::FeatureTracker::FeatureBits featureInfo;
     {
         WriteUnitOfWork wuow(opCtx);
         featureInfo = _catalog->getFeatureTracker()->getInfo(opCtx);

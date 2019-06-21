@@ -38,9 +38,9 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
+#include "mongo/db/storage/durable_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/storage_engine_impl.h"
+#include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -55,4 +55,5 @@ KVCollectionCatalogEntry::KVCollectionCatalogEntry(StorageEngineInterface* engin
       _engine(engine),
       _ident(ident.toString()),
       _recordStore(std::move(rs)) {}
-}
+
+}  // namespace mongo
