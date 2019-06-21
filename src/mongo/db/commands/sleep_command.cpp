@@ -96,7 +96,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         log() << "test only command sleep invoked";
-        long long millis = 0;
+        long long msToSleep = 0;
 
         if (cmdObj["secs"] || cmdObj["seconds"] || cmdObj["millis"]) {
             uassert(51153,
@@ -105,43 +105,64 @@ public:
 
             if (auto secsElem = cmdObj["secs"]) {
                 uassert(34344, "'secs' must be a number.", secsElem.isNumber());
-                millis += secsElem.numberLong() * 1000;
+                msToSleep += secsElem.numberLong() * 1000;
             } else if (auto secondsElem = cmdObj["seconds"]) {
                 uassert(51154, "'seconds' must be a number.", secondsElem.isNumber());
-                millis += secondsElem.numberLong() * 1000;
+                msToSleep += secondsElem.numberLong() * 1000;
             }
 
             if (auto millisElem = cmdObj["millis"]) {
                 uassert(34345, "'millis' must be a number.", millisElem.isNumber());
-                millis += millisElem.numberLong();
+                msToSleep += millisElem.numberLong();
             }
         } else {
-            millis = 10 * 1000;
+            msToSleep = 10 * 1000;
         }
 
-        StringData lockTarget;
-        if (cmdObj["lockTarget"]) {
-            lockTarget = cmdObj["lockTarget"].checkAndGetStringData();
-        }
+        auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+        auto deadline = now + Milliseconds(msToSleep);
 
-        if (!cmdObj["lock"]) {
-            // Legacy implementation
-            if (cmdObj.getBoolField("w")) {
-                _sleepInLock(opCtx, millis, MODE_X, lockTarget);
-            } else {
-                _sleepInLock(opCtx, millis, MODE_S, lockTarget);
+        // Note that if the system clock moves _backwards_ (which has been known to happen), this
+        // could result in a much longer sleep than requested. Since this command is only used for
+        // testing, we're okay with this imprecision.
+        while (deadline > now) {
+            Milliseconds msRemaining = deadline - now;
+
+            // If the clock moves back by an absurd amount then uassert.
+            Milliseconds threshold(10000);
+            uassert(31173,
+                    str::stream() << "Clock must have moved backwards by at least " << threshold
+                                  << " ms during sleep command",
+                    msRemaining.count() < msToSleep + threshold.count());
+
+            ON_BLOCK_EXIT(
+                [&now, opCtx] { now = opCtx->getServiceContext()->getFastClockSource()->now(); });
+
+            StringData lockTarget;
+            if (cmdObj["lockTarget"]) {
+                lockTarget = cmdObj["lockTarget"].checkAndGetStringData();
             }
-        } else {
-            uassert(34346, "Only one of 'w' and 'lock' may be set.", !cmdObj["w"]);
 
-            std::string lock(cmdObj.getStringField("lock"));
-            if (lock == "none") {
-                opCtx->sleepFor(Milliseconds(millis));
-            } else if (lock == "w") {
-                _sleepInLock(opCtx, millis, MODE_X, lockTarget);
+            if (!cmdObj["lock"]) {
+                // The caller may specify either 'w' as true or false to take a global X lock or
+                // global S lock, respectively.
+                if (cmdObj.getBoolField("w")) {
+                    _sleepInLock(opCtx, msRemaining.count(), MODE_X, lockTarget);
+                } else {
+                    _sleepInLock(opCtx, msRemaining.count(), MODE_S, lockTarget);
+                }
             } else {
-                uassert(34347, "'lock' must be one of 'r', 'w', 'none'.", lock == "r");
-                _sleepInLock(opCtx, millis, MODE_S, lockTarget);
+                uassert(34346, "Only one of 'w' and 'lock' may be set.", !cmdObj["w"]);
+
+                std::string lock(cmdObj.getStringField("lock"));
+                if (lock == "none") {
+                    opCtx->sleepFor(Milliseconds(msRemaining));
+                } else if (lock == "w") {
+                    _sleepInLock(opCtx, msRemaining.count(), MODE_X, lockTarget);
+                } else {
+                    uassert(34347, "'lock' must be one of 'r', 'w', 'none'.", lock == "r");
+                    _sleepInLock(opCtx, msRemaining.count(), MODE_S, lockTarget);
+                }
             }
         }
 
