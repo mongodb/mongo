@@ -53,6 +53,9 @@
     let coll = assertCreateCollection(db, collName);
     assert.writeOK(coll.insert({_id: 0}));
 
+    // Determine the number of shards that the collection is distributed across.
+    const numShards = FixtureHelpers.numberOfShardsForCollection(coll);
+
     change = cst.getOneChange(cursor);
     assert.eq(change.operationType, "insert", tojson(change));
 
@@ -76,6 +79,17 @@
     const resumeToken = changes[0]._id;
     const resumeTokenDrop = changes[3]._id;
     const resumeTokenInvalidate = changes[4]._id;
+
+    // Verify we can startAfter the invalidate. We should see one drop event for every other shard
+    // that the collection was present on, or nothing if the collection was not sharded. This test
+    // exercises the bug described in SERVER-41196.
+    const restartedStream = coll.watch([], {startAfter: resumeTokenInvalidate});
+    for (let i = 0; i < numShards - 1; ++i) {
+        assert.soon(() => restartedStream.hasNext());
+        const nextEvent = restartedStream.next();
+        assert.eq(nextEvent.operationType, "drop", () => tojson(nextEvent));
+    }
+    assert(!restartedStream.hasNext(), () => tojson(restartedStream.next()));
 
     // Verify that we can resume a stream after a collection drop without an explicit collation.
     assert.commandWorked(db.runCommand({
