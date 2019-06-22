@@ -62,15 +62,20 @@ public:
 
 protected:
     /**
+     * Pushes a document with a resume token corresponding to the given ResumeTokenData into the
+     * mock queue.
+     */
+    void addDocument(ResumeTokenData tokenData) {
+        _mock->push_back(Document{{"_id", ResumeToken(std::move(tokenData)).toDocument()}});
+    }
+
+    /**
      * Pushes a document with a resume token corresponding to the given timestamp, version,
      * txnOpIndex, docKey, and namespace into the mock queue.
      */
     void addDocument(
         Timestamp ts, int version, std::size_t txnOpIndex, Document docKey, UUID uuid) {
-        _mock->push_back(
-            Document{{"_id",
-                      ResumeToken(ResumeTokenData(ts, version, txnOpIndex, uuid, Value(docKey)))
-                          .toDocument()}});
+        return addDocument({ts, version, txnOpIndex, uuid, Value(docKey)});
     }
 
     /**
@@ -93,6 +98,17 @@ protected:
     }
 
     /**
+     * Convenience method to create the class under test with a given ResumeTokenData.
+     */
+    intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> createCheckResumeToken(
+        ResumeTokenData tokenData) {
+        auto checkResumeToken =
+            DocumentSourceEnsureResumeTokenPresent::create(getExpCtx(), std::move(tokenData));
+        checkResumeToken->setSource(_mock.get());
+        return checkResumeToken;
+    }
+
+    /**
      * Convenience method to create the class under test with a given timestamp, docKey, and
      * namespace.
      */
@@ -102,10 +118,8 @@ protected:
         std::size_t txnOpIndex,
         boost::optional<Document> docKey,
         UUID uuid) {
-        auto checkResumeToken = DocumentSourceEnsureResumeTokenPresent::create(
-            getExpCtx(), {ts, version, txnOpIndex, uuid, docKey ? Value(*docKey) : Value()});
-        checkResumeToken->setSource(_mock.get());
-        return checkResumeToken;
+        return createCheckResumeToken(
+            {ts, version, txnOpIndex, uuid, docKey ? Value(*docKey) : Value()});
     }
 
     /**
@@ -407,6 +421,122 @@ TEST_F(CheckResumeTokenTest,
     addDocument(resumeTimestamp, {{"_id"_sd, 1}}, uuids[0]);
 
     ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
+}
+
+TEST_F(CheckResumeTokenTest, ShouldSwallowInvalidateFromEachShardForStartAfterInvalidate) {
+    Timestamp resumeTimestamp(100, 1);
+    Timestamp firstEventAfter(100, 2);
+
+    // Create an array of 2 UUIDs. The first represents the UUID of the namespace before it was
+    // dropped. The second is the UUID of the collection after it is recreated.
+    UUID uuids[2] = {UUID::gen(), UUID::gen()};
+
+    // This behaviour is only relevant when DSEnsureResumeTokenPresent is running on mongoS.
+    getExpCtx()->inMongos = true;
+
+    // Create a resume token representing an 'invalidate' event, and use it to seed the stage. A
+    // resume token with {fromInvalidate:true} can only be used with startAfter, to start a new
+    // stream after the old stream is invalidated.
+    ResumeTokenData invalidateToken;
+    invalidateToken.clusterTime = resumeTimestamp;
+    invalidateToken.uuid = uuids[0];
+    invalidateToken.fromInvalidate = ResumeTokenData::kFromInvalidate;
+    auto checkResumeToken = createCheckResumeToken(invalidateToken);
+
+    // Add three documents which each have the invalidate resume token. We expect to see this in the
+    // event that we are starting after an invalidate and the invalidating event occurred on several
+    // shards at the same clusterTime.
+    addDocument(invalidateToken);
+    addDocument(invalidateToken);
+    addDocument(invalidateToken);
+
+    // Add a document representing an insert which recreated the collection after it was dropped.
+    auto expectedDocKey = Document{{"_id"_sd, 1}};
+    addDocument(Timestamp{100, 2}, expectedDocKey, uuids[1]);
+
+    // DSEnsureResumeTokenPresent should confirm that the invalidate event is present, swallow it
+    // and the next two invalidates, and return the insert event after the collection drop.
+    const auto firstDocAfterResume = checkResumeToken->getNext();
+    const auto tokenFromFirstDocAfterResume =
+        ResumeToken::parse(firstDocAfterResume.getDocument()["_id"].getDocument()).getData();
+
+    ASSERT_EQ(tokenFromFirstDocAfterResume.clusterTime, firstEventAfter);
+    ASSERT_DOCUMENT_EQ(tokenFromFirstDocAfterResume.documentKey.getDocument(), expectedDocKey);
+}
+
+TEST_F(CheckResumeTokenTest, ShouldNotSwallowUnrelatedInvalidateForStartAfterInvalidate) {
+    Timestamp resumeTimestamp(100, 1);
+
+    // This behaviour is only relevant when DSEnsureResumeTokenPresent is running on mongoS.
+    getExpCtx()->inMongos = true;
+
+    // Create an ordered array of of 2 UUIDs.
+    std::vector<UUID> uuids = {UUID::gen(), UUID::gen()};
+    std::sort(uuids.begin(), uuids.end());
+
+    // Create a resume token representing an 'invalidate' event, and use it to seed the stage. A
+    // resume token with {fromInvalidate:true} can only be used with startAfter, to start a new
+    // stream after the old stream is invalidated.
+    ResumeTokenData invalidateToken;
+    invalidateToken.clusterTime = resumeTimestamp;
+    invalidateToken.uuid = uuids[0];
+    invalidateToken.fromInvalidate = ResumeTokenData::kFromInvalidate;
+    auto checkResumeToken = createCheckResumeToken(invalidateToken);
+
+    // Create a second invalidate token with the same clusterTime but a different UUID.
+    auto unrelatedInvalidateToken = invalidateToken;
+    unrelatedInvalidateToken.uuid = uuids[1];
+
+    // Add three documents which each have the invalidate resume token. We expect to see this in the
+    // event that we are starting after an invalidate and the invalidating event occurred on several
+    // shards at the same clusterTime.
+    addDocument(invalidateToken);
+    addDocument(invalidateToken);
+    addDocument(invalidateToken);
+
+    // Add a fourth document which has the unrelated invalidate at the same clusterTime.
+    addDocument(unrelatedInvalidateToken);
+
+    // DSEnsureResumeTokenPresent should confirm that the invalidate event is present, swallow it
+    // and the next two invalidates, but decline to swallow the unrelated invalidate.
+    const auto firstDocAfterResume = checkResumeToken->getNext();
+    const auto tokenFromFirstDocAfterResume =
+        ResumeToken::parse(firstDocAfterResume.getDocument()["_id"].getDocument()).getData();
+
+    ASSERT_EQ(tokenFromFirstDocAfterResume, unrelatedInvalidateToken);
+}
+
+TEST_F(CheckResumeTokenTest, ShouldSwallowOnlyFirstInvalidateForStartAfterInvalidateInReplSet) {
+    Timestamp resumeTimestamp(100, 1);
+
+    // We only swallow multiple invalidates when DSEnsureResumeTokenPresent is running on mongoS.
+    // Set {inMongos:false} to verify that we do not swallow additional invalidates on a replica
+    // set, since this should never occur.
+    getExpCtx()->inMongos = false;
+
+    // Create a resume token representing an 'invalidate' event, and use it to seed the stage. A
+    // resume token with {fromInvalidate:true} can only be used with startAfter, to start a new
+    // stream after the old stream is invalidated.
+    ResumeTokenData invalidateToken;
+    invalidateToken.clusterTime = resumeTimestamp;
+    invalidateToken.uuid = testUuid();
+    invalidateToken.fromInvalidate = ResumeTokenData::kFromInvalidate;
+    auto checkResumeToken = createCheckResumeToken(invalidateToken);
+
+    // Add three documents which each have the invalidate resume token.
+    addDocument(invalidateToken);
+    addDocument(invalidateToken);
+    addDocument(invalidateToken);
+
+    // DSEnsureResumeTokenPresent should confirm that the invalidate event is present and swallow
+    // it. However, it should not swallow the subsequent two invalidates.
+    for (size_t i = 0; i < 2; ++i) {
+        const auto nextDocAfterResume = checkResumeToken->getNext();
+        const auto tokenFromNextDocAfterResume =
+            ResumeToken::parse(nextDocAfterResume.getDocument()["_id"].getDocument()).getData();
+        ASSERT_EQ(tokenFromNextDocAfterResume, invalidateToken);
+    }
+    ASSERT(checkResumeToken->getNext().isEOF());
 }
 
 TEST_F(CheckResumeTokenTest, ShouldSkipResumeTokensWithEarlierTxnOpIndex) {

@@ -341,7 +341,7 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
     list<intrusive_ptr<DocumentSource>> stages;
     boost::optional<Timestamp> startFrom;
     intrusive_ptr<DocumentSource> resumeStage = nullptr;
-    bool ignoreFirstInvalidate = false;
+    boost::optional<ResumeTokenData> startAfterInvalidate;
     bool showMigrationEvents = spec.getShowMigrationEvents();
     uassert(31123,
             "Change streams from mongos may not show migration events.",
@@ -357,9 +357,11 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
         ResumeToken token = resumeAfter ? resumeAfter.get() : startAfter.get();
         ResumeTokenData tokenData = token.getData();
 
-        // If resuming from an "invalidate" using "startAfter", set this bit to indicate to the
-        // DocumentSourceCheckInvalidate stage that a second invalidate should not be generated.
-        ignoreFirstInvalidate = startAfter && tokenData.fromInvalidate;
+        // If resuming from an "invalidate" using "startAfter", pass along the resume token data to
+        // DocumentSourceCheckInvalidate to signify that another invalidate should not be generated.
+        if (startAfter && tokenData.fromInvalidate) {
+            startAfterInvalidate = tokenData;
+        }
 
         uassert(ErrorCodes::InvalidResumeToken,
                 "Attempting to resume a change stream using 'resumeAfter' is not allowed from an "
@@ -432,7 +434,7 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
 
     // The resume stage must come after the check invalidate stage so that the former can determine
     // whether the event that matches the resume token should be followed by an "invalidate" event.
-    stages.push_back(DocumentSourceCheckInvalidate::create(expCtx, ignoreFirstInvalidate));
+    stages.push_back(DocumentSourceCheckInvalidate::create(expCtx, startAfterInvalidate));
     if (resumeStage) {
         stages.push_back(resumeStage);
     }

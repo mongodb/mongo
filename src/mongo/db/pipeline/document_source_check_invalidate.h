@@ -69,8 +69,9 @@ public:
     }
 
     static boost::intrusive_ptr<DocumentSourceCheckInvalidate> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, bool ignoreFirstInvalidate) {
-        return new DocumentSourceCheckInvalidate(expCtx, ignoreFirstInvalidate);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::optional<ResumeTokenData> startAfterInvalidate) {
+        return new DocumentSourceCheckInvalidate(expCtx, std::move(startAfterInvalidate));
     }
 
 private:
@@ -78,11 +79,14 @@ private:
      * Use the create static method to create a DocumentSourceCheckInvalidate.
      */
     DocumentSourceCheckInvalidate(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                  bool ignoreFirstInvalidate)
-        : DocumentSource(expCtx), _ignoreFirstInvalidate(ignoreFirstInvalidate) {}
+                                  boost::optional<ResumeTokenData> startAfterInvalidate)
+        : DocumentSource(expCtx), _startAfterInvalidate(std::move(startAfterInvalidate)) {
+        invariant(!_startAfterInvalidate ||
+                  _startAfterInvalidate->fromInvalidate == ResumeTokenData::kFromInvalidate);
+    }
 
+    boost::optional<ResumeTokenData> _startAfterInvalidate;
     boost::optional<Document> _queuedInvalidate;
-    bool _ignoreFirstInvalidate;
 };
 
 }  // namespace mongo

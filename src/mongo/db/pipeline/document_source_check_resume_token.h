@@ -154,6 +154,13 @@ private:
     DocumentSourceEnsureResumeTokenPresent(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            ResumeTokenData token);
 
+    /**
+     * Check the given event to determine whether it matches the client's resume token. If so, we
+     * swallow this event and return the next event in the stream. Otherwise, return boost::none.
+     */
+    boost::optional<DocumentSource::GetNextResult> _checkNextDocAndSwallowResumeToken(
+        const DocumentSource::GetNextResult& nextInput);
+
     ResumeStatus _resumeStatus = ResumeStatus::kCheckNextDoc;
     ResumeTokenData _tokenFromClient;
 };
