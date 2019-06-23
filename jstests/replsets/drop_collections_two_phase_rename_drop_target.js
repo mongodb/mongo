@@ -48,8 +48,7 @@
     const testDb = primary.getDB(dbName);
     const fromColl = testDb.getCollection(fromCollName);
     const toColl = testDb.getCollection(toCollName);
-    let maxNsLength = 127;
-    let longIndexName = ''.pad(maxNsLength - (toColl.getFullName() + '.$').length, true, 'a');
+    let longIndexName = 'a'.repeat(8192);
     let shortIndexName = "short_name";
 
     // In the target collection, which will be dropped, create one index with a "too long" name, and
@@ -95,28 +94,6 @@
         assert(isPendingDropResult);
         const droppedCollName = isPendingDropResult.name;
         jsTestLog('Original target collection is now in a drop-pending state: ' + droppedCollName);
-
-        // Check that indexes that would violate the namespace length constraints after rename were
-        // dropped.
-        const indexes = listIndexes(testDb, droppedCollName);
-        jsTestLog('Indexes in ' + droppedCollName + ': ' + tojson(indexes));
-        assert(indexes.find(idx => idx.name === shortIndexName));
-        assert.eq(undefined, indexes.find(idx => idx.name === longIndexName));
-
-        // Check that index drop appears before collection rename in the oplog.
-        const oplogColl = primary.getCollection('local.oplog.rs');
-        const cmdNs = testDb.getCollection('$cmd').getFullName();
-        const renameOplogEntry =
-            oplogColl.findOne({ns: cmdNs, 'o.renameCollection': fromColl.getFullName()});
-        const dropIndexOplogEntry =
-            oplogColl.findOne({ns: cmdNs, o: {dropIndexes: toCollName, index: longIndexName}});
-        const renameTimestamp = renameOplogEntry.ts;
-        const dropIndexTimestamp = dropIndexOplogEntry.ts;
-        assert.lt(dropIndexTimestamp,
-                  renameTimestamp,
-                  'index was not dropped before collection. index drop: ' +
-                      tojson(dropIndexOplogEntry) + ' . collection rename: ' +
-                      tojson(renameOplogEntry));
 
         // COMMIT collection drop.
         twoPhaseDropTest.resumeOplogApplication(secondary);

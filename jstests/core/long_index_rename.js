@@ -12,16 +12,8 @@
         coll.save({a: i});
     }
 
-    // Compute maximum index name length for this collection under FCV 4.0.
-    const maxNsLength = 127;
-    const maxIndexNameLength = maxNsLength - (coll.getFullName() + ".$").length;
-    jsTestLog('Max index name length under FCV 4.0 = ' + maxIndexNameLength);
-
-    // Create an index with the longest name allowed for this collection.
-    assert.commandWorked(coll.createIndex({a: 1}, {name: 'a'.repeat(maxIndexNameLength)}));
-
     // Beginning with 4.2, index namespaces longer than 127 characters are acceptable.
-    assert.commandWorked(coll.createIndex({b: 1}, {name: 'b'.repeat(maxIndexNameLength) + 1}));
+    assert.commandWorked(coll.createIndex({b: 1}, {name: 'a'.repeat(8192)}));
 
     // Before 4.2, index namespace lengths were checked while renaming collections.
     const dest = db.long_index_rename2;

@@ -393,18 +393,8 @@ TEST_F(DatabaseTest,
             ErrorCodes::FailedToParse,
             db->makeUniqueCollectionNamespace(_opCtx.get(), "CollectionModelWithoutPercentSign"));
 
-        // Generated namespace has to satisfy namespace length constraints so we will reject
-        // any collection model where the first substituted percent sign will not be in the
-        // generated namespace. See NamespaceString::MaxNsCollectionLen.
-        auto dbPrefix = _nss.db() + ".";
-        auto modelTooLong =
-            (StringBuilder() << dbPrefix
-                             << std::string('x',
-                                            NamespaceString::MaxNsCollectionLen - dbPrefix.size())
-                             << "%")
-                .str();
-        ASSERT_EQUALS(ErrorCodes::FailedToParse,
-                      db->makeUniqueCollectionNamespace(_opCtx.get(), modelTooLong));
+        std::string longCollModel(8192, '%');
+        ASSERT_OK(db->makeUniqueCollectionNamespace(_opCtx.get(), StringData(longCollModel)));
     });
 }
 

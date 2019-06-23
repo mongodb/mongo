@@ -492,33 +492,31 @@ TEST_F(RenameCollectionTest, RenameCollectionReturnsNotMasterIfNotPrimary) {
 
 TEST_F(RenameCollectionTest, TargetCollectionNameLong) {
     _createCollection(_opCtx.get(), _sourceNss);
-    const std::string targetCollectionName(NamespaceString::MaxNsCollectionLen, 'a');
+    const std::string targetCollectionName(8192, 'a');
     NamespaceString longTargetNss(_sourceNss.db(), targetCollectionName);
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, longTargetNss, {}));
 }
 
 TEST_F(RenameCollectionTest, LongIndexNameAllowedForTargetCollection) {
     ASSERT_GREATER_THAN(_targetNssDifferentDb.size(), _sourceNss.size());
-    std::size_t longestIndexNameAllowedForSource =
-        NamespaceString::MaxNsLen - 2U /*strlen(".$")*/ - _sourceNss.size();
 
     _createCollection(_opCtx.get(), _sourceNss);
-    const std::string indexName(longestIndexNameAllowedForSource, 'a');
+    std::size_t longIndexLength = 8192;
+    const std::string indexName(longIndexLength, 'a');
     _createIndexOnEmptyCollection(_opCtx.get(), _sourceNss, indexName);
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
 }
 
 TEST_F(RenameCollectionTest, LongIndexNameAllowedForTemporaryCollectionForRenameAcrossDatabase) {
     ASSERT_GREATER_THAN(_targetNssDifferentDb.size(), _sourceNss.size());
-    std::size_t longestIndexNameAllowedForTarget =
-        NamespaceString::MaxNsLen - 2U /*strlen(".$")*/ - _targetNssDifferentDb.size();
 
     // Using XXXXX to check namespace length. Each 'X' will be replaced by a random character in
     // renameCollection().
     const NamespaceString tempNss(_targetNssDifferentDb.getSisterNS("tmpXXXXX.renameCollection"));
 
     _createCollection(_opCtx.get(), _sourceNss);
-    const std::string indexName(longestIndexNameAllowedForTarget, 'a');
+    std::size_t longIndexLength = 8192;
+    const std::string indexName(longIndexLength, 'a');
     _createIndexOnEmptyCollection(_opCtx.get(), _sourceNss, indexName);
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
 }

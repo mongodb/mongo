@@ -157,23 +157,6 @@ public:
     static NamespaceString makeListCollectionsNSS(StringData dbName);
 
     /**
-     * Note that these values are derived from the mmap_v1 implementation and that is the only
-     * reason they are constrained as such.
-     */
-    enum MaxNsLenValue {
-        // Maximum possible length of name any namespace, including special ones like $extra.
-        // This includes rum for the NUL byte so it can be used when sizing buffers.
-        MaxNsLenWithNUL = 128,
-
-        // MaxNsLenWithNUL excluding the NUL byte. Use this when comparing std::string lengths.
-        MaxNsLen = MaxNsLenWithNUL - 1,
-
-        // Maximum allowed length of fully qualified namespace name of any real collection.
-        // Does not include NUL so it can be directly compared to std::string lengths.
-        MaxNsCollectionLen = MaxNsLen - 7 /*strlen(".$extra")*/,
-    };
-
-    /**
      * NOTE: DollarInDbNameBehavior::allow is deprecated.
      *
      * Please use DollarInDbNameBehavior::disallow and check explicitly for any DB names that must
@@ -306,9 +289,6 @@ public:
      *
      * Example:
      *     test.foo -> test.system.drop.<timestamp seconds>i<timestamp increment>t<term>.foo
-     *
-     * Original collection name may be truncated so that the generated namespace length does not
-     * exceed MaxNsCollectionLen.
      */
     NamespaceString makeDropPendingNamespace(const repl::OpTime& opTime) const;
 

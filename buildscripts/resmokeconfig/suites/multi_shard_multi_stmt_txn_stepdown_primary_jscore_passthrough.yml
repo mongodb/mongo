@@ -65,7 +65,6 @@ selector:
   - jstests/core/dbcase.js
   - jstests/core/dbcase2.js
   - jstests/core/no_db_created.js
-  - jstests/core/ns_length.js
   - jstests/core/views/*.js # Views tests aren't expected to work when collections are implicitly sharded.
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
   # These tests fail because sharded clusters do not clean up correctly after failed index builds.
@@ -233,7 +232,6 @@ selector:
   - jstests/core/doc_validation_options.js
   - jstests/core/geo_multinest0.js
   - jstests/core/insert_illegal_doc.js
-  - jstests/core/ns_length.js
   - jstests/core/push2.js
   - jstests/core/remove6.js
   - jstests/core/removeb.js

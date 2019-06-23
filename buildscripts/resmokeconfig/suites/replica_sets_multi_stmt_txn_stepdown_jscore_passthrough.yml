@@ -142,7 +142,6 @@ selector:
   - jstests/core/doc_validation_options.js
   - jstests/core/geo_multinest0.js
   - jstests/core/insert_illegal_doc.js
-  - jstests/core/ns_length.js
   - jstests/core/push2.js
   - jstests/core/remove6.js
   - jstests/core/removeb.js

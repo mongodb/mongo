@@ -204,14 +204,6 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
     if (!NamespaceString::validCollectionName(coll))
         return Status(ErrorCodes::InvalidNamespace, "invalid collection name");
 
-    if (db.size() + 1 /* dot */ + coll.size() > NamespaceString::MaxNsCollectionLen)
-        return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "fully qualified namespace " << db << '.' << coll
-                                    << " is too long "
-                                    << "(max is "
-                                    << NamespaceString::MaxNsCollectionLen
-                                    << " bytes)");
-
     // check spceial areas
 
     if (db == "system")

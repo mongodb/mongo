@@ -59,8 +59,7 @@ using namespace mongo::repl;
  */
 template <typename T>
 NamespaceString makeNamespace(const T& t, const std::string& suffix = "") {
-    return NamespaceString(std::string("local." + t.getSuiteName() + "_" + t.getTestName())
-                               .substr(0, NamespaceString::MaxNsCollectionLen - suffix.length()) +
+    return NamespaceString(std::string("local." + t.getSuiteName() + "_" + t.getTestName()) +
                            suffix);
 }
 

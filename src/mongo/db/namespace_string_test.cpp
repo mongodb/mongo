@@ -189,14 +189,11 @@ TEST(NamespaceStringTest, MakeDropPendingNamespace) {
     ASSERT_EQUALS(NamespaceString{"test.system.drop.1234567i8t9.foo"},
                   NamespaceString{"test.foo"}.makeDropPendingNamespace(
                       repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL)));
-    // If the collection name is too long to fit in the generated drop pending namespace, it will be
-    // truncated.
-    std::string dbName("test");
-    std::string collName(std::size_t(NamespaceString::MaxNsCollectionLen) - dbName.size() - 1, 't');
-    NamespaceString nss(dbName, collName);
-    auto dropPendingNss =
-        nss.makeDropPendingNamespace(repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL));
-    ASSERT_EQUALS(std::size_t(NamespaceString::MaxNsCollectionLen), dropPendingNss.size());
+
+    std::string collName(8192, 't');
+    NamespaceString nss("test", collName);
+    ASSERT_EQUALS(NamespaceString{"test.system.drop.1234567i8t9." + collName},
+                  nss.makeDropPendingNamespace(repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL)));
 }
 
 TEST(NamespaceStringTest, GetDropPendingNamespaceOpTime) {

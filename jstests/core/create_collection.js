@@ -18,6 +18,12 @@
     assert.commandFailedWithCode(db.createCollection("a\0b"), ErrorCodes.InvalidNamespace);
     assert.commandFailedWithCode(db.createCollection("ab\0"), ErrorCodes.InvalidNamespace);
 
+    // The collection name length limit was removed in 4.4, try creating a collection with a longer
+    // name than previously allowed.
+    const longCollName = 'a'.repeat(8192);
+    db[longCollName].drop();
+    assert.commandWorked(db.createCollection(longCollName));
+
     //
     // Tests for "idIndex" field.
     //
