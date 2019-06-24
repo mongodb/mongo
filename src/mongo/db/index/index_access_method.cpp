@@ -43,7 +43,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/index/index_access_method_gen.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
@@ -101,16 +100,6 @@ Status checkKeySize(const BSONObj& key) {
 
 }  // namespace
 
-// TODO SERVER-36386: Remove the server parameter
-bool failIndexKeyTooLongParam() {
-    // Always return true in FCV 4.2 although FCV 4.2 actually never needs to
-    // check this value because there shouldn't be any KeyTooLong errors in FCV 4.2.
-    if (serverGlobalParams.featureCompatibility.getVersion() ==
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42)
-        return true;
-    return failIndexKeyTooLong.load();
-}
-
 class BtreeExternalSortComparison {
 public:
     BtreeExternalSortComparison(const BSONObj& ordering, IndexVersion version)
@@ -140,11 +129,6 @@ AbstractIndexAccessMethod::AbstractIndexAccessMethod(IndexCatalogEntry* btreeSta
 }
 
 // TODO SERVER-36385: Remove this when there is no KeyTooLong error.
-bool AbstractIndexAccessMethod::ignoreKeyTooLong() {
-    return !failIndexKeyTooLongParam();
-}
-
-// TODO SERVER-36385: Remove this when there is no KeyTooLong error.
 bool AbstractIndexAccessMethod::shouldCheckIndexKeySize(OperationContext* opCtx) {
     // The index key size ought to be checked for nodes in FCV 4.0.  However, it is possible for an
     // index build to have begun on a secondary while in FCV 4.2 and then have FCV drop to 4.0.  For
@@ -168,7 +152,7 @@ bool AbstractIndexAccessMethod::isFatalError(OperationContext* opCtx, Status sta
     // If the status is Status::OK(), or if it is ErrorCodes::KeyTooLong and the user has chosen to
     // ignore this error, return false immediately.
     // TODO SERVER-36385: Remove this when there is no KeyTooLong error.
-    if (status.isOK() || (status == ErrorCodes::KeyTooLong && ignoreKeyTooLong())) {
+    if (status.isOK() || (status == ErrorCodes::KeyTooLong)) {
         return false;
     }
 
@@ -701,7 +685,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
             // Overlong key that's OK to skip?
             // TODO SERVER-36385: Remove this when there is no KeyTooLong error.
-            if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong()) {
+            if (status.code() == ErrorCodes::KeyTooLong) {
                 continue;
             }
 

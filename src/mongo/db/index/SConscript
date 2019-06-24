@@ -90,8 +90,7 @@ serveronlyEnv.InjectThirdParty(libraries=['snappy'])
 serveronlyEnv.Library(
     target="index_access_method",
     source=[
-        "index_access_method.cpp",
-        env.Idlc('index_access_method.idl')[0],
+        "index_access_method.cpp"
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

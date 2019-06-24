@@ -51,8 +51,6 @@ struct UpdateTicket;
 struct InsertResult;
 struct InsertDeleteOptions;
 
-bool failIndexKeyTooLongParam();
-
 /**
  * An IndexAccessMethod is the interface through which all the mutation, lookup, and
  * traversal of index entries is done. The class is designed so that the underlying index
@@ -564,12 +562,6 @@ private:
      * background index build.
      */
     bool isFatalError(OperationContext* opCtx, Status status, BSONObj key);
-
-    /**
-     * Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext
-     * TODO SERVER-36385: Remove this function.
-     */
-    bool ignoreKeyTooLong();
 
     /**
      * If true, we should check whether the index key exceeds the hardcoded limit.
