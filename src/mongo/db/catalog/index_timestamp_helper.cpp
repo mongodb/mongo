@@ -109,6 +109,10 @@ void IndexTimestampHelper::setGhostCommitTimestampForWrite(OperationContext* opC
  */
 namespace {
 bool requiresGhostCommitTimestampForCatalogWrite(OperationContext* opCtx, NamespaceString nss) {
+    if (opCtx->writesAreReplicated()) {
+        return false;
+    }
+
     if (!nss.isReplicated() || nss.coll().startsWith("tmp.mr.")) {
         return false;
     }
