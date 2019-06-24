@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/algorithm/string.hpp>
+
 #include "mongo/db/lasterror.h"
 
 #include "mongo/db/jsobj.h"
@@ -39,6 +41,19 @@ namespace mongo {
 LastError LastError::noError;
 
 const Client::Decoration<LastError> LastError::get = Client::declareDecoration<LastError>();
+
+namespace {
+void appendDupKeyFields(BSONObjBuilder& builder, std::string errMsg) {
+    // errMsg format for duplicate key errors:
+    // "E11000 duplicate key error collection: test.coll index: a_1 dup key: { a: 1.0 }",
+    std::vector<std::string> results;
+    boost::split(results, errMsg, [](char c) { return c == ' '; });
+    auto collName = results[5];
+    auto indexName = results[7];
+    builder.append("ns", collName);
+    builder.append("index", indexName);
+}
+}
 
 void LastError::reset(bool valid) {
     *this = LastError();
@@ -87,6 +102,9 @@ bool LastError::appendSelf(BSONObjBuilder& b, bool blankErr) const {
         }
     } else {
         b.append("err", _msg);
+        if (_msg.find("E11000 duplicate key error") != std::string::npos) {
+            appendDupKeyFields(b, _msg);
+        }
     }
 
     if (_code) {

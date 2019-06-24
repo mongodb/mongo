@@ -110,6 +110,8 @@ public:
         ASSERT_EQUALS(info["ok"].Double(), 1.0);
         ASSERT_EQUALS(info["code"].Int(), 11000);
         ASSERT_EQUALS(info["codeName"].String(), "DuplicateKey");
+        ASSERT_EQUALS(info["ns"].String(), _ns);
+        ASSERT_EQUALS(info["index"].String(), "_id_");
     }
 };
 
