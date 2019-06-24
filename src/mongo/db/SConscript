@@ -1854,3 +1854,21 @@ asioEnv.CppIntegrationTest(
         '$BUILD_DIR/mongo/util/version_impl',
     ],
 )
+
+env.CppLibfuzzerTest(
+    target='op_msg_fuzzer',
+    source=[
+        'op_msg_fuzzer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/service_context_d',
+        '$BUILD_DIR/mongo/transport/service_entry_point',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/unittest/unittest/',
+    ],
+)
