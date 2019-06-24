@@ -66,7 +66,7 @@
 
                 let message = "Retrying the " + commandName +
                     " command because a background operation is in progress (attempt " + attempt +
-                    ")";
+                    "): " + tojson(res);
 
                 // This handles the retry case when run against a standalone, replica set, or mongos
                 // where both shards returned the same response.
