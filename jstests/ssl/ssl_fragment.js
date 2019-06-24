@@ -20,11 +20,26 @@
         assert.eq(s, read, "Did not receive value written");
     }
 
-    const options = {
+    let options = {
         sslMode: "requireSSL",
         sslPEMKeyFile: "jstests/libs/server.pem",
         networkMessageCompressors: 'disabled',
     };
+
+    let mongosOptions = {
+        sslMode: "requireSSL",
+        sslPEMKeyFile: "jstests/libs/server.pem",
+        networkMessageCompressors: 'disabled',
+    };
+
+    if (_isWindows()) {
+        // Force the ASIO stack to do small reads which will excerise the schannel buffering code
+        // and significantly slow down the test
+        options = Object.extend(options,
+                                {setParameter: {"failpoint.smallTLSReads": "{'mode':'alwaysOn'}"}});
+        mongosOptions = Object.extend(
+            mongosOptions, {setParameter: {"failpoint.smallTLSReads": "{'mode':'alwaysOn'}"}});
+    }
 
     const mongod = MongoRunner.runMongod(options);
     runTest(mongod);
@@ -37,11 +52,13 @@
         config: 1,
         other: {
             configOptions: options,
-            mongosOptions: options,
+            mongosOptions: mongosOptions,
             shardOptions: options,
             shardAsReplicaSet: false,
         }
     });
+
     runTest(st.s0);
     st.stop();
+
 })();
