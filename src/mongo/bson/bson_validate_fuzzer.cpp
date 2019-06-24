@@ -33,4 +33,3 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     mongo::Status ret = mongo::validateBSON(Data, Size, mongo::BSONVersion::kLatest);
     return 0;
 }
-
