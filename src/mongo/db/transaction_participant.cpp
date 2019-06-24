@@ -1235,6 +1235,11 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
     }
 
+    // A correctly functioning coordinator could hit this uassert. This could happen if this
+    // participant shard failed over and the new primary majority committed prepare without this
+    // node in its majority. The coordinator could legally send commitTransaction with a
+    // commitTimestamp to this shard but target the old primary (this node) that has yet to prepare
+    // the transaction. We uassert since this node cannot commit the transaction.
     uassert(ErrorCodes::InvalidOptions,
             "commitTransaction cannot provide commitTimestamp to unprepared transaction.",
             o().txnState.isPrepared());
@@ -1248,6 +1253,14 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
             commitTimestamp >= prepareTimestamp);
 
     if (!commitOplogEntryOpTime) {
+        // A correctly functioning coordinator could hit this uassert. This could happen if this
+        // participant shard failed over and the new primary majority committed prepare but has yet
+        // to communicate that to this node. The coordinator could legally send commitTransaction
+        // with a commitTimestamp to this shard but target the old primary (this node) that does not
+        // yet know prepare is majority committed. We uassert since the commit oplog entry would be
+        // written in an old term and be guaranteed to roll back. This makes it easier to write
+        // correct tests, consider fewer participant commit cases, and catch potential bugs since
+        // hitting this uassert correctly is unlikely.
         uassert(ErrorCodes::InvalidOptions,
                 "commitTransaction for a prepared transaction cannot be run before its prepare "
                 "oplog entry has been majority committed",
