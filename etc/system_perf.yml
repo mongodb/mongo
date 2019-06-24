@@ -590,12 +590,42 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
-- name: bestbuy_agg_merge
+- name: bestbuy_agg_merge_same_db
   priority: 5
   commands:
     - func: "prepare environment"
       vars:
-        test: "bestbuy_agg_merge"
+        test: "bestbuy_agg_merge_same_db"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: bestbuy_agg_merge_different_db
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "bestbuy_agg_merge_different_db"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: bestbuy_agg_merge_target_hashed
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "bestbuy_agg_merge_target_hashed"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: bestbuy_agg_merge_wordcount
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "bestbuy_agg_merge_wordcount"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -877,7 +907,9 @@ buildvariants:
     - name: retryable_writes_workloads
     - name: non_sharded_workloads
     - name: bestbuy_agg
-    - name: bestbuy_agg_merge
+    - name: bestbuy_agg_merge_different_db
+    - name: bestbuy_agg_merge_same_db
+    - name: bestbuy_agg_merge_wordcount
     - name: bestbuy_query
     - name: change_streams_throughput
     - name: change_streams_latency
@@ -918,7 +950,9 @@ buildvariants:
     - name: smoke_test
     - name: non_sharded_workloads
     - name: bestbuy_agg
-    - name: bestbuy_agg_merge
+    - name: bestbuy_agg_merge_different_db
+    - name: bestbuy_agg_merge_same_db
+    - name: bestbuy_agg_merge_wordcount
     - name: bestbuy_query
     - name: big_update
 
@@ -1037,7 +1071,10 @@ buildvariants:
         variant: compile-linux-64-amzn
   tasks: &shardlitetasks
     - name: bestbuy_agg
-    - name: bestbuy_agg_merge
+    - name: bestbuy_agg_merge_different_db
+    - name: bestbuy_agg_merge_same_db
+    - name: bestbuy_agg_merge_target_hashed
+    - name: bestbuy_agg_merge_wordcount
     - name: bestbuy_query
     - name: change_streams_latency
     - name: change_streams_throughput
@@ -1085,7 +1122,9 @@ buildvariants:
     - name: secondary_performance # Uses a special 2 node mongodb setup
     - name: non_sharded_workloads
     - name: bestbuy_agg
-    - name: bestbuy_agg_merge
+    - name: bestbuy_agg_merge_different_db
+    - name: bestbuy_agg_merge_same_db
+    - name: bestbuy_agg_merge_wordcount
     - name: bestbuy_query
     - name: change_streams_throughput
     - name: change_streams_latency
@@ -1221,7 +1260,9 @@ buildvariants:
     - name: industry_benchmarks_wmajority
     - name: non_sharded_workloads
     - name: bestbuy_agg
-    - name: bestbuy_agg_merge
+    - name: bestbuy_agg_merge_different_db
+    - name: bestbuy_agg_merge_same_db
+    - name: bestbuy_agg_merge_wordcount
     - name: bestbuy_query
     - name: change_streams_throughput
     - name: change_streams_latency
