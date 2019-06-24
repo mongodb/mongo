@@ -84,7 +84,7 @@ env.Library(
 env.CppUnitTest(
     target='crypto_test',
     source=[
-        'aead_encryption_test.cpp',
+        'aead_encryption_test.cpp' if "tom" not in env["MONGO_CRYPTO"] else [],
         'mechanism_scram_test.cpp',
         'sha1_block_test.cpp',
         'sha256_block_test.cpp',
@@ -93,7 +93,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/base/secure_allocator',
-        'aead_encryption',
+        'aead_encryption' if "tom" not in env["MONGO_CRYPTO"] else [],
         'sha_block_${MONGO_CRYPTO}',
     ],
 )

@@ -192,13 +192,13 @@ scriptingEnv.Library(
 env.CppUnitTest(
     target='shell_test',
     source=[
-        'kms_test.cpp',
+        'kms_test.cpp' if "tom" not in env["MONGO_CRYPTO"] else [],
         'shell_options_test.cpp',
         'shell_utils_test.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/signal_handlers',
-        'kms',
+        'kms' if "tom" not in env["MONGO_CRYPTO"] else [],
         'shell_options_register',
         'shell_utils',
     ],
