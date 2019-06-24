@@ -361,9 +361,12 @@ private:
      * +----------------+     +-----------------------+     +-------------------+     +------+
      * | HandshakeStart | --> | NeedMoreHandshakeData | --> | HaveEncryptedData | --> | Done |
      * +----------------+     +-----------------------+     +-------------------+     +------+
+     *                          ^                   |
+     *                          +-------------------+
      *
-     * "[ HandshakeStart ] --> [ NeedMoreHandshakeData ] --> [HaveEncryptedData] -> [
-     * NeedMoreHandshakeData], [Done] " | graph-easy
+     * echo "[ HandshakeStart ] --> [ NeedMoreHandshakeData ] --> [ NeedMoreHandshakeData ] -->
+     * [HaveEncryptedData] -> [NeedMoreHandshakeData], [Done]" | graph-easy "[ HandshakeStart ] -->
+     * [ NeedMoreHandshakeData ] --> [HaveEncryptedData] -> [
      */
     enum class State {
         // Initial state
@@ -385,7 +388,7 @@ private:
     void setState(State s) {
         ASSERT_STATE_TRANSITION(_state == State::HandshakeStart, s == State::NeedMoreHandshakeData);
         ASSERT_STATE_TRANSITION(_state == State::NeedMoreHandshakeData,
-                                s == State::HaveEncryptedData);
+                                s == State::HaveEncryptedData || s == State::NeedMoreHandshakeData);
         ASSERT_STATE_TRANSITION(_state == State::HaveEncryptedData,
                                 s == State::NeedMoreHandshakeData || s == State::Done);
         _state = s;
