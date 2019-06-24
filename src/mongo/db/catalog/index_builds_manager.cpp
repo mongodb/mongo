@@ -99,23 +99,21 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
         builder->ignoreUniqueConstraint();
     }
 
-    auto initResult = writeConflictRetry(opCtx,
-                                         "IndexBuildsManager::setUpIndexBuild",
-                                         nss.ns(),
-                                         [opCtx, collection, builder, &onInit, &specs] {
-                                             return builder->init(opCtx, collection, specs, onInit);
-                                         });
-
-    if (!initResult.isOK()) {
-        return initResult.getStatus();
+    std::vector<BSONObj> indexes;
+    try {
+        indexes = writeConflictRetry(opCtx, "IndexBuildsManager::setUpIndexBuild", nss.ns(), [&]() {
+            return uassertStatusOK(builder->init(opCtx, collection, specs, onInit));
+        });
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
     if (options.forRecovery) {
         log() << "Index build initialized: " << buildUUID << ": " << nss
-              << ": indexes: " << initResult.getValue().size();
+              << ": indexes: " << indexes.size();
     } else {
         log() << "Index build initialized: " << buildUUID << ": " << nss << " ("
-              << *collection->uuid() << " ): indexes: " << initResult.getValue().size();
+              << *collection->uuid() << " ): indexes: " << indexes.size();
     }
 
     return Status::OK();
