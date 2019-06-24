@@ -188,6 +188,12 @@ public:
      * Updates metadata in config.chunks collection to show the given chunk in its new shard.
      * If 'validAfter' is not set, this means the commit request came from an older server version,
      * which is not history-aware.
+     *
+     * Returns a BSON object with the newly produced chunk versions after the migration:
+     *  - migratedChunkVersion - the version of the chunk, which was migrated
+     *  - controlChunkVersion (optional) - the version of the "control" chunk, which was changed in
+     *      order to reflect the change on the donor. This value will be missing if the last chunk
+     *      on the donor shard was migrated out.
      */
     StatusWith<BSONObj> commitChunkMigration(OperationContext* opCtx,
                                              const NamespaceString& nss,
