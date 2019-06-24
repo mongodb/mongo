@@ -597,9 +597,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
         if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery,
                       logger::LogSeverity::Debug(3))) {
-            ss << "verbose=[recovery_progress,checkpoint_progress,recovery],";
+            ss << "verbose=[recovery_progress,checkpoint_progress,compact_progress,recovery],";
         } else {
-            ss << "verbose=[recovery_progress,checkpoint_progress],";
+            ss << "verbose=[recovery_progress,checkpoint_progress,compact_progress],";
         }
 
         // Enable debug write-ahead logging for all tables under debug build.
