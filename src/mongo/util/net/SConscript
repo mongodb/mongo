@@ -205,6 +205,17 @@ env.CppUnitTest(
     ],
 )
 
+env.CppLibfuzzerTest(
+    target='asn1_parser_fuzzer',
+    source=[
+        'asn1_parser_fuzzer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/net/ssl_manager',
+    ],
+)
+
 if get_option('ssl') == 'on':
     env.CppUnitTest(
         target='util_net_ssl_test',
