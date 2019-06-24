@@ -41,6 +41,16 @@ env.Benchmark(
     ],
 )
 
+env.CppLibfuzzerTest(
+    target='bson_validate_fuzzer',
+    source=[
+        'bson_validate_fuzzer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 asioEnv = env.Clone()
 asioEnv.InjectThirdParty('asio')
 
