@@ -104,7 +104,7 @@ TEST_F(BTCSTest, NowWorks) {
     const auto then = _btcs->now();
     sleepFor(Milliseconds(100));
     const auto now = _btcs->now();
-    ASSERT_GT(now, then);
+    ASSERT_GTE(now, then);
     ASSERT_LTE(now, _btcs->now());
 }
 
