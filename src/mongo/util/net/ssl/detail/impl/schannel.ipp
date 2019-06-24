@@ -327,10 +327,13 @@ ssl_want SSLHandshakeManager::doServerHandshake(asio::error_code& ec,
     // ASC_RET_MUTUAL_AUTH is not set since we do our own certificate validation later.
     invariant(attribs == (retAttribs | ASC_RET_EXTENDED_ERROR | ASC_RET_MUTUAL_AUTH));
 
-    if (inputBuffers[1].BufferType == SECBUFFER_EXTRA && inputBuffers[1].pvBuffer != nullptr &&
-        inputBuffers[1].cbBuffer > 0) {
+    if (inputBuffers[1].BufferType == SECBUFFER_EXTRA && inputBuffers[1].cbBuffer > 0) {
+        // SECBUFFER_EXTRA do not set pvBuffer, just cbBuffer.
+        // cbBuffer tells us how much remaining in the buffer is extra
         _pExtraEncryptedBuffer->reset();
-        _pExtraEncryptedBuffer->append(inputBuffers[1].pvBuffer, inputBuffers[1].cbBuffer);
+        _pExtraEncryptedBuffer->append(_pInBuffer->data() +
+                                           (_pInBuffer->size() - inputBuffers[1].cbBuffer),
+                                       inputBuffers[1].cbBuffer);
     }
 
 
@@ -350,12 +353,14 @@ ssl_want SSLHandshakeManager::doServerHandshake(asio::error_code& ec,
     // Reset the input buffer
     _pInBuffer->reset();
 
-    // Check if we have any additional encrypted data
+    // Check if we have any additional data
     if (!_pExtraEncryptedBuffer->empty()) {
         _pInBuffer->swap(*_pExtraEncryptedBuffer);
         _pExtraEncryptedBuffer->reset();
 
-        setState(State::HaveEncryptedData);
+        // When doing the handshake and we have extra data, this means we have an incomplete tls
+        // record and need more bytes to complete the tls record.
+        setState(State::NeedMoreHandshakeData);
     }
 
     if (needOutput) {
@@ -467,10 +472,13 @@ ssl_want SSLHandshakeManager::doClientHandshake(asio::error_code& ec) {
 
     if (_pInBuffer->size()) {
         // Locate (optional) extra buffer
-        if (inputBuffers[1].BufferType == SECBUFFER_EXTRA && inputBuffers[1].pvBuffer != nullptr &&
-            inputBuffers[1].cbBuffer > 0) {
+        if (inputBuffers[1].BufferType == SECBUFFER_EXTRA && inputBuffers[1].cbBuffer > 0) {
+            // SECBUFFER_EXTRA do not set pvBuffer, just cbBuffer
+            // cbBuffer tells us how much remaining in the buffer is extra
             _pExtraEncryptedBuffer->reset();
-            _pExtraEncryptedBuffer->append(inputBuffers[1].pvBuffer, inputBuffers[1].cbBuffer);
+            _pExtraEncryptedBuffer->append(_pInBuffer->data() +
+                                               (_pInBuffer->size() - inputBuffers[1].cbBuffer),
+                                           inputBuffers[1].cbBuffer);
         }
     }
 
@@ -495,7 +503,9 @@ ssl_want SSLHandshakeManager::doClientHandshake(asio::error_code& ec) {
         _pInBuffer->swap(*_pExtraEncryptedBuffer);
         _pExtraEncryptedBuffer->reset();
 
-        setState(State::HaveEncryptedData);
+        // When doing the handshake and we have extra data, this means we have an incomplete tls
+        // record and need more bytes to complete the tls record.
+        setState(State::NeedMoreHandshakeData);
     }
 
     if (needOutput) {
