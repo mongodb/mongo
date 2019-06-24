@@ -43,10 +43,11 @@
 namespace mongo {
 namespace {
 
+using unittest::assertGet;
+
 using CommitChunkMigrate = ConfigServerTestFixture;
 
-TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
-
+TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithControlChunk) {
     std::string const nss = "TestDB.TestColl";
 
     ShardType shard0;
@@ -57,66 +58,66 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
     shard1.setName("shard1");
     shard1.setHost("shard1:12");
 
-    setupShards({shard0, shard1}).transitional_ignore();
+    setupShards({shard0, shard1});
 
-    int origMajorVersion = 12;
-    auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
+    ChunkType migratedChunk, controlChunk;
+    {
+        ChunkVersion origVersion(12, 7, OID::gen());
 
-    ChunkType chunk0;
-    chunk0.setNS(nss);
-    chunk0.setVersion(origVersion);
-    chunk0.setShard(shard0.getName());
+        migratedChunk.setNS(nss);
+        migratedChunk.setVersion(origVersion);
+        migratedChunk.setShard(shard0.getName());
+        migratedChunk.setMin(BSON("a" << 1));
+        migratedChunk.setMax(BSON("a" << 10));
 
-    // apportion
-    auto chunkMin = BSON("a" << 1);
-    chunk0.setMin(chunkMin);
-    auto chunkMax = BSON("a" << 10);
-    chunk0.setMax(chunkMax);
+        origVersion.incMinor();
 
-    ChunkType chunk1;
-    chunk1.setNS(nss);
-    chunk1.setVersion(origVersion);
-    chunk1.setShard(shard0.getName());
+        controlChunk.setNS(nss);
+        controlChunk.setVersion(origVersion);
+        controlChunk.setShard(shard0.getName());
+        controlChunk.setMin(BSON("a" << 10));
+        controlChunk.setMax(BSON("a" << 20));
+        controlChunk.setJumbo(true);
+    }
 
-    chunk1.setMin(chunkMax);
-    auto chunkMaxax = BSON("a" << 20);
-    chunk1.setMax(chunkMaxax);
+    setupChunks({migratedChunk, controlChunk});
 
-    setupChunks({chunk0, chunk1}).transitional_ignore();
-
-    // use crefs to verify it will take consts:
-    ChunkType const& chunk0cref = chunk0;
-    ChunkType const& chunk1cref = chunk1;
-
-    StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
-                                         ->commitChunkMigration(operationContext(),
-                                                                NamespaceString(chunk0.getNS()),
-                                                                chunk0cref,
-                                                                chunk1cref,
-                                                                origVersion.epoch(),
-                                                                ShardId(shard0.getName()),
-                                                                ShardId(shard1.getName()));
-
-    ASSERT_OK(resultBSON.getStatus());
+    Timestamp validAfter{101, 0};
+    BSONObj versions = assertGet(ShardingCatalogManager::get(operationContext())
+                                     ->commitChunkMigration(operationContext(),
+                                                            NamespaceString(nss),
+                                                            migratedChunk,
+                                                            controlChunk,
+                                                            migratedChunk.getVersion().epoch(),
+                                                            ShardId(shard0.getName()),
+                                                            ShardId(shard1.getName())));
 
     // Verify the versions returned match expected values.
-    BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::parseFromBSONWithFieldForCommands(versions, "migratedChunkVersion");
-    ASSERT_OK(mver.getStatus());
-    ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 0, origVersion.epoch()), mver.getValue());
+    auto mver = assertGet(
+        ChunkVersion::parseFromBSONWithFieldForCommands(versions, "migratedChunkVersion"));
+    ASSERT_EQ(ChunkVersion(migratedChunk.getVersion().majorVersion() + 1,
+                           0,
+                           migratedChunk.getVersion().epoch()),
+              mver);
 
-    auto cver = ChunkVersion::parseFromBSONWithFieldForCommands(versions, "controlChunkVersion");
-    ASSERT_OK(cver.getStatus());
-    ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 1, origVersion.epoch()), cver.getValue());
+    auto cver =
+        assertGet(ChunkVersion::parseFromBSONWithFieldForCommands(versions, "controlChunkVersion"));
+    ASSERT_EQ(ChunkVersion(migratedChunk.getVersion().majorVersion() + 1,
+                           1,
+                           migratedChunk.getVersion().epoch()),
+              cver);
 
     // Verify the chunks ended up in the right shards, and versions match the values returned.
-    auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), chunkMin));
+    auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), migratedChunk.getMin()));
     ASSERT_EQ("shard1", chunkDoc0.getShard().toString());
-    ASSERT_EQ(mver.getValue(), chunkDoc0.getVersion());
+    ASSERT_EQ(mver, chunkDoc0.getVersion());
 
-    auto chunkDoc1 = uassertStatusOK(getChunkDoc(operationContext(), chunkMax));
+    auto chunkDoc1 = uassertStatusOK(getChunkDoc(operationContext(), controlChunk.getMin()));
     ASSERT_EQ("shard0", chunkDoc1.getShard().toString());
-    ASSERT_EQ(cver.getValue(), chunkDoc1.getVersion());
+    ASSERT_EQ(cver, chunkDoc1.getVersion());
+
+    // The control chunk's jumbo status should be unchanged.
+    ASSERT(chunkDoc1.getJumbo());
 }
 
 TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtl) {
