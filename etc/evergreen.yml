@@ -345,6 +345,7 @@ variables:
     - func: "set task expansion macros"
     - func: "set up virtualenv"
     - func: "get buildnumber"
+    - func: "set up win mount script"
     - func: "generate compile expansions"
   teardown_group:
     - func: "scons cache pruning"
