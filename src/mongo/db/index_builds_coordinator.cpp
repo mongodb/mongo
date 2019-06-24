@@ -388,7 +388,9 @@ void IndexBuildsCoordinator::assertNoIndexBuildInProgress() const {
 void IndexBuildsCoordinator::assertNoIndexBuildInProgForCollection(
     const UUID& collectionUUID) const {
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
-            str::stream() << "cannot perform operation: an index build is currently running",
+            str::stream() << "cannot perform operation: an index build is currently running for "
+                             "collection with UUID: "
+                          << collectionUUID,
             !inProgForCollection(collectionUUID));
 }
 
