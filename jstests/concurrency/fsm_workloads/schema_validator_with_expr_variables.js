@@ -1,7 +1,12 @@
 /**
  * Test to verify that the schema validator works correctly in a multi-threaded environment, when
  * $expr uses expressions which mutate variable values while executing ($let, $map etc).
- * @tags: [requires_non_retryable_writes]
+ *
+ * Marked as 'requires_persistence' to prevent the test from running on 'inMemory' variant, because
+ * the test generates a large oplog and 'inMemory' instances have limited resources to accommodate
+ * all nodes in the replica set (which all run in the same instance), so it may fail with the OOM
+ * error.
+ * @tags: [requires_non_retryable_writes, requires_persistence]
  */
 
 "use strict";
