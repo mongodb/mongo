@@ -243,17 +243,16 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
     /**
      * Retrieves the next batch in the change stream and confirms that it is empty.
      */
-    self.assertNoChange =
-        function(cursor) {
+    self.assertNoChange = function(cursor) {
         cursor = self.getNextBatch(cursor);
         assert.eq(0, cursor.nextBatch.length, () => "Cursor had changes: " + tojson(cursor));
-    }
+    };
 
-        /**
-         * Gets the next document in the change stream. This always executes a 'getMore' first.
-         * If the current batch has a document in it, that one will be ignored.
-         */
-        self.getOneChange = function(cursor, expectInvalidate = false) {
+    /**
+     * Gets the next document in the change stream. This always executes a 'getMore' first.
+     * If the current batch has a document in it, that one will be ignored.
+     */
+    self.getOneChange = function(cursor, expectInvalidate = false) {
         changes = self.assertNextChangesEqual({
             cursor: cursor,
             expectedNumChanges: 1,
