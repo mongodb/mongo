@@ -88,6 +88,8 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
     auto recordStore = collection->getRecordStore();
     auto indexCatalog = collection->getIndexCatalog();
 
+    OldClientContext ctx(opCtx, collectionNss.ns());
+
     if (!recordStore->compactSupported())
         return StatusWith<CompactStats>(ErrorCodes::CommandNotSupported,
                                         str::stream()
@@ -103,7 +105,6 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
         collection = getCollectionForCompact(opCtx, database, collectionNss);
     }
 
-    OldClientContext ctx(opCtx, collectionNss.ns());
     log(LogComponent::kCommand) << "compact " << collectionNss
                                 << " begin, options: " << *compactOptions;
 
