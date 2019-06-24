@@ -404,7 +404,9 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     WriteUnitOfWork wuow(opCtx);
     if (slot.isNull()) {
         slot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
-        // TODO: make the oplogEntry a const reference instead of using the guard.
+        // It would be better to make the oplogEntry a const reference. But because in some cases, a
+        // new OpTime needs to be assigned within the WUOW as explained earlier, we instead pass
+        // oplogEntry by pointer and reset the OpTime to null using a ScopeGuard.
         oplogEntry->setOpTime(slot);
     }
 
@@ -647,24 +649,25 @@ std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count
 // -------------------------------------
 
 namespace {
-NamespaceString parseNs(const string& ns, const BSONObj& cmdObj) {
+NamespaceString extractNs(const NamespaceString& ns, const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     uassert(40073,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
             first.canonicalType() == canonicalizeBSONType(mongo::String));
     std::string coll = first.valuestr();
     uassert(28635, "no collection name specified", !coll.empty());
-    return NamespaceString(NamespaceString(ns).db().toString(), coll);
+    return NamespaceString(ns.db().toString(), coll);
 }
 
-std::pair<OptionalCollectionUUID, NamespaceString> parseCollModUUIDAndNss(OperationContext* opCtx,
-                                                                          const BSONElement& ui,
-                                                                          const char* ns,
-                                                                          BSONObj& cmd) {
-    if (ui.eoo()) {
-        return std::pair<OptionalCollectionUUID, NamespaceString>(boost::none, parseNs(ns, cmd));
+std::pair<OptionalCollectionUUID, NamespaceString> extractCollModUUIDAndNss(
+    OperationContext* opCtx,
+    const boost::optional<UUID>& ui,
+    const NamespaceString& ns,
+    const BSONObj& cmd) {
+    if (!ui) {
+        return std::pair<OptionalCollectionUUID, NamespaceString>(boost::none, extractNs(ns, cmd));
     }
-    CollectionUUID uuid = uassertStatusOK(UUID::parse(ui));
+    CollectionUUID uuid = ui.get();
     auto& catalog = CollectionCatalog::get(opCtx);
     const auto nsByUUID = catalog.lookupNSSByUUID(uuid);
     uassert(ErrorCodes::NamespaceNotFound,
@@ -674,28 +677,23 @@ std::pair<OptionalCollectionUUID, NamespaceString> parseCollModUUIDAndNss(Operat
     return std::pair<OptionalCollectionUUID, NamespaceString>(uuid, *nsByUUID);
 }
 
-NamespaceString parseUUID(OperationContext* opCtx, const BSONElement& ui) {
-    auto statusWithUUID = UUID::parse(ui);
-    uassertStatusOK(statusWithUUID);
-    auto uuid = statusWithUUID.getValue();
+NamespaceString extractNsFromUUID(OperationContext* opCtx, const boost::optional<UUID>& ui) {
+    invariant(ui);
+    auto uuid = ui.get();
     auto& catalog = CollectionCatalog::get(opCtx);
     auto nss = catalog.lookupNSSByUUID(uuid);
     uassert(ErrorCodes::NamespaceNotFound, "No namespace with UUID " + uuid.toString(), nss);
     return *nss;
 }
 
-NamespaceString parseUUIDorNs(OperationContext* opCtx,
-                              const char* ns,
-                              const BSONElement& ui,
-                              BSONObj& cmd) {
-    return ui.ok() ? parseUUID(opCtx, ui) : parseNs(ns, cmd);
+NamespaceString extractNsFromUUIDorNs(OperationContext* opCtx,
+                                      const NamespaceString& ns,
+                                      const boost::optional<UUID>& ui,
+                                      const BSONObj& cmd) {
+    return ui ? extractNsFromUUID(opCtx, ui) : extractNs(ns, cmd);
 }
 
 using OpApplyFn = std::function<Status(OperationContext* opCtx,
-                                       const char* ns,
-                                       const BSONElement& ui,
-                                       BSONObj& cmd,
-                                       const OpTime& opTime,
                                        const OplogEntry& entry,
                                        OplogApplication::Mode mode,
                                        boost::optional<Timestamp> stableTimestampForRecovery)>;
@@ -717,14 +715,12 @@ struct ApplyOpMetadata {
 const StringMap<ApplyOpMetadata> kOpsMap = {
     {"create",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
-          const NamespaceString nss(parseNs(ns, cmd));
+          const auto& ui = entry.getUuid();
+          const auto& cmd = entry.getObject();
+          const NamespaceString nss(extractNs(entry.getNss(), cmd));
           Lock::DBLock dbXLock(opCtx, nss.db(), MODE_X);
           if (auto idIndexElem = cmd["idIndex"]) {
               // Remove "idIndex" field from command.
@@ -746,14 +742,12 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
       {ErrorCodes::NamespaceExists}}},
     {"createIndexes",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
-          const NamespaceString nss(parseUUIDorNs(opCtx, ns, ui, cmd));
+          const auto& cmd = entry.getObject();
+          const NamespaceString nss(
+              extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd));
           BSONElement first = cmd.firstElement();
           invariant(first.fieldNameStringData() == "createIndexes");
           uassert(ErrorCodes::InvalidNamespace,
@@ -772,10 +766,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
        ErrorCodes::NamespaceNotFound}}},
     {"startIndexBuild",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
@@ -805,7 +795,9 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                      "The startIndexBuild operation is not supported in applyOps mode"};
          }
 
-         const NamespaceString nss(parseUUIDorNs(opCtx, ns, ui, cmd));
+         const auto& ui = entry.getUuid();
+         const auto& cmd = entry.getObject();
+         const NamespaceString nss(extractNsFromUUIDorNs(opCtx, entry.getNss(), ui, cmd));
 
          auto buildUUIDElem = cmd.getField("indexBuildUUID");
          uassert(ErrorCodes::BadValue,
@@ -822,16 +814,15 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                  "Error parsing 'startIndexBuild' oplog entry, field 'indexes' must be an array.",
                  indexesElem.type() == Array);
 
-         auto collUUID = uassertStatusOK(UUID::parse(ui));
+         uassert(ErrorCodes::BadValue,
+                 "Error parsing 'startIndexBuild' oplog entry, missing required field 'uuid'.",
+                 ui);
+         auto collUUID = ui.get();
 
          return startIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexesElem, mode);
      }}},
     {"commitIndexBuild",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
@@ -861,6 +852,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                      "The commitIndexBuild operation is not supported in applyOps mode"};
          }
 
+         const auto& cmd = entry.getObject();
          // Ensure the collection name is specified
          BSONElement first = cmd.firstElement();
          invariant(first.fieldNameStringData() == "commitIndexBuild");
@@ -868,7 +860,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                  "commitIndexBuild value must be a string",
                  first.type() == mongo::String);
 
-         const NamespaceString nss(parseUUIDorNs(opCtx, ns, ui, cmd));
+         const NamespaceString nss(
+             extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd));
 
          auto buildUUIDElem = cmd.getField("indexBuildUUID");
          uassert(ErrorCodes::BadValue,
@@ -889,10 +882,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      }}},
     {"abortIndexBuild",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTme,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
@@ -922,6 +911,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                      "The abortIndexBuild operation is not supported in applyOps mode"};
          }
 
+         const auto& cmd = entry.getObject();
          // Ensure that the first element is the 'abortIndexBuild' field.
          BSONElement first = cmd.firstElement();
          invariant(first.fieldNameStringData() == "abortIndexBuild");
@@ -951,49 +941,46 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      }}},
     {"collMod",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
           NamespaceString nss;
           BSONObjBuilder resultWeDontCareAbout;
-          std::tie(std::ignore, nss) = parseCollModUUIDAndNss(opCtx, ui, ns, cmd);
+          const auto& cmd = entry.getObject();
+          std::tie(std::ignore, nss) =
+              extractCollModUUIDAndNss(opCtx, entry.getUuid(), entry.getNss(), cmd);
           return collMod(opCtx, nss, cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dbCheck", {dbCheckOplogCommand, {}}},
     {"dropDatabase",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
-          return dropDatabase(opCtx, NamespaceString(ns).db().toString());
+          return dropDatabase(opCtx, entry.getNss().db().toString());
       },
       {ErrorCodes::NamespaceNotFound}}},
     {"drop",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
-          auto nss = parseUUIDorNs(opCtx, ns, ui, cmd);
+          const auto& cmd = entry.getObject();
+          auto nss = extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd);
           if (nss.isDropPendingNamespace()) {
               log()
-                  << "applyCommand: " << nss << " (UUID: " << ui.toString(false)
-                  << "): collection is already in a drop-pending state: ignoring collection drop: "
+                  << "applyCommand: " << nss
+                  << " : collection is already in a drop-pending state: ignoring collection drop: "
                   << redact(cmd);
               return Status::OK();
+          }
+          // Parse optime from oplog entry unless we are applying this command in standalone or on a
+          // primary (replicated writes enabled).
+          OpTime opTime;
+          if (!opCtx->writesAreReplicated()) {
+              opTime = entry.getOpTime();
           }
           return dropCollection(opCtx,
                                 nss,
@@ -1005,74 +992,73 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
     // deleteIndex(es) is deprecated but still works as of April 10, 2015
     {"deleteIndex",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
-          return dropIndexes(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
+          const auto& cmd = entry.getObject();
+          return dropIndexes(opCtx,
+                             extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd),
+                             cmd,
+                             &resultWeDontCareAbout);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"deleteIndexes",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
-          return dropIndexes(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
+          const auto& cmd = entry.getObject();
+          return dropIndexes(opCtx,
+                             extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd),
+                             cmd,
+                             &resultWeDontCareAbout);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndex",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
-          return dropIndexes(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
+          const auto& cmd = entry.getObject();
+          return dropIndexes(opCtx,
+                             extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd),
+                             cmd,
+                             &resultWeDontCareAbout);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndexes",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
-          return dropIndexes(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
+          const auto& cmd = entry.getObject();
+          return dropIndexes(opCtx,
+                             extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd),
+                             cmd,
+                             &resultWeDontCareAbout);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"renameCollection",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
-          return renameCollectionForApplyOps(opCtx, nsToDatabase(ns), ui, cmd, opTime);
+          // Parse optime from oplog entry unless we are applying this command in standalone or on a
+          // primary (replicated writes enabled).
+          OpTime opTime;
+          if (!opCtx->writesAreReplicated()) {
+              opTime = entry.getOpTime();
+          }
+          return renameCollectionForApplyOps(
+              opCtx, entry.getNss().db().toString(), entry.getUuid(), entry.getObject(), opTime);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::NamespaceExists}}},
     {"applyOps",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
@@ -1085,35 +1071,28 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      }}},
     {"convertToCapped",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
-          convertToCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd["size"].number());
+          const auto& cmd = entry.getObject();
+          convertToCapped(opCtx,
+                          extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd),
+                          cmd["size"].number());
           return Status::OK();
       },
       {ErrorCodes::NamespaceNotFound}}},
     {"emptycapped",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
-          return emptyCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd));
+          return emptyCapped(
+              opCtx,
+              extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), entry.getObject()));
       },
       {ErrorCodes::NamespaceNotFound}}},
     {"commitTransaction",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
@@ -1121,10 +1100,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      }}},
     {"abortTransaction",
      {[](OperationContext* opCtx,
-         const char* ns,
-         const BSONElement& ui,
-         BSONObj& cmd,
-         const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
@@ -1173,11 +1148,13 @@ StatusWith<OplogApplication::Mode> OplogApplication::parseMode(const std::string
 // See replset initial sync code.
 Status applyOperation_inlock(OperationContext* opCtx,
                              Database* db,
-                             const BSONObj& op,
+                             const OplogEntryBatch& opOrGroupedInserts,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
-    LOG(3) << "applying op: " << redact(op)
+    // Get the single oplog entry to be applied or the first oplog entry of grouped inserts.
+    auto op = opOrGroupedInserts.getOp();
+    LOG(3) << "applying op (or grouped inserts): " << redact(opOrGroupedInserts.toBSON())
            << ", oplog application mode: " << OplogApplication::modeToString(mode);
 
     // Choose opCounters based on running on standalone/primary or secondary by checking
@@ -1187,26 +1164,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
         mode == repl::OplogApplication::Mode::kApplyOpsCmd || opCtx->writesAreReplicated();
     OpCounters* opCounters = shouldUseGlobalOpCounters ? &globalOpCounters : &replOpCounters;
 
-    std::array<StringData, 8> names = {"ts", "t", "o", "ui", "ns", "op", "b", "o2"};
-    std::array<BSONElement, 8> fields;
-    op.getFields(names, &fields);
-    BSONElement& fieldTs = fields[0];
-    BSONElement& fieldT = fields[1];
-    BSONElement& fieldO = fields[2];
-    BSONElement& fieldUI = fields[3];
-    BSONElement& fieldNs = fields[4];
-    BSONElement& fieldOp = fields[5];
-    BSONElement& fieldB = fields[6];
-    BSONElement& fieldO2 = fields[7];
-
-    BSONObj o;
-    if (fieldO.isABSONObj())
-        o = fieldO.embeddedObject();
-
-    // operation type -- see logOp() comments for types
-    const char* opType = fieldOp.valuestrsafe();
-
-    if (*opType == 'n') {
+    auto opType = op.getOpType();
+    if (opType == OpTypeEnum::kNoop) {
         // no op
         if (incrementOpsAppliedStats) {
             incrementOpsAppliedStats();
@@ -1217,29 +1176,26 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
     NamespaceString requestNss;
     Collection* collection = nullptr;
-    if (fieldUI) {
+    if (auto uuid = op.getUuid()) {
         CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
-        auto uuid = uassertStatusOK(UUID::parse(fieldUI));
-        collection = catalog.lookupCollectionByUUID(uuid);
+        collection = catalog.lookupCollectionByUUID(uuid.get());
         uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Failed to apply operation due to missing collection (" << uuid
-                              << "): " << redact(op.toString()),
+                str::stream() << "Failed to apply operation due to missing collection ("
+                              << uuid.get() << "): " << redact(opOrGroupedInserts.toBSON()),
                 collection);
         requestNss = collection->ns();
         dassert(opCtx->lockState()->isCollectionLockedForMode(
             requestNss, supportsDocLocking() ? MODE_IX : MODE_X));
     } else {
-        uassert(ErrorCodes::InvalidNamespace,
-                "'ns' must be of type String",
-                fieldNs.type() == BSONType::String);
-        const StringData ns = fieldNs.valueStringDataSafe();
-        requestNss = NamespaceString(ns);
+        requestNss = op.getNss();
         invariant(requestNss.coll().size());
         dassert(opCtx->lockState()->isCollectionLockedForMode(
                     requestNss, supportsDocLocking() ? MODE_IX : MODE_X),
                 requestNss.ns());
         collection = db->getCollection(opCtx, requestNss);
     }
+
+    BSONObj o = op.getObject();
 
     // The feature compatibility version in the server configuration collection must not change
     // during initial sync.
@@ -1251,15 +1207,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
             return Status(ErrorCodes::OplogOperationUnsupported,
                           str::stream() << "Applying operation on feature compatibility version "
                                            "document not supported in initial sync: "
-                                        << redact(op));
+                                        << redact(opOrGroupedInserts.toBSON()));
         }
     }
 
     BSONObj o2;
-    if (fieldO2.isABSONObj())
-        o2 = fieldO2.Obj();
-
-    bool valueB = fieldB.booleanSafe();
+    if (op.getObject2())
+        o2 = op.getObject2().get();
 
     IndexCatalog* indexCatalog = collection == nullptr ? nullptr : collection->getIndexCatalog();
     const bool haveWrappingWriteUnitOfWork = opCtx->lockState()->inAWriteUnitOfWork();
@@ -1322,377 +1276,331 @@ Status applyOperation_inlock(OperationContext* opCtx,
         }
         MONGO_UNREACHABLE;
     }();
-    invariant(!assignOperationTimestamp || !fieldTs.eoo(),
-              str::stream() << "Oplog entry did not have 'ts' field when expected: " << redact(op));
+    invariant(!assignOperationTimestamp || !op.getTimestamp().isNull(),
+              str::stream() << "Oplog entry did not have 'ts' field when expected: "
+                            << redact(opOrGroupedInserts.toBSON()));
 
-    if (*opType == 'i') {
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Failed to apply insert due to missing collection: "
-                              << op.toString(),
-                collection);
+    switch (opType) {
+        case OpTypeEnum::kInsert: {
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "Failed to apply insert due to missing collection: "
+                                  << redact(opOrGroupedInserts.toBSON()),
+                    collection);
 
-        if (fieldO.type() == Array) {
-            // Batched inserts.
+            if (opOrGroupedInserts.isGroupedInserts()) {
+                // Grouped inserts.
 
-            // Cannot apply an array insert with applyOps command.  No support for wiping out
-            // the provided timestamps and using new ones for oplog.
-            uassert(ErrorCodes::OperationFailed,
-                    "Cannot apply an array insert with applyOps",
-                    !opCtx->writesAreReplicated());
-
-            uassert(ErrorCodes::BadValue,
-                    "Expected array for field 'ts'",
-                    fieldTs.ok() && fieldTs.type() == Array);
-            uassert(ErrorCodes::BadValue,
-                    "Expected array for field 't'",
-                    fieldT.ok() && fieldT.type() == Array);
-
-            uassert(ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to apply insert due to empty array element: "
-                                  << op.toString(),
-                    !fieldO.Obj().isEmpty() && !fieldTs.Obj().isEmpty() && !fieldT.Obj().isEmpty());
-
-            std::vector<InsertStatement> insertObjs;
-            auto fieldOIt = BSONObjIterator(fieldO.Obj());
-            auto fieldTsIt = BSONObjIterator(fieldTs.Obj());
-            auto fieldTIt = BSONObjIterator(fieldT.Obj());
-
-            while (true) {
-                auto oElem = fieldOIt.next();
-                auto tsElem = fieldTsIt.next();
-                auto tElem = fieldTIt.next();
-
-                // Note: we don't care about statement ids here since the secondaries don't create
-                // their own oplog entries.
-                insertObjs.emplace_back(oElem.Obj(), tsElem.timestamp(), tElem.Long());
-                if (!fieldOIt.more()) {
-                    // Make sure arrays are the same length.
-                    uassert(ErrorCodes::OperationFailed,
-                            str::stream()
-                                << "Failed to apply insert due to invalid array elements: "
-                                << op.toString(),
-                            !fieldTsIt.more());
-                    break;
-                }
-                // Make sure arrays are the same length.
+                // Cannot apply an array insert with applyOps command. No support for wiping out the
+                // provided timestamps and using new ones for oplog.
                 uassert(ErrorCodes::OperationFailed,
-                        str::stream() << "Failed to apply insert due to invalid array elements: "
-                                      << op.toString(),
-                        fieldTsIt.more());
-            }
+                        "Cannot apply an array insert with applyOps",
+                        !opCtx->writesAreReplicated());
 
-            WriteUnitOfWork wuow(opCtx);
-            OpDebug* const nullOpDebug = nullptr;
-            Status status = collection->insertDocuments(
-                opCtx, insertObjs.begin(), insertObjs.end(), nullOpDebug, true);
-            if (!status.isOK()) {
-                return status;
-            }
-            wuow.commit();
-            for (auto entry : insertObjs) {
+                std::vector<InsertStatement> insertObjs;
+                const auto insertOps = opOrGroupedInserts.getGroupedInserts();
+                for (const auto iOp : insertOps) {
+                    invariant(iOp->getTerm());
+                    insertObjs.emplace_back(
+                        iOp->getObject(), iOp->getTimestamp(), iOp->getTerm().get());
+                }
+
+                WriteUnitOfWork wuow(opCtx);
+                OpDebug* const nullOpDebug = nullptr;
+                Status status = collection->insertDocuments(
+                    opCtx, insertObjs.begin(), insertObjs.end(), nullOpDebug, true);
+                if (!status.isOK()) {
+                    return status;
+                }
+                wuow.commit();
+                for (auto entry : insertObjs) {
+                    opCounters->gotInsert();
+                    if (shouldUseGlobalOpCounters) {
+                        ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
+                            opCtx->getWriteConcern());
+                    }
+                    if (incrementOpsAppliedStats) {
+                        incrementOpsAppliedStats();
+                    }
+                }
+            } else {
+                // Single insert.
                 opCounters->gotInsert();
                 if (shouldUseGlobalOpCounters) {
                     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
                         opCtx->getWriteConcern());
                 }
+
+                // No _id.
+                // This indicates an issue with the upstream server:
+                //     The oplog entry is corrupted; or
+                //     The version of the upstream server is obsolete.
+                uassert(ErrorCodes::NoSuchKey,
+                        str::stream()
+                            << "Failed to apply insert due to missing _id: " << redact(op.toBSON()),
+                        o.hasField("_id"));
+
+                // 1. Insert if
+                //   a) we do not have a wrapping WriteUnitOfWork, which implies we are not part of
+                //      an "applyOps" command, OR
+                //   b) we are part of a multi-document transaction[1].
+                //
+                // 2. Upsert[2] if
+                //   a) we have a wrapping WriteUnitOfWork AND we are not part of a transaction,
+                //      which implies we are part of an "applyOps" command, OR
+                //   b) the previous insert failed with a DuplicateKey error AND we are not part of
+                //      a transaction.
+                //
+                // [1] Transactions should not convert inserts to upserts because on secondaries
+                //     they will perform a lookup that never occurred on the primary. This may cause
+                //     an unintended prepare conflict and block replication. For this reason,
+                //     transactions should always fail with DuplicateKey errors and never retry
+                //     inserts as upserts.
+                // [2] This upsert behavior exists to support idempotency guarantees outside
+                //     steady-state replication and existing users of applyOps.
+
+                const auto txnParticipant = TransactionParticipant::get(opCtx);
+                const bool inTxn = txnParticipant && txnParticipant.inMultiDocumentTransaction();
+                bool needToDoUpsert = haveWrappingWriteUnitOfWork && !inTxn;
+
+                Timestamp timestamp;
+                long long term = OpTime::kUninitializedTerm;
+                if (assignOperationTimestamp) {
+                    timestamp = op.getTimestamp();
+                    invariant(op.getTerm());
+                    term = op.getTerm().get();
+                }
+
+                if (!needToDoUpsert) {
+                    WriteUnitOfWork wuow(opCtx);
+
+                    // Do not use supplied timestamps if running through applyOps, as that would
+                    // allow a user to dictate what timestamps appear in the oplog.
+                    if (assignOperationTimestamp) {
+                        timestamp = op.getTimestamp();
+                        invariant(op.getTerm());
+                        term = op.getTerm().get();
+                    }
+
+                    OpDebug* const nullOpDebug = nullptr;
+                    Status status = collection->insertDocument(
+                        opCtx, InsertStatement(o, timestamp, term), nullOpDebug, true);
+
+                    if (status.isOK()) {
+                        wuow.commit();
+                    } else if (status == ErrorCodes::DuplicateKey) {
+                        // Transactions cannot be retried as upserts once they fail with a duplicate
+                        // key error.
+                        if (inTxn) {
+                            return status;
+                        }
+                        // Continue to the next block to retry the operation as an upsert.
+                        needToDoUpsert = true;
+                    } else {
+                        return status;
+                    }
+                }
+
+                // Now see if we need to do an upsert.
+                if (needToDoUpsert) {
+                    // Do update on DuplicateKey errors.
+                    // This will only be on the _id field in replication,
+                    // since we disable non-_id unique constraint violations.
+                    BSONObjBuilder b;
+                    b.append(o.getField("_id"));
+
+                    UpdateRequest request(requestNss);
+                    request.setQuery(b.done());
+                    request.setUpdateModification(o);
+                    request.setUpsert();
+                    request.setFromOplogApplication(true);
+
+                    const StringData ns = op.getNss().ns();
+                    writeConflictRetry(opCtx, "applyOps_upsert", ns, [&] {
+                        WriteUnitOfWork wuow(opCtx);
+                        // If this is an atomic applyOps (i.e: `haveWrappingWriteUnitOfWork` is
+                        // true), do not timestamp the write.
+                        if (assignOperationTimestamp && timestamp != Timestamp::min()) {
+                            uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
+                        }
+
+                        UpdateResult res = update(opCtx, db, request);
+                        if (res.numMatched == 0 && res.upserted.isEmpty()) {
+                            error() << "No document was updated even though we got a DuplicateKey "
+                                       "error when inserting";
+                            fassertFailedNoTrace(28750);
+                        }
+                        wuow.commit();
+                    });
+                }
+
                 if (incrementOpsAppliedStats) {
                     incrementOpsAppliedStats();
                 }
             }
-        } else {
-            // Single insert.
-            opCounters->gotInsert();
+            break;
+        }
+        case OpTypeEnum::kUpdate: {
+            opCounters->gotUpdate();
             if (shouldUseGlobalOpCounters) {
-                ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
+                ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(
                     opCtx->getWriteConcern());
             }
 
-            // No _id.
-            // This indicates an issue with the upstream server:
-            //     The oplog entry is corrupted; or
-            //     The version of the upstream server is obsolete.
+            auto idField = o2["_id"];
             uassert(ErrorCodes::NoSuchKey,
-                    str::stream() << "Failed to apply insert due to missing _id: " << op.toString(),
-                    o.hasField("_id"));
+                    str::stream() << "Failed to apply update due to missing _id: "
+                                  << redact(op.toBSON()),
+                    !idField.eoo());
 
-            // 1. Insert if
-            //   a) we do not have a wrapping WriteUnitOfWork, which implies we are not part of an
-            //      "applyOps" command, OR
-            //   b) we are part of a multi-document transaction[1].
-            //
-            // 2. Upsert[2] if
-            //   a) we have a wrapping WriteUnitOfWork AND we are not part of a transaction, which
-            //      implies we are part of an "applyOps" command, OR
-            //   b) the previous insert failed with a DuplicateKey error AND we are not part of a
-            //      transaction.
-            //
-            // [1] Transactions should not convert inserts to upserts because on secondaries they
-            //     will perform a lookup that never occurred on the primary. This may cause an
-            //     unintended prepare conflict and block replication. For this reason, transactions
-            //     should always fail with DuplicateKey errors and never retry inserts as upserts.
-            // [2] This upsert behavior exists to support idempotency guarantees outside
-            //     steady-state replication and existing users of applyOps.
+            // The o2 field may contain additional fields besides the _id (like the shard key
+            // fields), but we want to do the update by just _id so we can take advantage of the
+            // IDHACK.
+            BSONObj updateCriteria = idField.wrap();
 
-            const auto txnParticipant = TransactionParticipant::get(opCtx);
-            const bool inTxn = txnParticipant && txnParticipant.inMultiDocumentTransaction();
-            bool needToDoUpsert = haveWrappingWriteUnitOfWork && !inTxn;
+            const bool upsert = alwaysUpsert || op.getUpsert().value_or(false);
+            UpdateRequest request(requestNss);
+            request.setQuery(updateCriteria);
+            request.setUpdateModification(o);
+            request.setUpsert(upsert);
+            request.setFromOplogApplication(true);
 
             Timestamp timestamp;
-            long long term = OpTime::kUninitializedTerm;
             if (assignOperationTimestamp) {
-                if (fieldTs) {
-                    timestamp = fieldTs.timestamp();
-                }
-                if (fieldT) {
-                    term = fieldT.Long();
-                }
+                timestamp = op.getTimestamp();
             }
 
-            if (!needToDoUpsert) {
+            const StringData ns = op.getNss().ns();
+            auto status = writeConflictRetry(opCtx, "applyOps_update", ns, [&] {
                 WriteUnitOfWork wuow(opCtx);
+                if (timestamp != Timestamp::min()) {
+                    uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
+                }
 
-                // Do not use supplied timestamps if running through applyOps, as that would allow
-                // a user to dictate what timestamps appear in the oplog.
-                if (assignOperationTimestamp) {
-                    if (fieldTs.ok()) {
-                        timestamp = fieldTs.timestamp();
-                    }
-                    if (fieldT.ok()) {
-                        term = fieldT.Long();
+                UpdateResult ur = update(opCtx, db, request);
+                if (ur.numMatched == 0 && ur.upserted.isEmpty()) {
+                    if (ur.modifiers) {
+                        if (updateCriteria.nFields() == 1) {
+                            // was a simple { _id : ... } update criteria
+                            string msg = str::stream()
+                                << "failed to apply update: " << redact(op.toBSON());
+                            error() << msg;
+                            return Status(ErrorCodes::UpdateOperationFailed, msg);
+                        }
+
+                        // Need to check to see if it isn't present so we can exit early with a
+                        // failure. Note that adds some overhead for this extra check in some cases,
+                        // such as an updateCriteria of the form
+                        // { _id:..., { x : {$size:...} }
+                        // thus this is not ideal.
+                        if (collection == nullptr ||
+                            (indexCatalog->haveIdIndex(opCtx) &&
+                             Helpers::findById(opCtx, collection, updateCriteria).isNull()) ||
+                            // capped collections won't have an _id index
+                            (!indexCatalog->haveIdIndex(opCtx) &&
+                             Helpers::findOne(opCtx, collection, updateCriteria, false).isNull())) {
+                            string msg = str::stream()
+                                << "couldn't find doc: " << redact(op.toBSON());
+                            error() << msg;
+                            return Status(ErrorCodes::UpdateOperationFailed, msg);
+                        }
+
+                        // Otherwise, it's present; zero objects were updated because of additional
+                        // specifiers in the query for idempotence
+                    } else {
+                        // this could happen benignly on an oplog duplicate replay of an upsert
+                        // (because we are idempotent), if an regular non-mod update fails the item
+                        // is (presumably) missing.
+                        if (!upsert) {
+                            string msg = str::stream()
+                                << "update of non-mod failed: " << redact(op.toBSON());
+                            error() << msg;
+                            return Status(ErrorCodes::UpdateOperationFailed, msg);
+                        }
                     }
                 }
 
-                OpDebug* const nullOpDebug = nullptr;
-                Status status = collection->insertDocument(
-                    opCtx, InsertStatement(o, timestamp, term), nullOpDebug, true);
+                wuow.commit();
+                return Status::OK();
+            });
 
-                if (status.isOK()) {
-                    wuow.commit();
-                } else if (status == ErrorCodes::DuplicateKey) {
-                    // Transactions cannot be retried as upserts once they fail with a duplicate key
-                    // error.
-                    if (inTxn) {
-                        return status;
-                    }
-                    // Continue to the next block to retry the operation as an upsert.
-                    needToDoUpsert = true;
-                } else {
-                    return status;
-                }
-            }
-
-            // Now see if we need to do an upsert.
-            if (needToDoUpsert) {
-                // Do update on DuplicateKey errors.
-                // This will only be on the _id field in replication,
-                // since we disable non-_id unique constraint violations.
-                BSONObjBuilder b;
-                b.append(o.getField("_id"));
-
-                UpdateRequest request(requestNss);
-                request.setQuery(b.done());
-                request.setUpdateModification(o);
-                request.setUpsert();
-                request.setFromOplogApplication(true);
-
-                const StringData ns = fieldNs.valueStringDataSafe();
-                writeConflictRetry(opCtx, "applyOps_upsert", ns, [&] {
-                    WriteUnitOfWork wuow(opCtx);
-                    // If this is an atomic applyOps (i.e: `haveWrappingWriteUnitOfWork` is true),
-                    // do not timestamp the write.
-                    if (assignOperationTimestamp && timestamp != Timestamp::min()) {
-                        uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
-                    }
-
-                    UpdateResult res = update(opCtx, db, request);
-                    if (res.numMatched == 0 && res.upserted.isEmpty()) {
-                        error() << "No document was updated even though we got a DuplicateKey "
-                                   "error when inserting";
-                        fassertFailedNoTrace(28750);
-                    }
-                    wuow.commit();
-                });
+            if (!status.isOK()) {
+                return status;
             }
 
             if (incrementOpsAppliedStats) {
                 incrementOpsAppliedStats();
             }
+            break;
         }
-    } else if (*opType == 'u') {
-        opCounters->gotUpdate();
-        if (shouldUseGlobalOpCounters) {
-            ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(
-                opCtx->getWriteConcern());
-        }
-
-        auto idField = o2["_id"];
-        uassert(ErrorCodes::NoSuchKey,
-                str::stream() << "Failed to apply update due to missing _id: " << op.toString(),
-                !idField.eoo());
-
-        // The o2 field may contain additional fields besides the _id (like the shard key fields),
-        // but we want to do the update by just _id so we can take advantage of the IDHACK.
-        BSONObj updateCriteria = idField.wrap();
-        const bool upsert = valueB || alwaysUpsert;
-
-        UpdateRequest request(requestNss);
-        request.setQuery(updateCriteria);
-        request.setUpdateModification(o);
-        request.setUpsert(upsert);
-        request.setFromOplogApplication(true);
-
-        Timestamp timestamp;
-        if (assignOperationTimestamp) {
-            timestamp = fieldTs.timestamp();
-        }
-
-        const StringData ns = fieldNs.valueStringDataSafe();
-        auto status = writeConflictRetry(opCtx, "applyOps_update", ns, [&] {
-            WriteUnitOfWork wuow(opCtx);
-            if (timestamp != Timestamp::min()) {
-                uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
+        case OpTypeEnum::kDelete: {
+            opCounters->gotDelete();
+            if (shouldUseGlobalOpCounters) {
+                ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForDelete(
+                    opCtx->getWriteConcern());
             }
 
-            UpdateResult ur = update(opCtx, db, request);
-            if (ur.numMatched == 0 && ur.upserted.isEmpty()) {
-                if (ur.modifiers) {
-                    if (updateCriteria.nFields() == 1) {
-                        // was a simple { _id : ... } update criteria
-                        string msg = str::stream() << "failed to apply update: " << redact(op);
-                        error() << msg;
-                        return Status(ErrorCodes::UpdateOperationFailed, msg);
-                    }
+            auto idField = o["_id"];
+            uassert(ErrorCodes::NoSuchKey,
+                    str::stream() << "Failed to apply delete due to missing _id: "
+                                  << redact(op.toBSON()),
+                    !idField.eoo());
 
-                    // Need to check to see if it isn't present so we can exit early with a
-                    // failure. Note that adds some overhead for this extra check in some cases,
-                    // such as an updateCriteria of the form
-                    // { _id:..., { x : {$size:...} }
-                    // thus this is not ideal.
-                    if (collection == nullptr ||
-                        (indexCatalog->haveIdIndex(opCtx) &&
-                         Helpers::findById(opCtx, collection, updateCriteria).isNull()) ||
-                        // capped collections won't have an _id index
-                        (!indexCatalog->haveIdIndex(opCtx) &&
-                         Helpers::findOne(opCtx, collection, updateCriteria, false).isNull())) {
-                        string msg = str::stream() << "couldn't find doc: " << redact(op);
-                        error() << msg;
-                        return Status(ErrorCodes::UpdateOperationFailed, msg);
-                    }
+            // The o field may contain additional fields besides the _id (like the shard key
+            // fields), but we want to do the delete by just _id so we can take advantage of the
+            // IDHACK.
+            BSONObj deleteCriteria = idField.wrap();
 
-                    // Otherwise, it's present; zero objects were updated because of additional
-                    // specifiers in the query for idempotence
-                } else {
-                    // this could happen benignly on an oplog duplicate replay of an upsert
-                    // (because we are idempotent),
-                    // if an regular non-mod update fails the item is (presumably) missing.
-                    if (!upsert) {
-                        string msg = str::stream() << "update of non-mod failed: " << redact(op);
-                        error() << msg;
-                        return Status(ErrorCodes::UpdateOperationFailed, msg);
-                    }
+            Timestamp timestamp;
+            if (assignOperationTimestamp) {
+                timestamp = op.getTimestamp();
+            }
+
+            const StringData ns = op.getNss().ns();
+            writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
+                WriteUnitOfWork wuow(opCtx);
+                if (timestamp != Timestamp::min()) {
+                    uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
                 }
+                deleteObjects(opCtx, collection, requestNss, deleteCriteria, true /* justOne */);
+                wuow.commit();
+            });
+
+            if (incrementOpsAppliedStats) {
+                incrementOpsAppliedStats();
             }
-
-            wuow.commit();
-            return Status::OK();
-        });
-
-        if (!status.isOK()) {
-            return status;
+            break;
         }
-
-        if (incrementOpsAppliedStats) {
-            incrementOpsAppliedStats();
+        default: {
+            // Commands are processed in applyCommand_inlock().
+            invariant(false, str::stream() << "Unsupported opType " << OpType_serializer(opType));
         }
-    } else if (*opType == 'd') {
-        opCounters->gotDelete();
-        if (shouldUseGlobalOpCounters) {
-            ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForDelete(
-                opCtx->getWriteConcern());
-        }
-
-        auto idField = o["_id"];
-        uassert(ErrorCodes::NoSuchKey,
-                str::stream() << "Failed to apply delete due to missing _id: " << op.toString(),
-                !idField.eoo());
-
-        // The o field may contain additional fields besides the _id (like the shard key fields),
-        // but we want to do the delete by just _id so we can take advantage of the IDHACK.
-        BSONObj deleteCriteria = idField.wrap();
-
-        Timestamp timestamp;
-        if (assignOperationTimestamp) {
-            timestamp = fieldTs.timestamp();
-        }
-
-        const StringData ns = fieldNs.valueStringDataSafe();
-        writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
-            WriteUnitOfWork wuow(opCtx);
-            if (timestamp != Timestamp::min()) {
-                uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
-            }
-
-            if (opType[1] == 0) {
-                const auto justOne = true;
-                deleteObjects(opCtx, collection, requestNss, deleteCriteria, justOne);
-            } else
-                verify(opType[1] == 'b');  // "db" advertisement
-            wuow.commit();
-        });
-
-        if (incrementOpsAppliedStats) {
-            incrementOpsAppliedStats();
-        }
-    } else {
-        invariant(*opType != 'c');  // commands are processed in applyCommand_inlock()
-        uasserted(14825, str::stream() << "error in applyOperation : unknown opType " << *opType);
     }
 
     return Status::OK();
 }
 
 Status applyCommand_inlock(OperationContext* opCtx,
-                           const BSONObj& op,
                            const OplogEntry& entry,
                            OplogApplication::Mode mode,
                            boost::optional<Timestamp> stableTimestampForRecovery) {
     // We should only have a stableTimestampForRecovery during replication recovery.
     invariant(stableTimestampForRecovery == boost::none ||
               mode == OplogApplication::Mode::kRecovering);
-    LOG(3) << "applying command op: " << redact(op)
+    LOG(3) << "applying command op: " << redact(entry.toBSON())
            << ", oplog application mode: " << OplogApplication::modeToString(mode)
            << ", stable timestamp for recovery: " << stableTimestampForRecovery;
 
-    std::array<StringData, 4> names = {"o", "ui", "ns", "op"};
-    std::array<BSONElement, 4> fields;
-    op.getFields(names, &fields);
-    BSONElement& fieldO = fields[0];
-    BSONElement& fieldUI = fields[1];
-    BSONElement& fieldNs = fields[2];
-    BSONElement& fieldOp = fields[3];
-
-    const char* opType = fieldOp.valuestrsafe();
-    invariant(*opType == 'c');  // only commands are processed here
+    // Only commands are processed here.
+    invariant(entry.getOpType() == OpTypeEnum::kCommand);
 
     // Choose opCounters based on running on standalone/primary or secondary by checking
     // whether writes are replicated.
     OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
     opCounters->gotCommand();
 
-    if (fieldO.eoo()) {
-        return Status(ErrorCodes::NoSuchKey, "Missing expected field 'o'");
-    }
+    BSONObj o = entry.getObject();
 
-    if (!fieldO.isABSONObj()) {
-        return Status(ErrorCodes::BadValue, "Expected object for field 'o'");
-    }
-
-    BSONObj o = fieldO.embeddedObject();
-
-    uassert(ErrorCodes::InvalidNamespace,
-            "'ns' must be of type String",
-            fieldNs.type() == BSONType::String);
-    const NamespaceString nss(fieldNs.valueStringData());
+    const auto& nss = entry.getNss();
     if (!nss.isValid()) {
         return {ErrorCodes::InvalidNamespace, "invalid ns: " + std::string(nss.ns())};
     }
@@ -1719,21 +1627,18 @@ Status applyCommand_inlock(OperationContext* opCtx,
     if ((mode == OplogApplication::Mode::kInitialSync) &&
         (std::find(whitelistedOps.begin(), whitelistedOps.end(), o.firstElementFieldName()) ==
          whitelistedOps.end()) &&
-        parseNs(nss.ns(), o) == NamespaceString::kServerConfigurationNamespace) {
+        extractNs(nss, o) == NamespaceString::kServerConfigurationNamespace) {
         return Status(ErrorCodes::OplogOperationUnsupported,
                       str::stream() << "Applying command to feature compatibility version "
                                        "collection not supported in initial sync: "
-                                    << redact(op));
+                                    << redact(entry.toBSON()));
     }
 
     // Parse optime from oplog entry unless we are applying this command in standalone or on a
     // primary (replicated writes enabled).
     OpTime opTime;
     if (!opCtx->writesAreReplicated()) {
-        auto opTimeResult = OpTime::parseFromOplogEntry(op);
-        if (opTimeResult.isOK()) {
-            opTime = opTimeResult.getValue();
-        }
+        opTime = entry.getOpTime();
     }
 
     const bool assignCommandTimestamp = [&] {
@@ -1769,7 +1674,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
         MONGO_UNREACHABLE;
     }();
     invariant(!assignCommandTimestamp || !opTime.isNull(),
-              str::stream() << "Oplog entry did not have 'ts' field when expected: " << redact(op));
+              str::stream() << "Oplog entry did not have 'ts' field when expected: "
+                            << redact(entry.toBSON()));
 
     const Timestamp writeTime = (assignCommandTimestamp ? opTime.getTimestamp() : Timestamp());
 
@@ -1789,14 +1695,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 // If 'writeTime' is not null, any writes in this scope will be given 'writeTime' as
                 // their timestamp at commit.
                 TimestampBlock tsBlock(opCtx, writeTime);
-                return curOpToApply.applyFunc(opCtx,
-                                              nss.ns().c_str(),
-                                              fieldUI,
-                                              o,
-                                              opTime,
-                                              entry,
-                                              mode,
-                                              stableTimestampForRecovery);
+                return curOpToApply.applyFunc(opCtx, entry, mode, stableTimestampForRecovery);
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
@@ -1826,14 +1725,14 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 // TODO: This parse could be expensive and not worth it.
                 auto ns =
                     cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns().toString();
-                auto swUUID = UUID::parse(fieldUI);
-                if (!swUUID.isOK()) {
-                    error() << "Failed command " << redact(o) << " on " << ns << " with status "
-                            << swUUID.getStatus() << "during oplog application. Expected a UUID.";
+                auto swUUID = entry.getUuid();
+                if (!swUUID) {
+                    error() << "Failed command " << redact(o) << " on " << ns
+                            << "during oplog application. Expected a UUID.";
                 }
                 BackgroundOperation::awaitNoBgOpInProgForNs(ns);
                 IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(
-                    swUUID.getValue());
+                    swUUID.get());
 
                 opCtx->recoveryUnit()->abandonSnapshot();
                 opCtx->checkForInterrupt();
@@ -1853,7 +1752,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    AuthorizationManager::get(opCtx->getServiceContext())->logOp(opCtx, opType, nss, o, nullptr);
+    AuthorizationManager::get(opCtx->getServiceContext())->logOp(opCtx, "c", nss, o, nullptr);
     return Status::OK();
 }
 

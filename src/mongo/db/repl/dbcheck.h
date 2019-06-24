@@ -221,10 +221,6 @@ namespace repl {
  * errors (primarily by writing to the health log), so always returns `Status::OK`.
  */
 Status dbCheckOplogCommand(OperationContext* opCtx,
-                           const char* ns,
-                           const BSONElement& ui,
-                           BSONObj& cmd,
-                           const repl::OpTime& optime,
                            const repl::OplogEntry& entry,
                            OplogApplication::Mode mode,
                            boost::optional<Timestamp> stableTimestampForRecovery);

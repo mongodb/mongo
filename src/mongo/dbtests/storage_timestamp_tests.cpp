@@ -745,36 +745,34 @@ public:
         const std::int32_t docsToInsert = 10;
         const LogicalTime firstInsertTime = _clock->reserveTicks(docsToInsert);
 
-        BSONObjBuilder oplogEntryBuilder;
+        BSONObjBuilder oplogCommonBuilder;
+        oplogCommonBuilder << "v" << 2 << "op"
+                           << "i"
+                           << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid();
+        auto oplogCommon = oplogCommonBuilder.done();
 
-        // Populate the "ts" field with an array of all the grouped inserts' timestamps.
-        BSONArrayBuilder tsArrayBuilder(oplogEntryBuilder.subarrayStart("ts"));
+        std::vector<repl::OplogEntry> oplogEntries;
+        oplogEntries.reserve(docsToInsert);
+        std::vector<const repl::OplogEntry*> opPtrs;
+        BSONObjBuilder oplogEntryBuilders[docsToInsert];
         for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
-            tsArrayBuilder.append(firstInsertTime.addTicks(idx).asTimestamp());
+            auto o = BSON("_id" << idx);
+            // Populate the "ts" field.
+            oplogEntryBuilders[idx] << "ts" << firstInsertTime.addTicks(idx).asTimestamp();
+            // Populate the "t" (term) field.
+            oplogEntryBuilders[idx] << "t" << 1LL;
+            // Populate the "o" field.
+            oplogEntryBuilders[idx] << "o" << o;
+            // Populate the other common fields.
+            oplogEntryBuilders[idx].appendElementsUnique(oplogCommon);
+            // Insert ops to be applied.
+            oplogEntries.push_back(repl::OplogEntry(oplogEntryBuilders[idx].done()));
+            opPtrs.push_back(&(oplogEntries.back()));
         }
-        tsArrayBuilder.done();
 
-        // Populate the "t" (term) field with an array of all the grouped inserts' terms.
-        BSONArrayBuilder tArrayBuilder(oplogEntryBuilder.subarrayStart("t"));
-        for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
-            tArrayBuilder.append(1LL);
-        }
-        tArrayBuilder.done();
-
-        // Populate the "o" field with an array of all the grouped inserts.
-        BSONArrayBuilder oArrayBuilder(oplogEntryBuilder.subarrayStart("o"));
-        for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
-            oArrayBuilder.append(BSON("_id" << idx));
-        }
-        oArrayBuilder.done();
-
-        oplogEntryBuilder << "v" << 2 << "op"
-                          << "i"
-                          << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid();
-
-        auto oplogEntry = oplogEntryBuilder.done();
+        repl::OplogEntryBatch groupedInsertBatch(opPtrs.cbegin(), opPtrs.cend());
         ASSERT_OK(repl::SyncTail::syncApply(
-            _opCtx, oplogEntry, repl::OplogApplication::Mode::kSecondary, boost::none));
+            _opCtx, groupedInsertBatch, repl::OplogApplication::Mode::kSecondary, boost::none));
 
         for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
             OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());

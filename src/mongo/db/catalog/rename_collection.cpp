@@ -747,7 +747,7 @@ Status renameCollection(OperationContext* opCtx,
 
 Status renameCollectionForApplyOps(OperationContext* opCtx,
                                    const std::string& dbName,
-                                   const BSONElement& ui,
+                                   const OptionalCollectionUUID& uuidToRename,
                                    const BSONObj& cmd,
                                    const repl::OpTime& renameOpTime) {
 
@@ -769,9 +769,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
 
     NamespaceString sourceNss(sourceNsElt.valueStringData());
     NamespaceString targetNss(targetNsElt.valueStringData());
-    OptionalCollectionUUID uuidToRename;
-    if (!ui.eoo()) {
-        uuidToRename = uassertStatusOK(UUID::parse(ui));
+    if (uuidToRename) {
         auto nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(uuidToRename.get());
         if (nss)
             sourceNss = *nss;

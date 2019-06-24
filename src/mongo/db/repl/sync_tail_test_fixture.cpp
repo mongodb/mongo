@@ -154,7 +154,7 @@ StorageInterface* SyncTailTest::getStorageInterface() const {
 }
 
 void SyncTailTest::_testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
-                                               const BSONObj& op,
+                                               const OplogEntry& op,
                                                bool expectedApplyOpCalled) {
     bool applyOpCalled = false;
 
@@ -174,7 +174,7 @@ void SyncTailTest::_testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
             checkOpCtx(opCtx);
             ASSERT_EQUALS(NamespaceString("test.t"), nss);
             ASSERT_EQUALS(1U, docs.size());
-            ASSERT_BSONOBJ_EQ(op["o"].Obj(), docs[0]);
+            ASSERT_BSONOBJ_EQ(op.getObject(), docs[0]);
             return Status::OK();
         };
 
@@ -188,13 +188,13 @@ void SyncTailTest::_testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
         checkOpCtx(opCtx);
         ASSERT_EQUALS(NamespaceString("test.t"), nss);
         ASSERT(deletedDoc);
-        ASSERT_BSONOBJ_EQ(op["o"].Obj(), *deletedDoc);
+        ASSERT_BSONOBJ_EQ(op.getObject(), *deletedDoc);
         return Status::OK();
     };
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
     ASSERT_EQ(
-        SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kSecondary, boost::none),
+        SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary, boost::none),
         expectedError);
     ASSERT_EQ(applyOpCalled, expectedApplyOpCalled);
 }

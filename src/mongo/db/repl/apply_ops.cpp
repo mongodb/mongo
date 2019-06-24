@@ -160,21 +160,26 @@ Status _applyOps(OperationContext* opCtx,
                         << nss.ns() << " in atomic applyOps mode: " << redact(opObj));
             }
 
+            BSONObjBuilder builder;
+            builder.appendElements(opObj);
+            if (!builder.hasField(OplogEntry::kTimestampFieldName)) {
+                builder.append(OplogEntry::kTimestampFieldName, Timestamp());
+            }
             // Reject malformed operations in an atomic applyOps.
-            try {
-                ReplOperation::parse(IDLParserErrorContext("applyOps"), opObj);
-            } catch (...) {
+            auto entry = OplogEntry::parse(builder.done());
+            if (!entry.isOK()) {
                 uasserted(ErrorCodes::AtomicityFailure,
                           str::stream()
                               << "cannot apply a malformed operation in atomic applyOps mode: "
-                              << redact(opObj) << "; will retry without atomicity: "
-                              << exceptionToStatus().toString());
+                              << redact(opObj)
+                              << "; will retry without atomicity: " << entry.getStatus());
             }
 
             OldClientContext ctx(opCtx, nss.ns());
 
+            const auto& op = entry.getValue();
             status = repl::applyOperation_inlock(
-                opCtx, ctx.db(), opObj, alwaysUpsert, oplogApplicationMode);
+                opCtx, ctx.db(), &op, alwaysUpsert, oplogApplicationMode);
             if (!status.isOK())
                 return status;
 
@@ -207,12 +212,11 @@ Status _applyOps(OperationContext* opCtx,
                         if (!builder.hasField(OplogEntry::kHashFieldName)) {
                             builder.append(OplogEntry::kHashFieldName, 0LL);
                         }
-                        auto entryObj = builder.done();
-                        auto entry = uassertStatusOK(OplogEntry::parse(entryObj));
+                        auto entry = uassertStatusOK(OplogEntry::parse(builder.done()));
                         if (*opType == 'c') {
                             invariant(opCtx->lockState()->isW());
                             uassertStatusOK(applyCommand_inlock(
-                                opCtx, opObj, entry, oplogApplicationMode, boost::none));
+                                opCtx, entry, oplogApplicationMode, boost::none));
                             return Status::OK();
                         }
 
@@ -236,7 +240,7 @@ Status _applyOps(OperationContext* opCtx,
                         // ops.  This is to leave the door open to parallelizing CRUD op
                         // application in the future.
                         return repl::applyOperation_inlock(
-                            opCtx, ctx.db(), opObj, alwaysUpsert, oplogApplicationMode);
+                            opCtx, ctx.db(), &entry, alwaysUpsert, oplogApplicationMode);
                     });
             } catch (const DBException& ex) {
                 ab.append(false);

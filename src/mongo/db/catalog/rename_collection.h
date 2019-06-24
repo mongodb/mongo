@@ -66,7 +66,7 @@ Status renameCollection(OperationContext* opCtx,
  */
 Status renameCollectionForApplyOps(OperationContext* opCtx,
                                    const std::string& dbName,
-                                   const BSONElement& ui,
+                                   const OptionalCollectionUUID& uuidToRename,
                                    const BSONObj& cmd,
                                    const repl::OpTime& renameOpTime);
 

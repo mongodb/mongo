@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_batch.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 
@@ -192,8 +193,8 @@ inline std::ostream& operator<<(std::ostream& s, OplogApplication::Mode mode) {
 }
 
 /**
- * Take a non-command op and apply it locally
- * Used for applying from an oplog
+ * Used for applying from an oplog entry or grouped inserts.
+ * @param opOrGroupedInserts a single oplog entry or grouped inserts to be applied.
  * @param alwaysUpsert convert some updates to upserts for idempotency reasons
  * @param mode specifies what oplog application mode we are in
  * @param incrementOpsAppliedStats is called whenever an op is applied.
@@ -201,7 +202,7 @@ inline std::ostream& operator<<(std::ostream& s, OplogApplication::Mode mode) {
  */
 Status applyOperation_inlock(OperationContext* opCtx,
                              Database* db,
-                             const BSONObj& op,
+                             const OplogEntryBatch& opOrGroupedInserts,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats = {});
@@ -212,7 +213,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
  * Returns failure status if the op that could not be applied.
  */
 Status applyCommand_inlock(OperationContext* opCtx,
-                           const BSONObj& op,
                            const OplogEntry& entry,
                            OplogApplication::Mode mode,
                            boost::optional<Timestamp> stableTimestampForRecovery);

@@ -234,44 +234,18 @@ auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
     return OpTime(tsArray.Array()[elem].timestamp(), termArray.Array()[elem].Long());
 };
 
-TEST_F(SyncTailTest, SyncApplyNoNamespaceBadOp) {
-    const BSONObj op = BSON("op"
-                            << "x");
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync, boost::none),
-        ExceptionFor<ErrorCodes::BadValue>);
-}
-
-TEST_F(SyncTailTest, SyncApplyNoNamespaceNoOp) {
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(),
-                                  BSON("op"
-                                       << "n"),
-                                  OplogApplication::Mode::kInitialSync,
-                                  boost::none));
-}
-
-TEST_F(SyncTailTest, SyncApplyBadOp) {
-    const BSONObj op = BSON("op"
-                            << "x"
-                            << "ns"
-                            << "test.t");
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync, boost::none),
-        ExceptionFor<ErrorCodes::BadValue>);
-}
-
 TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
     NamespaceString nss("test.t");
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
-    ASSERT_THROWS(SyncTail::syncApply(
-                      _opCtx.get(), op.toBSON(), OplogApplication::Mode::kSecondary, boost::none),
-                  ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    ASSERT_THROWS(
+        SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary, boost::none),
+        ExceptionFor<ErrorCodes::NamespaceNotFound>);
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentDatabaseMissing) {
     NamespaceString otherNss("test.othername");
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, {});
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), false);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, false);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLookupByUUIDFails) {
@@ -279,9 +253,9 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLookupByUUIDFails) {
     createDatabase(_opCtx.get(), nss.db());
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, otherNss, kUuid);
-    ASSERT_THROWS(SyncTail::syncApply(
-                      _opCtx.get(), op.toBSON(), OplogApplication::Mode::kSecondary, boost::none),
-                  ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    ASSERT_THROWS(
+        SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary, boost::none),
+        ExceptionFor<ErrorCodes::NamespaceNotFound>);
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLookupByUUIDFails) {
@@ -289,7 +263,7 @@ TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLookupByUUIDFails) {
     createDatabase(_opCtx.get(), nss.db());
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, kUuid);
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), false);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, false);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
@@ -299,9 +273,9 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
     // which in the case of this test just ignores such errors. This tests mostly that we don't
     // implicitly create the collection and lock the database in MODE_X.
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
-    ASSERT_THROWS(SyncTail::syncApply(
-                      _opCtx.get(), op.toBSON(), OplogApplication::Mode::kSecondary, boost::none),
-                  ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    ASSERT_THROWS(
+        SyncTail::syncApply(_opCtx.get(), &op, OplogApplication::Mode::kSecondary, boost::none),
+        ExceptionFor<ErrorCodes::NamespaceNotFound>);
     ASSERT_FALSE(collectionExists(_opCtx.get(), nss));
 }
 
@@ -312,7 +286,7 @@ TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionMissing) {
     // which in the case of this test just ignores such errors. This tests mostly that we don't
     // implicitly create the collection and lock the database in MODE_X.
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), false);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, false);
     ASSERT_FALSE(collectionExists(_opCtx.get(), nss));
 }
 
@@ -320,14 +294,14 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionExists) {
     const NamespaceString nss("test.t");
     createCollection(_opCtx.get(), nss, {});
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), true);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, true);
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionExists) {
     const NamespaceString nss("test.t");
     createCollection(_opCtx.get(), nss, {});
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), false);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, false);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLockedByUUID) {
@@ -336,7 +310,7 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLockedByUUID) {
     // Test that the collection to lock is determined by the UUID and not the 'ns' field.
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, otherNss, uuid);
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), true);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, true);
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLockedByUUID) {
@@ -348,7 +322,7 @@ TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLockedByUUID) {
     // Test that the collection to lock is determined by the UUID and not the 'ns' field.
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, options.uuid);
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), false);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, false);
 }
 
 TEST_F(SyncTailTest, SyncApplyCommand) {
@@ -373,22 +347,10 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
     };
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_OK(
-        SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync, boost::none));
+    auto entry = OplogEntry(op);
+    ASSERT_OK(SyncTail::syncApply(
+        _opCtx.get(), &entry, OplogApplication::Mode::kInitialSync, boost::none));
     ASSERT_TRUE(applyCmdCalled);
-}
-
-TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
-    const BSONObj op = BSON("op"
-                            << "c"
-                            << "ns" << 12345 << "o"
-                            << BSON("create"
-                                    << "t")
-                            << "ts" << Timestamp(1, 1));
-    // This test relies on the namespace type check of IDL.
-    ASSERT_THROWS(
-        SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync, boost::none),
-        ExceptionFor<ErrorCodes::TypeMismatch>);
 }
 
 DEATH_TEST_F(SyncTailTest, MultiApplyAbortsWhenNoOperationsAreGiven, "!ops.empty()") {
@@ -2364,13 +2326,13 @@ TEST_F(SyncTailTest, LogSlowOpApplicationWhenSuccessful) {
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();
-    ASSERT_OK(SyncTail::syncApply(
-        _opCtx.get(), entry.toBSON(), OplogApplication::Mode::kSecondary, boost::none));
+    ASSERT_OK(
+        SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary, boost::none));
 
     // Use a builder for easier escaping. We expect the operation to be logged.
     StringBuilder expected;
-    expected << "applied op: CRUD { op: \"i\", ns: \"test.t\", o: { _id: 0 }, ts: Timestamp(1, 1), "
-                "t: 1, v: 2 }, took "
+    expected << "applied op: CRUD { ts: Timestamp(1, 1), t: 1, v: 2, op: \"i\", ns: \"test.t\", o: "
+                "{ _id: 0 } }, took "
              << applyDuration << "ms";
     ASSERT_EQUALS(1, countLogLinesContaining(expected.str()));
 }
@@ -2387,8 +2349,7 @@ TEST_F(SyncTailTest, DoNotLogSlowOpApplicationWhenFailed) {
 
     startCapturingLogMessages();
     ASSERT_THROWS(
-        SyncTail::syncApply(
-            _opCtx.get(), entry.toBSON(), OplogApplication::Mode::kSecondary, boost::none),
+        SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary, boost::none),
         ExceptionFor<ErrorCodes::NamespaceNotFound>);
 
     // Use a builder for easier escaping. We expect the operation to *not* be logged
@@ -2412,8 +2373,8 @@ TEST_F(SyncTailTest, DoNotLogNonSlowOpApplicationWhenSuccessful) {
     auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
 
     startCapturingLogMessages();
-    ASSERT_OK(SyncTail::syncApply(
-        _opCtx.get(), entry.toBSON(), OplogApplication::Mode::kSecondary, boost::none));
+    ASSERT_OK(
+        SyncTail::syncApply(_opCtx.get(), &entry, OplogApplication::Mode::kSecondary, boost::none));
 
     // Use a builder for easier escaping. We expect the operation to *not* be logged,
     // since it wasn't slow to apply.

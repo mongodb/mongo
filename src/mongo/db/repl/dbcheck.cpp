@@ -509,27 +509,28 @@ Status dbCheckDatabaseOnSecondary(OperationContext* opCtx,
 namespace repl {
 
 /*
- * The corresponding command run on the secondary.
+ * The corresponding command run during command application.
  */
 Status dbCheckOplogCommand(OperationContext* opCtx,
-                           const char* ns,
-                           const BSONElement& ui,
-                           BSONObj& cmd,
-                           const repl::OpTime& optime,
                            const repl::OplogEntry& entry,
                            OplogApplication::Mode mode,
                            boost::optional<Timestamp> stableTimestampForRecovery) {
+    const auto& cmd = entry.getObject();
+    OpTime opTime;
+    if (!opCtx->writesAreReplicated()) {
+        opTime = entry.getOpTime();
+    }
     auto type = OplogEntries_parse(IDLParserErrorContext("type"), cmd.getStringField("type"));
     IDLParserErrorContext ctx("o");
 
     switch (type) {
         case OplogEntriesEnum::Batch: {
             auto invocation = DbCheckOplogBatch::parse(ctx, cmd);
-            return dbCheckBatchOnSecondary(opCtx, optime, invocation);
+            return dbCheckBatchOnSecondary(opCtx, opTime, invocation);
         }
         case OplogEntriesEnum::Collection: {
             auto invocation = DbCheckOplogCollection::parse(ctx, cmd);
-            return dbCheckDatabaseOnSecondary(opCtx, optime, invocation);
+            return dbCheckDatabaseOnSecondary(opCtx, opTime, invocation);
         }
     }
 

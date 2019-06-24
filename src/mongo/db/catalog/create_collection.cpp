@@ -195,7 +195,7 @@ Status createCollection(OperationContext* opCtx,
 
 Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const std::string& dbName,
-                                   const BSONElement& ui,
+                                   const OptionalCollectionUUID& ui,
                                    const BSONObj& cmdObj,
                                    const BSONObj& idIndex) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
@@ -212,15 +212,14 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
     // We need to do the renaming part in a separate transaction, as we cannot transactionally
     // create a database on MMAPv1, which could result in createCollection failing if the database
     // does not yet exist.
-    if (ui.ok()) {
+    if (ui) {
         // Return an optional, indicating whether we need to early return (if the collection already
         // exists, or in case of an error).
         using Result = boost::optional<Status>;
         auto result =
             writeConflictRetry(opCtx, "createCollectionForApplyOps", newCollName.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
-                // Options need the field to be named "uuid", so parse/recreate.
-                auto uuid = uassertStatusOK(UUID::parse(ui));
+                auto uuid = ui.get();
                 uassert(ErrorCodes::InvalidUUID,
                         "Invalid UUID in applyOps create command: " + uuid.toString(),
                         uuid.isRFC4122v4());

@@ -33,6 +33,7 @@ env.Library(
     source=[
         'apply_ops.cpp',
         'oplog.cpp',
+        'oplog_entry_batch.cpp',
         'transaction_oplog_application.cpp',
         env.Idlc('apply_ops.idl')[0],
     ],

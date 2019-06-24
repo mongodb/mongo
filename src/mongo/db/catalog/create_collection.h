@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection_catalog.h"
 
 namespace mongo {
 class BSONObj;
@@ -55,7 +56,7 @@ Status createCollection(OperationContext* opCtx,
  */
 Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const std::string& dbName,
-                                   const BSONElement& ui,
+                                   const OptionalCollectionUUID& ui,
                                    const BSONObj& cmdObj,
                                    const BSONObj& idIndex = BSONObj());
 

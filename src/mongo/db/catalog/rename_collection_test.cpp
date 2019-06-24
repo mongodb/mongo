@@ -535,7 +535,7 @@ TEST_F(RenameCollectionTest,
     auto dbName = _sourceNss.db().toString();
     auto cmd = BSON("renameCollection" << dropPendingNss.ns() << "to" << _targetNss.ns());
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  renameCollectionForApplyOps(_opCtx.get(), dbName, {}, cmd, {}));
+                  renameCollectionForApplyOps(_opCtx.get(), dbName, boost::none, cmd, {}));
 
     // Source collections stays in drop-pending state.
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
@@ -552,10 +552,9 @@ TEST_F(
 
     auto dbName = _sourceNss.db().toString();
     NamespaceString ignoredSourceNss(dbName, "ignored");
-    auto uuidDoc = options.uuid->toBSON();
     auto cmd = BSON("renameCollection" << ignoredSourceNss.ns() << "to" << _targetNss.ns());
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["uuid"], cmd, {}));
+                  renameCollectionForApplyOps(_opCtx.get(), dbName, options.uuid, cmd, {}));
 
     // Source collections stays in drop-pending state.
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
@@ -566,20 +565,18 @@ TEST_F(
 TEST_F(RenameCollectionTest, RenameCollectionToItselfByNsForApplyOps) {
     auto dbName = _sourceNss.db().toString();
     auto uuid = _createCollectionWithUUID(_opCtx.get(), _sourceNss);
-    auto uuidDoc = BSON("ui" << uuid);
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _sourceNss.ns() << "dropTarget"
                                        << true);
-    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["ui"], cmd, {}));
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuid, cmd, {}));
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _sourceNss));
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionToItselfByUUIDForApplyOps) {
     auto dbName = _targetNss.db().toString();
     auto uuid = _createCollectionWithUUID(_opCtx.get(), _targetNss);
-    auto uuidDoc = BSON("ui" << uuid);
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
                                        << true);
-    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["ui"], cmd, {}));
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuid, cmd, {}));
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss));
 }
 
@@ -587,10 +584,9 @@ TEST_F(RenameCollectionTest, RenameCollectionByUUIDRatherThanNsForApplyOps) {
     auto realRenameFromNss = NamespaceString("test.bar2");
     auto dbName = realRenameFromNss.db().toString();
     auto uuid = _createCollectionWithUUID(_opCtx.get(), realRenameFromNss);
-    auto uuidDoc = BSON("ui" << uuid);
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
                                        << true);
-    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["ui"], cmd, {}));
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuid, cmd, {}));
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss));
 }
 
@@ -601,11 +597,10 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDTargetDo
     auto dbName = collA.db().toString();
     auto collAUUID = _createCollectionWithUUID(_opCtx.get(), collA);
     auto collCUUID = _createCollectionWithUUID(_opCtx.get(), collC);
-    auto uuidDoc = BSON("ui" << collAUUID);
     // Rename A to B, drop C, where B is not an existing collection
     auto cmd =
         BSON("renameCollection" << collA.ns() << "to" << collB.ns() << "dropTarget" << collCUUID);
-    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["ui"], cmd, {}));
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, collAUUID, cmd, {}));
     // A and C should be dropped
     ASSERT_FALSE(_collectionExists(_opCtx.get(), collA));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), collC));
@@ -625,12 +620,11 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDTargetEx
     auto collAUUID = _createCollectionWithUUID(_opCtx.get(), collA);
     auto collBUUID = _createCollectionWithUUID(_opCtx.get(), collB);
     auto collCUUID = _createCollectionWithUUID(_opCtx.get(), collC);
-    auto uuidDoc = BSON("ui" << collAUUID);
     // Rename A to B, drop C, where B is an existing collection
     // B should be kept but with a temporary name
     auto cmd =
         BSON("renameCollection" << collA.ns() << "to" << collB.ns() << "dropTarget" << collCUUID);
-    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["ui"], cmd, {}));
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, collAUUID, cmd, {}));
     // A and C should be dropped
     ASSERT_FALSE(_collectionExists(_opCtx.get(), collA));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), collC));
@@ -658,12 +652,11 @@ TEST_F(RenameCollectionTest,
     auto dbName = collA.db().toString();
     auto collAUUID = _createCollectionWithUUID(_opCtx.get(), collA);
     auto collCUUID = _createCollectionWithUUID(_opCtx.get(), collC);
-    auto uuidDoc = BSON("ui" << collAUUID);
     // Rename A to B, drop C, where B is an existing collection
     // B should be kept but with a temporary name
     auto cmd =
         BSON("renameCollection" << collA.ns() << "to" << collB.ns() << "dropTarget" << collCUUID);
-    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["ui"], cmd, {}));
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, collAUUID, cmd, {}));
     // A and C should be dropped
     ASSERT_FALSE(_collectionExists(_opCtx.get(), collA));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), collC));
@@ -685,12 +678,11 @@ TEST_F(RenameCollectionTest,
     auto collAUUID = _createCollectionWithUUID(_opCtx.get(), collA);
     auto collBUUID = _createCollectionWithUUID(_opCtx.get(), collB);
     auto collCUUID = UUID::gen();
-    auto uuidDoc = BSON("ui" << collAUUID);
     // Rename A to B, drop C, where B is an existing collection
     // B should be kept but with a temporary name
     auto cmd =
         BSON("renameCollection" << collA.ns() << "to" << collB.ns() << "dropTarget" << collCUUID);
-    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["ui"], cmd, {}));
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, collAUUID, cmd, {}));
     // A and C should be dropped
     ASSERT_FALSE(_collectionExists(_opCtx.get(), collA));
     // B (originally A) should exist
@@ -759,8 +751,9 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsRejectsRenameOpTimeIfWri
     auto dbName = _sourceNss.db().toString();
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns());
     auto renameOpTime = _opObserver->renameOpTime;
-    ASSERT_EQUALS(ErrorCodes::BadValue,
-                  renameCollectionForApplyOps(_opCtx.get(), dbName, {}, cmd, renameOpTime));
+    ASSERT_EQUALS(
+        ErrorCodes::BadValue,
+        renameCollectionForApplyOps(_opCtx.get(), dbName, boost::none, cmd, renameOpTime));
 }
 
 TEST_F(RenameCollectionTest,
@@ -778,7 +771,7 @@ TEST_F(RenameCollectionTest,
                                        << true);
 
     repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
-    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, {}, cmd, renameOpTime));
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, boost::none, cmd, renameOpTime));
 
     // Confirm that the target collection has been renamed to a drop-pending collection.
     auto dpns = _targetNss.makeDropPendingNamespace(renameOpTime);
@@ -800,16 +793,16 @@ DEATH_TEST_F(RenameCollectionTest,
                                        << true);
 
     repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
-    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, {}, cmd, renameOpTime));
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, boost::none, cmd, renameOpTime));
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsSourceAndTargetDoNotExist) {
-    auto uuidDoc = BSON("ui" << UUID::gen());
+    auto uuid = UUID::gen();
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
                                        << "true");
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  renameCollectionForApplyOps(
-                      _opCtx.get(), _sourceNss.db().toString(), uuidDoc["ui"], cmd, {}));
+    ASSERT_EQUALS(
+        ErrorCodes::NamespaceNotFound,
+        renameCollectionForApplyOps(_opCtx.get(), _sourceNss.db().toString(), uuid, cmd, {}));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
 }
@@ -817,12 +810,12 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsSourceAndTargetDoNotExis
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetEvenIfSourceDoesNotExist) {
     _createCollectionWithUUID(_opCtx.get(), _targetNss);
     auto missingSourceNss = NamespaceString("test.bar2");
-    auto uuidDoc = BSON("ui" << UUID::gen());
+    auto uuid = UUID::gen();
     auto cmd =
         BSON("renameCollection" << missingSourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
                                 << "true");
-    ASSERT_OK(renameCollectionForApplyOps(
-        _opCtx.get(), missingSourceNss.db().toString(), uuidDoc["ui"], cmd, {}));
+    ASSERT_OK(
+        renameCollectionForApplyOps(_opCtx.get(), missingSourceNss.db().toString(), uuid, cmd, {}));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
 }
 
@@ -831,11 +824,11 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSo
     auto dropTargetNss = NamespaceString("test.bar3");
     _createCollectionWithUUID(_opCtx.get(), _targetNss);
     auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), dropTargetNss);
-    auto uuidDoc = BSON("ui" << UUID::gen());
+    auto uuid = UUID::gen();
     auto cmd = BSON("renameCollection" << missingSourceNss.ns() << "to" << _targetNss.ns()
                                        << "dropTarget" << dropTargetUUID);
-    ASSERT_OK(renameCollectionForApplyOps(
-        _opCtx.get(), missingSourceNss.db().toString(), uuidDoc["ui"], cmd, {}));
+    ASSERT_OK(
+        renameCollectionForApplyOps(_opCtx.get(), missingSourceNss.db().toString(), uuid, cmd, {}));
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), dropTargetNss));
 }
@@ -845,7 +838,7 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetEvenIfSourceIs
     auto dropPendingNss = _sourceNss.makeDropPendingNamespace(dropOpTime);
 
     auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), _targetNss);
-    auto uuidDoc = BSON("ui" << _createCollectionWithUUID(_opCtx.get(), dropPendingNss));
+    auto uuid = _createCollectionWithUUID(_opCtx.get(), dropPendingNss);
     auto cmd =
         BSON("renameCollection" << dropPendingNss.ns() << "to" << _targetNss.ns() << "dropTarget"
                                 << "true");
@@ -853,7 +846,7 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetEvenIfSourceIs
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
     repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
     ASSERT_OK(renameCollectionForApplyOps(
-        _opCtx.get(), dropPendingNss.db().toString(), uuidDoc["ui"], cmd, renameOpTime));
+        _opCtx.get(), dropPendingNss.db().toString(), uuid, cmd, renameOpTime));
 
     // Source collections stays in drop-pending state.
     ASSERT_TRUE(_collectionExists(_opCtx.get(), dropPendingNss));
@@ -870,14 +863,14 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSo
     _createCollectionWithUUID(_opCtx.get(), _targetNss);
 
     auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), dropTargetNss);
-    auto uuidDoc = BSON("ui" << _createCollectionWithUUID(_opCtx.get(), dropPendingNss));
+    auto uuid = _createCollectionWithUUID(_opCtx.get(), dropPendingNss);
     auto cmd = BSON("renameCollection" << dropPendingNss.ns() << "to" << _targetNss.ns()
                                        << "dropTarget" << dropTargetUUID);
 
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
     repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
     ASSERT_OK(renameCollectionForApplyOps(
-        _opCtx.get(), dropPendingNss.db().toString(), uuidDoc["ui"], cmd, renameOpTime));
+        _opCtx.get(), dropPendingNss.db().toString(), uuid, cmd, renameOpTime));
 
     // Source collections stays in drop-pending state.
     ASSERT_TRUE(_collectionExists(_opCtx.get(), dropPendingNss));
@@ -889,14 +882,14 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSo
 
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSourceEqualsTarget) {
     auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), _targetNss);
-    auto uuidDoc = BSON("ui" << _createCollectionWithUUID(_opCtx.get(), _sourceNss));
+    auto uuid = _createCollectionWithUUID(_opCtx.get(), _sourceNss);
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _sourceNss.ns() << "dropTarget"
                                        << dropTargetUUID);
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
     repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
     auto dpns = _targetNss.makeDropPendingNamespace(renameOpTime);
     ASSERT_OK(renameCollectionForApplyOps(
-        _opCtx.get(), _sourceNss.db().toString(), uuidDoc["ui"], cmd, renameOpTime));
+        _opCtx.get(), _sourceNss.db().toString(), uuid, cmd, renameOpTime));
 
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _sourceNss));
     ASSERT_TRUE(_collectionExists(_opCtx.get(), dpns));
@@ -1005,7 +998,8 @@ void _testRenameCollectionAcrossDatabaseOplogEntries(
     if (forApplyOps) {
         auto cmd = BSON("renameCollection" << sourceNss.ns() << "to" << targetNss.ns()
                                            << "dropTarget" << true);
-        ASSERT_OK(renameCollectionForApplyOps(opCtx, sourceNss.db().toString(), {}, cmd, {}));
+        ASSERT_OK(
+            renameCollectionForApplyOps(opCtx, sourceNss.db().toString(), boost::none, cmd, {}));
     } else {
         RenameCollectionOptions options;
         options.dropTarget = true;
@@ -1140,10 +1134,9 @@ TEST_F(RenameCollectionTest, CatalogPointersRenameValidThroughRenameForApplyOps)
     Collection* sourceColl = AutoGetCollectionForRead(_opCtx.get(), _sourceNss).getCollection();
     ASSERT(sourceColl);
 
-    auto uuidDoc = BSON("ui" << UUID::gen());
+    auto uuid = UUID::gen();
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns());
-    ASSERT_OK(renameCollectionForApplyOps(
-        _opCtx.get(), _sourceNss.db().toString(), uuidDoc["ui"], cmd, {}));
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), _sourceNss.db().toString(), uuid, cmd, {}));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
 
     Collection* targetColl = AutoGetCollectionForRead(_opCtx.get(), _targetNss).getCollection();
@@ -1194,7 +1187,7 @@ TEST_F(RenameCollectionTest,
     auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << invalidTargetNss.ns());
 
     ASSERT_EQUALS(ErrorCodes::InvalidNamespace,
-                  renameCollectionForApplyOps(_opCtx.get(), dbName, {}, cmd, {}));
+                  renameCollectionForApplyOps(_opCtx.get(), dbName, boost::none, cmd, {}));
 }
 
 }  // namespace

@@ -66,7 +66,7 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
         try {
             AutoGetCollection coll(opCtx, op.getNss(), MODE_IX);
             auto status = repl::applyOperation_inlock(
-                opCtx, coll.getDb(), op.toBSON(), false /*alwaysUpsert*/, oplogApplicationMode);
+                opCtx, coll.getDb(), &op, false /*alwaysUpsert*/, oplogApplicationMode);
             if (!status.isOK()) {
                 return status;
             }

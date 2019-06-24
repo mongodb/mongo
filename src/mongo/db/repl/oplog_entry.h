@@ -170,7 +170,7 @@ public:
     using MutableOplogEntry::kVersionFieldName;
     using MutableOplogEntry::kWallClockTimeFieldName;
 
-    // Make serialize(), toBSON() and getters accessible.
+    // Make serialize() and getters accessible.
     using MutableOplogEntry::get_id;
     using MutableOplogEntry::getDurableReplOperation;
     using MutableOplogEntry::getFromMigrate;
@@ -193,7 +193,6 @@ public:
     using MutableOplogEntry::getVersion;
     using MutableOplogEntry::getWallClockTime;
     using MutableOplogEntry::serialize;
-    using MutableOplogEntry::toBSON;
 
     // Make helper functions accessible.
     using MutableOplogEntry::getOpTime;
@@ -322,6 +321,10 @@ public:
      * Serializes the oplog entry to a string.
      */
     std::string toString() const;
+
+    BSONObj toBSON() const {
+        return _raw;
+    }
 
 private:
     BSONObj _raw;  // Owned.

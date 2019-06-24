@@ -115,7 +115,7 @@ public:
 
 protected:
     void _testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
-                                     const BSONObj& op,
+                                     const OplogEntry& op,
                                      bool expectedApplyOpCalled);
 
     ServiceContext::UniqueOperationContext _opCtx;
