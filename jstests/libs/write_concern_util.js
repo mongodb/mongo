@@ -120,7 +120,7 @@ function runWriteConcernRetryabilityTest(priConn, secConn, cmd, kNodes, dbName, 
     // Send a dummy write to this connection so it will have the Client object initialized.
     const secondPriConn = new Mongo(priConn.host);
     const testDB2 = secondPriConn.getDB(dbName);
-    assert.writeOK(testDB2.dummy.insert({x: 1}, {writeConcern: {w: kNodes}}));
+    assert.commandWorked(testDB2.dummy.insert({x: 1}, {writeConcern: {w: kNodes}}));
 
     if (setupFunc) {
         setupFunc(priConn);
@@ -129,6 +129,17 @@ function runWriteConcernRetryabilityTest(priConn, secConn, cmd, kNodes, dbName, 
     stopServerReplication(secConn);
 
     const testDB = priConn.getDB(dbName);
+    checkWriteConcernTimedOut(testDB.runCommand(cmd));
+
+    // Retry the command on the new connection whose lastOp will be less than the main connection.
+    checkWriteConcernTimedOut(testDB2.runCommand(cmd));
+
+    // Retry the command on the main connection whose lastOp will not have changed.
+    checkWriteConcernTimedOut(testDB.runCommand(cmd));
+
+    // Bump forward the client lastOp on both connections and try again on both.
+    assert.commandWorked(testDB.dummy.insert({x: 2}));
+    assert.commandWorked(testDB2.dummy.insert({x: 3}));
     checkWriteConcernTimedOut(testDB.runCommand(cmd));
     checkWriteConcernTimedOut(testDB2.runCommand(cmd));
 
