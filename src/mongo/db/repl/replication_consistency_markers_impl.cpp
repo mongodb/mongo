@@ -114,7 +114,10 @@ void ReplicationConsistencyMarkersImpl::initializeMinValidDocument(OperationCont
 
 bool ReplicationConsistencyMarkersImpl::getInitialSyncFlag(OperationContext* opCtx) const {
     auto doc = _getMinValidDocument(opCtx);
-    invariant(doc);  // Initialized at startup so it should never be missing.
+    if (!doc) {
+        LOG(3) << "No min valid document found, returning initial sync flag value of false.";
+        return false;
+    }
 
     boost::optional<bool> flag = doc->getInitialSyncFlag();
     if (!flag) {
