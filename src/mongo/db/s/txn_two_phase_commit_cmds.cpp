@@ -108,14 +108,20 @@ public:
                 auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
                 auto prepareOpTime = txnParticipant.getPrepareOpTime();
 
-                // Ensure waiting for writeConcern of the prepare OpTime.
+                // Ensure waiting for writeConcern of the prepare OpTime. If the node has failed
+                // over, then we want to wait on an OpTime in the new term, so we wait on the
+                // lastApplied OpTime. If we've gotten to this point, then we are guaranteed that
+                // the transaction was prepared at this prepareOpTime on this branch of history and
+                // that waiting on this lastApplied OpTime waits on the prepareOpTime as well.
+                replClient.setLastOpToSystemLastOpTime(opCtx);
+
+                // TODO SERVER-39364: Due to a bug in setlastOpToSystemLastOpTime, the prepareOpTime
+                // may still be greater than the lastApplied. In that case we make sure that we wait
+                // on the prepareOpTime which is guaranteed to be in the current term. SERVER-39364
+                // can remove this extra setLastOp() call and just rely on the call to
+                // setLastOpToSystemLastOpTime() above.
                 if (prepareOpTime > replClient.getLastOp()) {
-                    // In case this node has failed over, in which case the term will have
-                    // increased, set the Client's last OpTime to the larger of the system last
-                    // OpTime and the prepare OpTime.
-                    const auto systemLastOpTime =
-                        repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
-                    replClient.setLastOp(opCtx, std::max(prepareOpTime, systemLastOpTime));
+                    replClient.setLastOp(opCtx, prepareOpTime);
                 }
 
                 invariant(opCtx->recoveryUnit()->getPrepareTimestamp() ==

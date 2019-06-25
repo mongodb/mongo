@@ -140,6 +140,12 @@ public:
             return;
         }
 
+        // Waits for write concern if we tried to explicitly set the lastOp forward but lastOp was
+        // already up to date. We still want to wait for write concern on the lastOp. This is
+        // primarily to make sure back to back retryable write retries still wait for write concern.
+        //
+        // WARNING: Retryable writes that expect to wait for write concern on retries must ensure
+        // this is entered by calling setLastOp() or setLastOpToSystemLastOpTime().
         if (repl::ReplClientInfo::forClient(opCtx->getClient())
                 .lastOpWasSetExplicitlyByClientForCurrentOperation(opCtx)) {
             waitForWriteConcernAndAppendStatus();

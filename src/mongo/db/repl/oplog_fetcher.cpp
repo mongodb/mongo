@@ -52,6 +52,7 @@ Seconds OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout(2);
 
 MONGO_FAIL_POINT_DEFINE(stopReplProducer);
 MONGO_FAIL_POINT_DEFINE(stopReplProducerOnDocument);
+MONGO_FAIL_POINT_DEFINE(setSmallOplogGetMoreMaxTimeMS);
 
 namespace {
 
@@ -391,6 +392,10 @@ Milliseconds OplogFetcher::getAwaitDataTimeout_forTest() const {
 }
 
 Milliseconds OplogFetcher::_getGetMoreMaxTime() const {
+    if (MONGO_FAIL_POINT(setSmallOplogGetMoreMaxTimeMS)) {
+        return Milliseconds(50);
+    }
+
     return _awaitDataTimeout;
 }
 
