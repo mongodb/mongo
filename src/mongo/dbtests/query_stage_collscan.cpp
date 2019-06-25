@@ -49,9 +49,10 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point_service.h"
 
-namespace QueryStageCollectionScan {
+namespace query_stage_collection_scan {
 
 using std::unique_ptr;
 using std::vector;
@@ -62,9 +63,9 @@ static const NamespaceString nss{"unittests.QueryStageCollectionScan"};
 // Stage-specific tests.
 //
 
-class QueryStageCollectionScanBase {
+class QueryStageCollectionScanTest : public unittest::Test {
 public:
-    QueryStageCollectionScanBase() : _client(&_opCtx) {
+    QueryStageCollectionScanTest() : _client(&_opCtx) {
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
 
         for (int i = 0; i < numObj(); ++i) {
@@ -74,7 +75,7 @@ public:
         }
     }
 
-    virtual ~QueryStageCollectionScanBase() {
+    virtual ~QueryStageCollectionScanTest() {
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         _client.dropCollection(nss.ns());
     }
@@ -156,257 +157,192 @@ private:
 };
 
 
-//
 // Go forwards, get everything.
-//
-class QueryStageCollscanBasicForward : public QueryStageCollectionScanBase {
-public:
-    void run() {
-        ASSERT_EQUALS(numObj(), countResults(CollectionScanParams::FORWARD, BSONObj()));
-    }
-};
-
-//
-// Go backwards, get everything.
-//
-
-class QueryStageCollscanBasicBackward : public QueryStageCollectionScanBase {
-public:
-    void run() {
-        ASSERT_EQUALS(numObj(), countResults(CollectionScanParams::BACKWARD, BSONObj()));
-    }
-};
-
-//
-// Go forwards and match half the docs.
-//
-
-class QueryStageCollscanBasicForwardWithMatch : public QueryStageCollectionScanBase {
-public:
-    void run() {
-        BSONObj obj = BSON("foo" << BSON("$lt" << 25));
-        ASSERT_EQUALS(25, countResults(CollectionScanParams::FORWARD, obj));
-    }
-};
-
-//
-// Go backwards and match half the docs.
-//
-
-class QueryStageCollscanBasicBackwardWithMatch : public QueryStageCollectionScanBase {
-public:
-    void run() {
-        BSONObj obj = BSON("foo" << BSON("$lt" << 25));
-        ASSERT_EQUALS(25, countResults(CollectionScanParams::BACKWARD, obj));
-    }
-};
-
-//
-// Get objects in the order we inserted them.
-//
-
-class QueryStageCollscanObjectsInOrderForward : public QueryStageCollectionScanBase {
-public:
-    void run() {
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        auto collection = ctx.getCollection();
-
-        // Configure the scan.
-        CollectionScanParams params;
-        params.direction = CollectionScanParams::FORWARD;
-        params.tailable = false;
-
-        // Make a scan and have the runner own it.
-        unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-        unique_ptr<PlanStage> ps =
-            std::make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), nullptr);
-
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
-
-        int count = 0;
-        PlanExecutor::ExecState state;
-        for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr));) {
-            // Make sure we get the objects in the order we want
-            ASSERT_EQUALS(count, obj["foo"].numberInt());
-            ++count;
-        }
-        ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
-        ASSERT_EQUALS(numObj(), count);
-    }
-};
-
-//
-// Get objects in the reverse order we inserted them when we go backwards.
-//
-
-class QueryStageCollscanObjectsInOrderBackward : public QueryStageCollectionScanBase {
-public:
-    void run() {
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        auto collection = ctx.getCollection();
-
-        CollectionScanParams params;
-        params.direction = CollectionScanParams::BACKWARD;
-        params.tailable = false;
-
-        unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-        unique_ptr<PlanStage> ps =
-            std::make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), nullptr);
-
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
-        ASSERT_OK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
-
-        int count = 0;
-        PlanExecutor::ExecState state;
-        for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr));) {
-            ++count;
-            ASSERT_EQUALS(numObj() - count, obj["foo"].numberInt());
-        }
-        ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
-        ASSERT_EQUALS(numObj(), count);
-    }
-};
-
-//
-// Scan through half the objects, delete the one we're about to fetch, then expect to get the
-// "next" object we would have gotten after that.
-//
-
-class QueryStageCollscanDeleteUpcomingObject : public QueryStageCollectionScanBase {
-public:
-    void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-
-        Collection* coll = ctx.getCollection();
-
-        // Get the RecordIds that would be returned by an in-order scan.
-        vector<RecordId> recordIds;
-        getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
-
-        // Configure the scan.
-        CollectionScanParams params;
-        params.direction = CollectionScanParams::FORWARD;
-        params.tailable = false;
-
-        WorkingSet ws;
-        unique_ptr<PlanStage> scan(new CollectionScan(&_opCtx, coll, params, &ws, nullptr));
-
-        int count = 0;
-        while (count < 10) {
-            WorkingSetID id = WorkingSet::INVALID_ID;
-            PlanStage::StageState state = scan->work(&id);
-            if (PlanStage::ADVANCED == state) {
-                WorkingSetMember* member = ws.get(id);
-                ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
-                              member->obj.value()["foo"].numberInt());
-                ++count;
-            }
-        }
-
-        // Remove recordIds[count].
-        scan->saveState();
-        remove(coll->docFor(&_opCtx, recordIds[count]).value());
-        scan->restoreState();
-
-        // Skip over recordIds[count].
-        ++count;
-
-        // Expect the rest.
-        while (!scan->isEOF()) {
-            WorkingSetID id = WorkingSet::INVALID_ID;
-            PlanStage::StageState state = scan->work(&id);
-            if (PlanStage::ADVANCED == state) {
-                WorkingSetMember* member = ws.get(id);
-                ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
-                              member->obj.value()["foo"].numberInt());
-                ++count;
-            }
-        }
-
-        ASSERT_EQUALS(numObj(), count);
-    }
-};
-
-//
-// Scan through half the objects, delete the one we're about to fetch, then expect to get the
-// "next" object we would have gotten after that.  But, do it in reverse!
-//
-
-class QueryStageCollscanDeleteUpcomingObjectBackward : public QueryStageCollectionScanBase {
-public:
-    void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        Collection* coll = ctx.getCollection();
-
-        // Get the RecordIds that would be returned by an in-order scan.
-        vector<RecordId> recordIds;
-        getRecordIds(coll, CollectionScanParams::BACKWARD, &recordIds);
-
-        // Configure the scan.
-        CollectionScanParams params;
-        params.direction = CollectionScanParams::BACKWARD;
-        params.tailable = false;
-
-        WorkingSet ws;
-        unique_ptr<PlanStage> scan(new CollectionScan(&_opCtx, coll, params, &ws, nullptr));
-
-        int count = 0;
-        while (count < 10) {
-            WorkingSetID id = WorkingSet::INVALID_ID;
-            PlanStage::StageState state = scan->work(&id);
-            if (PlanStage::ADVANCED == state) {
-                WorkingSetMember* member = ws.get(id);
-                ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
-                              member->obj.value()["foo"].numberInt());
-                ++count;
-            }
-        }
-
-        // Remove recordIds[count].
-        scan->saveState();
-        remove(coll->docFor(&_opCtx, recordIds[count]).value());
-        scan->restoreState();
-
-        // Skip over recordIds[count].
-        ++count;
-
-        // Expect the rest.
-        while (!scan->isEOF()) {
-            WorkingSetID id = WorkingSet::INVALID_ID;
-            PlanStage::StageState state = scan->work(&id);
-            if (PlanStage::ADVANCED == state) {
-                WorkingSetMember* member = ws.get(id);
-                ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
-                              member->obj.value()["foo"].numberInt());
-                ++count;
-            }
-        }
-
-        ASSERT_EQUALS(numObj(), count);
-    }
-};
-
-class All : public Suite {
-public:
-    All() : Suite("QueryStageCollectionScan") {}
-
-    void setupTests() {
-        // Stage-specific tests below.
-        add<QueryStageCollscanBasicForward>();
-        add<QueryStageCollscanBasicBackward>();
-        add<QueryStageCollscanBasicForwardWithMatch>();
-        add<QueryStageCollscanBasicBackwardWithMatch>();
-        add<QueryStageCollscanObjectsInOrderForward>();
-        add<QueryStageCollscanObjectsInOrderBackward>();
-        add<QueryStageCollscanDeleteUpcomingObject>();
-        add<QueryStageCollscanDeleteUpcomingObjectBackward>();
-    }
-};
-
-SuiteInstance<All> all;
+TEST_F(QueryStageCollectionScanTest, QueryStageCollscanBasicForward) {
+    ASSERT_EQUALS(numObj(), countResults(CollectionScanParams::FORWARD, BSONObj()));
 }
+
+// Go backwards, get everything.
+TEST_F(QueryStageCollectionScanTest, QueryStageCollscanBasicBackward) {
+    ASSERT_EQUALS(numObj(), countResults(CollectionScanParams::BACKWARD, BSONObj()));
+}
+
+// Go forwards and match half the docs.
+TEST_F(QueryStageCollectionScanTest, QueryStageCollscanBasicForwardWithMatch) {
+    BSONObj obj = BSON("foo" << BSON("$lt" << 25));
+    ASSERT_EQUALS(25, countResults(CollectionScanParams::FORWARD, obj));
+}
+
+// Go backwards and match half the docs.
+TEST_F(QueryStageCollectionScanTest, QueryStageCollscanBasicBackwardWithMatch) {
+    BSONObj obj = BSON("foo" << BSON("$lt" << 25));
+    ASSERT_EQUALS(25, countResults(CollectionScanParams::BACKWARD, obj));
+}
+
+// Get objects in the order we inserted them.
+TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
+    AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
+    auto collection = ctx.getCollection();
+
+    // Configure the scan.
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::FORWARD;
+    params.tailable = false;
+
+    // Make a scan and have the runner own it.
+    unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+    unique_ptr<PlanStage> ps =
+        std::make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), nullptr);
+
+    auto statusWithPlanExecutor = PlanExecutor::make(
+        &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
+    ASSERT_OK(statusWithPlanExecutor.getStatus());
+    auto exec = std::move(statusWithPlanExecutor.getValue());
+
+    int count = 0;
+    PlanExecutor::ExecState state;
+    for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr));) {
+        // Make sure we get the objects in the order we want
+        ASSERT_EQUALS(count, obj["foo"].numberInt());
+        ++count;
+    }
+    ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
+    ASSERT_EQUALS(numObj(), count);
+}
+
+// Get objects in the reverse order we inserted them when we go backwards.
+TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
+    AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
+    auto collection = ctx.getCollection();
+
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::BACKWARD;
+    params.tailable = false;
+
+    unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+    unique_ptr<PlanStage> ps =
+        std::make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), nullptr);
+
+    auto statusWithPlanExecutor = PlanExecutor::make(
+        &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
+    ASSERT_OK(statusWithPlanExecutor.getStatus());
+    auto exec = std::move(statusWithPlanExecutor.getValue());
+
+    int count = 0;
+    PlanExecutor::ExecState state;
+    for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr));) {
+        ++count;
+        ASSERT_EQUALS(numObj() - count, obj["foo"].numberInt());
+    }
+    ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
+    ASSERT_EQUALS(numObj(), count);
+}
+
+// Scan through half the objects, delete the one we're about to fetch, then expect to get the "next"
+// object we would have gotten after that.
+TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+
+    Collection* coll = ctx.getCollection();
+
+    // Get the RecordIds that would be returned by an in-order scan.
+    vector<RecordId> recordIds;
+    getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+
+    // Configure the scan.
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::FORWARD;
+    params.tailable = false;
+
+    WorkingSet ws;
+    unique_ptr<PlanStage> scan(new CollectionScan(&_opCtx, coll, params, &ws, nullptr));
+
+    int count = 0;
+    while (count < 10) {
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState state = scan->work(&id);
+        if (PlanStage::ADVANCED == state) {
+            WorkingSetMember* member = ws.get(id);
+            ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
+                          member->obj.value()["foo"].numberInt());
+            ++count;
+        }
+    }
+
+    // Remove recordIds[count].
+    scan->saveState();
+    remove(coll->docFor(&_opCtx, recordIds[count]).value());
+    scan->restoreState();
+
+    // Skip over recordIds[count].
+    ++count;
+
+    // Expect the rest.
+    while (!scan->isEOF()) {
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState state = scan->work(&id);
+        if (PlanStage::ADVANCED == state) {
+            WorkingSetMember* member = ws.get(id);
+            ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
+                          member->obj.value()["foo"].numberInt());
+            ++count;
+        }
+    }
+
+    ASSERT_EQUALS(numObj(), count);
+}
+
+// Scan through half the objects, delete the one we're about to fetch, then expect to get the "next"
+// object we would have gotten after that.  But, do it in reverse!
+TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackward) {
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
+    Collection* coll = ctx.getCollection();
+
+    // Get the RecordIds that would be returned by an in-order scan.
+    vector<RecordId> recordIds;
+    getRecordIds(coll, CollectionScanParams::BACKWARD, &recordIds);
+
+    // Configure the scan.
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::BACKWARD;
+    params.tailable = false;
+
+    WorkingSet ws;
+    unique_ptr<PlanStage> scan(new CollectionScan(&_opCtx, coll, params, &ws, nullptr));
+
+    int count = 0;
+    while (count < 10) {
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState state = scan->work(&id);
+        if (PlanStage::ADVANCED == state) {
+            WorkingSetMember* member = ws.get(id);
+            ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
+                          member->obj.value()["foo"].numberInt());
+            ++count;
+        }
+    }
+
+    // Remove recordIds[count].
+    scan->saveState();
+    remove(coll->docFor(&_opCtx, recordIds[count]).value());
+    scan->restoreState();
+
+    // Skip over recordIds[count].
+    ++count;
+
+    // Expect the rest.
+    while (!scan->isEOF()) {
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState state = scan->work(&id);
+        if (PlanStage::ADVANCED == state) {
+            WorkingSetMember* member = ws.get(id);
+            ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
+                          member->obj.value()["foo"].numberInt());
+            ++count;
+        }
+    }
+
+    ASSERT_EQUALS(numObj(), count);
+}
+
+}  // namespace query_stage_collection_scan
