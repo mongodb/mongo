@@ -2307,7 +2307,7 @@ HostAndPort ReplicationCoordinatorImpl::getMyHostAndPort() const {
 
 int ReplicationCoordinatorImpl::_getMyId_inlock() const {
     const MemberConfig& self = _rsConfig.getMemberAt(_selfIndex);
-    return self.getId();
+    return self.getId().getData();
 }
 
 Status ReplicationCoordinatorImpl::resyncData(OperationContext* opCtx, bool waitUntilCompleted) {

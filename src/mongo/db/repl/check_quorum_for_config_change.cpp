@@ -94,7 +94,7 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
         hbArgs.setCheckEmpty();
     }
     hbArgs.setSenderHost(myConfig.getHostAndPort());
-    hbArgs.setSenderId(myConfig.getId());
+    hbArgs.setSenderId(myConfig.getId().getData());
     hbArgs.setTerm(_term);
     hbRequest = hbArgs.toBSON();
 

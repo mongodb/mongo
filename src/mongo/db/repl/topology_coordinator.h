@@ -434,10 +434,10 @@ public:
 
     /**
      * Goes through the memberData and determines which member that is currently live
-     * has the stalest (earliest) last update time.  Returns (-1, Date_t::max()) if there are
-     * no other members.
+     * has the stalest (earliest) last update time.  Returns (MemberId(), Date_t::max()) if there
+     * are no other members.
      */
-    std::pair<int, Date_t> getStalestLiveMember() const;
+    std::pair<MemberId, Date_t> getStalestLiveMember() const;
 
     /**
      * Go through the memberData, and mark nodes which haven't been updated
@@ -691,7 +691,8 @@ public:
      * each member in the config. If the member is not up or hasn't responded to a heartbeat since
      * we last restarted, then its value will be boost::none.
      */
-    std::map<int, boost::optional<OpTime>> latestKnownOpTimeSinceHeartbeatRestartPerMember() const;
+    std::map<MemberId, boost::optional<OpTime>> latestKnownOpTimeSinceHeartbeatRestartPerMember()
+        const;
 
     /**
      * Checks if the 'commitQuorum' can be satisifed by 'members'. Returns true if it can be

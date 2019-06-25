@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/repl/member_id.h"
 #include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/db/repl/split_horizon.h"
 #include "mongo/util/net/hostandport.h"
@@ -84,7 +85,7 @@ public:
     /**
      * Gets the identifier for this member, unique within a ReplSetConfig.
      */
-    int getId() const {
+    MemberId getId() const {
         return _id;
     }
 
@@ -214,7 +215,7 @@ private:
         return getHostAndPort(SplitHorizon::kDefaultHorizon);
     }
 
-    int _id;
+    MemberId _id;
     double _priority;  // 0 means can never be primary
     int _votes;        // Can this member vote? Only 0 and 1 are valid.  Default 1.
     bool _arbiterOnly;

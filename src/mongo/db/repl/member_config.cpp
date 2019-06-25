@@ -93,7 +93,7 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
         uasserted(ErrorCodes::TypeMismatch,
                   str::stream() << kIdFieldName << " field has non-numeric type "
                                 << typeName(idElement.type()));
-    _id = idElement.numberInt();
+    _id = MemberId(idElement.numberInt());
 
     //
     // Parse h field.
@@ -203,7 +203,7 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
     //
 
     // Add a voter tag if this non-arbiter member votes; use _id for uniquity.
-    const std::string id = str::stream() << _id;
+    const std::string id = std::to_string(_id.getData());
     if (isVoter() && !_arbiterOnly) {
         _tags.push_back(tagConfig->makeTag(kInternalVoterTagName, id));
     }
@@ -220,12 +220,6 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
 }
 
 Status MemberConfig::validate() const {
-    if (_id < 0 || _id > 255) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << kIdFieldName << " field value of " << _id
-                                    << " is out of range.");
-    }
-
     if (_priority < 0 || _priority > 1000) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << kPriorityFieldName << " field value of " << _priority
@@ -282,7 +276,7 @@ bool MemberConfig::hasTags(const ReplSetTagConfig& tagConfig) const {
 
 BSONObj MemberConfig::toBSON(const ReplSetTagConfig& tagConfig) const {
     BSONObjBuilder configBuilder;
-    configBuilder.append("_id", _id);
+    configBuilder.append("_id", _id.getData());
     configBuilder.append("host", _host().toString());
     configBuilder.append("arbiterOnly", _arbiterOnly);
     configBuilder.append("buildIndexes", _buildIndexes);
