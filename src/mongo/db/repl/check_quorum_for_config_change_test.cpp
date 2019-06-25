@@ -222,7 +222,7 @@ const BSONObj makeHeartbeatRequest(const ReplSetConfig& rsConfig, int myConfigIn
         hbArgs.setCheckEmpty();
     }
     hbArgs.setSenderHost(myConfig.getHostAndPort());
-    hbArgs.setSenderId(myConfig.getId());
+    hbArgs.setSenderId(myConfig.getId().getData());
     hbArgs.setTerm(0);
     return hbArgs.toBSON();
 }

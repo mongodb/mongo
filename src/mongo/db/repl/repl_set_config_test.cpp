@@ -74,7 +74,7 @@ TEST(ReplSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS("rs0", config.getReplSetName());
     ASSERT_EQUALS(1, config.getConfigVersion());
     ASSERT_EQUALS(1, config.getNumMembers());
-    ASSERT_EQUALS(0, config.membersBegin()->getId());
+    ASSERT_EQUALS(MemberId(0), config.membersBegin()->getId());
     ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
     ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
     ASSERT_EQUALS(ReplSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
@@ -122,7 +122,7 @@ TEST(ReplSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_EQUALS("rs0", config.getReplSetName());
     ASSERT_EQUALS(1234, config.getConfigVersion());
     ASSERT_EQUALS(1, config.getNumMembers());
-    ASSERT_EQUALS(234, config.membersBegin()->getId());
+    ASSERT_EQUALS(MemberId(234), config.membersBegin()->getId());
     ASSERT_EQUALS(0, config.getDefaultWriteConcern().wNumNodes);
     ASSERT_EQUALS("majority", config.getDefaultWriteConcern().wMode);
     ASSERT_FALSE(config.isChainingAllowed());

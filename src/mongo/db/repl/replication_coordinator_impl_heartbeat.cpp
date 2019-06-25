@@ -756,10 +756,10 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
     // Scan liveness table for earliest date; schedule a run at (that date plus election
     // timeout).
     Date_t earliestDate;
-    int earliestMemberId;
+    MemberId earliestMemberId;
     std::tie(earliestMemberId, earliestDate) = _topCoord->getStalestLiveMember();
 
-    if (earliestMemberId == -1 || earliestDate == Date_t::max()) {
+    if (!earliestMemberId || earliestDate == Date_t::max()) {
         _earliestMemberId = -1;
         // Nobody here but us.
         return;
@@ -788,7 +788,7 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
         return;
     }
     _handleLivenessTimeoutCbh = cbh;
-    _earliestMemberId = earliestMemberId;
+    _earliestMemberId = earliestMemberId.getData();
 }
 
 void ReplicationCoordinatorImpl::_cancelAndRescheduleLivenessUpdate_inlock(int updatedMemberId) {

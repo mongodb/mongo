@@ -583,7 +583,7 @@ Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
                           "Our replica set configuration is invalid or does not include us");
         }
     } else {
-        if (args.getSenderId() == _selfConfig().getId()) {
+        if (args.getSenderId() == _selfConfig().getId().getData()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Received heartbeat from member with the same "
                                            "member ID as ourself: "
@@ -605,7 +605,7 @@ Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
     response->setDurableOpTimeAndWallTime(lastOpDurable);
 
     if (_currentPrimaryIndex != -1) {
-        response->setPrimaryId(_rsConfig.getMemberAt(_currentPrimaryIndex).getId());
+        response->setPrimaryId(_rsConfig.getMemberAt(_currentPrimaryIndex).getId().getData());
     }
 
     response->setTerm(_term);
@@ -648,7 +648,7 @@ int TopologyCoordinator::_getMemberIndex(int id) const {
     int index = 0;
     for (ReplSetConfig::MemberIterator it = _rsConfig.membersBegin(); it != _rsConfig.membersEnd();
          ++it, ++index) {
-        if (it->getId() == id) {
+        if (it->getId() == MemberId(id)) {
             return index;
         }
     }
@@ -672,7 +672,7 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHear
         hbArgs.setConfigVersion(_rsConfig.getConfigVersion());
         if (_selfIndex >= 0) {
             const MemberConfig& me = _selfConfig();
-            hbArgs.setSenderId(me.getId());
+            hbArgs.setSenderId(me.getId().getData());
             hbArgs.setSenderHost(me.getHostAndPort());
         }
         hbArgs.setTerm(_term);
@@ -929,9 +929,9 @@ bool TopologyCoordinator::setMemberAsDown(Date_t now, const int memberIndex) {
     return false;
 }
 
-std::pair<int, Date_t> TopologyCoordinator::getStalestLiveMember() const {
+std::pair<MemberId, Date_t> TopologyCoordinator::getStalestLiveMember() const {
     Date_t earliestDate = Date_t::max();
-    int earliestMemberId = -1;
+    MemberId earliestMemberId;
     for (const auto& memberData : _memberData) {
         if (memberData.isSelf()) {
             continue;
@@ -1018,27 +1018,26 @@ StatusWith<bool> TopologyCoordinator::setLastOptime(const UpdatePositionArgs::Up
     }
     invariant(_rsConfig.isInitialized());  // Can only use setLastOptime in replSet mode.
 
-    if (args.memberId < 0) {
-        std::string errmsg = str::stream()
-            << "Received replSetUpdatePosition for node with memberId " << args.memberId
-            << " which is negative and therefore invalid";
-        LOG(1) << errmsg;
-        return Status(ErrorCodes::NodeNotFound, errmsg);
+    MemberId memberId;
+    try {
+        memberId = MemberId(args.memberId);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
-    if (args.memberId == _rsConfig.getMemberAt(_selfIndex).getId()) {
+    if (memberId == _rsConfig.getMemberAt(_selfIndex).getId()) {
         // Do not let remote nodes tell us what our optime is.
         return false;
     }
 
-    LOG(2) << "received notification that node with memberID " << args.memberId
+    LOG(2) << "received notification that node with memberID " << memberId
            << " in config with version " << args.cfgver
            << " has reached optime: " << args.appliedOpTime
            << " and is durable through: " << args.durableOpTime;
 
     if (args.cfgver != _rsConfig.getConfigVersion()) {
         std::string errmsg = str::stream()
-            << "Received replSetUpdatePosition for node with memberId " << args.memberId
+            << "Received replSetUpdatePosition for node with memberId " << memberId
             << " whose config version of " << args.cfgver << " doesn't match our config version of "
             << _rsConfig.getConfigVersion();
         LOG(1) << errmsg;
@@ -1046,20 +1045,20 @@ StatusWith<bool> TopologyCoordinator::setLastOptime(const UpdatePositionArgs::Up
         return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
     }
 
-    auto* memberData = _findMemberDataByMemberId(args.memberId);
+    auto* memberData = _findMemberDataByMemberId(memberId.getData());
     if (!memberData) {
-        invariant(!_rsConfig.findMemberByID(args.memberId));
+        invariant(!_rsConfig.findMemberByID(memberId.getData()));
 
         std::string errmsg = str::stream()
-            << "Received replSetUpdatePosition for node with memberId " << args.memberId
+            << "Received replSetUpdatePosition for node with memberId " << memberId
             << " which doesn't exist in our config";
         LOG(1) << errmsg;
         return Status(ErrorCodes::NodeNotFound, errmsg);
     }
 
-    invariant(args.memberId == memberData->getMemberId());
+    invariant(memberId == memberData->getMemberId());
 
-    LOG(3) << "Node with memberID " << args.memberId << " currently has optime "
+    LOG(3) << "Node with memberID " << memberId << " currently has optime "
            << memberData->getLastAppliedOpTime() << " durable through "
            << memberData->getLastDurableOpTime() << "; updating to optime " << args.appliedOpTime
            << " and durable through " << args.durableOpTime;
@@ -1474,7 +1473,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
         if (itIndex == _selfIndex) {
             // add self
             BSONObjBuilder bb;
-            bb.append("_id", _selfConfig().getId());
+            bb.append("_id", _selfConfig().getId().getData());
             bb.append("name", _selfConfig().getHostAndPort().toString());
             appendIP(&bb, "ip", _selfConfig().getHostAndPort());
             bb.append("health", 1.0);
@@ -1491,7 +1490,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                 bb.append("syncingTo", _syncSource.toString());
                 bb.append("syncSourceHost", _syncSource.toString());
                 const MemberConfig* member = _rsConfig.findMemberByHostAndPort(_syncSource);
-                bb.append("syncSourceId", member ? member->getId() : -1);
+                bb.append("syncSourceId", member ? member->getId().getData() : -1);
             } else {
                 bb.append("syncingTo", "");
                 bb.append("syncSourceHost", "");
@@ -1517,7 +1516,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
             // add non-self member
             const MemberConfig& itConfig = _rsConfig.getMemberAt(itIndex);
             BSONObjBuilder bb;
-            bb.append("_id", itConfig.getId());
+            bb.append("_id", itConfig.getId().getData());
             bb.append("name", itConfig.getHostAndPort().toString());
             appendIP(&bb, "ip", itConfig.getHostAndPort());
             double h = it->getHealth();
@@ -1559,7 +1558,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                 bb.append("syncingTo", syncSource.toString());
                 bb.append("syncSourceHost", syncSource.toString());
                 const MemberConfig* member = _rsConfig.findMemberByHostAndPort(syncSource);
-                bb.append("syncSourceId", member ? member->getId() : -1);
+                bb.append("syncSourceId", member ? member->getId().getData() : -1);
             } else {
                 bb.append("syncingTo", "");
                 bb.append("syncSourceHost", "");
@@ -1592,7 +1591,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
         response->append("syncingTo", _syncSource.toString());
         response->append("syncSourceHost", _syncSource.toString());
         const MemberConfig* member = _rsConfig.findMemberByHostAndPort(_syncSource);
-        response->append("syncSourceId", member ? member->getId() : -1);
+        response->append("syncSourceId", member ? member->getId().getData() : -1);
     } else {
         response->append("syncingTo", "");
         response->append("syncSourceHost", "");
@@ -1673,7 +1672,7 @@ StatusWith<BSONObj> TopologyCoordinator::prepareReplSetUpdatePositionCommand(
                                                  UpdatePositionArgs::kAppliedOpTimeFieldName);
         entry.appendDate(UpdatePositionArgs::kAppliedWallTimeFieldName,
                          memberData.getLastAppliedWallTime());
-        entry.append(UpdatePositionArgs::kMemberIdFieldName, memberData.getMemberId());
+        entry.append(UpdatePositionArgs::kMemberIdFieldName, memberData.getMemberId().getData());
         entry.append(UpdatePositionArgs::kConfigVersionFieldName, _rsConfig.getConfigVersion());
     }
     arrayBuilder.done();
@@ -1705,9 +1704,7 @@ void TopologyCoordinator::fillMemberData(BSONObjBuilder* result) {
             entry.append("heartbeatDurableOpTime", heartbeatDurableOpTime.toBSON());
 
             if (_selfIndex >= 0) {
-                const int memberId = memberData.getMemberId();
-                invariant(memberId >= 0);
-                entry.append("memberId", memberId);
+                entry.append("memberId", memberData.getMemberId().getData());
             }
         }
     }
@@ -2839,12 +2836,12 @@ boost::optional<OpTime> TopologyCoordinator::latestKnownOpTimeSinceHeartbeatRest
     return latest;
 }
 
-std::map<int, boost::optional<OpTime>>
+std::map<MemberId, boost::optional<OpTime>>
 TopologyCoordinator::latestKnownOpTimeSinceHeartbeatRestartPerMember() const {
-    std::map<int, boost::optional<OpTime>> opTimesPerMember;
+    std::map<MemberId, boost::optional<OpTime>> opTimesPerMember;
     for (size_t i = 0; i < _memberData.size(); i++) {
         auto& member = _memberData[i];
-        int memberId = _rsConfig.getMemberAt(i).getId();
+        MemberId memberId = _rsConfig.getMemberAt(i).getId();
 
         if (!member.isUpdatedSinceRestart()) {
             opTimesPerMember[memberId] = boost::none;

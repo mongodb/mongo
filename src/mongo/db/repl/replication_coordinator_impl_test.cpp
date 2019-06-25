@@ -1531,10 +1531,10 @@ TEST_F(ReplCoordTest, UpdatePositionArgsAdvancesWallTimes) {
     // Make sure wall times are propagated through processReplSetUpdatePosition
     auto memberDataVector = repl->getMemberData();
     for (auto member : memberDataVector) {
-        if (member.getMemberId() == 1) {
+        if (member.getMemberId() == MemberId(1)) {
             ASSERT_EQ(member.getLastAppliedWallTime(), memberOneAppliedWallTime);
             ASSERT_EQ(member.getLastDurableWallTime(), memberOneDurableWallTime);
-        } else if (member.getMemberId() == 2) {
+        } else if (member.getMemberId() == MemberId(2)) {
             ASSERT_EQ(member.getLastAppliedWallTime(), memberTwoAppliedWallTime);
             ASSERT_EQ(member.getLastDurableWallTime(), memberTwoDurableWallTime);
         }

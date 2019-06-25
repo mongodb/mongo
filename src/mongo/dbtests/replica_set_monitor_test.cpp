@@ -128,8 +128,8 @@ repl::ReplSetConfig _getConfigWithMemberRemoved(const repl::ReplSetConfig& oldCo
             continue;
         }
 
-        membersBuilder.append(
-            BSON("_id" << member->getId() << "host" << member->getHostAndPort().toString()));
+        membersBuilder.append(BSON("_id" << member->getId().getData() << "host"
+                                         << member->getHostAndPort().toString()));
     }
 
     membersBuilder.done();
@@ -216,22 +216,22 @@ protected:
             const string host(_replSet->getPrimary());
             const mongo::repl::MemberConfig* member =
                 oldConfig.findMemberByHostAndPort(HostAndPort(host));
-            membersBuilder.append(
-                BSON("_id" << member->getId() << "host" << host << "tags" << BSON("dc"
-                                                                                  << "ny"
-                                                                                  << "num"
-                                                                                  << "1")));
+            membersBuilder.append(BSON(
+                "_id" << member->getId().getData() << "host" << host << "tags" << BSON("dc"
+                                                                                       << "ny"
+                                                                                       << "num"
+                                                                                       << "1")));
         }
 
         {
             const string host(_replSet->getSecondaries().front());
             const mongo::repl::MemberConfig* member =
                 oldConfig.findMemberByHostAndPort(HostAndPort(host));
-            membersBuilder.append(
-                BSON("_id" << member->getId() << "host" << host << "tags" << BSON("dc"
-                                                                                  << "ny"
-                                                                                  << "num"
-                                                                                  << "2")));
+            membersBuilder.append(BSON(
+                "_id" << member->getId().getData() << "host" << host << "tags" << BSON("dc"
+                                                                                       << "ny"
+                                                                                       << "num"
+                                                                                       << "2")));
         }
 
         membersBuilder.done();

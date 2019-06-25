@@ -279,8 +279,8 @@ ReplSetConfig _getConfigWithMemberRemoved(const ReplSetConfig& oldConfig,
             continue;
         }
 
-        membersBuilder.append(
-            BSON("_id" << member->getId() << "host" << member->getHostAndPort().toString()));
+        membersBuilder.append(BSON("_id" << member->getId().getData() << "host"
+                                         << member->getHostAndPort().toString()));
     }
 
     membersBuilder.done();

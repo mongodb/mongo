@@ -2573,7 +2573,7 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
         hbArgs.setConfigVersion(config.getConfigVersion());
         hbArgs.setSetName(config.getReplSetName());
         hbArgs.setSenderHost(request.target);
-        hbArgs.setSenderId(config.findMemberByHostAndPort(request.target)->getId());
+        hbArgs.setSenderId(config.findMemberByHostAndPort(request.target)->getId().getData());
         hbArgs.setTerm(getReplCoord()->getTerm());
         ASSERT(hbArgs.isInitialized());
         ReplSetHeartbeatResponse response;

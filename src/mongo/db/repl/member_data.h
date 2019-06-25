@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/repl/member_id.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/util/time_support.h"
@@ -129,7 +130,7 @@ public:
         return _configIndex;
     }
 
-    int getMemberId() const {
+    MemberId getMemberId() const {
         return _memberId;
     }
 
@@ -228,7 +229,7 @@ public:
         _hostAndPort = hostAndPort;
     }
 
-    void setMemberId(int memberId) {
+    void setMemberId(MemberId memberId) {
         _memberId = memberId;
     }
 
@@ -282,7 +283,7 @@ private:
 
     // This member's member ID.  memberId and hostAndPort duplicate information in the
     // set's ReplSetConfig.
-    int _memberId = -1;
+    MemberId _memberId;
 
     // Client address of this member.
     HostAndPort _hostAndPort;

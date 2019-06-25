@@ -44,7 +44,7 @@ TEST(MemberConfig, ParseMinimalMemberConfigAndCheckDefaults) {
     MemberConfig mc(BSON("_id" << 0 << "host"
                                << "localhost:12345"),
                     &tagConfig);
-    ASSERT_EQUALS(0, mc.getId());
+    ASSERT_EQUALS(MemberId(0), mc.getId());
     ASSERT_EQUALS(HostAndPort("localhost", 12345), mc.getHostAndPort());
     ASSERT_EQUALS(1.0, mc.getPriority());
     ASSERT_EQUALS(Seconds(0), mc.getSlaveDelay());
@@ -72,6 +72,22 @@ TEST(MemberConfig, ParseFailsWithMissingIdField) {
                                     << "localhost:12345"),
                                &tagConfig),
                   ExceptionFor<ErrorCodes::NoSuchKey>);
+}
+
+TEST(MemberConfig, ParseFailsWithIdOutOfRange) {
+    ReplSetTagConfig tagConfig;
+    {
+        ASSERT_THROWS(MemberConfig(BSON("_id" << -1 << "host"
+                                              << "localhost:12345"),
+                                   &tagConfig),
+                      ExceptionFor<ErrorCodes::BadValue>);
+    }
+    {
+        ASSERT_THROWS(MemberConfig(BSON("_id" << -1 << "host"
+                                              << "localhost:12345"),
+                                   &tagConfig),
+                      ExceptionFor<ErrorCodes::BadValue>);
+    }
 }
 
 TEST(MemberConfig, ParseFailsWithBadIdField) {
@@ -464,22 +480,6 @@ TEST(MemberConfig, HorizonFieldWithEmptyStringIsRejected) {
     } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
         ASSERT_NOT_EQUALS(ex.toStatus().reason().find("Horizons cannot have empty names"),
                           std::string::npos);
-    }
-}
-
-TEST(MemberConfig, ValidateFailsWithIdOutOfRange) {
-    ReplSetTagConfig tagConfig;
-    {
-        MemberConfig mc(BSON("_id" << -1 << "host"
-                                   << "localhost:12345"),
-                        &tagConfig);
-        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
-    }
-    {
-        MemberConfig mc(BSON("_id" << 256 << "host"
-                                   << "localhost:12345"),
-                        &tagConfig);
-        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
     }
 }
 
