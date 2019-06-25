@@ -436,6 +436,17 @@ tasks:
       vars:
         script_flags: --ycsb-throughput-analysis reports
 
+- name: ycsb_60GB
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "ycsb-60GB"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
 - name: industry_benchmarks_secondary_reads
   priority: 5
   commands:
@@ -869,6 +880,7 @@ buildvariants:
         variant: compile-linux-64-amzn
   tasks: &1nodetasks
     - name: industry_benchmarks
+    - name: ycsb_60GB
     - name: crud_workloads
     - name: mixed_workloads
     - name: misc_workloads
@@ -906,6 +918,7 @@ buildvariants:
         variant: compile-linux-64-amzn
   tasks: &standalonetasks
     - name: industry_benchmarks
+    - name: ycsb_60GB
     - name: crud_workloads
     - name: jasper_smoke
     - name: genny_canaries
@@ -1071,6 +1084,7 @@ buildvariants:
         variant: compile-linux-64-amzn
   tasks: &3nodetasks
     - name: industry_benchmarks
+    - name: ycsb_60GB
     - name: industry_benchmarks_secondary_reads
     - name: crud_workloads
     - name: jasper_smoke
@@ -1208,6 +1222,7 @@ buildvariants:
         variant: compile-rhel70
   tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
     - name: industry_benchmarks
+    - name: ycsb_60GB
     - name: industry_benchmarks_secondary_reads
     - name: crud_workloads
     - name: jasper_smoke
