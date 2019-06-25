@@ -39,6 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/namespace_string.h"
@@ -195,9 +196,17 @@ Status ViewCatalog::_createOrUpdateView(WithLock lk,
 
     _durable->upsert(opCtx, viewName, viewDefBuilder.obj());
     _viewMap[viewName.ns()] = view;
-    opCtx->recoveryUnit()->onRollback([this, viewName]() {
+
+    // Register the view in the CollectionCatalog mapping from ResourceID->namespace
+    CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
+    auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
+    catalog.addResource(viewRid, viewName.ns());
+
+    opCtx->recoveryUnit()->onRollback([this, viewName, opCtx, viewRid]() {
         this->_viewMap.erase(viewName.ns());
         this->_viewGraphNeedsRefresh = true;
+        CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
+        catalog.removeResource(viewRid, viewName.ns());
     });
 
     // We may get invalidated, but we're exclusively locked, so the change must be ours.
@@ -411,8 +420,12 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
                       str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
 
     ViewDefinition savedDefinition = *viewPtr;
-    opCtx->recoveryUnit()->onRollback([this, viewName, savedDefinition]() {
+
+    opCtx->recoveryUnit()->onRollback([this, viewName, savedDefinition, opCtx]() {
         this->_viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(savedDefinition);
+        auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
+        CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
+        catalog.addResource(viewRid, viewName.ns());
     });
 
     return _createOrUpdateView(lk,
@@ -446,9 +459,16 @@ Status ViewCatalog::dropView(OperationContext* opCtx, const NamespaceString& vie
     _durable->remove(opCtx, viewName);
     _viewGraph.remove(savedDefinition.name());
     _viewMap.erase(viewName.ns());
-    opCtx->recoveryUnit()->onRollback([this, viewName, savedDefinition]() {
+
+    CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
+    auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
+    catalog.removeResource(viewRid, viewName.ns());
+
+    opCtx->recoveryUnit()->onRollback([this, viewName, savedDefinition, opCtx, viewRid]() {
         this->_viewGraphNeedsRefresh = true;
         this->_viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(savedDefinition);
+        CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
+        catalog.addResource(viewRid, viewName.ns());
     });
 
     // We may get invalidated, but we're exclusively locked, so the change must be ours.

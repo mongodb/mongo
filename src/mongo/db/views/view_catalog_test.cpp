@@ -39,6 +39,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -449,6 +451,96 @@ TEST_F(ViewCatalogFixture, LookupExistingView) {
     ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
 
     ASSERT(viewCatalog.lookup(opCtx.get(), "db.view"_sd));
+}
+
+TEST_F(ViewCatalogFixture, LookupRIDExistingView) {
+    const NamespaceString viewName("db.view");
+    const NamespaceString viewOn("db.coll");
+
+    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+
+    auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
+    auto& collectionCatalog = CollectionCatalog::get(opCtx.get());
+    ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == "db.view");
+}
+
+TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
+    const NamespaceString viewName("db.view");
+    const NamespaceString viewOn("db.coll");
+    {
+        WriteUnitOfWork wunit(opCtx.get());
+        ASSERT_OK(
+            viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+    }
+    auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
+    auto& collectionCatalog = CollectionCatalog::get(opCtx.get());
+    ASSERT(!collectionCatalog.lookupResourceName(resourceID));
+}
+
+TEST_F(ViewCatalogFixture, LookupRIDAfterDrop) {
+    const NamespaceString viewName("db.view");
+    const NamespaceString viewOn("db.coll");
+
+    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_OK(viewCatalog.dropView(opCtx.get(), viewName));
+
+    auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
+    auto& collectionCatalog = CollectionCatalog::get(opCtx.get());
+    ASSERT(!collectionCatalog.lookupResourceName(resourceID));
+}
+
+TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
+    const NamespaceString viewName("db.view");
+    const NamespaceString viewOn("db.coll");
+
+    auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
+    auto& collectionCatalog = CollectionCatalog::get(opCtx.get());
+    {
+        WriteUnitOfWork wunit(opCtx.get());
+        ASSERT_OK(
+            viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+        ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == viewName.ns());
+        wunit.commit();
+    }
+
+    {
+        WriteUnitOfWork wunit(opCtx.get());
+        ASSERT_OK(viewCatalog.dropView(opCtx.get(), viewName));
+    }
+
+    ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == viewName.ns());
+}
+
+TEST_F(ViewCatalogFixture, LookupRIDAfterModify) {
+    const NamespaceString viewName("db.view");
+    const NamespaceString viewOn("db.coll");
+
+    auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
+    auto& collectionCatalog = CollectionCatalog::get(opCtx.get());
+    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_OK(viewCatalog.modifyView(opCtx.get(), viewName, viewOn, emptyPipeline));
+    ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == viewName.ns());
+}
+
+TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
+    const NamespaceString viewName("db.view");
+    const NamespaceString viewOn("db.coll");
+
+    auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
+    auto& collectionCatalog = CollectionCatalog::get(opCtx.get());
+    {
+        WriteUnitOfWork wunit(opCtx.get());
+        ASSERT_OK(
+            viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+        ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == viewName.ns());
+        wunit.commit();
+    }
+    {
+        WriteUnitOfWork wunit(opCtx.get());
+        ASSERT_OK(viewCatalog.modifyView(opCtx.get(), viewName, viewOn, emptyPipeline));
+        ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == viewName.ns());
+    }
+    ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == viewName.ns());
 }
 
 TEST_F(ViewCatalogFixture, CreateViewThenDropAndLookup) {
