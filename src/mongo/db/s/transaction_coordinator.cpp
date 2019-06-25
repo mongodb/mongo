@@ -342,7 +342,8 @@ void TransactionCoordinator::_done(Status status) {
         ServerTransactionCoordinatorsMetrics::get(_serviceContext),
         tickSource,
         _serviceContext->getPreciseClockSource()->now(),
-        _step);
+        _step,
+        _decisionDurable ? _decision : boost::none);
 
     if (status.isOK() &&
         (shouldLog(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1)) ||

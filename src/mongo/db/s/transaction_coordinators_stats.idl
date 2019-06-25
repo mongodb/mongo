@@ -66,5 +66,11 @@ structs:
       totalStartedTwoPhaseCommit:
         type: long
         default: 0
+      totalAbortedTwoPhaseCommit:
+        type: long
+        default: 0
+      totalCommittedTwoPhaseCommit:
+        type: long
+        default: 0
       currentInSteps:
         type: CurrentInSteps
