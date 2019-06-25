@@ -259,7 +259,8 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
         // Retrieve the default commit quorum if one wasn't passed in, which consists of all
         // data-bearing nodes.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        int numDataBearingMembers = replCoord->getConfig().getNumDataBearingMembers();
+        int numDataBearingMembers =
+            replCoord->isReplEnabled() ? replCoord->getConfig().getNumDataBearingMembers() : 1;
         return CommitQuorumOptions(numDataBearingMembers);
     }
 }
