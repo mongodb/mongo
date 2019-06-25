@@ -27,8 +27,17 @@
         return;
     }
 
-    let coll = rst.getPrimary().getDB(dbName)[collName];
-    assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}], {}, {writeConcern: {w: "majority"}}));
+    let primary = rst.getPrimary();
+    let testDB = primary.getDB(dbName);
+    let coll = testDB.getCollection(collName);
+    assert.commandWorked(testDB.runCommand({
+        createIndexes: collName,
+        indexes: [
+            {key: {a: 1}, name: 'a_1'},
+            {key: {b: 1}, name: 'b_1'},
+        ],
+        writeConcern: {w: "majority"},
+    }));
     assert.eq(3, coll.getIndexes().length);
     rst.awaitReplication(undefined, ReplSetTest.OpTimeType.LAST_DURABLE);
 
@@ -44,7 +53,9 @@
     // Dropping the index would normally modify the collection metadata and drop the
     // table. Because we're not advancing the stable timestamp and we're going to crash the
     // server, the catalog change won't take effect, but ident being dropped will.
-    coll = rst.getPrimary().getDB(dbName)[collName];
+    primary = rst.getPrimary();
+    testDB = primary.getDB(dbName);
+    coll = testDB.getCollection(collName);
     assert.commandWorked(coll.dropIndexes());
     rst.awaitReplication();
 

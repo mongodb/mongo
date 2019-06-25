@@ -36,7 +36,11 @@
         {configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'alwaysOn'});
 
     jsTestLog("Starting a background index build.");
-    assert.commandWorked(testColl.createIndexes([{x: 1}], {}, {writeConcern: {w: 2}}));
+    assert.commandWorked(testDB.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {x: 1}, name: 'x_1'}],
+        writeConcern: {w: 2},
+    }));
 
     const session = primary.startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);

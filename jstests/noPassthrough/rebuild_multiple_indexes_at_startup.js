@@ -23,8 +23,17 @@
         return;
     }
 
-    let coll = rst.getPrimary().getDB("indexRebuild")["coll"];
-    assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}], {}, {writeConcern: {w: "majority"}}));
+    let testDB = rst.getPrimary().getDB("indexRebuild");
+    let collName = "coll";
+    let coll = testDB.getCollection(collName);
+    assert.commandWorked(testDB.runCommand({
+        createIndexes: collName,
+        indexes: [
+            {key: {a: 1}, name: 'a_1'},
+            {key: {b: 1}, name: 'b_1'},
+        ],
+        writeConcern: {w: "majority"},
+    }));
     assert.eq(3, coll.getIndexes().length);
     rst.awaitReplication(undefined, ReplSetTest.OpTimeType.LAST_DURABLE);
 
