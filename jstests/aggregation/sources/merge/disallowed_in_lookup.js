@@ -75,10 +75,7 @@
         coll.getDB().runCommand({create: "view1", viewOn: coll.getName(), pipeline: pipeline});
     assert.commandFailedWithCode(cmdRes, kErrorCodeMergeBannedInLookup);
 
-    // Test that a $merge without an explicit "on" field still fails within a $lookup. Note that we
-    // may get a different error code since the pipeline will passthrough to the shards in the
-    // sharded passthrough suites, and fail because mongod expects mongos to populate "on" if the
-    // user does not specify it.
+    // Test that a $merge without an explicit "on" field still fails within a $lookup.
     pipeline = [
         {
           $lookup: {
@@ -90,5 +87,5 @@
     ];
     assert.commandFailedWithCode(
         db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
-        [kErrorCodeMergeBannedInLookup, 51124]);
+        kErrorCodeMergeBannedInLookup);
 }());

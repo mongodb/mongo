@@ -103,16 +103,7 @@ public:
     }
 
     /**
-     * Returns false if the pipeline has any stage which must be run locally on mongos.
-     */
-    bool allowedToForwardFromMongos() const {
-        return std::all_of(_stageSpecs.cbegin(), _stageSpecs.cend(), [](const auto& spec) {
-            return spec->allowedToForwardFromMongos();
-        });
-    }
-
-    /**
-     * Returns false if the pipeline has any Document Source which requires rewriting via serialize.
+     * Returns false if the pipeline has any stages which cannot be passed through to the shards.
      */
     bool allowedToPassthroughFromMongos() const {
         return std::all_of(_stageSpecs.cbegin(), _stageSpecs.cend(), [](const auto& spec) {

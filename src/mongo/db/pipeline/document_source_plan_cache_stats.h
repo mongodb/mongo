@@ -60,11 +60,6 @@ public:
             return true;
         }
 
-        bool allowedToForwardFromMongos() const override {
-            // $planCacheStats must be run locally on a mongod.
-            return false;
-        }
-
         bool allowedToPassthroughFromMongos() const override {
             // $planCacheStats must be run locally on a mongod.
             return false;

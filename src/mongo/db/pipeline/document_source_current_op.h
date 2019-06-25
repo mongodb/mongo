@@ -70,10 +70,6 @@ public:
             return privileges;
         }
 
-        bool allowedToForwardFromMongos() const final {
-            return _localOps == LocalOpsMode::kRemoteShardOps;
-        }
-
         bool allowedToPassthroughFromMongos() const final {
             return _localOps == LocalOpsMode::kRemoteShardOps;
         }
