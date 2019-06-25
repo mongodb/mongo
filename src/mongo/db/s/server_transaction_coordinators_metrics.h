@@ -76,6 +76,12 @@ public:
     void incrementCurrentDeletingCoordinatorDoc();
     void decrementCurrentDeletingCoordinatorDoc();
 
+    std::int64_t getTotalAbortedTwoPhaseCommit();
+    void incrementTotalAbortedTwoPhaseCommit();
+
+    std::int64_t getTotalSuccessfulTwoPhaseCommit();
+    void incrementTotalSuccessfulTwoPhaseCommit();
+
     /**
      * Appends the accumulated stats to a transaction coordinators stats object for reporting.
      */
@@ -89,6 +95,14 @@ private:
     // The total number of transaction coordinators on this process that started a two-phase commit
     // since the process's inception.
     AtomicWord<std::int64_t> _totalStartedTwoPhaseCommit{0};
+
+    // The total number of transaction coordinators on this process that aborted a two-phase commit
+    // since the process's inception.
+    AtomicWord<std::int64_t> _totalAbortedTwoPhaseCommit{0};
+
+    // The total number of transaction coordinators on this process that committed a two-phase
+    // commit since the process's inception.
+    AtomicWord<std::int64_t> _totalSuccessfulTwoPhaseCommit{0};
 
     // The number of transaction coordinators currently in the "writing participant list" phase.
     AtomicWord<std::int64_t> _totalWritingParticipantList{0};

@@ -47,6 +47,7 @@
 namespace mongo {
 namespace {
 
+using CoordinatorCommitDecision = txn::CoordinatorCommitDecision;
 using PrepareResponse = txn::PrepareResponse;
 using TransactionCoordinatorDocument = txn::TransactionCoordinatorDocument;
 
@@ -946,6 +947,8 @@ public:
         // Totals
         std::int64_t totalCreated{0};
         std::int64_t totalStartedTwoPhaseCommit{0};
+        std::int64_t totalAbortedTwoPhaseCommit{0};
+        std::int64_t totalCommittedTwoPhaseCommit{0};
 
         // Current in steps
         std::int64_t currentWritingParticipantList{0};
@@ -960,6 +963,10 @@ public:
         ASSERT_EQ(expectedMetrics.totalCreated, metrics()->getTotalCreated());
         ASSERT_EQ(expectedMetrics.totalStartedTwoPhaseCommit,
                   metrics()->getTotalStartedTwoPhaseCommit());
+        ASSERT_EQ(expectedMetrics.totalAbortedTwoPhaseCommit,
+                  metrics()->getTotalAbortedTwoPhaseCommit());
+        ASSERT_EQ(expectedMetrics.totalCommittedTwoPhaseCommit,
+                  metrics()->getTotalSuccessfulTwoPhaseCommit());
 
         // Current in steps
         ASSERT_EQ(expectedMetrics.currentWritingParticipantList,
@@ -1130,12 +1137,12 @@ TEST_F(TransactionCoordinatorMetricsTest, SingleCoordinatorStatsSimpleTwoPhaseCo
     checkStats(stats, expectedStats);
 
     // Stats are updated on onEnd.
-
     expectedStats.endTime = advanceClockSourceAndReturnNewNow();
     coordinatorObserver.onEnd(metrics(),
                               tickSource(),
                               clockSource()->now(),
-                              TransactionCoordinator::Step::kDeletingCoordinatorDoc);
+                              TransactionCoordinator::Step::kDeletingCoordinatorDoc,
+                              CoordinatorCommitDecision(txn::CommitDecision::kCommit));
     checkStats(stats, expectedStats);
 
     // Once onEnd has been called, advancing the time does not cause any duration to increase.
@@ -1188,10 +1195,12 @@ TEST_F(TransactionCoordinatorMetricsTest, ServerWideMetricsSimpleTwoPhaseCommit)
 
     // Metrics are updated on onEnd.
     expectedMetrics.currentDeletingCoordinatorDoc--;
+    expectedMetrics.totalAbortedTwoPhaseCommit++;
     coordinatorObserver.onEnd(metrics(),
                               tickSource(),
                               clockSource()->now(),
-                              TransactionCoordinator::Step::kDeletingCoordinatorDoc);
+                              TransactionCoordinator::Step::kDeletingCoordinatorDoc,
+                              CoordinatorCommitDecision(txn::CommitDecision::kAbort));
     checkMetrics(expectedMetrics);
 }
 
@@ -1268,17 +1277,21 @@ TEST_F(TransactionCoordinatorMetricsTest, ServerWideMetricsSimpleTwoPhaseCommitT
     checkMetrics(expectedMetrics);
 
     expectedMetrics.currentDeletingCoordinatorDoc--;
+    expectedMetrics.totalAbortedTwoPhaseCommit++;
     coordinatorObserver1.onEnd(metrics(),
                                tickSource(),
                                clockSource()->now(),
-                               TransactionCoordinator::Step::kDeletingCoordinatorDoc);
+                               TransactionCoordinator::Step::kDeletingCoordinatorDoc,
+                               CoordinatorCommitDecision(txn::CommitDecision::kAbort));
     checkMetrics(expectedMetrics);
 
     expectedMetrics.currentDeletingCoordinatorDoc--;
+    expectedMetrics.totalCommittedTwoPhaseCommit++;
     coordinatorObserver2.onEnd(metrics(),
                                tickSource(),
                                clockSource()->now(),
-                               TransactionCoordinator::Step::kDeletingCoordinatorDoc);
+                               TransactionCoordinator::Step::kDeletingCoordinatorDoc,
+                               CoordinatorCommitDecision(txn::CommitDecision::kCommit));
     checkMetrics(expectedMetrics);
 }
 
@@ -1439,12 +1452,14 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     expectedStats.deletingCoordinatorDocDuration =
         *expectedStats.deletingCoordinatorDocDuration + Microseconds(100);
     expectedMetrics.currentDeletingCoordinatorDoc--;
+    expectedMetrics.totalCommittedTwoPhaseCommit++;
 
     setGlobalFailPoint("hangAfterDeletingCoordinatorDoc",
                        BSON("mode"
                             << "off"));
     // The last thing the coordinator will do on the hijacked commit response thread is signal the
     // coordinator's completion.
+
     future.timed_get(kLongFutureTimeout);
     coordinator.onCompletion().get();
 
@@ -1781,6 +1796,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
     expectedStats.waitingForDecisionAcksDuration =
         *expectedStats.waitingForDecisionAcksDuration + Microseconds(100);
     expectedMetrics.currentWaitingForDecisionAcks--;
+    expectedMetrics.totalCommittedTwoPhaseCommit++;
 
     awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
     network()->enterNetwork();
@@ -1856,6 +1872,7 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
     expectedStats.deletingCoordinatorDocDuration =
         *expectedStats.deletingCoordinatorDocDuration + Microseconds(100);
     expectedMetrics.currentDeletingCoordinatorDoc--;
+    expectedMetrics.totalCommittedTwoPhaseCommit++;
 
     awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
     // The last thing the coordinator will do on the hijacked commit response thread is signal

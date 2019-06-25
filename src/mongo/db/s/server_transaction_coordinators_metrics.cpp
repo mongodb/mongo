@@ -67,6 +67,22 @@ void ServerTransactionCoordinatorsMetrics::incrementTotalStartedTwoPhaseCommit()
     _totalStartedTwoPhaseCommit.fetchAndAdd(1);
 }
 
+std::int64_t ServerTransactionCoordinatorsMetrics::getTotalAbortedTwoPhaseCommit() {
+    return _totalAbortedTwoPhaseCommit.load();
+}
+
+void ServerTransactionCoordinatorsMetrics::incrementTotalAbortedTwoPhaseCommit() {
+    _totalAbortedTwoPhaseCommit.fetchAndAdd(1);
+}
+
+std::int64_t ServerTransactionCoordinatorsMetrics::getTotalSuccessfulTwoPhaseCommit() {
+    return _totalSuccessfulTwoPhaseCommit.load();
+}
+
+void ServerTransactionCoordinatorsMetrics::incrementTotalSuccessfulTwoPhaseCommit() {
+    _totalSuccessfulTwoPhaseCommit.fetchAndAdd(1);
+}
+
 std::int64_t ServerTransactionCoordinatorsMetrics::getCurrentWritingParticipantList() {
     return _totalWritingParticipantList.load();
 }
@@ -120,6 +136,8 @@ void ServerTransactionCoordinatorsMetrics::decrementCurrentDeletingCoordinatorDo
 void ServerTransactionCoordinatorsMetrics::updateStats(TransactionCoordinatorsStats* stats) {
     stats->setTotalCreated(_totalCreated.load());
     stats->setTotalStartedTwoPhaseCommit(_totalStartedTwoPhaseCommit.load());
+    stats->setTotalAbortedTwoPhaseCommit(_totalAbortedTwoPhaseCommit.load());
+    stats->setTotalCommittedTwoPhaseCommit(_totalSuccessfulTwoPhaseCommit.load());
 
     CurrentInSteps currentInSteps;
     currentInSteps.setWritingParticipantList(_totalWritingParticipantList.load());

@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+using CommitDecision = txn::CommitDecision;
+
 void TransactionCoordinatorMetricsObserver::onCreate(
     ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorsMetrics,
     TickSource* tickSource,
@@ -144,7 +146,8 @@ void TransactionCoordinatorMetricsObserver::onEnd(
     ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorsMetrics,
     TickSource* tickSource,
     Date_t curWallClockTime,
-    TransactionCoordinator::Step step) {
+    TransactionCoordinator::Step step,
+    const boost::optional<txn::CoordinatorCommitDecision>& decision) {
 
     //
     // Per transaction coordinator stats.
@@ -154,6 +157,17 @@ void TransactionCoordinatorMetricsObserver::onEnd(
     //
     // Server wide transaction coordinators metrics.
     //
+    if (decision) {
+        switch (decision->getDecision()) {
+            case CommitDecision::kCommit:
+                serverTransactionCoordinatorsMetrics->incrementTotalSuccessfulTwoPhaseCommit();
+                break;
+            case CommitDecision::kAbort:
+                serverTransactionCoordinatorsMetrics->incrementTotalAbortedTwoPhaseCommit();
+                break;
+        }
+    }
+
     _decrementLastStep(serverTransactionCoordinatorsMetrics, step);
 }
 
