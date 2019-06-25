@@ -47,25 +47,35 @@ template <typename CollectionT>
 void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
     invariant(!_collection);
 
+    // We should be holding a lock associated with the name of the collection prior to yielding,
+    // even if the collection was renamed during yield.
+    dassert(getOpCtx()->lockState()->isCollectionLockedForMode(_nss, MODE_IS));
+
     const CollectionCatalog& catalog = CollectionCatalog::get(getOpCtx());
-    _collection = catalog.lookupCollectionByUUID(_collectionUUID);
+    auto newNss = catalog.lookupNSSByUUID(_collectionUUID);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "collection dropped. UUID " << _collectionUUID,
-            _collection);
+            newNss);
+
+    // TODO SERVER-31695: Allow queries to survive collection rename, rather than throwing here when
+    // a rename has happened during yield.
+    uassert(ErrorCodes::QueryPlanKilled,
+            str::stream() << "collection renamed from '" << _nss << "' to '" << *newNss
+                          << "'. UUID "
+                          << _collectionUUID,
+            *newNss == _nss);
+
+    // At this point we know that the collection name has not changed, and therefore we have
+    // restored locks on the correct name. It is now safe to restore the Collection pointer. The
+    // collection must exist, since we already successfully looked up the namespace string by UUID
+    // under the correct lock manager locks.
+    _collection = catalog.lookupCollectionByUUID(_collectionUUID);
+    invariant(_collection);
 
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream()
                 << "Database epoch changed due to a database-level event such as 'restartCatalog'.",
             getDatabaseEpoch(_collection) == _databaseEpoch);
-
-    // TODO SERVER-31695: Allow queries to survive collection rename, rather than throwing here when
-    // a rename has happened during yield.
-    uassert(ErrorCodes::QueryPlanKilled,
-            str::stream() << "collection renamed from '" << _nss.ns() << "' to '"
-                          << _collection->ns().ns()
-                          << "'. UUID "
-                          << _collectionUUID,
-            _nss == _collection->ns());
 
     doRestoreStateRequiresCollection();
 }
