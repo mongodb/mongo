@@ -269,6 +269,13 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
                    scope->getProto<mozjs::DBRefInfo>().getJSClass() == jsclass) {
             uasserted(ErrorCodes::BadValue, "Second parameter cannot be MinKey, MaxKey, or DBRef");
         } else {
+            if (scope->getProto<mozjs::BinDataInfo>().getJSClass() == jsclass) {
+                mozjs::ObjectWrapper o(cx, args.get(1));
+                auto binType = BinDataType(o.getNumberInt(mozjs::InternedString::type));
+                uassert(ErrorCodes::BadValue,
+                        "Cannot encrypt BinData subtype 2.",
+                        binType != BinDataType::ByteArrayDeprecated);
+            }
             if (scope->getProto<mozjs::NumberDecimalInfo>().getJSClass() == jsclass) {
                 uassert(ErrorCodes::BadValue,
                         "Cannot deterministically encrypt NumberDecimal type objects.",

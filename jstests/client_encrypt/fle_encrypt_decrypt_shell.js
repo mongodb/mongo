@@ -50,7 +50,12 @@ load('jstests/ssl/libs/ssl_helpers.js');
         UUID(),
         ISODate(),
         new Date('December 17, 1995 03:24:00'),
-        BinData(2, '1234'),
+        BinData(0, '1234'),
+        BinData(1, '1234'),
+        BinData(3, '1234'),
+        BinData(4, '1234'),
+        BinData(5, '1234'),
+        BinData(6, '1234'),
         new Timestamp(1, 2),
         new ObjectId(),
         new DBPointer("mongo", new ObjectId()),
@@ -67,7 +72,8 @@ load('jstests/ssl/libs/ssl_helpers.js');
         Code("function() { return true; }")
     ];
 
-    const failTestCases = [null, undefined, MinKey(), MaxKey(), DBRef("test", "test", "test")];
+    const failTestCases =
+        [null, undefined, MinKey(), MaxKey(), DBRef("test", "test", "test"), BinData(2, '1234')];
 
     const shell = Mongo(conn.host, clientSideFLEOptions);
     const keyVault = shell.getKeyVault();
