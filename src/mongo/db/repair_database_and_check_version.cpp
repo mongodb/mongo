@@ -49,6 +49,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/durable_catalog.h"
@@ -574,9 +575,16 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         }
     }
 
+    auto replProcess = repl::ReplicationProcess::get(opCtx);
+    auto needInitialSync = false;
+    if (auto initialSyncFlag = false; replProcess) {
+        initialSyncFlag = replProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx);
+        // The node did not complete the last initial sync. We should attempt initial sync again.
+        needInitialSync = initialSyncFlag && replSettings.usingReplSets();
+    }
     // Fail to start up if there is no featureCompatibilityVersion document and there are non-local
-    // databases present.
-    if (!fcvDocumentExists && nonLocalDatabases) {
+    // databases present and we do not need to start up via initial sync.
+    if (!fcvDocumentExists && nonLocalDatabases && !needInitialSync) {
         severe()
             << "Unable to start up mongod due to missing featureCompatibilityVersion document.";
         severe() << "Please run with --repair to restore the document.";
