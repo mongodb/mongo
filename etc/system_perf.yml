@@ -404,6 +404,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: validate_cmd
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "validate_cmd"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: service_architecture_workloads
   priority: 5
   commands:
@@ -968,6 +978,7 @@ buildvariants:
     - name: bestbuy_agg_merge_wordcount
     - name: bestbuy_query
     - name: big_update
+    - name: validate_cmd
 
 - name: linux-standalone-audit
   display_name: Linux Standalone Audit
