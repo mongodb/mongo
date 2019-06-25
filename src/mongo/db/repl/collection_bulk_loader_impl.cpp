@@ -115,21 +115,21 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
 
 Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
                                                  const std::vector<BSONObj>::const_iterator end) {
-    int count = 0;
     return _runTaskReleaseResourcesOnFailure([&] {
         UnreplicatedWritesBlock uwb(_opCtx.get());
 
         for (auto iter = begin; iter != end; ++iter) {
+            boost::optional<RecordId> loc;
+            const auto& doc = *iter;
             Status status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::insertDocuments", _nss.ns(), [&] {
                     WriteUnitOfWork wunit(_opCtx.get());
-                    const auto& doc = *iter;
                     if (_idIndexBlock || _secondaryIndexesBlock) {
-                        // This flavor of insertDocument will not update any pre-existing indexes,
-                        // only the indexers passed in.
-                        auto onRecordInserted = [&](const RecordId& loc) {
-                            return _addDocumentToIndexBlocks(doc, loc);
+                        auto onRecordInserted = [&](const RecordId& location) {
+                            loc = location;
+                            return Status::OK();
                         };
+                        // This version of insert will not update any indexes.
                         const auto status = _autoColl->getCollection()->insertDocumentForBulkLoader(
                             _opCtx.get(), doc, onRecordInserted);
                         if (!status.isOK()) {
@@ -154,7 +154,15 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
                 return status;
             }
 
-            ++count;
+            if (loc) {
+                // Inserts index entries into the external sorter. This will not update
+                // pre-existing indexes.
+                status = _addDocumentToIndexBlocks(doc, loc.get());
+            }
+
+            if (!status.isOK()) {
+                return status;
+            }
         }
         return Status::OK();
     });

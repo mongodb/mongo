@@ -53,6 +53,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -96,6 +97,9 @@ MONGO_FAIL_POINT_DEFINE(failCollectionInserts);
 //      first_id: <string>
 //  }
 MONGO_FAIL_POINT_DEFINE(hangAfterCollectionInserts);
+
+// This fail point throws a WriteConflictException after a successful call to insertRecords.
+MONGO_FAIL_POINT_DEFINE(failAfterBulkLoadDocInsert);
 
 /**
  * Checks the 'failCollectionInserts' fail point at the beginning of an insert operation to see if
@@ -473,8 +477,11 @@ Status CollectionImpl::insertDocumentForBulkLoader(OperationContext* opCtx,
         return loc.getStatus();
 
     status = onRecordInserted(loc.getValue());
-    if (!status.isOK()) {
-        return status;
+
+    if (MONGO_FAIL_POINT(failAfterBulkLoadDocInsert)) {
+        log() << "Failpoint failAfterBulkLoadDocInsert enabled for " << _ns.ns()
+              << ". Throwing WriteConflictException.";
+        throw WriteConflictException();
     }
 
     vector<InsertStatement> inserts;
