@@ -101,6 +101,11 @@ public:
             return (_foreignNssSet.find(nss) == _foreignNssSet.end());
         }
 
+        bool allowedToPassthroughFromMongos() const {
+            // If a sub-pipeline exists, check that all its stages are allowed to pass through.
+            return !_liteParsedPipeline || _liteParsedPipeline->allowedToPassthroughFromMongos();
+        }
+
     private:
         const NamespaceString _fromNss;
         const stdx::unordered_set<NamespaceString> _foreignNssSet;

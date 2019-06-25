@@ -83,6 +83,15 @@ public:
 
         bool allowShardedForeignCollection(NamespaceString nss) const final;
 
+        bool allowedToPassthroughFromMongos() const {
+            // If any of the sub-pipelines doesn't allow pass through, then return false.
+            return std::all_of(_liteParsedPipelines.cbegin(),
+                               _liteParsedPipelines.cend(),
+                               [](const auto& subPipeline) {
+                                   return subPipeline.allowedToPassthroughFromMongos();
+                               });
+        }
+
     private:
         const std::vector<LiteParsedPipeline> _liteParsedPipelines;
         const PrivilegeVector _requiredPrivileges;

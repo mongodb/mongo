@@ -787,8 +787,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // 3. Does not need to run on all shards.
     // 4. Doesn't need transformation via DocumentSource::serialize().
     if (routingInfo && !routingInfo->cm() && !mustRunOnAll &&
-        litePipe.allowedToForwardFromMongos() && litePipe.allowedToPassthroughFromMongos() &&
-        !involvesShardedCollections) {
+        litePipe.allowedToPassthroughFromMongos() && !involvesShardedCollections) {
         const auto primaryShardId = routingInfo->db().primary()->getId();
         return aggPassthrough(
             opCtx, namespaces, primaryShardId, request, litePipe, privileges, result);

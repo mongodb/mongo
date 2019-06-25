@@ -114,14 +114,7 @@ public:
     }
 
     /**
-     * Returns true if this stage may be forwarded to shards from a mongos.
-     */
-    virtual bool allowedToForwardFromMongos() const {
-        return true;
-    }
-
-    /**
-     * Returns true if this stage may be forwarded from Mongos unmodified.
+     * Returns true if this stage may be forwarded from mongos unmodified.
      */
     virtual bool allowedToPassthroughFromMongos() const {
         return true;
