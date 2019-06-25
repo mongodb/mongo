@@ -65,8 +65,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 
 namespace {
 
@@ -610,6 +610,8 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _engineName(params.engineName),
       _isCapped(params.isCapped),
       _isEphemeral(params.isEphemeral),
+      _isLogged(WiredTigerUtil::useTableLogging(NamespaceString(ns()),
+                                                getGlobalReplSettings().usingReplSets())),
       _isOplog(NamespaceString::oplog(params.ns)),
       _cappedMaxSize(params.cappedMaxSize),
       _cappedMaxSizeSlack(std::min(params.cappedMaxSize / 10, int64_t(16 * 1024 * 1024))),
@@ -642,11 +644,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
     }
 
     if (!params.isReadOnly) {
-        uassertStatusOK(WiredTigerUtil::setTableLogging(
-            ctx,
-            _uri,
-            WiredTigerUtil::useTableLogging(NamespaceString(ns()),
-                                            getGlobalReplSettings().usingReplSets())));
+        uassertStatusOK(WiredTigerUtil::setTableLogging(ctx, _uri, _isLogged));
     }
 
     if (_isOplog) {
@@ -1273,12 +1271,15 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
 
     // Check if we should modify rather than doing a full update.  Look for deltas for documents
     // larger than 1KB, up to 16 changes representing up to 10% of the data.
+    //
+    // Skip modify for logged tables: don't trust WiredTiger's recovery with operations that are not
+    // idempotent.
     const int kMinLengthForDiff = 1024;
     const int kMaxEntries = 16;
     const int kMaxDiffBytes = len / 10;
 
     bool skip_update = false;
-    if (len > kMinLengthForDiff && len <= old_length + kMaxDiffBytes) {
+    if (!_isLogged && len > kMinLengthForDiff && len <= old_length + kMaxDiffBytes) {
         int nentries = kMaxEntries;
         std::vector<WT_MODIFY> entries(nentries);
 
