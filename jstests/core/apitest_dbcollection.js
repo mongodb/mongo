@@ -161,6 +161,7 @@ assert.eq(0, db.getCollection("test_db").getIndexes().length, "24");
     assert.eq(0, noCollStats.nindexes, "All properties should be 0 on nonexistant collections");
     assert.eq(
         0, noCollStats.totalIndexSize, "All properties should be 0 on nonexistant collections");
+    assert.eq(0, noCollStats.totalSize, "All properties should be 0 on nonexistant collections");
 
     // scale - passed to stats() as sole numerical argument or part of an options object.
     t.drop();

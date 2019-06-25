@@ -44,7 +44,7 @@
     }
 
     assert(dbStats.hasOwnProperty("storageSize"), tojson(dbStats));
-    assert(dbStats.hasOwnProperty("numExtents"), tojson(dbStats));
+    assert(dbStats.hasOwnProperty("totalSize"), tojson(dbStats));
     assert(dbStats.hasOwnProperty("indexSize"), tojson(dbStats));
 
     if (isUsingPersistentStorage) {

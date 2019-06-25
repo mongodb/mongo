@@ -138,7 +138,7 @@ public:
                         result.append(e);
                 } else if (fieldIsAnyOf(
                                fieldName,
-                               {"count", "size", "storageSize", "numExtents", "totalIndexSize"})) {
+                               {"count", "size", "storageSize", "totalIndexSize", "totalSize"})) {
                     counts[e.fieldName()] += e.numberLong();
                 } else if (fieldName == "avgObjSize") {
                     const auto shardAvgObjSize = e.numberLong();

@@ -20,10 +20,6 @@ function assertEmpty() {
     assert.eq(stats.count, 0);
     assert.eq(stats.size, 0);
 
-    if ('numExtents' in stats) {
-        assert.lte(stats.numExtents, 1);
-    }
-
     assert.eq(t.count(), 0);
     assert.eq(t.find().itcount(), 0);
 

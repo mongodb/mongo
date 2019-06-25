@@ -48,6 +48,7 @@
     assert.eq(numDocs / 2, x.shards[s.shard0.shardName].count, "count on " + s.shard0.shardName);
     assert.eq(numDocs / 2, x.shards[s.shard1.shardName].count, "count on " + s.shard1.shardName);
     assert(x.totalIndexSize > 0);
+    assert(x.totalSize > 0);
 
     // insert one doc into a non-sharded collection
     dbForTest.bar.insert({x: 1});

@@ -41,6 +41,7 @@ selector:
   - jstests/sharding/upsert_sharded.js
   - jstests/sharding/write_transactions_during_migration.js
   - jstests/sharding/change_stream_show_migration_events.js
+  - jstests/sharding/features3.js
   - jstests/sharding/prepare_transaction_then_migrate.js
   # Enable after SERVER-40258 gets backported and available in the official 4.2 binaries.
   - jstests/sharding/prepared_txn_metadata_refresh.js

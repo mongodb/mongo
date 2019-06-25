@@ -694,7 +694,7 @@ public:
             result.append("avgObjSize", 0);
             result.appendNumber("dataSize", 0);
             result.appendNumber("storageSize", 0);
-            result.appendNumber("numExtents", 0);
+            result.appendNumber("totalSize", 0);
             result.appendNumber("indexes", 0);
             result.appendNumber("indexSize", 0);
             result.appendNumber("scaleFactor", scale);

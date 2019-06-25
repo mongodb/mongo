@@ -61,6 +61,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         result->appendNumber("size", 0);
         result->appendNumber("count", 0);
         result->appendNumber("storageSize", 0);
+        result->append("totalSize", 0);
         result->append("nindexes", 0);
         result->appendNumber("totalIndexSize", 0);
         result->append("indexDetails", BSONObj());
@@ -80,9 +81,9 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         result->append("avgObjSize", collection->averageObjectSize(opCtx));
 
     RecordStore* recordStore = collection->getRecordStore();
-    result->appendNumber(
-        "storageSize",
-        static_cast<long long>(recordStore->storageSize(opCtx, result, verbose ? 1 : 0)) / scale);
+    auto storageSize =
+        static_cast<long long>(recordStore->storageSize(opCtx, result, verbose ? 1 : 0));
+    result->appendNumber("storageSize", storageSize / scale);
 
     recordStore->appendCustomStats(opCtx, result, scale);
 
@@ -117,6 +118,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     long long indexSize = collection->getIndexSize(opCtx, &indexSizes, scale);
 
     result->appendNumber("totalIndexSize", indexSize / scale);
+    result->appendNumber("totalSize", (storageSize + indexSize) / scale);
     result->append("indexSizes", indexSizes.obj());
     result->append("scaleFactor", scale);
 

@@ -130,6 +130,7 @@
         statComp(stat_obj.size, stat_obj_scaled.size, scale);
         statComp(stat_obj.storageSize, stat_obj_scaled.storageSize, scale);
         statComp(stat_obj.totalIndexSize, stat_obj_scaled.totalIndexSize, scale);
+        statComp(stat_obj.totalSize, stat_obj_scaled.totalSize, scale);
         statComp(stat_obj.avgObjSize, stat_obj_scaled.avgObjSize, 1);
         /* lastExtentSize doesn't exist in mongos level collection stats */
         if (!mongos) {
