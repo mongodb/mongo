@@ -1,0 +1,7 @@
+test_kind: cpp_libfuzzer_test
+
+selector:
+  root: build/libfuzzer_tests.txt
+
+executor:
+  config: {}

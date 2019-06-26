@@ -435,9 +435,10 @@ ORDER_TESTS_BY_NAME = True
 DEFAULT_BENCHMARK_TEST_LIST = "build/benchmarks.txt"
 DEFAULT_UNIT_TEST_LIST = "build/unittests.txt"
 DEFAULT_INTEGRATION_TEST_LIST = "build/integration_tests.txt"
+DEFAULT_LIBFUZZER_TEST_LIST = "build/libfuzzer_tests.txt"
 
 # External files or executables, used as suite selectors, that are created during the build and
 # therefore might not be available when creating a test membership map.
 EXTERNAL_SUITE_SELECTORS = (DEFAULT_BENCHMARK_TEST_LIST, DEFAULT_UNIT_TEST_LIST,
                             DEFAULT_INTEGRATION_TEST_LIST, DEFAULT_DBTEST_EXECUTABLE,
-                            DEFAULT_MONGOEBENCH_EXECUTABLE)
+                            DEFAULT_MONGOEBENCH_EXECUTABLE, DEFAULT_LIBFUZZER_TEST_LIST)

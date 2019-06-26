@@ -193,10 +193,10 @@ class Process(object):
         """Poll."""
         return self._process.poll()
 
-    def wait(self):
+    def wait(self, timeout=None):
         """Wait until process has terminated and all output has been consumed by the logger pipes."""
 
-        return_code = self._process.wait()
+        return_code = self._process.wait(timeout)
 
         if self._stdout_pipe:
             self._stdout_pipe.wait_until_finished()

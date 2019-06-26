@@ -200,6 +200,12 @@ variables:
   - compile_unittests
   - unittests
 
+- &libfuzzertests
+  name: libfuzzertests!
+  execution_tasks:
+  - compile_libfuzzertests
+  - libfuzzertests
+
 - &dbtest
   name: dbtest!
   execution_tasks:
@@ -400,6 +406,7 @@ variables:
   - ubuntu1804-debug-asan
   - ubuntu1804-debug-ubsan
   - ubuntu1804-debug-aubsan-lite
+  - ubuntu1804-debug-aubsan-lite_fuzzer
   - ubuntu1804-debug-aubsan-async
 
 
@@ -528,6 +535,51 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/benchrun_json_files.tgz
       bucket: mciuploads
       extract_to: src/benchrun_embedded/testcases
+
+  "fetch corpus": &fetch_corpus
+    command: s3.get
+    params:
+      aws_key: ${s3_access_key_id}
+      aws_secret: ${s3_secret_access_key}
+      remote_file: ${project}/corpus/mongo-${build_variant}-latest.tgz
+      bucket: fuzzer-artifacts
+      local_file: src/corpus.tgz
+
+  "extract corpus": &extract_corpus
+    command: shell.exec
+    type: test
+    params:
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        target_dir="src/corpus"
+        mkdir -p $target_dir
+        mv src/corpus.tgz $target_dir
+
+        cd $target_dir
+        tar xzf corpus.tgz
+
+  "archive new corpus": &archive_new_corpus
+    command: archive.targz_pack
+    params:
+      target: corpus.tgz
+      source_dir: src/corpus
+      include:
+        - "**"
+
+  "upload new corpus": &upload_new_corpus
+    command: s3.put
+    params:
+      aws_key: ${s3_access_key_id}
+      aws_secret: ${s3_secret_access_key}
+      local_file: corpus.tgz
+      remote_file: ${project}/corpus/mongo-${build_variant}-latest.tgz
+      bucket: fuzzer-artifacts
+      permissions: private
+      content_type: ${content_type|application/gzip}
+      display_name: "Fuzzer Tests Corpus Tar Archive"
 
   "get buildnumber": &get_buildnumber
     command: keyval.inc
@@ -3760,6 +3812,36 @@ tasks:
     - func: "run tests"
       vars:
         resmoke_args: --suites=unittests
+
+##compile_libfuzzertests - build libfuzzertests ##
+- name: compile_libfuzzertests
+  commands:
+    - func: "scons compile"
+      vars:
+        targets: libfuzzer_tests
+        task_compile_flags: >-
+          --detect-odr-violations
+
+## libfuzzertests - run libfuzzertests ##
+- name: libfuzzertests
+  commands:
+    - func: "fetch corpus"
+    - func: "extract corpus"
+    - func: "run tests"
+      vars:
+        resmoke_args: --suites=libfuzzer
+    - command: shell.exec
+      type: setup
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          set -o verbose
+          set -o errexit
+
+          ./buildscripts/merge_corpus.sh
+    - func: "archive new corpus"
+    - func: "upload new corpus"
 
 ## compile_dbtest ##
 - name: compile_dbtest
@@ -8220,6 +8302,11 @@ task_groups:
   - compile_dbtest
   - dbtest
 - <<: *compile_task_group_template
+  name: libfuzzertests_TG
+  tasks:
+  - compile_libfuzzertests
+  - libfuzzertests
+- <<: *compile_task_group_template
   name: compile_all_run_unittests_TG
   tasks:
   - compile
@@ -12288,6 +12375,30 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: .logical_session_cache .one_sec
   - name: watchdog_wiredtiger
+
+- name: ubuntu1804-debug-aubsan-lite_fuzzer
+  display_name: "{A,UB}SAN Enterprise SSL Ubuntu 18.04 FUZZER"
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-build
+  stepback: false
+  batchtime: 1440 # 1 day
+  expansions:
+    # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
+    variant_path_suffix: /opt/mongodbtoolchain/v3/bin
+    lang_environment: LANG=C
+    san_options: UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1
+    compile_flags: LINKFLAGS=-nostdlib++ LIBS=stdc++ --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address,fuzzer --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip --disable-warnings-as-errors
+    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
+    tooltags: "ssl"
+    build_mongoreplay: true
+    hang_analyzer_dump_core: false
+    scons_cache_scope: shared
+  display_tasks:
+  - *libfuzzertests
+  tasks:
+   - name: libfuzzertests_TG
 
 - name: ubuntu1804-debug-aubsan-async
   display_name: "~ {A,UB}SAN Enterprise SSL Ubuntu 18.04 async"
