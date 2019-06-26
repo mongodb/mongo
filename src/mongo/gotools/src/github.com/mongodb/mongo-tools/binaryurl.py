@@ -48,10 +48,9 @@ if opts.version == "latest" or isVersionGreaterOrEqual(opts.version,"4.1.0"):
     opts.target = 'windows_x86_64-2012plus'
 
 def isCorrectVersion(version):
+  # for approximate match, ignore '-rcX' part, but due to json file ordering
+  # x.y.z will always be before x.y.z-rcX, which is what we want
   parts = version["version"].split("-")
-  # always skip '-rcX' versions
-  if len(parts) > 1:
-    return False
   actual = parts[0].split(".")
   desired = opts.version.split(".")
   for i in range(len(desired)):

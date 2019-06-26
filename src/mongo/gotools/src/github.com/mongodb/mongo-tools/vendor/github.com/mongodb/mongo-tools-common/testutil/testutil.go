@@ -8,6 +8,7 @@
 package testutil
 
 import (
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -136,4 +137,33 @@ func dottedStringToSlice(s string) ([]int, error) {
 		parts = append(parts, i)
 	}
 	return parts, nil
+}
+
+// MergeOplogStreams combines oplog arrays such that the order of entries is
+// random, but order-preserving with respect to each initial stream.
+func MergeOplogStreams(input [][]db.Oplog) []db.Oplog {
+	// Copy input op arrays so we can destructively shuffle them together
+	streams := make([][]db.Oplog, len(input))
+	opCount := 0
+	for i, v := range input {
+		streams[i] = make([]db.Oplog, len(v))
+		copy(streams[i], v)
+		opCount += len(v)
+	}
+
+	ops := make([]db.Oplog, 0, opCount)
+	for len(streams) != 0 {
+		// randomly pick a stream to add an op
+		rand.Shuffle(len(streams), func(i, j int) {
+			streams[i], streams[j] = streams[j], streams[i]
+		})
+		ops = append(ops, streams[0][0])
+		// remove the op and its stream if empty
+		streams[0] = streams[0][1:]
+		if len(streams[0]) == 0 {
+			streams = streams[1:]
+		}
+	}
+
+	return ops
 }

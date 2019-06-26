@@ -178,11 +178,16 @@ func (restore *MongoRestore) filterUUIDs(op db.Oplog) (db.Oplog, error) {
 	if !restore.OutputOptions.PreserveUUID {
 		op.UI = nil
 
+		// TODO TOOLS-2308: the following workaround is no longer allowed since
+		// 4.1.3 and no longer needed since 3.6.9/4.0.3.  We're commenting it
+		// out to get our CI to green, but need a longer-term fix for users on
+		// 3.0.0-3.0.8/4.0.0-4.0.2.
+
 		// new createIndexes oplog command requires 'ui', so if we aren't
 		// preserving UUIDs, we must convert it to an old style index insert
-		if op.Operation == "c" && op.Object[0].Key == "createIndexes" {
-			return convertCreateIndexToIndexInsert(op)
-		}
+		// if op.Operation == "c" && op.Object[0].Key == "createIndexes" {
+		// 	return convertCreateIndexToIndexInsert(op)
+		// }
 	}
 
 	// Check for and filter nested applyOps ops

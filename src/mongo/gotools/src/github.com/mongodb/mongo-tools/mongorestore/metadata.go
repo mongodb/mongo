@@ -146,7 +146,7 @@ func (restore *MongoRestore) CollectionExists(intent *intents.Intent) (bool, err
 // CreateIndexes takes in an intent and an array of index documents and
 // attempts to create them using the createIndexes command. If that command
 // fails, we fall back to individual index creation.
-func (restore *MongoRestore) CreateIndexes(intent *intents.Intent, indexes []IndexDocument) error {
+func (restore *MongoRestore) CreateIndexes(intent *intents.Intent, indexes []IndexDocument, hasNonSimpleCollation bool) error {
 	// first, sanitize the indexes
 	for _, index := range indexes {
 		// update the namespace of the index before inserting
@@ -164,6 +164,12 @@ func (restore *MongoRestore) CreateIndexes(intent *intents.Intent, indexes []Ind
 		// unless we specifically want to keep it
 		if !restore.OutputOptions.KeepIndexVersion {
 			delete(index.Options, "v")
+		}
+
+		// for non-simple default collation on the collection, indexes without
+		// a collation option need to add "collation:{locale:"simple"}}
+		if _, ok := index.Options["collation"]; hasNonSimpleCollation && !ok {
+			index.Options["collation"] = bson.D{{"locale", "simple"}}
 		}
 	}
 

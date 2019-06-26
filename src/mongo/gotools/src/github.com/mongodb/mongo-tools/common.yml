@@ -13,37 +13,43 @@ mongo_tools_variables:
   mongo_tools_task_lists:
     mac_task_list: &macos_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
       - name: qa-tests-3.2
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
+      - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: qa-dump-restore-gzip
+      - name: qa-dump-restore-gzip-4.2
       - name: qa-dump-restore-gzip-3.2
-      - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-archiving-4.2
       - name: qa-dump-restore-archiving-3.2
       - name: unit
       - name: replay-dist
-      - name: replay-sanity_check
-      - name: replay-go_test
-      - name: replay-auth_test
-      - name: replay-sharded_test
-      - name: replay-repl_test
+      - name: replay-sanity_check-4.2
+      - name: replay-go_test-4.2
+      - name: replay-auth_test-4.2
+      - name: replay-sharded_test-4.2
+      - name: replay-repl_test-4.2
       # Disabled due to TOOLS-2107
-      # - name: replay-replay_test
+      # - name: replay-replay_test-4.2
     macos_ssl_task_list: &macos_ssl_tasks
       - name: dist
       - name: qa-tests-4.0
+      - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl
+      - name: native-cert-ssl-4.2
       - name: unit
       - name: replay-dist
     rhel_x86_64_task_list: &rhel_x86_64_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
       - name: legacy30
       - name: lint-go
       - name: format-go
@@ -52,50 +58,59 @@ mongo_tools_variables:
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
+      - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: qa-dump-restore-gzip
+      - name: qa-dump-restore-gzip-4.2
       - name: qa-dump-restore-gzip-3.2
-      - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-archiving-4.2
       - name: qa-dump-restore-archiving-3.2
       - name: unit
       - name: vet
       - name: replay-dist
-      - name: replay-sanity_check
-      - name: replay-go_test
-      - name: replay-auth_test
-      - name: replay-sharded_test
-      - name: replay-repl_test
+      - name: replay-sanity_check-4.2
+      - name: replay-go_test-4.2
+      - name: replay-auth_test-4.2
+      - name: replay-sharded_test-4.2
+      - name: replay-repl_test-4.2
       # Disabled due to TOOLS-2116
-      # - name: replay-replay_test
+      # - name: replay-replay_test-4.2
     rhel_x86_64_ssl_task_list: &rhel_x86_64_ssl_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
       - name: qa-tests-4.0
+      - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl
+      - name: native-cert-ssl-4.2
       - name: replay-dist
     rhel_x86_64_enterprise_task_list: &rhel_x86_64_enterprise_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
       # Disabled due to TOOLS-2119
       # - name: kerberos
       - name: qa-tests-4.0
+      - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl
+      - name: native-cert-ssl-4.2
       - name: replay-dist
-      - name: replay-sanity_check
-      - name: replay-go_test
-      - name: replay-auth_test
-      - name: replay-sharded_test
-      - name: replay-repl_test
+      - name: replay-sanity_check-4.2
+      - name: replay-go_test-4.2
+      - name: replay-auth_test-4.2
+      - name: replay-sharded_test-4.2
+      - name: replay-repl_test-4.2
       # Disabled due to TOOLS-2116
-      # - name: replay-replay_test
+      # - name: replay-replay_test-4.2
     ubuntu_x86_64_task_list: &ubuntu_x86_64_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
       - name: lint-go
       - name: format-go
       - name: lint-js
@@ -103,63 +118,75 @@ mongo_tools_variables:
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
+      - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: qa-dump-restore-gzip
+      - name: qa-dump-restore-gzip-4.2
       - name: qa-dump-restore-gzip-3.2
-      - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-archiving-4.2
       - name: qa-dump-restore-archiving-3.2
       - name: unit
       - name: vet
       - name: replay-dist
-      - name: replay-sanity_check
-      - name: replay-go_test
-      - name: replay-auth_test
-      - name: replay-sharded_test
-      - name: replay-repl_test
+      - name: replay-sanity_check-4.2
+      - name: replay-go_test-4.2
+      - name: replay-auth_test-4.2
+      - name: replay-sharded_test-4.2
+      - name: replay-repl_test-4.2
       # Disabled due to TOOLS-2108
-      # - name: replay-replay_test
+      # - name: replay-replay_test-4.2
     ubuntu_x86_64_ssl_task_list: &ubuntu_x86_64_ssl_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
       - name: qa-tests-4.0
+      - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl
+      - name: native-cert-ssl-4.2
       - name: replay-dist
     ubuntu_x86_64_enterprise_task_list: &ubuntu_x86_64_enterprise_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
       - name: kerberos
       - name: qa-tests-4.0
+      - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl
+      - name: native-cert-ssl-4.2
       - name: replay-dist
-      - name: replay-sanity_check
-      - name: replay-go_test
-      - name: replay-auth_test
-      - name: replay-sharded_test
-      - name: replay-repl_test
+      - name: replay-sanity_check-4.2
+      - name: replay-go_test-4.2
+      - name: replay-auth_test-4.2
+      - name: replay-sharded_test-4.2
+      - name: replay-repl_test-4.2
       # Disabled due to TOOLS-2108
-      # - name: replay-replay_test
+      # - name: replay-replay_test-4.2
     ubuntu_x86_64_race_task_list: &ubuntu_x86_64_race_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
       - name: qa-tests-4.0
+      - name: qa-tests-4.2
       - name: unit
       - name: replay-dist
-      - name: replay-sanity_check
-      - name: replay-go_test
-      - name: replay-auth_test
-      - name: replay-sharded_test
-      - name: replay-repl_test
+      - name: replay-sanity_check-4.2
+      - name: replay-go_test-4.2
+      - name: replay-auth_test-4.2
+      - name: replay-sharded_test-4.2
+      - name: replay-repl_test-4.2
       # Disabled due to TOOLS-2108
-      # - name: replay-replay_test
+      # - name: replay-replay_test-4.2
     windows_64_task_list: &windows_64_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
         distros:
         - windows-64-vs2013-test
       - name: qa-tests-3.2
@@ -174,13 +201,16 @@ mongo_tools_variables:
       - name: qa-tests-4.0
         distros:
         - windows-64-vs2013-test
-      - name: qa-dump-restore-archiving
+      - name: qa-tests-4.2
+        distros:
+        - windows-64-vs2013-test
+      - name: qa-dump-restore-archiving-4.2
         distros:
         - windows-64-vs2013-test
       - name: qa-dump-restore-archiving-3.2
         distros:
         - windows-64-vs2013-test
-      - name: qa-dump-restore-gzip
+      - name: qa-dump-restore-gzip-4.2
         distros:
         - windows-64-vs2013-test
       - name: qa-dump-restore-gzip-3.2
@@ -190,16 +220,21 @@ mongo_tools_variables:
       - name: unit
     windows_64_ssl_task_list: &windows_64_ssl_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
       - name: qa-tests-4.0
+      - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl
+      - name: native-cert-ssl-4.2
       - name: unit
     windows_64_enterprise_task_list: &windows_64_enterprise_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
       - name: kerberos
         distros:
         - windows-64-vs2013-test
@@ -215,63 +250,78 @@ mongo_tools_variables:
       - name: qa-tests-4.0
         distros:
         - windows-64-vs2013-test
+      - name: qa-tests-4.2
+        distros:
+        - windows-64-vs2013-test
       - name: qa-tests-unstable
         distros:
         - windows-64-vs2013-test
       - name: unit
-      - name: native-cert-ssl
+      - name: native-cert-ssl-4.2
     rhel71_ppc64le_enterprise_task_list: &rhel71_ppc64le_enterprise_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
       #- name: kerberos
-      - name: qa-dump-restore-archiving
-      - name: qa-dump-restore-gzip
+      - name: qa-dump-restore-archiving-4.2
+      - name: qa-dump-restore-gzip-4.2
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
+      - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl
+      - name: native-cert-ssl-4.2
       - name: replay-dist
-      - name: replay-sanity_check
-      - name: replay-go_test
-      - name: replay-auth_test
-      - name: replay-sharded_test
-      - name: replay-repl_test
+      - name: replay-sanity_check-4.2
+      - name: replay-go_test-4.2
+      - name: replay-auth_test-4.2
+      - name: replay-sharded_test-4.2
+      - name: replay-repl_test-4.2
       # Disabled due to TOOLS-2108
-      # - name: replay-replay_test
+      # - name: replay-replay_test-4.2
     rhel67_s390x_enterprise_task_list: &rhel67_s390x_enterprise_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
+      - name: integration-4.0
+      - name: integration-4.0-auth
+      - name: integration-4.2
+      - name: integration-4.2-auth
       # Disabled due to TOOLS-2119
       # - name: kerberos
-      - name: qa-dump-restore-archiving
-      - name: qa-dump-restore-gzip
+      - name: qa-dump-restore-archiving-4.2
+      - name: qa-dump-restore-gzip-4.2
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
+      - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl
+      - name: native-cert-ssl-4.2
       - name: replay-dist
-      - name: replay-sanity_check
-      - name: replay-go_test
-      - name: replay-auth_test
-      - name: replay-sharded_test
-      - name: replay-repl_test
+      - name: replay-sanity_check-4.2
+      - name: replay-go_test-4.2
+      - name: replay-auth_test-4.2
+      - name: replay-sharded_test-4.2
+      - name: replay-repl_test-4.2
       # Disabled due to TOOLS-2108
-      # - name: replay-replay_test
+      # - name: replay-replay_test-4.2
     ubuntu1604_arm64_ssl_task_list: &ubuntu1604_arm64_ssl_tasks
       - name: dist
-      - name: integration
-      - name: integration-auth
-      - name: qa-dump-restore-archiving
-      - name: qa-dump-restore-gzip
+      - name: integration-4.0
+      - name: integration-4.0-auth
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
+      - name: replay-dist
+    ubuntu1804_arm64_ssl_task_list: &ubuntu1804_arm64_ssl_tasks
+      - name: dist
+      - name: integration-4.2
+      - name: integration-4.2-auth
+      - name: qa-dump-restore-archiving-4.2
+      - name: qa-dump-restore-gzip-4.2
+      - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl
+      - name: native-cert-ssl-4.2
       - name: replay-dist
 
 
@@ -938,7 +988,7 @@ tasks:
       vars:
         tool: mongotop
 
-- name: integration
+- name: integration-4.0
   commands:
     - func: "fetch source"
     - command: expansions.update
@@ -951,7 +1001,7 @@ tasks:
       vars:
           INT_TEST: "true" 
 
-- name: integration-auth
+- name: integration-4.0-auth
   commands:
     - func: "fetch source"
     # Concat auth args
@@ -969,6 +1019,44 @@ tasks:
     - func: "download mongod"
       vars:
         mongo_version: "4.0"
+    - func: "start mongod"
+    - func: "wait for mongod to be ready"
+    - func: "run tool integration tests"
+      vars:
+          INT_TEST: "true"
+          AUTH_TEST: "true"
+
+- name: integration-4.2
+  commands:
+    - func: "fetch source"
+    - command: expansions.update
+    - func: "download mongod"
+      vars:
+        mongo_version: "4.2"
+    - func: "start mongod"
+    - func: "wait for mongod to be ready"
+    - func: "run tool integration tests"
+      vars:
+          INT_TEST: "true" 
+
+- name: integration-4.2-auth
+  commands:
+    - func: "fetch source"
+    # Concat auth args
+    - command: expansions.update
+      params:
+        updates:
+          - key: "mongod_args"
+            concat: " --auth"
+          - key: "auth_username"
+            value: "passwordIsTaco"
+          - key: "auth_password"
+            value: "Taco"
+          - key: "create_mongod_users_command"
+            value: "db.createUser({ user: '${auth_username}', pwd: '${auth_password}', roles: [{ role: '__system', db: 'admin' }] });"
+    - func: "download mongod"
+      vars:
+        mongo_version: "4.2"
     - func: "start mongod"
     - func: "wait for mongod to be ready"
     - func: "run tool integration tests"
@@ -1109,6 +1197,45 @@ tasks:
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
         excludes: "requires_mongo_26,${excludes}"
+
+- name: qa-tests-4.2
+  depends_on:
+  - name: dist
+  commands:
+    - func: "fetch source"
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "4.2"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongotop
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - func: "fetch tool"
+      vars:
+        tool: bsondump
+    - func: "run qa-tests"
+      vars:
+        resmoke_suite: "core${resmoke_use_ssl}"
+        excludes: "requires_mongo_26,requires_unstable,${excludes}"
 
 - name: qa-tests-4.0
   depends_on:
@@ -1266,7 +1393,7 @@ tasks:
         resmoke_suite: "core${resmoke_use_ssl}"
         excludes: "requires_mongo_26,requires_mongo_34,requires_mongo_36,requires_mongo_40,requires_unstable,,${excludes}"
 
-- name: native-cert-ssl
+- name: native-cert-ssl-4.2
   depends_on:
   - name: dist
   commands:
@@ -1275,7 +1402,7 @@ tasks:
     - func: "setup credentials"
     - func: "download mongod"
       vars:
-        mongo_version: "4.0"
+        mongo_version: "4.2"
     - func: "fetch tool"
       vars:
         tool: mongoimport
@@ -1313,7 +1440,7 @@ tasks:
           chmod 400 jstests/libs/key*
           python buildscripts/resmoke.py --suite=native_cert_ssl  --continueOnFailure --log=buildlogger --reportFile=../../report.json ${resmoke_args} --excludeWithAnyTags="${excludes}"
 
-- name: qa-dump-restore-archiving
+- name: qa-dump-restore-archiving-4.2
   depends_on:
   - name: dist
   commands:
@@ -1322,7 +1449,7 @@ tasks:
     - func: "setup credentials"
     - func: "download mongod"
       vars:
-        mongo_version: "4.0"
+        mongo_version: "4.2"
     - func: "fetch tool"
       vars:
         tool: mongodump
@@ -1355,7 +1482,7 @@ tasks:
         resmoke_suite: "restore_archive"
         excludes: "requires_mongo_26,requires_mongo_34,requires_mongo_36,requires_mongo_40,requires_unstable,${excludes}"
 
-- name: qa-dump-restore-gzip
+- name: qa-dump-restore-gzip-4.2
   depends_on:
   - name: dist
   commands:
@@ -1364,7 +1491,7 @@ tasks:
     - func: "setup credentials"
     - func: "download mongod"
       vars:
-        mongo_version: "4.0"
+        mongo_version: "4.2"
     - func: "fetch tool"
       vars:
         tool: mongodump
@@ -1466,7 +1593,7 @@ tasks:
       tool: mongoreplay
   - func: "build tool"
 
-- name: replay-sanity_check
+- name: replay-sanity_check-4.2
   depends_on:
   - name: replay-dist
   commands:
@@ -1476,7 +1603,7 @@ tasks:
       tool: mongoreplay
   - func: "download mongod"
     vars:
-      mongo_version: "4.0"
+      mongo_version: "4.2"
   - func: "start mongod"
   - func: "wait for mongod to be ready"
   - command: shell.exec
@@ -1490,7 +1617,7 @@ tasks:
         echo "Running sanity check"
         PATH=$PATH:$PWD/bin ./mongoreplay/sanity_check.sh -p ${mongod_port}
 
-- name: replay-go_test
+- name: replay-go_test-4.2
   depends_on:
   - name: replay-dist
   commands:
@@ -1506,7 +1633,7 @@ tasks:
       pcapFname: getmore_single_channel.pcap
   - func: "download mongod"
     vars:
-      mongo_version: "4.0"
+      mongo_version: "4.2"
   - func: "start mongod"
   - func: "wait for mongod to be ready"
   - func: "run replay go_test"
@@ -1516,7 +1643,7 @@ tasks:
         additional_args: github.com/mongodb/mongo-tools/mongoreplay
         TESTING_REPLAY: true
 
-- name: replay-sharded_test
+- name: replay-sharded_test-4.2
   depends_on:
   - name: replay-dist
   commands:
@@ -1532,7 +1659,7 @@ tasks:
       pcapFname: getmore_single_channel.pcap
   - func: "download mongod"
     vars:
-      mongo_version: "4.0"
+      mongo_version: "4.2"
   - func: "create sharded_cluster"
   - func: "run replay go_test"
     vars:
@@ -1541,7 +1668,7 @@ tasks:
         additional_args: github.com/mongodb/mongo-tools/mongoreplay --run "LiveDB"
         TESTING_REPLAY: true
 
-- name: replay-auth_test
+- name: replay-auth_test-4.2
   depends_on:
   - name: replay-dist
   commands:
@@ -1557,7 +1684,7 @@ tasks:
       pcapFname: getmore_single_channel.pcap
   - func: "download mongod"
     vars:
-      mongo_version: "4.0"
+      mongo_version: "4.2"
   - func: "start mongod"
     vars:
         additional_args: --auth
@@ -1572,7 +1699,7 @@ tasks:
         additional_args: github.com/mongodb/mongo-tools/mongoreplay --run "(LiveDB)|(Authed)"
         TESTING_REPLAY: true
 
-- name: replay-repl_test
+- name: replay-repl_test-4.2
   depends_on:
   - name: replay-dist
   commands:
@@ -1588,7 +1715,7 @@ tasks:
       pcapFname: getmore_single_channel.pcap
   - func: "download mongod"
     vars:
-      mongo_version: "4.0"
+      mongo_version: "4.2"
   - func: "create repl_set"
     vars:
         mongod_port: ${mongod_port}
@@ -1599,7 +1726,7 @@ tasks:
         additional_args: github.com/mongodb/mongo-tools/mongoreplay --run "LiveDB"
         TESTING_REPLAY: true
 
-- name: replay-replay_test
+- name: replay-replay_test-4.2
   depends_on:
   - name: replay-dist
   commands:
@@ -1609,7 +1736,7 @@ tasks:
       tool: mongoreplay
   - func: "download mongod"
     vars:
-      mongo_version: "4.0"
+      mongo_version: "4.2"
   - func: "fetch ftdc"
   - command: shell.exec
     params:
@@ -2024,6 +2151,7 @@ buildvariants:
 #        ARM Buildvariants            #
 #######################################
 
+# MongoDB 3.4 - 4.0
 - name: ubuntu1604-arm64-ssl
   display_name: ZAP ARM64 Ubuntu 16.04 SSL
   run_on:
@@ -2045,6 +2173,29 @@ buildvariants:
     integration_test_args: integration
     USE_SSL: "true"
   tasks: *ubuntu1604_arm64_ssl_tasks
+
+# MongoDB 4.2+
+- name: ubuntu1804-arm64-ssl
+  display_name: ZAP ARM64 Ubuntu 18.04 SSL
+  run_on:
+  - ubuntu1804-arm64-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "ubuntu1804"
+    mongo_edition: "targeted"
+    mongo_arch: "aarch64"
+    build_tags: "ssl"
+    resmoke_use_ssl: _ssl
+    excludes: requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30
+    resmoke_args: -j 2
+    arch: "linux/arm64"
+    edition: ssl
+    integration_test_args: integration
+    USE_SSL: "true"
+  tasks: *ubuntu1804_arm64_ssl_tasks
 
 #######################################
 #        Power Buildvariants          #
@@ -2072,10 +2223,24 @@ buildvariants:
     integration_test_args: integration
   tasks: *rhel71_ppc64le_enterprise_tasks
 
+# MongoDB 3.4 - 4.0
 - name: ubuntu1604-ppc64le-enterprise
   display_name: ZAP PPC64LE Ubuntu 16.04 Enterprise
   run_on:
   - ubuntu1604-power8-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    build_tags: 'ssl sasl gssapi'
+  tasks:
+  - name: dist
+  - name: replay-dist
+
+# MongoDB 4.2+
+- name: ubuntu1804-ppc64le-enterprise
+  display_name: ZAP PPC64LE Ubuntu 18.04 Enterprise
+  run_on:
+  - ubuntu1804-power8-test
   stepback: false
   batchtime: 10080 # weekly
   expansions:
@@ -2114,6 +2279,18 @@ buildvariants:
   display_name: ZAP s390x Ubuntu 16.04 Enterprise
   run_on:
   - ubuntu1604-zseries-small
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    build_tags: "sasl gssapi ssl"
+  tasks:
+  - name: dist
+  - name: replay-dist
+
+- name: ubuntu1804-s390x-enterprise
+  display_name: ZAP s390x Ubuntu 18.04 Enterprise
+  run_on:
+  - ubuntu1804-zseries-test
   stepback: false
   batchtime: 10080 # weekly
   expansions:
