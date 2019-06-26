@@ -83,16 +83,15 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
  * Helper that will read the entire sequence of oplog entries for the transaction and apply each of
  * them.
  *
- * Currently used for oplog application of a commitTransaction oplog entry during recovery, rollback
- * and initial sync.
+ * Currently used for oplog application of a commitTransaction oplog entry during recovery and
+ * rollback.
  */
 Status _applyTransactionFromOplogChain(OperationContext* opCtx,
                                        const OplogEntry& entry,
                                        repl::OplogApplication::Mode mode,
                                        Timestamp commitTimestamp,
                                        Timestamp durableTimestamp) {
-    invariant(mode == repl::OplogApplication::Mode::kRecovering ||
-              mode == repl::OplogApplication::Mode::kInitialSync);
+    invariant(mode == repl::OplogApplication::Mode::kRecovering);
 
     repl::MultiApplier::Operations ops;
     {
@@ -151,76 +150,88 @@ const repl::OplogEntry getPreviousOplogEntry(OperationContext* opCtx,
 Status applyCommitTransaction(OperationContext* opCtx,
                               const OplogEntry& entry,
                               repl::OplogApplication::Mode mode) {
-    // Return error if run via applyOps command.
-    uassert(50987,
-            "commitTransaction is only used internally by secondaries.",
-            mode != repl::OplogApplication::Mode::kApplyOpsCmd);
-
     IDLParserErrorContext ctx("commitTransaction");
     auto commitOplogEntryOpTime = entry.getOpTime();
     auto commitCommand = CommitTransactionOplogObject::parse(ctx, entry.getObject());
     invariant(commitCommand.getCommitTimestamp());
 
-    if (mode == repl::OplogApplication::Mode::kRecovering) {
-        return _applyTransactionFromOplogChain(opCtx,
-                                               entry,
-                                               mode,
-                                               *commitCommand.getCommitTimestamp(),
-                                               commitOplogEntryOpTime.getTimestamp());
+    switch (mode) {
+        case repl::OplogApplication::Mode::kRecovering: {
+            return _applyTransactionFromOplogChain(opCtx,
+                                                   entry,
+                                                   mode,
+                                                   *commitCommand.getCommitTimestamp(),
+                                                   commitOplogEntryOpTime.getTimestamp());
+        }
+        case repl::OplogApplication::Mode::kInitialSync: {
+            // Initial sync should never apply 'commitTransaction' since it unpacks committed
+            // transactions onto various applier threads.
+            MONGO_UNREACHABLE;
+        }
+        case repl::OplogApplication::Mode::kApplyOpsCmd: {
+            // Return error if run via applyOps command.
+            uasserted(50987, "commitTransaction is only used internally by secondaries.");
+        }
+        case repl::OplogApplication::Mode::kSecondary: {
+            // Transaction operations are in its own batch, so we can modify their opCtx.
+            invariant(entry.getSessionId());
+            invariant(entry.getTxnNumber());
+            opCtx->setLogicalSessionId(*entry.getSessionId());
+            opCtx->setTxnNumber(*entry.getTxnNumber());
+
+            // The write on transaction table may be applied concurrently, so refreshing state
+            // from disk may read that write, causing starting a new transaction on an existing
+            // txnNumber. Thus, we start a new transaction without refreshing state from disk.
+            MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
+
+            auto transaction = TransactionParticipant::get(opCtx);
+            invariant(transaction);
+            transaction.unstashTransactionResources(opCtx, "commitTransaction");
+            transaction.commitPreparedTransaction(
+                opCtx, *commitCommand.getCommitTimestamp(), commitOplogEntryOpTime);
+            return Status::OK();
+        }
     }
-
-    invariant(mode == repl::OplogApplication::Mode::kSecondary);
-
-    // Transaction operations are in its own batch, so we can modify their opCtx.
-    invariant(entry.getSessionId());
-    invariant(entry.getTxnNumber());
-    opCtx->setLogicalSessionId(*entry.getSessionId());
-    opCtx->setTxnNumber(*entry.getTxnNumber());
-
-    // The write on transaction table may be applied concurrently, so refreshing state
-    // from disk may read that write, causing starting a new transaction on an existing
-    // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
-
-    auto transaction = TransactionParticipant::get(opCtx);
-    invariant(transaction);
-    transaction.unstashTransactionResources(opCtx, "commitTransaction");
-    transaction.commitPreparedTransaction(
-        opCtx, *commitCommand.getCommitTimestamp(), commitOplogEntryOpTime);
-    return Status::OK();
+    MONGO_UNREACHABLE;
 }
 
 Status applyAbortTransaction(OperationContext* opCtx,
                              const OplogEntry& entry,
                              repl::OplogApplication::Mode mode) {
-    // Return error if run via applyOps command.
-    uassert(50972,
-            "abortTransaction is only used internally by secondaries.",
-            mode != repl::OplogApplication::Mode::kApplyOpsCmd);
+    switch (mode) {
+        case repl::OplogApplication::Mode::kRecovering: {
+            // We don't put transactions into the prepare state until the end of recovery,
+            // so there is no transaction to abort.
+            return Status::OK();
+        }
+        case repl::OplogApplication::Mode::kInitialSync: {
+            // We don't put transactions into the prepare state until the end of initial sync,
+            // so there is no transaction to abort.
+            return Status::OK();
+        }
+        case repl::OplogApplication::Mode::kApplyOpsCmd: {
+            // Return error if run via applyOps command.
+            uasserted(50972, "abortTransaction is only used internally by secondaries.");
+        }
+        case repl::OplogApplication::Mode::kSecondary: {
+            // Transaction operations are in its own batch, so we can modify their opCtx.
+            invariant(entry.getSessionId());
+            invariant(entry.getTxnNumber());
+            opCtx->setLogicalSessionId(*entry.getSessionId());
+            opCtx->setTxnNumber(*entry.getTxnNumber());
 
-    // We don't put transactions into the prepare state until the end of recovery and initial sync,
-    // so there is no transaction to abort.
-    if (mode == repl::OplogApplication::Mode::kRecovering ||
-        mode == repl::OplogApplication::Mode::kInitialSync) {
-        return Status::OK();
+            // The write on transaction table may be applied concurrently, so refreshing state
+            // from disk may read that write, causing starting a new transaction on an existing
+            // txnNumber. Thus, we start a new transaction without refreshing state from disk.
+            MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
+
+            auto transaction = TransactionParticipant::get(opCtx);
+            transaction.unstashTransactionResources(opCtx, "abortTransaction");
+            transaction.abortActiveTransaction(opCtx);
+            return Status::OK();
+        }
     }
-
-    invariant(mode == repl::OplogApplication::Mode::kSecondary);
-
-    // Transaction operations are in its own batch, so we can modify their opCtx.
-    invariant(entry.getSessionId());
-    invariant(entry.getTxnNumber());
-    opCtx->setLogicalSessionId(*entry.getSessionId());
-    opCtx->setTxnNumber(*entry.getTxnNumber());
-    // The write on transaction table may be applied concurrently, so refreshing state
-    // from disk may read that write, causing starting a new transaction on an existing
-    // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
-
-    auto transaction = TransactionParticipant::get(opCtx);
-    transaction.unstashTransactionResources(opCtx, "abortTransaction");
-    transaction.abortActiveTransaction(opCtx);
-    return Status::OK();
+    MONGO_UNREACHABLE;
 }
 
 repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
@@ -291,7 +302,7 @@ namespace {
  */
 Status _applyPrepareTransaction(OperationContext* opCtx,
                                 const OplogEntry& entry,
-                                repl::OplogApplication::Mode oplogApplicationMode) {
+                                repl::OplogApplication::Mode mode) {
 
     // The operations here are reconstructed at their prepare time.  However, that time will
     // be ignored because there is an outer write unit of work during their application.
@@ -301,8 +312,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         return readTransactionOperationsFromOplogChain(opCtx, entry, {}, boost::none);
     }();
 
-    if (oplogApplicationMode == repl::OplogApplication::Mode::kRecovering ||
-        oplogApplicationMode == repl::OplogApplication::Mode::kInitialSync) {
+    if (mode == repl::OplogApplication::Mode::kRecovering ||
+        mode == repl::OplogApplication::Mode::kInitialSync) {
         // We might replay a prepared transaction behind oldest timestamp.  Note that since this is
         // scoped to the storage transaction, and readTransactionOperationsFromOplogChain implicitly
         // abandons the storage transaction when it releases the global lock, this must be done
@@ -339,7 +350,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     auto transaction = TransactionParticipant::get(opCtx);
     transaction.unstashTransactionResources(opCtx, "prepareTransaction");
 
-    auto status = _applyOperationsForTransaction(opCtx, ops, oplogApplicationMode);
+    auto status = _applyOperationsForTransaction(opCtx, ops, mode);
     fassert(31137, status);
 
     if (MONGO_FAIL_POINT(applyOpsHangBeforePreparingTransaction)) {
@@ -355,16 +366,21 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 }
 
 /**
- * Apply a prepared transaction during recovery.
+ * Apply a prepared transaction when we are reconstructing prepared transactions.
  */
-Status applyRecoveredPrepareTransaction(OperationContext* opCtx,
-                                        const OplogEntry& entry,
-                                        repl::OplogApplication::Mode mode) {
-    // Snapshot transactions never conflict with the PBWM lock.
-    invariant(!opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
+void _reconstructPreparedTransaction(OperationContext* opCtx,
+                                     const OplogEntry& prepareEntry,
+                                     repl::OplogApplication::Mode mode) {
+    repl::UnreplicatedWritesBlock uwb(opCtx);
+
+    // Snapshot transaction can never conflict with the PBWM lock.
+    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+
     // We might replay a prepared transaction behind oldest timestamp.
     opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
-    return _applyPrepareTransaction(opCtx, entry, mode);
+
+    // Checks out the session, applies the operations and prepares the transaction.
+    uassertStatusOK(_applyPrepareTransaction(opCtx, prepareEntry, mode));
 }
 }  // namespace
 
@@ -376,33 +392,37 @@ Status applyRecoveredPrepareTransaction(OperationContext* opCtx,
  */
 Status applyPrepareTransaction(OperationContext* opCtx,
                                const OplogEntry& entry,
-                               repl::OplogApplication::Mode oplogApplicationMode) {
-    // Don't apply the operations from the prepared transaction until either we see a commit
-    // transaction oplog entry during recovery or are at the end of recovery.
-    if (oplogApplicationMode == repl::OplogApplication::Mode::kRecovering) {
-        if (!serverGlobalParams.enableMajorityReadConcern) {
-            error() << "Cannot replay a prepared transaction when 'enableMajorityReadConcern' is "
+                               repl::OplogApplication::Mode mode) {
+    switch (mode) {
+        case repl::OplogApplication::Mode::kRecovering: {
+            if (!serverGlobalParams.enableMajorityReadConcern) {
+                error()
+                    << "Cannot replay a prepared transaction when 'enableMajorityReadConcern' is "
                        "set to false. Restart the server with --enableMajorityReadConcern=true "
                        "to complete recovery.";
+                fassertFailed(51146);
+            }
+
+            // Don't apply the operations from the prepared transaction until either we see a commit
+            // transaction oplog entry during recovery or are at the end of recovery.
+            return Status::OK();
         }
-        fassert(51146, serverGlobalParams.enableMajorityReadConcern);
-        return Status::OK();
+        case repl::OplogApplication::Mode::kInitialSync: {
+            // Don't apply the operations from the prepared transaction until either we see a commit
+            // transaction oplog entry during the oplog application phase of initial sync or are at
+            // the end of initial sync.
+            return Status::OK();
+        }
+        case repl::OplogApplication::Mode::kApplyOpsCmd: {
+            // Return error if run via applyOps command.
+            uasserted(51145,
+                      "prepare applyOps oplog entry is only used internally by secondaries.");
+        }
+        case repl::OplogApplication::Mode::kSecondary: {
+            return _applyPrepareTransaction(opCtx, entry, repl::OplogApplication::Mode::kSecondary);
+        }
     }
-
-    // Don't apply the operations from the prepared transaction until either we see a commit
-    // transaction oplog entry during the oplog application phase of initial sync or are at the end
-    // of initial sync.
-    if (oplogApplicationMode == repl::OplogApplication::Mode::kInitialSync) {
-        return Status::OK();
-    }
-
-    // Return error if run via applyOps command.
-    uassert(51145,
-            "prepare applyOps oplog entry is only used internally by secondaries.",
-            oplogApplicationMode != repl::OplogApplication::Mode::kApplyOpsCmd);
-
-    invariant(oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);
-    return _applyPrepareTransaction(opCtx, entry, oplogApplicationMode);
+    MONGO_UNREACHABLE;
 }
 
 void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplication::Mode mode) {
@@ -443,14 +463,7 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
                 opCtx->getServiceContext()->makeClient("reconstruct-prepared-transactions");
             AlternativeClientRegion acr(newClient);
             const auto newOpCtx = cc().makeOperationContext();
-            repl::UnreplicatedWritesBlock uwb(newOpCtx.get());
-
-            // Snapshot transaction can never conflict with the PBWM lock.
-            newOpCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
-
-            // Checks out the session, applies the operations and prepares the transaction.
-            uassertStatusOK(
-                applyRecoveredPrepareTransaction(newOpCtx.get(), prepareOplogEntry, mode));
+            _reconstructPreparedTransaction(newOpCtx.get(), prepareOplogEntry, mode);
         }
     }
 }
