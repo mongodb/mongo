@@ -784,6 +784,15 @@ Status runAggregate(OperationContext* opCtx,
         }
     }
 
+    // The aggregation pipeline may change the namespace of the curop and we need to set it back to
+    // the original namespace to correctly report command stats. One example when the namespace can
+    // be changed is when the pipeline contains an $out stage, which executes an internal command to
+    // create a temp collection, changing the curop namespace to the name of this temp collection.
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        curOp->setNS_inlock(origNss.ns());
+    }
+
     // Any code that needs the cursor pinned must be inside the try block, above.
     return Status::OK();
 }
