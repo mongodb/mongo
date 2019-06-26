@@ -1038,7 +1038,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * any cached snapshots have to be refreshed.
 	 */
 	if (!readonly)
-		(void)__wt_gen_next(session, WT_GEN_COMMIT);
+		WT_IGNORE_RET(__wt_gen_next(session, WT_GEN_COMMIT));
 
 	/* First check if we've already committed something in the future. */
 	if (update_timestamp) {
@@ -1067,7 +1067,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * because the user's data is committed.
 	 */
 	if (!readonly)
-		(void)__wt_cache_eviction_check(session, false, false, NULL);
+		WT_IGNORE_RET(
+		    __wt_cache_eviction_check(session, false, false, NULL));
 	return (0);
 
 err:	/*
@@ -1301,7 +1302,8 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	 * because the user's data is committed.
 	 */
 	if (!readonly)
-		(void)__wt_cache_eviction_check(session, false, false, NULL);
+		WT_IGNORE_RET(
+		    __wt_cache_eviction_check(session, false, false, NULL));
 	return (ret);
 }
 

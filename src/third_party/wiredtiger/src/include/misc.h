@@ -16,7 +16,17 @@
 	(void)(v);							\
 } while (0);
 #define	WT_IGNORE_RET(call) do {					\
-	int __ignored_ret;						\
+	uintmax_t __ignored_ret;					\
+	__ignored_ret = (uintmax_t)(call);				\
+	WT_UNUSED(__ignored_ret);					\
+} while (0)
+#define	WT_IGNORE_RET_BOOL(call) do {					\
+	bool __ignored_ret;						\
+	__ignored_ret = (call);						\
+	WT_UNUSED(__ignored_ret);					\
+} while (0)
+#define	WT_IGNORE_RET_PTR(call) do {					\
+	const void *__ignored_ret;					\
 	__ignored_ret = (call);						\
 	WT_UNUSED(__ignored_ret);					\
 } while (0)

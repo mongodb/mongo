@@ -17,5 +17,5 @@ report_interval=10
 run_time=7200
 sample_interval=10
 sample_rate=1
-threads=((count=20,reads=1))
+threads=((count=20,reads=1,throttle=625))
 warmup=120

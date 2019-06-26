@@ -618,8 +618,10 @@ __las_insert_block_verbose(
 	    (ckpt_gen_current > ckpt_gen_last &&
 	    __wt_atomic_casv64(&cache->las_verb_gen_write,
 	    ckpt_gen_last, ckpt_gen_current))) {
-		(void)__wt_eviction_clean_needed(session, &pct_full);
-		(void)__wt_eviction_dirty_needed(session, &pct_dirty);
+		WT_IGNORE_RET_BOOL(
+		    __wt_eviction_clean_needed(session, &pct_full));
+		WT_IGNORE_RET_BOOL(
+		    __wt_eviction_dirty_needed(session, &pct_dirty));
 
 		__wt_verbose(session,
 		    WT_VERB_LOOKASIDE | WT_VERB_LOOKASIDE_ACTIVITY,

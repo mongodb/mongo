@@ -65,7 +65,7 @@ rw_start(u_int readers, u_int writers)
 		if (i == 0 || multiple_files) {
 			run_info[i].name = dmalloc(64);
 			testutil_check(__wt_snprintf(
-			    run_info[i].name, 64, FNAME, i));
+			    run_info[i].name, 64, FNAME, (int)i));
 
 			/* Vary by orders of magnitude */
 			if (vary_nops)
@@ -88,7 +88,7 @@ rw_start(u_int readers, u_int writers)
 			/* Have readers read from tables with writes. */
 			name_index = i % writers;
 			testutil_check(__wt_snprintf(
-			    run_info[offset].name, 64, FNAME, name_index));
+			    run_info[offset].name, 64, FNAME, (int)name_index));
 
 			/* Vary by orders of magnitude */
 			if (vary_nops)

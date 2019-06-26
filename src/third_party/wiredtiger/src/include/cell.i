@@ -80,21 +80,23 @@ __cell_pack_value_validity(WT_SESSION_IMPL *session, uint8_t **pp,
 
 		flags = 0;
 		if (start_ts != WT_TS_NONE) {
-			(void)__wt_vpack_uint(pp, 0, start_ts);
+			WT_IGNORE_RET(__wt_vpack_uint(pp, 0, start_ts));
 			LF_SET(WT_CELL_TS_START);
 		}
 		if (start_txn != WT_TXN_NONE) {
-			(void)__wt_vpack_uint(pp, 0, start_txn);
+			WT_IGNORE_RET(__wt_vpack_uint(pp, 0, start_txn));
 			LF_SET(WT_CELL_TXN_START);
 		}
 		if (stop_ts != WT_TS_MAX) {
 			/* Store differences, not absolutes. */
-			(void)__wt_vpack_uint(pp, 0, stop_ts - start_ts);
+			WT_IGNORE_RET(
+			    __wt_vpack_uint(pp, 0, stop_ts - start_ts));
 			LF_SET(WT_CELL_TS_STOP);
 		}
 		if (stop_txn != WT_TXN_MAX) {
 			/* Store differences, not absolutes. */
-			(void)__wt_vpack_uint(pp, 0, stop_txn - start_txn);
+			WT_IGNORE_RET(
+			    __wt_vpack_uint(pp, 0, stop_txn - start_txn));
 			LF_SET(WT_CELL_TXN_STOP);
 		}
 		*flagsp = flags;
@@ -177,27 +179,28 @@ __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp,
 
 		flags = 0;
 		if (newest_durable_ts != WT_TS_NONE) {
-			(void)__wt_vpack_uint(pp, 0, newest_durable_ts);
+			WT_IGNORE_RET(
+			    __wt_vpack_uint(pp, 0, newest_durable_ts));
 			LF_SET(WT_CELL_TS_DURABLE);
 		}
 		if (oldest_start_ts != WT_TS_NONE) {
-			(void)__wt_vpack_uint(pp, 0, oldest_start_ts);
+			WT_IGNORE_RET(__wt_vpack_uint(pp, 0, oldest_start_ts));
 			LF_SET(WT_CELL_TS_START);
 		}
 		if (oldest_start_txn != WT_TXN_NONE) {
-			(void)__wt_vpack_uint(pp, 0, oldest_start_txn);
+			WT_IGNORE_RET(__wt_vpack_uint(pp, 0, oldest_start_txn));
 			LF_SET(WT_CELL_TXN_START);
 		}
 		if (newest_stop_ts != WT_TS_MAX) {
 			/* Store differences, not absolutes. */
-			(void)__wt_vpack_uint(
-			    pp, 0, newest_stop_ts - oldest_start_ts);
+			WT_IGNORE_RET(__wt_vpack_uint(
+			    pp, 0, newest_stop_ts - oldest_start_ts));
 			LF_SET(WT_CELL_TS_STOP);
 		}
 		if (newest_stop_txn != WT_TXN_MAX) {
 			/* Store differences, not absolutes. */
-			(void)__wt_vpack_uint(
-			    pp, 0, newest_stop_txn - oldest_start_txn);
+			WT_IGNORE_RET(__wt_vpack_uint(
+			    pp, 0, newest_stop_txn - oldest_start_txn));
 			LF_SET(WT_CELL_TXN_STOP);
 		}
 		*flagsp = flags;
@@ -229,9 +232,11 @@ __wt_cell_pack_addr(WT_SESSION_IMPL *session,
 		cell->__chunk[0] |= (uint8_t)cell_type;	/* Type */
 	else {
 		cell->__chunk[0] |= (uint8_t)(cell_type | WT_CELL_64V);
-		(void)__wt_vpack_uint(&p, 0, recno);	/* Record number */
+							/* Record number */
+		WT_IGNORE_RET(__wt_vpack_uint(&p, 0, recno));
 	}
-	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
+							/* Length */
+	WT_IGNORE_RET(__wt_vpack_uint(&p, 0, (uint64_t)size));
 	return (WT_PTRDIFF(p, cell));
 }
 
@@ -274,9 +279,11 @@ __wt_cell_pack_value(WT_SESSION_IMPL *session, WT_CELL *cell,
 			cell->__chunk[0] |= WT_CELL_VALUE;	/* Type */
 		} else {
 			cell->__chunk[0] |= WT_CELL_VALUE | WT_CELL_64V;
-			(void)__wt_vpack_uint(&p, 0, rle);	/* RLE */
+								/* RLE */
+			WT_IGNORE_RET(__wt_vpack_uint(&p, 0, rle));
 		}
-		(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
+								/* Length */
+		WT_IGNORE_RET(__wt_vpack_uint(&p, 0, (uint64_t)size));
 	}
 	return (WT_PTRDIFF(p, cell));
 }
@@ -385,9 +392,11 @@ __wt_cell_pack_copy(WT_SESSION_IMPL *session, WT_CELL *cell,
 	else {
 		cell->__chunk[0] |=			/* Type */
 		    WT_CELL_VALUE_COPY | WT_CELL_64V;
-		(void)__wt_vpack_uint(&p, 0, rle);	/* RLE */
+							/* RLE */
+		WT_IGNORE_RET(__wt_vpack_uint(&p, 0, rle));
 	}
-	(void)__wt_vpack_uint(&p, 0, v);		/* Copy offset */
+							/* Copy offset */
+	WT_IGNORE_RET(__wt_vpack_uint(&p, 0, v));
 	return (WT_PTRDIFF(p, cell));
 }
 
@@ -412,9 +421,10 @@ __wt_cell_pack_del(WT_SESSION_IMPL *session, WT_CELL *cell,
 	if (rle < 2)
 		cell->__chunk[0] |= WT_CELL_DEL;	/* Type */
 	else {
-		cell->__chunk[0] |=			/* Type */
-		    WT_CELL_DEL | WT_CELL_64V;
-		(void)__wt_vpack_uint(&p, 0, rle);	/* RLE */
+							/* Type */
+		cell->__chunk[0] |= WT_CELL_DEL | WT_CELL_64V;
+							/* RLE */
+		WT_IGNORE_RET(__wt_vpack_uint(&p, 0, rle));
 	}
 	return (WT_PTRDIFF(p, cell));
 }
@@ -444,8 +454,8 @@ __wt_cell_pack_int_key(WT_CELL *cell, size_t size)
 	 * the adjustment size. Decrement/increment it when packing/unpacking
 	 * so it takes up less room.
 	 */
-	size -= WT_CELL_SIZE_ADJUST;
-	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
+	size -= WT_CELL_SIZE_ADJUST;			/* Length */
+	WT_IGNORE_RET(__wt_vpack_uint(&p, 0, (uint64_t)size));
 	return (WT_PTRDIFF(p, cell));
 }
 
@@ -487,8 +497,8 @@ __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, size_t size)
 	 * the adjustment size. Decrement/increment it when packing/unpacking
 	 * so it takes up less room.
 	 */
-	size -= WT_CELL_SIZE_ADJUST;
-	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
+	size -= WT_CELL_SIZE_ADJUST;			/* Length */
+	WT_IGNORE_RET(__wt_vpack_uint(&p, 0, (uint64_t)size));
 	return (WT_PTRDIFF(p, cell));
 }
 
@@ -523,9 +533,11 @@ __wt_cell_pack_ovfl(WT_SESSION_IMPL *session, WT_CELL *cell, uint8_t type,
 		cell->__chunk[0] |= type;		/* Type */
 	else {
 		cell->__chunk[0] |= type | WT_CELL_64V;	/* Type */
-		(void)__wt_vpack_uint(&p, 0, rle);	/* RLE */
+							/* RLE */
+		WT_IGNORE_RET(__wt_vpack_uint(&p, 0, rle));
 	}
-	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);	/* Length */
+							/* Length */
+	WT_IGNORE_RET(__wt_vpack_uint(&p, 0, (uint64_t)size));
 	return (WT_PTRDIFF(p, cell));
 }
 
@@ -978,7 +990,7 @@ __wt_cell_unpack_dsk(WT_SESSION_IMPL *session,
 		return;
 	}
 
-	(void)__wt_cell_unpack_safe(session, dsk, cell, unpack, NULL);
+	WT_IGNORE_RET(__wt_cell_unpack_safe(session, dsk, cell, unpack, NULL));
 }
 
 /*

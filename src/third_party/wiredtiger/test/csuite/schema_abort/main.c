@@ -755,13 +755,13 @@ thread_run(void *arg)
 		 * can be viewed well in a binary dump.
 		 */
 		testutil_check(__wt_snprintf(cbuf, sizeof(cbuf),
-		    "COLL: thread:%" PRIu64 " ts:%" PRIu64 " key: %" PRIu64,
+		    "COLL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64,
 		    td->info, stable_ts, i));
 		testutil_check(__wt_snprintf(lbuf, sizeof(lbuf),
-		    "LOCAL: thread:%" PRIu64 " ts:%" PRIu64 " key: %" PRIu64,
+		    "LOCAL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64,
 		    td->info, stable_ts, i));
 		testutil_check(__wt_snprintf(obuf, sizeof(obuf),
-		    "OPLOG: thread:%" PRIu64 " ts:%" PRIu64 " key: %" PRIu64,
+		    "OPLOG: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64,
 		    td->info, stable_ts, i));
 		data.size = __wt_random(&rnd) % MAX_VAL;
 		data.data = cbuf;

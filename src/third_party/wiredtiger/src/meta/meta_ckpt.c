@@ -274,7 +274,8 @@ __wt_meta_block_metadata(
 		metadata = min_config;
 		metadata_len = strlen(min_config);
 	} else {
-		__wt_buf_set(session, a, min_config, strlen(min_config));
+		WT_ERR(__wt_buf_set(
+		    session, a, min_config, strlen(min_config)));
 		__wt_encrypt_size(session, kencryptor, a->size, &encrypt_size);
 		WT_ERR(__wt_buf_grow(session, b, encrypt_size));
 		WT_ERR(__wt_encrypt(session, kencryptor, 0, a, b));

@@ -20,7 +20,7 @@ __wt_ext_transaction_id(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session)
 	(void)wt_api;					/* Unused parameters */
 	session = (WT_SESSION_IMPL *)wt_session;
 	/* Ignore failures: the only case is running out of transaction IDs. */
-	(void)__wt_txn_id_check(session);
+	WT_IGNORE_RET(__wt_txn_id_check(session));
 	return (session->txn.id);
 }
 

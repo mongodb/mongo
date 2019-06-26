@@ -55,20 +55,10 @@ __wt_vfprintf(
 /*
  * __wt_fprintf --
  *	ANSI C fprintf.
- *
- * Inline functions are not parsed for external prototypes, so in cases where we
- * want GCC attributes attached to the functions, we have to do so explicitly.
  */
 static inline int
 __wt_fprintf(WT_SESSION_IMPL *session, WT_FSTREAM *fstr, const char *fmt, ...)
-    WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
-
-/*
- * __wt_fprintf --
- *	ANSI C fprintf.
- */
-static inline int
-__wt_fprintf(WT_SESSION_IMPL *session, WT_FSTREAM *fstr, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	WT_DECL_RET;
 	va_list ap;

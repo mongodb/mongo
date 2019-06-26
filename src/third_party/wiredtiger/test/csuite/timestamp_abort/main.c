@@ -85,12 +85,12 @@ static volatile uint64_t global_ts = 1;
 #define	ENV_CONFIG_DEF						\
     "cache_size=20M,create,log=(archive=true,file_max=10M,enabled),"	\
     "debug_mode=(table_logging=true,checkpoint_retention=5),"		\
-    "statistics=(fast),statistics_log=(wait=1,json=true),session_max=%" PRIu32
+    "statistics=(fast),statistics_log=(wait=1,json=true),session_max=%d"
 #define	ENV_CONFIG_TXNSYNC					\
     "cache_size=20M,create,log=(archive=true,file_max=10M,enabled),"	\
     "debug_mode=(table_logging=true,checkpoint_retention=5),"		\
     "statistics=(fast),statistics_log=(wait=1,json=true),"		\
-    "transaction_sync=(enabled,method=none),session_max=%" PRIu32
+    "transaction_sync=(enabled,method=none),session_max=%d"
 #define	ENV_CONFIG_REC "log=(archive=false,recover=on)"
 
 typedef struct {
@@ -355,13 +355,13 @@ thread_run(void *arg)
 		 * can be viewed well in a binary dump.
 		 */
 		testutil_check(__wt_snprintf(cbuf, sizeof(cbuf),
-		    "COLL: thread:%" PRIu64 " ts:%" PRIu64 " key: %" PRIu64,
+		    "COLL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64,
 		    td->info, active_ts, i));
 		testutil_check(__wt_snprintf(lbuf, sizeof(lbuf),
-		    "LOCAL: thread:%" PRIu64 " ts:%" PRIu64 " key: %" PRIu64,
+		    "LOCAL: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64,
 		    td->info, active_ts, i));
 		testutil_check(__wt_snprintf(obuf, sizeof(obuf),
-		    "OPLOG: thread:%" PRIu64 " ts:%" PRIu64 " key: %" PRIu64,
+		    "OPLOG: thread:%" PRIu32 " ts:%" PRIu64 " key: %" PRIu64,
 		    td->info, active_ts, i));
 		data.size = __wt_random(&rnd) % MAX_VAL;
 		data.data = cbuf;
@@ -455,11 +455,11 @@ run_workload(uint32_t nth)
 	if (chdir(home) != 0)
 		testutil_die(errno, "Child chdir: %s", home);
 	if (inmem)
-		(void)__wt_snprintf(envconf, sizeof(envconf),
-		    ENV_CONFIG_DEF, SESSION_MAX);
+		testutil_check(__wt_snprintf(envconf, sizeof(envconf),
+		    ENV_CONFIG_DEF, SESSION_MAX));
 	else
-		(void)__wt_snprintf(envconf, sizeof(envconf),
-		    ENV_CONFIG_TXNSYNC, SESSION_MAX);
+		testutil_check(__wt_snprintf(envconf, sizeof(envconf),
+		    ENV_CONFIG_TXNSYNC, SESSION_MAX));
 	if (compat)
 		strcat(envconf, ENV_CONFIG_COMPAT);
 

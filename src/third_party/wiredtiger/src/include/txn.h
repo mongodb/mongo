@@ -30,6 +30,12 @@
 #define	WT_TXN_TS_INCLUDE_OLDEST	0x4u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 
+typedef enum {
+	WT_VISIBLE_FALSE=0,     /* Not a visible update */
+	WT_VISIBLE_PREPARE=1,   /* Prepared update */
+	WT_VISIBLE_TRUE=2       /* A visible update */
+} WT_VISIBLE_TYPE;
+
 /*
  * Transaction ID comparison dealing with edge cases.
  *

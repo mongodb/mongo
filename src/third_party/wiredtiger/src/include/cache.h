@@ -248,14 +248,15 @@ struct __wt_cache {
 	uint32_t pool_flags;		/* Cache pool flags */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define	WT_CACHE_EVICT_CLEAN	  0x01u	/* Evict clean pages */
-#define	WT_CACHE_EVICT_CLEAN_HARD 0x02u	/* Clean % blocking app threads */
-#define	WT_CACHE_EVICT_DEBUG_MODE 0x04u	/* Aggressive debugging mode */
-#define	WT_CACHE_EVICT_DIRTY	  0x08u	/* Evict dirty pages */
-#define	WT_CACHE_EVICT_DIRTY_HARD 0x10u	/* Dirty % blocking app threads */
-#define	WT_CACHE_EVICT_LOOKASIDE  0x20u	/* Try lookaside eviction */
-#define	WT_CACHE_EVICT_SCRUB	  0x40u	/* Scrub dirty pages */
-#define	WT_CACHE_EVICT_URGENT	  0x80u	/* Pages are in the urgent queue */
+#define	WT_CACHE_EVICT_CLEAN	  0x001u /* Evict clean pages */
+#define	WT_CACHE_EVICT_CLEAN_HARD 0x002u /* Clean % blocking app threads */
+#define	WT_CACHE_EVICT_DEBUG_MODE 0x004u /* Aggressive debugging mode */
+#define	WT_CACHE_EVICT_DIRTY	  0x008u /* Evict dirty pages */
+#define	WT_CACHE_EVICT_DIRTY_HARD 0x010u /* Dirty % blocking app threads */
+#define	WT_CACHE_EVICT_LOOKASIDE  0x020u /* Try lookaside eviction */
+#define	WT_CACHE_EVICT_NOKEEP	  0x040u /* Don't add read pages to cache */
+#define	WT_CACHE_EVICT_SCRUB	  0x080u /* Scrub dirty pages */
+#define	WT_CACHE_EVICT_URGENT	  0x100u /* Pages are in the urgent queue */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 #define	WT_CACHE_EVICT_ALL	(WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_DIRTY)
 	uint32_t flags;

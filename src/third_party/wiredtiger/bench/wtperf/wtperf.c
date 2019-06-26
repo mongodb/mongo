@@ -1396,7 +1396,7 @@ monitor(void *arg)
 			testutil_check(__wt_snprintf(&buf[buf_size],
 			    sizeof(buf) - buf_size,
 			    ".%3.3" PRIu64 "Z",
-			    ns_to_ms((uint64_t)t.tv_nsec)));
+			    (uint64_t)ns_to_ms((uint64_t)t.tv_nsec)));
 			(void)fprintf(jfp, "{");
 			if (first) {
 				(void)fprintf(jfp, "\"version\":\"%s\",",
@@ -1985,7 +1985,7 @@ create_uris(WTPERF *wtperf)
 			    len, "table:%s", opts->table_name));
 		else
 			testutil_check(__wt_snprintf(wtperf->uris[i],
-			    len, "table:%s%05d", opts->table_name, i));
+			    len, "table:%s%05" PRIu32, opts->table_name, i));
 	}
 
 	/* Create the log-like-table URI. */

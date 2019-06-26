@@ -161,7 +161,7 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv,
 	case 'r':
 	case 'R':
 		WT_RET(__wt_snprintf_len_incr(
-		    (char *)buf, bufsz, &s, "%" PRId64, pv->u.u));
+		    (char *)buf, bufsz, &s, "%" PRIu64, pv->u.u));
 		*retsizep += s;
 		return (0);
 	}
