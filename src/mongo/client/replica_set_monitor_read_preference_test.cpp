@@ -620,9 +620,9 @@ public:
         return *matchSecondTags;
     }
 
-    const TagSet& getMatchesLastTagSet() {
-        if (matchLastTags.get() != nullptr) {
-            return *matchLastTags;
+    const TagSet& getMatchesOnlyFirstTagSet() {
+        if (matchOnlyFirstTag.get() != nullptr) {
+            return *matchOnlyFirstTag;
         }
 
         BSONArrayBuilder arrayBuilder;
@@ -636,9 +636,9 @@ public:
                                  << "34"));
         arrayBuilder.append(BSON("p"
                                  << "1"));
-        matchLastTags.reset(new TagSet(arrayBuilder.arr()));
+        matchOnlyFirstTag.reset(new TagSet(arrayBuilder.arr()));
 
-        return *matchLastTags;
+        return *matchOnlyFirstTag;
     }
 
     const TagSet& getMatchesPriTagSet() {
@@ -656,27 +656,37 @@ public:
         return *matchPriTags;
     }
 
+    const stdx::unordered_set<std::string> vectorToSet(std::vector<HostAndPort> hosts) {
+        stdx::unordered_set<std::string> matchSet;
+        std::transform(hosts.begin(),
+                       hosts.end(),
+                       std::inserter(matchSet, matchSet.begin()),
+                       [](const auto& node) { return node.host(); });
+        return matchSet;
+    }
+
 private:
     std::unique_ptr<TagSet> matchFirstTags;
     std::unique_ptr<TagSet> matchSecondTags;
-    std::unique_ptr<TagSet> matchLastTags;
+    std::unique_ptr<TagSet> matchOnlyFirstTag;
     std::unique_ptr<TagSet> matchPriTags;
 };
 
-TEST_F(MultiTagsTest, MultiTagsTestMatchesFirst) {
+TEST_F(MultiTagsTest, MultiTagsTestMatchesSecondaries) {
     auto nodes = getThreeMemberWithTags();
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
-    HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::PrimaryPreferred,
-                                  getMatchesFirstTagSet(),
-                                  3,
-                                  &isPrimarySelected);
+    std::vector<HostAndPort> hosts = selectNodes(nodes,
+                                                 mongo::ReadPreference::PrimaryPreferred,
+                                                 getMatchesFirstTagSet(),
+                                                 3,
+                                                 &isPrimarySelected);
+    ASSERT_EQUALS(hosts.size(), 2ull);
 
     ASSERT(!isPrimarySelected);
-    ASSERT_EQUALS("a", host.host());
+    ASSERT(vectorToSet(hosts) == stdx::unordered_set<std::string>({"a", "c"}));
 }
 
 TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesFirstNotOk) {
@@ -702,14 +712,15 @@ TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesSecondTest) {
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
-    HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::PrimaryPreferred,
-                                  getMatchesSecondTagSet(),
-                                  3,
-                                  &isPrimarySelected);
+    std::vector<HostAndPort> hosts = selectNodes(nodes,
+                                                 mongo::ReadPreference::PrimaryPreferred,
+                                                 getMatchesSecondTagSet(),
+                                                 3,
+                                                 &isPrimarySelected);
+    ASSERT_EQUALS(hosts.size(), 2ull);
 
     ASSERT(!isPrimarySelected);
-    ASSERT_EQUALS("c", host.host());
+    ASSERT(vectorToSet(hosts) == stdx::unordered_set<std::string>({"a", "c"}));
 }
 
 TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesSecondNotOkTest) {
@@ -729,7 +740,7 @@ TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesSecondNotOkTest) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesLastTest) {
+TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesOnlySecondTest) {
     auto nodes = getThreeMemberWithTags();
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -737,7 +748,7 @@ TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesLastTest) {
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
                                   mongo::ReadPreference::PrimaryPreferred,
-                                  getMatchesLastTagSet(),
+                                  getMatchesOnlyFirstTagSet(),
                                   3,
                                   &isPrimarySelected);
 
@@ -745,7 +756,7 @@ TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesLastTest) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesLastNotOkTest) {
+TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesOnlySecondNotOkTest) {
     auto nodes = getThreeMemberWithTags();
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -754,7 +765,7 @@ TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesLastNotOkTest) {
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
                                   mongo::ReadPreference::PrimaryPreferred,
-                                  getMatchesLastTagSet(),
+                                  getMatchesOnlyFirstTagSet(),
                                   3,
                                   &isPrimarySelected);
 
@@ -791,14 +802,15 @@ TEST_F(MultiTagsTest, SecOnlyMatchesFirstTest) {
     auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
-    HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryOnly,
-                                  getMatchesFirstTagSet(),
-                                  3,
-                                  &isPrimarySelected);
+    std::vector<HostAndPort> hosts = selectNodes(nodes,
+                                                 mongo::ReadPreference::SecondaryOnly,
+                                                 getMatchesFirstTagSet(),
+                                                 3,
+                                                 &isPrimarySelected);
+    ASSERT_EQUALS(hosts.size(), 2ull);
 
     ASSERT(!isPrimarySelected);
-    ASSERT_EQUALS("a", host.host());
+    ASSERT(vectorToSet(hosts) == stdx::unordered_set<std::string>({"a", "c"}));
 }
 
 TEST_F(MultiTagsTest, SecOnlyMatchesFirstNotOk) {
@@ -821,14 +833,15 @@ TEST_F(MultiTagsTest, SecOnlyMatchesSecond) {
     auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
-    HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryOnly,
-                                  getMatchesSecondTagSet(),
-                                  3,
-                                  &isPrimarySelected);
+    std::vector<HostAndPort> hosts = selectNodes(nodes,
+                                                 mongo::ReadPreference::SecondaryOnly,
+                                                 getMatchesSecondTagSet(),
+                                                 3,
+                                                 &isPrimarySelected);
+    ASSERT_EQUALS(hosts.size(), 2ull);
 
     ASSERT(!isPrimarySelected);
-    ASSERT_EQUALS("c", host.host());
+    ASSERT(vectorToSet(hosts) == stdx::unordered_set<std::string>({"a", "c"}));
 }
 
 TEST_F(MultiTagsTest, SecOnlyMatchesSecondNotOk) {
@@ -847,25 +860,31 @@ TEST_F(MultiTagsTest, SecOnlyMatchesSecondNotOk) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTagsTest, SecOnlyMatchesLast) {
+TEST_F(MultiTagsTest, SecOnlyMatchesOnlyFirst) {
     auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
-    HostAndPort host = selectNode(
-        nodes, mongo::ReadPreference::SecondaryOnly, getMatchesLastTagSet(), 3, &isPrimarySelected);
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryOnly,
+                                  getMatchesOnlyFirstTagSet(),
+                                  3,
+                                  &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTagsTest, SecOnlyMatchesLastNotOk) {
+TEST_F(MultiTagsTest, SecOnlyMatchesOnlyFirstNotOk) {
     auto nodes = getThreeMemberWithTags();
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
-    HostAndPort host = selectNode(
-        nodes, mongo::ReadPreference::SecondaryOnly, getMatchesLastTagSet(), 3, &isPrimarySelected);
+    HostAndPort host = selectNode(nodes,
+                                  mongo::ReadPreference::SecondaryOnly,
+                                  getMatchesOnlyFirstTagSet(),
+                                  3,
+                                  &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -896,14 +915,16 @@ TEST_F(MultiTagsTest, SecPrefMatchesFirst) {
     auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
-    HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryPreferred,
-                                  getMatchesFirstTagSet(),
-                                  3,
-                                  &isPrimarySelected);
+    std::vector<HostAndPort> hosts = selectNodes(nodes,
+                                                 mongo::ReadPreference::SecondaryPreferred,
+                                                 getMatchesFirstTagSet(),
+                                                 3,
+                                                 &isPrimarySelected);
+
+    ASSERT_EQUALS(hosts.size(), 2ull);
 
     ASSERT(!isPrimarySelected);
-    ASSERT_EQUALS("a", host.host());
+    ASSERT(vectorToSet(hosts) == stdx::unordered_set<std::string>({"a", "c"}));
 }
 
 TEST_F(MultiTagsTest, SecPrefMatchesFirstNotOk) {
@@ -926,14 +947,16 @@ TEST_F(MultiTagsTest, SecPrefMatchesSecond) {
     auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
-    HostAndPort host = selectNode(nodes,
-                                  mongo::ReadPreference::SecondaryPreferred,
-                                  getMatchesSecondTagSet(),
-                                  3,
-                                  &isPrimarySelected);
+    std::vector<HostAndPort> hosts = selectNodes(nodes,
+                                                 mongo::ReadPreference::SecondaryPreferred,
+                                                 getMatchesSecondTagSet(),
+                                                 3,
+                                                 &isPrimarySelected);
+
+    ASSERT_EQUALS(hosts.size(), 2ull);
 
     ASSERT(!isPrimarySelected);
-    ASSERT_EQUALS("c", host.host());
+    ASSERT(vectorToSet(hosts) == stdx::unordered_set<std::string>({"a", "c"}));
 }
 
 TEST_F(MultiTagsTest, SecPrefMatchesSecondNotOk) {
@@ -952,13 +975,13 @@ TEST_F(MultiTagsTest, SecPrefMatchesSecondNotOk) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTagsTest, SecPrefMatchesLast) {
+TEST_F(MultiTagsTest, SecPrefMatchesOnlyFirst) {
     auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
                                   mongo::ReadPreference::SecondaryPreferred,
-                                  getMatchesLastTagSet(),
+                                  getMatchesOnlyFirstTagSet(),
                                   3,
                                   &isPrimarySelected);
 
@@ -966,7 +989,7 @@ TEST_F(MultiTagsTest, SecPrefMatchesLast) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTagsTest, SecPrefMatchesLastNotOk) {
+TEST_F(MultiTagsTest, SecPrefMatchesOnlyFirstNotOk) {
     auto nodes = getThreeMemberWithTags();
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -974,7 +997,7 @@ TEST_F(MultiTagsTest, SecPrefMatchesLastNotOk) {
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
                                   mongo::ReadPreference::SecondaryPreferred,
-                                  getMatchesLastTagSet(),
+                                  getMatchesOnlyFirstTagSet(),
                                   3,
                                   &isPrimarySelected);
 
@@ -1025,11 +1048,13 @@ TEST_F(MultiTagsTest, NearestMatchesFirst) {
     auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
-    HostAndPort host = selectNode(
+    std::vector<HostAndPort> hosts = selectNodes(
         nodes, mongo::ReadPreference::Nearest, getMatchesFirstTagSet(), 3, &isPrimarySelected);
 
+    ASSERT_EQUALS(hosts.size(), 2ull);
+
     ASSERT(!isPrimarySelected);
-    ASSERT_EQUALS("a", host.host());
+    ASSERT(vectorToSet(hosts) == stdx::unordered_set<std::string>({"a", "c"}));
 }
 
 TEST_F(MultiTagsTest, NearestMatchesFirstNotOk) {
@@ -1057,11 +1082,13 @@ TEST_F(MultiTagsTest, NearestMatchesSecond) {
     auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
-    HostAndPort host = selectNode(
+    std::vector<HostAndPort> hosts = selectNodes(
         nodes, mongo::ReadPreference::Nearest, getMatchesSecondTagSet(), 3, &isPrimarySelected);
 
+    ASSERT_EQUALS(hosts.size(), 2ull);
+
     ASSERT(!isPrimarySelected);
-    ASSERT_EQUALS("c", host.host());
+    ASSERT(vectorToSet(hosts) == stdx::unordered_set<std::string>({"a", "c"}));
 }
 
 TEST_F(MultiTagsTest, NearestMatchesSecondNotOk) {
@@ -1087,12 +1114,12 @@ TEST_F(MultiTagsTest, NearestMatchesSecondNotOk) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST_F(MultiTagsTest, NearestMatchesLast) {
+TEST_F(MultiTagsTest, NearestMatchesOnlyFirst) {
     auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
-        nodes, mongo::ReadPreference::Nearest, getMatchesLastTagSet(), 3, &isPrimarySelected);
+        nodes, mongo::ReadPreference::Nearest, getMatchesOnlyFirstTagSet(), 3, &isPrimarySelected);
 
     ASSERT(!isPrimarySelected);
     ASSERT_EQUALS("a", host.host());
@@ -1105,7 +1132,7 @@ TEST_F(MultiTagsTest, NeatestMatchesLastNotOk) {
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
-        nodes, mongo::ReadPreference::Nearest, getMatchesLastTagSet(), 3, &isPrimarySelected);
+        nodes, mongo::ReadPreference::Nearest, getMatchesOnlyFirstTagSet(), 3, &isPrimarySelected);
 
     ASSERT(host.empty());
 }
@@ -1114,11 +1141,13 @@ TEST_F(MultiTagsTest, NearestMultiTagsTestWithPriMatch) {
     auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
-    HostAndPort host = selectNode(
+    std::vector<HostAndPort> hosts = selectNodes(
         nodes, mongo::ReadPreference::Nearest, getMatchesPriTagSet(), 3, &isPrimarySelected);
 
+    ASSERT_EQUALS(hosts.size(), 2ull);
     ASSERT(isPrimarySelected);
-    ASSERT_EQUALS("b", host.host());
+
+    ASSERT(vectorToSet(hosts) == stdx::unordered_set<std::string>({"a", "b"}));
 }
 
 TEST_F(MultiTagsTest, NearestMultiTagsTestNoMatch) {
