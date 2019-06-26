@@ -213,10 +213,6 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
     bool docWasModified = false;
 
-    const auto isFCV42 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
-
     auto* const css = CollectionShardingState::get(getOpCtx(), collection()->ns());
     auto metadata = css->getCurrentMetadata();
     Status status = Status::OK();
@@ -224,8 +220,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     const bool isInsert = false;
     FieldRefSet immutablePaths;
     if (getOpCtx()->writesAreReplicated() && !request->isFromMigration()) {
-        if (metadata->isSharded() &&
-            (!OperationShardingState::isOperationVersioned(getOpCtx()) || !isFCV42)) {
+        if (metadata->isSharded() && !OperationShardingState::isOperationVersioned(getOpCtx())) {
             auto& immutablePathsVector = metadata->getKeyPatternFields();
             immutablePaths.fillFrom(
                 transitional_tools_do_not_use::unspool_vector(immutablePathsVector));
@@ -323,7 +318,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
                 Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
-                if (isFCV42 && metadata->isSharded() && _shouldCheckForShardKeyUpdate) {
+                if (metadata->isSharded() && _shouldCheckForShardKeyUpdate) {
                     bool changesShardKeyOnSameNode =
                         checkUpdateChangesShardKeyFields(metadata, oldObj);
                     if (changesShardKeyOnSameNode && !args.preImageDoc) {
@@ -351,7 +346,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                     newObj.objsize() <= BSONObjMaxUserSize);
 
             if (!request->isExplain()) {
-                if (isFCV42 && metadata->isSharded() && _shouldCheckForShardKeyUpdate) {
+                if (metadata->isSharded() && _shouldCheckForShardKeyUpdate) {
                     bool changesShardKeyOnSameNode =
                         checkUpdateChangesShardKeyFields(metadata, oldObj);
                     if (changesShardKeyOnSameNode && !args.preImageDoc) {
@@ -412,13 +407,8 @@ BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     auto* const css = CollectionShardingState::get(opCtx, ns);
     auto metadata = css->getCurrentMetadata();
 
-    const auto isFCV42 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
-
     FieldRefSet immutablePaths;
-    if (metadata->isSharded() &&
-        (!OperationShardingState::isOperationVersioned(opCtx) || !isFCV42)) {
+    if (metadata->isSharded() && !OperationShardingState::isOperationVersioned(opCtx)) {
         auto& immutablePathsVector = metadata->getKeyPatternFields();
         immutablePaths.fillFrom(
             transitional_tools_do_not_use::unspool_vector(immutablePathsVector));
@@ -594,13 +584,10 @@ void UpdateStage::doInsert() {
     // fields in the 'q' field belong to this shard, but those in the 'u' field do not. In this case
     // we need to throw so that MongoS can target the insert to the correct shard.
     if (_shouldCheckForShardKeyUpdate) {
-        const auto isFCV42 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
         auto* const css = CollectionShardingState::get(getOpCtx(), collection()->ns());
         const auto& metadata = css->getCurrentMetadata();
 
-        if (isFCV42 && metadata->isSharded()) {
+        if (metadata->isSharded()) {
             const ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
             auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newObj);
 
