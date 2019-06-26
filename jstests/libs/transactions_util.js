@@ -70,6 +70,10 @@ var TransactionsUtil = (function() {
                     eval("v = " + tojson(v));
                 } else if (v instanceof NumberLong) {  // convert NumberLong properly
                     eval("v = " + tojson(v));
+                } else if (v instanceof Date) {  // convert Date properly
+                    eval("v = " + tojson(v));
+                } else if (v instanceof Timestamp) {  // convert Timestamp properly
+                    eval("v = " + tojson(v));
                 } else if (Object.getPrototypeOf(v) === Object.prototype) {
                     v = deepCopyObject({}, v);
                 } else if (Array.isArray(v)) {

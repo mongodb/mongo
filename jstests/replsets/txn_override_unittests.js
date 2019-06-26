@@ -1804,6 +1804,47 @@
               assert.docEq(coll2.find().toArray(), [{_id: 2}]);
           }
         },
+        {
+          name: 'Dates are copied correctly for SERVER-41917',
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["commitTransaction"],
+                                       {errorCode: ErrorCodes.NoSuchTransaction});
+
+              let date = new Date();
+              assert.commandWorked(coll1.insert({_id: 3, a: date}));
+              date.setMilliseconds(date.getMilliseconds() + 2);
+              assert.eq(null, coll1.findOne({_id: 3, a: date}));
+              const origDoc = coll1.findOne({_id: 3});
+              const ret = assert.commandWorked(coll1.update({_id: 3}, {$min: {a: date}}));
+              assert.eq(ret.nModified, 0);
+
+              endCurrentTransactionIfOpen();
+
+              assert.eq(coll1.findOne({_id: 3}).a, origDoc.a);
+          }
+        },
+        {
+          name: 'Timestamps are copied correctly for SERVER-41917',
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["commitTransaction"],
+                                       {errorCode: ErrorCodes.NoSuchTransaction});
+
+              let ts = new Timestamp(5, 6);
+              assert.commandWorked(coll1.insert({_id: 3, a: ts}));
+              ts.t++;
+
+              assert.eq(null, coll1.findOne({_id: 3, a: ts}));
+              const origDoc = coll1.findOne({_id: 3});
+              const ret = assert.commandWorked(coll1.update({_id: 3}, {$min: {a: ts}}));
+              assert.eq(ret.nModified, 0);
+
+              endCurrentTransactionIfOpen();
+
+              assert.eq(coll1.findOne({_id: 3}).a, origDoc.a);
+          }
+        }
     ];
 
     TestData.networkErrorAndTxnOverrideConfig = {};
