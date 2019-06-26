@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mongodb/mongo-tools-common/bsonutil"
 	"github.com/mongodb/mongo-tools-common/db"
 	"github.com/mongodb/mongo-tools-common/intents"
 	"github.com/mongodb/mongo-tools-common/log"
@@ -184,6 +185,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) Result {
 	}
 
 	logMessageSuffix := "with no metadata"
+	var hasNonSimpleCollation bool
 	// first create the collection with options from the metadata file
 	if intent.MetadataFile != nil {
 		logMessageSuffix = "using options from metadata"
@@ -210,6 +212,14 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) Result {
 					return Result{Err: fmt.Errorf("--preserveUUID used but no UUID found in %v", intent.MetadataLocation)}
 				}
 				uuid = metadata.UUID
+			}
+
+			collation, err := bsonutil.FindSubdocumentByKey("collation", &options)
+			if err == nil {
+				localeValue, err := bsonutil.FindValueByKey("locale", &collation)
+				if err == nil {
+					hasNonSimpleCollation = localeValue != "simple"
+				}
 			}
 		}
 
@@ -279,7 +289,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) Result {
 	// finally, add indexes
 	if len(indexes) > 0 && !restore.OutputOptions.NoIndexRestore {
 		log.Logvf(log.Always, "restoring indexes for collection %v from metadata", intent.Namespace())
-		err = restore.CreateIndexes(intent, indexes)
+		err = restore.CreateIndexes(intent, indexes, hasNonSimpleCollation)
 		if err != nil {
 			result.Err = fmt.Errorf("error creating indexes for %v: %v", intent.Namespace(), err)
 			return result

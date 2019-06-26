@@ -7,6 +7,8 @@
 package mongorestore
 
 import (
+	"fmt"
+	"io/ioutil"
 	"testing"
 
 	"github.com/mongodb/mongo-tools-common/intents"
@@ -178,4 +180,53 @@ func TestGetDumpAuthVersion(t *testing.T) {
 		})
 	})
 
+}
+
+const indexCollationTestDataFile = "testdata/index_collation.json"
+
+func TestIndexGetsSimpleCollation(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
+
+	metadata, err := readCollationTestData(indexCollationTestDataFile)
+	if err != nil {
+		t.Fatalf("Error reading data file: %v", err)
+	}
+
+	dumpDir := testDumpDir{
+		dirName: "index_collation",
+		collections: []testCollData{{
+			ns:       "test.foo",
+			metadata: metadata,
+		}},
+	}
+
+	err = dumpDir.Create()
+	if err != nil {
+		t.Fatalf("Error reading data file: %v", err)
+	}
+
+	Convey("With a test MongoRestore", t, func() {
+		args := []string{
+			DropOption,
+			dumpDir.Path(),
+		}
+		restore, err := getRestoreWithArgs(args...)
+		So(err, ShouldBeNil)
+
+		result := restore.Restore()
+		So(result.Err, ShouldBeNil)
+	})
+}
+
+func readCollationTestData(filename string) (bson.D, error) {
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't load %s: %v", filename, err)
+	}
+	var data bson.D
+	err = bson.UnmarshalExtJSON(b, false, &data)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't decode JSON: %v", err)
+	}
+	return data, nil
 }
