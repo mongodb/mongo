@@ -106,9 +106,9 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
             // Create the collection if it doesn't exist.
             if (!db->getCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace)) {
                 WriteUnitOfWork wuow(opCtx);
-                CollectionOptions defaultCollectionOptions;
+                CollectionOptions options;
                 Collection* collection = db->createCollection(
-                    opCtx, NamespaceString::kIndexBuildEntryNamespace, defaultCollectionOptions);
+                    opCtx, NamespaceString::kIndexBuildEntryNamespace, options);
 
                 // Ensure the collection exists.
                 invariant(collection);

@@ -100,11 +100,12 @@ bool CollectionOptions::isView() const {
 }
 
 Status CollectionOptions::validateForStorage() const {
-    return CollectionOptions::parse(toBSON(), ParseKind::parseForStorage).getStatus();
+    return CollectionOptions().parse(toBSON(), ParseKind::parseForStorage);
 }
 
-StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
-    CollectionOptions collectionOptions;
+Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
+    *this = {};
+
     // Versions 2.4 and earlier of the server store "create" inside the collection metadata when the
     // user issues an explicit collection creation command. These versions also wrote any
     // unrecognized fields into the catalog metadata and allowed the order of these fields to be
@@ -129,30 +130,30 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             if (!res.isOK()) {
                 return res.getStatus();
             }
-            collectionOptions.uuid = res.getValue();
+            uuid = res.getValue();
         } else if (fieldName == "capped") {
-            collectionOptions.capped = e.trueValue();
+            capped = e.trueValue();
         } else if (fieldName == "size") {
             if (!e.isNumber()) {
                 // Ignoring for backwards compatibility.
                 continue;
             }
-            collectionOptions.cappedSize = e.safeNumberLong();
-            if (collectionOptions.cappedSize < 0)
+            cappedSize = e.safeNumberLong();
+            if (cappedSize < 0)
                 return Status(ErrorCodes::BadValue, "size has to be >= 0");
             const long long kGB = 1024 * 1024 * 1024;
             const long long kPB = 1024 * 1024 * kGB;
-            if (collectionOptions.cappedSize > kPB)
+            if (cappedSize > kPB)
                 return Status(ErrorCodes::BadValue, "size cannot exceed 1 PB");
-            collectionOptions.cappedSize += 0xff;
-            collectionOptions.cappedSize &= 0xffffffffffffff00LL;
+            cappedSize += 0xff;
+            cappedSize &= 0xffffffffffffff00LL;
         } else if (fieldName == "max") {
             if (!options["capped"].trueValue() || !e.isNumber()) {
                 // Ignoring for backwards compatibility.
                 continue;
             }
-            collectionOptions.cappedMaxDocs = e.safeNumberLong();
-            if (!validMaxCappedDocs(&collectionOptions.cappedMaxDocs))
+            cappedMaxDocs = e.safeNumberLong();
+            if (!validMaxCappedDocs(&cappedMaxDocs))
                 return Status(ErrorCodes::BadValue,
                               "max in a capped collection has to be < 2^31 or not set");
         } else if (fieldName == "$nExtents") {
@@ -160,27 +161,27 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
                 BSONObjIterator j(e.Obj());
                 while (j.more()) {
                     BSONElement inner = j.next();
-                    collectionOptions.initialExtentSizes.push_back(inner.numberInt());
+                    initialExtentSizes.push_back(inner.numberInt());
                 }
             } else {
-                collectionOptions.initialNumExtents = e.safeNumberLong();
+                initialNumExtents = e.safeNumberLong();
             }
         } else if (fieldName == "autoIndexId") {
             if (e.trueValue())
-                collectionOptions.autoIndexId = YES;
+                autoIndexId = YES;
             else
-                collectionOptions.autoIndexId = NO;
+                autoIndexId = NO;
         } else if (fieldName == "flags") {
             // Ignoring this field as it is deprecated.
             continue;
         } else if (fieldName == "temp") {
-            collectionOptions.temp = e.trueValue();
+            temp = e.trueValue();
         } else if (fieldName == "storageEngine") {
             Status status = checkStorageEngineOptions(e);
             if (!status.isOK()) {
                 return status;
             }
-            collectionOptions.storageEngine = e.Obj().getOwned();
+            storageEngine = e.Obj().getOwned();
         } else if (fieldName == "indexOptionDefaults") {
             if (e.type() != mongo::Object) {
                 return {ErrorCodes::TypeMismatch, "'indexOptionDefaults' has to be a document."};
@@ -198,25 +199,25 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
                                           << " is not a supported option."};
                 }
             }
-            collectionOptions.indexOptionDefaults = e.Obj().getOwned();
+            indexOptionDefaults = e.Obj().getOwned();
         } else if (fieldName == "validator") {
             if (e.type() != mongo::Object) {
                 return Status(ErrorCodes::BadValue, "'validator' has to be a document.");
             }
 
-            collectionOptions.validator = e.Obj().getOwned();
+            validator = e.Obj().getOwned();
         } else if (fieldName == "validationAction") {
             if (e.type() != mongo::String) {
                 return Status(ErrorCodes::BadValue, "'validationAction' has to be a string.");
             }
 
-            collectionOptions.validationAction = e.String();
+            validationAction = e.String();
         } else if (fieldName == "validationLevel") {
             if (e.type() != mongo::String) {
                 return Status(ErrorCodes::BadValue, "'validationLevel' has to be a string.");
             }
 
-            collectionOptions.validationLevel = e.String();
+            validationLevel = e.String();
         } else if (fieldName == "collation") {
             if (e.type() != mongo::Object) {
                 return Status(ErrorCodes::BadValue, "'collation' has to be a document.");
@@ -226,14 +227,14 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
                 return Status(ErrorCodes::BadValue, "'collation' cannot be an empty document.");
             }
 
-            collectionOptions.collation = e.Obj().getOwned();
+            collation = e.Obj().getOwned();
         } else if (fieldName == "viewOn") {
             if (e.type() != mongo::String) {
                 return Status(ErrorCodes::BadValue, "'viewOn' has to be a string.");
             }
 
-            collectionOptions.viewOn = e.String();
-            if (collectionOptions.viewOn.empty()) {
+            viewOn = e.String();
+            if (viewOn.empty()) {
                 return Status(ErrorCodes::BadValue, "'viewOn' cannot be empty.'");
             }
         } else if (fieldName == "pipeline") {
@@ -241,7 +242,7 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
                 return Status(ErrorCodes::BadValue, "'pipeline' has to be an array.");
             }
 
-            collectionOptions.pipeline = e.Obj().getOwned();
+            pipeline = e.Obj().getOwned();
         } else if (fieldName == "idIndex" && kind == parseForCommand) {
             if (e.type() != mongo::Object) {
                 return Status(ErrorCodes::TypeMismatch, "'idIndex' has to be an object.");
@@ -252,7 +253,7 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
                 return {ErrorCodes::FailedToParse, "idIndex cannot be empty"};
             }
 
-            collectionOptions.idIndex = std::move(tempIdIndex);
+            idIndex = std::move(tempIdIndex);
         } else if (!createdOn24OrEarlier && !mongo::isGenericArgument(fieldName)) {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "The field '" << fieldName
@@ -261,11 +262,11 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
         }
     }
 
-    if (collectionOptions.viewOn.empty() && !collectionOptions.pipeline.isEmpty()) {
+    if (viewOn.empty() && !pipeline.isEmpty()) {
         return Status(ErrorCodes::BadValue, "'pipeline' cannot be specified without 'viewOn'");
     }
 
-    return collectionOptions;
+    return Status::OK();
 }
 
 BSONObj CollectionOptions::toBSON() const {

@@ -463,10 +463,11 @@ public:
                     if (!collection) {
                         uassertStatusOK(userAllowedCreateNS(nsString.db(), nsString.coll()));
                         WriteUnitOfWork wuow(opCtx);
-                        CollectionOptions defaultCollectionOptions;
+                        CollectionOptions collectionOptions;
+                        uassertStatusOK(collectionOptions.parse(
+                            BSONObj(), CollectionOptions::ParseKind::parseForCommand));
                         auto db = autoDb->getDb();
-                        uassertStatusOK(
-                            db->userCreateNS(opCtx, nsString, defaultCollectionOptions));
+                        uassertStatusOK(db->userCreateNS(opCtx, nsString, collectionOptions));
                         wuow.commit();
 
                         collection = autoDb->getDb()->getCollection(opCtx, nsString);

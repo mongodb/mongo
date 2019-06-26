@@ -37,11 +37,11 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-using unittest::assertGet;
 
-void checkRoundTrip(const CollectionOptions& options) {
-    CollectionOptions parsedOptions = assertGet(CollectionOptions::parse(options.toBSON()));
-    ASSERT_BSONOBJ_EQ(options.toBSON(), parsedOptions.toBSON());
+void checkRoundTrip(const CollectionOptions& options1) {
+    CollectionOptions options2;
+    options2.parse(options1.toBSON()).transitional_ignore();
+    ASSERT_BSONOBJ_EQ(options1.toBSON(), options2.toBSON());
 }
 
 TEST(CollectionOptions, SimpleRoundTrip) {
@@ -66,10 +66,11 @@ TEST(CollectionOptions, Validate) {
 }
 
 TEST(CollectionOptions, Validator) {
+    CollectionOptions options;
 
-    ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{validator: 'notAnObject'}")).getStatus());
-    CollectionOptions options =
-        assertGet(CollectionOptions::parse(fromjson("{validator: {a: 1}}")));
+    ASSERT_NOT_OK(options.parse(fromjson("{validator: 'notAnObject'}")));
+
+    ASSERT_OK(options.parse(fromjson("{validator: {a: 1}}")));
     ASSERT_BSONOBJ_EQ(options.validator, fromjson("{a: 1}"));
 
     options.validator = fromjson("{b: 1}");
@@ -81,45 +82,41 @@ TEST(CollectionOptions, Validator) {
 }
 
 TEST(CollectionOptions, ErrorBadSize) {
-    ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{capped: true, size: -1}")).getStatus());
-    ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{capped: false, size: -1}")).getStatus());
-    ASSERT_NOT_OK(CollectionOptions::parse(
-                      BSON("capped" << true << "size" << std::numeric_limits<long long>::min()))
-                      .getStatus());
-    ASSERT_NOT_OK(
-        CollectionOptions::parse(BSON("capped" << true << "size" << (1LL << 62))).getStatus());
-    ASSERT_NOT_OK(CollectionOptions::parse(
-                      BSON("capped" << true << "size" << std::numeric_limits<long long>::max()))
-                      .getStatus());
+    ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{capped: true, size: -1}")));
+    ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{capped: false, size: -1}")));
+    ASSERT_NOT_OK(CollectionOptions().parse(
+        BSON("capped" << true << "size" << std::numeric_limits<long long>::min())));
+    ASSERT_NOT_OK(CollectionOptions().parse(BSON("capped" << true << "size" << (1LL << 62))));
+    ASSERT_NOT_OK(CollectionOptions().parse(
+        BSON("capped" << true << "size" << std::numeric_limits<long long>::max())));
 }
 
 TEST(CollectionOptions, ErrorBadMax) {
-    ASSERT_NOT_OK(
-        CollectionOptions::parse(BSON("capped" << true << "max" << (1LL << 31))).getStatus());
+    ASSERT_NOT_OK(CollectionOptions().parse(BSON("capped" << true << "max" << (1LL << 31))));
 }
 
 TEST(CollectionOptions, CappedSizeRoundsUpForAlignment) {
     const long long kUnalignedCappedSize = 1000;
     const long long kAlignedCappedSize = 1024;
-    // Check size rounds up to multiple of alignment.
-    auto options = assertGet(
-        CollectionOptions::parse((BSON("capped" << true << "size" << kUnalignedCappedSize))));
+    CollectionOptions options;
 
+    // Check size rounds up to multiple of alignment.
+    ASSERT_OK(options.parse(BSON("capped" << true << "size" << kUnalignedCappedSize)));
     ASSERT_EQUALS(options.capped, true);
     ASSERT_EQUALS(options.cappedSize, kAlignedCappedSize);
     ASSERT_EQUALS(options.cappedMaxDocs, 0);
 }
 
 TEST(CollectionOptions, IgnoreSizeWrongType) {
-    auto options =
-        assertGet(CollectionOptions::parse(fromjson("{size: undefined, capped: undefined}")));
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{size: undefined, capped: undefined}")));
     ASSERT_EQUALS(options.capped, false);
     ASSERT_EQUALS(options.cappedSize, 0);
 }
 
 TEST(CollectionOptions, IgnoreMaxWrongType) {
-    auto options =
-        assertGet(CollectionOptions::parse(fromjson("{capped: true, size: 1024, max: ''}")));
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{capped: true, size: 1024, max: ''}")));
     ASSERT_EQUALS(options.capped, true);
     ASSERT_EQUALS(options.cappedSize, 1024);
     ASSERT_EQUALS(options.cappedMaxDocs, 0);
@@ -127,18 +124,18 @@ TEST(CollectionOptions, IgnoreMaxWrongType) {
 
 TEST(CollectionOptions, InvalidStorageEngineField) {
     // "storageEngine" field has to be an object if present.
-    ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{storageEngine: 1}")).getStatus());
+    ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{storageEngine: 1}")));
 
     // Every field under "storageEngine" has to be an object.
-    ASSERT_NOT_OK(
-        CollectionOptions::parse(fromjson("{storageEngine: {storageEngine1: 1}}")).getStatus());
+    ASSERT_NOT_OK(CollectionOptions().parse(fromjson("{storageEngine: {storageEngine1: 1}}")));
 
     // Empty "storageEngine" not allowed
-    ASSERT_OK(CollectionOptions::parse(fromjson("{storageEngine: {}}")).getStatus());
+    ASSERT_OK(CollectionOptions().parse(fromjson("{storageEngine: {}}")));
 }
 
 TEST(CollectionOptions, ParseEngineField) {
-    auto opts = assertGet(CollectionOptions::parse(
+    CollectionOptions opts;
+    ASSERT_OK(opts.parse(
         fromjson("{storageEngine: {storageEngine1: {x: 1, y: 2}, storageEngine2: {a: 1, b:2}}}")));
     checkRoundTrip(opts);
 
@@ -162,9 +159,8 @@ TEST(CollectionOptions, ParseEngineField) {
 }
 
 TEST(CollectionOptions, ResetStorageEngineField) {
-
-    auto opts =
-        assertGet(CollectionOptions::parse(fromjson("{storageEngine: {storageEngine1: {x: 1}}}")));
+    CollectionOptions opts;
+    ASSERT_OK(opts.parse(fromjson("{storageEngine: {storageEngine1: {x: 1}}}")));
     checkRoundTrip(opts);
 
     CollectionOptions defaultOpts;
@@ -193,21 +189,25 @@ TEST(CollectionOptions, ModifyStorageEngineField) {
 }
 
 TEST(CollectionOptions, FailToParseCollationThatIsNotAnObject) {
-    ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{collation: 'notAnObject'}")).getStatus());
+    CollectionOptions options;
+    ASSERT_NOT_OK(options.parse(fromjson("{collation: 'notAnObject'}")));
 }
 
 TEST(CollectionOptions, FailToParseCollationThatIsAnEmptyObject) {
-    ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{collation: {}}")).getStatus());
+    CollectionOptions options;
+    ASSERT_NOT_OK(options.parse(fromjson("{collation: {}}")));
 }
 
 TEST(CollectionOptions, CollationFieldParsesCorrectly) {
-    auto options = assertGet(CollectionOptions::parse(fromjson("{collation: {locale: 'en'}}")));
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{collation: {locale: 'en'}}")));
     ASSERT_BSONOBJ_EQ(options.collation, fromjson("{locale: 'en'}"));
     ASSERT_OK(options.validateForStorage());
 }
 
 TEST(CollectionOptions, ParsedCollationObjShouldBeOwned) {
-    auto options = assertGet(CollectionOptions::parse(fromjson("{collation: {locale: 'en'}}")));
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{collation: {locale: 'en'}}")));
     ASSERT_BSONOBJ_EQ(options.collation, fromjson("{locale: 'en'}"));
     ASSERT_TRUE(options.collation.isOwned());
 }
@@ -215,87 +215,104 @@ TEST(CollectionOptions, ParsedCollationObjShouldBeOwned) {
 TEST(CollectionOptions, ResetClearsCollationField) {
     CollectionOptions options;
     ASSERT_TRUE(options.collation.isEmpty());
-    options = assertGet(CollectionOptions::parse(fromjson("{collation: {locale: 'en'}}")));
+    ASSERT_OK(options.parse(fromjson("{collation: {locale: 'en'}}")));
     ASSERT_FALSE(options.collation.isEmpty());
 }
 
 TEST(CollectionOptions, CollationFieldLeftEmptyWhenOmitted) {
-    auto options = assertGet(CollectionOptions::parse(fromjson("{validator: {a: 1}}")));
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{validator: {a: 1}}")));
     ASSERT_TRUE(options.collation.isEmpty());
 }
 
 TEST(CollectionOptions, CollationFieldNotDumpedToBSONWhenOmitted) {
-    auto options = assertGet(CollectionOptions::parse(fromjson("{validator: {a: 1}}")));
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{validator: {a: 1}}")));
     ASSERT_TRUE(options.collation.isEmpty());
     BSONObj asBSON = options.toBSON();
     ASSERT_FALSE(asBSON["collation"]);
 }
 
 TEST(CollectionOptions, ViewParsesCorrectly) {
-    auto options =
-        assertGet(CollectionOptions::parse(fromjson("{viewOn: 'c', pipeline: [{$match: {}}]}")));
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{viewOn: 'c', pipeline: [{$match: {}}]}")));
     ASSERT_EQ(options.viewOn, "c");
     ASSERT_BSONOBJ_EQ(options.pipeline, fromjson("[{$match: {}}]"));
 }
 
 TEST(CollectionOptions, ViewParsesCorrectlyWithoutPipeline) {
-    auto options = assertGet(CollectionOptions::parse(fromjson("{viewOn: 'c'}")));
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{viewOn: 'c'}")));
     ASSERT_EQ(options.viewOn, "c");
     ASSERT_BSONOBJ_EQ(options.pipeline, BSONObj());
 }
 
 TEST(CollectionOptions, PipelineFieldRequiresViewOn) {
-    ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{pipeline: [{$match: {}}]}")).getStatus());
+    CollectionOptions options;
+    ASSERT_NOT_OK(options.parse(fromjson("{pipeline: [{$match: {}}]}")));
 }
 
 TEST(CollectionOptions, UnknownTopLevelOptionFailsToParse) {
-    auto statusWith = CollectionOptions::parse(fromjson("{invalidOption: 1}"));
-    ASSERT_EQ(statusWith.getStatus().code(), ErrorCodes::InvalidOptions);
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{invalidOption: 1}"));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.code(), ErrorCodes::InvalidOptions);
 }
 
 TEST(CollectionOptions, CreateOptionIgnoredIfFirst) {
-    ASSERT_OK(CollectionOptions::parse(fromjson("{create: 1}")).getStatus());
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{create: 1}"));
+    ASSERT_OK(status);
 }
 
 TEST(CollectionOptions, CreateOptionIgnoredIfNotFirst) {
-    auto options =
-        assertGet(CollectionOptions::parse(fromjson("{capped: true, create: 1, size: 1024}")));
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{capped: true, create: 1, size: 1024}"));
+    ASSERT_OK(status);
     ASSERT_EQ(options.capped, true);
     ASSERT_EQ(options.cappedSize, 1024L);
 }
 
 TEST(CollectionOptions, UnknownOptionIgnoredIfCreateOptionFirst) {
-    ASSERT_OK(CollectionOptions::parse(fromjson("{create: 1, invalidOption: 1}")).getStatus());
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{create: 1, invalidOption: 1}")));
 }
 
 TEST(CollectionOptions, UnknownOptionIgnoredIfCreateOptionPresent) {
-    ASSERT_OK(CollectionOptions::parse(fromjson("{invalidOption: 1, create: 1}")).getStatus());
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{invalidOption: 1, create: 1}")));
 }
 
 TEST(CollectionOptions, UnknownOptionRejectedIfCreateOptionNotPresent) {
-    auto statusWith = CollectionOptions::parse(fromjson("{invalidOption: 1}"));
-    ASSERT_EQ(statusWith.getStatus().code(), ErrorCodes::InvalidOptions);
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{invalidOption: 1}"));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.code(), ErrorCodes::InvalidOptions);
 }
 
 TEST(CollectionOptions, DuplicateCreateOptionIgnoredIfCreateOptionFirst) {
-    auto statusWith = CollectionOptions::parse(BSON("create" << 1 << "create" << 1));
-    ASSERT_OK(statusWith.getStatus());
+    CollectionOptions options;
+    auto status = options.parse(BSON("create" << 1 << "create" << 1));
+    ASSERT_OK(status);
 }
 
 TEST(CollectionOptions, DuplicateCreateOptionIgnoredIfCreateOptionNotFirst) {
-    auto statusWith = CollectionOptions::parse(
-        BSON("capped" << true << "create" << 1 << "create" << 1 << "size" << 1024));
-    ASSERT_OK(statusWith.getStatus());
+    CollectionOptions options;
+    auto status =
+        options.parse(BSON("capped" << true << "create" << 1 << "create" << 1 << "size" << 1024));
+    ASSERT_OK(status);
 }
 
 TEST(CollectionOptions, MaxTimeMSWhitelistedOptionIgnored) {
-    auto statusWith = CollectionOptions::parse(fromjson("{maxTimeMS: 1}"));
-    ASSERT_OK(statusWith.getStatus());
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{maxTimeMS: 1}"));
+    ASSERT_OK(status);
 }
 
 TEST(CollectionOptions, WriteConcernWhitelistedOptionIgnored) {
-    auto statusWith = CollectionOptions::parse(fromjson("{writeConcern: 1}"));
-    ASSERT_OK(statusWith.getStatus());
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{writeConcern: 1}"));
+    ASSERT_OK(status);
 }
 
 TEST(CollectionOptions, ParseUUID) {
@@ -304,14 +321,13 @@ TEST(CollectionOptions, ParseUUID) {
 
     // Check required parse failures
     ASSERT_FALSE(options.uuid);
-    ASSERT_NOT_OK(CollectionOptions::parse(uuid.toBSON()).getStatus());
-    ASSERT_NOT_OK(CollectionOptions::parse(BSON("uuid" << 1)).getStatus());
-    ASSERT_NOT_OK(CollectionOptions::parse(BSON("uuid" << 1), CollectionOptions::parseForStorage)
-                      .getStatus());
+    ASSERT_NOT_OK(options.parse(uuid.toBSON()));
+    ASSERT_NOT_OK(options.parse(BSON("uuid" << 1)));
+    ASSERT_NOT_OK(options.parse(BSON("uuid" << 1), CollectionOptions::parseForStorage));
+    ASSERT_FALSE(options.uuid);
 
     // Check successful parse and roundtrip.
-    options =
-        assertGet(CollectionOptions::parse(uuid.toBSON(), CollectionOptions::parseForStorage));
+    ASSERT_OK(options.parse(uuid.toBSON(), CollectionOptions::parseForStorage));
     ASSERT(options.uuid.get() == uuid);
 
     // Check that a collection options containing a UUID passes validation.
@@ -319,49 +335,49 @@ TEST(CollectionOptions, ParseUUID) {
 }
 
 TEST(CollectionOptions, SizeNumberLimits) {
-    CollectionOptions options = assertGet(CollectionOptions::parse(fromjson("{size: 'a'}")));
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{size: 'a'}")));
     ASSERT_EQ(options.cappedSize, 0);
 
-    options = assertGet(CollectionOptions::parse(fromjson("{size: '-1'}")));
+
+    ASSERT_OK(options.parse(fromjson("{size: '-1'}")));
     ASSERT_EQ(options.cappedSize, 0);
 
-    options =
-        assertGet(CollectionOptions::parse(fromjson("{size: '-9999999999999999999999999999999'}")));
+    ASSERT_OK(options.parse(fromjson("{size: '-9999999999999999999999999999999'}")));
     ASSERT_EQ(options.cappedSize, 0);
 
     // The test for size is redundant since size returns a status that's not ok if it's larger
     // than a petabyte, which is smaller than LLONG_MAX anyways. We test that here.
-    ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{size: 9999999999999999}")).getStatus());
+    ASSERT_NOT_OK(options.parse(fromjson("{size: 9999999999999999}")));
 }
 
 TEST(CollectionOptions, MaxNumberLimits) {
-    CollectionOptions options = assertGet(CollectionOptions::parse(fromjson("{max: 'a'}")));
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{max: 'a'}")));
     ASSERT_EQ(options.cappedMaxDocs, 0);
 
-    options = assertGet(CollectionOptions::parse(fromjson("{max: '-1'}")));
+    ASSERT_OK(options.parse(fromjson("{max: '-1'}")));
     ASSERT_EQ(options.cappedMaxDocs, 0);
 
-    options = assertGet(
-        CollectionOptions::parse(fromjson("{max: '-9999999999999999999999999999999999'}")));
+    ASSERT_OK(options.parse(fromjson("{max: '-9999999999999999999999999999999999'}")));
     ASSERT_EQ(options.cappedMaxDocs, 0);
 
-    options = assertGet(CollectionOptions::parse(fromjson("{max: 99999999999999999999999999999}")));
+    ASSERT_OK(options.parse(fromjson("{max: 99999999999999999999999999999}")));
     ASSERT_EQ(options.cappedMaxDocs, 0);
 }
 
 TEST(CollectionOptions, NExtentsNumberLimits) {
-    CollectionOptions options = assertGet(CollectionOptions::parse(fromjson("{$nExtents: 'a'}")));
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{$nExtents: 'a'}")));
     ASSERT_EQ(options.initialNumExtents, 0);
 
-    options = assertGet(CollectionOptions::parse(fromjson("{$nExtents: '-1'}")));
+    ASSERT_OK(options.parse(fromjson("{$nExtents: '-1'}")));
     ASSERT_EQ(options.initialNumExtents, 0);
 
-    options = assertGet(
-        CollectionOptions::parse(fromjson("{$nExtents: '-9999999999999999999999999999999999'}")));
+    ASSERT_OK(options.parse(fromjson("{$nExtents: '-9999999999999999999999999999999999'}")));
     ASSERT_EQ(options.initialNumExtents, 0);
 
-    options = assertGet(
-        CollectionOptions::parse(fromjson("{$nExtents: 9999999999999999999999999999999}")));
+    ASSERT_OK(options.parse(fromjson("{$nExtents: 9999999999999999999999999999999}")));
     ASSERT_EQ(options.initialNumExtents, LLONG_MAX);
 }
 }  // namespace mongo

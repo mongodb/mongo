@@ -123,12 +123,11 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     NamespaceString nss("a.b");
     std::string ident = "collection-1234";
     std::string record = "abcd";
-    CollectionOptions defaultCollectionOptions;
+    CollectionOptions options;
 
     std::unique_ptr<RecordStore> rs;
-    ASSERT_OK(
-        _engine->createRecordStore(opCtxPtr.get(), nss.ns(), ident, defaultCollectionOptions));
-    rs = _engine->getRecordStore(opCtxPtr.get(), nss.ns(), ident, defaultCollectionOptions);
+    ASSERT_OK(_engine->createRecordStore(opCtxPtr.get(), nss.ns(), ident, options));
+    rs = _engine->getRecordStore(opCtxPtr.get(), nss.ns(), ident, options);
     ASSERT(rs);
 
     RecordId loc;
@@ -151,8 +150,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     ASSERT(!boost::filesystem::exists(tmpFile));
 
 #ifdef _WIN32
-    auto status =
-        _engine->recoverOrphanedIdent(opCtxPtr.get(), nss, ident, defaultCollectionOptions);
+    auto status = _engine->recoverOrphanedIdent(opCtxPtr.get(), nss, ident, options);
     ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
 #else
     // Move the data file out of the way so the ident can be dropped. This not permitted on Windows
@@ -169,8 +167,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     boost::filesystem::rename(tmpFile, *dataFilePath, err);
     ASSERT(!err) << err.message();
 
-    auto status =
-        _engine->recoverOrphanedIdent(opCtxPtr.get(), nss, ident, defaultCollectionOptions);
+    auto status = _engine->recoverOrphanedIdent(opCtxPtr.get(), nss, ident, options);
     ASSERT_EQ(ErrorCodes::DataModifiedByRepair, status.code());
 #endif
 }
@@ -181,12 +178,11 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     NamespaceString nss("a.b");
     std::string ident = "collection-1234";
     std::string record = "abcd";
-    CollectionOptions defaultCollectionOptions;
+    CollectionOptions options;
 
     std::unique_ptr<RecordStore> rs;
-    ASSERT_OK(
-        _engine->createRecordStore(opCtxPtr.get(), nss.ns(), ident, defaultCollectionOptions));
-    rs = _engine->getRecordStore(opCtxPtr.get(), nss.ns(), ident, defaultCollectionOptions);
+    ASSERT_OK(_engine->createRecordStore(opCtxPtr.get(), nss.ns(), ident, options));
+    rs = _engine->getRecordStore(opCtxPtr.get(), nss.ns(), ident, options);
     ASSERT(rs);
 
     RecordId loc;
@@ -208,8 +204,7 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     ASSERT_OK(_engine->dropIdent(opCtxPtr.get(), ident));
 
 #ifdef _WIN32
-    auto status =
-        _engine->recoverOrphanedIdent(opCtxPtr.get(), nss, ident, defaultCollectionOptions);
+    auto status = _engine->recoverOrphanedIdent(opCtxPtr.get(), nss, ident, options);
     ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
 #else
     // The ident may not get immediately dropped, so ensure it is completely gone.
@@ -227,14 +222,13 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
 
     // This should recreate an empty data file successfully and move the old one to a name that ends
     // in ".corrupt".
-    auto status =
-        _engine->recoverOrphanedIdent(opCtxPtr.get(), nss, ident, defaultCollectionOptions);
+    auto status = _engine->recoverOrphanedIdent(opCtxPtr.get(), nss, ident, options);
     ASSERT_EQ(ErrorCodes::DataModifiedByRepair, status.code()) << status.reason();
 
     boost::filesystem::path corruptFile = (dataFilePath->string() + ".corrupt");
     ASSERT(boost::filesystem::exists(corruptFile));
 
-    rs = _engine->getRecordStore(opCtxPtr.get(), nss.ns(), ident, defaultCollectionOptions);
+    rs = _engine->getRecordStore(opCtxPtr.get(), nss.ns(), ident, options);
     RecordData data;
     ASSERT_FALSE(rs->findRecord(opCtxPtr.get(), loc, &data));
 #endif

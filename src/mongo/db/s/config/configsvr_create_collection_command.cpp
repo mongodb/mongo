@@ -77,7 +77,7 @@ public:
 
             CollectionOptions options;
             if (auto requestOptions = request().getOptions()) {
-                options = uassertStatusOK(CollectionOptions::parse(*requestOptions));
+                uassertStatusOK(options.parse(*requestOptions));
             }
 
             auto const catalogClient = Grid::get(opCtx)->catalogClient();

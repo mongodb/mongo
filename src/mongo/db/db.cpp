@@ -234,8 +234,9 @@ void logStartup(OperationContext* opCtx) {
     if (!collection) {
         BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
         repl::UnreplicatedWritesBlock uwb(opCtx);
-        CollectionOptions collectionOptions = uassertStatusOK(
-            CollectionOptions::parse(options, CollectionOptions::ParseKind::parseForCommand));
+        CollectionOptions collectionOptions;
+        uassertStatusOK(
+            collectionOptions.parse(options, CollectionOptions::ParseKind::parseForCommand));
         uassertStatusOK(db->userCreateNS(opCtx, startupLogCollectionName, collectionOptions));
         collection = db->getCollection(opCtx, startupLogCollectionName);
     }

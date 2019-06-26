@@ -51,7 +51,6 @@
 #include "mongo/db/query/find.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/timer.h"
 
 namespace {
@@ -1357,10 +1356,10 @@ public:
         // a bit.
         {
             WriteUnitOfWork wunit(&_opCtx);
-
-            CollectionOptions collectionOptions = unittest::assertGet(
-                CollectionOptions::parse(fromjson("{ capped : true, size : 2000, max: 10000 }"),
-                                         CollectionOptions::parseForCommand));
+            CollectionOptions collectionOptions;
+            ASSERT_OK(
+                collectionOptions.parse(fromjson("{ capped : true, size : 2000, max: 10000 }"),
+                                        CollectionOptions::parseForCommand));
             NamespaceString nss(ns());
             ASSERT(ctx.db()->userCreateNS(&_opCtx, nss, collectionOptions, false).isOK());
             wunit.commit();
