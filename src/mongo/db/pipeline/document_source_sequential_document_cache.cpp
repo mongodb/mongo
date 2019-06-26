@@ -54,9 +54,17 @@ DocumentSource::GetNextResult DocumentSourceSequentialDocumentCache::getNext() {
 
     pExpCtx->checkForInterrupt();
 
+    if (_cacheIsEOF) {
+        return GetNextResult::makeEOF();
+    }
+
     if (_cache->isServing()) {
         auto nextDoc = _cache->getNext();
-        return (nextDoc ? std::move(*nextDoc) : GetNextResult::makeEOF());
+        if (nextDoc) {
+            return std::move(*nextDoc);
+        }
+        _cacheIsEOF = true;
+        return GetNextResult::makeEOF();
     }
 
     auto nextResult = pSource->getNext();
@@ -64,6 +72,7 @@ DocumentSource::GetNextResult DocumentSourceSequentialDocumentCache::getNext() {
     if (!_cache->isAbandoned()) {
         if (nextResult.isEOF()) {
             _cache->freeze();
+            _cacheIsEOF = true;
         } else {
             _cache->add(nextResult.getDocument());
         }

@@ -446,6 +446,7 @@ env.CppUnitTest(
         'document_source_redact_test.cpp',
         'document_source_replace_root_test.cpp',
         'document_source_sample_test.cpp',
+        'document_source_sequential_document_cache_test.cpp',
         'document_source_skip_test.cpp',
         'document_source_sort_by_count_test.cpp',
         'document_source_sort_test.cpp',
