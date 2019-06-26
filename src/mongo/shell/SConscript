@@ -146,7 +146,7 @@ kmsEnv.Library(
     ],
 )
 
-if "tom" not in env["MONGO_CRYPTO"]:
+if get_option('ssl') == 'on':
     env.CppUnitTest(
         target='kms_test',
         source='kms_test.cpp',
