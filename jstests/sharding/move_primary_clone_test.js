@@ -9,8 +9,8 @@
         return 0;
     }
 
-    function checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, barUUID, fooUUID) {
-        var res = toShard.getDB("test1").runCommand({listCollections: 1});
+    function getCollections(shard) {
+        var res = shard.getDB("test1").runCommand({listCollections: 1});
         assert.commandWorked(res);
 
         var collections = res.cursor.firstBatch;
@@ -19,19 +19,23 @@
         collections.sort(sortByName);
         assert.eq(collections.length, 2);
 
+        return collections;
+    }
+
+    function checkOptions(c, expectedOptions) {
+        assert.hasFields(c, ['options'], 'Missing options field for collection ' + c.name);
+        assert.hasFields(
+            c.options, expectedOptions, 'Missing expected option(s) for collection ' + c.name);
+    }
+
+    function checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, barUUID, fooUUID) {
         var c1, c2;
-        [c1, c2] = collections;
+        [c1, c2] = getCollections(toShard);
 
         function checkName(c, expectedName) {
             assert.eq(c.name,
                       expectedName,
                       'Expected collection to be ' + expectedName + ', got ' + c.name);
-        }
-
-        function checkOptions(c, expectedOptions) {
-            assert.hasFields(c, ['options'], 'Missing options field for collection ' + c.name);
-            assert.hasFields(
-                c.options, expectedOptions, 'Missing expected option(s) for collection ' + c.name);
         }
 
         function checkUUIDsEqual(c, expectedUUID) {
@@ -161,14 +165,34 @@
             // If the collections are sharded, the UUID of the collection on the donor should be
             // copied over and the options should be the same so retrying the move should succeed.
             assert.commandWorked(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}));
-
             checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, baruuid, foouuid);
 
-            // Now change an option on the toShard, and verify that calling clone again fails if
-            // the options don't match.
+            // Now change an option on the toShard, and verify that calling clone again succeeds
+            // when the options don't match.
             assert.commandWorked(
                 toShard.getDB('test1').runCommand({collMod: 'bar', validationLevel: 'moderate'}));
-            assert.commandFailed(st.s0.adminCommand({movePrimary: "test1", to: fromShard.name}));
+            assert.commandWorked(st.s0.adminCommand({movePrimary: "test1", to: fromShard.name}));
+
+            // Assert that the fromShard does not have the new options, but the toShard does
+            let barOnToShard = getCollections(toShard)[0];
+            checkOptions(
+                barOnToShard,
+                Object.keys(
+                    {validator: {$jsonSchema: {required: ['a']}}, validationLevel: "moderate"}));
+            let barOnFromShard = getCollections(fromShard)[0];
+            checkOptions(barOnFromShard, Object.keys(barOptions));
+
+            // The docs should still be on the original primary shard (fromShard).
+            checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, baruuid, foouuid);
+
+            // Now drop and recreate the collection on the toShard. The collection should now have
+            // a different UUID, so we should fail on movePrimary.
+            assert.commandWorked(toShard.getDB("test1").runCommand({drop: "bar"}));
+            assert.commandWorked(toShard.getDB("test1").bar.insert({"x": 1}));
+
+            assert.commandFailedWithCode(
+                st.s0.adminCommand({movePrimary: "test1", to: toShard.name}),
+                ErrorCodes.InvalidOptions);
         } else {
             // If the collections are unsharded, we should fail when any collections being copied
             // exist on the target shard.
