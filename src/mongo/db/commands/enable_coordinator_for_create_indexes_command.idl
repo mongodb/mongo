@@ -37,4 +37,3 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: "enableIndexBuildsCoordinatorForCreateIndexesCommand"
     default: false
-    test_only: true

@@ -18,7 +18,7 @@
     // enableTestCommands not specified.
     assertFails({
         'setParameter': {
-            enableIndexBuildsCoordinatorForCreateIndexesCommand: 'false',
+            AlwaysRecordTraffic: 'false',
         },
     });
 
@@ -37,7 +37,7 @@
         assertFails({
             'setParameter': {
                 enableTestCommands: v,
-                enableIndexBuildsCoordinatorForCreateIndexesCommand: 'false',
+                AlwaysRecordTraffic: 'false',
             },
         });
     });
