@@ -253,14 +253,11 @@ public:
     }
 
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) {
-        for (auto nss : _namespaces) {
-            AutoGetCollectionForRead coll(opCtx, nss);
-            auto* collection = coll.getCollection();
-            if (collection) {
-                auto optUUID = collection->uuid();
-                if (optUUID) {
-                    builder << nss.toString() << optUUID.get();
-                }
+        auto& catalog = CollectionCatalog::get(opCtx);
+        for (auto& nss : _namespaces) {
+            auto optUUID = catalog.lookupUUIDByNSS(nss);
+            if (optUUID) {
+                builder << nss.toString() << optUUID.get();
             }
         }
     }
