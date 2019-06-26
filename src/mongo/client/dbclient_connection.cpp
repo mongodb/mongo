@@ -579,7 +579,13 @@ void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);
     if (!MONGO_FAIL_POINT(dbClientConnectionDisableChecksum)) {
+#ifdef MONGO_CONFIG_SSL
+        if (!SSLPeerInfo::forSession(_session).isTLS) {
+            OpMsg::appendChecksum(&toSend);
+        }
+#else
         OpMsg::appendChecksum(&toSend);
+#endif
     }
     uassertStatusOK(
         _session->sinkMessage(uassertStatusOK(_compressorManager.compressMessage(toSend))));
@@ -625,7 +631,13 @@ bool DBClientConnection::call(Message& toSend,
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);
     if (!MONGO_FAIL_POINT(dbClientConnectionDisableChecksum)) {
+#ifdef MONGO_CONFIG_SSL
+        if (!SSLPeerInfo::forSession(_session).isTLS) {
+            OpMsg::appendChecksum(&toSend);
+        }
+#else
         OpMsg::appendChecksum(&toSend);
+#endif
     }
     auto swm = _compressorManager.compressMessage(toSend);
     uassertStatusOK(swm.getStatus());

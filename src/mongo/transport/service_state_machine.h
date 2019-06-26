@@ -45,6 +45,7 @@
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_mode.h"
+#include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
 
