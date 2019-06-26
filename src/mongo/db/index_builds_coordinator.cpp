@@ -764,10 +764,6 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
     boost::optional<Lock::CollectionLock> collLock;
     collLock.emplace(opCtx, *nss, MODE_X);
 
-    // Allow the strong lock acquisition above to be interrupted, but from this point forward do
-    // not allow locks or re-locks to be interrupted.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
     auto collection =
         CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
     invariant(collection,
