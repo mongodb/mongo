@@ -118,12 +118,21 @@ struct SSLPeerInfo {
     explicit SSLPeerInfo(SSLX509Name subjectName,
                          boost::optional<std::string> sniName = {},
                          stdx::unordered_set<RoleName> roles = {})
-        : subjectName(std::move(subjectName)),
+        : isTLS(true),
+          subjectName(std::move(subjectName)),
           sniName(std::move(sniName)),
           roles(std::move(roles)) {}
     SSLPeerInfo() = default;
 
-    explicit SSLPeerInfo(boost::optional<std::string> sniName) : sniName(std::move(sniName)) {}
+    explicit SSLPeerInfo(boost::optional<std::string> sniName)
+        : isTLS(true), sniName(std::move(sniName)) {}
+
+    /**
+     * This flag is used to indicate if the underlying socket is using TLS or not. A default
+     * constructor of SSLPeerInfo indicates that TLS is not being used, and the other
+     * constructors set its value to true.
+     */
+    bool isTLS = false;
 
     SSLX509Name subjectName;
     boost::optional<std::string> sniName;

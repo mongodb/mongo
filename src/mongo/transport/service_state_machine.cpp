@@ -455,7 +455,13 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
         toSink.header().setId(nextMessageId());
         toSink.header().setResponseToMsgId(_inMessage.header().getId());
         if (OpMsg::isFlagSet(_inMessage, OpMsg::kChecksumPresent)) {
+#ifdef MONGO_CONFIG_SSL
+            if (!SSLPeerInfo::forSession(_session()).isTLS) {
+                OpMsg::appendChecksum(&toSink);
+            }
+#else
             OpMsg::appendChecksum(&toSink);
+#endif
         }
 
         // If the incoming message has the exhaust flag set and is a 'getMore' command, then we

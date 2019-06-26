@@ -203,7 +203,13 @@ Future<Message> AsyncDBClient::_call(Message request, const BatonHandle& baton) 
     auto msgId = nextMessageId();
     request.header().setId(msgId);
     request.header().setResponseToMsgId(0);
+#ifdef MONGO_CONFIG_SSL
+    if (!SSLPeerInfo::forSession(_session).isTLS) {
+        OpMsg::appendChecksum(&request);
+    }
+#else
     OpMsg::appendChecksum(&request);
+#endif
 
     return _session->asyncSinkMessage(request, baton)
         .then([this, baton] { return _session->asyncSourceMessage(baton); })
