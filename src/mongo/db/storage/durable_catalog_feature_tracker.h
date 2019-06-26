@@ -80,8 +80,6 @@ public:
      */
     enum class RepairableFeature : std::uint64_t {
         kPathLevelMultikeyTracking = 1 << 0,
-        // TODO SERVER-36385: Mark kIndexKeyStringWithLongTypeBits as obsolete in 4.4 because 4.4
-        // can only downgrade to 4.2 which can read long TypeBits.
         kIndexKeyStringWithLongTypeBits = 1 << 1,
         kNextFeatureBit = 1 << 2
     };

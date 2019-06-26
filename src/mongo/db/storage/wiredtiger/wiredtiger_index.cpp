@@ -300,10 +300,10 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
     }
 }
 
-StatusWith<SpecialFormatInserted> WiredTigerIndex::insert(OperationContext* opCtx,
-                                                          const BSONObj& key,
-                                                          const RecordId& id,
-                                                          bool dupsAllowed) {
+Status WiredTigerIndex::insert(OperationContext* opCtx,
+                               const BSONObj& key,
+                               const RecordId& id,
+                               bool dupsAllowed) {
     dassert(opCtx->lockState()->isWriteLocked());
     invariant(id.isValid());
     dassert(!hasFieldNames(key));
@@ -606,7 +606,7 @@ public:
     StandardBulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx, KVPrefix prefix)
         : BulkBuilder(idx, opCtx, prefix), _idx(idx) {}
 
-    StatusWith<SpecialFormatInserted> addKey(const BSONObj& key, const RecordId& id) override {
+    Status addKey(const BSONObj& key, const RecordId& id) override {
         KeyString data(_idx->keyStringVersion(), key, _idx->_ordering, id);
 
         // Can't use WiredTigerCursor since we aren't using the cache.
@@ -621,18 +621,14 @@ public:
 
         invariantWTOK(_cursor->insert(_cursor));
 
-        if (data.getTypeBits().isLongEncoding())
-            return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::LongTypeBitsInserted);
-
-        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
+        return Status::OK();
     }
 
-    SpecialFormatInserted commit(bool mayInterrupt) override {
+    void commit(bool mayInterrupt) override {
         // TODO do we still need this?
         // this is bizarre, but required as part of the contract
         WriteUnitOfWork uow(_opCtx);
         uow.commit();
-        return SpecialFormatInserted::NoSpecialFormatInserted;
     }
 
 private:
@@ -658,28 +654,24 @@ public:
           _dupsAllowed(dupsAllowed),
           _keyString(idx->keyStringVersion()) {}
 
-    StatusWith<SpecialFormatInserted> addKey(const BSONObj& newKey, const RecordId& id) override {
+    Status addKey(const BSONObj& newKey, const RecordId& id) override {
         if (_idx->isTimestampSafeUniqueIdx()) {
             return addKeyTimestampSafe(newKey, id);
         }
         return addKeyTimestampUnsafe(newKey, id);
     }
 
-    SpecialFormatInserted commit(bool mayInterrupt) override {
-        SpecialFormatInserted specialFormatInserted =
-            SpecialFormatInserted::NoSpecialFormatInserted;
+    void commit(bool mayInterrupt) override {
         WriteUnitOfWork uow(_opCtx);
         if (!_records.empty()) {
             // This handles inserting the last unique key.
-            specialFormatInserted = doInsert();
+            doInsert();
         }
         uow.commit();
-        return specialFormatInserted;
     }
 
 private:
-    StatusWith<SpecialFormatInserted> addKeyTimestampSafe(const BSONObj& newKey,
-                                                          const RecordId& id) {
+    Status addKeyTimestampSafe(const BSONObj& newKey, const RecordId& id) {
         // Do a duplicate check, but only if dups aren't allowed.
         if (!_dupsAllowed) {
             const int cmp = newKey.woCompare(_previousKey, _ordering);
@@ -713,23 +705,17 @@ private:
         if (!_dupsAllowed)
             _previousKey = newKey.getOwned();
 
-        if (_keyString.getTypeBits().isLongEncoding())
-            return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::LongTypeBitsInserted);
-
-        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
+        return Status::OK();
     }
 
-    StatusWith<SpecialFormatInserted> addKeyTimestampUnsafe(const BSONObj& newKey,
-                                                            const RecordId& id) {
-        SpecialFormatInserted specialFormatInserted =
-            SpecialFormatInserted::NoSpecialFormatInserted;
+    Status addKeyTimestampUnsafe(const BSONObj& newKey, const RecordId& id) {
         const int cmp = newKey.woCompare(_previousKey, _ordering);
         if (cmp != 0) {
             if (!_previousKey.isEmpty()) {
                 // _previousKey.isEmpty() is only true on the first call to addKey().
                 invariant(cmp > 0);  // newKey must be > the last key
                 // We are done with dups of the last key so we can insert it now.
-                specialFormatInserted = doInsert();
+                doInsert();
             }
             invariant(_records.empty());
         } else {
@@ -748,10 +734,10 @@ private:
         _records.push_back(std::make_pair(id, _keyString.getTypeBits()));
         _previousKey = newKey.getOwned();
 
-        return StatusWith<SpecialFormatInserted>(specialFormatInserted);
+        return Status::OK();
     }
 
-    SpecialFormatInserted doInsert() {
+    void doInsert() {
         invariant(!_records.empty());
 
         KeyString value(_idx->keyStringVersion());
@@ -773,11 +759,6 @@ private:
         invariantWTOK(_cursor->insert(_cursor));
 
         _records.clear();
-
-        if (_keyString.getTypeBits().isLongEncoding() || value.getTypeBits().isLongEncoding())
-            return SpecialFormatInserted::LongTypeBitsInserted;
-
-        return SpecialFormatInserted::NoSpecialFormatInserted;
     }
 
     WiredTigerIndex* _idx;
@@ -1344,23 +1325,22 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx, WT_CURSOR* c, const B
     MONGO_UNREACHABLE;
 }
 
-StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insert(OperationContext* opCtx,
-                                                                 WT_CURSOR* c,
-                                                                 const BSONObj& key,
-                                                                 const RecordId& id,
-                                                                 bool dupsAllowed) {
+Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
+                                      WT_CURSOR* c,
+                                      const BSONObj& key,
+                                      const RecordId& id,
+                                      bool dupsAllowed) {
     if (isTimestampSafeUniqueIdx()) {
         return _insertTimestampSafe(opCtx, c, key, id, dupsAllowed);
     }
     return _insertTimestampUnsafe(opCtx, c, key, id, dupsAllowed);
 }
 
-StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insertTimestampUnsafe(
-    OperationContext* opCtx,
-    WT_CURSOR* c,
-    const BSONObj& key,
-    const RecordId& id,
-    bool dupsAllowed) {
+Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
+                                                     WT_CURSOR* c,
+                                                     const BSONObj& key,
+                                                     const RecordId& id,
+                                                     bool dupsAllowed) {
     const KeyString data(keyStringVersion(), key, _ordering);
     WiredTigerItem keyItem(data.getBuffer(), data.getSize());
 
@@ -1375,12 +1355,7 @@ StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insertTimestampUnsafe(
 
     if (ret != WT_DUPLICATE_KEY) {
         if (ret == 0) {
-            if (data.getTypeBits().isLongEncoding())
-                return StatusWith<SpecialFormatInserted>(
-                    SpecialFormatInserted::LongTypeBitsInserted);
-            else
-                return StatusWith<SpecialFormatInserted>(
-                    SpecialFormatInserted::NoSpecialFormatInserted);
+            return Status::OK();
         }
 
         return wtRCToStatus(ret);
@@ -1403,8 +1378,7 @@ StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insertTimestampUnsafe(
     while (br.remaining()) {
         RecordId idInIndex = KeyString::decodeRecordId(&br);
         if (id == idInIndex)
-            return StatusWith<SpecialFormatInserted>(
-                SpecialFormatInserted::NoSpecialFormatInserted);  // already in index
+            return Status::OK();
 
         if (!insertedId && id < idInIndex) {
             value.appendRecordId(id);
@@ -1433,18 +1407,14 @@ StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insertTimestampUnsafe(
     if (!status.isOK())
         return status;
 
-    if (value.getTypeBits().isLongEncoding())
-        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::LongTypeBitsInserted);
-
-    return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
+    return Status::OK();
 }
 
-StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insertTimestampSafe(
-    OperationContext* opCtx,
-    WT_CURSOR* c,
-    const BSONObj& key,
-    const RecordId& id,
-    bool dupsAllowed) {
+Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
+                                                   WT_CURSOR* c,
+                                                   const BSONObj& key,
+                                                   const RecordId& id,
+                                                   bool dupsAllowed) {
     TRACE_INDEX << "Timestamp safe unique idx key: " << key << " id: " << id;
 
     int ret;
@@ -1495,10 +1465,7 @@ StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insertTimestampSafe(
     if (ret != WT_DUPLICATE_KEY)
         invariantWTOK(ret);
 
-    if (tableKey.getTypeBits().isLongEncoding())
-        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::LongTypeBitsInserted);
-
-    return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
+    return Status::OK();
 }
 
 void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
@@ -1676,11 +1643,11 @@ SortedDataBuilderInterface* WiredTigerIndexStandard::getBulkBuilder(OperationCon
     return new StandardBulkBuilder(this, opCtx, _prefix);
 }
 
-StatusWith<SpecialFormatInserted> WiredTigerIndexStandard::_insert(OperationContext* opCtx,
-                                                                   WT_CURSOR* c,
-                                                                   const BSONObj& keyBson,
-                                                                   const RecordId& id,
-                                                                   bool dupsAllowed) {
+Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
+                                        WT_CURSOR* c,
+                                        const BSONObj& keyBson,
+                                        const RecordId& id,
+                                        bool dupsAllowed) {
     invariant(dupsAllowed);
 
     TRACE_INDEX << " key: " << keyBson << " id: " << id;
@@ -1702,10 +1669,7 @@ StatusWith<SpecialFormatInserted> WiredTigerIndexStandard::_insert(OperationCont
     if (ret != 0 && ret != WT_DUPLICATE_KEY)
         return wtRCToStatus(ret);
 
-    if (key.getTypeBits().isLongEncoding())
-        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::LongTypeBitsInserted);
-
-    return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
+    return Status::OK();
 }
 
 void WiredTigerIndexStandard::_unindex(OperationContext* opCtx,

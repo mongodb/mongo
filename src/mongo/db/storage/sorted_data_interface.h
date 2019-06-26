@@ -46,13 +46,6 @@ class SortedDataBuilderInterface;
 struct ValidateResults;
 
 /**
- * This enum is returned by any functions that could potentially insert special format onto disk. It
- * is a way to inform the callers to do something when special format exists on disk.
- * TODO SERVER-36385: Remove this enum in 4.4.
- */
-enum SpecialFormatInserted { NoSpecialFormatInserted = 0, LongTypeBitsInserted = 1 };
-
-/**
  * This is the uniform interface for storing indexes and supporting point queries as well as range
  * queries. The actual implementation is up to the storage engine. All the storage engines must
  * support an index key size up to the maximum document size.
@@ -91,14 +84,11 @@ public:
      *
      *         ErrorCodes::DuplicateKey if 'key' already exists in 'this' index
      *         at a RecordId other than 'loc' and duplicates were not allowed
-     *
-     *         SpecialFormatInserted::LongTypeBitsInserted if the key we've
-     *         inserted has long typebits.
      */
-    virtual StatusWith<SpecialFormatInserted> insert(OperationContext* opCtx,
-                                                     const BSONObj& key,
-                                                     const RecordId& loc,
-                                                     bool dupsAllowed) = 0;
+    virtual Status insert(OperationContext* opCtx,
+                          const BSONObj& key,
+                          const RecordId& loc,
+                          bool dupsAllowed) = 0;
 
     /**
      * Remove the entry from the index with the specified key and RecordId.
@@ -378,13 +368,8 @@ public:
      *
      * 'key' must be > or >= the last key passed to this function (depends on _dupsAllowed).  If
      * this is violated an error Status (ErrorCodes::InternalError) will be returned.
-     *
-     * @return Status::OK() if addKey succeeded,
-     *
-     *         SpecialFormatInserted::LongTypeBitsInserted if we've inserted any
-     *         key with long typebits.
      */
-    virtual StatusWith<SpecialFormatInserted> addKey(const BSONObj& key, const RecordId& loc) = 0;
+    virtual Status addKey(const BSONObj& key, const RecordId& loc) = 0;
 
     /**
      * Do any necessary work to finish building the tree.
@@ -394,17 +379,8 @@ public:
      *
      * This is called outside of any WriteUnitOfWork to allow implementations to split this up
      * into multiple units.
-     *
-     * @return SpecialFormatInserted::LongTypeBitsInserted if we've inserted any
-     * key with long typebits.
-     *
-     * TODO SERVER-36385: Change the return type from SpecialFormatInserted back to "void" as that
-     * was a hack introduced in SERVER-36280 for detecting long TypeBits in an edge case in one of
-     * the unique index builder implementations.
      */
-    virtual SpecialFormatInserted commit(bool mayInterrupt) {
-        return SpecialFormatInserted::NoSpecialFormatInserted;
-    }
+    virtual void commit(bool mayInterrupt) {}
 };
 
 }  // namespace mongo

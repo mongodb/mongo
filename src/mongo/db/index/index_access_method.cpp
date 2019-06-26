@@ -84,20 +84,6 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
 std::vector<BSONObj> asVector(const BSONObjSet& objSet) {
     return {objSet.begin(), objSet.end()};
 }
-
-// TODO SERVER-36385: Remove this
-const int TempKeyMaxSize = 1024;
-
-// TODO SERVER-36385: Completely remove the key size check in 4.4
-Status checkKeySize(const BSONObj& key) {
-    if (key.objsize() >= TempKeyMaxSize) {
-        std::string msg = str::stream() << "Index key too large to index, failing " << key.objsize()
-                                        << ' ' << redact(key);
-        return Status(ErrorCodes::KeyTooLong, msg);
-    }
-    return Status::OK();
-}
-
 }  // namespace
 
 class BtreeExternalSortComparison {
@@ -128,31 +114,9 @@ AbstractIndexAccessMethod::AbstractIndexAccessMethod(IndexCatalogEntry* btreeSta
     verify(IndexDescriptor::isIndexVersionSupported(_descriptor->version()));
 }
 
-// TODO SERVER-36385: Remove this when there is no KeyTooLong error.
-bool AbstractIndexAccessMethod::shouldCheckIndexKeySize(OperationContext* opCtx) {
-    // The index key size ought to be checked for nodes in FCV 4.0.  However, it is possible for an
-    // index build to have begun on a secondary while in FCV 4.2 and then have FCV drop to 4.0.  For
-    // those builds, we should NOT check the index key length; instead of crashing, we are going to
-    // allow them.
-
-    // The check for RSTL confirms that we are a primary, or a secondary that started a build while
-    // in FCV 4.0.  In FCV 4.2, secondary index builds unlock the RSTL, and thus are not allowed to
-    // call shouldRelaxIndexConstraints(), since that function checks replication state and that is
-    // not allowed unless you hold the RSTL.
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.getVersion() ==
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40 &&
-        opCtx->lockState()->isRSTLLocked() &&
-        !repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx,
-                                                                               _btreeState->ns());
-    ;
-}
-
 bool AbstractIndexAccessMethod::isFatalError(OperationContext* opCtx, Status status, BSONObj key) {
-    // If the status is Status::OK(), or if it is ErrorCodes::KeyTooLong and the user has chosen to
-    // ignore this error, return false immediately.
-    // TODO SERVER-36385: Remove this when there is no KeyTooLong error.
-    if (status.isOK() || (status == ErrorCodes::KeyTooLong)) {
+    // If the status is Status::OK() return false immediately.
+    if (status.isOK()) {
         return false;
     }
 
@@ -196,40 +160,28 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
                                              const RecordId& loc,
                                              const InsertDeleteOptions& options,
                                              InsertResult* result) {
-    bool checkIndexKeySize = shouldCheckIndexKeySize(opCtx);
-
     // Add all new data keys, and all new multikey metadata keys, into the index. When iterating
     // over the data keys, each of them should point to the doc's RecordId. When iterating over
     // the multikey metadata keys, they should point to the reserved 'kMultikeyMetadataKeyId'.
     for (const auto keyVec : {&keys, &multikeyMetadataKeys}) {
         const auto& recordId = (keyVec == &keys ? loc : kMultikeyMetadataKeyId);
         for (const auto& key : *keyVec) {
-            Status status = checkIndexKeySize ? checkKeySize(key) : Status::OK();
-            if (status.isOK()) {
-                bool unique = _descriptor->unique();
-                StatusWith<SpecialFormatInserted> ret =
-                    _newInterface->insert(opCtx, key, recordId, !unique /* dupsAllowed */);
-                status = ret.getStatus();
+            bool unique = _descriptor->unique();
+            Status status = _newInterface->insert(opCtx, key, recordId, !unique /* dupsAllowed */);
 
-                // When duplicates are encountered and allowed, retry with dupsAllowed. Add the
-                // key to the output vector so callers know which duplicate keys were inserted.
-                if (ErrorCodes::DuplicateKey == status.code() && options.dupsAllowed) {
-                    invariant(unique);
-                    ret = _newInterface->insert(opCtx, key, recordId, true /* dupsAllowed */);
-                    status = ret.getStatus();
+            // When duplicates are encountered and allowed, retry with dupsAllowed. Add the
+            // key to the output vector so callers know which duplicate keys were inserted.
+            if (ErrorCodes::DuplicateKey == status.code() && options.dupsAllowed) {
+                invariant(unique);
+                status = _newInterface->insert(opCtx, key, recordId, true /* dupsAllowed */);
 
-                    // This is speculative in that the 'dupsInserted' vector is not used by any code
-                    // today. It is currently in place to test detecting duplicate key errors during
-                    // hybrid index builds. Duplicate detection in the future will likely not take
-                    // place in this insert() method.
-                    if (status.isOK() && result) {
-                        result->dupsInserted.push_back(key);
-                    }
+                // This is speculative in that the 'dupsInserted' vector is not used by any code
+                // today. It is currently in place to test detecting duplicate key errors during
+                // hybrid index builds. Duplicate detection in the future will likely not take
+                // place in this insert() method.
+                if (status.isOK() && result) {
+                    result->dupsInserted.push_back(key);
                 }
-
-                if (status.isOK() && ret.getValue() == SpecialFormatInserted::LongTypeBitsInserted)
-                    DurableCatalog::get(opCtx)->setIndexKeyStringWithLongTypeBitsExistsOnDisk(
-                        opCtx);
             }
             if (isFatalError(opCtx, status, key)) {
                 return status;
@@ -459,8 +411,6 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
         _newInterface->unindex(opCtx, remKey, ticket.loc, ticket.dupsAllowed);
     }
 
-    bool checkIndexKeySize = shouldCheckIndexKeySize(opCtx);
-
     // Add all new data keys, and all new multikey metadata keys, into the index. When iterating
     // over the data keys, each of them should point to the doc's RecordId. When iterating over
     // the multikey metadata keys, they should point to the reserved 'kMultikeyMetadataKeyId'.
@@ -468,15 +418,7 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
     for (const auto keySet : {&ticket.added, &newMultikeyMetadataKeys}) {
         const auto& recordId = (keySet == &ticket.added ? ticket.loc : kMultikeyMetadataKeyId);
         for (const auto& key : *keySet) {
-            Status status = checkIndexKeySize ? checkKeySize(key) : Status::OK();
-            if (status.isOK()) {
-                StatusWith<SpecialFormatInserted> ret =
-                    _newInterface->insert(opCtx, key, recordId, ticket.dupsAllowed);
-                status = ret.getStatus();
-                if (status.isOK() && ret.getValue() == SpecialFormatInserted::LongTypeBitsInserted)
-                    DurableCatalog::get(opCtx)->setIndexKeyStringWithLongTypeBitsExistsOnDisk(
-                        opCtx);
-            }
+            Status status = _newInterface->insert(opCtx, key, recordId, ticket.dupsAllowed);
             if (isFatalError(opCtx, status, key)) {
                 return status;
             }
@@ -640,10 +582,6 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
     auto builder = std::unique_ptr<SortedDataBuilderInterface>(
         _newInterface->getBulkBuilder(opCtx, dupsAllowed));
 
-    // We need to check the index key size possibly on a primary-started index build; never on a
-    // replicated index build.
-    bool checkIndexKeySize = shouldCheckIndexKeySize(opCtx);
-
     BSONObj previousKey;
     const Ordering ordering = Ordering::make(_descriptor->keyPattern());
 
@@ -671,24 +609,11 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
             }
         }
 
-        Status status = checkIndexKeySize ? checkKeySize(data.first) : Status::OK();
-        if (status.isOK()) {
-            StatusWith<SpecialFormatInserted> ret = builder->addKey(data.first, data.second);
-            status = ret.getStatus();
-            if (status.isOK() && ret.getValue() == SpecialFormatInserted::LongTypeBitsInserted)
-                DurableCatalog::get(opCtx)->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
-        }
+        Status status = builder->addKey(data.first, data.second);
 
         if (!status.isOK()) {
             // Duplicates are checked before inserting.
             invariant(status.code() != ErrorCodes::DuplicateKey);
-
-            // Overlong key that's OK to skip?
-            // TODO SERVER-36385: Remove this when there is no KeyTooLong error.
-            if (status.code() == ErrorCodes::KeyTooLong) {
-                continue;
-            }
-
             return status;
         }
 
@@ -709,12 +634,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
           << " keys from external sorter into index in " << timer.seconds() << " seconds";
 
     WriteUnitOfWork wunit(opCtx);
-    SpecialFormatInserted specialFormatInserted = builder->commit(true /* mayInterrupt */);
-    // It's ok to insert KeyStrings with long TypeBits but we need to mark the feature
-    // tracker bit so that downgrade binary which cannot read the long TypeBits fails to
-    // start up.
-    if (specialFormatInserted == SpecialFormatInserted::LongTypeBitsInserted)
-        DurableCatalog::get(opCtx)->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
+    builder->commit(true);
     wunit.commit();
     return Status::OK();
 }
@@ -728,10 +648,8 @@ void AbstractIndexAccessMethod::getKeys(const BSONObj& obj,
                                         BSONObjSet* keys,
                                         BSONObjSet* multikeyMetadataKeys,
                                         MultikeyPaths* multikeyPaths) const {
-    // TODO SERVER-36385: Remove ErrorCodes::KeyTooLong.
     static stdx::unordered_set<int> whiteList{ErrorCodes::CannotBuildIndexKeys,
                                               // Btree
-                                              ErrorCodes::KeyTooLong,
                                               ErrorCodes::CannotIndexParallelArrays,
                                               // FTS
                                               16732,

@@ -179,14 +179,12 @@ SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
       _lastKeyToString(""),
       _lastRID(-1) {}
 
-SpecialFormatInserted SortedDataBuilderInterface::commit(bool mayInterrupt) {
+void SortedDataBuilderInterface::commit(bool mayInterrupt) {
     WriteUnitOfWork wunit(_opCtx);
     wunit.commit();
-    return SpecialFormatInserted::NoSpecialFormatInserted;
 }
 
-StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONObj& key,
-                                                                     const RecordId& loc) {
+Status SortedDataBuilderInterface::addKey(const BSONObj& key, const RecordId& loc) {
     StringStore* workingCopy(RecoveryUnit::get(_opCtx)->getHead());
 
     invariant(loc.isNormal() || loc.isReserved());
@@ -235,7 +233,7 @@ StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONO
     _lastRID = loc.repr();
 
     RecoveryUnit::get(_opCtx)->makeDirty();
-    return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
+    return Status::OK();
 }
 
 SortedDataBuilderInterface* SortedDataInterface::getBulkBuilder(OperationContext* opCtx,
@@ -287,10 +285,10 @@ SortedDataInterface::SortedDataInterface(const Ordering& ordering, bool isUnique
     _KSForIdentEnd = createKeyString(BSONObj(), RecordId::min(), _identEnd, _order, _isUnique);
 }
 
-StatusWith<SpecialFormatInserted> SortedDataInterface::insert(OperationContext* opCtx,
-                                                              const BSONObj& key,
-                                                              const RecordId& loc,
-                                                              bool dupsAllowed) {
+Status SortedDataInterface::insert(OperationContext* opCtx,
+                                   const BSONObj& key,
+                                   const RecordId& loc,
+                                   bool dupsAllowed) {
     // The KeyString representation of the key.
     std::unique_ptr<KeyString> workingCopyInternalKs = keyToKeyString(key, _order);
 
@@ -323,8 +321,7 @@ StatusWith<SpecialFormatInserted> SortedDataInterface::insert(OperationContext* 
                         key, _collectionNamespace, _indexName, _keyPattern);
                 }
             } else {
-                return StatusWith<SpecialFormatInserted>(
-                    SpecialFormatInserted::NoSpecialFormatInserted);
+                return Status::OK();
             }
         }
     } else {
@@ -332,7 +329,7 @@ StatusWith<SpecialFormatInserted> SortedDataInterface::insert(OperationContext* 
     }
 
     if (workingCopy->find(insertKeyString) != workingCopy->end())
-        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
+        return Status::OK();
 
     // The value we insert is the RecordId followed by the typebits.
     std::string internalTbString = std::string(workingCopyInternalKs->getTypeBits().getBuffer(),
@@ -347,7 +344,7 @@ StatusWith<SpecialFormatInserted> SortedDataInterface::insert(OperationContext* 
     workingCopy->insert(StringStore::value_type(insertKeyString, data));
     RecoveryUnit::get(opCtx)->makeDirty();
 
-    return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
+    return Status::OK();
 }
 
 void SortedDataInterface::unindex(OperationContext* opCtx,
