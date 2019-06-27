@@ -132,6 +132,7 @@ env.Library(
         'transaction_coordinator_structures.cpp',
         'transaction_coordinator_util.cpp',
         'transaction_coordinator.cpp',
+        'wait_for_majority_service.cpp',
         env.Idlc('transaction_coordinator_document.idl')[0],
         env.Idlc('transaction_coordinators_stats.idl')[0],
     ],
@@ -327,6 +328,7 @@ env.CppUnitTest(
         'sharding_logging_test.cpp',
         'start_chunk_clone_request_test.cpp',
         'type_shard_identity_test.cpp',
+        'wait_for_majority_service_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',

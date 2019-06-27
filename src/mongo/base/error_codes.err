@@ -288,6 +288,8 @@ error_code("ChangeStreamHistoryLost", 286)
 # The code below is for internal use only and must never be returned in a network response
 error_code("TransactionCoordinatorDeadlineTaskCanceled", 287)
 error_code("ChecksumMismatch", 288)
+# Internal only code used by WaitForMajorityService.
+error_code("WaitForMajorityServiceEarlierOpTimeAvailable", 289)
 
 # Error codes 4000-8999 are reserved.
 

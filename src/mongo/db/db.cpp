@@ -123,6 +123,7 @@
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state_recovery.h"
+#include "mongo/db/s/wait_for_majority_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_mongod.h"
@@ -504,6 +505,8 @@ ExitCode _initAndListen(int listenPort) {
                  "data."
               << startupWarningsLog;
     }
+
+    WaitForMajorityService::get(serviceContext).setUp(serviceContext);
 
     // This function may take the global lock.
     auto shardingInitialized = ShardingInitializationMongoD::get(startupOpCtx.get())
@@ -903,6 +906,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             log() << "Failed to stepDown in non-command initiated shutdown path " << e.toString();
         }
     }
+
+    WaitForMajorityService::get(serviceContext).shutDown();
 
     // Terminate the balancer thread so it doesn't leak memory.
     if (auto balancer = Balancer::get(serviceContext)) {

@@ -45,6 +45,7 @@ namespace mongo {
 class TransactionCoordinatorTestFixture : public ShardServerTestFixture {
 protected:
     void setUp() override;
+    void tearDown() override;
 
     /**
      * Override the CatalogClient to make CatalogClient::getAllShards automatically return the
