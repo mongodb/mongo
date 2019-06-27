@@ -171,13 +171,13 @@ std::unique_ptr<executor::TaskExecutorPool> ShardingMongodTestFixture::makeTaskE
     // note that the ThreadPoolMock uses the NetworkInterfaceMock's threads to run tasks, which is
     // again just the (single) thread the unit test is running on. Therefore, all tasks, local and
     // remote, must be carried out synchronously by the test thread.
-    auto fixedTaskExecutor = makeThreadPoolTestExecutor(std::move(netForFixedTaskExecutor));
+    auto fixedTaskExecutor = makeSharedThreadPoolTestExecutor(std::move(netForFixedTaskExecutor));
     _networkTestEnv = stdx::make_unique<NetworkTestEnv>(fixedTaskExecutor.get(), _mockNetwork);
 
     // Set up (one) TaskExecutor for the set of arbitrary TaskExecutors.
-    std::vector<std::unique_ptr<executor::TaskExecutor>> arbitraryExecutorsForExecutorPool;
+    std::vector<std::shared_ptr<executor::TaskExecutor>> arbitraryExecutorsForExecutorPool;
     arbitraryExecutorsForExecutorPool.emplace_back(
-        makeThreadPoolTestExecutor(stdx::make_unique<executor::NetworkInterfaceMock>()));
+        makeSharedThreadPoolTestExecutor(stdx::make_unique<executor::NetworkInterfaceMock>()));
 
     // Set up the TaskExecutorPool with the fixed TaskExecutor and set of arbitrary TaskExecutors.
     auto executorPool = stdx::make_unique<executor::TaskExecutorPool>();
@@ -338,7 +338,7 @@ void ShardingMongodTestFixture::shutdownExecutorPool() {
     _executorPoolShutDown = true;
 }
 
-executor::TaskExecutor* ShardingMongodTestFixture::executor() const {
+std::shared_ptr<executor::TaskExecutor> ShardingMongodTestFixture::executor() const {
     invariant(Grid::get(operationContext())->getExecutorPool());
     return Grid::get(operationContext())->getExecutorPool()->getFixedExecutor();
 }

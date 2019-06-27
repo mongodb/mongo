@@ -50,10 +50,8 @@ public:
 
     ~OwnedRemoteCursor() {
         if (_remoteCursor) {
-            killRemoteCursor(_opCtx,
-                             Grid::get(_opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                             releaseCursor(),
-                             _nss);
+            auto executor = Grid::get(_opCtx)->getExecutorPool()->getArbitraryExecutor();
+            killRemoteCursor(_opCtx, executor.get(), releaseCursor(), _nss);
         }
     }
 

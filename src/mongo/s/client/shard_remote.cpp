@@ -301,7 +301,8 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
     const Milliseconds requestTimeout =
         std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeMSOverride);
 
-    Fetcher fetcher(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    Fetcher fetcher(executor.get(),
                     host.getValue(),
                     dbName.toString(),
                     cmdObj,

@@ -98,7 +98,7 @@ public:
      * with a new, valid OperationContext before the next use.
      */
     AsyncResultsMerger(OperationContext* opCtx,
-                       executor::TaskExecutor* executor,
+                       std::shared_ptr<executor::TaskExecutor> executor,
                        AsyncResultsMergerParams params);
 
     /**
@@ -446,7 +446,7 @@ private:
     void _updateRemoteMetadata(WithLock, size_t remoteIndex, const CursorResponse& response);
 
     OperationContext* _opCtx;
-    executor::TaskExecutor* _executor;
+    std::shared_ptr<executor::TaskExecutor> _executor;
     TailableModeEnum _tailableMode;
     AsyncResultsMergerParams _params;
 

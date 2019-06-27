@@ -50,7 +50,7 @@
 namespace mongo {
 
 std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
-                                           executor::TaskExecutor* executor,
+                                           std::shared_ptr<executor::TaskExecutor> executor,
                                            const NamespaceString& nss,
                                            const ReadPreferenceSetting readPref,
                                            const std::vector<std::pair<ShardId, BSONObj>>& remotes,
@@ -136,7 +136,7 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
             }
 
             // Schedule killCursors against all cursors that were established.
-            killRemoteCursors(opCtx, executor, std::move(remoteCursors), nss);
+            killRemoteCursors(opCtx, executor.get(), std::move(remoteCursors), nss);
         } catch (const DBException&) {
             // Ignore the new error and rethrow the original one.
         }

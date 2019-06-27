@@ -483,7 +483,7 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
                            std::vector<OwnedRemoteCursor> ownedCursors,
                            const std::vector<ShardId>& targetedShards,
                            boost::optional<BSONObj> shardCursorsSortSpec,
-                           executor::TaskExecutor* executor) {
+                           std::shared_ptr<executor::TaskExecutor> executor) {
     auto* opCtx = mergePipeline->getContext()->opCtx;
     AsyncResultsMergerParams armParams;
     armParams.setSort(shardCursorsSortSpec);
@@ -521,7 +521,7 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
     // For change streams, we need to set up a custom stage to establish cursors on new shards when
     // they are added, to ensure we don't miss results from the new shards.
     auto mergeCursorsStage = DocumentSourceMergeCursors::create(
-        executor, std::move(armParams), mergePipeline->getContext());
+        std::move(executor), std::move(armParams), mergePipeline->getContext());
 
     if (liteParsedPipeline.hasChangeStream()) {
         mergePipeline->addInitialSource(DocumentSourceUpdateOnAddShard::create(

@@ -44,8 +44,9 @@
 namespace mongo {
 namespace executor {
 
-AsyncMulticaster::AsyncMulticaster(executor::TaskExecutor* executor, Options options)
-    : _options(options), _executor(executor) {}
+AsyncMulticaster::AsyncMulticaster(std::shared_ptr<executor::TaskExecutor> executor,
+                                   Options options)
+    : _options(options), _executor(std::move(executor)) {}
 
 std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
     const std::vector<HostAndPort> servers,

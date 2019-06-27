@@ -131,7 +131,7 @@ public:
      * valid for the lifetime of the ARS.
      */
     AsyncRequestsSender(OperationContext* opCtx,
-                        executor::TaskExecutor* executor,
+                        std::shared_ptr<executor::TaskExecutor> executor,
                         StringData dbName,
                         const std::vector<AsyncRequestsSender::Request>& requests,
                         const ReadPreferenceSetting& readPreference,

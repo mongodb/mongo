@@ -208,13 +208,15 @@ TEST_F(ClusterClientCursorImplTest, LogicalSessionIdsOnCursors) {
 }
 
 TEST_F(ClusterClientCursorImplTest, ShouldStoreLSIDIfSetOnOpCtx) {
+    std::shared_ptr<executor::TaskExecutor> nullExecutor;
+
     {
         // Make a cursor with no lsid or txnNumber.
         ClusterClientCursorParams params(NamespaceString("test"), {});
         params.lsid = _opCtx->getLogicalSessionId();
         params.txnNumber = _opCtx->getTxnNumber();
 
-        auto cursor = ClusterClientCursorImpl::make(_opCtx.get(), nullptr, std::move(params));
+        auto cursor = ClusterClientCursorImpl::make(_opCtx.get(), nullExecutor, std::move(params));
         ASSERT_FALSE(cursor->getLsid());
         ASSERT_FALSE(cursor->getTxnNumber());
     }
@@ -228,7 +230,7 @@ TEST_F(ClusterClientCursorImplTest, ShouldStoreLSIDIfSetOnOpCtx) {
         params.lsid = _opCtx->getLogicalSessionId();
         params.txnNumber = _opCtx->getTxnNumber();
 
-        auto cursor = ClusterClientCursorImpl::make(_opCtx.get(), nullptr, std::move(params));
+        auto cursor = ClusterClientCursorImpl::make(_opCtx.get(), nullExecutor, std::move(params));
         ASSERT_EQ(*cursor->getLsid(), lsid);
         ASSERT_FALSE(cursor->getTxnNumber());
     }
@@ -242,7 +244,7 @@ TEST_F(ClusterClientCursorImplTest, ShouldStoreLSIDIfSetOnOpCtx) {
         params.lsid = _opCtx->getLogicalSessionId();
         params.txnNumber = _opCtx->getTxnNumber();
 
-        auto cursor = ClusterClientCursorImpl::make(_opCtx.get(), nullptr, std::move(params));
+        auto cursor = ClusterClientCursorImpl::make(_opCtx.get(), nullExecutor, std::move(params));
         ASSERT_EQ(*cursor->getLsid(), lsid);
         ASSERT_EQ(*cursor->getTxnNumber(), txnNumber);
     }

@@ -38,11 +38,11 @@ namespace mongo {
 
 BlockingResultsMerger::BlockingResultsMerger(OperationContext* opCtx,
                                              AsyncResultsMergerParams&& armParams,
-                                             executor::TaskExecutor* executor,
+                                             std::shared_ptr<executor::TaskExecutor> executor,
                                              std::unique_ptr<ResourceYielder> resourceYielder)
     : _tailableMode(armParams.getTailableMode().value_or(TailableModeEnum::kNormal)),
       _executor(executor),
-      _arm(opCtx, executor, std::move(armParams)),
+      _arm(opCtx, std::move(executor), std::move(armParams)),
       _resourceYielder(std::move(resourceYielder)) {}
 
 StatusWith<stdx::cv_status> BlockingResultsMerger::doWaiting(

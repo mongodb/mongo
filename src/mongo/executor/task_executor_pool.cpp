@@ -73,8 +73,8 @@ void TaskExecutorPool::shutdownAndJoin() {
     }
 }
 
-void TaskExecutorPool::addExecutors(std::vector<std::unique_ptr<TaskExecutor>> executors,
-                                    std::unique_ptr<TaskExecutor> fixedExecutor) {
+void TaskExecutorPool::addExecutors(std::vector<std::shared_ptr<TaskExecutor>> executors,
+                                    std::shared_ptr<TaskExecutor> fixedExecutor) {
     invariant(_executors.empty());
     invariant(fixedExecutor);
     invariant(!_fixedExecutor);
@@ -83,15 +83,15 @@ void TaskExecutorPool::addExecutors(std::vector<std::unique_ptr<TaskExecutor>> e
     _executors = std::move(executors);
 }
 
-TaskExecutor* TaskExecutorPool::getArbitraryExecutor() {
+const std::shared_ptr<TaskExecutor>& TaskExecutorPool::getArbitraryExecutor() {
     invariant(!_executors.empty());
     uint64_t idx = (_counter.fetchAndAdd(1) % _executors.size());
-    return _executors[idx].get();
+    return _executors[idx];
 }
 
-TaskExecutor* TaskExecutorPool::getFixedExecutor() {
+const std::shared_ptr<TaskExecutor>& TaskExecutorPool::getFixedExecutor() {
     invariant(_fixedExecutor);
-    return _fixedExecutor.get();
+    return _fixedExecutor;
 }
 
 void TaskExecutorPool::appendConnectionStats(ConnectionPoolStats* stats) const {

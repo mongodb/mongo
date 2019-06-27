@@ -46,13 +46,13 @@ REGISTER_DOCUMENT_SOURCE(mergeCursors,
 constexpr StringData DocumentSourceMergeCursors::kStageName;
 
 DocumentSourceMergeCursors::DocumentSourceMergeCursors(
-    executor::TaskExecutor* executor,
+    std::shared_ptr<executor::TaskExecutor> executor,
     AsyncResultsMergerParams armParams,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<BSONObj> ownedParamsSpec)
     : DocumentSource(expCtx),
       _armParamsObj(std::move(ownedParamsSpec)),
-      _executor(executor),
+      _executor(std::move(executor)),
       _armParams(std::move(armParams)) {}
 
 std::size_t DocumentSourceMergeCursors::getNumRemotes() const {
@@ -129,10 +129,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
 }
 
 boost::intrusive_ptr<DocumentSourceMergeCursors> DocumentSourceMergeCursors::create(
-    executor::TaskExecutor* executor,
+    std::shared_ptr<executor::TaskExecutor> executor,
     AsyncResultsMergerParams params,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceMergeCursors(executor, std::move(params), expCtx);
+    return new DocumentSourceMergeCursors(std::move(executor), std::move(params), expCtx);
 }
 
 void DocumentSourceMergeCursors::detachFromOperationContext() {

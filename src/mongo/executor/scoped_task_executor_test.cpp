@@ -46,10 +46,10 @@ public:
     void setUp() override {
         auto net = std::make_unique<NetworkInterfaceMock>();
         _net = net.get();
-        _tpte.emplace(std::make_unique<ThreadPoolMock>(_net, 1, ThreadPoolMock::Options{}),
-                      std::move(net));
+        _tpte = std::make_shared<ThreadPoolTaskExecutor>(
+            std::make_unique<ThreadPoolMock>(_net, 1, ThreadPoolMock::Options{}), std::move(net));
         _tpte->startup();
-        _executor.emplace(_tpte.get_ptr());
+        _executor.emplace(_tpte);
     }
 
     void tearDown() override {
@@ -118,7 +118,7 @@ public:
 
 private:
     NetworkInterfaceMock* _net;
-    boost::optional<ThreadPoolTaskExecutor> _tpte;
+    std::shared_ptr<ThreadPoolTaskExecutor> _tpte;
     boost::optional<ScopedTaskExecutor> _executor;
 };
 

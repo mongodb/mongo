@@ -82,10 +82,10 @@ int compareSortKeys(BSONObj leftSortKey, BSONObj rightSortKey, BSONObj sortKeyPa
 }  // namespace
 
 AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
-                                       executor::TaskExecutor* executor,
+                                       std::shared_ptr<executor::TaskExecutor> executor,
                                        AsyncResultsMergerParams params)
     : _opCtx(opCtx),
-      _executor(executor),
+      _executor(std::move(executor)),
       // This strange initialization is to work around the fact that the IDL does not currently
       // support a default value for an enum. The default tailable mode should be 'kNormal', but
       // since that is not supported we treat boost::none (unspecified) to mean 'kNormal'.

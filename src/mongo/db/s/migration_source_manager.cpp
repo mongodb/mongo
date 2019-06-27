@@ -108,8 +108,7 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
         opCtx,
         executor::RemoteCommandRequest::kNoTimeout);
 
-    executor::TaskExecutor* const executor =
-        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto noOp = [](const executor::TaskExecutor::RemoteCommandCallbackArgs&) {};
     executor->scheduleRemoteCommand(request, noOp).getStatus().ignore();
 }

@@ -44,6 +44,13 @@ std::unique_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
         stdx::make_unique<ThreadPoolMock>(netPtr, 1, std::move(options)), std::move(net));
 }
 
+std::shared_ptr<ThreadPoolTaskExecutor> makeSharedThreadPoolTestExecutor(
+    std::unique_ptr<NetworkInterfaceMock> net, ThreadPoolMock::Options options) {
+    auto netPtr = net.get();
+    return std::make_shared<ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPoolMock>(netPtr, 1, std::move(options)), std::move(net));
+}
+
 ThreadPoolExecutorTest::ThreadPoolExecutorTest() {}
 
 ThreadPoolExecutorTest::ThreadPoolExecutorTest(ThreadPoolMock::Options options)

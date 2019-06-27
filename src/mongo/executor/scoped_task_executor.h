@@ -83,7 +83,7 @@ namespace executor {
  */
 class ScopedTaskExecutor {
 public:
-    explicit ScopedTaskExecutor(TaskExecutor* executor);
+    explicit ScopedTaskExecutor(std::shared_ptr<TaskExecutor> executor);
 
     // Delete all move/copy-ability
     ScopedTaskExecutor(TaskExecutor&&) = delete;

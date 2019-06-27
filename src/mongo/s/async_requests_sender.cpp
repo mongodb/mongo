@@ -59,7 +59,7 @@ const int kMaxNumFailedHostRetryAttempts = 3;
 }  // namespace
 
 AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
-                                         executor::TaskExecutor* executor,
+                                         std::shared_ptr<executor::TaskExecutor> executor,
                                          StringData dbName,
                                          const std::vector<AsyncRequestsSender::Request>& requests,
                                          const ReadPreferenceSetting& readPreference,
@@ -68,7 +68,7 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
       _db(dbName.toString()),
       _readPreference(readPreference),
       _retryPolicy(retryPolicy),
-      _subExecutor(executor),
+      _subExecutor(std::move(executor)),
       _subBaton(opCtx->getBaton()->makeSubBaton()) {
 
     _remotesLeft = requests.size();

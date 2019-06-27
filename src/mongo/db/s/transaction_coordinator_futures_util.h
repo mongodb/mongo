@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "mongo/client/read_preference.h"
@@ -192,8 +193,8 @@ private:
     // Service context under which this executor runs
     ServiceContext* const _serviceContext;
 
-    // Cached reference to the executor to use
-    executor::TaskExecutor* const _executor;
+    // Executor for performing async tasks.
+    std::shared_ptr<executor::TaskExecutor> _executor;
 
     // If this work scheduler was constructed through 'makeChildScheduler', points to the parent
     // scheduler and contains the iterator from the parent, which needs to be removed on destruction

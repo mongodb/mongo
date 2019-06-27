@@ -76,7 +76,7 @@ public:
     CatalogCache* catalogCache() const;
     ShardRegistry* shardRegistry() const;
     RemoteCommandTargeterFactoryMock* targeterFactory() const;
-    executor::TaskExecutor* executor() const;
+    std::shared_ptr<executor::TaskExecutor> executor() const;
     DistLockManager* distLock() const;
     ClusterCursorManager* clusterCursorManager() const;
     executor::TaskExecutorPool* executorPool() const;

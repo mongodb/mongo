@@ -57,11 +57,12 @@ std::unique_ptr<ClusterClientCursor> ClusterClientCursorGuard::releaseCursor() {
     return std::move(_ccc);
 }
 
-ClusterClientCursorGuard ClusterClientCursorImpl::make(OperationContext* opCtx,
-                                                       executor::TaskExecutor* executor,
-                                                       ClusterClientCursorParams&& params) {
+ClusterClientCursorGuard ClusterClientCursorImpl::make(
+    OperationContext* opCtx,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    ClusterClientCursorParams&& params) {
     std::unique_ptr<ClusterClientCursor> cursor(new ClusterClientCursorImpl(
-        opCtx, executor, std::move(params), opCtx->getLogicalSessionId()));
+        opCtx, std::move(executor), std::move(params), opCtx->getLogicalSessionId()));
     return ClusterClientCursorGuard(opCtx, std::move(cursor));
 }
 
@@ -74,11 +75,11 @@ ClusterClientCursorGuard ClusterClientCursorImpl::make(OperationContext* opCtx,
 }
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
-                                                 executor::TaskExecutor* executor,
+                                                 std::shared_ptr<executor::TaskExecutor> executor,
                                                  ClusterClientCursorParams&& params,
                                                  boost::optional<LogicalSessionId> lsid)
     : _params(std::move(params)),
-      _root(buildMergerPlan(opCtx, executor, &_params)),
+      _root(buildMergerPlan(opCtx, std::move(executor), &_params)),
       _lsid(lsid),
       _opCtx(opCtx),
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
@@ -222,7 +223,9 @@ boost::optional<ReadPreferenceSetting> ClusterClientCursorImpl::getReadPreferenc
 }
 
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
-    OperationContext* opCtx, executor::TaskExecutor* executor, ClusterClientCursorParams* params) {
+    OperationContext* opCtx,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    ClusterClientCursorParams* params) {
     const auto skip = params->skip;
     const auto limit = params->limit;
 
