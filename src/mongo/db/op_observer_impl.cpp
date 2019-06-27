@@ -910,24 +910,25 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
     if (stmts.empty())
         return;
 
-    BSONObjBuilder applyOpsBuilder;
-    BSONArrayBuilder opsArray(applyOpsBuilder.subarrayStart("applyOps"_sd));
-    for (auto& stmt : stmts) {
-        opsArray.append(stmt.toBSON());
-    }
-    opsArray.done();
-    const NamespaceString cmdNss{"admin", "$cmd"};
-
-    OperationSessionInfo sessionInfo;
-    repl::OplogLink oplogLink;
-    sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
-    sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-    StmtId stmtId(0);
-    oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
-    // Until we support multiple oplog entries per transaction, prevOpTime should always be null.
-    invariant(oplogLink.prevOpTime.isNull());
-
     try {
+        BSONObjBuilder applyOpsBuilder;
+        BSONArrayBuilder opsArray(applyOpsBuilder.subarrayStart("applyOps"_sd));
+        for (auto& stmt : stmts) {
+            opsArray.append(stmt.toBSON());
+        }
+        opsArray.done();
+        const NamespaceString cmdNss{"admin", "$cmd"};
+
+        OperationSessionInfo sessionInfo;
+        repl::OplogLink oplogLink;
+        sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+        sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
+        StmtId stmtId(0);
+        oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
+        // Until we support multiple oplog entries per transaction, prevOpTime should always be
+        // null.
+        invariant(oplogLink.prevOpTime.isNull());
+
         auto applyOpCmd = applyOpsBuilder.done();
         auto times = replLogApplyOps(opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink);
 
