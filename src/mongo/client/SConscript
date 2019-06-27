@@ -295,15 +295,29 @@ env.CppUnitTest(
     ],
 )
 
+# The following two tests cannot be combined because the second one
+# needs to be filtered out for the repl and sharding variants of the
+# integration tests.
 env.CppIntegrationTest(
-    target='client_integration_test',
+    target='client_connpool_integration_test',
     source=[
         'connpool_integration_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/mongo/util/version_impl',
+        'clientdriver_network',
+    ],
+)
+
+env.CppIntegrationTest(
+    target='client_dbclient_connection_integration_test',
+    source=[
         'dbclient_connection_integration_test.cpp',
     ],
     LIBDEPS=[
-        'clientdriver_network',
         '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
         '$BUILD_DIR/mongo/util/version_impl',
+        'clientdriver_network',
     ],
 )

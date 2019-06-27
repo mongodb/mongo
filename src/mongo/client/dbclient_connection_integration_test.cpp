@@ -83,7 +83,6 @@ public:
     }
 };
 
-#if 0
 TEST_F(DBClientConnectionFixture, shutdownWorksIfCalledFirst) {
     auto conn = makeConn();
 
@@ -108,7 +107,6 @@ TEST_F(DBClientConnectionFixture, shutdownWorksIfRunCommandInProgress) {
     ASSERT_THROWS(conn->runCommand("admin", sleepCmd, reply),
                   ExceptionForCat<ErrorCategory::NetworkError>);  // Currently HostUnreachable.
 }
-#endif  // 0
 
 }  // namespace
 }  // namespace mongo
