@@ -43,6 +43,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/multi_key_path_tracker.h"
@@ -267,31 +268,68 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level
     // multikey information in order to avoid unintentionally setting path-level multikey
     // information on an index created before 3.4.
-    const bool indexMetadataHasChanged = DurableCatalog::get(opCtx)->setIndexIsMultikey(
-        opCtx, _collection->ns(), _descriptor->indexName(), paths);
+    bool indexMetadataHasChanged;
 
-    // When the recovery unit commits, update the multikey paths if needed and clear the plan cache
-    // if the index metadata has changed.
-    opCtx->recoveryUnit()->onCommit(
-        [this, multikeyPaths, indexMetadataHasChanged](boost::optional<Timestamp>) {
-            _isMultikey.store(true);
+    // The commit handler for a transaction that sets the multikey flag. When the recovery unit
+    // commits, update the multikey paths if needed and clear the plan cache if the index metadata
+    // has changed.
+    auto onMultikeyCommitFn = [this, multikeyPaths](bool indexMetadataHasChanged) {
+        _isMultikey.store(true);
 
-            if (_indexTracksPathLevelMultikeyInfo) {
-                stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-                for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-                    _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
-                }
+        if (_indexTracksPathLevelMultikeyInfo) {
+            stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+            for (size_t i = 0; i < multikeyPaths.size(); ++i) {
+                _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
             }
+        }
 
-            if (indexMetadataHasChanged && _infoCache) {
-                LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
-                       << " set to multi key.";
-                _infoCache->clearQueryCache();
-            }
-        });
+        if (indexMetadataHasChanged && _infoCache) {
+            LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
+                   << " set to multi key.";
+            _infoCache->clearQueryCache();
+        }
+    };
 
-    // Keep multikey changes in memory to correctly service later reads using this index.
+    // If we are inside a multi-document transaction, we write the on-disk multikey update in a
+    // separate transaction so that it will not generate prepare conflicts with other operations
+    // that try to set the multikey flag. In general, it should always be safe to update the
+    // multikey flag earlier than necessary, and so we are not concerned with the atomicity of the
+    // multikey flag write and the parent transaction. We can do this write separately and commit it
+    // before the parent transaction commits.
     auto txnParticipant = TransactionParticipant::get(opCtx);
+    if (txnParticipant && txnParticipant.inMultiDocumentTransaction()) {
+        TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+        writeConflictRetry(opCtx, "set index multikey", _collection->ns().ns(), [&] {
+            WriteUnitOfWork wuow(opCtx);
+            auto writeTs = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
+            auto status = opCtx->recoveryUnit()->setTimestamp(writeTs);
+            if (status.code() == ErrorCodes::BadValue) {
+                log() << "Temporarily could not timestamp the multikey catalog write, retrying. "
+                      << status.reason();
+                throw WriteConflictException();
+            }
+            fassert(31164, status);
+            indexMetadataHasChanged = DurableCatalog::get(opCtx)->setIndexIsMultikey(
+                opCtx, _collection->ns(), _descriptor->indexName(), paths);
+            opCtx->recoveryUnit()->onCommit([onMultikeyCommitFn, indexMetadataHasChanged](
+                boost::optional<Timestamp>) { onMultikeyCommitFn(indexMetadataHasChanged); });
+            wuow.commit();
+        });
+    } else {
+        indexMetadataHasChanged = DurableCatalog::get(opCtx)->setIndexIsMultikey(
+            opCtx, _collection->ns(), _descriptor->indexName(), paths);
+    }
+
+    opCtx->recoveryUnit()->onCommit([onMultikeyCommitFn, indexMetadataHasChanged](
+        boost::optional<Timestamp>) { onMultikeyCommitFn(indexMetadataHasChanged); });
+
+    // Within a multi-document transaction, reads should be able to see the effect of previous
+    // writes done within that transaction. If a previous write in a transaction has set the index
+    // to be multikey, then a subsequent read MUST know that fact in order to return correct
+    // results. This is true in general for multikey writes. Since we don't update the in-memory
+    // multikey flag until after the transaction commits, we track extra information here to let
+    // subsequent readers within the same transaction know if this index was set as multikey by a
+    // previous write in the transaction.
     if (txnParticipant && txnParticipant.inMultiDocumentTransaction()) {
         txnParticipant.addUncommittedMultikeyPathInfo(
             MultikeyPathInfo{_collection->ns(), _descriptor->indexName(), std::move(paths)});
