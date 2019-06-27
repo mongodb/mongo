@@ -122,7 +122,8 @@ var doTest = function(signal) {
     var result = db.runCommand({getLastError: 1, w: 3, wtimeout: 30000});
     printjson(result);
     var lastOp = result.lastOp;
-    var lastOplogOp = master.getDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+    const oplogEntries = replTest.dumpOplog(master);
+    const lastOplogOp = oplogEntries[0];
     assert.eq(lastOplogOp['ts'], lastOp['ts']);
     assert.eq(lastOplogOp['t'], lastOp['t']);
 
