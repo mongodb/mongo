@@ -109,6 +109,12 @@ public:
                                      LogicalSessionId lsid,
                                      TxnNumber txnNumber);
 
+    /**
+     * Blocking call which waits for the previous stepUp/stepDown round to join and ensures all
+     * tasks scheduled by that round have completed.
+     */
+    void joinPreviousRound();
+
 private:
     struct CatalogAndScheduler {
         CatalogAndScheduler(ServiceContext* service) : scheduler(service) {}
@@ -127,12 +133,6 @@ private:
      * exception.
      */
     std::shared_ptr<CatalogAndScheduler> _getCatalogAndScheduler(OperationContext* opCtx);
-
-    /**
-     * Blocking call which waits for the previous stepUp/stepDown round to join and ensures all
-     * tasks scheduled by that round have completed.
-     */
-    void _joinPreviousRound();
 
     // Contains the catalog + scheduler, which was active at the last step-down attempt (if any).
     // Set at onStepDown and destroyed at onStepUp, which are always invoked sequentially by the

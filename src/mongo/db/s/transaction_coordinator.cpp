@@ -35,7 +35,10 @@
 
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/s/transaction_coordinator_metrics_observer.h"
+#include "mongo/db/s/wait_for_majority_service.h"
 #include "mongo/db/server_options.h"
+#include "mongo/s/grid.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -45,6 +48,26 @@ using CommitDecision = txn::CommitDecision;
 using CoordinatorCommitDecision = txn::CoordinatorCommitDecision;
 using PrepareVoteConsensus = txn::PrepareVoteConsensus;
 using TransactionCoordinatorDocument = txn::TransactionCoordinatorDocument;
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForParticipantListWriteConcern);
+MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForDecisionWriteConcern);
+
+void hangIfFailPointEnabled(ServiceContext* service,
+                            FailPoint& failpoint,
+                            const StringData& failPointName) {
+    MONGO_FAIL_POINT_BLOCK(failpoint, fp) {
+        LOG(0) << "Hit " << failPointName << " failpoint";
+        const BSONObj& data = fp.getData();
+        if (!data["useUninterruptibleSleep"].eoo()) {
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(failpoint);
+        } else {
+            ThreadClient tc(failPointName, service);
+            auto opCtx = tc->makeOperationContext();
+
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx.get(), failpoint);
+        }
+    }
+}
 
 }  // namespace
 
@@ -112,17 +135,25 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
                     _serviceContext->getPreciseClockSource()->now());
 
                 if (_participantsDurable)
-                    return Future<void>::makeReady();
+                    return Future<repl::OpTime>::makeReady(repl::OpTime());
             }
 
             return txn::persistParticipantsList(
-                       *_sendPrepareScheduler, _lsid, _txnNumber, *_participants)
-                .then([this] {
-                    stdx::lock_guard<stdx::mutex> lg(_mutex);
-                    _participantsDurable = true;
-                });
+                *_sendPrepareScheduler, _lsid, _txnNumber, *_participants);
         })
+        .then([this](repl::OpTime opTime) {
+            hangIfFailPointEnabled(_serviceContext,
+                                   hangBeforeWaitingForParticipantListWriteConcern,
+                                   "hangBeforeWaitingForParticipantListWriteConcern");
+            return WaitForMajorityService::get(_serviceContext).waitUntilMajority(opTime);
+        })
+        .thenRunOn(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor())
         .then([this] {
+            {
+                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                _participantsDurable = true;
+            }
+
             // Send prepare to the participants, unless this has already been done (which would only
             // be the case if this coordinator was created as part of step-up recovery and the
             // recovery document contained a decision).
@@ -184,16 +215,24 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
                     _serviceContext->getPreciseClockSource()->now());
 
                 if (_decisionDurable)
-                    return Future<void>::makeReady();
+                    return Future<repl::OpTime>::makeReady(repl::OpTime());
             }
 
-            return txn::persistDecision(*_scheduler, _lsid, _txnNumber, *_participants, *_decision)
-                .then([this] {
-                    stdx::lock_guard<stdx::mutex> lg(_mutex);
-                    _decisionDurable = true;
-                });
+            return txn::persistDecision(*_scheduler, _lsid, _txnNumber, *_participants, *_decision);
         })
+        .then([this](repl::OpTime opTime) {
+            hangIfFailPointEnabled(_serviceContext,
+                                   hangBeforeWaitingForDecisionWriteConcern,
+                                   "hangBeforeWaitingForDecisionWriteConcern");
+            return WaitForMajorityService::get(_serviceContext).waitUntilMajority(opTime);
+        })
+        .thenRunOn(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor())
         .then([this] {
+            {
+                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                _decisionDurable = true;
+            }
+
             // Send the commit/abort decision to the participants.
             //  Input: _decisionDurable
             //  Output: (none)
@@ -249,13 +288,13 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
             _scheduler->shutdown(
                 {ErrorCodes::TransactionCoordinatorDeadlineTaskCanceled, "Coordinator completed"});
 
-            return std::move(deadlineFuture).onCompletion([s = std::move(s)](Status) { return s; });
-        })
-        .getAsync([this](Status s) {
-            // Notify all the listeners which are interested in the coordinator's lifecycle. After
-            // this call, the coordinator object could potentially get destroyed by its lifetime
-            // controller, so there shouldn't be any accesses to `this` after this call.
-            _done(s);
+            return std::move(deadlineFuture).onCompletion([ this, s = std::move(s) ](Status) {
+                // Notify all the listeners which are interested in the coordinator's lifecycle.
+                // After this call, the coordinator object could potentially get destroyed by its
+                // lifetime controller, so there shouldn't be any accesses to `this` after this
+                // call.
+                _done(s);
+            });
         });
 }
 

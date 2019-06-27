@@ -48,8 +48,6 @@ namespace mongo {
 namespace txn {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForParticipantListWriteConcern);
-MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForDecisionWriteConcern);
 MONGO_FAIL_POINT_DEFINE(hangAfterDeletingCoordinatorDoc);
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeWritingParticipantList);
@@ -57,10 +55,6 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeWritingDecision);
 MONGO_FAIL_POINT_DEFINE(hangBeforeDeletingCoordinatorDoc);
 
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
-
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kNoTimeout);
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
@@ -92,7 +86,8 @@ std::string buildParticipantListString(const std::vector<ShardId>& participantLi
     return ss.str();
 }
 
-bool shouldRetryPersistingCoordinatorState(const Status& responseStatus) {
+template <typename T>
+bool shouldRetryPersistingCoordinatorState(const StatusWith<T>& responseStatus) {
     return !responseStatus.isOK() &&
         responseStatus != ErrorCodes::TransactionCoordinatorSteppingDown;
 }
@@ -100,10 +95,10 @@ bool shouldRetryPersistingCoordinatorState(const Status& responseStatus) {
 }  // namespace
 
 namespace {
-void persistParticipantListBlocking(OperationContext* opCtx,
-                                    const LogicalSessionId& lsid,
-                                    TxnNumber txnNumber,
-                                    const std::vector<ShardId>& participantList) {
+repl::OpTime persistParticipantListBlocking(OperationContext* opCtx,
+                                            const LogicalSessionId& lsid,
+                                            TxnNumber txnNumber,
+                                            const std::vector<ShardId>& participantList) {
     LOG(3) << "Going to write participant list for " << lsid.getId() << ':' << txnNumber;
 
     if (MONGO_FAIL_POINT(hangBeforeWritingParticipantList)) {
@@ -173,37 +168,21 @@ void persistParticipantListBlocking(OperationContext* opCtx,
 
     LOG(3) << "Wrote participant list for " << lsid.getId() << ':' << txnNumber;
 
-    MONGO_FAIL_POINT_BLOCK(hangBeforeWaitingForParticipantListWriteConcern, fp) {
-        LOG(0) << "Hit hangBeforeWaitingForParticipantListWriteConcern failpoint";
-        const BSONObj& data = fp.getData();
-        if (!data["useUninterruptibleSleep"].eoo()) {
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeWaitingForParticipantListWriteConcern);
-        } else {
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-                opCtx, hangBeforeWaitingForParticipantListWriteConcern);
-        }
-    }
-
-    WriteConcernResult unusedWCResult;
-    uassertStatusOK(
-        waitForWriteConcern(opCtx,
-                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                            kMajorityWriteConcern,
-                            &unusedWCResult));
+    return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 }
 }  // namespace
 
-Future<void> persistParticipantsList(txn::AsyncWorkScheduler& scheduler,
-                                     const LogicalSessionId& lsid,
-                                     TxnNumber txnNumber,
-                                     const txn::ParticipantsList& participants) {
+Future<repl::OpTime> persistParticipantsList(txn::AsyncWorkScheduler& scheduler,
+                                             const LogicalSessionId& lsid,
+                                             TxnNumber txnNumber,
+                                             const txn::ParticipantsList& participants) {
     return txn::doWhile(
         scheduler,
         boost::none /* no need for a backoff */,
-        [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
+        [](const StatusWith<repl::OpTime>& s) { return shouldRetryPersistingCoordinatorState(s); },
         [&scheduler, lsid, txnNumber, participants] {
             return scheduler.scheduleWork([lsid, txnNumber, participants](OperationContext* opCtx) {
-                persistParticipantListBlocking(opCtx, lsid, txnNumber, participants);
+                return persistParticipantListBlocking(opCtx, lsid, txnNumber, participants);
             });
         });
 }
@@ -286,11 +265,11 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
 }
 
 namespace {
-void persistDecisionBlocking(OperationContext* opCtx,
-                             const LogicalSessionId& lsid,
-                             TxnNumber txnNumber,
-                             const std::vector<ShardId>& participantList,
-                             const txn::CoordinatorCommitDecision& decision) {
+repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
+                                     const LogicalSessionId& lsid,
+                                     TxnNumber txnNumber,
+                                     const std::vector<ShardId>& participantList,
+                                     const txn::CoordinatorCommitDecision& decision) {
     const bool isCommit = decision.getDecision() == txn::CommitDecision::kCommit;
     LOG(3) << "Going to write decision " << (isCommit ? "commit" : "abort") << " for "
            << lsid.getId() << ':' << txnNumber;
@@ -368,41 +347,25 @@ void persistDecisionBlocking(OperationContext* opCtx,
     LOG(3) << "Wrote decision " << (isCommit ? "commit" : "abort") << " for " << lsid.getId() << ':'
            << txnNumber;
 
-    MONGO_FAIL_POINT_BLOCK(hangBeforeWaitingForDecisionWriteConcern, fp) {
-        LOG(0) << "Hit hangBeforeWaitingForDecisionWriteConcern failpoint";
-        const BSONObj& data = fp.getData();
-        if (!data["useUninterruptibleSleep"].eoo()) {
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeWaitingForDecisionWriteConcern);
-        } else {
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-                opCtx, hangBeforeWaitingForDecisionWriteConcern);
-        }
-    }
-
-    WriteConcernResult unusedWCResult;
-    uassertStatusOK(
-        waitForWriteConcern(opCtx,
-                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                            kMajorityWriteConcern,
-                            &unusedWCResult));
+    return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 }
 }  // namespace
 
-Future<void> persistDecision(txn::AsyncWorkScheduler& scheduler,
-                             const LogicalSessionId& lsid,
-                             TxnNumber txnNumber,
-                             const txn::ParticipantsList& participants,
-                             const txn::CoordinatorCommitDecision& decision) {
-    return txn::doWhile(scheduler,
-                        boost::none /* no need for a backoff */,
-                        [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
-                        [&scheduler, lsid, txnNumber, participants, decision] {
-                            return scheduler.scheduleWork(
-                                [lsid, txnNumber, participants, decision](OperationContext* opCtx) {
-                                    persistDecisionBlocking(
-                                        opCtx, lsid, txnNumber, participants, decision);
-                                });
-                        });
+Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
+                                     const LogicalSessionId& lsid,
+                                     TxnNumber txnNumber,
+                                     const txn::ParticipantsList& participants,
+                                     const txn::CoordinatorCommitDecision& decision) {
+    return txn::doWhile(
+        scheduler,
+        boost::none /* no need for a backoff */,
+        [](const StatusWith<repl::OpTime>& s) { return shouldRetryPersistingCoordinatorState(s); },
+        [&scheduler, lsid, txnNumber, participants, decision] {
+            return scheduler.scheduleWork(
+                [lsid, txnNumber, participants, decision](OperationContext* opCtx) {
+                    return persistDecisionBlocking(opCtx, lsid, txnNumber, participants, decision);
+                });
+        });
 }
 
 Future<void> sendCommit(ServiceContext* service,

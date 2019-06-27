@@ -37,6 +37,7 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/wait_for_majority_service.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/unittest/unittest.h"
@@ -64,6 +65,13 @@ void TransactionCoordinatorTestFixture::setUp() {
             uassertStatusOK(shardRegistry()->getShard(operationContext(), shardId))->getTargeter());
         shardTargeter->setFindHostReturnValue(makeHostAndPort(shardId));
     }
+
+    WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
+}
+
+void TransactionCoordinatorTestFixture::tearDown() {
+    WaitForMajorityService::get(getServiceContext()).shutDown();
+    ShardServerTestFixture::tearDown();
 }
 
 std::unique_ptr<ShardingCatalogClient> TransactionCoordinatorTestFixture::makeShardingCatalogClient(

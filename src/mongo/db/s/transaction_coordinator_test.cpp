@@ -66,6 +66,31 @@ StatusWith<BSONObj> makePrepareOkResponse(const Timestamp& timestamp) {
 const StatusWith<BSONObj> kPrepareOk = makePrepareOkResponse(kDummyPrepareTimestamp);
 const StatusWith<BSONObj> kPrepareOkNoTimestamp = BSON("ok" << 1);
 
+/**
+ * Searches for a client matching the name and mark the operation context as killed.
+ */
+void killClientOpCtx(ServiceContext* service, const std::string& clientName) {
+    for (int retries = 0; retries < 20; retries++) {
+        for (ServiceContext::LockedClientsCursor cursor(service); auto client = cursor.next();) {
+            invariant(client);
+
+            stdx::lock_guard lk(*client);
+            if (client->desc() == clientName) {
+                if (auto opCtx = client->getOperationContext()) {
+                    opCtx->getServiceContext()->killOperation(
+                        lk, opCtx, ErrorCodes::InterruptedAtShutdown);
+                    return;
+                }
+            }
+        }
+
+        sleepmillis(50);
+    }
+
+    error() << "Timed out trying to find and kill client opCtx with name: " << clientName;
+    ASSERT_FALSE(true);
+}
+
 class TransactionCoordinatorTestBase : public TransactionCoordinatorTestFixture {
 protected:
     void assertPrepareSentAndRespondWithSuccess() {
@@ -566,8 +591,7 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
     // We should retry until shutdown. The original participants should be persisted.
 
     std::vector<ShardId> smallerParticipantList{ShardId("shard0001"), ShardId("shard0002")};
-    Future<void> future =
-        txn::persistParticipantsList(*_aws, _lsid, _txnNumber, smallerParticipantList);
+    auto future = txn::persistParticipantsList(*_aws, _lsid, _txnNumber, smallerParticipantList);
 
     _aws->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Shutdown for test"});
     advanceClockAndExecuteScheduledTasks();
@@ -619,11 +643,12 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
        PersistCommitDecisionWhenNoDocumentForTransactionExistsCanBeInterruptedAndReturnsError) {
-    Future<void> future = txn::persistDecision(*_aws, _lsid, _txnNumber, _participants, [&] {
-        txn::CoordinatorCommitDecision decision(txn::CommitDecision::kCommit);
-        decision.setCommitTimestamp(_commitTimestamp);
-        return decision;
-    }());
+    Future<repl::OpTime> future =
+        txn::persistDecision(*_aws, _lsid, _txnNumber, _participants, [&] {
+            txn::CoordinatorCommitDecision decision(txn::CommitDecision::kCommit);
+            decision.setCommitTimestamp(_commitTimestamp);
+            return decision;
+        }());
     _aws->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Shutdown for test"});
 
     ASSERT_THROWS_CODE(
@@ -1078,6 +1103,10 @@ public:
         assertCommitSentAndRespondWithSuccess();
 
         stopCapturingLogMessages();
+
+        // Properly wait for the coordinator to finish all asynchronous tasks.
+        auto future = coordinator.onCompletion();
+        future.getNoThrow().ignore();
     }
 };
 
@@ -1624,7 +1653,6 @@ TEST_F(TransactionCoordinatorMetricsTest,
     expectedMetrics.totalCreated++;
 
     auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
-    auto awsPtr = aws.get();
     TransactionCoordinator coordinator(
         getServiceContext(), _lsid, _txnNumber, std::move(aws), Date_t::max());
     const auto& stats =
@@ -1657,7 +1685,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
         *expectedStats.writingParticipantListDuration + Microseconds(100);
     expectedMetrics.currentWritingParticipantList--;
 
-    awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
+    killClientOpCtx(getServiceContext(), "hangBeforeWaitingForParticipantListWriteConcern");
     coordinator.onCompletion().get();
 
     checkStats(stats, expectedStats);
@@ -1746,7 +1774,6 @@ TEST_F(TransactionCoordinatorMetricsTest,
     expectedMetrics.totalCreated++;
 
     auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
-    auto awsPtr = aws.get();
     TransactionCoordinator coordinator(
         getServiceContext(), _lsid, _txnNumber, std::move(aws), Date_t::max());
     const auto& stats =
@@ -1784,7 +1811,7 @@ TEST_F(TransactionCoordinatorMetricsTest,
         *expectedStats.writingDecisionDuration + Microseconds(100);
     expectedMetrics.currentWritingDecision--;
 
-    awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
+    killClientOpCtx(getServiceContext(), "hangBeforeWaitingForDecisionWriteConcern");
     coordinator.onCompletion().get();
 
     checkStats(stats, expectedStats);

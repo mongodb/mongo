@@ -192,7 +192,6 @@ protected:
     }
 };
 
-
 using TransactionCoordinatorServiceStepUpStepDownTest = TransactionCoordinatorServiceTestFixture;
 
 TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, OperationsFailBeforeStepUpStarts) {
@@ -273,7 +272,6 @@ TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, StepDownBeforeStepUpTask
     service()->onStepDown();
 }
 
-
 class TransactionCoordinatorServiceTest : public TransactionCoordinatorServiceTestFixture {
 protected:
     void setUp() override {
@@ -284,6 +282,7 @@ protected:
 
     void tearDown() override {
         service()->onStepDown();
+        service()->joinPreviousRound();
 
         TransactionCoordinatorServiceTestFixture::tearDown();
     }
@@ -341,8 +340,6 @@ TEST_F(TransactionCoordinatorServiceTest,
     // commit acks.
     coordinatorService->createCoordinator(
         operationContext(), _lsid, _txnNumber + 1, kCommitDeadline);
-    auto newTxnCommitDecisionFuture = coordinatorService->coordinateCommit(
-        operationContext(), _lsid, _txnNumber + 1, kTwoShardIdSet);
 
     // Finish committing the old transaction by sending it commit acks from both participants.
     assertCommitSentAndRespondWithSuccess();
@@ -351,6 +348,10 @@ TEST_F(TransactionCoordinatorServiceTest,
     // The old transaction should now be committed.
     ASSERT_EQ(static_cast<int>(oldTxnCommitDecisionFuture.get()),
               static_cast<int>(txn::CommitDecision::kCommit));
+
+    auto newTxnCommitDecisionFuture = coordinatorService->coordinateCommit(
+        operationContext(), _lsid, _txnNumber + 1, kTwoShardIdSet);
+
     commitTransaction(*coordinatorService, _lsid, _txnNumber + 1, kTwoShardIdSet);
 }
 
@@ -703,19 +704,12 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
 }
 
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,
-       CoordinateCommitWithNoVotesReturnsNotReadyFuture) {
+       CoordinateCommitReturnsCorrectCommitDecisionOnCommit) {
 
     auto commitDecisionFuture = *coordinatorService()->coordinateCommit(
         operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     ASSERT_FALSE(commitDecisionFuture.isReady());
-}
-
-TEST_F(TransactionCoordinatorServiceTestSingleTxn,
-       CoordinateCommitReturnsCorrectCommitDecisionOnCommit) {
-
-    auto commitDecisionFuture = *coordinatorService()->coordinateCommit(
-        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     assertPrepareSentAndRespondWithSuccess();
     assertPrepareSentAndRespondWithSuccess();

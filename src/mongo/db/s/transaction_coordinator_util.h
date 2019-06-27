@@ -31,6 +31,7 @@
 
 #include <vector>
 
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 
@@ -45,17 +46,17 @@ namespace txn {
  *    participants: ["shard0000", "shard0001"]
  * }
  *
- * into config.transaction_coordinators and waits for the upsert to be majority-committed.
+ * into config.transaction_coordinators and returns the opTime of the upsert.
  *
  * Throws if the upsert fails or waiting for writeConcern fails.
  *
  * If the upsert returns a DuplicateKey error, converts it to an anonymous error, because it means a
  * document for the (lsid, txnNumber) exists with a different participant list.
  */
-Future<void> persistParticipantsList(txn::AsyncWorkScheduler& scheduler,
-                                     const LogicalSessionId& lsid,
-                                     TxnNumber txnNumber,
-                                     const txn::ParticipantsList& participants);
+Future<repl::OpTime> persistParticipantsList(txn::AsyncWorkScheduler& scheduler,
+                                             const LogicalSessionId& lsid,
+                                             TxnNumber txnNumber,
+                                             const txn::ParticipantsList& participants);
 
 struct PrepareResponse;
 class PrepareVoteConsensus {
@@ -120,7 +121,7 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
  *    commitTimestamp: Timestamp(xxxxxxxx, x),
  * }
  *
- * and waits for the update to be majority-committed.
+ * Returns the opTime of the write.
  *
  * Throws if the update fails or waiting for writeConcern fails.
  *
@@ -128,11 +129,11 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
  * means either no document for (lsid, txnNumber) exists, or a document exists but has a different
  * participant list, different decision, or different commit Timestamp.
  */
-Future<void> persistDecision(txn::AsyncWorkScheduler& scheduler,
-                             const LogicalSessionId& lsid,
-                             TxnNumber txnNumber,
-                             const txn::ParticipantsList& participants,
-                             const txn::CoordinatorCommitDecision& decision);
+Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
+                                     const LogicalSessionId& lsid,
+                                     TxnNumber txnNumber,
+                                     const txn::ParticipantsList& participants,
+                                     const txn::CoordinatorCommitDecision& decision);
 
 /**
  * Sends commit to all shards and returns a future that will be resolved when all participants have

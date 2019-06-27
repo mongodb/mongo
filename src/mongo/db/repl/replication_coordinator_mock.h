@@ -286,9 +286,10 @@ public:
 
     /**
      * Sets the function to generate the return value for calls to awaitReplication().
-     * 'opTime' is the optime passed to awaitReplication().
+     * 'OperationContext' and 'opTime' are the parameters passed to awaitReplication().
      */
-    using AwaitReplicationReturnValueFunction = stdx::function<StatusAndDuration(const OpTime&)>;
+    using AwaitReplicationReturnValueFunction =
+        stdx::function<StatusAndDuration(OperationContext*, const OpTime&)>;
     void setAwaitReplicationReturnValueFunction(
         AwaitReplicationReturnValueFunction returnValueFunction);
 
@@ -324,7 +325,8 @@ private:
     OpTime _myLastAppliedOpTime;
     Date_t _myLastAppliedWallTime;
     ReplSetConfig _getConfigReturnValue;
-    AwaitReplicationReturnValueFunction _awaitReplicationReturnValueFunction = [](const OpTime&) {
+    AwaitReplicationReturnValueFunction _awaitReplicationReturnValueFunction = [](OperationContext*,
+                                                                                  const OpTime&) {
         return StatusAndDuration(Status::OK(), Milliseconds(0));
     };
     bool _alwaysAllowWrites = false;

@@ -51,7 +51,7 @@ const auto transactionCoordinatorServiceDecoration =
 TransactionCoordinatorService::TransactionCoordinatorService() = default;
 
 TransactionCoordinatorService::~TransactionCoordinatorService() {
-    _joinPreviousRound();
+    joinPreviousRound();
 }
 
 TransactionCoordinatorService* TransactionCoordinatorService::get(OperationContext* opCtx) {
@@ -137,7 +137,7 @@ boost::optional<Future<txn::CommitDecision>> TransactionCoordinatorService::reco
 
 void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                                              Milliseconds recoveryDelayForTesting) {
-    _joinPreviousRound();
+    joinPreviousRound();
 
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     invariant(!_catalogAndScheduler);
@@ -235,7 +235,7 @@ TransactionCoordinatorService::_getCatalogAndScheduler(OperationContext* opCtx) 
     return _catalogAndScheduler;
 }
 
-void TransactionCoordinatorService::_joinPreviousRound() {
+void TransactionCoordinatorService::joinPreviousRound() {
     // onStepDown must have been called
     invariant(!_catalogAndScheduler);
 
