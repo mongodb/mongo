@@ -55,6 +55,14 @@ public:
     DiagnosticInfo(DiagnosticInfo&&) = default;
     DiagnosticInfo& operator=(DiagnosticInfo&&) = default;
 
+    struct StackFrame {
+        StringData objectPath = "";
+        ptrdiff_t sectionOffset = 0;
+        unsigned long sectionSize = 0;
+        ptrdiff_t instructionOffset = 0;
+    };
+    using StackTrace = std::vector<StackFrame>;
+
     Date_t getTimestamp() {
         return _timestamp;
     }
@@ -63,15 +71,23 @@ public:
         return _captureName;
     }
 
+    StackTrace makeStackTrace();
+
+    static std::vector<void*> getBacktraceAddresses();
+
     friend DiagnosticInfo takeDiagnosticInfo(const StringData& captureName);
 
 private:
     Date_t _timestamp;
     StringData _captureName;
+    std::vector<void*> _backtraceAddresses;
 
-
-    DiagnosticInfo(const Date_t& timestamp, const StringData& captureName)
-        : _timestamp(timestamp), _captureName(captureName) {}
+    DiagnosticInfo(const Date_t& timestamp,
+                   const StringData& captureName,
+                   std::vector<void*> backtraceAddresses)
+        : _timestamp(timestamp),
+          _captureName(captureName),
+          _backtraceAddresses(backtraceAddresses) {}
 };
 
 /**
