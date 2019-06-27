@@ -52,6 +52,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_metadata.h"
@@ -709,8 +710,18 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                     << " ( "
                                     << *collectionUUID
                                     << " )");
+
+        // Set last op on error to provide the client with a specific optime to read the state of
+        // the server when the createIndexes command failed.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
         throw;
     }
+
+    // IndexBuildsCoordinator may write the createIndexes oplog entry on a different thread.
+    // The current client's last op should be synchronized with the oplog to ensure consistent
+    // getLastError results as the previous non-IndexBuildsCoordinator behavior.
+    repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
     result.append(kNumIndexesBeforeFieldName, stats.numIndexesBefore);
     result.append(kNumIndexesAfterFieldName, stats.numIndexesAfter);
