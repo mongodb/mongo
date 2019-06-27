@@ -56,7 +56,7 @@
         assert.eq(ex.code, ErrorCodes.MaxTimeMSExpired);
     };
 
-    testColl.insert({_id: 1});
+    testColl.insert({_id: 1}, {writeConcern: {w: 2}});
     tryFiveTimes("totally unsharded", runTest);
 
     assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
