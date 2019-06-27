@@ -116,12 +116,6 @@ struct HostAndPort {
     std::string toString() const;
 
     /**
-     * Like toString(), but writes to various `sink` instead.
-     */
-    void append(StringBuilder& sink) const;
-    void append(fmt::writer& sink) const;
-
-    /**
      * Returns true if this object represents no valid HostAndPort.
      */
     bool empty() const;
@@ -141,29 +135,68 @@ struct HostAndPort {
     }
 
 private:
+    friend struct fmt::formatter<HostAndPort>;
+
+    struct AppendVisitor {
+        virtual void operator()(StringData v) = 0;
+        virtual void operator()(std::uint16_t v) = 0;
+        virtual ~AppendVisitor() = default;
+    };
+
+    void _appendToVisitor(AppendVisitor& sink) const;
+
+    template <typename F>
+    void _appendToPolymorphicFunc(F f) const;
+
+    template <typename Stream>
+    Stream& _appendToStream(Stream& os) const {
+        _appendToPolymorphicFunc([&](const auto& v) { os << v; });
+        return os;
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const HostAndPort& hp) {
+        return hp._appendToStream(os);
+    }
+    friend StringBuilder& operator<<(StringBuilder& os, const HostAndPort& hp) {
+        return hp._appendToStream(os);
+    }
+    friend StackStringBuilder& operator<<(StackStringBuilder& os, const HostAndPort& hp) {
+        return hp._appendToStream(os);
+    }
+
     std::string _host;
     int _port;  // -1 indicates unspecified
 };
 
-std::ostream& operator<<(std::ostream& os, const HostAndPort& hp);
-
-StringBuilder& operator<<(StringBuilder& os, const HostAndPort& hp);
-
-StackStringBuilder& operator<<(StackStringBuilder& os, const HostAndPort& hp);
+template <typename F>
+void HostAndPort::_appendToPolymorphicFunc(F f) const {
+    struct Vis : AppendVisitor {
+        explicit Vis(F f) : _f{std::move(f)} {}
+        void operator()(StringData v) override {
+            _f(v);
+        }
+        void operator()(std::uint16_t v) override {
+            _f(v);
+        }
+        F _f;
+    };
+    Vis visitor(std::move(f));
+    _appendToVisitor(visitor);
+}
 
 }  // namespace mongo
 
+namespace fmt {
 template <>
-struct fmt::formatter<mongo::HostAndPort> {
+struct formatter<mongo::HostAndPort> {
     template <typename ParseContext>
-    auto parse(ParseContext& ctx) -> decltype(ctx.begin()) {
+    constexpr auto parse(ParseContext& ctx) {
         return ctx.begin();
     }
-
     template <typename FormatContext>
-    auto format(const mongo::HostAndPort& hp, FormatContext& ctx) -> decltype(ctx.out()) {
-        fmt::writer w(ctx.out());
-        hp.append(w);
+    auto format(const mongo::HostAndPort& hp, FormatContext& ctx) {
+        hp._appendToPolymorphicFunc([&](const auto& v) { fmt::format_to(ctx.out(), "{}", v); });
         return ctx.out();
     }
 };
+}  // namespace fmt

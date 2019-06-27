@@ -102,38 +102,23 @@ bool HostAndPort::isDefaultRoute() const {
 
 std::string HostAndPort::toString() const {
     StringBuilder ss;
-    append(ss);
+    ss << *this;
     return ss.str();
 }
 
-template <typename SinkFunc>
-static void appendGeneric(const HostAndPort& hp, const SinkFunc& write) {
+void HostAndPort::_appendToVisitor(AppendVisitor& write) const {
     // wrap ipv6 addresses in []s for roundtrip-ability
-    if (hp.host().find(':') != std::string::npos) {
+    if (host().find(':') != std::string::npos) {
         write("[");
-        write(hp.host());
+        write(host());
         write("]");
     } else {
-        write(hp.host());
+        write(host());
     }
-    if (hp.host().find('/') == std::string::npos) {
+    if (host().find('/') == std::string::npos) {
         write(":");
-        write(hp.port());
+        write(port());
     }
-}
-
-template <typename Stream>
-static Stream& appendToStream(const HostAndPort& hp, Stream& sink) {
-    appendGeneric(hp, [&sink](const auto& v) { sink << v; });
-    return sink;
-}
-
-void HostAndPort::append(StringBuilder& sink) const {
-    appendToStream(*this, sink);
-}
-
-void HostAndPort::append(fmt::writer& sink) const {
-    appendGeneric(*this, [&sink](const auto& v) { sink.write(v); });
 }
 
 bool HostAndPort::empty() const {
@@ -212,18 +197,6 @@ Status HostAndPort::initialize(StringData s) {
     _host = hostPart.toString();
     _port = port;
     return Status::OK();
-}
-
-std::ostream& operator<<(std::ostream& os, const HostAndPort& hp) {
-    return appendToStream(hp, os);
-}
-
-StringBuilder& operator<<(StringBuilder& os, const HostAndPort& hp) {
-    return appendToStream(hp, os);
-}
-
-StackStringBuilder& operator<<(StackStringBuilder& os, const HostAndPort& hp) {
-    return appendToStream(hp, os);
 }
 
 }  // namespace mongo
