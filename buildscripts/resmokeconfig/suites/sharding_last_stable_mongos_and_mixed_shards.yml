@@ -141,8 +141,6 @@ selector:
   - jstests/sharding/refine_collection_shard_key_basic.js
   # Enable when SERVER-41237 is backported
   - jstests/sharding/graph_lookup.js
-  # Enable when BACKPORT-4650 is completed
-  - jstests/sharding/server_status.js
 
 executor:
   config:
