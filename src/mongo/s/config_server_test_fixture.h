@@ -90,7 +90,7 @@ public:
     /**
      * Setup the config.shards collection to contain the given shards.
      */
-    Status setupShards(const std::vector<ShardType>& shards);
+    void setupShards(const std::vector<ShardType>& shards);
 
     /**
      * Retrieves the shard document from the config server.
@@ -101,7 +101,7 @@ public:
     /**
      * Setup the config.chunks collection to contain the given chunks.
      */
-    Status setupChunks(const std::vector<ChunkType>& chunks);
+    void setupChunks(const std::vector<ChunkType>& chunks);
 
     /**
      * Retrieves the chunk document from the config server.

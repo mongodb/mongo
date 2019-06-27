@@ -129,7 +129,7 @@ TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {
     shard2.setMaxSizeMB(100);
     shard2.setState(ShardType::ShardState::kShardAware);
 
-    ASSERT_OK(setupShards(std::vector<ShardType>{shard1, shard2}));
+    setupShards(std::vector<ShardType>{shard1, shard2});
 
     auto result = assertGet(ShardingCatalogManager::get(operationContext())
                                 ->removeShard(operationContext(), shard1.getName()));
@@ -151,7 +151,7 @@ TEST_F(RemoveShardTest, RemoveShardCantRemoveLastShard) {
     shard1.setMaxSizeMB(100);
     shard1.setState(ShardType::ShardState::kShardAware);
 
-    ASSERT_OK(setupShards(std::vector<ShardType>{shard1}));
+    setupShards(std::vector<ShardType>{shard1});
 
     ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                   ShardingCatalogManager::get(operationContext())
@@ -172,7 +172,7 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     shard2.setMaxSizeMB(100);
     shard2.setState(ShardType::ShardState::kShardAware);
 
-    ASSERT_OK(setupShards(std::vector<ShardType>{shard1, shard2}));
+    setupShards(std::vector<ShardType>{shard1, shard2});
 
     auto result = assertGet(ShardingCatalogManager::get(operationContext())
                                 ->removeShard(operationContext(), shard1.getName()));
@@ -208,9 +208,9 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
                      ChunkVersion(1, 3, epoch),
                      shard1.getName());
 
-    ASSERT_OK(setupShards(std::vector<ShardType>{shard1, shard2}));
+    setupShards(std::vector<ShardType>{shard1, shard2});
     setupDatabase("testDB", shard1.getName(), true);
-    ASSERT_OK(setupChunks(std::vector<ChunkType>{chunk1, chunk2, chunk3}));
+    setupChunks(std::vector<ChunkType>{chunk1, chunk2, chunk3});
 
     auto startedResult = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->removeShard(operationContext(), shard1.getName()));
@@ -237,7 +237,7 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
     shard2.setMaxSizeMB(100);
     shard2.setState(ShardType::ShardState::kShardAware);
 
-    ASSERT_OK(setupShards(std::vector<ShardType>{shard1, shard2}));
+    setupShards(std::vector<ShardType>{shard1, shard2});
     setupDatabase("testDB", shard1.getName(), false);
 
     auto startedResult = assertGet(ShardingCatalogManager::get(operationContext())
@@ -281,9 +281,9 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
 
     std::vector<ChunkType> chunks{chunk1, chunk2, chunk3};
 
-    ASSERT_OK(setupShards(std::vector<ShardType>{shard1, shard2}));
+    setupShards(std::vector<ShardType>{shard1, shard2});
     setupDatabase("testDB", shard2.getName(), false);
-    ASSERT_OK(setupChunks(std::vector<ChunkType>{chunk1, chunk2, chunk3}));
+    setupChunks(std::vector<ChunkType>{chunk1, chunk2, chunk3});
 
     auto startedResult = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->removeShard(operationContext(), shard1.getName()));

@@ -66,7 +66,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
 
     std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
 
-    setupChunks({chunk, chunk2}).transitional_ignore();
+    setupChunks({chunk, chunk2});
 
     Timestamp validAfter{100, 0};
 
@@ -137,7 +137,7 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     // Record chunk boundaries for passing into commitChunkMerge
     std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkBound2, chunkMax};
 
-    setupChunks({chunk, chunk2, chunk3}).transitional_ignore();
+    setupChunks({chunk, chunk2, chunk3});
 
     Timestamp validAfter{100, 0};
 
@@ -212,7 +212,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     otherChunk.setMin(BSON("a" << 10));
     otherChunk.setMax(BSON("a" << 20));
 
-    setupChunks({chunk, chunk2, otherChunk}).transitional_ignore();
+    setupChunks({chunk, chunk2, otherChunk});
 
     Timestamp validAfter{100, 0};
 
@@ -283,7 +283,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     otherChunk.setMin(BSON("a" << 10));
     otherChunk.setMax(BSON("a" << 20));
 
-    setupChunks({chunk, chunk2, otherChunk}).transitional_ignore();
+    setupChunks({chunk, chunk2, otherChunk});
 
     Timestamp validAfter{1};
 
@@ -349,7 +349,7 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
     // Record chunk boundaries for passing into commitChunkMerge
     std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
 
-    setupChunks({chunk, chunk2}).transitional_ignore();
+    setupChunks({chunk, chunk2});
 
     Timestamp validAfter{1};
 
@@ -386,7 +386,7 @@ TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
     // Record chunk baoundaries for passing into commitChunkMerge
     std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
 
-    setupChunks({chunk, chunk2}).transitional_ignore();
+    setupChunks({chunk, chunk2});
 
     Timestamp validAfter{1};
 
@@ -429,7 +429,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
     mergedChunk.setVersion(mergedVersion);
     mergedChunk.setMax(chunkMax);
 
-    setupChunks({mergedChunk}).transitional_ignore();
+    setupChunks({mergedChunk});
 
     Timestamp validAfter{1};
 
@@ -492,7 +492,7 @@ TEST_F(MergeChunkTest, ChunkBoundariesOutOfOrderFails) {
         chunk.setVersion(version);
         originalChunks.push_back(chunk);
 
-        setupChunks(originalChunks).transitional_ignore();
+        setupChunks(originalChunks);
     }
 
     Timestamp validAfter{1};
@@ -530,7 +530,7 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     chunk3.setMin(chunkBound2);
     chunk3.setMax(chunkMax);
 
-    ASSERT_OK(setupChunks({chunk1, chunk2, chunk3}));
+    setupChunks({chunk1, chunk2, chunk3});
 
     // Record chunk boundaries for passing into commitChunkMerge
     std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound1, chunkBound2, chunkMax};

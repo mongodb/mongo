@@ -50,7 +50,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveZoneThatNoLongerExistsShouldNotError) {
     shard.setName("a");
     shard.setHost("a:1234");
 
-    setupShards({shard}).transitional_ignore();
+    setupShards({shard});
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->removeShardFromZone(operationContext(), shard.getName(), "z"));
@@ -72,7 +72,7 @@ TEST_F(RemoveShardFromZoneTest, RemovingZoneThatIsOnlyReferencedByAnotherShardSh
     shardB.setName("b");
     shardB.setHost("b:1234");
 
-    setupShards({shardA, shardB}).transitional_ignore();
+    setupShards({shardA, shardB});
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->removeShardFromZone(operationContext(), shardB.getName(), "z"));
@@ -105,7 +105,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldSucceedWhenNoChunks
     shardB.setName("b");
     shardB.setHost("b:1234");
 
-    setupShards({shardA, shardB}).transitional_ignore();
+    setupShards({shardA, shardB});
 
     // Insert a chunk range document referring to a different zone
     TagsType tagDoc;
@@ -146,7 +146,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldFailWhenAChunkRefer
     shardB.setName("b");
     shardB.setHost("b:1234");
 
-    setupShards({shardA, shardB}).transitional_ignore();
+    setupShards({shardA, shardB});
 
     TagsType tagDoc;
     tagDoc.setNS(NamespaceString("test.foo"));
@@ -185,7 +185,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveZoneShouldFailIfShardDoesntExist) {
     shardA.setHost("a:1234");
     shardA.setTags({"z"});
 
-    setupShards({shardA}).transitional_ignore();
+    setupShards({shardA});
 
     auto status = ShardingCatalogManager::get(operationContext())
                       ->removeShardFromZone(operationContext(), "b", "z");
@@ -212,7 +212,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveZoneFromShardShouldOnlyRemoveZoneOnSpecifi
     shardB.setHost("b:1234");
     shardB.setTags({"y", "z"});
 
-    setupShards({shardA, shardB}).transitional_ignore();
+    setupShards({shardA, shardB});
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->removeShardFromZone(operationContext(), shardB.getName(), "z"));
