@@ -735,7 +735,8 @@ config_sanity(WTPERF *wtperf)
 	    ((opts->checkpoint_threads != 0 &&
 	    opts->checkpoint_interval > opts->run_time) ||
 	    opts->report_interval > opts->run_time ||
-	    opts->sample_interval > opts->run_time)) {
+	    opts->sample_interval > opts->run_time ||
+	    opts->scan_interval > opts->run_time)) {
 		fprintf(stderr, "interval value longer than the run-time\n");
 		return (EINVAL);
 	}
@@ -754,6 +755,29 @@ config_sanity(WTPERF *wtperf)
 	if (opts->pareto > 100) {
 		fprintf(stderr,
 		    "Invalid pareto distribution - should be a percentage\n");
+		return (EINVAL);
+	}
+
+	if (opts->scan_pct > 100) {
+		fprintf(stderr,
+		    "Invalid scan_pct - should be a percentage\n");
+		return (EINVAL);
+	}
+
+	/* If we have separate tables for scanning, we need a separate count. */
+	if ((opts->scan_icount > 0 && opts->scan_table_count == 0) ||
+	    (opts->scan_icount == 0 && opts->scan_table_count > 0)) {
+		fprintf(stderr,
+		    "scan_icount %" PRIu32
+		    " and scan_table_count %" PRIu32
+		    " must both be zero or nonzero.\n",
+		    opts->scan_icount, opts->scan_table_count);
+		return (EINVAL);
+	}
+	if (opts->scan_interval > 0 && opts->icount == 0 &&
+	    opts->scan_icount == 0) {
+		fprintf(stderr,
+		    "Invalid scan_interval - requires icount to be non-zero\n");
 		return (EINVAL);
 	}
 
@@ -948,6 +972,7 @@ config_opt_print(WTPERF *wtperf)
 	    opts->checkpoint_threads, opts->checkpoint_interval);
 	printf("\t" "Reporting interval: %" PRIu32 "\n", opts->report_interval);
 	printf("\t" "Sampling interval: %" PRIu32 "\n", opts->sample_interval);
+	printf("\t" "Scan interval: %" PRIu32 "\n", opts->scan_interval);
 
 	printf("\t" "Verbosity: %" PRIu32 "\n", opts->verbose);
 }
