@@ -55,7 +55,7 @@
         addShard: {skip: "not on a user database"},
         addShardToZone: {skip: "not on a user database"},
         aggregate: {
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             sendsShardVersion: true,
             command: {aggregate: collName, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}},
         },

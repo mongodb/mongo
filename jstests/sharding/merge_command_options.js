@@ -21,6 +21,12 @@
     assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
     st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
 
+    // Force a refresh on rs0. This is necessary because MongoS will get StaleDbVersion upon sending
+    // the agg request below, causing it to retry the agg command from the top and thus send
+    // listIndexes to the primary shard twice.
+    assert.commandWorked(
+        st.rs0.getPrimary().getDB('test').adminCommand({_flushDatabaseCacheUpdates: 'test'}));
+
     // Shard the target collection, and set the unique flag to ensure that there's a unique
     // index on the shard key.
     const shardKey = {sk: 1};

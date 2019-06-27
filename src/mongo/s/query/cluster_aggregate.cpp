@@ -790,7 +790,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         litePipe.allowedToPassthroughFromMongos() && !involvesShardedCollections) {
         const auto primaryShardId = routingInfo->db().primary()->getId();
         return aggPassthrough(
-            opCtx, namespaces, primaryShardId, request, litePipe, privileges, result);
+            opCtx, namespaces, routingInfo->db(), request, litePipe, privileges, result);
     }
 
     // Populate the collection UUID and the appropriate collation to use.
@@ -871,7 +871,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
 Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
                                         const Namespaces& namespaces,
-                                        const ShardId& shardId,
+                                        const CachedDatabaseInfo& dbInfo,
                                         const AggregationRequest& aggRequest,
                                         const LiteParsedPipeline& liteParsedPipeline,
                                         const PrivilegeVector& privileges,
@@ -882,14 +882,16 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         sharded_agg_helpers::createPassthroughCommandForShard(
             opCtx, aggRequest, boost::none, nullptr, BSONObj()));
 
+    const auto shardId = dbInfo.primary()->getId();
+    const auto cmdObjWithShardVersion = (shardId != ShardRegistry::kConfigServerShardId)
+        ? appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED())
+        : std::move(cmdObj);
+
     MultiStatementTransactionRequestsSender ars(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
         namespaces.executionNss.db().toString(),
-        {{shardId,
-          shardId != ShardRegistry::kConfigServerShardId
-              ? appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED())
-              : std::move(cmdObj)}},
+        {{shardId, appendDbVersionIfPresent(cmdObjWithShardVersion, dbInfo)}},
         ReadPreferenceSetting::get(opCtx),
         Shard::RetryPolicy::kIdempotent);
     auto response = ars.next();

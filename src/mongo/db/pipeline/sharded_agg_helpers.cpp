@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/cluster_query_knobs_gen.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/util/fail_point.h"
@@ -413,10 +414,11 @@ std::vector<RemoteCursor> establishShardCursors(
     } else {
         // The collection is unsharded. Target only the primary shard for the database.
         // Don't append shard version info when contacting the config servers.
+        const auto cmdObjWithShardVersion = !routingInfo->db().primary()->isConfig()
+            ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED())
+            : cmdObj;
         requests.emplace_back(routingInfo->db().primaryId(),
-                              !routingInfo->db().primary()->isConfig()
-                                  ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED())
-                                  : cmdObj);
+                              appendDbVersionIfPresent(cmdObjWithShardVersion, routingInfo->db()));
     }
 
     if (MONGO_FAIL_POINT(clusterAggregateHangBeforeEstablishingShardCursors)) {

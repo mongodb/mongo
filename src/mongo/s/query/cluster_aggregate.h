@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
@@ -107,7 +108,7 @@ public:
 private:
     static Status aggPassthrough(OperationContext*,
                                  const Namespaces&,
-                                 const ShardId&,
+                                 const CachedDatabaseInfo&,
                                  const AggregationRequest&,
                                  const LiteParsedPipeline&,
                                  const PrivilegeVector& privileges,
