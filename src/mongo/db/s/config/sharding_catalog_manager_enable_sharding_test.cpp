@@ -70,7 +70,7 @@ TEST_F(EnableShardingTest, noDBExists) {
     shard.setName("shard0");
     shard.setHost("shard0:12");
 
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
 
     auto shardTargeter = RemoteCommandTargeterMock::get(
         uassertStatusOK(shardRegistry()->getShard(operationContext(), ShardId("shard0")))
@@ -107,7 +107,7 @@ TEST_F(EnableShardingTest, dbExistsWithDifferentCase) {
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shard0:12");
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
     setupDatabase("Db3", shard.getName(), false);
     ASSERT_THROWS_CODE(
         ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db3"),
@@ -119,7 +119,7 @@ TEST_F(EnableShardingTest, dbExists) {
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shard0:12");
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
     setupDatabase("db4", shard.getName(), false);
     ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db4");
 }
@@ -128,7 +128,7 @@ TEST_F(EnableShardingTest, succeedsWhenTheDatabaseIsAlreadySharded) {
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shard0:12");
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
     setupDatabase("db5", shard.getName(), true);
     ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db5");
 }
@@ -138,7 +138,7 @@ TEST_F(EnableShardingTest, dbExistsInvalidFormat) {
     shard.setName("shard0");
     shard.setHost("shard0:12");
 
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
 
     // Set up database with bad type for primary field.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),

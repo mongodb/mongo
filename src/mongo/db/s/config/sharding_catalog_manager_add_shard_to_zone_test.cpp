@@ -49,7 +49,7 @@ TEST_F(AddShardToZoneTest, AddSingleZoneToExistingShardShouldSucceed) {
     shard.setName("a");
     shard.setHost("a:1234");
 
-    setupShards({shard}).transitional_ignore();
+    setupShards({shard});
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->addShardToZone(operationContext(), shard.getName(), "z"));
@@ -68,7 +68,7 @@ TEST_F(AddShardToZoneTest, AddZoneToShardWithSameTagShouldSucceed) {
     shard.setHost("a:1234");
     shard.setTags({"x", "y"});
 
-    setupShards({shard}).transitional_ignore();
+    setupShards({shard});
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->addShardToZone(operationContext(), shard.getName(), "x"));
@@ -89,7 +89,7 @@ TEST_F(AddShardToZoneTest, AddZoneToShardWithNewTagShouldAppend) {
     shard.setHost("a:1234");
     shard.setTags({"x"});
 
-    setupShards({shard}).transitional_ignore();
+    setupShards({shard});
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->addShardToZone(operationContext(), shard.getName(), "y"));
@@ -109,7 +109,7 @@ TEST_F(AddShardToZoneTest, AddSingleZoneToNonExistingShardShouldFail) {
     shard.setName("a");
     shard.setHost("a:1234");
 
-    setupShards({shard}).transitional_ignore();
+    setupShards({shard});
 
     auto status = ShardingCatalogManager::get(operationContext())
                       ->addShardToZone(operationContext(), "b", "z");

@@ -138,7 +138,7 @@ TEST_F(ConfigServerShardCollectionTest, Partially_Written_Chunks_Present) {
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shardHost");
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
 
     setupDatabase(kNamespace.db().toString(), shard.getName(), true);
 
@@ -150,7 +150,7 @@ TEST_F(ConfigServerShardCollectionTest, Partially_Written_Chunks_Present) {
     chunk.setShard(shard.getName());
     chunk.setMin(BSON("_id" << 1));
     chunk.setMax(BSON("_id" << 5));
-    ASSERT_OK(setupChunks({chunk}));
+    setupChunks({chunk});
 
     ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
                            ->shardCollection(operationContext(),
@@ -178,7 +178,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_ForMapReduce_NoInitialSpli
     targeter->setFindHostReturnValue(shardHost);
     targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
 
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
 
     setupDatabase(kNamespace.db().toString(), shard.getName(), true);
 
@@ -246,7 +246,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_ForMapReduce_WithInitialSp
     targeter2->setFindHostReturnValue(shard2Host);
     targeterFactory()->addTargeterToReturn(ConnectionString(shard2Host), std::move(targeter2));
 
-    ASSERT_OK(setupShards(vector<ShardType>{shard0, shard1, shard2}));
+    setupShards(vector<ShardType>{shard0, shard1, shard2});
 
     setupDatabase(kNamespace.db().toString(), shard0.getName(), true);
 
@@ -313,7 +313,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_NoInitialSplitPoints_NoSpl
     targeter->setFindHostReturnValue(shardHost);
     targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
 
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
 
     setupDatabase(kNamespace.db().toString(), shard.getName(), true);
 
@@ -363,7 +363,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_NoInitialSplitPoints_WithS
     targeter->setFindHostReturnValue(shardHost);
     targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
 
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
 
     setupDatabase(kNamespace.db().toString(), shard.getName(), true);
 
@@ -435,7 +435,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_WithInitialSplitPoints_NoS
     targeter->setFindHostReturnValue(shardHost);
     targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
 
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
 
     setupDatabase(kNamespace.db().toString(), shard.getName(), true);
 
@@ -543,7 +543,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_Man
     targeter->setFindHostReturnValue(connStr.getServers()[0]);
     targeterFactory()->addTargeterToReturn(connStr, std::move(targeter));
 
-    ASSERT_OK(setupShards(kShards));
+    setupShards(kShards);
     shardRegistry()->reload(operationContext());
 
     auto future = launchAsync([&] {
@@ -581,7 +581,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromClient_ManyChun
     targeter->setFindHostReturnValue(connStr.getServers()[0]);
     targeterFactory()->addTargeterToReturn(connStr, std::move(targeter));
 
-    ASSERT_OK(setupShards(kShards));
+    setupShards(kShards);
     shardRegistry()->reload(operationContext());
 
     auto future = launchAsync([&] {
@@ -616,7 +616,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_WithZones_OneChunkToPrimary) {
     const std::vector<ShardType> kShards{ShardType("shard0", "rs0/shard0:123", {"TestZone"}),
                                          ShardType("shard1", "rs1/shard1:123", {"TestZone"}),
                                          ShardType("shard2", "rs2/shard2:123")};
-    ASSERT_OK(setupShards(kShards));
+    setupShards(kShards);
     shardRegistry()->reload(operationContext());
 
     std::vector<BSONObj> splitPoints{};
@@ -657,7 +657,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_SplitPoints_FromClient_ManyChunksD
     targeter->setFindHostReturnValue(connStr.getServers()[0]);
     targeterFactory()->addTargeterToReturn(connStr, std::move(targeter));
 
-    ASSERT_OK(setupShards(kShards));
+    setupShards(kShards);
     shardRegistry()->reload(operationContext());
 
     auto future = launchAsync([&] {
@@ -702,7 +702,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_NoSplitPoints_OneChunkToPrimary) {
     targeter->setFindHostReturnValue(connStr.getServers()[0]);
     targeterFactory()->addTargeterToReturn(connStr, std::move(targeter));
 
-    ASSERT_OK(setupShards(kShards));
+    setupShards(kShards);
     shardRegistry()->reload(operationContext());
 
     auto future = launchAsync([&] {
@@ -736,7 +736,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_WithZones_ManyChunksOnFirstZoneSha
     const std::vector<ShardType> kShards{ShardType("shard0", "rs0/shard0:123", {"TestZone"}),
                                          ShardType("shard1", "rs1/shard1:123", {"TestZone"}),
                                          ShardType("shard2", "rs2/shard2:123")};
-    ASSERT_OK(setupShards(kShards));
+    setupShards(kShards);
     shardRegistry()->reload(operationContext());
 
     std::vector<BSONObj> splitPoints{};

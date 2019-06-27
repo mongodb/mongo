@@ -70,17 +70,17 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
     ShardType s0;
     s0.setName("shard0000");
     s0.setHost("ShardHost0:27017");
-    ASSERT_OK(setupShards(vector<ShardType>{s0}));
+    setupShards(vector<ShardType>{s0});
 
     ShardType s1;
     s1.setName("shard0001");
     s1.setHost("ShardHost1:27017");
-    ASSERT_OK(setupShards(vector<ShardType>{s1}));
+    setupShards(vector<ShardType>{s1});
 
     ShardType s2;
     s2.setName("shard0002");
     s2.setHost("ShardHost2:27017");
-    ASSERT_OK(setupShards(vector<ShardType>{s2}));
+    setupShards(vector<ShardType>{s2});
 
     // Prime the shard registry with information about the existing shards
     shardRegistry()->reload(operationContext());
@@ -158,7 +158,7 @@ TEST_F(CreateDatabaseTest, createDatabaseDBExists) {
     shard.setName("shard0");
     shard.setHost("shard0:12");
 
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
 
     setupDatabase(dbname, shard.getName(), false);
 
@@ -173,7 +173,7 @@ TEST_F(CreateDatabaseTest, createDatabaseDBExistsDifferentCase) {
     shard.setName("shard0");
     shard.setHost("shard0:12");
 
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
 
     setupDatabase(dbnameDiffCase, shard.getName(), false);
 
