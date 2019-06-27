@@ -21,6 +21,8 @@ class IndexBuildTest {
         const result = database.currentOp();
         assert.commandWorked(result);
         let indexBuildOpId = -1;
+        let indexBuildObj = {};
+        let indexBuildNamespace = "";
 
         result.inprog.forEach(function(op) {
             if (op.op != 'command') {
@@ -34,10 +36,16 @@ class IndexBuildTest {
                 op.command.indexes.forEach((index) => {
                     if (!indexName || index.name === indexName) {
                         indexBuildOpId = op.opid;
+                        indexBuildObj = index;
+                        indexBuildNamespace = op.ns;
                     }
                 });
             }
         });
+        if (indexBuildOpId != -1) {
+            jsTestLog("found in progress index build: " + tojson(indexBuildObj) + " on namespace " +
+                      indexBuildNamespace + " opid: " + indexBuildOpId);
+        }
         return indexBuildOpId;
     }
 
