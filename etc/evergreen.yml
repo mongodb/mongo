@@ -1027,6 +1027,8 @@ pre:
              # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
              export APPDATA=${workdir}/npm-app-data
              export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
+             # TODO: this is to work around BUILD-8652
+             cd "$(pwd -P | sed 's,cygdrive/c/,cygdrive/z/,')"
            else
              export PATH="$PATH:/opt/node/bin"
            fi
