@@ -85,6 +85,11 @@ public:
                     "'prepareTransaction' is not supported for replica sets with arbiters",
                     !replCoord->setContainsArbiter());
 
+            // We do not allow the prepareTransaction command to run on a standalone.
+            uassert(51239,
+                    "'prepareTransaction' is not supported on standalone nodes.",
+                    replCoord->isReplEnabled());
+
             auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::CommandFailed,
                     "prepareTransaction must be run within a transaction",
