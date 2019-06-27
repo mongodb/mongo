@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/mr.h"
+#include "mongo/db/commands/mr_common.h"
 
 #include <string>
 #include <vector>
@@ -43,30 +43,30 @@
 namespace mongo {
 
 namespace mr {
-Config::OutputOptions Config::parseOutputOptions(const std::string& dbname, const BSONObj& cmdObj) {
-    Config::OutputOptions outputOptions;
+OutputOptions parseOutputOptions(const std::string& dbname, const BSONObj& cmdObj) {
+    OutputOptions outputOptions;
 
     outputOptions.outNonAtomic = false;
     if (cmdObj["out"].type() == String) {
         outputOptions.collectionName = cmdObj["out"].String();
-        outputOptions.outType = REPLACE;
+        outputOptions.outType = OutputType::kReplace;
     } else if (cmdObj["out"].type() == Object) {
         BSONObj o = cmdObj["out"].embeddedObject();
 
         if (o.hasElement("normal")) {
-            outputOptions.outType = REPLACE;
+            outputOptions.outType = OutputType::kReplace;
             outputOptions.collectionName = o["normal"].String();
         } else if (o.hasElement("replace")) {
-            outputOptions.outType = REPLACE;
+            outputOptions.outType = OutputType::kReplace;
             outputOptions.collectionName = o["replace"].String();
         } else if (o.hasElement("merge")) {
-            outputOptions.outType = MERGE;
+            outputOptions.outType = OutputType::kMerge;
             outputOptions.collectionName = o["merge"].String();
         } else if (o.hasElement("reduce")) {
-            outputOptions.outType = REDUCE;
+            outputOptions.outType = OutputType::kReduce;
             outputOptions.collectionName = o["reduce"].String();
         } else if (o.hasElement("inline")) {
-            outputOptions.outType = INMEMORY;
+            outputOptions.outType = OutputType::kInMemory;
         } else {
             uasserted(13522,
                       str::stream() << "please specify one of "
@@ -82,13 +82,14 @@ Config::OutputOptions Config::parseOutputOptions(const std::string& dbname, cons
             if (outputOptions.outNonAtomic)
                 uassert(15895,
                         "nonAtomic option cannot be used with this output type",
-                        (outputOptions.outType == REDUCE || outputOptions.outType == MERGE));
+                        (outputOptions.outType == OutputType::kReduce ||
+                         outputOptions.outType == OutputType::kMerge));
         }
     } else {
         uasserted(13606, "'out' has to be a string or an object");
     }
 
-    if (outputOptions.outType != INMEMORY) {
+    if (outputOptions.outType != OutputType::kInMemory) {
         const StringData outDb(outputOptions.outDB.empty() ? dbname : outputOptions.outDB);
         const NamespaceString nss(outDb, outputOptions.collectionName);
         uassert(ErrorCodes::InvalidNamespace,
@@ -104,7 +105,7 @@ void addPrivilegesRequiredForMapReduce(const BasicCommand* commandTemplate,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
-    Config::OutputOptions outputOptions = Config::parseOutputOptions(dbname, cmdObj);
+    OutputOptions outputOptions = parseOutputOptions(dbname, cmdObj);
 
     ResourcePattern inputResource(commandTemplate->parseResourcePattern(dbname, cmdObj));
     uassert(ErrorCodes::InvalidNamespace,
@@ -112,10 +113,10 @@ void addPrivilegesRequiredForMapReduce(const BasicCommand* commandTemplate,
             inputResource.isExactNamespacePattern());
     out->push_back(Privilege(inputResource, ActionType::find));
 
-    if (outputOptions.outType != Config::INMEMORY) {
+    if (outputOptions.outType != OutputType::kInMemory) {
         ActionSet outputActions;
         outputActions.addAction(ActionType::insert);
-        if (outputOptions.outType == Config::REPLACE) {
+        if (outputOptions.outType == OutputType::kReplace) {
             outputActions.addAction(ActionType::remove);
         } else {
             outputActions.addAction(ActionType::update);

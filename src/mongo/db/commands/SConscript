@@ -350,6 +350,8 @@ env.Library(
         "dbhash.cpp",
         "driverHelpers.cpp",
         "haystack.cpp",
+        "map_reduce_command.cpp",
+        "map_reduce_finish_command.cpp",
         "mr.cpp",
         "oplog_application_checks.cpp",
         "oplog_note.cpp",

@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands/mr_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
@@ -223,22 +224,7 @@ public:
     NamespaceString incLong;
     NamespaceString tempNamespace;
 
-    enum OutputType {
-        REPLACE,  // atomically replace the collection
-        MERGE,    // merge keys, override dups
-        REDUCE,   // merge keys, reduce dups
-        INMEMORY  // only store in memory, limited in size
-    };
-    struct OutputOptions {
-        std::string outDB;
-        std::string collectionName;
-        NamespaceString finalNamespace;
-        // if true, no lock during output operation
-        bool outNonAtomic;
-        OutputType outType;
-    } outputOptions;
-
-    static OutputOptions parseOutputOptions(const std::string& dbname, const BSONObj& cmdObj);
+    mr::OutputOptions outputOptions;
 
     // max number of keys allowed in JS map before switching mode
     long jsMaxKeys;
@@ -253,7 +239,7 @@ public:
     // if the output collection is sharded, we must be told what UUID to use for it
     boost::optional<UUID> finalOutputCollUUID;
 
-    static AtomicWord<unsigned> JOB_NUMBER;
+    static AtomicWord<unsigned> jobNumber;
 };  // end MRsetup
 
 /**
@@ -398,15 +384,16 @@ protected:
     ScriptingFunction _reduceAndFinalizeAndInsert;
 };
 
-void addPrivilegesRequiredForMapReduce(const BasicCommand* commandTemplate,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out);
+bool runMapReduce(OperationContext* opCtx,
+                  const std::string& dbname,
+                  const BSONObj& cmd,
+                  std::string& errmsg,
+                  BSONObjBuilder& result);
 
-/**
- * Returns true if the provided mapReduce command has an 'out' parameter.
- */
-bool mrSupportsWriteConcern(const BSONObj& cmd);
+bool runMapReduceShardedFinish(OperationContext* opCtx,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               BSONObjBuilder& result);
 
 }  // namespace mr
 }  // namespace mongo
