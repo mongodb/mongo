@@ -130,7 +130,7 @@ protected:
         testPrimaryShard.setName("primary");
         testPrimaryShard.setHost("b:20");
 
-        uassertStatusOK(setupShards({extraShard, testPrimaryShard}));
+        setupShards({extraShard, testPrimaryShard});
 
         // Prime the shard registry with information about the existing shards
         shardRegistry()->reload(operationContext());

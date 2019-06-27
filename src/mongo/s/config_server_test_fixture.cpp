@@ -284,16 +284,11 @@ StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(Operation
     return findResult.docs.front().getOwned();
 }
 
-Status ConfigServerTestFixture::setupShards(const std::vector<ShardType>& shards) {
+void ConfigServerTestFixture::setupShards(const std::vector<ShardType>& shards) {
     const NamespaceString shardNS(ShardType::ConfigNS);
     for (const auto& shard : shards) {
-        auto insertStatus = insertToConfigCollection(operationContext(), shardNS, shard.toBSON());
-        if (!insertStatus.isOK()) {
-            return insertStatus;
-        }
+        ASSERT_OK(insertToConfigCollection(operationContext(), shardNS, shard.toBSON()));
     }
-
-    return Status::OK();
 }
 
 StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* opCtx,
@@ -311,16 +306,11 @@ StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* opC
     return ShardType::fromBSON(doc.getValue());
 }
 
-Status ConfigServerTestFixture::setupChunks(const std::vector<ChunkType>& chunks) {
+void ConfigServerTestFixture::setupChunks(const std::vector<ChunkType>& chunks) {
     const NamespaceString chunkNS(ChunkType::ConfigNS);
     for (const auto& chunk : chunks) {
-        auto insertStatus =
-            insertToConfigCollection(operationContext(), chunkNS, chunk.toConfigBSON());
-        if (!insertStatus.isOK())
-            return insertStatus;
+        ASSERT_OK(insertToConfigCollection(operationContext(), chunkNS, chunk.toConfigBSON()));
     }
-
-    return Status::OK();
 }
 
 StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opCtx,

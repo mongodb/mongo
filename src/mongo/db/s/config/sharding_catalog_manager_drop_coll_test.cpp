@@ -70,7 +70,7 @@ public:
         _min = BSON(_shardKey << 0);
         _max = BSON(_shardKey << 10);
 
-        ASSERT_OK(setupShards({_shard1, _shard2}));
+        setupShards({_shard1, _shard2});
 
         auto shard1Targeter = RemoteCommandTargeterMock::get(
             uassertStatusOK(shardRegistry()->getShard(operationContext(), _shard1.getName()))

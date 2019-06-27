@@ -278,6 +278,7 @@ void ShardingTestFixture::addRemoteShards(
         targeterFactory()->addTargeterToReturn(ConnectionString(std::get<1>(shard)),
                                                std::move(targeter));
     }
+
     setupShards(shards);
 }
 
