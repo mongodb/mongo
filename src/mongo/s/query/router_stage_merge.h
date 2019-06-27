@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/blocking_results_merger.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
@@ -44,9 +46,10 @@ namespace mongo {
 class RouterStageMerge final : public RouterExecStage {
 public:
     RouterStageMerge(OperationContext* opCtx,
-                     executor::TaskExecutor* executor,
+                     std::shared_ptr<executor::TaskExecutor> executor,
                      AsyncResultsMergerParams&& armParams)
-        : RouterExecStage(opCtx), _resultsMerger(opCtx, std::move(armParams), executor, nullptr) {}
+        : RouterExecStage(opCtx),
+          _resultsMerger(opCtx, std::move(armParams), std::move(executor), nullptr) {}
 
     StatusWith<ClusterQueryResult> next(ExecContext execCtx) final {
         return _resultsMerger.next(getOpCtx(), execCtx);

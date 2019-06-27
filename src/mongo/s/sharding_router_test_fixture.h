@@ -62,7 +62,7 @@ public:
     ShardingCatalogClient* catalogClient() const;
     ShardRegistry* shardRegistry() const;
     RemoteCommandTargeterFactoryMock* targeterFactory() const;
-    executor::TaskExecutor* executor() const;
+    std::shared_ptr<executor::TaskExecutor> executor() const;
     DistLockManagerMock* distLock() const;
     RemoteCommandTargeterMock* configTargeter() const;
 
@@ -180,7 +180,7 @@ private:
     RemoteCommandTargeterMock* _configTargeter;
 
     // For the Grid's fixed executor.
-    executor::TaskExecutor* _executor;
+    std::shared_ptr<executor::TaskExecutor> _fixedExecutor;
 
     // For the Grid's arbitrary executor in its executorPool.
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnvForPool;

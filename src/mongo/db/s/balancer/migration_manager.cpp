@@ -381,8 +381,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
 }
 
 void MigrationManager::interruptAndDisableMigrations() {
-    executor::TaskExecutor* const executor =
-        Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
+    auto executor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(_state == State::kEnabled || _state == State::kRecovering);
@@ -479,8 +478,7 @@ void MigrationManager::_schedule(WithLock lock,
                                  OperationContext* opCtx,
                                  const HostAndPort& targetHost,
                                  Migration migration) {
-    executor::TaskExecutor* const executor =
-        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
     const NamespaceString nss(migration.nss);
 

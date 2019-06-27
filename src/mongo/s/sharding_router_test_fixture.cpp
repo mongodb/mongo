@@ -118,9 +118,8 @@ ShardingTestFixture::ShardingTestFixture() {
     auto fixedNet = std::make_unique<executor::NetworkInterfaceMock>();
     fixedNet->setEgressMetadataHook(makeMetadataHookList());
     _mockNetwork = fixedNet.get();
-    auto fixedExec = makeShardingTestExecutor(std::move(fixedNet));
-    _networkTestEnv = std::make_unique<NetworkTestEnv>(fixedExec.get(), _mockNetwork);
-    _executor = fixedExec.get();
+    _fixedExecutor = makeShardingTestExecutor(std::move(fixedNet));
+    _networkTestEnv = std::make_unique<NetworkTestEnv>(_fixedExecutor.get(), _mockNetwork);
 
     auto netForPool = std::make_unique<executor::NetworkInterfaceMock>();
     netForPool->setEgressMetadataHook(makeMetadataHookList());
@@ -128,11 +127,11 @@ ShardingTestFixture::ShardingTestFixture() {
     auto execForPool = makeShardingTestExecutor(std::move(netForPool));
     _networkTestEnvForPool =
         std::make_unique<NetworkTestEnv>(execForPool.get(), _mockNetworkForPool);
-    std::vector<std::unique_ptr<executor::TaskExecutor>> executorsForPool;
+    std::vector<std::shared_ptr<executor::TaskExecutor>> executorsForPool;
     executorsForPool.emplace_back(std::move(execForPool));
 
     auto executorPool = std::make_unique<executor::TaskExecutorPool>();
-    executorPool->addExecutors(std::move(executorsForPool), std::move(fixedExec));
+    executorPool->addExecutors(std::move(executorsForPool), _fixedExecutor);
 
     auto uniqueDistLockManager = std::make_unique<DistLockManagerMock>(nullptr);
     _distLockManager = uniqueDistLockManager.get();
@@ -193,8 +192,8 @@ ShardingTestFixture::~ShardingTestFixture() {
 }
 
 void ShardingTestFixture::shutdownExecutor() {
-    if (_executor)
-        _executor->shutdown();
+    if (_fixedExecutor)
+        _fixedExecutor->shutdown();
 }
 
 ShardingCatalogClient* ShardingTestFixture::catalogClient() const {
@@ -217,10 +216,10 @@ RemoteCommandTargeterMock* ShardingTestFixture::configTargeter() const {
     return _configTargeter;
 }
 
-executor::TaskExecutor* ShardingTestFixture::executor() const {
-    invariant(_executor);
+std::shared_ptr<executor::TaskExecutor> ShardingTestFixture::executor() const {
+    invariant(_fixedExecutor);
 
-    return _executor;
+    return _fixedExecutor;
 }
 
 DistLockManagerMock* ShardingTestFixture::distLock() const {

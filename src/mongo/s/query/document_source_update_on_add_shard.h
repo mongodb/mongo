@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
@@ -51,7 +53,7 @@ public:
      */
     static boost::intrusive_ptr<DocumentSourceUpdateOnAddShard> create(
         const boost::intrusive_ptr<ExpressionContext>&,
-        executor::TaskExecutor*,
+        std::shared_ptr<executor::TaskExecutor> executor,
         const boost::intrusive_ptr<DocumentSourceMergeCursors>&,
         std::vector<ShardId> shardsWithCursors,
         BSONObj cmdToRunOnNewShards);
@@ -81,7 +83,7 @@ public:
 
 private:
     DocumentSourceUpdateOnAddShard(const boost::intrusive_ptr<ExpressionContext>&,
-                                   executor::TaskExecutor*,
+                                   std::shared_ptr<executor::TaskExecutor> executor,
                                    const boost::intrusive_ptr<DocumentSourceMergeCursors>&,
                                    std::vector<ShardId>&& shardsWithCursors,
                                    BSONObj cmdToRunOnNewShards);
@@ -96,7 +98,7 @@ private:
      */
     std::vector<RemoteCursor> establishShardCursorsOnNewShards(const Document& newShardDetectedObj);
 
-    executor::TaskExecutor* _executor;
+    std::shared_ptr<executor::TaskExecutor> _executor;
     boost::intrusive_ptr<DocumentSourceMergeCursors> _mergeCursors;
     std::vector<ShardId> _shardsWithCursors;
     BSONObj _cmdToRunOnNewShards;

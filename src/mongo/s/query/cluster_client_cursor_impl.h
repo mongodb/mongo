@@ -90,7 +90,7 @@ public:
      * ensured by an RAII object.
      */
     static ClusterClientCursorGuard make(OperationContext* opCtx,
-                                         executor::TaskExecutor* executor,
+                                         std::shared_ptr<executor::TaskExecutor> executor,
                                          ClusterClientCursorParams&& params);
 
     /**
@@ -161,7 +161,7 @@ public:
      * Constructs a cluster client cursor.
      */
     ClusterClientCursorImpl(OperationContext* opCtx,
-                            executor::TaskExecutor* executor,
+                            std::shared_ptr<executor::TaskExecutor> executor,
                             ClusterClientCursorParams&& params,
                             boost::optional<LogicalSessionId> lsid);
 
@@ -169,9 +169,10 @@ private:
     /**
      * Constructs the pipeline of MergerPlanStages which will be used to answer the query.
      */
-    std::unique_ptr<RouterExecStage> buildMergerPlan(OperationContext* opCtx,
-                                                     executor::TaskExecutor* executor,
-                                                     ClusterClientCursorParams* params);
+    std::unique_ptr<RouterExecStage> buildMergerPlan(
+        OperationContext* opCtx,
+        std::shared_ptr<executor::TaskExecutor> executor,
+        ClusterClientCursorParams* params);
 
     ClusterClientCursorParams _params;
 

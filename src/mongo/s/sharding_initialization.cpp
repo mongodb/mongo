@@ -98,7 +98,7 @@ std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service
     return std::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
 }
 
-std::unique_ptr<executor::TaskExecutor> makeShardingFixedTaskExecutor(
+std::shared_ptr<executor::TaskExecutor> makeShardingFixedTaskExecutor(
     std::unique_ptr<NetworkInterface> net) {
     auto executor =
         std::make_unique<ThreadPoolTaskExecutor>(std::make_unique<ThreadPool>([] {
@@ -110,7 +110,7 @@ std::unique_ptr<executor::TaskExecutor> makeShardingFixedTaskExecutor(
                                                  }()),
                                                  std::move(net));
 
-    return std::make_unique<executor::ShardingTaskExecutor>(std::move(executor));
+    return std::make_shared<executor::ShardingTaskExecutor>(std::move(executor));
 }
 
 std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
@@ -118,7 +118,7 @@ std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
     rpc::ShardingEgressMetadataHookBuilder metadataHookBuilder,
     ConnectionPool::Options connPoolOptions,
     boost::optional<size_t> taskExecutorPoolSize) {
-    std::vector<std::unique_ptr<executor::TaskExecutor>> executors;
+    std::vector<std::shared_ptr<executor::TaskExecutor>> executors;
 
     const auto poolSize = taskExecutorPoolSize.value_or(TaskExecutorPool::getSuggestedPoolSize());
 

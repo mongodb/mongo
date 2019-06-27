@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <memory>
 #include <vector>
 
 #include "mongo/base/status_with.h"
@@ -64,7 +65,7 @@ class CursorResponse;
  */
 std::vector<RemoteCursor> establishCursors(
     OperationContext* opCtx,
-    executor::TaskExecutor* executor,
+    std::shared_ptr<executor::TaskExecutor> executor,
     const NamespaceString& nss,
     const ReadPreferenceSetting readPref,
     const std::vector<std::pair<ShardId, BSONObj>>& remotes,

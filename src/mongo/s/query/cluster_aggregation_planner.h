@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/db/pipeline/exchange_spec_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -82,7 +84,7 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
                            std::vector<OwnedRemoteCursor> remoteCursors,
                            const std::vector<ShardId>& targetedShards,
                            boost::optional<BSONObj> shardCursorsSortSpec,
-                           executor::TaskExecutor*);
+                           std::shared_ptr<executor::TaskExecutor> executor);
 
 /**
  * Builds a ClusterClientCursor which will execute 'pipeline'. If 'pipeline' consists entirely of

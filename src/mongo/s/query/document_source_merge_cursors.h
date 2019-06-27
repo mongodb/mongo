@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/blocking_results_merger.h"
@@ -60,7 +62,7 @@ public:
      * Creates a new DocumentSourceMergeCursors from the given parameters.
      */
     static boost::intrusive_ptr<DocumentSourceMergeCursors> create(
-        executor::TaskExecutor*,
+        std::shared_ptr<executor::TaskExecutor>,
         AsyncResultsMergerParams,
         const boost::intrusive_ptr<ExpressionContext>&);
 
@@ -149,7 +151,7 @@ protected:
     void doDispose() final;
 
 private:
-    DocumentSourceMergeCursors(executor::TaskExecutor*,
+    DocumentSourceMergeCursors(std::shared_ptr<executor::TaskExecutor>,
                                AsyncResultsMergerParams,
                                const boost::intrusive_ptr<ExpressionContext>&,
                                boost::optional<BSONObj> ownedParamsSpec = boost::none);
@@ -164,7 +166,7 @@ private:
     // params are in use. We store them here.
     boost::optional<BSONObj> _armParamsObj;
 
-    executor::TaskExecutor* _executor;
+    std::shared_ptr<executor::TaskExecutor> _executor;
 
     // '_blockingResultsMerger' is lazily populated. Until we need to use it, '_armParams' will be
     // populated with the parameters. Once we start using '_blockingResultsMerger', '_armParams'

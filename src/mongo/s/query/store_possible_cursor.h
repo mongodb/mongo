@@ -78,7 +78,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const HostAndPort& server,
                                         const BSONObj& cmdResult,
                                         const NamespaceString& requestedNss,
-                                        executor::TaskExecutor* executor,
+                                        std::shared_ptr<executor::TaskExecutor> executor,
                                         ClusterCursorManager* cursorManager,
                                         PrivilegeVector privileges,
                                         TailableModeEnum tailableMode = TailableModeEnum::kNormal);

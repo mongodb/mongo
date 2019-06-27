@@ -49,22 +49,25 @@ bool needsUpdate(const Document& childResult) {
 
 boost::intrusive_ptr<DocumentSourceUpdateOnAddShard> DocumentSourceUpdateOnAddShard::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    executor::TaskExecutor* executor,
+    std::shared_ptr<executor::TaskExecutor> executor,
     const boost::intrusive_ptr<DocumentSourceMergeCursors>& mergeCursors,
     std::vector<ShardId> shardsWithCursors,
     BSONObj cmdToRunOnNewShards) {
-    return new DocumentSourceUpdateOnAddShard(
-        expCtx, executor, mergeCursors, std::move(shardsWithCursors), cmdToRunOnNewShards);
+    return new DocumentSourceUpdateOnAddShard(expCtx,
+                                              std::move(executor),
+                                              mergeCursors,
+                                              std::move(shardsWithCursors),
+                                              cmdToRunOnNewShards);
 }
 
 DocumentSourceUpdateOnAddShard::DocumentSourceUpdateOnAddShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    executor::TaskExecutor* executor,
+    std::shared_ptr<executor::TaskExecutor> executor,
     const boost::intrusive_ptr<DocumentSourceMergeCursors>& mergeCursors,
     std::vector<ShardId>&& shardsWithCursors,
     BSONObj cmdToRunOnNewShards)
     : DocumentSource(expCtx),
-      _executor(executor),
+      _executor(std::move(executor)),
       _mergeCursors(mergeCursors),
       _shardsWithCursors(std::move(shardsWithCursors)),
       _cmdToRunOnNewShards(cmdToRunOnNewShards.getOwned()) {}

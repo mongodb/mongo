@@ -64,7 +64,7 @@ class MetadataManagerTest : public ShardServerTestFixture {
 protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
-        _manager = std::make_shared<MetadataManager>(getServiceContext(), kNss, executor());
+        _manager = std::make_shared<MetadataManager>(getServiceContext(), kNss, executor().get());
     }
 
     /**

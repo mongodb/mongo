@@ -49,7 +49,7 @@ class ScopedTaskExecutor::Impl : public std::enable_shared_from_this<ScopedTaskE
         Status(ErrorCodes::ShutdownInProgress, "Shutting down ScopedTaskExecutor::Impl");
 
 public:
-    explicit Impl(TaskExecutor* executor) : _executor(executor) {}
+    explicit Impl(std::shared_ptr<TaskExecutor> executor) : _executor(std::move(executor)) {}
 
     ~Impl() {
         // The ScopedTaskExecutor dtor calls shutdown, so this is guaranteed.
@@ -304,7 +304,7 @@ private:
 
     stdx::mutex _mutex;
     bool _inShutdown = false;
-    TaskExecutor* const _executor;
+    std::shared_ptr<TaskExecutor> _executor;
     size_t _id = 0;
     stdx::unordered_map<size_t, CallbackHandle> _cbHandles;
 
@@ -313,8 +313,8 @@ private:
     stdx::condition_variable _cv;
 };
 
-ScopedTaskExecutor::ScopedTaskExecutor(TaskExecutor* executor)
-    : _executor(std::make_shared<Impl>(executor)) {}
+ScopedTaskExecutor::ScopedTaskExecutor(std::shared_ptr<TaskExecutor> executor)
+    : _executor(std::make_shared<Impl>(std::move(executor))) {}
 
 ScopedTaskExecutor::~ScopedTaskExecutor() {
     _executor->shutdown();
