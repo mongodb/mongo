@@ -119,7 +119,7 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shardHost");
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
 
     setupDatabase(nss.db().toString(), shard.getName(), true);
 
@@ -131,7 +131,7 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
     chunk.setShard(shard.getName());
     chunk.setMin(BSON("_id" << 1));
     chunk.setMax(BSON("_id" << 5));
-    ASSERT_OK(setupChunks({chunk}));
+    setupChunks({chunk});
 
     ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
     BSONObj defaultCollation;
@@ -163,7 +163,7 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     targeter->setFindHostReturnValue(shardHost);
     targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
 
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
 
     const auto nss = NamespaceString("db1.foo");
 
@@ -235,7 +235,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     targeter2->setFindHostReturnValue(shard2Host);
     targeterFactory()->addTargeterToReturn(ConnectionString(shard2Host), std::move(targeter2));
 
-    ASSERT_OK(setupShards(vector<ShardType>{shard0, shard1, shard2}));
+    setupShards(vector<ShardType>{shard0, shard1, shard2});
 
     const auto nss = NamespaceString("db1.foo");
     string ns = "db1.foo";
@@ -342,7 +342,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
     targeter->setFindHostReturnValue(shardHost);
     targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
 
-    ASSERT_OK(setupShards(vector<ShardType>{shard}));
+    setupShards(vector<ShardType>{shard});
 
     const auto nss = NamespaceString("db1.foo");
     string ns = "db1.foo";

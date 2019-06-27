@@ -159,7 +159,7 @@ void KeysCollectionManagerSharding::stopMonitoring() {
 
 void KeysCollectionManagerSharding::enableKeyGenerator(OperationContext* opCtx, bool doEnable) {
     if (doEnable) {
-        _refresher.switchFunc(opCtx, [this](OperationContext* opCtx) {
+        _refresher.setFunc([this](OperationContext* opCtx) {
             KeysCollectionCacheReaderAndUpdater keyGenerator(
                 _purpose, _client.get(), _keyValidForInterval);
             auto keyGenerationStatus = keyGenerator.refresh(opCtx);
@@ -178,8 +178,7 @@ void KeysCollectionManagerSharding::enableKeyGenerator(OperationContext* opCtx, 
             return cacheRefreshStatus;
         });
     } else {
-        _refresher.switchFunc(
-            opCtx, [this](OperationContext* opCtx) { return _keysCache.refresh(opCtx); });
+        _refresher.setFunc([this](OperationContext* opCtx) { return _keysCache.refresh(opCtx); });
     }
 }
 
@@ -311,11 +310,6 @@ void KeysCollectionManagerSharding::PeriodicRunner::setFunc(RefreshFunc newRefre
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _doRefresh = std::make_shared<RefreshFunc>(std::move(newRefreshStrategy));
     _refreshNeededCV.notify_all();
-}
-
-void KeysCollectionManagerSharding::PeriodicRunner::switchFunc(OperationContext* opCtx,
-                                                               RefreshFunc newRefreshStrategy) {
-    setFunc(newRefreshStrategy);
 }
 
 void KeysCollectionManagerSharding::PeriodicRunner::start(ServiceContext* service,

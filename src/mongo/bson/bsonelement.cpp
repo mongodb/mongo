@@ -798,7 +798,6 @@ void BSONElement::toString(
                 s << toHex(data, len) << ")";
             }
         } break;
-
         case bsonTimestamp: {
             // Convert from Milliseconds to Seconds for consistent Timestamp printing.
             auto secs = duration_cast<Seconds>(timestampTime().toDurationSinceEpoch());

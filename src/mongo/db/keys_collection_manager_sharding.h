@@ -134,15 +134,11 @@ private:
 
         /**
          * Sets the refresh function to use.
-         * Should only be used to bootstrap this refresher with initial strategy.
+         *
+         * Should only be used to bootstrap this refresher with initial strategy. Also waits to make
+         * sure that the old strategy is not being used and will no longer be used after this call.
          */
         void setFunc(RefreshFunc newRefreshStrategy);
-
-        /**
-         * Switches the current strategy with a new one. This also waits to make sure that the old
-         * strategy is not being used and will no longer be used after this call.
-         */
-        void switchFunc(OperationContext* opCtx, RefreshFunc newRefreshStrategy);
 
         /**
          * Starts the refresh thread.

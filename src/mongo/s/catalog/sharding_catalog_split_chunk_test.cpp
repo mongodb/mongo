@@ -59,7 +59,7 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     auto chunkSplitPoint = BSON("a" << 5);
     std::vector<BSONObj> splitPoints{chunkSplitPoint};
 
-    ASSERT_OK(setupChunks({chunk}));
+    setupChunks({chunk});
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->commitChunkSplit(operationContext(),
@@ -109,7 +109,7 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     auto chunkSplitPoint2 = BSON("a" << 7);
     std::vector<BSONObj> splitPoints{chunkSplitPoint, chunkSplitPoint2};
 
-    ASSERT_OK(setupChunks({chunk}));
+    setupChunks({chunk});
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->commitChunkSplit(operationContext(),
@@ -180,7 +180,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     chunk2.setMin(BSON("a" << 10));
     chunk2.setMax(BSON("a" << 20));
 
-    ASSERT_OK(setupChunks({chunk, chunk2}));
+    setupChunks({chunk, chunk2});
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->commitChunkSplit(operationContext(),
@@ -230,7 +230,7 @@ TEST_F(SplitChunkTest, PreConditionFailErrors) {
     auto chunkSplitPoint = BSON("a" << 5);
     splitPoints.push_back(chunkSplitPoint);
 
-    ASSERT_OK(setupChunks({chunk}));
+    setupChunks({chunk});
 
     auto splitStatus = ShardingCatalogManager::get(operationContext())
                            ->commitChunkSplit(operationContext(),
@@ -257,7 +257,7 @@ TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
 
     std::vector<BSONObj> splitPoints{BSON("a" << 5)};
 
-    ASSERT_OK(setupChunks({chunk}));
+    setupChunks({chunk});
 
     auto splitStatus = ShardingCatalogManager::get(operationContext())
                            ->commitChunkSplit(operationContext(),
@@ -284,7 +284,7 @@ TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
 
     std::vector<BSONObj> splitPoints{BSON("a" << 5)};
 
-    ASSERT_OK(setupChunks({chunk}));
+    setupChunks({chunk});
 
     auto splitStatus = ShardingCatalogManager::get(operationContext())
                            ->commitChunkSplit(operationContext(),
@@ -311,7 +311,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfOrderShouldFail) {
 
     std::vector<BSONObj> splitPoints{BSON("a" << 5), BSON("a" << 4)};
 
-    ASSERT_OK(setupChunks({chunk}));
+    setupChunks({chunk});
 
     auto splitStatus = ShardingCatalogManager::get(operationContext())
                            ->commitChunkSplit(operationContext(),
@@ -338,7 +338,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMinShouldFail) {
 
     std::vector<BSONObj> splitPoints{BSON("a" << 0), BSON("a" << 5)};
 
-    ASSERT_OK(setupChunks({chunk}));
+    setupChunks({chunk});
 
     auto splitStatus = ShardingCatalogManager::get(operationContext())
                            ->commitChunkSplit(operationContext(),
@@ -365,7 +365,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMaxShouldFail) {
 
     std::vector<BSONObj> splitPoints{BSON("a" << 5), BSON("a" << 15)};
 
-    ASSERT_OK(setupChunks({chunk}));
+    setupChunks({chunk});
 
     auto splitStatus = ShardingCatalogManager::get(operationContext())
                            ->commitChunkSplit(operationContext(),
@@ -389,7 +389,7 @@ TEST_F(SplitChunkTest, SplitPointsWithDollarPrefixShouldFail) {
     auto chunkMax = BSON("a" << kMaxBSONKey);
     chunk.setMin(chunkMin);
     chunk.setMax(chunkMax);
-    ASSERT_OK(setupChunks({chunk}));
+    setupChunks({chunk});
 
     ASSERT_NOT_OK(ShardingCatalogManager::get(operationContext())
                       ->commitChunkSplit(operationContext(),

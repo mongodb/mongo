@@ -63,7 +63,7 @@ public:
         shard.setHost("a:1234");
         shard.setTags({zoneName()});
 
-        setupShards({shard}).transitional_ignore();
+        setupShards({shard});
 
         CollectionType shardedCollection;
         shardedCollection.setNs(shardedNS());
