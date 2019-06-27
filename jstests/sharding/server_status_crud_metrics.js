@@ -56,7 +56,7 @@
 
     // Shouldn't increment the metric when routing fails.
     assert.commandFailedWithCode(testDB.coll.update({}, {$set: {x: 2}}, {multi: false}),
-                                 ErrorCodes.InvalidOptions);
+                                 [ErrorCodes.InvalidOptions, ErrorCodes.ShardKeyNotFound]);
     assert.commandFailedWithCode(testDB.coll.update({_id: 1}, {$set: {x: 2}}, {upsert: true}),
                                  ErrorCodes.ShardKeyNotFound);
 
