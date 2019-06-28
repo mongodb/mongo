@@ -16,5 +16,5 @@
 
     let expectedRoles =
         [{"role": "backup", "db": "admin"}, {"role": "readAnyDatabase", "db": "admin"}];
-    assert.docEq(connStatus.authInfo.authenticatedUserRoles, expectedRoles);
+    assert.sameMembers(connStatus.authInfo.authenticatedUserRoles, expectedRoles);
 }());
