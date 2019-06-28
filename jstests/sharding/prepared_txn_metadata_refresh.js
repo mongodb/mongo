@@ -2,6 +2,8 @@
  * Test to make sure that transactions doesn't block shard version metadata refresh.
  * Test relies on the fact that destination shard does not update it's shard version after a
  * migration when doNotRefreshRecipientAfterCommit failpoint is ON.
+ *
+ * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
 (function() {
