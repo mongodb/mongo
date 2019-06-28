@@ -36,7 +36,7 @@
 
 namespace mongo {
 void RecoveryUnit::registerChange(Change* change) {
-    invariant(_inUnitOfWork());
+    invariant(_inUnitOfWork(), toString(_getState()));
     _changes.push_back(std::unique_ptr<Change>{change});
 }
 
