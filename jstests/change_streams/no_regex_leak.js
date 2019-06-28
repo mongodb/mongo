@@ -50,11 +50,12 @@
         cstUnrelated.cleanUp();
         cstProblematic.cleanUp();
     }
-
-    test_no_leak("has_no_pipe", "coll", "has_a_|pipe", "coll");
+    if (!_isWindows()) {
+        test_no_leak("has_no_pipe", "coll", "has_a_|pipe", "coll");
+        test_no_leak("starssss", "coll", "stars*", "coll");
+    }
     test_no_leak("has_[two]_brackets", "coll", "has_t_brackets", "coll");
     test_no_leak("test", "dotted.collection", "testadotted", "collection");
     test_no_leak("carat", "coll", "hasa^carat", "coll");
-    test_no_leak("starssss", "coll", "stars*", "coll");
     test_no_leak("db1", "coll", "db1", "col*");
 }());
