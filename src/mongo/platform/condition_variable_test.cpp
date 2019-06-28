@@ -27,55 +27,35 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/unittest/unittest.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/service_context.h"
+#include "mongo/platform/condition_variable.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/util/time_support.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/barrier.h"
 
 namespace mongo {
 
-/**
- * DiagnosticInfo keeps track of diagnostic information such as a developer provided
- * name, the time when a lock was first acquired, and a partial caller call stack.
- */
-class DiagnosticInfo {
-public:
-    struct Diagnostic {
-        static DiagnosticInfo& get(Client*);
-        static void set(Client*, std::shared_ptr<DiagnosticInfo>);
-        Mutex m;
-        std::shared_ptr<DiagnosticInfo> diagnostic;
-    };
+TEST(ConditionVariable, BasicSingleThread) {
+    unittest::Barrier barrier(2U);
+    ConditionVariable cv;
+    Mutex m;
+    bool done = false;
 
-    virtual ~DiagnosticInfo() = default;
-    DiagnosticInfo(const DiagnosticInfo&) = delete;
-    DiagnosticInfo& operator=(const DiagnosticInfo&) = delete;
-    DiagnosticInfo(DiagnosticInfo&&) = default;
-    DiagnosticInfo& operator=(DiagnosticInfo&&) = default;
+    stdx::thread worker([&]() {
+        stdx::unique_lock<Mutex> lk(m);
+        barrier.countDownAndWait();
+        ASSERT(!done);
+        cv.wait(lk, [&] { return done; });
+        ASSERT(done);
+    });
 
-    Date_t getTimestamp() {
-        return _timestamp;
+    barrier.countDownAndWait();
+    {
+        stdx::unique_lock<Mutex> lk(m);
+        done = true;
     }
-
-    StringData getCaptureName() {
-        return _captureName;
-    }
-
-    friend DiagnosticInfo takeDiagnosticInfo(const StringData& captureName);
-
-private:
-    Date_t _timestamp;
-    StringData _captureName;
-
-
-    DiagnosticInfo(const Date_t& timestamp, const StringData& captureName)
-        : _timestamp(timestamp), _captureName(captureName) {}
-};
-
-/**
- * Captures the diagnostic information based on the caller's context.
- */
-DiagnosticInfo takeDiagnosticInfo(const StringData& captureName);
-}  // namespace monogo
+    cv.notify_one();
+    worker.join();
+}
+}

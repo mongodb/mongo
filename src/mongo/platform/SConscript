@@ -8,6 +8,7 @@ env.CppUnitTest(
         'atomic_proxy_test.cpp',
         'atomic_word_test.cpp',
         'bits_test.cpp',
+        'condition_variable_test.cpp',
         'endian_test.cpp',
         'mutex_test.cpp',
         'process_id_test.cpp',

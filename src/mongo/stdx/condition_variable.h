@@ -88,18 +88,17 @@ class Waitable;
 
 namespace stdx {
 
-using condition_variable_any = ::std::condition_variable_any;  // NOLINT
-using cv_status = ::std::cv_status;                            // NOLINT
-using ::std::notify_all_at_thread_exit;                        // NOLINT
+using cv_status = ::std::cv_status;      // NOLINT
+using ::std::notify_all_at_thread_exit;  // NOLINT
 
 /**
- * We wrap std::condition_variable to allow us to register Notifyables which can "wait" on the
- * condvar without actually waiting on the std::condition_variable.  This allows us to possibly do
- * productive work in those types, rather than sleeping in the os.
+ * We wrap std::condition_variable_any to allow us to register Notifyables which can "wait" on the
+ * condvar without actually waiting on the std::condition_variable_any. This allows us to possibly
+ * do productive work in those types, rather than sleeping in the os.
  */
-class condition_variable : private std::condition_variable {  // NOLINT
+class condition_variable : private std::condition_variable_any {  // NOLINT
 public:
-    using std::condition_variable::condition_variable;  // NOLINT
+    using std::condition_variable_any::condition_variable_any;  // NOLINT
 
     void notify_one() noexcept {
         if (_notifyableCount.load()) {
@@ -110,7 +109,7 @@ public:
             }
         }
 
-        std::condition_variable::notify_one();  // NOLINT
+        std::condition_variable_any::notify_one();  // NOLINT
     }
 
     void notify_all() noexcept {
@@ -121,13 +120,12 @@ public:
             }
         }
 
-        std::condition_variable::notify_all();  // NOLINT
+        std::condition_variable_any::notify_all();  // NOLINT
     }
 
-    using std::condition_variable::wait;           // NOLINT
-    using std::condition_variable::wait_for;       // NOLINT
-    using std::condition_variable::wait_until;     // NOLINT
-    using std::condition_variable::native_handle;  // NOLINT
+    using std::condition_variable_any::wait;        // NOLINT
+    using std::condition_variable_any::wait_for;    // NOLINT
+    using std::condition_variable_any::wait_until;  // NOLINT
 
 private:
     friend class ::mongo::Waitable;
@@ -212,5 +210,6 @@ private:
     std::list<Notifyable*> _notifyables;
 };
 
+using condition_variable_any = stdx::condition_variable;
 }  // namespace stdx
 }  // namespace mongo
