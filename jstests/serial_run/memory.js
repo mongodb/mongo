@@ -1,3 +1,5 @@
+// @tags: [requires_fast_memory]
+
 var col = db.memoryTest;
 
 var buildInfo = assert.commandWorked(db.adminCommand("buildInfo"));

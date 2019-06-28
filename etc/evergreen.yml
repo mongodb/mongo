@@ -12098,6 +12098,7 @@ buildvariants:
     build_mongoreplay: true
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_fast_memory
   display_tasks:
   - *dbtest
   - *unittests
@@ -12161,6 +12162,7 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     target_resmoke_time: 15
+    test_flags: --excludeWithAnyTags=requires_fast_memory
   display_tasks:
   - *dbtest
   - *unittests
