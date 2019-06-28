@@ -93,11 +93,14 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
     }
 
     if (PlanExecutor::FAILURE == state) {
-        error() << "Plan executor error during findAndModify: " << PlanExecutor::statestr(state)
-                << ", stats: " << redact(Explain::getWinningPlanStats(exec));
+        // We should always have a valid status member object at this point.
+        auto status = WorkingSetCommon::getMemberObjectStatus(value);
+        invariant(!status.isOK());
+        warning() << "Plan executor error during findAndModify: " << PlanExecutor::statestr(state)
+                  << ", status: " << status
+                  << ", stats: " << redact(Explain::getWinningPlanStats(exec));
 
-        uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(value),
-                                   "Plan executor error during findAndModify");
+        uassertStatusOKWithContext(status, "Plan executor error during findAndModify");
         MONGO_UNREACHABLE;
     }
 

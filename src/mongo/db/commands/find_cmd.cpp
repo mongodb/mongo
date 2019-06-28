@@ -477,12 +477,15 @@ public:
             // Throw an assertion if query execution fails for any reason.
             if (PlanExecutor::FAILURE == state) {
                 firstBatch.abandon();
-                LOG(1) << "Plan executor error during find command: "
-                       << PlanExecutor::statestr(state)
-                       << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
-                uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                    "Executor error during find command"));
+                // We should always have a valid status member object at this point.
+                auto status = WorkingSetCommon::getMemberObjectStatus(obj);
+                invariant(!status.isOK());
+                warning() << "Plan executor error during find command: "
+                          << PlanExecutor::statestr(state) << ", status: " << status
+                          << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
+
+                uassertStatusOK(status.withContext("Executor error during find command"));
             }
 
             // Before saving the cursor, ensure that whatever plan we established happened with the

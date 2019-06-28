@@ -297,14 +297,15 @@ public:
 
             switch (*state) {
                 case PlanExecutor::FAILURE: {
-                    // Log an error message and then perform the cleanup.
-                    error() << "GetMore command executor error: FAILURE, stats: "
-                            << redact(Explain::getWinningPlanStats(exec));
-
-                    nextBatch->abandon();
                     // We should always have a valid status member object at this point.
                     auto status = WorkingSetCommon::getMemberObjectStatus(obj);
                     invariant(!status.isOK());
+                    // Log an error message and then perform the cleanup.
+                    warning() << "GetMore command executor error: "
+                              << PlanExecutor::statestr(*state) << ", status: " << status
+                              << ", stats: " << redact(Explain::getWinningPlanStats(exec));
+
+                    nextBatch->abandon();
                     return status;
                 }
                 case PlanExecutor::IS_EOF:
