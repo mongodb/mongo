@@ -40,7 +40,7 @@ template <typename Char> struct format_part {
 
     which_arg_id which;
 
-    FMT_UNRESTRICTED_UNION value {
+    union value {
       FMT_CONSTEXPR value() : index(0u) {}
       FMT_CONSTEXPR value(unsigned id) : index(id) {}
       FMT_CONSTEXPR value(internal::string_view_metadata id)
@@ -48,8 +48,7 @@ template <typename Char> struct format_part {
 
       unsigned index;
       internal::string_view_metadata named_index;
-    }
-    val;
+    } val;
   };
 
   struct specification {
@@ -89,7 +88,7 @@ template <typename Char> struct format_part {
 
   which_value which;
   std::size_t end_of_argument_id;
-  FMT_UNRESTRICTED_UNION value {
+  union value {
     FMT_CONSTEXPR value() : arg_id(0u) {}
     FMT_CONSTEXPR value(unsigned id) : arg_id(id) {}
     FMT_CONSTEXPR value(named_argument_id named_id)
@@ -100,8 +99,7 @@ template <typename Char> struct format_part {
     internal::string_view_metadata named_arg_id;
     internal::string_view_metadata text;
     specification spec;
-  }
-  val;
+  } val;
 };
 
 namespace internal {
@@ -185,8 +183,8 @@ class format_preparation_handler : public internal::error_handler {
 template <typename Format, typename PreparedPartsProvider, typename... Args>
 class prepared_format {
  public:
-  typedef FMT_CHAR(Format) char_type;
-  typedef format_part<char_type> format_part_t;
+  using char_type = char_t<Format>;
+  using format_part_t = format_part<char_type>;
 
   prepared_format(Format f)
       : format_(std::move(f)), parts_provider_(to_string_view(format_)) {}
@@ -216,8 +214,9 @@ class prepared_format {
 
   std::basic_string<char_type> format(const Args&... args) const {
     basic_memory_buffer<char_type> buffer;
-    typedef back_insert_range<internal::basic_buffer<char_type>> range;
-    this->vformat_to(range(buffer), make_args_checked(format_, args...));
+    using range = buffer_range<char_type>;
+    this->vformat_to(range(buffer), basic_format_args<context>{
+                                        make_args_checked(format_, args...)});
     return to_string(buffer);
   }
 
@@ -225,8 +224,9 @@ class prepared_format {
   inline std::back_insert_iterator<Container> format_to(
       std::back_insert_iterator<Container> out, const Args&... args) const {
     internal::container_buffer<Container> buffer(internal::get_container(out));
-    typedef back_insert_range<internal::basic_buffer<char_type>> range;
-    this->vformat_to(range(buffer), make_args_checked(format_, args...));
+    using range = buffer_range<char_type>;
+    this->vformat_to(range(buffer), basic_format_args<context>{
+                                        make_args_checked(format_, args...)});
     return out;
   }
 
@@ -239,21 +239,23 @@ class prepared_format {
   }
 
   template <std::size_t SIZE = inline_buffer_size>
-  inline typename buffer_context<char_type>::type::iterator format_to(
+  inline typename buffer_context<char_type>::iterator format_to(
       basic_memory_buffer<char_type, SIZE>& buf, const Args&... args) const {
-    typedef back_insert_range<internal::basic_buffer<char_type>> range;
-    return this->vformat_to(range(buf), make_args_checked(format_, args...));
+    using range = buffer_range<char_type>;
+    return this->vformat_to(
+        range(buf),
+        basic_format_args<context>{make_args_checked(format_, args...)});
   }
 
  private:
-  typedef typename buffer_context<char_type>::type context;
+  typedef buffer_context<char_type> context;
 
-  template <typename Range>
-  typename context::iterator vformat_to(Range out,
-                                        basic_format_args<context> args) const {
+  template <typename Range, typename Context>
+  auto vformat_to(Range out, basic_format_args<Context> args) const ->
+      typename Context::iterator {
     const auto format_view = internal::to_string_view(format_);
     basic_parse_context<char_type> parse_ctx(format_view);
-    context ctx(out.begin(), args);
+    Context ctx(out.begin(), args);
 
     const auto& parts = parts_provider_.parts();
     for (auto part_it = parts.begin(); part_it != parts.end(); ++part_it) {
@@ -262,7 +264,7 @@ class prepared_format {
 
       switch (part.which) {
       case format_part_t::which_value::text: {
-        const auto text = value.text.to_view(format_view);
+        const auto text = value.text.to_view(format_view.data());
         auto output = ctx.out();
         auto&& it = internal::reserve(output, text.size());
         it = std::copy_n(text.begin(), text.size(), it);
@@ -276,16 +278,17 @@ class prepared_format {
 
       case format_part_t::which_value::named_argument_id: {
         advance_parse_context_to_specification(parse_ctx, part);
-        const auto named_arg_id = value.named_arg_id.to_view(format_view);
+        const auto named_arg_id =
+            value.named_arg_id.to_view(format_view.data());
         format_arg<Range>(parse_ctx, ctx, named_arg_id);
       } break;
       case format_part_t::which_value::specification: {
         const auto& arg_id_value = value.spec.arg_id.val;
-        const auto arg =
-            value.spec.arg_id.which ==
-                    format_part_t::argument_id::which_arg_id::index
-                ? ctx.arg(arg_id_value.index)
-                : ctx.arg(arg_id_value.named_index.to_view(format_));
+        const auto arg = value.spec.arg_id.which ==
+                                 format_part_t::argument_id::which_arg_id::index
+                             ? ctx.arg(arg_id_value.index)
+                             : ctx.arg(arg_id_value.named_index.to_view(
+                                   to_string_view(format_).data()));
 
         auto specs = value.spec.parsed_specs;
 
@@ -297,7 +300,7 @@ class prepared_format {
         check_prepared_specs(specs, arg.type());
         advance_parse_context_to_specification(parse_ctx, part);
         ctx.advance_to(
-            visit_format_arg(arg_formatter<Range>(ctx, FMT_NULL, &specs), arg));
+            visit_format_arg(arg_formatter<Range>(ctx, nullptr, &specs), arg));
       } break;
       }
     }
@@ -310,7 +313,7 @@ class prepared_format {
       const format_part_t& part) const {
     const auto view = to_string_view(format_);
     const auto specification_begin = view.data() + part.end_of_argument_id;
-    parse_ctx.advance_to(specification_begin);
+    advance_to(parse_ctx, specification_begin);
   }
 
   template <typename Range, typename Context, typename Id>
@@ -351,7 +354,7 @@ class prepared_format {
 
 template <typename Format> class compiletime_prepared_parts_type_provider {
  private:
-  typedef FMT_CHAR(Format) char_type;
+  using char_type = char_t<Format>;
 
   class count_handler {
    private:
@@ -440,9 +443,8 @@ template <typename Format> class compiletime_prepared_parts_type_provider {
     typedef format_part<char_type> value_type;
   };
 
-  typedef typename std::conditional<static_cast<bool>(number_of_format_parts),
-                                    format_parts_array<number_of_format_parts>,
-                                    empty>::type type;
+  using type = conditional_t<static_cast<bool>(number_of_format_parts),
+                             format_parts_array<number_of_format_parts>, empty>;
 };
 
 template <typename Parts> class compiletime_prepared_parts_collector {
@@ -539,14 +541,14 @@ struct parts_container_concept_check : std::true_type {
   template <typename T> static std::false_type has_add_check(check_second);
   template <typename T>
   static decltype(
-      (void)declval<T>().add(declval<typename T::format_part_type>()),
+      (void)std::declval<T>().add(std::declval<typename T::format_part_type>()),
       std::true_type()) has_add_check(check_first);
   typedef decltype(has_add_check<PartsContainer>(check_first())) has_add;
   static_assert(has_add::value, "PartsContainer doesn't provide add() method");
 
   template <typename T> static std::false_type has_last_check(check_second);
   template <typename T>
-  static decltype((void)declval<T>().last(),
+  static decltype((void)std::declval<T>().last(),
                   std::true_type()) has_last_check(check_first);
   typedef decltype(has_last_check<PartsContainer>(check_first())) has_last;
   static_assert(has_last::value,
@@ -555,8 +557,8 @@ struct parts_container_concept_check : std::true_type {
   template <typename T>
   static std::false_type has_substitute_last_check(check_second);
   template <typename T>
-  static decltype((void)declval<T>().substitute_last(
-                      declval<typename T::format_part_type>()),
+  static decltype((void)std::declval<T>().substitute_last(
+                      std::declval<typename T::format_part_type>()),
                   std::true_type()) has_substitute_last_check(check_first);
   typedef decltype(has_substitute_last_check<PartsContainer>(
       check_first())) has_substitute_last;
@@ -565,7 +567,7 @@ struct parts_container_concept_check : std::true_type {
 
   template <typename T> static std::false_type has_begin_check(check_second);
   template <typename T>
-  static decltype((void)declval<T>().begin(),
+  static decltype((void)std::declval<T>().begin(),
                   std::true_type()) has_begin_check(check_first);
   typedef decltype(has_begin_check<PartsContainer>(check_first())) has_begin;
   static_assert(has_begin::value,
@@ -573,7 +575,7 @@ struct parts_container_concept_check : std::true_type {
 
   template <typename T> static std::false_type has_end_check(check_second);
   template <typename T>
-  static decltype((void)declval<T>().end(),
+  static decltype((void)std::declval<T>().end(),
                   std::true_type()) has_end_check(check_first);
   typedef decltype(has_end_check<PartsContainer>(check_first())) has_end;
   static_assert(has_end::value, "PartsContainer doesn't provide end() method");
@@ -626,19 +628,19 @@ class parts_container {
 
   format_part_type last() { return parts_.back(); }
 
-  auto begin() -> decltype(internal::declval<Container>().begin()) {
+  auto begin() -> decltype(std::declval<Container>().begin()) {
     return parts_.begin();
   }
 
-  auto begin() const -> decltype(internal::declval<const Container>().begin()) {
+  auto begin() const -> decltype(std::declval<const Container>().begin()) {
     return parts_.begin();
   }
 
-  auto end() -> decltype(internal::declval<Container>().end()) {
+  auto end() -> decltype(std::declval<Container>().end()) {
     return parts_.end();
   }
 
-  auto end() const -> decltype(internal::declval<const Container>().end()) {
+  auto end() const -> decltype(std::declval<const Container>().end()) {
     return parts_.end();
   }
 
@@ -649,7 +651,7 @@ class parts_container {
 // Delegate preparing to preparator, to take advantage of a partial
 // specialization.
 template <typename Format, typename... Args> struct preparator {
-  typedef parts_container<FMT_CHAR(Format)> container;
+  typedef parts_container<char_t<Format>> container;
   typedef typename basic_prepared_format<Format, container, Args...>::type
       prepared_format_type;
 
@@ -674,9 +676,8 @@ struct compiletime_format_tag {};
 struct runtime_format_tag {};
 
 template <typename Format> struct format_tag {
-  typedef typename std::conditional<is_compile_string<Format>::value,
-                                    compiletime_format_tag,
-                                    runtime_format_tag>::type type;
+  using type = conditional_t<is_compile_string<Format>::value,
+                             compiletime_format_tag, runtime_format_tag>;
 };
 
 #if FMT_USE_CONSTEXPR

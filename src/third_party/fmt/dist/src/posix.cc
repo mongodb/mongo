@@ -73,7 +73,7 @@ buffered_file::~buffered_file() FMT_NOEXCEPT {
 
 buffered_file::buffered_file(cstring_view filename, cstring_view mode) {
   FMT_RETRY_VAL(file_, FMT_SYSTEM(fopen(filename.c_str(), mode.c_str())),
-                FMT_NULL);
+                nullptr);
   if (!file_)
     FMT_THROW(system_error(errno, "cannot open file {}", filename.c_str()));
 }
@@ -81,7 +81,7 @@ buffered_file::buffered_file(cstring_view filename, cstring_view mode) {
 void buffered_file::close() {
   if (!file_) return;
   int result = FMT_SYSTEM(fclose(file_));
-  file_ = FMT_NULL;
+  file_ = nullptr;
   if (result != 0) FMT_THROW(system_error(errno, "cannot close file"));
 }
 

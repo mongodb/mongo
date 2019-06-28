@@ -82,7 +82,7 @@ template <typename T> class is_like_std_string {
 
  public:
   static FMT_CONSTEXPR_DECL const bool value =
-      !std::is_void<decltype(check<T>(FMT_NULL))>::value;
+      is_string<T>::value || !std::is_void<decltype(check<T>(nullptr))>::value;
 };
 
 template <typename Char>
@@ -95,25 +95,24 @@ template <typename T, typename _ = void> struct is_range_ : std::false_type {};
 #if !FMT_MSC_VER || FMT_MSC_VER > 1800
 template <typename T>
 struct is_range_<
-    T, typename std::conditional<
-           false,
-           conditional_helper<decltype(internal::declval<T>().begin()),
-                              decltype(internal::declval<T>().end())>,
-           void>::type> : std::true_type {};
+    T, conditional_t<false,
+                     conditional_helper<decltype(std::declval<T>().begin()),
+                                        decltype(std::declval<T>().end())>,
+                     void>> : std::true_type {};
 #endif
 
 /// tuple_size and tuple_element check.
 template <typename T> class is_tuple_like_ {
   template <typename U>
-  static auto check(U* p) -> decltype(
-      std::tuple_size<U>::value,
-      (void)internal::declval<typename std::tuple_element<0, U>::type>(),
-      int());
+  static auto check(U* p)
+      -> decltype(std::tuple_size<U>::value,
+                  (void)std::declval<typename std::tuple_element<0, U>::type>(),
+                  int());
   template <typename> static void check(...);
 
  public:
   static FMT_CONSTEXPR_DECL const bool value =
-      !std::is_void<decltype(check<T>(FMT_NULL))>::value;
+      !std::is_void<decltype(check<T>(nullptr))>::value;
 };
 
 // Check for integer_sequence
@@ -195,9 +194,7 @@ template <typename T> struct is_tuple_like {
 };
 
 template <typename TupleT, typename Char>
-struct formatter<
-    TupleT, Char,
-    typename std::enable_if<fmt::is_tuple_like<TupleT>::value>::type> {
+struct formatter<TupleT, Char, enable_if_t<fmt::is_tuple_like<TupleT>::value>> {
  private:
   // C++11 generic lambda for format()
   template <typename FormatContext> struct format_each {
@@ -251,8 +248,7 @@ template <typename T> struct is_range {
 };
 
 template <typename RangeT, typename Char>
-struct formatter<RangeT, Char,
-                 typename std::enable_if<fmt::is_range<RangeT>::value>::type> {
+struct formatter<RangeT, Char, enable_if_t<fmt::is_range<RangeT>::value>> {
   formatting_range<Char> formatting;
 
   template <typename ParseContext>

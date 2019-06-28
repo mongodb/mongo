@@ -133,7 +133,7 @@ class buffered_file {
 
  public:
   // Constructs a buffered_file object which doesn't represent any file.
-  buffered_file() FMT_NOEXCEPT : file_(FMT_NULL) {}
+  buffered_file() FMT_NOEXCEPT : file_(nullptr) {}
 
   // Destroys the object closing the file it represents if any.
   FMT_API ~buffered_file() FMT_NOEXCEPT;
@@ -144,13 +144,13 @@ class buffered_file {
 
  public:
   buffered_file(buffered_file&& other) FMT_NOEXCEPT : file_(other.file_) {
-    other.file_ = FMT_NULL;
+    other.file_ = nullptr;
   }
 
   buffered_file& operator=(buffered_file&& other) {
     close();
     file_ = other.file_;
-    other.file_ = FMT_NULL;
+    other.file_ = nullptr;
     return *this;
   }
 
@@ -261,12 +261,6 @@ class file {
 // Returns the memory page size.
 long getpagesize();
 
-#if (defined(LC_NUMERIC_MASK) || defined(_MSC_VER)) &&                        \
-    !defined(__ANDROID__) && !defined(__CYGWIN__) && !defined(__OpenBSD__) && \
-    !defined(__NEWLIB_H__)
-#  define FMT_LOCALE
-#endif
-
 #ifdef FMT_LOCALE
 // A "C" numeric locale.
 class Locale {
@@ -295,7 +289,7 @@ class Locale {
  public:
   typedef locale_t Type;
 
-  Locale() : locale_(newlocale(LC_NUMERIC_MASK, "C", FMT_NULL)) {
+  Locale() : locale_(newlocale(LC_NUMERIC_MASK, "C", nullptr)) {
     if (!locale_) FMT_THROW(system_error(errno, "cannot create locale"));
   }
   ~Locale() { freelocale(locale_); }
@@ -305,7 +299,7 @@ class Locale {
   // Converts string to floating-point number and advances str past the end
   // of the parsed input.
   double strtod(const char*& str) const {
-    char* end = FMT_NULL;
+    char* end = nullptr;
     double result = strtod_l(str, &end, locale_);
     str = end;
     return result;

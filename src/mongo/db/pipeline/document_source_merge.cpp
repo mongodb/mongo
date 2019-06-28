@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_merge.h"
 
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 #include <map>
 
 #include "mongo/db/curop_failpoint_helpers.h"
