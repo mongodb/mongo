@@ -930,13 +930,6 @@ boost::optional<std::string> DurableCatalogImpl::getSideWritesIdent(OperationCon
     return md.indexes[offset].sideWritesIdent;
 }
 
-void DurableCatalogImpl::setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx) {
-    const auto feature = FeatureTracker::RepairableFeature::kIndexKeyStringWithLongTypeBits;
-    if (!getFeatureTracker()->isRepairableFeatureInUse(opCtx, feature)) {
-        getFeatureTracker()->markRepairableFeatureAsInUse(opCtx, feature);
-    }
-}
-
 void DurableCatalogImpl::updateValidator(OperationContext* opCtx,
                                          NamespaceString ns,
                                          const BSONObj& validator,

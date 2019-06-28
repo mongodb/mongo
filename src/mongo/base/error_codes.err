@@ -302,8 +302,7 @@ error_code("InterruptedAtShutdown", 11600)
 error_code("Interrupted", 11601)
 error_code("InterruptedDueToReplStateChange", 11602)
 error_code("OutOfDiskSpace", 14031 )
-# TODO SERVER-36385: Mark KeyTooLong error as obsolete
-error_code("KeyTooLong", 17280);
+error_code("OSBELETE_KeyTooLong", 17280);
 error_code("BackgroundOperationInProgressForDatabase", 12586);
 error_code("BackgroundOperationInProgressForNamespace", 12587);
 error_code("NotMasterOrSecondary", 13436);

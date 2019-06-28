@@ -39,7 +39,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
@@ -50,12 +49,6 @@
 namespace mongo {
 
 namespace {
-
-// TODO SERVER-36385: Completely remove the key size check in 4.4
-bool largeKeyDisallowed() {
-    return (serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40);
-}
 
 // The number of items we can scan before we must yield.
 static const int kScanLimit = 1000;
@@ -107,11 +100,6 @@ void IndexConsistency::removeMultikeyMetadataPath(const KeyString& ks, IndexInfo
 
 size_t IndexConsistency::getMultikeyMetadataPathCount(IndexInfo* indexInfo) {
     return indexInfo->hashedMultikeyMetadataPaths.size();
-}
-
-void IndexConsistency::addLongIndexKey(IndexInfo* indexInfo) {
-    indexInfo->numRecords++;
-    indexInfo->numLongKeys++;
 }
 
 bool IndexConsistency::haveEntryMismatch() const {

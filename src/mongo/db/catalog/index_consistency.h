@@ -60,8 +60,6 @@ struct IndexInfo {
     std::unique_ptr<KeyString> ks;
     // The number of index entries belonging to the index.
     int64_t numKeys = 0;
-    // The number of long keys that are not indexed for the index.
-    int64_t numLongKeys = 0;
     // The number of records that have a key in their document that referenced back to the this
     // index.
     int64_t numRecords = 0;
@@ -112,13 +110,6 @@ public:
     void addMultikeyMetadataPath(const KeyString& ks, IndexInfo* indexInfo);
     void removeMultikeyMetadataPath(const KeyString& ks, IndexInfo* indexInfo);
     size_t getMultikeyMetadataPathCount(IndexInfo* indexInfo);
-
-    /**
-     * Add one to the `_longKeys` count for the given `indexNs`.
-     * This is required because index keys > `KeyString::kMaxKeyBytes` are not indexed.
-     * TODO SERVER-36385: Completely remove the key size check in 4.4
-     */
-    void addLongIndexKey(IndexInfo* indexInfo);
 
     /**
      * Returns true if any value in the `_indexKeyCount` map is not equal to 0, otherwise

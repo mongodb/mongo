@@ -104,7 +104,7 @@ public:
         invariant(_data->empty());
     }
 
-    StatusWith<SpecialFormatInserted> addKey(const BSONObj& key, const RecordId& loc) {
+    Status addKey(const BSONObj& key, const RecordId& loc) {
         // inserts should be in ascending (key, RecordId) order.
 
         invariant(loc.isValid());
@@ -125,7 +125,7 @@ public:
         _last = _data->insert(_data->end(), IndexKeyEntry(owned, loc));
         *_currentKeySize += key.objsize();
 
-        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
+        return Status::OK();
     }
 
 private:
@@ -161,10 +161,10 @@ public:
             _data, &_currentKeySize, dupsAllowed, _collectionNamespace, _indexName, _keyPattern);
     }
 
-    virtual StatusWith<SpecialFormatInserted> insert(OperationContext* opCtx,
-                                                     const BSONObj& key,
-                                                     const RecordId& loc,
-                                                     bool dupsAllowed) {
+    virtual Status insert(OperationContext* opCtx,
+                          const BSONObj& key,
+                          const RecordId& loc,
+                          bool dupsAllowed) {
         invariant(loc.isValid());
         invariant(!hasFieldNames(key));
 
@@ -178,7 +178,7 @@ public:
             _currentKeySize += key.objsize();
             opCtx->recoveryUnit()->registerChange(new IndexChange(_data, entry, true));
         }
-        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
+        return Status::OK();
     }
 
     virtual void unindex(OperationContext* opCtx,

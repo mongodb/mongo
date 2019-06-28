@@ -564,12 +564,6 @@ private:
     bool isFatalError(OperationContext* opCtx, Status status, BSONObj key);
 
     /**
-     * If true, we should check whether the index key exceeds the hardcoded limit.
-     * TODO SERVER-36385: Remove this function.
-     */
-    bool shouldCheckIndexKeySize(OperationContext* opCtx);
-
-    /**
      * Removes a single key from the index.
      *
      * Used by remove() only.
