@@ -457,6 +457,28 @@ TEST_F(KeyStringTest, DecimalNumbers) {
     ROUNDTRIP(V1, BSON("" << BSONNULL << "" << BSON("a" << Decimal128::kPositiveInfinity)));
 }
 
+TEST_F(KeyStringTest, KeyStringValue) {
+    // Test that KeyString is releasable into a Value type that is comparable. Once
+    // released, it is reusable once reset.
+    KeyString ks1(KeyString::Version::V1, BSON("" << 1), ALL_ASCENDING);
+    KeyString::Value data1 = ks1.getValue();
+
+    KeyString ks2(KeyString::Version::V1, BSON("" << 2), ALL_ASCENDING);
+    KeyString::Value data2 = ks2.getValue();
+
+    ASSERT(data2.compare(data1) > 0);
+    ASSERT(data1.compare(data2) < 0);
+
+    // Test that Value is moveable.
+    KeyString::Value moved = std::move(data1);
+    ASSERT(data2.compare(moved) > 0);
+    ASSERT(moved.compare(data2) < 0);
+
+    // Test that Value is copyable.
+    KeyString::Value dataCopy = data2;
+    ASSERT(data2.compare(dataCopy) == 0);
+}
+
 TEST_F(KeyStringTest, LotsOfNumbers1) {
     for (int i = 0; i < 64; i++) {
         int64_t x = 1LL << i;

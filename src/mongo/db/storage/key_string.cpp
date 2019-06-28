@@ -2135,6 +2135,28 @@ int KeyString::compare(const KeyString& other) const {
     return a < b ? -1 : 1;
 }
 
+int KeyString::Value::compare(const KeyString::Value& other) const {
+    int a = getSize();
+    int b = other.getSize();
+
+    int min = std::min(a, b);
+
+    int cmp = memcmp(getBuffer(), other.getBuffer(), min);
+
+    if (cmp) {
+        if (cmp < 0)
+            return -1;
+        return 1;
+    }
+
+    // keys match
+
+    if (a == b)
+        return 0;
+
+    return a < b ? -1 : 1;
+}
+
 uint32_t KeyString::TypeBits::readSizeFromBuffer(BufReader* reader) {
     const uint8_t firstByte = reader->peek<uint8_t>();
 
