@@ -63,6 +63,8 @@ public:
         // See comments in getBuffer() about short/long encoding schemes.
         static const uint8_t kMaxBytesForShortEncoding = 127;
         static const uint8_t kPrefixBytes = 5;
+        // TODO SERVER-36385: Remove this 1KB limit.
+        static const uint32_t kMaxKeyBytes = 1024;
         static const uint8_t kStoredDecimalExponentBits = 6;
         static const uint32_t kStoredDecimalExponentMask = (1U << kStoredDecimalExponentBits) - 1;
 

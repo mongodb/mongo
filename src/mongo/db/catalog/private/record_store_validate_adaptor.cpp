@@ -49,6 +49,12 @@
 namespace mongo {
 
 namespace {
+// TODO SERVER-36385: Completely remove the key size check in 4.4
+bool isLargeKeyDisallowed() {
+    return serverGlobalParams.featureCompatibility.getVersion() ==
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40;
+}
+
 KeyString makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey) {
     const auto multikeyMetadataOrd = Ordering::make(BSON("" << 1 << "" << 1));
     const RecordId multikeyMetadataRecordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
@@ -120,7 +126,15 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                                                        &indexInfo);
         }
 
+        bool largeKeyDisallowed = isLargeKeyDisallowed();
         for (const auto& key : documentKeySet) {
+            if (largeKeyDisallowed &&
+                key.objsize() >= static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
+                // Index keys >= 1024 bytes are not indexed.
+                _indexConsistency->addLongIndexKey(&indexInfo);
+                continue;
+            }
+
             indexInfo.ks->resetToKey(key, indexInfo.ord, recordId);
             _indexConsistency->addDocKey(*indexInfo.ks, &indexInfo, recordId, key);
         }
@@ -250,17 +264,19 @@ void RecordStoreValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* id
                                                        ValidateResults& results) {
     const std::string indexName = idx->indexName();
     IndexInfo* indexInfo = &_indexConsistency->getIndexInfo(indexName);
-    auto numTotalKeys = indexInfo->numKeys;
+    int64_t numIndexedKeys = indexInfo->numKeys;
+    int64_t numLongKeys = indexInfo->numLongKeys;
+    auto totalKeys = numLongKeys + numIndexedKeys;
 
     bool hasTooFewKeys = false;
     bool noErrorOnTooFewKeys = (_level != kValidateFull);
 
-    if (idx->isIdIndex() && numTotalKeys != numRecs) {
-        hasTooFewKeys = numTotalKeys < numRecs ? true : hasTooFewKeys;
-        std::string msg = str::stream() << "number of _id index entries (" << numTotalKeys
+    if (idx->isIdIndex() && totalKeys != numRecs) {
+        hasTooFewKeys = totalKeys < numRecs ? true : hasTooFewKeys;
+        std::string msg = str::stream() << "number of _id index entries (" << numIndexedKeys
                                         << ") does not match the number of documents in the index ("
-                                        << numRecs << ")";
-        if (noErrorOnTooFewKeys && (numTotalKeys < numRecs)) {
+                                        << numRecs - numLongKeys << ")";
+        if (noErrorOnTooFewKeys && (numIndexedKeys < numRecs)) {
             results.warnings.push_back(msg);
         } else {
             results.errors.push_back(msg);
@@ -273,21 +289,21 @@ void RecordStoreValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* id
     // produce an index key per array entry) and not $** indexes which can produce index keys for
     // multiple paths within a single document.
     if (results.valid && !idx->isMultikey(_opCtx) &&
-        idx->getIndexType() != IndexType::INDEX_WILDCARD && numTotalKeys > numRecs) {
+        idx->getIndexType() != IndexType::INDEX_WILDCARD && totalKeys > numRecs) {
         std::string err = str::stream()
             << "index " << idx->indexName() << " is not multi-key, but has more entries ("
-            << numTotalKeys << ") than documents in the index (" << numRecs << ")";
+            << numIndexedKeys << ") than documents in the index (" << numRecs - numLongKeys << ")";
         results.errors.push_back(err);
         results.valid = false;
     }
     // Ignore any indexes with a special access method. If an access method name is given, the
     // index may be a full text, geo or special index plugin with different semantics.
     if (results.valid && !idx->isSparse() && !idx->isPartial() && !idx->isIdIndex() &&
-        idx->getAccessMethodName() == "" && numTotalKeys < numRecs) {
+        idx->getAccessMethodName() == "" && totalKeys < numRecs) {
         hasTooFewKeys = true;
         std::string msg = str::stream()
             << "index " << idx->indexName() << " is not sparse or partial, but has fewer entries ("
-            << numTotalKeys << ") than documents in the index (" << numRecs << ")";
+            << numIndexedKeys << ") than documents in the index (" << numRecs - numLongKeys << ")";
         if (noErrorOnTooFewKeys) {
             results.warnings.push_back(msg);
         } else {
@@ -298,8 +314,10 @@ void RecordStoreValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* id
 
     if ((_level != kValidateFull) && hasTooFewKeys) {
         std::string warning = str::stream()
-            << "index " << idx->indexName() << " has fewer keys than records."
-            << " Please re-run the validate command with {full: true}";
+            << "index " << idx->indexName()
+            << " has fewer keys than records. This may be the result of currently or "
+               "previously running the server with the failIndexKeyTooLong parameter set to "
+               "false. Please re-run the validate command with {full: true}";
         results.warnings.push_back(warning);
     }
 }

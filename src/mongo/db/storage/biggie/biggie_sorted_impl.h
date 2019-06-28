@@ -47,8 +47,8 @@ public:
                                const NamespaceString& collectionNamespace,
                                const std::string& indexName,
                                const BSONObj& keyPattern);
-    void commit(bool mayInterrupt) override;
-    virtual Status addKey(const BSONObj& key, const RecordId& loc);
+    SpecialFormatInserted commit(bool mayInterrupt) override;
+    virtual StatusWith<SpecialFormatInserted> addKey(const BSONObj& key, const RecordId& loc);
 
 private:
     OperationContext* _opCtx;
@@ -80,10 +80,10 @@ public:
     SortedDataInterface(const Ordering& ordering, bool isUnique, StringData ident);
     virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx,
                                                        bool dupsAllowed) override;
-    virtual Status insert(OperationContext* opCtx,
-                          const BSONObj& key,
-                          const RecordId& loc,
-                          bool dupsAllowed) override;
+    virtual StatusWith<SpecialFormatInserted> insert(OperationContext* opCtx,
+                                                     const BSONObj& key,
+                                                     const RecordId& loc,
+                                                     bool dupsAllowed) override;
     virtual void unindex(OperationContext* opCtx,
                          const BSONObj& key,
                          const RecordId& loc,

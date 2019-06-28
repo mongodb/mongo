@@ -132,6 +132,10 @@ public:
                                                     NamespaceString ns,
                                                     StringData indexName) const;
 
+    // TODO SERVER-36385 Remove this function: we don't set the feature tracker bit in 4.4 because
+    // 4.4 can only downgrade to 4.2 which can read long TypeBits.
+    void setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx);
+
     void updateValidator(OperationContext* opCtx,
                          NamespaceString ns,
                          const BSONObj& validator,

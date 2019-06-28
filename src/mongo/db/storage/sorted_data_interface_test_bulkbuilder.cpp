@@ -54,7 +54,7 @@ TEST(SortedDataInterface, BuilderAddKey) {
             sorted->getBulkBuilder(opCtx.get(), true));
 
         ASSERT_OK(builder->addKey(key1, loc1));
-        builder->commit(false);
+        ASSERT_EQUALS(SpecialFormatInserted::NoSpecialFormatInserted, builder->commit(false));
     }
 
     {
@@ -82,7 +82,7 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordId) {
         ASSERT(reservedLoc.isReserved());
 
         ASSERT_OK(builder->addKey(key1, reservedLoc));
-        builder->commit(false);
+        ASSERT_EQUALS(SpecialFormatInserted::NoSpecialFormatInserted, builder->commit(false));
     }
 
     {
@@ -108,7 +108,7 @@ TEST(SortedDataInterface, BuilderAddCompoundKey) {
             sorted->getBulkBuilder(opCtx.get(), true));
 
         ASSERT_OK(builder->addKey(compoundKey1a, loc1));
-        builder->commit(false);
+        ASSERT_EQUALS(SpecialFormatInserted::NoSpecialFormatInserted, builder->commit(false));
     }
 
     {
@@ -137,7 +137,7 @@ TEST(SortedDataInterface, BuilderAddSameKey) {
 
         ASSERT_OK(builder->addKey(key1, loc1));
         ASSERT_EQUALS(ErrorCodes::DuplicateKey, builder->addKey(key1, loc2));
-        builder->commit(false);
+        ASSERT_EQUALS(SpecialFormatInserted::NoSpecialFormatInserted, builder->commit(false));
     }
 
     {
@@ -165,7 +165,7 @@ TEST(SortedDataInterface, BuilderAddSameKeyWithDupsAllowed) {
 
         ASSERT_OK(builder->addKey(key1, loc1));
         ASSERT_OK(builder->addKey(key1, loc2));
-        builder->commit(false);
+        ASSERT_EQUALS(SpecialFormatInserted::NoSpecialFormatInserted, builder->commit(false));
     }
 
     {
@@ -193,7 +193,7 @@ TEST(SortedDataInterface, BuilderAddMultipleKeys) {
         ASSERT_OK(builder->addKey(key1, loc1));
         ASSERT_OK(builder->addKey(key2, loc2));
         ASSERT_OK(builder->addKey(key3, loc3));
-        builder->commit(false);
+        ASSERT_EQUALS(SpecialFormatInserted::NoSpecialFormatInserted, builder->commit(false));
     }
 
     {
@@ -223,7 +223,7 @@ TEST(SortedDataInterface, BuilderAddMultipleCompoundKeys) {
         ASSERT_OK(builder->addKey(compoundKey1c, loc4));
         ASSERT_OK(builder->addKey(compoundKey2b, loc3));
         ASSERT_OK(builder->addKey(compoundKey3a, loc5));
-        builder->commit(false);
+        ASSERT_EQUALS(SpecialFormatInserted::NoSpecialFormatInserted, builder->commit(false));
     }
 
     {
