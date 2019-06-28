@@ -20,7 +20,7 @@ from distutils.util import strtobool  # pylint: disable=no-name-in-module
 import requests
 import yaml
 
-from evergreen.api import EvergreenApi
+from evergreen.api import RetryingEvergreenApi
 from shrub.config import Configuration
 from shrub.command import CommandDefinition
 from shrub.operations import CmdTimeoutUpdate
@@ -732,4 +732,4 @@ class Main(object):
 
 
 if __name__ == "__main__":
-    Main(EvergreenApi.get_api(config_file=CONFIG_FILE)).main()
+    Main(RetryingEvergreenApi.get_api(config_file=CONFIG_FILE)).main()
