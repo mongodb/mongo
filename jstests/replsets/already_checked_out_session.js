@@ -28,6 +28,7 @@
             }));
             return {ok: 1};
         } catch (e) {
+            print("doInsertWithSession failed with " + e.toString());
             return {ok: 0, error: e.toString(), stack: e.stack};
         }
     }
