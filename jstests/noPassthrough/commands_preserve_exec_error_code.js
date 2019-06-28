@@ -43,6 +43,11 @@
     assertCmdFailsWithInternalError(
         {findAndModify: coll.getName(), query: {_id: 1}, update: {$set: {x: 2}}});
 
+    const cmdRes = db.runCommand({find: coll.getName(), batchSize: 0});
+    assert.commandWorked(cmdRes);
+    assertCmdFailsWithInternalError(
+        {getMore: cmdRes.cursor.id, collection: coll.getName(), batchSize: 1});
+
     assert.commandWorked(
         db.adminCommand({configureFailPoint: "planExecutorAlwaysFails", mode: "off"}));
     MongoRunner.stopMongod(mongod);
