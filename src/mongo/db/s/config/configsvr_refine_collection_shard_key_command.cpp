@@ -33,6 +33,8 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/refine_collection_shard_key_gen.h"
 #include "mongo/util/log.h"
 
@@ -49,18 +51,50 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            const NamespaceString& nss = ns();
+
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrRefineCollectionShardKey can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream()
-                        << "refineCollectionShardKey must be called with majority writeConcern",
+                    "refineCollectionShardKey must be called with majority writeConcern",
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
             // Set the operation context read concern level to local for reads into the config
             // database.
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+            const auto catalogClient = Grid::get(opCtx)->catalogClient();
+
+            // Acquire distlocks on the namespace's database and collection.
+            DistLockManager::ScopedDistLock dbDistLock(uassertStatusOK(
+                catalogClient->getDistLockManager()->lock(opCtx,
+                                                          nss.db(),
+                                                          "refineCollectionShardKey",
+                                                          DistLockManager::kDefaultLockTimeout)));
+            DistLockManager::ScopedDistLock collDistLock(uassertStatusOK(
+                catalogClient->getDistLockManager()->lock(opCtx,
+                                                          nss.ns(),
+                                                          "refineCollectionShardKey",
+                                                          DistLockManager::kDefaultLockTimeout)));
+
+            const auto collStatus =
+                catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+
+            uassert(ErrorCodes::NamespaceNotSharded,
+                    str::stream() << "refineCollectionShardKey namespace " << nss.toString()
+                                  << " is not sharded",
+                    collStatus != ErrorCodes::NamespaceNotFound);
+
+            const auto collType = uassertStatusOK(collStatus).value;
+
+            uassert(ErrorCodes::StaleEpoch,
+                    str::stream()
+                        << "refineCollectionShardKey namespace "
+                        << nss.toString()
+                        << " has a different epoch than mongos had in its routing table cache",
+                    request().getEpoch() == collType.getEpoch());
         }
 
     private:

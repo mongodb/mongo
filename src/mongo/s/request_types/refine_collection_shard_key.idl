@@ -57,3 +57,8 @@ commands:
                 type: object
                 description: "The index specification document to use as the new shard key."
                 optional: false
+            epoch:
+                type: objectid
+                description: "The expected epoch of the namespace provided to
+                              refineCollectionShardKey."
+                optional: false

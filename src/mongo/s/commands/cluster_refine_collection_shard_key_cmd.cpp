@@ -35,10 +35,13 @@
 #include "mongo/db/commands.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/refine_collection_shard_key_gen.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyAfterRefresh);
 
 class RefineCollectionShardKeyCommand final : public TypedCommand<RefineCollectionShardKeyCommand> {
 public:
@@ -49,13 +52,23 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            const NamespaceString nss = ns();
+            const NamespaceString& nss = ns();
 
-            ConfigsvrRefineCollectionShardKey configsvrRefineCollShardKey(nss, request().getKey());
+            const auto routingInfo = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                             nss));
+
+            if (MONGO_FAIL_POINT(hangRefineCollectionShardKeyAfterRefresh)) {
+                log() << "Hit hangRefineCollectionShardKeyAfterRefresh failpoint";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+                    opCtx, hangRefineCollectionShardKeyAfterRefresh);
+            }
+
+            ConfigsvrRefineCollectionShardKey configsvrRefineCollShardKey(
+                nss, request().getKey(), routingInfo.cm()->getVersion().epoch());
             configsvrRefineCollShardKey.setDbName(request().getDbName());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
             auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
