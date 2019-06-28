@@ -2667,14 +2667,16 @@ TEST_F(
     // First response says readOnly: true.
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse);
 
-    const auto participant = txnRouter.getParticipant(shard1);
+    const auto oldParticipant = txnRouter.getParticipant(shard1);
 
-    ASSERT(TransactionRouter::Participant::ReadOnly::kReadOnly == participant->readOnly);
+    ASSERT(TransactionRouter::Participant::ReadOnly::kReadOnly == oldParticipant->readOnly);
 
     // Later response says readOnly: false.
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
 
-    ASSERT(TransactionRouter::Participant::ReadOnly::kNotReadOnly == participant->readOnly);
+    const auto updatedParticipant = txnRouter.getParticipant(shard1);
+
+    ASSERT(TransactionRouter::Participant::ReadOnly::kNotReadOnly == updatedParticipant->readOnly);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
