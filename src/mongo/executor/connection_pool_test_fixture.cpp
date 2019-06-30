@@ -64,13 +64,15 @@ void TimerImpl::clear() {
     }
 }
 
-void TimerImpl::fireIfNecessary() {
-    auto now = PoolImpl().now();
+Date_t TimerImpl::now() {
+    return _global->now();
+}
 
+void TimerImpl::fireIfNecessary() {
     auto timers = _timers;
 
     for (auto&& x : timers) {
-        if (_timers.count(x) && (x->_expiration <= now)) {
+        if (_timers.count(x) && (x->_expiration <= x->now())) {
             auto execCB = [cb = std::move(x->_cb)](auto&&) mutable {
                 std::move(cb)();
             };
@@ -79,10 +81,6 @@ void TimerImpl::fireIfNecessary() {
             global->_executor->schedule(std::move(execCB));
         }
     }
-}
-
-Date_t TimerImpl::now() {
-    return _global->now();
 }
 
 std::set<TimerImpl*> TimerImpl::_timers;
