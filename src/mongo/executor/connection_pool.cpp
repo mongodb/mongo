@@ -331,9 +331,11 @@ public:
     template <typename CallableT>
     void runOnExecutor(CallableT&& cb) {
         ExecutorFuture(ExecutorPtr(_parent->_factory->getExecutor()))  //
-            .getAsync([ anchor = shared_from_this(),
-                        cb = std::forward<CallableT>(cb) ](Status && status) mutable {
+            .getAsync([ this, anchor = shared_from_this(), cb = std::forward<CallableT>(cb) ](
+                Status && status) mutable {
                 invariant(status);
+
+                stdx::lock_guard lk(_parent->_mutex);
                 cb();
             });
     }
@@ -489,22 +491,17 @@ void ConnectionPool::dropConnections(const HostAndPort& hostAndPort) {
     if (iter == _pools.end())
         return;
 
-    auto pool = iter->second;
+    auto& pool = iter->second;
     pool->triggerShutdown(
         Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"));
 }
 
 void ConnectionPool::dropConnections(transport::Session::TagMask tags) {
-    // Grab all current pools (under the lock)
-    auto pools = [&] {
-        stdx::lock_guard lk(_mutex);
-        return _pools;
-    }();
+    stdx::lock_guard lk(_mutex);
 
-    for (const auto& pair : pools) {
+    for (const auto& pair : _pools) {
         auto& pool = pair.second;
 
-        stdx::lock_guard lk(_mutex);
         if (pool->matchesTags(tags))
             continue;
 
@@ -664,8 +661,6 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
 auto ConnectionPool::SpecificPool::makeHandle(ConnectionInterface* connection) -> ConnectionHandle {
     auto deleter = [ this, anchor = shared_from_this() ](ConnectionInterface * connection) {
         runOnExecutor([this, connection]() {
-            stdx::lock_guard lk(_parent->_mutex);
-
             returnConnection(connection);
 
             _lastActiveTime = _parent->_factory->now();
@@ -837,9 +832,16 @@ void ConnectionPool::SpecificPool::addToReady(OwnedConnection conn) {
 
 // Sets state to shutdown and kicks off the failure protocol to tank existing connections
 void ConnectionPool::SpecificPool::triggerShutdown(const Status& status) {
-    _health.isShutdown = true;
+    auto wasShutdown = std::exchange(_health.isShutdown, true);
+    if (wasShutdown) {
+        return;
+    }
 
     LOG(2) << "Delisting connection pool for " << _hostAndPort;
+
+    // Make sure the pool lifetime lasts until the end of this function,
+    // it could be only in the map of pools
+    auto anchor = shared_from_this();
     _parent->_controller->removeHost(_id);
     _parent->_pools.erase(_hostAndPort);
 
@@ -1118,7 +1120,7 @@ void ConnectionPool::SpecificPool::updateController() {
         }
     }
 
-    runOnExecutor([ this, anchor = shared_from_this() ]() { spawnConnections(); });
+    runOnExecutor([this]() { spawnConnections(); });
 }
 
 // Updates our state and manages the request timer

@@ -64,12 +64,28 @@ protected:
     }
 
     auto makePool(ConnectionPool::Options options = {}) {
-        _pool =
-            std::make_shared<ConnectionPool>(std::make_shared<PoolImpl>(), "test pool", options);
+        _pool = std::make_shared<ConnectionPool>(
+            std::make_shared<PoolImpl>(_executor), "test pool", options);
         return _pool;
     }
 
+    /**
+     * Get from a pool with out-of-line execution and return the future for a connection
+     *
+     * Since the InlineOutOfLineExecutor starts running on the same thread once schedule is called,
+     * this function allows us to avoid deadlocks with get(), which is the only public function that
+     * calls schedule while holding a lock. In normal operation, the OutOfLineExecutor is actually
+     * out of line, and this contrivance isn't necessary.
+     */
+    template <typename... Args>
+    auto getFromPool(Args&&... args) {
+        return ExecutorFuture(_executor)
+            .then([ pool = _pool, args... ]() { return pool->get(args...); })
+            .semi();
+    }
+
 private:
+    std::shared_ptr<OutOfLineExecutor> _executor = std::make_shared<InlineOutOfLineExecutor>();
     std::shared_ptr<ConnectionPool> _pool;
 };
 
@@ -1440,7 +1456,7 @@ TEST_F(ConnectionPoolTest, AsyncGet) {
         size_t connId = 0;
 
         // no connections in the pool, our future is not satisfied
-        auto connFuture = pool->get(HostAndPort(), transport::kGlobalSSLMode, Seconds{1});
+        auto connFuture = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds{1});
         ASSERT_FALSE(connFuture.isReady());
 
         // Successfully get a new connection
@@ -1463,8 +1479,8 @@ TEST_F(ConnectionPoolTest, AsyncGet) {
         size_t connId2 = 0;
         size_t connId3 = 0;
 
-        auto connFuture1 = pool->get(HostAndPort(), transport::kGlobalSSLMode, Seconds{1});
-        auto connFuture2 = pool->get(HostAndPort(), transport::kGlobalSSLMode, Seconds{10});
+        auto connFuture1 = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds{1});
+        auto connFuture2 = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds{10});
 
         // The first future should be immediately ready. The second should be in the queue.
         ASSERT_TRUE(connFuture1.isReady());
@@ -1475,7 +1491,7 @@ TEST_F(ConnectionPoolTest, AsyncGet) {
         auto conn1 = std::move(connFuture1).get();
 
         // Grab our third future while our first one is being fulfilled
-        connFuture3 = pool->get(HostAndPort(), transport::kGlobalSSLMode, Seconds{1});
+        connFuture3 = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds{1});
 
         connId1 = getId(conn1);
         doneWith(conn1);
@@ -1512,7 +1528,7 @@ TEST_F(ConnectionPoolTest, ReturnAfterShutdown) {
     auto pool = makePool();
 
     // Grab a connection and hold it to end of scope
-    auto connFuture = pool->get(HostAndPort(), transport::kGlobalSSLMode, Seconds(1));
+    auto connFuture = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1));
     ConnectionImpl::pushSetup(Status::OK());
     auto conn = std::move(connFuture).get();
     doneWith(conn);

@@ -46,7 +46,7 @@ class PoolImpl;
  */
 class TimerImpl final : public ConnectionPool::TimerInterface {
 public:
-    TimerImpl(PoolImpl* global);
+    explicit TimerImpl(PoolImpl* global);
     ~TimerImpl() override;
 
     void setTimeout(Milliseconds timeout, TimeoutCallback cb) override;
@@ -174,7 +174,7 @@ class PoolImpl final : public ConnectionPool::DependentTypeFactoryInterface {
     friend class TimerImpl;
 
 public:
-    PoolImpl() = default;
+    explicit PoolImpl(const std::shared_ptr<OutOfLineExecutor>& executor) : _executor(executor) {}
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
         const HostAndPort& hostAndPort,
         transport::ConnectSSLMode sslMode,
@@ -197,7 +197,7 @@ public:
 
 private:
     ConnectionPool* _pool = nullptr;
-    std::shared_ptr<OutOfLineExecutor> _executor = std::make_shared<InlineOutOfLineExecutor>();
+    std::shared_ptr<OutOfLineExecutor> _executor;
 
     static boost::optional<Date_t> _now;
 };
