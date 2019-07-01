@@ -843,6 +843,15 @@ void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
     }
 }
 
+bool ReplicationCoordinatorExternalStateImpl::tooStale() {
+    LockGuard lk(_threadMutex);
+    if (_bgSync) {
+        return _bgSync->tooStale();
+    }
+
+    return false;
+}
+
 void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationContext* opCtx) {
     // Acquire the GlobalLock in mode IS to conflict with database drops which acquire the
     // GlobalLock in mode X.

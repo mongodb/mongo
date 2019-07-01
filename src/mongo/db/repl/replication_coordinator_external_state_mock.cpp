@@ -234,6 +234,10 @@ void ReplicationCoordinatorExternalStateMock::stopProducer() {}
 
 void ReplicationCoordinatorExternalStateMock::startProducerIfStopped() {}
 
+bool ReplicationCoordinatorExternalStateMock::tooStale() {
+    return false;
+}
+
 void ReplicationCoordinatorExternalStateMock::dropAllSnapshots() {}
 
 void ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(

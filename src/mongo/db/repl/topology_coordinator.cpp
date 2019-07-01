@@ -1584,6 +1584,10 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     response->append("myState", myState.s);
     response->append("term", _term);
 
+    if (rsStatusArgs.tooStale) {
+        response->append("tooStale", true);
+    }
+
     // Add sync source info
     if (!_syncSource.empty() && !myState.primary() && !myState.removed()) {
         response->append("syncingTo", _syncSource.toString());

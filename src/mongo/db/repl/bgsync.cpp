@@ -162,6 +162,10 @@ bool BackgroundSync::inShutdown() const {
     return _inShutdown_inlock();
 }
 
+bool BackgroundSync::tooStale() const {
+    return _tooStale.load();
+}
+
 bool BackgroundSync::_inShutdown_inlock() const {
     return _inShutdown;
 }
@@ -295,7 +299,7 @@ void BackgroundSync::_produce() {
     }
 
     if (syncSourceResp.syncSourceStatus == ErrorCodes::OplogStartMissing) {
-        // All (accessible) sync sources were too stale.
+        // All (accessible) sync sources are too far ahead of us.
         if (_replCoord->getMemberState().primary()) {
             warning() << "Too stale to catch up.";
             log() << "Our newest OpTime : " << lastOpTimeFetched;
@@ -305,13 +309,10 @@ void BackgroundSync::_produce() {
             return;
         }
 
-        // We only need to mark ourselves as too stale once.
-        if (_tooStale) {
+        if (_tooStale.swap(true)) {
+            // We had already marked ourselves too stale.
             return;
         }
-
-        // Mark yourself as too stale.
-        _tooStale = true;
 
         // Need to take the RSTL in mode X to transition out of SECONDARY.
         auto opCtx = cc().makeOperationContext();
@@ -364,12 +365,8 @@ void BackgroundSync::_produce() {
 
     // If we find a good sync source after having gone too stale, disable maintenance mode so we can
     // transition to SECONDARY.
-    if (_tooStale) {
-
-        _tooStale = false;
-
+    if (_tooStale.swap(false)) {
         log() << "No longer too stale. Able to sync from " << source;
-
         auto status = _replCoord->setMaintenanceMode(false);
         if (!status.isOK()) {
             warning() << "Failed to leave maintenance mode: " << status;

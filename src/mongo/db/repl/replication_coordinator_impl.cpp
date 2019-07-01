@@ -2365,7 +2365,8 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
             static_cast<unsigned>(time(nullptr) - serverGlobalParams.started),
             _getCurrentCommittedSnapshotOpTimeAndWallTime_inlock(),
             initialSyncProgress,
-            _storage->getLastStableRecoveryTimestamp(_service)},
+            _storage->getLastStableRecoveryTimestamp(_service),
+            _externalState->tooStale()},
         response,
         &result);
     return result;

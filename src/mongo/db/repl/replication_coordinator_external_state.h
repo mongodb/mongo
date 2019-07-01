@@ -233,6 +233,11 @@ public:
     virtual void startProducerIfStopped() = 0;
 
     /**
+     * True if we have discovered that no sync source's oplog overlaps with ours.
+     */
+    virtual bool tooStale() = 0;
+
+    /**
      * Drops all snapshots and clears the "committed" snapshot.
      */
     virtual void dropAllSnapshots() = 0;

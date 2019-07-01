@@ -309,6 +309,7 @@ public:
         // as well as startup recovery without re-initial syncing in the case of durable storage
         // engines.
         const boost::optional<Timestamp> lastStableRecoveryTimestamp;
+        bool tooStale;
     };
 
     // produce a reply to a status request

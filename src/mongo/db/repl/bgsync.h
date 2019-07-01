@@ -42,6 +42,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rollback_impl.h"
 #include "mongo/db/repl/sync_source_resolver.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -115,6 +116,11 @@ public:
      * Once this returns true, nothing more will be added to the queue and consumers must shutdown.
      */
     bool inShutdown() const;
+
+    /**
+     * Returns true if we have discovered that no sync source's oplog overlaps with ours.
+     */
+    bool tooStale() const;
 
     // starts the sync target notifying thread
     void notifierThread();
@@ -242,7 +248,7 @@ private:
 
     // Flag that marks whether a node's oplog has no common point with any
     // potential sync sources.
-    bool _tooStale = false;  // (PR)
+    AtomicWord<bool> _tooStale{false};  // (S)
 
     ProducerState _state = ProducerState::Starting;  // (M)
 

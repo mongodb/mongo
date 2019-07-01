@@ -60,6 +60,13 @@
         }
     }
 
+    /**
+     * True if a node's entry in "members" has tooStale: true.
+     */
+    function tooStale(conn) {
+        return assert.commandWorked(conn.adminCommand("replSetGetStatus")).tooStale;
+    }
+
     var testName = "too_stale_secondary";
 
     var smallOplogSizeMB = 1;
@@ -100,6 +107,7 @@
 
     jsTestLog("1: Insert one document on the primary (Node 0) and ensure it is replicated.");
     assert.writeOK(primaryTestDB[collName].insert({a: 1}, {writeConcern: {w: 3}}));
+    assert(!tooStale(replTest.nodes[2]));
 
     jsTestLog("2: Stop Node 2.");
     replTest.stop(2);
@@ -123,6 +131,7 @@
 
     jsTestLog("6: Wait for Node 2 to transition to RECOVERING (it should be too stale).");
     replTest.waitForState(replTest.nodes[2], ReplSetTest.State.RECOVERING);
+    assert(tooStale(replTest.nodes[2]));
 
     jsTestLog("7: Stop and restart Node 2.");
     replTest.stop(2);
@@ -137,6 +146,7 @@
 
     jsTestLog("10: Wait for Node 2 to leave RECOVERING and transition to SECONDARY.");
     replTest.waitForState(replTest.nodes[2], ReplSetTest.State.SECONDARY);
+    assert(!tooStale(replTest.nodes[2]));
 
     replTest.stopSet();
 }());
