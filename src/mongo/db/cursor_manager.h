@@ -110,6 +110,13 @@ public:
      * Returns ErrorCodes::CursorNotFound if the cursor does not exist or
      * ErrorCodes::QueryPlanKilled if the cursor was killed in between uses.
      *
+     * If 'checkSessionAuth' is 'kCheckSession' or left unspecified, this function also checks if
+     * the current session in the specified 'opCtx' has privilege to access the cursor specified by
+     * 'id.' In this case, this function returns a 'mongo::Status' with information regarding the
+     * nature of the inaccessability when the cursor is not accessible. If 'kNoCheckSession' is
+     * passed for 'checkSessionAuth,' this function does not check if the current session is
+     * authorized to access the cursor with the given id.
+     *
      * Throws a AssertionException if the cursor is already pinned. Callers need not specially
      * handle this error, as it should only happen if a misbehaving client attempts to
      * simultaneously issue two operations against the same cursor id.
