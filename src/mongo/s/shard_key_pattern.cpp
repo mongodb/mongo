@@ -226,6 +226,10 @@ bool ShardKeyPattern::isShardKey(const BSONObj& shardKey) const {
     return shardKey.nFields() == keyPatternBSON.nFields();
 }
 
+bool ShardKeyPattern::isExtendedBy(const ShardKeyPattern& newShardKeyPattern) const {
+    return toBSON().isFieldNamePrefixOf(newShardKeyPattern.toBSON());
+}
+
 BSONObj ShardKeyPattern::normalizeShardKey(const BSONObj& shardKey) const {
     // We want to return an empty key if users pass us something that's not a shard key
     if (shardKey.nFields() > _keyPattern.toBSON().nFields())

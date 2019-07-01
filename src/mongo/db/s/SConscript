@@ -57,6 +57,7 @@ env.Library(
         'session_catalog_migration_source.cpp',
         'shard_filtering_metadata_refresh.cpp',
         'shard_identity_rollback_notifier.cpp',
+        'shard_key_util.cpp',
         'shard_metadata_util.cpp',
         'shard_server_catalog_cache_loader.cpp',
         'shard_server_op_observer.cpp',

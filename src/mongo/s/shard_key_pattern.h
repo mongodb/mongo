@@ -113,6 +113,12 @@ public:
     bool isShardKey(const BSONObj& shardKey) const;
 
     /**
+     * Returns true if the new shard key pattern extends this shard key pattern - i.e. contains this
+     * shard key pattern as a prefix (begins with the same field names in the same order).
+     */
+    bool isExtendedBy(const ShardKeyPattern& newShardKeyPattern) const;
+
+    /**
      * Given a shard key, return it in normal form where the fields are in the same order as
      * the shard key pattern fields.
      *
