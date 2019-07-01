@@ -29,6 +29,10 @@ sh._getBalancerStatus = function() {
 };
 
 sh._dataFormat = function(bytes) {
+    if (bytes == null) {
+        return "0B";
+    }
+
     if (bytes < 1024)
         return Math.floor(bytes) + "B";
     if (bytes < 1024 * 1024)
