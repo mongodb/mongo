@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/sessions_collection.h"
@@ -175,23 +176,11 @@ int removeSessionsTransactionRecords(OperationContext* opCtx,
 }
 
 void createTransactionTable(OperationContext* opCtx) {
-    const size_t initialExtentSize = 0;
-    const bool capped = false;
-    const bool maxSize = 0;
-    BSONObj result;
-
-    DBDirectClient client(opCtx);
-
-    if (client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                                initialExtentSize,
-                                capped,
-                                maxSize,
-                                &result)) {
-        return;
-    }
-
-    const auto status = getStatusFromCommandResult(result);
-
+    auto serviceCtx = opCtx->getServiceContext();
+    CollectionOptions options;
+    auto status =
+        repl::StorageInterface::get(serviceCtx)
+            ->createCollection(opCtx, NamespaceString::kSessionTransactionsTableNamespace, options);
     if (status == ErrorCodes::NamespaceExists) {
         return;
     }

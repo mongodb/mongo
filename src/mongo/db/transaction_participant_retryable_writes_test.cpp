@@ -39,6 +39,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
@@ -166,10 +167,9 @@ class TransactionParticipantRetryableWritesTest : public MockReplCoordServerFixt
 protected:
     void setUp() {
         MockReplCoordServerFixture::setUp();
-
-        MongoDSessionCatalog::onStepUp(opCtx());
-
         const auto service = opCtx()->getServiceContext();
+        repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
+        MongoDSessionCatalog::onStepUp(opCtx());
 
         const auto opObserverRegistry = dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
         opObserverRegistry->addObserver(stdx::make_unique<OpObserverMock>());
