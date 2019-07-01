@@ -353,8 +353,6 @@ BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) c
 }
 
 bool ShardKeyPattern::isUniqueIndexCompatible(const BSONObj& uniqueIndexPattern) const {
-    dassert(!KeyPattern::isHashedKeyPattern(uniqueIndexPattern));
-
     if (!uniqueIndexPattern.isEmpty() && uniqueIndexPattern.firstElementFieldName() == kIdField) {
         return true;
     }

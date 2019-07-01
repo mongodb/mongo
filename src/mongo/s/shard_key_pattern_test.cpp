@@ -486,6 +486,10 @@ TEST(ShardKeyPattern, UniqueIndexCompatibleHashed) {
     ASSERT(indexComp(pattern, BSON("a.b" << 1 << "c" << 1)));
     ASSERT(indexComp(pattern, BSON("a.b" << -1 << "c" << 1)));
 
+    ASSERT(indexComp(pattern,
+                     BSON("a.b"
+                          << "hashed")));
+
     ASSERT(indexComp(pattern, BSON("_id" << 1)));
     ASSERT(indexComp(pattern, BSON("_id" << -1 << "c" << 1)));
 
