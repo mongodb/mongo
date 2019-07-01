@@ -237,6 +237,10 @@ Status storeMongoShellOptions(const moe::Environment& params,
         shellGlobalParams.jsHeapLimitMB = jsHeapLimitMB;
     }
 
+    if (params.count("idleSessionTimeout")) {
+        shellGlobalParams.idleSessionTimeout = Seconds(params["idleSessionTimeout"].as<int>());
+    }
+
     if (shellGlobalParams.url == "*") {
         StringBuilder sb;
         sb << "ERROR: "

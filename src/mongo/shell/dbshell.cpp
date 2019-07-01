@@ -177,6 +177,19 @@ enum ShellExitCode : int {
 Scope* shellMainScope;
 }
 
+bool isSessionTimedOut() {
+    static Date_t previousCommandTime = Date_t::now();
+    if (shellGlobalParams.idleSessionTimeout > Seconds(0)) {
+        const Date_t now = Date_t::now();
+
+        if (now > (previousCommandTime + shellGlobalParams.idleSessionTimeout)) {
+            return true;
+        }
+        previousCommandTime = now;
+    }
+    return false;
+}
+
 void generateCompletions(const std::string& prefix, std::vector<std::string>& all) {
     if (prefix.find('"') != std::string::npos)
         return;
@@ -945,6 +958,15 @@ int _main(int argc, char* argv[], char** envp) {
                 free(line);
                 break;
             }
+
+            // Support idle session lifetime limits
+            if (isSessionTimedOut()) {
+                std::cout << "Idle Connection Timeout: Shell session has expired" << std::endl;
+                if (line)
+                    free(line);
+                break;
+            }
+
             if (code == "cls") {
                 free(line);
                 linenoiseClearScreen();

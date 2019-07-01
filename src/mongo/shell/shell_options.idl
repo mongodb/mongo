@@ -203,3 +203,8 @@ configs:
     description: "Remote host name to use for purpose of GSSAPI/Kerberos authentication"
     arg_vartype: String
 
+  "idleSessionTimeout":
+    description: "Terminate the Shell session if it's been idle for this many seconds"
+    arg_vartype: Int
+    default: 0
+    validator: {gte: 0}
