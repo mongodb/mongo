@@ -42,6 +42,8 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -226,9 +228,18 @@ class TxnParticipantTest : public MockReplCoordServerFixture {
 protected:
     void setUp() override {
         MockReplCoordServerFixture::setUp();
+        const auto service = opCtx()->getServiceContext();
+        auto _storageInterfaceImpl = std::make_unique<repl::StorageInterfaceImpl>();
+
+        // onStepUp() relies on the storage interface to create the config.transactions table.
+        repl::StorageInterface::set(service, std::move(_storageInterfaceImpl));
         MongoDSessionCatalog::onStepUp(opCtx());
 
-        const auto service = opCtx()->getServiceContext();
+        // We use the mocked storage interface here since StorageInterfaceImpl does not support
+        // getPointInTimeReadTimestamp().
+        auto _storageInterfaceMock = std::make_unique<repl::StorageInterfaceMock>();
+        repl::StorageInterface::set(service, std::move(_storageInterfaceMock));
+
         OpObserverRegistry* opObserverRegistry =
             dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
         auto mockObserver = std::make_unique<OpObserverMock>();
@@ -1520,6 +1531,9 @@ TEST_F(TxnParticipantTest, ReacquireLocksForPreparedTransactionsOnStepUp) {
 
     // Step-up will restore the locks of prepared transactions.
     ASSERT(opCtx()->writesAreReplicated());
+    const auto service = opCtx()->getServiceContext();
+    // onStepUp() relies on the storage interface to create the config.transactions table.
+    repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
     MongoDSessionCatalog::onStepUp(opCtx());
     {
         auto sessionCheckout = checkOutSession({});

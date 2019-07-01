@@ -1793,6 +1793,7 @@ envWithAsio.CppUnitTest(
         'repl/mock_repl_coord_server_fixture',
         'repl/oplog_interface_local',
         'repl/repl_coordinator_interface',
+        'repl/storage_interface_impl',
         'repl/replmocks',
         'server_options_servers',
         'service_context',

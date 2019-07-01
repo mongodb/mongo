@@ -42,6 +42,7 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/db/server_options.h"
@@ -131,7 +132,9 @@ public:
             RemoteCommandTargeterMock::get(donorShard->getTargeter())
                 ->setFindHostReturnValue(kDonorConnStr.getServers()[0]);
         }
-
+        // onStepUp() relies on the storage interface to create the config.transactions table.
+        repl::StorageInterface::set(getServiceContext(),
+                                    std::make_unique<repl::StorageInterfaceImpl>());
         MongoDSessionCatalog::onStepUp(operationContext());
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
     }
