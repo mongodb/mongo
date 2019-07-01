@@ -331,16 +331,16 @@ public:
     virtual void setOldestTimestamp(Timestamp newOldestTimestamp, bool force) {}
 
     /**
-     * See 'StorageEngine::getCacheOverflowTableInsertCount'
+     * See `StorageEngine::isCacheUnderPressure()`
      */
-    virtual int64_t getCacheOverflowTableInsertCount(OperationContext* opCtx) const {
-        return 0;
+    virtual bool isCacheUnderPressure(OperationContext* opCtx) const {
+        return false;
     }
 
     /**
-     * See 'StorageEngine::setCacheOverflowTableInsertCountForTest()'
+     * See 'StorageEngine::setCachePressureForTest()'
      */
-    virtual void setCacheOverflowTableInsertCountForTest(int insertCount) {}
+    virtual void setCachePressureForTest(int pressure) {}
 
     /**
      * See `StorageEngine::supportsRecoverToStableTimestamp`

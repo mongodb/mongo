@@ -97,9 +97,9 @@ public:
         return true;
     }
 
-    virtual int64_t getCacheOverflowTableInsertCount(OperationContext* opCtx) const override;
+    virtual bool isCacheUnderPressure(OperationContext* opCtx) const override;
 
-    virtual void setCacheOverflowTableInsertCountForTest(int insertCount) override;
+    virtual void setCachePressureForTest(int pressure) override;
 
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) {
         return 1;
@@ -154,6 +154,6 @@ public:
 private:
     std::shared_ptr<void> _catalogInfo;
 
-    int _overflowTableInsertCountForTest;
+    int _cachePressureForTest;
 };
 }

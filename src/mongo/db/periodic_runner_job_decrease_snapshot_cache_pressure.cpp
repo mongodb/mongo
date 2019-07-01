@@ -43,26 +43,26 @@
 
 namespace mongo {
 
-auto PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::get(ServiceContext* serviceContext)
-    -> PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded& {
+auto PeriodicThreadToDecreaseSnapshotHistoryCachePressure::get(ServiceContext* serviceContext)
+    -> PeriodicThreadToDecreaseSnapshotHistoryCachePressure& {
     auto& jobContainer = _serviceDecoration(serviceContext);
     jobContainer._init(serviceContext);
     return jobContainer;
 }
 
-auto PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::operator-> () const noexcept
+auto PeriodicThreadToDecreaseSnapshotHistoryCachePressure::operator-> () const noexcept
     -> PeriodicJobAnchor* {
     stdx::lock_guard lk(_mutex);
     return _anchor.get();
 }
 
-auto PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::operator*() const noexcept
+auto PeriodicThreadToDecreaseSnapshotHistoryCachePressure::operator*() const noexcept
     -> PeriodicJobAnchor& {
     stdx::lock_guard lk(_mutex);
     return *_anchor;
 }
 
-void PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::_init(ServiceContext* serviceContext) {
+void PeriodicThreadToDecreaseSnapshotHistoryCachePressure::_init(ServiceContext* serviceContext) {
     stdx::lock_guard lk(_mutex);
     if (_anchor) {
         return;
@@ -72,7 +72,7 @@ void PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::_init(ServiceContext* s
     invariant(periodicRunner);
 
     PeriodicRunner::PeriodicJob job(
-        "startPeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded",
+        "startPeriodicThreadToDecreaseSnapshotHistoryCachePressure",
         [](Client* client) {
             try {
                 // The opCtx destructor handles unsetting itself from the Client.
@@ -88,18 +88,17 @@ void PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::_init(ServiceContext* s
                 }
             }
         },
-        Seconds(snapshotWindowParams.decreaseHistoryIfNotNeededPeriodSeconds.load()));
+        Seconds(snapshotWindowParams.checkCachePressurePeriodSeconds.load()));
 
     _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 
-    SnapshotWindowParams::observeDecreaseHistoryIfNotNeededPeriodSeconds.addObserver([anchor =
-                                                                                          _anchor](
+    SnapshotWindowParams::observeCheckCachePressurePeriodSeconds.addObserver([anchor = _anchor](
         const auto& secs) {
         try {
             anchor->setPeriod(Seconds(secs));
         } catch (const DBException& ex) {
-            log() << "Failed to update the period of the thread which decreases data history "
-                     "target window size if there have been no new SnapshotTooOld errors."
+            log() << "Failed to update the period of the thread which decreases data history cache "
+                     "target size if there is cache pressure."
                   << ex.toStatus();
         }
     });

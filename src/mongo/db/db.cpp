@@ -611,7 +611,7 @@ ExitCode _initAndListen(int listenPort) {
     // release periodically in order to avoid storage cache pressure build up.
     if (storageEngine->supportsReadConcernSnapshot()) {
         PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->start();
-        PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::get(serviceContext)->start();
+        PeriodicThreadToDecreaseSnapshotHistoryCachePressure::get(serviceContext)->start();
     }
 
     // Set up the logical session cache
@@ -929,7 +929,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     if (auto storageEngine = serviceContext->getStorageEngine()) {
         if (storageEngine->supportsReadConcernSnapshot()) {
             PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->stop();
-            PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::get(serviceContext)->stop();
+            PeriodicThreadToDecreaseSnapshotHistoryCachePressure::get(serviceContext)->stop();
         }
 
         ServiceContext::UniqueOperationContext uniqueOpCtx;
