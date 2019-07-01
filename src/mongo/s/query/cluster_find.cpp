@@ -197,6 +197,8 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
             routingInfo.cm()->getVersion(shardId).appendToCommand(&cmdBuilder);
         } else if (!query.nss().isOnInternalDb()) {
             ChunkVersion::UNSHARDED().appendToCommand(&cmdBuilder);
+            auto dbVersion = routingInfo.db().databaseVersion();
+            cmdBuilder.append("databaseVersion", dbVersion.toBSON());
         }
 
         if (opCtx->getTxnNumber()) {
@@ -430,6 +432,33 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
 
         try {
             return runQueryWithoutRetrying(opCtx, query, readPref, routingInfo, results);
+        } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
+            if (retries >= kMaxRetries) {
+                // Check if there are no retries remaining, so the last received error can be
+                // propagated to the caller.
+                ex.addContext(str::stream() << "Failed to run query after " << kMaxRetries
+                                            << " retries");
+                throw;
+            }
+
+            LOG(1) << "Received error status for query " << redact(query.toStringShort())
+                   << " on attempt " << retries << " of " << kMaxRetries << ": " << redact(ex);
+
+            Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
+                                                                     ex->getVersionReceived());
+
+            if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName)) {
+                    throw;
+                }
+
+                // Reset the default global read timestamp so the retry's routing table reflects the
+                // chunk placement after the refresh (no-op if the transaction is not running with
+                // snapshot read concern).
+                txnRouter.onStaleShardOrDbError(opCtx, kFindCmdName, ex.toStatus());
+                txnRouter.setDefaultAtClusterTime(opCtx);
+            }
+
         } catch (DBException& ex) {
             if (retries >= kMaxRetries) {
                 // Check if there are no retries remaining, so the last received error can be

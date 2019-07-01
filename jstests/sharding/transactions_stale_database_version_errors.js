@@ -41,8 +41,15 @@
 
     session.startTransaction();
 
-    // Find is not database versioned so it will not trigger SDV or a refresh on Shard0.
-    assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 0}}));
+    // Run first statement on different database so distinct still triggers a SDV.
+    const dbName2 = "test2";
+    const sessionDB2 = session.getDatabase(dbName2);
+
+    assert.writeOK(st.s.getDB(dbName2)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName2}));
+    st.ensurePrimaryShard(dbName2, st.shard1.shardName);
+
+    assert.commandWorked(sessionDB2.runCommand({find: collName, filter: {_id: 0}}));
 
     // Distinct is database versioned, so it will trigger SDV. The router will retry and the retry
     // will discover the transaction was aborted, because a previous statement had completed on

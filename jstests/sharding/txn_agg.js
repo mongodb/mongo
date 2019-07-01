@@ -28,6 +28,11 @@
     let sessionColl = sessionDB.getCollection('user');
     let sessionUnsharded = sessionDB.getCollection('foo');
 
+    // Transactions do not internally retry on StaleDbVersion errors, so we
+    // ensure the primary shard's cached databaseVersion is fresh before running commands through
+    // mongos on the unsharded collections.
+    assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: "test"}));
+
     // passthrough
 
     session.startTransaction();

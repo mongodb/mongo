@@ -208,7 +208,7 @@
             command: {filemd5: ObjectId(), root: collName}
         },
         find: {
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             sendsShardVersion: true,
             command: {find: collName, filter: {x: 1}},
         },
