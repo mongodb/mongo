@@ -346,7 +346,7 @@ std::vector<std::string> CollectionCatalog::getAllDbNames() const {
 void CollectionCatalog::registerCollection(CollectionUUID uuid, std::unique_ptr<Collection> coll) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
 
-    LOG(0) << "Registering collection " << coll->ns() << " with UUID " << uuid;
+    LOG(1) << "Registering collection " << coll->ns() << " with UUID " << uuid;
 
     auto ns = coll->ns();
     auto dbName = ns.db().toString();
@@ -378,7 +378,7 @@ std::unique_ptr<Collection> CollectionCatalog::deregisterCollection(CollectionUU
     auto dbName = ns.db().toString();
     auto dbIdPair = std::make_pair(dbName, uuid);
 
-    LOG(0) << "Deregistering collection " << ns << " with UUID " << uuid;
+    LOG(1) << "Deregistering collection " << ns << " with UUID " << uuid;
 
     // Make sure collection object exists.
     invariant(_collections.find(ns) != _collections.end());
@@ -413,7 +413,7 @@ void CollectionCatalog::deregisterAllCollections() {
         auto dbName = ns.db().toString();
         auto dbIdPair = std::make_pair(dbName, uuid);
 
-        LOG(0) << "Deregistering collection " << ns << " with UUID " << uuid;
+        LOG(1) << "Deregistering collection " << ns << " with UUID " << uuid;
 
         entry.second.reset();
     }
