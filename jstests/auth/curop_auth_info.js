@@ -44,7 +44,7 @@
         finderWait();
 
         const authedUsers = myOp["effectiveUsers"];
-        const impersonators = myOp["userImpersonators"];
+        const impersonators = myOp["runBy"];
         print(tojson(authedUsers), tojson(impersonators));
         if (impersonators) {
             assert.eq(authedUsers.length, 1);

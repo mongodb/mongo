@@ -256,8 +256,8 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
                         opCtx->getServiceContext()->getPreciseClockSource()->now().toString());
 
     auto authSession = AuthorizationSession::get(client);
-    // Depending on whether we're impersonating or not, this might be "effectiveUsers" or
-    // "userImpersonators".
+    // Depending on whether the authenticated user is the same user which ran the command,
+    // this might be "effectiveUsers" or "runBy".
     const auto serializeAuthenticatedUsers = [&](StringData name) {
         if (authSession->isAuthenticated()) {
             BSONArrayBuilder users(infoBuilder->subarrayStart(name));
@@ -276,7 +276,7 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
         }
 
         users.doneFast();
-        serializeAuthenticatedUsers("userImpersonators"_sd);
+        serializeAuthenticatedUsers("runBy"_sd);
     } else {
         serializeAuthenticatedUsers("effectiveUsers"_sd);
     }
