@@ -36,6 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/balancer/balancer.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/str.h"
@@ -106,6 +107,7 @@ private:
         uassertStatusOK(balancerConfig->setBalancerMode(opCtx, BalancerSettingsType::kFull));
         uassertStatusOK(balancerConfig->enableAutoSplit(opCtx, true));
         Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged();
+        ShardingLogging::get(opCtx)->logAction(opCtx, "balancer.start", "", BSONObj()).ignore();
     }
 };
 
@@ -126,6 +128,8 @@ private:
 
         Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged();
         Balancer::get(opCtx)->joinCurrentRound(opCtx);
+
+        ShardingLogging::get(opCtx)->logAction(opCtx, "balancer.stop", "", BSONObj()).ignore();
     }
 };
 
