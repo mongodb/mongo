@@ -10,6 +10,12 @@
  * it is safe for the two commands to ignore prepare conflicts for reads. This test also makes sure
  * mapReduce that does writes is not allowed to run on secondaries.
  *
+ * Also test that validate, which acquires collection X lock during its execution, does not block on
+ * a prepared transaction on secondaries. Otherwise, it would cause deadlocks when the prepared
+ * transaction reacquires locks (since locks were yielded on secondaries) at commit time. This test
+ * makes sure the validate command does not accept a non local read concern or afterClusterTime and
+ * that it is therefore safe to ignore prepare conflicts during its execution.
+ *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
@@ -93,6 +99,16 @@
                 readConcern: read_concern,
                 maxTimeMS: timeout,
             });
+            return res;
+        };
+
+        const validate = function(read_concern, db, timeout = successTimeout) {
+            let res = db.runCommand({
+                validate: collName,
+                readConcern: read_concern,
+                maxTimeMS: timeout,
+            });
+
             return res;
         };
 
@@ -224,6 +240,33 @@
         jsTestLog("Test mapReduce on primary blocks on collection S lock which conflicts with " +
                   "a prepared transaction.");
         assert.commandFailedWithCode(mapReduce({}, testDB, {inline: 1}, failureTimeout),
+                                     ErrorCodes.MaxTimeMSExpired);
+
+        // validate does not accept a non local read concern or afterClusterTime and it also sets
+        // ignore_prepare=true during its execution. Therefore, validate should never get prepare
+        // conflicts on secondaries. validate acquires collection X lock during its execution and it
+        // will be blocked by a prepared transaction that writes to the same collection if it is run
+        // on primaries.
+        jsTestLog("Test validate doesn't support afterClusterTime read.");
+        assert.commandFailedWithCode(
+            validate({level: 'local', afterClusterTime: clusterTimeAfterPrepare}, secondaryTestDB),
+            ErrorCodes.InvalidOptions);
+        jsTestLog("Test validate doesn't support read concern other than local.");
+        assert.commandWorked(validate({level: 'local'}, secondaryTestDB));
+        assert.commandFailedWithCode(validate({level: 'available'}, secondaryTestDB),
+                                     ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(validate({level: 'majority'}, secondaryTestDB),
+                                     ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(validate({level: 'snapshot'}, secondaryTestDB),
+                                     ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(validate({level: 'linearizable'}, secondaryTestDB),
+                                     ErrorCodes.InvalidOptions);
+
+        jsTestLog("Test validate on secondary doesn't block on a prepared transaction.");
+        assert.commandWorked(validate({}, secondaryTestDB));
+        jsTestLog("Test validate on primary blocks on collection X lock which conflicts with " +
+                  "a prepared transaction.");
+        assert.commandFailedWithCode(validate({}, testDB, failureTimeout),
                                      ErrorCodes.MaxTimeMSExpired);
 
         jsTestLog("Test read from an update blocks on a prepared transaction.");
