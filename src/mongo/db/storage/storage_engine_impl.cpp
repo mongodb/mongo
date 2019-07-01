@@ -730,12 +730,12 @@ void StorageEngineImpl::setOldestActiveTransactionTimestampCallback(
     _engine->setOldestActiveTransactionTimestampCallback(callback);
 }
 
-int64_t StorageEngineImpl::getCacheOverflowTableInsertCount(OperationContext* opCtx) const {
-    return _engine->getCacheOverflowTableInsertCount(opCtx);
+bool StorageEngineImpl::isCacheUnderPressure(OperationContext* opCtx) const {
+    return _engine->isCacheUnderPressure(opCtx);
 }
 
-void StorageEngineImpl::setCacheOverflowTableInsertCountForTest(int insertCount) {
-    return _engine->setCacheOverflowTableInsertCountForTest(insertCount);
+void StorageEngineImpl::setCachePressureForTest(int pressure) {
+    return _engine->setCachePressureForTest(pressure);
 }
 
 bool StorageEngineImpl::supportsRecoverToStableTimestamp() const {

@@ -125,9 +125,9 @@ public:
     virtual void setOldestActiveTransactionTimestampCallback(
         StorageEngine::OldestActiveTransactionTimestampCallback) override;
 
-    virtual int64_t getCacheOverflowTableInsertCount(OperationContext* opCtx) const override;
+    virtual bool isCacheUnderPressure(OperationContext* opCtx) const override;
 
-    virtual void setCacheOverflowTableInsertCountForTest(int insertCount) override;
+    virtual void setCachePressureForTest(int pressure) override;
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 

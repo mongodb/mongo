@@ -34,15 +34,13 @@ namespace mongo {
 class ServiceContext;
 
 /**
- * Periodically checks whether there has been any storage engine cache pressure and SnapshotTooOld
- * errors to determine whether the maintained snapshot history window target setting should be
- * decreased. If there has been cache pressure and no new SnapshotTooOld errors in the last period,
- * then the target window size will be decrease. Maintaining too much snapshot and write history can
- * slow down the system. Runs once every decreaseHistoryIfNotNeededPeriodSeconds.
+ * Periodically checks for storage engine cache pressure to determine whether the maintained
+ * snapshot history window target setting should be decreased. Maintaining too much snapshot and
+ * write history can slow down the system. Runs once every checkCachePressurePeriodSeconds.
  *
  * This function should only ever be called once, during mongod server startup (db.cpp).
  * The PeriodicRunner will handle shutting down the job on shutdown, no extra handling necessary.
  */
-void startPeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded(ServiceContext* serviceContext);
+void startPeriodicThreadToDecreaseSnapshotHistoryCachePressure(ServiceContext* serviceContext);
 
 }  // namespace mongo

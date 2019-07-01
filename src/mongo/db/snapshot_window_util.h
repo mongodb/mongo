@@ -40,9 +40,10 @@ class OperationContext;
 namespace SnapshotWindowUtil {
 
 /**
- * Increases the setting that controls the window of time between stable_timestamp and
+ * Attempts to increase the setting that controls the window of time between stable_timestamp and
  * oldest_timestamp, in order to provide a greater range of available snapshots for point-in-time
- * operations. This function will be called when server requests return SnapshotTooOld (or similar)
+ * operations. The window will not be increased, however, if the cache pressure is currently too
+ * high. This function will be called when server requests return SnapshotTooOld (or similar)
  * errors. Note that this will not immediately affect the oldest_timestamp. Rather, it affects
  * actions taken next time oldest_timestamp is updated, usually when the stable timestamp is
  * advanced.
@@ -59,15 +60,12 @@ namespace SnapshotWindowUtil {
 void increaseTargetSnapshotWindowSize(OperationContext* opCtx);
 
 /**
- * Decreases the target snapshot window size if there has been cache pressure and no new
- * SnapshotTooOld errors as tracked via the incrementSnapshotTooOldErrorCount() below since the last
- * time this function was called.
- *
- * We do not decrease the window size when there have been SnapshotTooOld errors recently, even if
- * there is some cache pressure, because that will cause sharded transaction commands to fail.
- *
- * Note that this will not necessarily immediately affect the actual window size; rather,
- * it affects actions taken whenever oldest_timestamp is updated, usually when the stable_timestamp
+ * Attempts to decrease (if not already zero) the setting that affects the size of the window of
+ * time between stable_timestamp and oldest_timestamp in order to reduce storage engine cache
+ * pressure. The window target will not be decreased, however, if the cache is not currently under
+ * pressure. Pressure can occur when too much history is being maintained for point-in-time
+ * snapshots. Note that this will not necessarily immediately affect the actual window size; rather,
+ * it affects actions taken whenever oldest_timestamp is updated, usually when the stable timestamp
  * is advanced.
  *
  * This will make one attempt to immediately adjust the window size if possible.
@@ -75,16 +73,6 @@ void increaseTargetSnapshotWindowSize(OperationContext* opCtx);
  * Implements a multiplicative decrease algorithm.
  */
 void decreaseTargetSnapshotWindowSize(OperationContext* opCtx);
-
-/**
- * Registers on a counter SnapshotTooOld errors encountered in the command layer.
- * decreaseTargetSnapshotWindowSize() above uses the counter value: if there are any errors since
- * the last decreaseTargetSnapshotWindowSize() call, then decreaseTargetSnapshotWindowSize() will
- * choose not decrease the target snapshot window size setting.
- *
- * Concurrency safe, the internal counter is atomic.
- */
-void incrementSnapshotTooOldErrorCount();
 
 }  // namespace SnapshotWindowUtil
 }  // namespace mongo

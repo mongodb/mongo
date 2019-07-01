@@ -1933,14 +1933,14 @@ void WiredTigerKVEngine::replicationBatchIsComplete() const {
     _oplogManager->triggerJournalFlush();
 }
 
-int64_t WiredTigerKVEngine::getCacheOverflowTableInsertCount(OperationContext* opCtx) const {
+bool WiredTigerKVEngine::isCacheUnderPressure(OperationContext* opCtx) const {
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
     invariant(session);
 
-    int64_t insertCount = uassertStatusOK(WiredTigerUtil::getStatisticsValueAs<int64_t>(
-        session->getSession(), "statistics:", "", WT_STAT_CONN_CACHE_LOOKASIDE_INSERT));
+    int64_t score = uassertStatusOK(WiredTigerUtil::getStatisticsValueAs<int64_t>(
+        session->getSession(), "statistics:", "", WT_STAT_CONN_CACHE_LOOKASIDE_SCORE));
 
-    return insertCount;
+    return (score >= snapshotWindowParams.cachePressureThreshold.load());
 }
 
 Timestamp WiredTigerKVEngine::getStableTimestamp() const {

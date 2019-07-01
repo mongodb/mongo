@@ -158,8 +158,8 @@ public:
      * that affect that window of maintained history.
      *
      * "snapshot-window-settings" : {
-     *      "total number of cache overflow disk writes",
-     *      "total number of SnapshotTooOld errors",
+     *      "cache pressure percentage threshold" : <num>,
+     *      "current cache pressure percentage" : <num>,
      *      "max target available snapshots window size in seconds" : <num>,
      *      "target available snapshots window size in seconds" : <num>,
      *      "current available snapshots window size in seconds" : <num>,

@@ -615,7 +615,7 @@ ExitCode _initAndListen(int listenPort) {
     // release periodically in order to avoid storage cache pressure build up.
     if (storageEngine->supportsReadConcernSnapshot()) {
         startPeriodicThreadToAbortExpiredTransactions(serviceContext);
-        startPeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded(serviceContext);
+        startPeriodicThreadToDecreaseSnapshotHistoryCachePressure(serviceContext);
     }
 
     // Set up the logical session cache

@@ -17,6 +17,17 @@
                                false /*hasUpperBound*/,
                                "unused" /*upperOutOfBounds*/);
 
+    // Valid parameter values are in the range [0, 100].
+    testNumericServerParameter("cachePressureThreshold",
+                               true /*isStartupParameter*/,
+                               true /*isRuntimeParameter*/,
+                               50 /*defaultValue*/,
+                               70 /*nonDefaultValidValue*/,
+                               true /*hasLowerBound*/,
+                               -1 /*lowerOutOfBounds*/,
+                               true /*hasUpperBound*/,
+                               101 /*upperOutOfBounds*/);
+
     // Valid parameter values are in the range (0, 1).
     testNumericServerParameter("snapshotWindowMultiplicativeDecrease",
                                true /*isStartupParameter*/,
@@ -32,7 +43,7 @@
     testNumericServerParameter("snapshotWindowAdditiveIncreaseSeconds",
                                true /*isStartupParameter*/,
                                true /*isRuntimeParameter*/,
-                               1 /*defaultValue*/,
+                               2 /*defaultValue*/,
                                10 /*nonDefaultValidValue*/,
                                true /*hasLowerBound*/,
                                0 /*lowerOutOfBounds*/,
@@ -40,10 +51,10 @@
                                "unused" /*upperOutOfBounds*/);
 
     // Valid parameter values are in the range [1, infinity).
-    testNumericServerParameter("decreaseHistoryIfNotNeededPeriodSeconds",
+    testNumericServerParameter("checkCachePressurePeriodSeconds",
                                true /*isStartupParameter*/,
                                true /*isRuntimeParameter*/,
-                               15 /*defaultValue*/,
+                               5 /*defaultValue*/,
                                8 /*nonDefaultValidValue*/,
                                true /*hasLowerBound*/,
                                0 /*lowerOutOfBounds*/,
@@ -52,6 +63,17 @@
 
     // Valid parameter values are in the range [1, infinity).
     testNumericServerParameter("minMillisBetweenSnapshotWindowInc",
+                               true /*isStartupParameter*/,
+                               true /*isRuntimeParameter*/,
+                               500 /*defaultValue*/,
+                               2 * 1000 /*nonDefaultValidValue*/,
+                               true /*hasLowerBound*/,
+                               0 /*lowerOutOfBounds*/,
+                               false /*hasUpperBound*/,
+                               "unused" /*upperOutOfBounds*/);
+
+    // Valid parameter values are in the range [1, infinity).
+    testNumericServerParameter("minMillisBetweenSnapshotWindowDec",
                                true /*isStartupParameter*/,
                                true /*isRuntimeParameter*/,
                                500 /*defaultValue*/,

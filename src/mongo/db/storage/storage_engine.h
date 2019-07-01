@@ -453,19 +453,21 @@ public:
         OldestActiveTransactionTimestampCallback callback){};
 
     /**
-     * Retrieves the number of inserts done to the cache overflow table. Writes to that table only
-     * occur when the read/write cache size exceeds the allotted in-memory cache capacity and must
-     * write to disk, which is slow. Tracking this value over time is indicative of cache pressure.
+     * Indicates whether the storage engine cache is under pressure.
+     *
+     * Retrieves a cache pressure value in the range [0, 100] from the storage engine, and compares
+     * it against storageGlobalParams.cachePressureThreshold, a dynamic server parameter, to
+     * determine whether cache pressure is too high.
      */
-    virtual int64_t getCacheOverflowTableInsertCount(OperationContext* opCtx) const {
-        return 0;
+    virtual bool isCacheUnderPressure(OperationContext* opCtx) const {
+        return false;
     }
 
     /**
-     * For unit tests only. Sets the counter for the number of cache overflow table inserts that the
-     * getCacheOverflowTableInsertCount() function above returns.
+     * For unit tests only. Sets the cache pressure value with which isCacheUnderPressure()
+     * evalutates to 'pressure'.
      */
-    virtual void setCacheOverflowTableInsertCountForTest(int insertCount) {}
+    virtual void setCachePressureForTest(int pressure) {}
 
     /**
      *  Notifies the storage engine that a replication batch has completed.

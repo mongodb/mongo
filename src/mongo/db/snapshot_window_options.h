@@ -64,42 +64,49 @@ struct SnapshotWindowParams {
     AtomicWord<int> targetSnapshotHistoryWindowInSeconds{
         maxTargetSnapshotHistoryWindowInSeconds.load()};
 
+    // cachePressureThreshold (startup & runtime server paramter, range [0, 100]).
+    //
+    // Dictates what percentage of cache in use is considered too high. This setting helps preempt
+    // storage cache pressure immobilizing the system. Attempts to increase
+    // targetSnapshotHistoryWindowInSeconds will be ignored when the cache pressure reaches this
+    // threshold. Additionally, a periodic task will decrease targetSnapshotHistoryWindowInSeconds
+    // when cache pressure exceeds the threshold.
+    AtomicWord<int> cachePressureThreshold{50};
+
     // snapshotWindowMultiplicativeDecrease (startup & runtime server paramter, range (0,1)).
     //
-    // Controls by what multiplier the target snapshot history window size setting is decreased
-    // when there is cache pressure.
+    // Controls by what multiplier the target snapshot history window setting is decreased when
+    // cache pressure becomes too high, per the cachePressureThreshold setting.
     AtomicDouble snapshotWindowMultiplicativeDecrease{0.75};
 
     // snapshotWindowAdditiveIncreaseSeconds (startup & runtime server paramter, range 1+).
     //
-    // Controls by how much the target snapshot history window size setting is increased when we
-    // need to service older snapshots for global point-in-time reads.
-    AtomicWord<int> snapshotWindowAdditiveIncreaseSeconds{1};
+    // Controls by how much the target snapshot history window setting is increased when cache
+    // pressure is OK, per cachePressureThreshold, and we need to service older snapshots for global
+    // point-in-time reads.
+    AtomicWord<int> snapshotWindowAdditiveIncreaseSeconds{2};
 
     // minMillisBetweenSnapshotWindowInc (startup & runtime server paramter, range 0+).
+    // minMillisBetweenSnapshotWindowDec (startup & runtime server paramter, range 0+).
     //
-    // Controls how often attempting to increase the target snapshot window will have an effect.
-    // Multiple callers within minMillisBetweenSnapshotWindowInc will have the same effect as one.
-    // This protects the system because it takes time for the target snapshot window to affect the
-    // actual storage engine snapshot window. The stable timestamp must move forward for the window
-    // between it and oldest timestamp to grow or shrink.
+    // Controls how often attempting to increase/decrease the target snapshot window will have an
+    // effect. Multiple callers within minMillisBetweenSnapshotWindowInc will have the same effect
+    // as one. This protects the system because it takes time for the target snapshot window to
+    // affect the actual storage engine snapshot window. The stable timestamp must move forward for
+    // the window between it and oldest timestamp to grow or shrink.
     AtomicWord<int> minMillisBetweenSnapshotWindowInc{500};
+    AtomicWord<int> minMillisBetweenSnapshotWindowDec{500};
 
-    // decreaseHistoryIfNotNeededPeriodSeconds (startup & runtime server paramter, range 1+)
+    // checkCachePressurePeriodSeconds (startup & runtime server paramter, range 1+)
     //
     // Controls the period of the task that checks for cache pressure and decreases
-    // targetSnapshotHistoryWindowInSeconds if there has been pressure and no new SnapshotTooOld
-    // errors.
-    //
-    // This should not run very frequently. It is preferable to increase the window size, and cache
-    // pressure, rather than failing PIT reads.
-    AtomicWord<int> decreaseHistoryIfNotNeededPeriodSeconds{15};
+    // targetSnapshotHistoryWindowInSeconds if the pressure is above cachePressureThreshold. The
+    // target window size setting must not be decreased too fast because time must be allowed for
+    // the storage engine to attempt to act on the new setting.
+    AtomicWord<int> checkCachePressurePeriodSeconds{5};
 
-    static inline MutableObserverRegistry<decltype(
-        decreaseHistoryIfNotNeededPeriodSeconds)::WordType>
-        observeDecreaseHistoryIfNotNeededPeriodSeconds;
-
-    AtomicWord<long long> snapshotTooOldErrorCount{0};
+    static inline MutableObserverRegistry<decltype(checkCachePressurePeriodSeconds)::WordType>
+        observeCheckCachePressurePeriodSeconds;
 };
 
 extern SnapshotWindowParams snapshotWindowParams;

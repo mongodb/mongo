@@ -41,6 +41,14 @@ server_parameters:
     cpp_varname: "snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds"
     validator: { gte: 0 }
 
+  cachePressureThreshold:
+    description: "Cache pressure threshold"
+    set_at: [ startup, runtime ]
+    cpp_varname: "snapshotWindowParams.cachePressureThreshold"
+    validator:
+      gte: 0
+      lte: 100
+
   snapshotWindowMultiplicativeDecrease:
     description: "Snapshot window multiplicative decrease"
     set_at: [ startup, runtime ]
@@ -61,9 +69,15 @@ server_parameters:
     cpp_varname: "snapshotWindowParams.minMillisBetweenSnapshotWindowInc"
     validator: { gte: 1 }
 
-  decreaseHistoryIfNotNeededPeriodSeconds:
+  minMillisBetweenSnapshotWindowDec:
+    description: "Minimum duration between snapshot window decrement, in milliseconds"
+    set_at: [ startup, runtime ]
+    cpp_varname: "snapshotWindowParams.minMillisBetweenSnapshotWindowDec"
+    validator: { gte: 1 }
+
+  checkCachePressurePeriodSeconds:
     description: "Check cache pressure period, in seconds"
     set_at: [ startup, runtime ]
-    cpp_varname: "snapshotWindowParams.decreaseHistoryIfNotNeededPeriodSeconds"
+    cpp_varname: "snapshotWindowParams.checkCachePressurePeriodSeconds"
     validator: { gte: 1 }
-    on_update: std::ref(SnapshotWindowParams::observeDecreaseHistoryIfNotNeededPeriodSeconds)
+    on_update: std::ref(SnapshotWindowParams::observeCheckCachePressurePeriodSeconds)
