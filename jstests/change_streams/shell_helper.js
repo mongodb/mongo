@@ -15,6 +15,8 @@
 
     const coll = assertDropAndRecreateCollection(db, "change_stream_shell_helper");
 
+    assert.commandWorked(db.adminCommand({"setParameter": 1, "logLevel": 5}));
+
     function checkNextChange(cursor, expected) {
         assert.soon(() => cursor.hasNext());
         const nextObj = cursor.next();

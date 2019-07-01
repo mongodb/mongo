@@ -135,10 +135,12 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
         // Add operationTime.
         auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
         if (operationTime != LogicalTime::kUninitialized) {
+            LOG(5) << "Appending operationTime: " << operationTime.asTimestamp();
             responseBuilder->append(kOperationTime, operationTime.asTimestamp());
         } else if (now != LogicalTime::kUninitialized) {
             // If we don't know the actual operation time, use the cluster time instead. This is
             // safe but not optimal because we can always return a later operation time than actual.
+            LOG(5) << "Appending clusterTime as operationTime " << now.asTimestamp();
             responseBuilder->append(kOperationTime, now.asTimestamp());
         }
 

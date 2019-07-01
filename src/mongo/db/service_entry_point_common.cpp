@@ -299,6 +299,7 @@ LogicalTime computeOperationTime(OperationContext* opCtx, LogicalTime startOpera
     invariant(isReplSet);
 
     if (startOperationTime == LogicalTime::kUninitialized) {
+        LOG(5) << "startOperationTime is uninitialized";
         return LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
     }
 
@@ -346,6 +347,9 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
 
         dassert(signedTime.getTime() >= operationTime);
         rpc::LogicalTimeMetadata(signedTime).writeToMetadata(metadataBob);
+
+        LOG(5) << "Appending operationTime to cmd response for authorized client: "
+               << operationTime;
         operationTime.appendAsOperationTime(commandBodyFieldsBob);
 
         return;
@@ -368,6 +372,8 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
 
     dassert(signedTime.getTime() >= operationTime);
     rpc::LogicalTimeMetadata(signedTime).writeToMetadata(metadataBob);
+
+    LOG(5) << "Appending operationTime to cmd response: " << operationTime;
     operationTime.appendAsOperationTime(commandBodyFieldsBob);
 }
 
