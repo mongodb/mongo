@@ -485,7 +485,7 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cval.val)
 		F_SET(txn, WT_TXN_IGNORE_PREPARE);
 
-	WT_RET(__wt_txn_parse_read_timestamp(session, cfg));
+	WT_RET(__wt_txn_parse_read_timestamp(session, cfg, NULL));
 
 	return (0);
 }
@@ -933,8 +933,12 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
 	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || txn->mod_count == 0);
-	/* Transaction should not have updated any of the logged tables. */
-	WT_ASSERT(session, txn->logrec == NULL);
+	/*
+	 * A transaction should not have updated any of the logged tables,
+	 * if debug mode logging is not turned on.
+	 */
+	if (!FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_DEBUG_MODE))
+		WT_ASSERT(session, txn->logrec == NULL);
 
 	WT_RET(__wt_txn_context_check(session, true));
 

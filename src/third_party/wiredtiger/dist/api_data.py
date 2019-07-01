@@ -430,6 +430,18 @@ connection_runtime_config = [
         for space to be available in cache before giving up. Default will
         wait forever''',
         min=0),
+    Config('cache_overflow', '', r'''
+        cache overflow configuration options''',
+        type='category', subconfig=[
+        Config('file_max', '0', r'''
+            The maximum number of bytes that WiredTiger is allowed to use for
+            its cache overflow mechanism. If the cache overflow file exceeds
+            this size, a panic will be triggered. The default value means that
+            the cache overflow file is unbounded and may use as much space as
+            the filesystem will accommodate. The minimum non-zero setting is
+            100MB.''',    # !!! Must match WT_LAS_FILE_MIN
+            min='0')
+        ]),
     Config('cache_overhead', '8', r'''
         assume the heap allocator overhead is the specified percentage, and
         adjust the cache usage by that amount (for example, if there is 10GB
@@ -455,6 +467,31 @@ connection_runtime_config = [
             seconds to wait between each checkpoint; setting this value
             above 0 configures periodic checkpoints''',
             min='0', max='100000'),
+        ]),
+    Config('debug_mode', '', r'''
+        control the settings of various extended debugging features''',
+        type='category', subconfig=[
+        Config('checkpoint_retention', '0', r'''
+            adjust log archiving to retain the log records of this number
+            of checkpoints. Zero or one means perform normal archiving.''',
+            min='0', max='1024'),
+        Config('eviction', 'false', r'''
+            if true, modify internal algorithms to change skew to force
+            lookaside eviction to happen more aggressively. This includes but
+            is not limited to not skewing newest, not favoring leaf pages,
+            and modifying the eviction score mechanism.''',
+            type='boolean'),
+        Config('rollback_error', '0', r'''
+            return a WT_ROLLBACK error from a transaction operation about
+            every Nth operation to simulate a collision''',
+            min='0', max='10M'),
+        Config('table_logging', 'false', r'''
+            if true, write transaction related information to the log for all
+            operations, even operations for tables with logging turned off.
+            This setting introduces a log format change that may break older
+            versions of WiredTiger. These operations are informational and
+            skipped in recovery.''',
+            type='boolean'),
         ]),
     Config('error_prefix', '', r'''
         prefix string for error messages'''),

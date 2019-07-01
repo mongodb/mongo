@@ -127,6 +127,10 @@ test_wt4333_handle_locks_SOURCES = wt4333_handle_locks/main.c
 noinst_PROGRAMS += test_wt4333_handle_locks
 all_TESTS += test_wt4333_handle_locks
 
+test_wt4803_cache_overflow_abort_SOURCES = wt4803_cache_overflow_abort/main.c
+noinst_PROGRAMS += test_wt4803_cache_overflow_abort
+all_TESTS += test_wt4803_cache_overflow_abort
+
 # Run this during a "make check" smoke test.
 TESTS = $(all_TESTS)
 LOG_COMPILER = $(TEST_WRAPPER)

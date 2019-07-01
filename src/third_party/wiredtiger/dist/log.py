@@ -18,6 +18,9 @@ field_types = {
           'WT_ERR(__logrec_make_hex_str(session, &escaped, &arg));']),
     'recno' : ('uint64_t', 'r', '%" PRIu64 "', 'arg', [ '' ]),
     'uint32' : ('uint32_t', 'I', '%" PRIu32 "', 'arg', [ '' ]),
+    # The fileid may have the high bit set. Print in both decimal and hex.
+    'uint32_id' : ('uint32_t', 'I',
+        '%" PRIu32 " 0x%" PRIx32 "', 'arg, arg', [ '' ]),
     'uint64' : ('uint64_t', 'Q', '%" PRIu64 "', 'arg', [ '' ]),
 }
 

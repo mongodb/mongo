@@ -667,8 +667,10 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	WT_TXN *txn;
 	wt_timestamp_t ts;
+	bool set_ts;
 
 	txn = &session->txn;
+	set_ts = false;
 
 	/* Look for a commit timestamp. */
 	ret = __wt_config_gets_def(session, cfg, "commit_timestamp", 0, &cval);
@@ -678,6 +680,7 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET(__wt_txn_parse_timestamp(session, "commit", &ts, &cval));
 		WT_RET(__wt_timestamp_validate(session, "commit", ts, &cval));
 		txn->commit_timestamp = ts;
+		set_ts = true;
 		__wt_txn_set_commit_timestamp(session);
 	} else
 		/*
@@ -687,7 +690,10 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET(__wt_txn_context_prepare_check(session));
 
 	/* Look for a read timestamp. */
-	WT_RET(__wt_txn_parse_read_timestamp(session, cfg));
+	WT_RET(__wt_txn_parse_read_timestamp(session, cfg, &set_ts));
+
+	if (set_ts)
+		WT_RET(__wt_txn_ts_log(session));
 
 	return (0);
 }
@@ -775,7 +781,8 @@ __wt_txn_parse_prepare_timestamp(
  *	Parse a request to set a transaction's read_timestamp.
  */
 int
-__wt_txn_parse_read_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_txn_parse_read_timestamp(WT_SESSION_IMPL *session,
+    const char *cfg[], bool *set_tsp)
 {
 	WT_CONFIG_ITEM cval;
 	WT_TXN *txn;
@@ -844,6 +851,8 @@ __wt_txn_parse_read_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 			round_to_oldest = false;
 		}
 
+		if (set_tsp != NULL)
+			*set_tsp = true;
 		__wt_txn_set_read_timestamp(session);
 		__wt_readunlock(session, &txn_global->rwlock);
 		if (round_to_oldest) {

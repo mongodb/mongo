@@ -781,6 +781,8 @@ static const char * const __stats_connection_desc[] = {
 	"cache: cache overflow score",
 	"cache: cache overflow table entries",
 	"cache: cache overflow table insert calls",
+	"cache: cache overflow table max on-disk size",
+	"cache: cache overflow table on-disk size",
 	"cache: cache overflow table remove calls",
 	"cache: checkpoint blocked page eviction",
 	"cache: eviction calls to get a page",
@@ -1204,6 +1206,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing cache_lookaside_score */
 		/* not clearing cache_lookaside_entries */
 	stats->cache_lookaside_insert = 0;
+		/* not clearing cache_lookaside_ondisk_max */
+		/* not clearing cache_lookaside_ondisk */
 	stats->cache_lookaside_remove = 0;
 	stats->cache_eviction_checkpoint = 0;
 	stats->cache_eviction_get_ref = 0;
@@ -1616,6 +1620,10 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_lookaside_entries);
 	to->cache_lookaside_insert +=
 	    WT_STAT_READ(from, cache_lookaside_insert);
+	to->cache_lookaside_ondisk_max +=
+	    WT_STAT_READ(from, cache_lookaside_ondisk_max);
+	to->cache_lookaside_ondisk +=
+	    WT_STAT_READ(from, cache_lookaside_ondisk);
 	to->cache_lookaside_remove +=
 	    WT_STAT_READ(from, cache_lookaside_remove);
 	to->cache_eviction_checkpoint +=

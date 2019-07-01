@@ -201,6 +201,13 @@ __wt_value_return_upd(WT_SESSION_IMPL *session,
 					memcpy(listp, list, sizeof(list));
 			}
 			listp[i++] = upd;
+
+			/*
+			 * Once a modify is found, all previously committed
+			 * modifications should be applied regardless of
+			 * visibility.
+			 */
+			ignore_visibility = true;
 		}
 	}
 

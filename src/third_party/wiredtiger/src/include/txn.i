@@ -425,6 +425,42 @@ __wt_txn_op_apply_prepare_state(
 }
 
 /*
+ * __wt_txn_op_delete_commit_apply_timestamps --
+ *	Apply the correct start and durable timestamps to any
+ *	updates in the page del update list.
+ */
+static inline void
+__wt_txn_op_delete_commit_apply_timestamps(
+    WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_TXN *txn;
+	WT_UPDATE **updp;
+	uint32_t previous_state;
+
+	txn = &session->txn;
+
+	/*
+	 * Lock the ref to ensure we don't race with eviction freeing the page
+	 * deleted update list or with a page instantiate.
+	 */
+	for (;; __wt_yield()) {
+		previous_state = ref->state;
+		WT_ASSERT(session, previous_state != WT_REF_READING);
+		if (previous_state != WT_REF_LOCKED && WT_REF_CAS_STATE(
+		    session, ref, previous_state, WT_REF_LOCKED))
+			break;
+	}
+
+	for (updp = ref->page_del->update_list;
+	    updp != NULL && *updp != NULL; ++updp) {
+		(*updp)->timestamp = txn->commit_timestamp;
+	}
+
+	/* Unlock the page by setting it back to it's previous state */
+	WT_REF_SET_STATE(ref, previous_state);
+}
+
+/*
  * __wt_txn_op_set_timestamp --
  *	Decide whether to copy a commit timestamp into an update. If the op
  *	structure doesn't have a populated update or ref field or in prepared
@@ -471,6 +507,10 @@ __wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 		    &op->u.ref->page_del->timestamp : &op->u.op_upd->timestamp;
 		if (*timestamp == 0)
 			*timestamp = txn->commit_timestamp;
+
+		if (op->type == WT_TXN_OP_REF_DELETE)
+			__wt_txn_op_delete_commit_apply_timestamps(
+			    session, op->u.ref);
 	}
 }
 
@@ -1075,13 +1115,19 @@ static inline int
 __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
 	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
 	bool ignore_prepare_set;
 
 	txn = &session->txn;
+	txn_global = &S2C(session)->txn_global;
 
 	if (txn->isolation != WT_ISO_SNAPSHOT)
 		return (0);
 
+	if (txn_global->debug_rollback != 0 &&
+	    ++txn_global->debug_ops % txn_global->debug_rollback == 0)
+		return (__wt_txn_rollback_required(session,
+		    "debug mode simulated conflict"));
 	/*
 	 * Always include prepared transactions in this check: they are not
 	 * supposed to affect visibility for update operations.

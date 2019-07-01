@@ -1,5 +1,5 @@
 {
-    "commit": "4051e4941c894655cdb7d3dec97a7e32e7defbe6", 
+    "commit": "4a3194b043b8cffb5339c12e1554d0bd42ed1b1f", 
     "github": "wiredtiger/wiredtiger.git", 
     "vendor": "wiredtiger", 
     "branch": "mongodb-4.0"

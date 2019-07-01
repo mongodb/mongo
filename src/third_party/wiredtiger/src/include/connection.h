@@ -193,6 +193,9 @@ struct __wt_connection_impl {
 	WT_SPINLOCK optrack_map_spinlock; /* Translation file spinlock. */
 	uintmax_t optrack_pid;		/* Cache the process ID. */
 
+	WT_LSN		*debug_ckpt;	/* Debug mode checkpoint LSNs. */
+	uint32_t	 debug_ckpt_cnt;/* Checkpoint retention number */
+
 	void  **foc;			/* Free-on-close array */
 	size_t  foc_cnt;		/* Array entries */
 	size_t  foc_size;		/* Array size */
@@ -321,15 +324,16 @@ struct __wt_connection_impl {
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define	WT_CONN_LOG_ARCHIVE		0x001u	/* Archive is enabled */
-#define	WT_CONN_LOG_DOWNGRADED		0x002u	/* Running older version */
-#define	WT_CONN_LOG_ENABLED		0x004u	/* Logging is enabled */
-#define	WT_CONN_LOG_EXISTED		0x008u	/* Log files found */
-#define	WT_CONN_LOG_FORCE_DOWNGRADE	0x010u	/* Force downgrade */
-#define	WT_CONN_LOG_RECOVER_DIRTY	0x020u	/* Recovering unclean */
-#define	WT_CONN_LOG_RECOVER_DONE	0x040u	/* Recovery completed */
-#define	WT_CONN_LOG_RECOVER_ERR		0x080u	/* Error if recovery required */
-#define	WT_CONN_LOG_RECOVER_FAILED	0x100u	/* Recovery failed */
-#define	WT_CONN_LOG_ZERO_FILL		0x200u	/* Manually zero files */
+#define	WT_CONN_LOG_DEBUG_MODE		0x002u	/* Debug-mode logging enabled */
+#define	WT_CONN_LOG_DOWNGRADED		0x004u	/* Running older version */
+#define	WT_CONN_LOG_ENABLED		0x008u	/* Logging is enabled */
+#define	WT_CONN_LOG_EXISTED		0x010u	/* Log files found */
+#define	WT_CONN_LOG_FORCE_DOWNGRADE	0x020u	/* Force downgrade */
+#define	WT_CONN_LOG_RECOVER_DIRTY	0x040u	/* Recovering unclean */
+#define	WT_CONN_LOG_RECOVER_DONE	0x080u	/* Recovery completed */
+#define	WT_CONN_LOG_RECOVER_ERR		0x100u	/* Error if recovery required */
+#define	WT_CONN_LOG_RECOVER_FAILED	0x200u	/* Recovery failed */
+#define	WT_CONN_LOG_ZERO_FILL		0x400u	/* Manually zero files */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t	 log_flags;	/* Global logging configuration */
 	WT_CONDVAR	*log_cond;	/* Log server wait mutex */

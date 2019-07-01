@@ -918,6 +918,7 @@ __wt_row_leaf_key_set_cell(WT_PAGE *page, WT_ROW *rip, WT_CELL *cell)
 	 */
 	v = WT_CELL_ENCODE_OFFSET(WT_PAGE_DISK_OFFSET(page, cell)) |
 	    WT_CELL_FLAG;
+	WT_ASSERT(NULL, WT_ROW_SLOT(page, rip) < page->entries);
 	WT_ROW_KEY_SET(rip, v);
 }
 
@@ -937,6 +938,7 @@ __wt_row_leaf_key_set(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *unpack)
 	v = WT_K_ENCODE_KEY_LEN(unpack->size) |
 	    WT_K_ENCODE_KEY_OFFSET(WT_PAGE_DISK_OFFSET(page, unpack->data)) |
 	    WT_K_FLAG;
+	WT_ASSERT(NULL, WT_ROW_SLOT(page, rip) < page->entries);
 	WT_ROW_KEY_SET(rip, v);
 }
 
@@ -975,6 +977,7 @@ __wt_row_leaf_value_set(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *unpack)
 	    WT_KV_ENCODE_VALUE_LEN(unpack->size) |
 	    WT_KV_ENCODE_KEY_OFFSET(key_offset) |
 	    WT_KV_ENCODE_VALUE_OFFSET(value_offset) | WT_KV_FLAG;
+	WT_ASSERT(NULL, WT_ROW_SLOT(page, rip) < page->entries);
 	WT_ROW_KEY_SET(rip, v);
 }
 
@@ -1516,7 +1519,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 				WT_IGNORE_RET(
 				    __wt_page_evict_urgent(session, ref));
 		} else {
-			WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
+			WT_RET_BUSY_OK(__wt_page_release_evict(session, ref,
+			    flags));
 			return (0);
 		}
 	}

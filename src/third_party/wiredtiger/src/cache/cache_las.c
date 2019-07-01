@@ -57,6 +57,46 @@ __las_entry_count(WT_CACHE *cache)
 }
 
 /*
+ * __wt_las_config --
+ *	Configure the lookaside table.
+ */
+int
+__wt_las_config(WT_SESSION_IMPL *session, const char **cfg)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CURSOR_BTREE *las_cursor;
+	WT_SESSION_IMPL *las_session;
+
+	WT_RET(__wt_config_gets(
+	    session, cfg, "cache_overflow.file_max", &cval));
+
+	if (cval.val != 0 && cval.val < WT_LAS_FILE_MIN)
+		WT_RET_MSG(session, EINVAL,
+		    "max cache overflow size %" PRId64 " below minimum %d",
+		    cval.val, WT_LAS_FILE_MIN);
+
+	/* This is expected for in-memory configurations. */
+	las_session = S2C(session)->cache->las_session[0];
+	WT_ASSERT(session,
+	    las_session != NULL || F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+
+	if (las_session == NULL)
+		return (0);
+
+	/*
+	 * We need to set file_max on the btree associated with one of the
+	 * lookaside sessions.
+	 */
+	las_cursor = (WT_CURSOR_BTREE *)las_session->las_cursor;
+	las_cursor->btree->file_max = (uint64_t)cval.val;
+
+	WT_STAT_CONN_SET(
+	    session, cache_lookaside_ondisk_max, las_cursor->btree->file_max);
+
+	return (0);
+}
+
+/*
  * __wt_las_empty --
  *	Return when there are entries in the lookaside table.
  */
@@ -126,7 +166,7 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
  *	Initialize the database's lookaside store.
  */
 int
-__wt_las_create(WT_SESSION_IMPL *session)
+__wt_las_create(WT_SESSION_IMPL *session, const char **cfg)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
@@ -165,6 +205,8 @@ __wt_las_create(WT_SESSION_IMPL *session)
 		    true, WT_LAS_SESSION_FLAGS, &cache->las_session[i]));
 		WT_RET(__wt_las_cursor_open(cache->las_session[i]));
 	}
+
+	WT_RET(__wt_las_config(session, cfg));
 
 	/* The statistics server is already running, make sure we don't race. */
 	WT_WRITE_BARRIER();
@@ -609,8 +651,10 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 	WT_SAVE_UPD *list;
 	WT_SESSION_IMPL *session;
 	WT_TXN_ISOLATION saved_isolation;
-	WT_UPDATE *upd;
-	uint64_t insert_cnt, las_counter, las_pageid, prepared_insert_cnt;
+	WT_UPDATE *first_upd, *upd;
+	wt_off_t las_size;
+	uint64_t insert_cnt, las_counter, las_pageid, max_las_size;
+	uint64_t prepared_insert_cnt;
 	uint32_t btree_id, i, slot;
 	uint8_t *p;
 	bool local_txn;
@@ -688,7 +732,7 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 			slot = page->type == WT_PAGE_ROW_LEAF ?
 			    WT_ROW_SLOT(page, list->ripcip) :
 			    WT_COL_SLOT(page, list->ripcip);
-		upd = list->ins == NULL ?
+		first_upd = upd = list->ins == NULL ?
 		    page->modify->mod_row_update[slot] : list->ins->upd;
 
 		/*
@@ -707,6 +751,9 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 				las_value.size = upd->size;
 				break;
 			case WT_UPDATE_BIRTHMARK:
+				WT_ASSERT(session, upd != first_upd ||
+				    multi->page_las.skew_newest);
+				/* FALLTHROUGH */
 			case WT_UPDATE_TOMBSTONE:
 				las_value.size = 0;
 				break;
@@ -727,6 +774,8 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 			    (upd->type == WT_UPDATE_STANDARD ||
 			    upd->type == WT_UPDATE_MODIFY)) {
 				las_value.size = 0;
+				WT_ASSERT(session, upd != first_upd ||
+				    multi->page_las.skew_newest);
 				cursor->set_value(cursor, upd->txnid,
 				    upd->timestamp, upd->prepare_state,
 				    WT_UPDATE_BIRTHMARK, &las_value);
@@ -747,6 +796,14 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 				++prepared_insert_cnt;
 		} while ((upd = upd->next) != NULL);
 	}
+
+	WT_ERR(__wt_block_manager_named_size(session, WT_LAS_FILE, &las_size));
+	WT_STAT_CONN_SET(session, cache_lookaside_ondisk, las_size);
+	max_las_size = ((WT_CURSOR_BTREE *)cursor)->btree->file_max;
+	if (max_las_size != 0 && (uint64_t)las_size > max_las_size)
+		WT_PANIC_MSG(session, WT_PANIC,
+		    "WiredTigerLAS: file size of %" PRIu64 " exceeds maximum "
+		    "size %" PRIu64, (uint64_t)las_size, max_las_size);
 
 err:	/* Resolve the transaction. */
 	if (local_txn) {
@@ -773,6 +830,7 @@ err:	/* Resolve the transaction. */
 		__las_insert_block_verbose(session, btree, multi);
 	}
 
+	WT_UNUSED(first_upd);
 	return (ret);
 }
 

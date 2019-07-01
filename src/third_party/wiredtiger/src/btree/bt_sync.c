@@ -143,7 +143,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	 * checkpoint, the on-disk version is correct.  If the truncate is
 	 * visible, we skip over the child page when writing its parent.  We
 	 * check whether a truncate is visible in the checkpoint as part of
-	 * reconciling internal pages (specifically in __rec_child_modify).
+	 * reconciling internal pages (specifically in __wt_rec_child_modify).
 	 */
 	LF_SET(WT_READ_DELETED_SKIP);
 
@@ -326,7 +326,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			    page->read_gen == WT_READGEN_WONT_NEED &&
 			    !tried_eviction) {
 				WT_ERR_BUSY_OK(
-				    __wt_page_release_evict(session, walk));
+				    __wt_page_release_evict(session, walk, 0));
 				walk = prev;
 				prev = NULL;
 				tried_eviction = true;

@@ -8,7 +8,7 @@ functions:
     command: git.get_project
     params:
       directory: wiredtiger
-  "fetch artifacts" : 
+  "fetch artifacts" :
     - command: s3.get
       params:
         aws_key: ${aws_key}
@@ -19,7 +19,7 @@ functions:
   "fetch mongo-tests repo" :
     command: shell.exec
     params:
-      script: | 
+      script: |
         git clone https://github.com/wiredtiger/mongo-tests
   "compile wiredtiger":
     command: shell.exec
@@ -35,7 +35,7 @@ functions:
           ./build_posix/reconf
           ${configure_env_vars|} ./configure --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
           ${make_command|make} ${smp_command|} 2>&1
-    
+
           # On macOS, change the binary location with install_name_tool since DYLD_LIBRARY_PATH
           # appears not to work for dynamic modules loaded by python. For wt, the libtool generated
           # script has the wrong path for running on test machines.
@@ -609,6 +609,20 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test_wt4156_metadata_salvage 2>&1
 
+  - name: csuite-wt4803-cache-overflow-abort-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt4803_cache_overflow_abort 2>&1
+
   - name: csuite-rwlock-test
     depends_on:
       - name: compile
@@ -760,9 +774,9 @@ tasks:
 
   # Break out Python unit tests into multiple buckets/tasks based on test name and runtime
   # The test/suite/run.py script can work out test names by casting each command argument
-  # with "test_" prefix and "*.py" postfix. 
+  # with "test_" prefix and "*.py" postfix.
   #
-  # One example: 
+  # One example:
   # "test/suite/run.py [ab]" will be translated to testing "test_a*.py" and "test_b*.py"
 
   - name: unit-test-bucket00
@@ -934,18 +948,18 @@ tasks:
 
   - name: million-collection-test
     depends_on: []
-    run_on: 
+    run_on:
       - rhel62-large
-    commands: 
+    commands:
       - func: "fetch mongo-tests repo"
       - command: shell.exec
         params:
           working_dir: mongo-tests
-          script: | 
+          script: |
             set -o errexit
             set -o verbose
             ulimit -n 1000000
-            ulimit -c unlimited 
+            ulimit -c unlimited
             largescale/run-million-collection-test.sh .
 
 buildvariants:
@@ -1051,4 +1065,3 @@ buildvariants:
     - name: make-check-test
     - name: unit-test
     - name: fops
-

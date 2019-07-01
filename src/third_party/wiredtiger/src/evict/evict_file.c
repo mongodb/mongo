@@ -95,7 +95,8 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			 * Ensure the ref state is restored to the previous
 			 * value if eviction fails.
 			 */
-			WT_ERR(__wt_evict(session, ref, true, ref->state));
+			WT_ERR(__wt_evict(session, ref, ref->state,
+			    WT_EVICT_CALL_CLOSING));
 			break;
 		case WT_SYNC_DISCARD:
 			/*

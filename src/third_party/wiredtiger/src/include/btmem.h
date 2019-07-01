@@ -1114,9 +1114,9 @@ struct __wt_update {
 
 /*
  * WT_MODIFY_MEM_FACTOR	--
- *	Limit update chains to a factor of the base document size.
+ *	Limit update chains to a fraction of the base document size.
  */
-#define	WT_MODIFY_MEM_FACTOR	1
+#define	WT_MODIFY_MEM_FRACTION	10
 
 /*
  * WT_INSERT --
