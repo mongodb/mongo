@@ -903,6 +903,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     collLock->emplace(opCtx, nss, MODE_S);
     uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
         opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
+    collLock->reset();
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
         log() << "Hanging after index build second drain";
