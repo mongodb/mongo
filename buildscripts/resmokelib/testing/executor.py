@@ -196,12 +196,20 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         except (KeyboardInterrupt, SystemExit):
             interrupt_flag.set()
             user_interrupted = True
-        else:
-            # Only wait for all the Job instances if not interrupted by the user.
-            self.logger.debug("Waiting for threads to complete")
+
+        wait_secs = 2.0
+        self.logger.debug("Waiting for threads to complete")
+
+        timer = threading.Timer(wait_secs, self._log_timeout_warning, args=[wait_secs])
+        timer.daemon = True
+        timer.start()
+        try:
             for thr in threads:
                 thr.join()
-            self.logger.debug("Threads are completed!")
+        finally:
+            timer.cancel()
+
+        self.logger.debug("Threads are completed!")
 
         reports = [job.report for job in self._jobs]
         combined_report = _report.TestReport.combine(*reports)
@@ -316,3 +324,9 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 queue.put(queue_elem)
 
         return queue
+
+    def _log_timeout_warning(self, seconds):
+        """Log a message if any thread fails to terminate after `seconds`."""
+        self.logger.warning(
+            '*** Still waiting for processes to terminate after %s seconds. Try using ctrl-\\ '
+            'to send a SIGQUIT on Linux or ctrl-c again on Windows ***', seconds)
