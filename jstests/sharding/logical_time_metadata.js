@@ -30,12 +30,16 @@
 
     res = st.rs0.getPrimary().adminCommand({replSetGetStatus: 1});
 
+    // Cluster time may advance after replSetGetStatus finishes executing and before its logical
+    // time metadata is computed, in which case the response's $clusterTime will be greater than the
+    // appliedOpTime timestamp in its body. Assert the timestamp is <= $clusterTime to account for
+    // this.
     var appliedTime = res.optimes.appliedOpTime.ts;
     var logicalTimeMetadata = res.$clusterTime;
-    assert.eq(0,
-              timestampCmp(appliedTime, logicalTimeMetadata.clusterTime),
-              'appliedTime: ' + tojson(appliedTime) + ' != clusterTime: ' +
-                  tojson(logicalTimeMetadata.clusterTime));
+    assert.lte(0,
+               timestampCmp(appliedTime, logicalTimeMetadata.clusterTime),
+               'appliedTime: ' + tojson(appliedTime) + ' not less than or equal to clusterTime: ' +
+                   tojson(logicalTimeMetadata.clusterTime));
 
     assert.commandWorked(db.runCommand({ping: 1, '$clusterTime': logicalTimeMetadata}));
 
