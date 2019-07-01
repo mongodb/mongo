@@ -1224,8 +1224,8 @@ DBCollection.prototype.getShardDistribution = function() {
 
         numChunks += chunks.length;
 
-        var estChunkData = shardStats.size / chunks.length;
-        var estChunkCount = Math.floor(shardStats.count / chunks.length);
+        var estChunkData = (chunks.length == 0) ? 0 : shardStats.size / chunks.length;
+        var estChunkCount = (chunks.length == 0) ? 0 : Math.floor(shardStats.count / chunks.length);
 
         print(" data : " + sh._dataFormat(shardStats.size) + " docs : " + shardStats.count +
               " chunks : " + chunks.length);
@@ -1239,8 +1239,10 @@ DBCollection.prototype.getShardDistribution = function() {
     for (var shard in stats.shards) {
         var shardStats = stats.shards[shard];
 
-        var estDataPercent = Math.floor(shardStats.size / stats.size * 10000) / 100;
-        var estDocPercent = Math.floor(shardStats.count / stats.count * 10000) / 100;
+        var estDataPercent =
+            (stats.size == 0) ? 0 : (Math.floor(shardStats.size / stats.size * 10000) / 100);
+        var estDocPercent =
+            (stats.count == 0) ? 0 : (Math.floor(shardStats.count / stats.count * 10000) / 100);
 
         print(" Shard " + shard + " contains " + estDataPercent + "% data, " + estDocPercent +
               "% docs in cluster, " + "avg obj size on shard : " +
