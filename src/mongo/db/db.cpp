@@ -611,7 +611,11 @@ ExitCode _initAndListen(int listenPort) {
     // release periodically in order to avoid storage cache pressure build up.
     if (storageEngine->supportsReadConcernSnapshot()) {
         PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->start();
-        PeriodicThreadToDecreaseSnapshotHistoryCachePressure::get(serviceContext)->start();
+        // The inMemory engine is not yet used for replica or sharded transactions in production so
+        // it does not currently maintain snapshot history. It is live in testing, however.
+        if (!storageEngine->isEphemeral() || getTestCommandsEnabled()) {
+            PeriodicThreadToDecreaseSnapshotHistoryCachePressure::get(serviceContext)->start();
+        }
     }
 
     // Set up the logical session cache

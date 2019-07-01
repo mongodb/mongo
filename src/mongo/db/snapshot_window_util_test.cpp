@@ -32,6 +32,7 @@
 #include "mongo/db/snapshot_window_util.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_devnull_test_fixture.h"
 #include "mongo/db/snapshot_window_options.h"
@@ -51,6 +52,7 @@ public:
     void setUp() override {
         ServiceContextDevnullTestFixture::setUp();
         _opCtx = cc().makeOperationContext();
+        setTestCommandsEnabled(true);
     }
 
     void tearDown() override {
