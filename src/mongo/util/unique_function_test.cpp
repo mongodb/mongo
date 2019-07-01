@@ -31,7 +31,47 @@
 
 #include "mongo/unittest/unittest.h"
 
+/**
+ * Note that tests in this file are deliberately outside the mongodb namespace to ensure that
+ * deduction works appropriately via adl.  I.e. this set of tests doesn't follow our usual
+ * convention, needn't be considered prevailing local style, but should be left alone moving
+ * forward.
+ */
 namespace {
+
+template <typename Sig>
+struct FuncObj;
+template <typename Ret, typename... Args>
+struct FuncObj<Ret(Args...)> {
+    Ret operator()(Args...);
+};
+
+template <typename Sig>
+auto makeFuncObj() -> FuncObj<Sig>;
+template <typename Sig>
+auto makeFuncPtr() -> Sig*;
+
+#define TEST_DEDUCTION_GUIDE(sig)                                                      \
+    static_assert(std::is_same_v<decltype(mongo::unique_function(makeFuncPtr<sig>())), \
+                                 mongo::unique_function<sig>>);                        \
+    static_assert(std::is_same_v<decltype(mongo::unique_function(makeFuncObj<sig>())), \
+                                 mongo::unique_function<sig>>)
+
+TEST_DEDUCTION_GUIDE(void());
+TEST_DEDUCTION_GUIDE(void(int));
+TEST_DEDUCTION_GUIDE(void(int&));
+TEST_DEDUCTION_GUIDE(void(int&&));
+TEST_DEDUCTION_GUIDE(void(int, double));
+TEST_DEDUCTION_GUIDE(void(int&, double));
+TEST_DEDUCTION_GUIDE(void(int&&, double));
+TEST_DEDUCTION_GUIDE(int*());
+TEST_DEDUCTION_GUIDE(int*(int));
+TEST_DEDUCTION_GUIDE(int*(int&));
+TEST_DEDUCTION_GUIDE(int*(int&&));
+TEST_DEDUCTION_GUIDE(int*(int, double));
+TEST_DEDUCTION_GUIDE(int*(int&, double));
+TEST_DEDUCTION_GUIDE(int*(int&&, double));
+
 template <int channel>
 struct RunDetection {
     ~RunDetection() {

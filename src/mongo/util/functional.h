@@ -168,6 +168,30 @@ private:
     std::unique_ptr<Impl> impl;
 };
 
+/**
+ * Helper to pattern-match the signatures for all combinations of const and l-value-qualifed member
+ * function pointers. We don't currently support r-value-qualified call operators.
+ */
+template <typename>
+struct UFDeductionHelper {};
+template <typename Class, typename Ret, typename... Args>
+struct UFDeductionHelper<Ret (Class::*)(Args...)> : stdx::type_identity<Ret(Args...)> {};
+template <typename Class, typename Ret, typename... Args>
+struct UFDeductionHelper<Ret (Class::*)(Args...)&> : stdx::type_identity<Ret(Args...)> {};
+template <typename Class, typename Ret, typename... Args>
+struct UFDeductionHelper<Ret (Class::*)(Args...) const> : stdx::type_identity<Ret(Args...)> {};
+template <typename Class, typename Ret, typename... Args>
+struct UFDeductionHelper<Ret (Class::*)(Args...) const&> : stdx::type_identity<Ret(Args...)> {};
+
+/**
+ * Deduction guides for unique_function<Sig> that pluck the signature off of function pointers and
+ * non-overloaded, non-generic function objects such as lambdas that don't use `auto` arguments.
+ */
+template <typename Ret, typename... Args>
+unique_function(Ret (*)(Args...))->unique_function<Ret(Args...)>;
+template <typename T, typename Sig = typename UFDeductionHelper<decltype(&T::operator())>::type>
+unique_function(T)->unique_function<Sig>;
+
 template <typename Signature>
 bool operator==(const unique_function<Signature>& lhs, std::nullptr_t) noexcept {
     return !lhs;
