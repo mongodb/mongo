@@ -202,9 +202,9 @@ public:
         TxnResources& operator=(TxnResources&&) = default;
 
         /**
-         * Returns a const pointer to the stashed lock state, or nullptr if no stashed locks exist.
+         * Returns a pointer to the stashed lock state, or nullptr if no stashed locks exist.
          */
-        const Locker* locker() const {
+        Locker* locker() const {
             return _locker.get();
         }
 
@@ -357,6 +357,9 @@ public:
      */
     class Participant : public Observer {
     public:
+        // Indicates whether the future lock requests should have timeouts.
+        enum class MaxLockTimeout { kNotAllowed, kAllowed };
+
         explicit Participant(OperationContext* opCtx);
         explicit Participant(const SessionToKill& session);
 
@@ -760,9 +763,22 @@ public:
         // invalidating a transaction, or starting a new transaction.
         void _resetTransactionState(WithLock wl, TransactionState::StateFlag state);
 
-        // Releases the resources held in *o().txnResources to the operation context.
-        // o().txnResources must be engaged prior to calling this.
-        void _releaseTransactionResourcesToOpCtx(OperationContext* opCtx);
+        /* Releases the resources held in *o().txnResources to the operation context.
+         * o().txnResources must be engaged prior to calling this.
+         *
+         * maxLockTimeout will determine whether future lock requests should have lock timeouts.
+         *  - MaxLockTimeout::kNotAllowed will clear the lock timeout.
+         *  - MaxLockTimeout::kAllowed will set the timeout as
+         *    MaxTransactionLockRequestTimeoutMillis.
+         *
+         * ------------------------------------------------------------------
+         * |                | PRIMARY    | SECONDARY     | STATE TRANSITION |
+         * |----------------|------------|---------------|------------------|
+         * |maxLockTimeout  | kAllowed   | kNotAllowed   |  kNotAllowed     |
+         * ------------------------------------------------------------------
+         */
+        void _releaseTransactionResourcesToOpCtx(OperationContext* opCtx,
+                                                 MaxLockTimeout maxLockTimeout);
 
         TransactionParticipant::PrivateState& p() {
             return _tp->_p;
