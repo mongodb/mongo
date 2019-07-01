@@ -50,12 +50,16 @@
                    "Expected response from a " + connType + " to contain lastCommittedOpTime," +
                        " received: " + tojson(res) + ", cmd was: " + tojson(cmdObj));
 
+            // The last committed opTime may advance after replSetGetStatus finishes executing and
+            // before its response's metadata is computed, in which case the response's
+            // lastCommittedOpTime will be greater than the lastCommittedOpTime timestamp in its
+            // body. Assert the timestamp is <= lastCommittedOpTime to account for this.
             const statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
-            assert.eq(
+            assert.lte(
                 0,
                 bsonWoCompare(res.lastCommittedOpTime, statusRes.optimes.lastCommittedOpTime.ts),
                 "lastCommittedOpTime in command response, " + res.lastCommittedOpTime +
-                    ", does not equal the replSetGetStatus lastCommittedOpTime timestamp, " +
+                    ", is not <= to the replSetGetStatus lastCommittedOpTime timestamp, " +
                     statusRes.optimes.lastCommittedOpTime.ts + ", cmd was: " + tojson(cmdObj));
 
             return true;
