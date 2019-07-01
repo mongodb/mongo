@@ -85,10 +85,8 @@ var testPrepareRecoverFromOplogAsStandalone = function(name, commitBeforeRecover
     }
 
     jsTestLog("Testing that on restart with the flag set we play recovery.");
-    // TODO SERVER-41888: Never skip collection validation.
     node = rst.restart(node, {
         noReplSet: true,
-        skipValidation: !commitBeforeRecovery,
         setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}
     });
 
@@ -99,7 +97,6 @@ var testPrepareRecoverFromOplogAsStandalone = function(name, commitBeforeRecover
     const expectedDocs = commitBeforeRecovery ? [1234, 5678] : [];
     assertDocsInColl(node, expectedDocs, txnCollName);
 
-    // TODO SERVER-41888: Never skip collection validation.
-    rst.stop(node, undefined, {skipValidation: true});
-    rst.stop(secondary, undefined, {skipValidation: true});
+    rst.stop(node);
+    rst.stop(secondary);
 };
