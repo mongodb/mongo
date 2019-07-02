@@ -27,16 +27,6 @@
               {a: [], b: []},
               "empty index should have no multiKeyPaths; plan: " + tojson(ixscan));
 
-    // After a failed insert, the index should not be marked as multikey.
-    assert.commandFailedWithCode(coll.insert({a: [[1], {0: 1}]}), 16746);
-    ixscan = getIndexScanExplainOutput();
-    assert.eq(ixscan.isMultiKey,
-              false,
-              "index should not be marked multikey after failed insert; plan: " + tojson(ixscan));
-    assert.eq(ixscan.multiKeyPaths,
-              {a: [], b: []},
-              "index should have empty multiKeyPaths after failed insert; plan: " + tojson(ixscan));
-
     assert.commandWorked(coll.insert({a: [1, 2, 3]}));
     ixscan = getIndexScanExplainOutput();
     assert.eq(ixscan.isMultiKey,

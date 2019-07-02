@@ -1586,6 +1586,90 @@ public:
     }
 };
 
+class PrimarySetsMultikeyInsideMultiDocumentTransaction : public StorageTimestampTest {
+
+public:
+    void run() {
+        auto service = _opCtx->getServiceContext();
+        auto sessionCatalog = SessionCatalog::get(service);
+        sessionCatalog->reset_forTest();
+        MongoDSessionCatalog::onStepUp(_opCtx);
+
+        NamespaceString nss("unittests.PrimarySetsMultikeyInsideMultiDocumentTransaction");
+        reset(nss);
+
+        auto indexName = "a_1";
+        auto indexSpec =
+            BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1) << "v"
+                        << static_cast<int>(kIndexVersion));
+        auto doc = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
+
+        {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+            ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+        }
+
+        auto presentTs = _clock->getClusterTime().asTimestamp();
+
+        // This test does not run a real ReplicationCoordinator, so must advance the snapshot
+        // manager manually.
+        auto storageEngine = cc().getServiceContext()->getStorageEngine();
+        storageEngine->getSnapshotManager()->setLocalSnapshot(presentTs);
+
+        const auto beforeTxnTime = _clock->reserveTicks(1);
+        auto beforeTxnTs = beforeTxnTime.asTimestamp();
+        auto commitEntryTs = beforeTxnTime.addTicks(1).asTimestamp();
+
+        unittest::log() << "Present TS: " << presentTs;
+        unittest::log() << "Before transaction TS: " << beforeTxnTs;
+        unittest::log() << "Commit entry TS: " << commitEntryTs;
+
+        const auto sessionId = makeLogicalSessionIdForTest();
+        _opCtx->setLogicalSessionId(sessionId);
+        _opCtx->setTxnNumber(1);
+
+        // Check out the session.
+        MongoDOperationContextSession ocs(_opCtx);
+
+        auto txnParticipant = TransactionParticipant::get(_opCtx);
+        ASSERT(txnParticipant);
+
+        txnParticipant.beginOrContinue(
+            _opCtx, *_opCtx->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
+        txnParticipant.unstashTransactionResources(_opCtx, "insert");
+        {
+            // Insert a document that will set the index as multikey.
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+            insertDocument(autoColl.getCollection(), InsertStatement(doc));
+        }
+
+        txnParticipant.commitUnpreparedTransaction(_opCtx);
+        txnParticipant.stashTransactionResources(_opCtx);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+        auto coll = autoColl.getCollection();
+
+        // Make sure the transaction committed and its writes were timestamped correctly.
+        assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
+        assertDocumentAtTimestamp(coll, presentTs, BSONObj());
+        assertDocumentAtTimestamp(coll, commitEntryTs, doc);
+        assertDocumentAtTimestamp(coll, nullTs, doc);
+
+        // Make sure the multikey write was timestamped correctly. For correctness, the timestamp of
+        // the write that sets the multikey flag to true should be less than or equal to the first
+        // write that made the index multikey, which, in this case, is the commit timestamp of the
+        // transaction. In other words, it is not incorrect to assign a timestamp that is too early,
+        // but it is incorrect to assign a timestamp that is too late. In this specific case, we
+        // expect the write to be timestamped at the logical clock tick directly preceding the
+        // commit time.
+        assertMultikeyPaths(_opCtx, coll, indexName, presentTs, false /* shouldBeMultikey */, {{}});
+        assertMultikeyPaths(
+            _opCtx, coll, indexName, beforeTxnTs, true /* shouldBeMultikey */, {{0}});
+        assertMultikeyPaths(
+            _opCtx, coll, indexName, commitEntryTs, true /* shouldBeMultikey */, {{0}});
+    }
+};
+
 class InitializeMinValid : public StorageTimestampTest {
 public:
     void run() {
@@ -3499,6 +3583,7 @@ public:
         add<InitialSyncSetIndexMultikeyOnInsert>();
         add<PrimarySetIndexMultikeyOnInsert>();
         add<PrimarySetIndexMultikeyOnInsertUnreplicated>();
+        add<PrimarySetsMultikeyInsideMultiDocumentTransaction>();
         add<InitializeMinValid>();
         add<SetMinValidInitialSyncFlag>();
         add<SetMinValidToAtLeast>();
