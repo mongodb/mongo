@@ -160,6 +160,7 @@ public:
      * "snapshot-window-settings" : {
      *      "cache pressure percentage threshold" : <num>,
      *      "current cache pressure percentage" : <num>,
+     *      "total number of SnapshotTooOld errors" : <num>,
      *      "max target available snapshots window size in seconds" : <num>,
      *      "target available snapshots window size in seconds" : <num>,
      *      "current available snapshots window size in seconds" : <num>,

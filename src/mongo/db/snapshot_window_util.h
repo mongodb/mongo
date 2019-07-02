@@ -74,5 +74,13 @@ void increaseTargetSnapshotWindowSize(OperationContext* opCtx);
  */
 void decreaseTargetSnapshotWindowSize(OperationContext* opCtx);
 
+/**
+ * Increments a counter of SnapshotTooOld errors encountered in the command layer. Used for
+ * statistics purposes. Continuing SnapshotTooOld errors can indicate cache pressure.
+ *
+ * Concurrency safe, the internal counter is atomic.
+ */
+void incrementSnapshotTooOldErrorCount();
+
 }  // namespace SnapshotWindowUtil
 }  // namespace mongo

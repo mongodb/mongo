@@ -159,5 +159,9 @@ void decreaseTargetSnapshotWindowSize(OperationContext* opCtx) {
     }
 }
 
+void incrementSnapshotTooOldErrorCount() {
+    snapshotWindowParams.snapshotTooOldErrorCount.addAndFetch(1);
+}
+
 }  // namespace SnapshotWindowUtil
 }  // namespace mongo
