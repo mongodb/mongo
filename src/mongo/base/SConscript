@@ -21,9 +21,10 @@ generateErrorCodes = env_for_error_codes.Command(
         'error_codes.tpl.h',
         'error_codes.tpl.cpp',
     ],
-    action=['$PYTHON ${SOURCES[0]} ${SOURCES[1]} '
-            '${SOURCES[2]}=${TARGETS[0]} '
-            '${SOURCES[3]}=${TARGETS[1]}'
+    action=[
+        '$PYTHON ${SOURCES[0]} ${SOURCES[1]} '
+        '${SOURCES[2]}=${TARGETS[0]} '
+        '${SOURCES[3]}=${TARGETS[1]}'
     ],
 )
 
@@ -98,6 +99,7 @@ env.CppUnitTest(
         'transaction_error_test.cpp',
         'uuid_test.cpp',
     ],
+    AIB_COMPONENT='base',
     LIBDEPS=[
         'secure_allocator',
         'system_error',

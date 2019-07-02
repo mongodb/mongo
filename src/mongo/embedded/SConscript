@@ -152,9 +152,10 @@ if get_option('link-model') != 'dynamic-sdk':
             '$BUILD_DIR/mongo/transport/transport_layer_manager',
             '$BUILD_DIR/mongo/util/signal_handlers',
         ],
-        INSTALL_ALIAS=[
-            'embedded-test',
-        ],
+        AIB_COMPONENT='embedded-test',
+        AIB_COMPONENTS_EXTRA=[
+            'tests',
+        ]
     )
 
     env.Alias('all', mongoed) # This ensures it compiles and links, but doesn't copy it anywhere.

@@ -31,5 +31,5 @@ ca = env.SharedLibrary(
         'customaction.def',
     ],
     # We don't want the usual auto install rules to apply to this file.
-    INSTALL_ALIAS=[],
+    AIB_IGNORE=True,
 )

@@ -72,6 +72,8 @@ def _update_builder(env, builder, bitcode):
     else:
         pass
 
+    builder.action = base_action
+
     base_emitter = builder.emitter
 
     def new_emitter(target, source, env):
@@ -126,7 +128,7 @@ def generate(env):
     # TODO: For now, not doing this for programs. Need to update
     # auto_install_binaries to understand to install the debug symbol
     # for target X to the same target location as X.
-    for builder in ['SharedLibrary', 'LoadableModule']:
+    for builder in ['Program', 'SharedLibrary', 'LoadableModule']:
         _update_builder(env, env['BUILDERS'][builder], bitcode)
 
 

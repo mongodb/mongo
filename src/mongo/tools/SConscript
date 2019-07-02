@@ -29,9 +29,7 @@ mongobridge = env.Program(
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         '$BUILD_DIR/mongo/util/signal_handlers',
     ],
-    INSTALL_ALIAS=[
-        'tools'
-    ],
+    AIB_COMPONENT='tools',
 )
 
 mongoebench = yamlEnv.Program(
@@ -51,9 +49,10 @@ mongoebench = yamlEnv.Program(
         '$BUILD_DIR/mongo/shell/benchrun',
         '$BUILD_DIR/mongo/util/signal_handlers',
     ],
-    INSTALL_ALIAS=[
-        'embedded-test',
-        'tools',
+    AIB_COMPONENT="embedded-test",
+    AIB_COMPONENTS_EXTRA=[
+        "tests",
+        "benchmarks",
     ],
 )
 

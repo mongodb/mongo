@@ -1321,6 +1321,8 @@ functions:
   "do benchmark embedded setup":
   - command: manifest.load
   - *git_get_project
+  - *set_task_expansion_macros
+  - *set_up_virtualenv
   - *fetch_artifacts
   - *get_buildnumber
   - *set_up_credentials
@@ -3856,7 +3858,7 @@ tasks:
           --install-mode=hygienic
           --js-engine=none
           --opt=size
-          --prefix='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION'
+          --dest-dir='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION'
           --separate-debug
           --ssl=off
           --use-system-mongo-c=on

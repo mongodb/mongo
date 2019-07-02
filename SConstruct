@@ -100,6 +100,20 @@ add_option('prefix',
     help='installation prefix',
 )
 
+add_option('dest-dir',
+    default=None,
+    help='root of installation as a subdirectory of $BUILD_DIR'
+)
+
+add_option('legacy-tarball',
+    choices=['true', 'false'],
+    default='false',
+    const='true',
+    nargs='?',
+    type='choice',
+    help='Build a tarball matching the old MongoDB dist targets',
+)
+
 add_option('install-mode',
     choices=['legacy', 'hygienic'],
     default='legacy',
@@ -947,9 +961,9 @@ if cacheDir[0] not in ['$', '#']:
         print("Do not use relative paths with --cache-dir")
         Exit(1)
 
-installDir = get_option('prefix').rstrip('/')
-if installDir[0] not in ['$', '#']:
-    if not os.path.isabs(installDir):
+prefix = get_option('prefix').rstrip('/')
+if prefix[0] not in ['$', '#']:
+    if not os.path.isabs(prefix):
         print("Do not use relative paths with --prefix")
         Exit(1)
 
@@ -1029,12 +1043,33 @@ envDict = dict(BUILD_ROOT=buildDir,
                BENCHMARK_LIST='$BUILD_ROOT/benchmarks.txt',
                CONFIGUREDIR='$BUILD_ROOT/scons/$VARIANT_DIR/sconf_temp',
                CONFIGURELOG='$BUILD_ROOT/scons/config.log',
-               INSTALL_DIR=installDir,
+               PREFIX=get_option('prefix'),
                CONFIG_HEADER_DEFINES={},
                LIBDEPS_TAG_EXPANSIONS=[],
                )
 
 env = Environment(variables=env_vars, **envDict)
+
+if get_option('dest-dir') is None:
+    destDir = env.Dir('$BUILD_ROOT/install')
+    prefix = env.Dir(get_option('prefix'))
+    if destDir != prefix:
+        installDir = destDir.Dir(get_option('prefix')[1:])
+    else:
+        installDir = destDir
+else:
+    destDir = get_option('dest-dir')
+    if destDir[0] not in ['$', '#']:
+        if not os.path.isabs(destDir):
+            print("Do not use relative paths with --dest-dir")
+            Exit(1)
+    installDir = destDir
+
+env['INSTALL_DIR'] = installDir
+env['DEST_DIR'] = destDir
+if get_option('legacy-tarball') == 'true':
+    env['INSTALL_DIR'] = env.Dir('$INSTALL_DIR').Dir('$SERVER_DIST_BASENAME')
+
 del envDict
 
 for var in ['CC', 'CXX']:
@@ -3633,10 +3668,65 @@ if get_option('install-mode') == 'hygienic':
         env.Tool('separate_debug')
 
     env.Tool('auto_install_binaries')
+    env.AddSuffixMapping({
+        "$PROGSUFFIX": env.SuffixMap(
+            directory="$PREFIX_BIN_DIR",
+            default_roles=[
+                "runtime",
+            ]
+        ),
+        
+        "$LIBSUFFIX": env.SuffixMap(
+            directory="$PREFIX_LIB_DIR",
+            default_roles=[
+                "dev",
+            ]
+        ),
+
+        "$SHLIBSUFFIX": env.SuffixMap(
+            directory="$PREFIX_BIN_DIR" \
+            if mongo_platform.get_running_os_name() == "windows" \
+            else "$PREFIX_LIB_DIR",
+            default_roles=[
+                "runtime",
+            ]
+        ),
+
+        ".debug": env.SuffixMap(
+            directory="$PREFIX_DEBUG_DIR",
+            default_roles=[
+                "debug",
+            ]
+        ),
+        
+        ".dSYM": env.SuffixMap(
+            directory="$PREFIX_DEBUG_DIR",
+            default_roles=[
+                "debug"
+            ]
+        ),
+        
+        ".lib": env.SuffixMap(
+            directory="$PREFIX_LIB_DIR",
+            default_roles=[
+                "dev"
+            ]
+        ),
+        
+        ".h": env.SuffixMap(
+            directory="$PREFIX_INCLUDE_DIR",
+            default_roles=[
+                "dev",
+            ]
+        ),
+    })
+
     if env['PLATFORM'] == 'posix':
         env.AppendUnique(
             RPATH=[
-                env.Literal('\\$$ORIGIN/../lib')
+                # In the future when we want to improve dynamic builds
+                # we should set this to $PREFIX ideally
+                 env.Literal('\\$$ORIGIN/../lib'),
             ],
             LINKFLAGS=[
                 # Most systems *require* -z,origin to make origin work, but android
@@ -3957,10 +4047,6 @@ if should_dagger:
     # Require everything to be built before trying to extract build dependency information
     env.Requires(dependencyDb, allTargets)
 
-# We don't want installing files to cause them to flow into the cache,
-# since presumably we can re-install them from the origin if needed.
-env.NoCache(env.FindInstalledFiles())
-
 # Declare the cache prune target
 cachePrune = env.Command(
     target="#cache-prune",
@@ -3973,6 +4059,13 @@ cachePrune = env.Command(
 
 env.AlwaysBuild(cachePrune)
 env.Alias('cache-prune', cachePrune)
+
+if get_option('install-mode') == 'hygienic':
+    env.FinalizeInstallDependencies()
+
+# We don't want installing files to cause them to flow into the cache,	
+# since presumably we can re-install them from the origin if needed.	
+env.NoCache(env.FindInstalledFiles())
 
 # Substitute environment variables in any build targets so that we can
 # say, for instance:

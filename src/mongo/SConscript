@@ -439,10 +439,10 @@ mongod = env.Program(
         'util/version_impl',
         'watchdog/watchdog_mongod',
     ],
-    INSTALL_ALIAS=[
-        'core',
-        'default',
-        'servers',
+    AIB_COMPONENT="servers",
+    AIB_COMPONENTS_EXTRA=[
+        "default",
+        "core",
     ],
 )
 
@@ -543,9 +543,10 @@ mongos = env.Program(
         'util/options_parser/options_parser_init',
         'util/options_parser/options_parser',
     ],
-    INSTALL_ALIAS=[
-        'servers',
-    ],
+    AIB_COMPONENT="servers",
+    AIB_COMPONENTS_EXTRA=[
+        "core",
+    ]
 )
 
 if not hygienic:
@@ -636,9 +637,9 @@ if not has_option('noshell') and usemozjs:
             "$BUILD_DIR/mongo/client/connection_string",
             '$BUILD_DIR/mongo/util/net/ssl_options_client' if get_option('ssl') == 'on' else '',
         ],
-        INSTALL_ALIAS=[
-            'shell',
-            'core',
+        AIB_COMPONENT="shell",
+        AIB_COMPONENTS_EXTRA=[
+            "core",
         ],
     )
 
@@ -712,13 +713,20 @@ def installBinary( e, name ):
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
 def installExternalBinary( e, name_str ):
-
-    if hygienic:
-        return
-
     name = env.File("#/%s" % add_exe(name_str))
     if not name.isfile():
         env.FatalError("ERROR: external binary not found: {0}", name)
+
+    if hygienic:
+        env.AutoInstall(
+            target='$PREFIX_BIN_DIR',
+            source=[
+                name
+            ],
+            AIB_COMPONENT='tools',
+            AIB_ROLE='runtime',
+        )
+        return
 
     distBinaries.append(name)
 
@@ -731,7 +739,15 @@ def installExternalBinary( e, name_str ):
 # It is required for "dist" but optional for "install"
 if has_option("use-new-tools"):
 
-    env.Append(MODULE_BANNERS=[env.File('#/src/mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools')])
+    if hygienic:
+        env.AutoInstall(
+            target='$INSTALL_DIR',
+            source=env.File('#/src/mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools'),
+            AIB_COMPONENT='tools',
+            AIB_ROLE='base',
+        )
+    else:
+        env.Append(MODULE_BANNERS=[env.File('#/src/mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools')])
 
     toolsRoot = "src/mongo-tools"
 
@@ -757,14 +773,40 @@ if not hygienic:
 
 # Stage the top-level mongodb banners
 distsrc = env.Dir('#distsrc')
-env.Append(MODULE_BANNERS = [distsrc.File('README'),
-                             distsrc.File('THIRD-PARTY-NOTICES'),
-                             distsrc.File('MPL-2')])
+if hygienic:
+    env.AutoInstall(
+        target='$INSTALL_DIR',
+        source=[
+            distsrc.File('README'),
+            # TODO: we need figure out what to do when we use a different
+            # THIRD-PARTY-NOTICES for example, with Embedded
+            distsrc.File('THIRD-PARTY-NOTICES'),
+            distsrc.File('MPL-2'),
+        ],
+        AIB_COMPONENT='common',
+        AIB_ROLE='base',
+    )
+else:
+    env.Append(MODULE_BANNERS = [distsrc.File('README'),
+                                 distsrc.File('THIRD-PARTY-NOTICES'),
+                                 distsrc.File('MPL-2')])
 
+enterprise_license = [banner for banner in env["MODULE_BANNERS"] if banner.name ==  "LICENSE-Enterprise.txt"]
+if hygienic:
+    env.AutoInstall(
+        target='$INSTALL_DIR',
+        source=[
+            enterprise_license[0]
+            if enterprise_license else distsrc.File('LICENSE-Community.txt'),
+        ],
+        AIB_COMPONENT='common',
+        AIB_ROLE='base',
+    )
 # If no module has introduced a file named LICENSE-Enterprise.txt then this
 # is a Community build, so inject the AGPL and the Community license
-if sum(map(lambda x: x.name == "LICENSE-Enterprise.txt", env['MODULE_BANNERS'])) == 0:
+elif not enterprise_license:
     env.Append(MODULE_BANNERS = [distsrc.File('LICENSE-Community.txt')])
+    
 
 # All module banners get staged to the top level of the tarfile, so we
 # need to fail if we are going to have a name collision.
@@ -814,13 +856,12 @@ if not hygienic:
     compass_script_installer = env.Install("$INSTALL_DIR/bin", compass_installer)
 else:
     compass_script_installer = env.AutoInstall(
-        'bin',
+        target='$PREFIX_BIN_DIR',
         source=[
             compass_installer,
         ],
-        INSTALL_ALIAS=[
-            'tools',
-        ],
+        AIB_COMPONENT='tools',
+        AIB_ROLE='runtime',
     )
 
 if env.TargetOSIs('posix'):
@@ -829,7 +870,7 @@ if env.TargetOSIs('posix'):
 
 # "dist" target is valid only when --use-new-tools is specified
 # Attempts to build release artifacts without tools must fail
-if has_option("use-new-tools"):
+if has_option("use-new-tools") and not hygienic:
     server_archive = env.Command(
         target='#/${SERVER_ARCHIVE}',
         source=['#buildscripts/make_archive.py'] + env["MODULE_BANNERS"] + env["ARCHIVE_ADDITIONS"] + distBinaries,
@@ -853,7 +894,7 @@ if has_option("use-new-tools"):
 
     env.Alias("dist", server_archive)
     env.NoCache(server_archive)
-else:
+elif not hygienic:
     def failDist(env, target, source):
         env.FatalError("ERROR: 'dist' target only valid with --use-new-tools.")
     env.Alias("dist", [], [ failDist ] )
