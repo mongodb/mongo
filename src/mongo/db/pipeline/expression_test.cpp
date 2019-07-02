@@ -4311,6 +4311,30 @@ class FirstNull : public ExpectedResultBase {
     }
 };
 
+class LeftNullAndRightEmpty : public ExpectedResultBase {
+    Document getSpec() {
+        return DOC("input" << DOC_ARRAY(Value(BSONNULL) << vector<Value>()) << "expected"
+                           << DOC("$setIntersection" << BSONNULL << "$setUnion" << BSONNULL
+                                                     << "$setDifference"
+                                                     << BSONNULL)
+                           << "error"
+                           << DOC_ARRAY("$setEquals"_sd
+                                        << "$setIsSubset"_sd));
+    }
+};
+
+class RightNullAndLeftEmpty : public ExpectedResultBase {
+    Document getSpec() {
+        return DOC("input" << DOC_ARRAY(vector<Value>() << Value(BSONNULL)) << "expected"
+                           << DOC("$setIntersection" << BSONNULL << "$setUnion" << BSONNULL
+                                                     << "$setDifference"
+                                                     << BSONNULL)
+                           << "error"
+                           << DOC_ARRAY("$setEquals"_sd
+                                        << "$setIsSubset"_sd));
+    }
+};
+
 class NoArg : public ExpectedResultBase {
     Document getSpec() {
         return DOC(
@@ -6407,6 +6431,8 @@ public:
         add<Set::NoOverlap>();
         add<Set::Overlap>();
         add<Set::FirstNull>();
+        add<Set::LeftNullAndRightEmpty>();
+        add<Set::RightNullAndLeftEmpty>();
         add<Set::LastNull>();
         add<Set::NoArg>();
         add<Set::OneArg>();

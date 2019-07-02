@@ -3868,7 +3868,7 @@ Value ExpressionSetIntersection::evaluate(const Document& root, Variables* varia
 
         if (i == 0) {
             currentIntersection.insert(nextEntry.getArray().begin(), nextEntry.getArray().end());
-        } else {
+        } else if (!currentIntersection.empty()) {
             ValueSet nextSet = arrayToSet(nextEntry, valueComparator);
             if (currentIntersection.size() > nextSet.size()) {
                 // to iterate over whichever is the smaller set
@@ -3884,9 +3884,6 @@ Value ExpressionSetIntersection::evaluate(const Document& root, Variables* varia
                     ++it;
                 }
             }
-        }
-        if (currentIntersection.empty()) {
-            break;
         }
     }
     return Value(vector<Value>(currentIntersection.begin(), currentIntersection.end()));
