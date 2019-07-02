@@ -40,6 +40,7 @@
 
 namespace mongo {
 namespace optionenvironment {
+namespace {
 
 MONGO_STARTUP_OPTIONS_PARSE(StartupOptions)(InitializerContext* context) {
     OptionsParser parser;
@@ -50,6 +51,14 @@ MONGO_STARTUP_OPTIONS_PARSE(StartupOptions)(InitializerContext* context) {
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
         quickExit(EXIT_BADOPTIONS);
     }
+
+    return Status::OK();
+}
+
+MONGO_INITIALIZER_GENERAL(OutputConfig,
+                          ("EndStartupOptionValidation"),
+                          ("BeginStartupOptionStorage"))
+(InitializerContext*) {
     if (startupOptionsParsed.count("outputConfig")) {
         bool output = false;
         auto status = startupOptionsParsed.get(Key("outputConfig"), &output);
@@ -64,5 +73,6 @@ MONGO_STARTUP_OPTIONS_PARSE(StartupOptions)(InitializerContext* context) {
     return Status::OK();
 }
 
+}  // namespace
 }  // namespace optionenvironment
 }  // namespace mongo

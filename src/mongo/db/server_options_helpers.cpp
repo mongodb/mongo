@@ -46,6 +46,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
+#include "mongo/idl/server_parameter.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/transport/message_compressor_registry.h"
@@ -149,6 +150,22 @@ Status validateBaseOptions(const moe::Environment& params) {
         } else {
             // Deregister test-only parameters.
             ServerParameterSet::getGlobal()->disableTestParameters();
+        }
+
+        // Must come after registerAllFailPointsAsServerParameters() above.
+        const auto& spMap = ServerParameterSet::getGlobal()->getMap();
+        for (const auto setParam : parameters) {
+            const auto it = spMap.find(setParam.first);
+
+            if (it == spMap.end()) {
+                return {ErrorCodes::BadValue,
+                        str::stream() << "Unknown --setParameter '" << setParam.first << "'"};
+            }
+            if (!enableTestCommandsValue && it->second->isTestOnly()) {
+                return {ErrorCodes::BadValue,
+                        str::stream() << "--setParameter '" << setParam.first
+                                      << "' only available when used with 'enableTestCommands'"};
+            }
         }
     }
 
