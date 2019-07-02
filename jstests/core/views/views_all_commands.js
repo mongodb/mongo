@@ -200,20 +200,6 @@
         dbStats: {skip: "TODO(SERVER-25948)"},
         delete: {command: {delete: "view", deletes: [{q: {x: 1}, limit: 1}]}, expectFailure: true},
         distinct: {command: {distinct: "view", key: "_id"}},
-        doTxn: {
-            command: {
-                doTxn: [{op: "i", o: {_id: 1}, ns: "test.view"}],
-                txnNumber: NumberLong("0"),
-                lsid: {id: UUID()}
-            },
-            expectFailure: true,
-            expectedErrorCode: [
-                ErrorCodes.CommandNotSupportedOnView,
-                ErrorCodes.CommandNotSupported,
-                ErrorCodes.IllegalOperation
-            ],
-            skipSharded: true,
-        },
         driverOIDTest: {skip: isUnrelated},
         drop: {command: {drop: "view"}},
         dropAllRolesFromDatabase: {skip: isUnrelated},

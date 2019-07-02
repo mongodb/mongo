@@ -348,7 +348,6 @@ env.Library(
         "dbcheck.cpp",
         "dbcommands_d.cpp",
         "dbhash.cpp",
-        "do_txn_cmd.cpp",
         "driverHelpers.cpp",
         "haystack.cpp",
         "mr.cpp",

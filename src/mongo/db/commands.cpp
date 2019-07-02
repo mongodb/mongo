@@ -114,7 +114,6 @@ const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
                                         {"coordinateCommitTransaction", 1},
                                         {"delete", 1},
                                         {"distinct", 1},
-                                        {"doTxn", 1},
                                         {"find", 1},
                                         {"findandmodify", 1},
                                         {"findAndModify", 1},
@@ -129,7 +128,6 @@ const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
 const StringMap<int> txnAdminCommands = {{"abortTransaction", 1},
                                          {"commitTransaction", 1},
                                          {"coordinateCommitTransaction", 1},
-                                         {"doTxn", 1},
                                          {"prepareTransaction", 1}};
 
 }  // namespace

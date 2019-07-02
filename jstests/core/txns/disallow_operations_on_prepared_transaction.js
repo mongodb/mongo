@@ -63,17 +63,6 @@
     }),
                                  ErrorCodes.PreparedTransactionInProgress);
 
-    // This fails with ConflictingOperationInProgress instead of PreparedTransactionInProgress
-    // because doTxn is always runs with startTransaction = true.
-    jsTestLog("Test that you can't run doTxn on a prepared transaction.");
-    assert.commandFailedWithCode(sessionDB.runCommand({
-        doTxn: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 5}}}],
-        txnNumber: NumberLong(session.getTxnNumber_forTesting()),
-        stmtId: NumberInt(1),
-        autocommit: false
-    }),
-                                 ErrorCodes.OperationNotSupportedInTransaction);
-
     jsTestLog("Test that you can't run find on a prepared transaction.");
     assert.commandFailedWithCode(assert.throws(function() {
         sessionColl.find({}).toArray();

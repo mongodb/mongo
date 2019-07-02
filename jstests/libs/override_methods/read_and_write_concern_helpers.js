@@ -50,7 +50,6 @@ var kCommandsSupportingWriteConcern = new Set([
     "createUser",
     "delete",
     "deleteIndexes",
-    "doTxn",
     "drop",
     "dropAllRolesFromDatabase",
     "dropAllUsersFromDatabase",
@@ -81,4 +80,4 @@ var kCommandsSupportingWriteConcern = new Set([
 ]);
 
 var kCommandsSupportingWriteConcernInTransaction =
-    new Set(["doTxn", "abortTransaction", "commitTransaction"]);
+    new Set(["abortTransaction", "commitTransaction"]);

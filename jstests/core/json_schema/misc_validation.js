@@ -10,7 +10,6 @@
  * - update
  * - findAndModify
  * - applyOps
- * - doTxn
  * - $elemMatch projection
  *
  * @tags: [
@@ -331,24 +330,5 @@
         // transactions.
         coll.drop({writeConcern: {w: "majority"}});
         assert.writeOK(coll.insert({_id: 1, a: true}));
-
-        if (FixtureHelpers.isReplSet(db) && !isMongos && isWiredTiger(db)) {
-            // Test $jsonSchema in the precondition checking for doTxn.
-            const session = db.getMongo().startSession();
-            const sessionDb = session.getDatabase(testDB.getName());
-            res = sessionDb.adminCommand({
-                doTxn: [
-                    {op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$set: {a: false}}},
-                ],
-                preCondition: [{
-                    ns: coll.getFullName(),
-                    q: {$jsonSchema: {properties: {a: {type: "boolean"}}}},
-                    res: {a: true}
-                }],
-                txnNumber: NumberLong("0")
-            });
-            assert.commandWorked(res);
-            assert.eq(1, res.applied);
-        }
     }
 }());

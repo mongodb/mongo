@@ -32,7 +32,6 @@ env.Library(
     target='oplog',
     source=[
         'apply_ops.cpp',
-        'do_txn.cpp',
         'oplog.cpp',
         'transaction_oplog_application.cpp',
         env.Idlc('apply_ops.idl')[0],
@@ -1202,7 +1201,6 @@ env.CppUnitTest(
         'abstract_oplog_fetcher_test.cpp',
         'apply_ops_test.cpp',
         'check_quorum_for_config_change_test.cpp',
-        'do_txn_test.cpp',
         'drop_pending_collection_reaper_test.cpp',
         'idempotency_document_structure_test.cpp',
         'idempotency_test.cpp',
