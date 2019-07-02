@@ -328,6 +328,8 @@ public:
         /**
          * If this session is not holding stashed locks in txnResourceStash (transaction is active),
          * reports the current state of the session using the provided builder.
+         *
+         * The Client lock for the given OperationContext must be held when calling this method.
          */
         void reportUnstashedState(OperationContext* opCtx, BSONObjBuilder* builder) const;
 

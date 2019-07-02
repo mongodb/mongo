@@ -1714,14 +1714,9 @@ void TransactionParticipant::Observer::reportStashedState(OperationContext* opCt
 
 void TransactionParticipant::Observer::reportUnstashedState(OperationContext* opCtx,
                                                             BSONObjBuilder* builder) const {
-    // This method may only take the metrics mutex, as it is called with the Client mutex held.  So
-    // we cannot check the stashed state directly.  Instead, a transaction is considered unstashed
-    // if it is not actually a transaction (retryable write, no stash used), or is active (not
-    // stashed), or has ended (any stash would be cleared).
-
-    const auto& singleTransactionStats = o().transactionMetricsObserver.getSingleTransactionStats();
-    if (!singleTransactionStats.isForMultiDocumentTransaction() ||
-        singleTransactionStats.isActive() || singleTransactionStats.isEnded()) {
+    // The Client mutex must be held when calling this function, so it is safe to access the state
+    // of the TransactionParticipant.
+    if (!o().txnResourceStash) {
         BSONObjBuilder transactionBuilder;
         _reportTransactionStats(opCtx, &transactionBuilder, repl::ReadConcernArgs::get(opCtx));
         builder->append("transaction", transactionBuilder.obj());
