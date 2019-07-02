@@ -56,20 +56,20 @@ public:
 
     void _run(OplogBuffer* oplogBuffer) final;
     void _shutdown() final;
-    StatusWith<OpTime> _multiApply(OperationContext* opCtx,
-                                   Operations ops,
-                                   boost::optional<repl::OplogApplication::Mode> mode) final;
+    StatusWith<OpTime> _multiApply(OperationContext* opCtx, Operations ops) final;
 };
 
 OplogApplierMock::OplogApplierMock(OplogBuffer* oplogBuffer)
-    : OplogApplier(nullptr, oplogBuffer, nullptr) {}
+    : OplogApplier(nullptr,
+                   oplogBuffer,
+                   nullptr,
+                   OplogApplier::Options(OplogApplication::Mode::kSecondary)) {}
 
 void OplogApplierMock::_run(OplogBuffer* oplogBuffer) {}
 
 void OplogApplierMock::_shutdown() {}
 
-StatusWith<OpTime> OplogApplierMock::_multiApply(
-    OperationContext* opCtx, Operations ops, boost::optional<repl::OplogApplication::Mode> mode) {
+StatusWith<OpTime> OplogApplierMock::_multiApply(OperationContext* opCtx, Operations ops) {
     return OpTime();
 }
 

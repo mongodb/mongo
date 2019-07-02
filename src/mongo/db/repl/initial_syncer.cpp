@@ -924,7 +924,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
 
     // Create oplog applier.
     auto consistencyMarkers = _replicationProcess->getConsistencyMarkers();
-    OplogApplier::Options options;
+    OplogApplier::Options options(OplogApplication::Mode::kInitialSync);
     options.allowNamespaceNotFoundErrorsOnCrudOps = true;
     options.missingDocumentSourceForInitialSync = _syncSource;
     options.beginApplyingOpTime = lastOpTime;
@@ -1219,8 +1219,7 @@ void InitialSyncer::_getNextApplierBatchCallback(
         _fetchCount.store(0);
         MultiApplier::MultiApplyFn applyBatchOfOperationsFn = [this](OperationContext* opCtx,
                                                                      MultiApplier::Operations ops) {
-            return _oplogApplier->multiApply(
-                opCtx, std::move(ops), repl::OplogApplication::Mode::kInitialSync);
+            return _oplogApplier->multiApply(opCtx, std::move(ops));
         };
         OpTime lastApplied = ops.back().getOpTime();
         invariant(ops.back().getWallClockTime());

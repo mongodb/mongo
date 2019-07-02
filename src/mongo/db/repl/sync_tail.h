@@ -97,11 +97,6 @@ public:
              MultiSyncApplyFunc func,
              ThreadPool* writerPool,
              const OplogApplier::Options& options);
-    SyncTail(OplogApplier::Observer* observer,
-             ReplicationConsistencyMarkers* consistencyMarkers,
-             StorageInterface* storageInterface,
-             MultiSyncApplyFunc func,
-             ThreadPool* writerPool);
     virtual ~SyncTail();
 
     /**
@@ -228,15 +223,12 @@ public:
      * to at least the last optime of the batch. If 'minValid' is already greater than or equal
      * to the last optime of this batch, it will not be updated.
      */
-    StatusWith<OpTime> multiApply(OperationContext* opCtx,
-                                  MultiApplier::Operations ops,
-                                  boost::optional<repl::OplogApplication::Mode> mode);
+    StatusWith<OpTime> multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
 
     void fillWriterVectors(OperationContext* opCtx,
                            MultiApplier::Operations* ops,
                            std::vector<MultiApplier::OperationPtrs>* writerVectors,
-                           std::vector<MultiApplier::Operations>* derivedOps,
-                           boost::optional<repl::OplogApplication::Mode> mode);
+                           std::vector<MultiApplier::Operations>* derivedOps);
 
 private:
     class OpQueueBatcher;
@@ -247,8 +239,7 @@ private:
                             MultiApplier::Operations* ops,
                             std::vector<MultiApplier::OperationPtrs>* writerVectors,
                             std::vector<MultiApplier::Operations>* derivedOps,
-                            SessionUpdateTracker* sessionUpdateTracker,
-                            boost::optional<repl::OplogApplication::Mode> mode);
+                            SessionUpdateTracker* sessionUpdateTracker);
 
     /**
      * Doles out all the work to the writer pool threads. Does not modify writerVectors, but passes

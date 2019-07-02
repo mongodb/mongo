@@ -1386,10 +1386,9 @@ public:
             nullptr,  // replication coordinator. not required for multiApply().
             _consistencyMarkers,
             storageInterface,
-            {},
+            repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
             writerPool.get());
-        ASSERT_EQUALS(op2.getOpTime(),
-                      unittest::assertGet(oplogApplier.multiApply(_opCtx, ops, boost::none)));
+        ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(oplogApplier.multiApply(_opCtx, ops)));
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
         assertMultikeyPaths(
@@ -1485,7 +1484,7 @@ public:
         DoNothingOplogApplierObserver observer;
         auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::OplogApplier::makeWriterPool();
-        repl::OplogApplier::Options options;
+        repl::OplogApplier::Options options(repl::OplogApplication::Mode::kInitialSync);
         options.allowNamespaceNotFoundErrorsOnCrudOps = true;
         options.missingDocumentSourceForInitialSync = HostAndPort("localhost", 123);
 
@@ -1498,7 +1497,7 @@ public:
             storageInterface,
             options,
             writerPool.get());
-        auto lastTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, ops, boost::none));
+        auto lastTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, ops));
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 
         // Wait for the index build to finish before making any assertions.
@@ -2567,8 +2566,13 @@ public:
         auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::OplogApplier::makeWriterPool(1);
         repl::SyncTail syncTail(
-            nullptr, _consistencyMarkers, storageInterface, applyOperationFn, writerPool.get());
-        auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx, {insertOp}, boost::none));
+            nullptr,
+            _consistencyMarkers,
+            storageInterface,
+            applyOperationFn,
+            writerPool.get(),
+            repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary));
+        auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx, {insertOp}));
         ASSERT_EQ(insertOp.getOpTime(), lastOpTime);
 
         joinGuard.dismiss();

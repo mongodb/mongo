@@ -49,16 +49,17 @@ public:
                      OplogBuffer* oplogBuffer,
                      Observer* observer,
                      DataReplicatorExternalStateMock* externalState)
-        : OplogApplier(executor, oplogBuffer, observer),
+        : OplogApplier(executor,
+                       oplogBuffer,
+                       observer,
+                       OplogApplier::Options(OplogApplication::Mode::kSecondary)),
           _observer(observer),
           _externalState(externalState) {}
 
 private:
     void _run(OplogBuffer* oplogBuffer) final {}
     void _shutdown() final {}
-    StatusWith<OpTime> _multiApply(OperationContext* opCtx,
-                                   Operations ops,
-                                   boost::optional<repl::OplogApplication::Mode> mode) final {
+    StatusWith<OpTime> _multiApply(OperationContext* opCtx, Operations ops) final {
         return _externalState->multiApplyFn(opCtx, ops, _observer);
     }
 
