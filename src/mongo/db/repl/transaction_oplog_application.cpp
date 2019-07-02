@@ -376,6 +376,14 @@ void _reconstructPreparedTransaction(OperationContext* opCtx,
     // Snapshot transaction can never conflict with the PBWM lock.
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
+    // When querying indexes, we return the record matching the key if it exists, or an
+    // adjacent document. This means that it is possible for us to hit a prepare conflict if
+    // we query for an incomplete key and an adjacent key is prepared.
+    // We ignore prepare conflicts on recovering nodes because they may encounter prepare
+    // conflicts that did not occur on the primary.
+    opCtx->recoveryUnit()->setPrepareConflictBehavior(
+        PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+
     // We might replay a prepared transaction behind oldest timestamp.
     opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
 
@@ -463,6 +471,7 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
                 opCtx->getServiceContext()->makeClient("reconstruct-prepared-transactions");
             AlternativeClientRegion acr(newClient);
             const auto newOpCtx = cc().makeOperationContext();
+
             _reconstructPreparedTransaction(newOpCtx.get(), prepareOplogEntry, mode);
         }
     }
