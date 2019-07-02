@@ -90,8 +90,6 @@ assert.commandWorked(sessionDb.runCommand({
     autocommit: false
 }));
 
-// The doTxn command is intentionally left out.
-
 jsTestLog("Check that find and getmore accept a statement ID");
 // Put in some data to find so getMore has a cursor to use.
 assert.writeOK(testColl.insert([{_id: 0}, {_id: 1}], {writeConcern: {w: "majority"}}));

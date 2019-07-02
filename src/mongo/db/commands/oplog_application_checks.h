@@ -50,11 +50,9 @@ class OperationContext;
 // with a specified UUID, so both the forceUUID and useUUID actions must be authorized.
 //
 // kOk means no special conditions apply.
-//
-// Only kOk and kNeedsUseUUID are valid for 'doTxn'.  All are valid for 'applyOps'.
 enum class OplogApplicationValidity { kOk, kNeedsUseUUID, kNeedsForceAndUseUUID, kNeedsSuperuser };
 
-// OplogApplicationChecks contains helper functions for checking the applyOps and doTxn commands.
+// OplogApplicationChecks contains helper functions for checking the applyOps command.
 class OplogApplicationChecks {
 public:
     /**

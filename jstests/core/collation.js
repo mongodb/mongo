@@ -1821,55 +1821,6 @@ if (!isMongos) {
     assert.eq(8, coll.findOne({_id: "foo"}).x);
 }
 
-// doTxn
-if (FixtureHelpers.isReplSet(db) && !isMongos && isWiredTiger(db)) {
-    const session = db.getMongo().startSession();
-    const sessionDb = session.getDatabase(db.getName());
-
-    // Use majority write concern to clear the drop-pending that can cause lock conflicts with
-    // transactions.
-    coll.drop({writeConcern: {w: "majority"}});
-
-    assert.commandWorked(
-        db.createCollection("collation", {collation: {locale: "en_US", strength: 2}}));
-    assert.writeOK(coll.insert({_id: "foo", x: 5, str: "bar"}));
-
-    // preCondition.q respects collection default collation.
-    assert.commandFailed(sessionDb.runCommand({
-        doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 6}}}],
-        preCondition: [{ns: coll.getFullName(), q: {_id: "not foo"}, res: {str: "bar"}}],
-        txnNumber: NumberLong("0")
-    }));
-    assert.eq(5, coll.findOne({_id: "foo"}).x);
-    assert.commandWorked(sessionDb.runCommand({
-        doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 6}}}],
-        preCondition: [{ns: coll.getFullName(), q: {_id: "FOO"}, res: {str: "bar"}}],
-        txnNumber: NumberLong("1")
-    }));
-    assert.eq(6, coll.findOne({_id: "foo"}).x);
-
-    // preCondition.res respects collection default collation.
-    assert.commandFailed(sessionDb.runCommand({
-        doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 7}}}],
-        preCondition: [{ns: coll.getFullName(), q: {_id: "foo"}, res: {str: "not bar"}}],
-        txnNumber: NumberLong("2")
-    }));
-    assert.eq(6, coll.findOne({_id: "foo"}).x);
-    assert.commandWorked(sessionDb.runCommand({
-        doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 7}}}],
-        preCondition: [{ns: coll.getFullName(), q: {_id: "foo"}, res: {str: "BAR"}}],
-        txnNumber: NumberLong("3")
-    }));
-    assert.eq(7, coll.findOne({_id: "foo"}).x);
-
-    // <operation>.o2 respects collection default collation.
-    assert.commandWorked(sessionDb.runCommand({
-        doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "FOO"}, o: {$set: {x: 8}}}],
-        txnNumber: NumberLong("4")
-    }));
-    assert.eq(8, coll.findOne({_id: "foo"}).x);
-}
-
 // Test that the collection created with the "cloneCollectionAsCapped" command inherits the
 // default collation of the corresponding collection. We skip running this command in a sharded
 // cluster because it isn't supported by mongos.

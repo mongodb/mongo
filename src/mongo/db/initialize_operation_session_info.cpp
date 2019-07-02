@@ -143,22 +143,6 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
                 osi.getStartTransaction().value());
     }
 
-    // Populate the session info for doTxn command.
-    if (requestBody.firstElementFieldName() == "doTxn"_sd) {
-        uassert(ErrorCodes::InvalidOptions,
-                "doTxn can only be run with a transaction number.",
-                osi.getTxnNumber());
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                "doTxn can not be run in a transaction",
-                !osi.getAutocommit());
-        // 'autocommit' and 'startTransaction' are populated for 'doTxn' to get the oplog
-        // entry generation behavior used for multi-document transactions. The 'doTxn'
-        // command still logically behaves as a commit.
-        osi.setAutocommit(false);
-        osi.setStartTransaction(true);
-    }
-
-
     return osi;
 }
 
