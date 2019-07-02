@@ -1359,7 +1359,12 @@ class SyncTest : public SyncTail {
 public:
     bool returnEmpty;
     explicit SyncTest(OplogApplier::Observer* observer)
-        : SyncTail(observer, nullptr, nullptr, SyncTail::MultiSyncApplyFunc(), nullptr),
+        : SyncTail(observer,
+                   nullptr,
+                   nullptr,
+                   SyncTail::MultiSyncApplyFunc(),
+                   nullptr,
+                   OplogApplier::Options(OplogApplication::Mode::kInitialSync)),
           returnEmpty(false) {}
     virtual ~SyncTest() {}
     BSONObj getMissingDoc(OperationContext* opCtx, const OplogEntry& oplogEntry) override {
@@ -1406,7 +1411,7 @@ public:
 
         // this should fail because we can't connect
         try {
-            OplogApplier::Options options;
+            OplogApplier::Options options(OplogApplication::Mode::kInitialSync);
             options.allowNamespaceNotFoundErrorsOnCrudOps = true;
             options.missingDocumentSourceForInitialSync = HostAndPort("localhost", 123);
             SyncTail badSource(

@@ -42,7 +42,7 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
                                    StorageInterface* storageInterface,
                                    const OplogApplier::Options& options,
                                    ThreadPool* writerPool)
-    : OplogApplier(executor, oplogBuffer, observer),
+    : OplogApplier(executor, oplogBuffer, observer, options),
       _replCoord(replCoord),
       _syncTail(
           observer, consistencyMarkers, storageInterface, multiSyncApply, writerPool, options),
@@ -61,9 +61,8 @@ void OplogApplierImpl::_shutdown() {
     _syncTail.shutdown();
 }
 
-StatusWith<OpTime> OplogApplierImpl::_multiApply(
-    OperationContext* opCtx, Operations ops, boost::optional<repl::OplogApplication::Mode> mode) {
-    return _syncTail.multiApply(opCtx, std::move(ops), mode);
+StatusWith<OpTime> OplogApplierImpl::_multiApply(OperationContext* opCtx, Operations ops) {
+    return _syncTail.multiApply(opCtx, std::move(ops));
 }
 
 }  // namespace repl

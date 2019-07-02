@@ -35,6 +35,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -62,6 +63,10 @@ public:
      **/
     class Options {
     public:
+        Options() = delete;
+        explicit Options(OplogApplication::Mode inputMode) : mode(inputMode) {}
+
+        // TODO (SERVER-42039): Remove fields here that are redundant with the mode.
         bool allowNamespaceNotFoundErrorsOnCrudOps = false;
         bool relaxUniqueIndexConstraints = false;
         bool skipWritesToOplog = false;
@@ -77,6 +82,8 @@ public:
         // For replication recovery only. During replication rollback, this is used to keep track
         // of the stable timestamp from which we replay the oplog.
         boost::optional<Timestamp> stableTimestampForRecovery;
+
+        const OplogApplication::Mode mode;
     };
 
     /**
@@ -131,7 +138,10 @@ public:
      * Obtains batches of operations from the OplogBuffer to apply.
      * Reports oplog application progress using the Observer.
      */
-    OplogApplier(executor::TaskExecutor* executor, OplogBuffer* oplogBuffer, Observer* observer);
+    OplogApplier(executor::TaskExecutor* executor,
+                 OplogBuffer* oplogBuffer,
+                 Observer* observer,
+                 const Options& options);
 
     virtual ~OplogApplier() = default;
 
@@ -195,9 +205,7 @@ public:
      *
      * TODO: remove when enqueue() is implemented.
      */
-    StatusWith<OpTime> multiApply(OperationContext* opCtx,
-                                  Operations ops,
-                                  boost::optional<repl::OplogApplication::Mode> mode);
+    StatusWith<OpTime> multiApply(OperationContext* opCtx, Operations ops);
 
 private:
     /**
@@ -223,9 +231,7 @@ private:
      * Called from multiApply() to apply a batch of operations in parallel.
      * Implemented in subclasses but not visible otherwise.
      */
-    virtual StatusWith<OpTime> _multiApply(OperationContext* opCtx,
-                                           Operations ops,
-                                           boost::optional<repl::OplogApplication::Mode> mode) = 0;
+    virtual StatusWith<OpTime> _multiApply(OperationContext* opCtx, Operations ops) = 0;
 
     // Used to schedule task for oplog application loop.
     // Not owned by us.
@@ -242,6 +248,9 @@ private:
 
     // Set to true if shutdown() has been called.
     bool _inShutdown = false;
+
+    // Configures this OplogApplier.
+    const Options _options;
 };
 
 /**

@@ -373,7 +373,7 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     RecoveryOplogApplierStats stats;
 
     auto writerPool = OplogApplier::makeWriterPool();
-    OplogApplier::Options options;
+    OplogApplier::Options options(OplogApplication::Mode::kRecovering);
     options.allowNamespaceNotFoundErrorsOnCrudOps = true;
     options.skipWritesToOplog = true;
     // During replication recovery, the stableTimestampForRecovery refers to the stable timestamp
@@ -402,8 +402,7 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     OplogApplier::Operations batch;
     while (
         !(batch = fassert(50763, oplogApplier.getNextApplierBatch(opCtx, batchLimits))).empty()) {
-        applyThroughOpTime = uassertStatusOK(
-            oplogApplier.multiApply(opCtx, std::move(batch), OplogApplication::Mode::kRecovering));
+        applyThroughOpTime = uassertStatusOK(oplogApplier.multiApply(opCtx, std::move(batch)));
     }
     stats.complete(applyThroughOpTime);
     invariant(oplogBuffer.isEmpty(),

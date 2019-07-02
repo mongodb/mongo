@@ -38,6 +38,7 @@
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
@@ -91,14 +92,14 @@ void SyncTailOpObserver::onCreateCollection(OperationContext* opCtx,
 
 // static
 OplogApplier::Options SyncTailTest::makeInitialSyncOptions() {
-    OplogApplier::Options options;
+    OplogApplier::Options options(OplogApplication::Mode::kInitialSync);
     options.allowNamespaceNotFoundErrorsOnCrudOps = true;
     options.missingDocumentSourceForInitialSync = HostAndPort("localhost", 123);
     return options;
 }
 
 OplogApplier::Options SyncTailTest::makeRecoveryOptions() {
-    OplogApplier::Options options;
+    OplogApplier::Options options(OplogApplication::Mode::kRecovering);
     options.allowNamespaceNotFoundErrorsOnCrudOps = true;
     options.skipWritesToOplog = true;
     return options;
@@ -214,7 +215,8 @@ Status SyncTailTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
                       getConsistencyMarkers(),
                       getStorageInterface(),
                       SyncTail::MultiSyncApplyFunc(),
-                      nullptr);
+                      nullptr,
+                      OplogApplier::Options(OplogApplication::Mode::kSecondary));
     MultiApplier::OperationPtrs opsPtrs;
     for (auto& op : ops) {
         opsPtrs.push_back(&op);

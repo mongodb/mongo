@@ -388,13 +388,6 @@ SyncTail::SyncTail(OplogApplier::Observer* observer,
       _writerPool(writerPool),
       _options(options) {}
 
-SyncTail::SyncTail(OplogApplier::Observer* observer,
-                   ReplicationConsistencyMarkers* consistencyMarkers,
-                   StorageInterface* storageInterface,
-                   MultiSyncApplyFunc func,
-                   ThreadPool* writerPool)
-    : SyncTail(observer, consistencyMarkers, storageInterface, func, writerPool, {}) {}
-
 SyncTail::~SyncTail() {}
 
 const OplogApplier::Options& SyncTail::getOptions() const {
@@ -795,7 +788,7 @@ void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
         // Apply the operations in this batch. 'multiApply' returns the optime of the last op that
         // was applied, which should be the last optime in the batch.
         auto lastOpTimeAppliedInBatch =
-            fassertNoTrace(34437, multiApply(&opCtx, ops.releaseBatch(), boost::none));
+            fassertNoTrace(34437, multiApply(&opCtx, ops.releaseBatch()));
         invariant(lastOpTimeAppliedInBatch == lastOpTimeInBatch);
 
         // In order to provide resilience in the event of a crash in the middle of batch
@@ -1036,13 +1029,7 @@ Status multiSyncApply(OperationContext* opCtx,
 
     ApplierHelpers::stableSortByNamespace(ops);
 
-    // Assume we are recovering if oplog writes are disabled in the options.
-    // Assume we are in initial sync if we have a host for fetching missing documents.
-    const auto oplogApplicationMode = st->getOptions().skipWritesToOplog
-        ? OplogApplication::Mode::kRecovering
-        : (st->getOptions().missingDocumentSourceForInitialSync
-               ? OplogApplication::Mode::kInitialSync
-               : OplogApplication::Mode::kSecondary);
+    const auto oplogApplicationMode = st->getOptions().mode;
 
     ApplierHelpers::InsertGroup insertGroup(ops, opCtx, oplogApplicationMode);
 
@@ -1121,8 +1108,7 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
                                   MultiApplier::Operations* ops,
                                   std::vector<MultiApplier::OperationPtrs>* writerVectors,
                                   std::vector<MultiApplier::Operations>* derivedOps,
-                                  SessionUpdateTracker* sessionUpdateTracker,
-                                  boost::optional<repl::OplogApplication::Mode> mode) {
+                                  SessionUpdateTracker* sessionUpdateTracker) {
     const auto serviceContext = opCtx->getServiceContext();
     const auto storageEngine = serviceContext->getStorageEngine();
 
@@ -1150,8 +1136,7 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
         if (sessionUpdateTracker) {
             if (auto newOplogWrites = sessionUpdateTracker->updateSession(op)) {
                 derivedOps->emplace_back(std::move(*newOplogWrites));
-                _fillWriterVectors(
-                    opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr, mode);
+                _fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
             }
         }
 
@@ -1219,7 +1204,7 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
                     }
                     // Transaction entries cannot have different session updates.
                     _fillWriterVectors(
-                        opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr, mode);
+                        opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
                 } else {
                     // The applyOps entry was not generated as part of a transaction.
                     invariant(!op.getPrevWriteOpTimeInTransaction());
@@ -1227,7 +1212,7 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
 
                     // Nested entries cannot have different session updates.
                     _fillWriterVectors(
-                        opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr, mode);
+                        opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
                 }
             } catch (...) {
                 fassertFailedWithStatusNoTrace(
@@ -1242,7 +1227,7 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
         // If we see a commitTransaction command that is a part of a prepared transaction during
         // initial sync, find the prepare oplog entry, extract applyOps operations, and fill writers
         // with the extracted operations.
-        if (isPreparedCommit(op) && (mode == OplogApplication::Mode::kInitialSync)) {
+        if (isPreparedCommit(op) && (_options.mode == OplogApplication::Mode::kInitialSync)) {
             auto logicalSessionId = op.getSessionId();
             auto& partialTxnList = partialTxnOps[*logicalSessionId];
 
@@ -1261,8 +1246,7 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
                 partialTxnList.clear();
             }
 
-            _fillWriterVectors(
-                opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr, mode);
+            _fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
             continue;
         }
 
@@ -1277,15 +1261,14 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
 void SyncTail::fillWriterVectors(OperationContext* opCtx,
                                  MultiApplier::Operations* ops,
                                  std::vector<MultiApplier::OperationPtrs>* writerVectors,
-                                 std::vector<MultiApplier::Operations>* derivedOps,
-                                 boost::optional<repl::OplogApplication::Mode> mode) {
+                                 std::vector<MultiApplier::Operations>* derivedOps) {
     SessionUpdateTracker sessionUpdateTracker;
-    _fillWriterVectors(opCtx, ops, writerVectors, derivedOps, &sessionUpdateTracker, mode);
+    _fillWriterVectors(opCtx, ops, writerVectors, derivedOps, &sessionUpdateTracker);
 
     auto newOplogWrites = sessionUpdateTracker.flushAll();
     if (!newOplogWrites.empty()) {
         derivedOps->emplace_back(std::move(newOplogWrites));
-        _fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr, mode);
+        _fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
     }
 }
 
@@ -1317,9 +1300,7 @@ void SyncTail::_applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors
     }
 }
 
-StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx,
-                                        MultiApplier::Operations ops,
-                                        boost::optional<repl::OplogApplication::Mode> mode) {
+StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
     invariant(!ops.empty());
 
     LOG(2) << "replication batch size is " << ops.size();
@@ -1363,7 +1344,7 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx,
         std::vector<MultiApplier::Operations> derivedOps;
 
         std::vector<MultiApplier::OperationPtrs> writerVectors(_writerPool->getStats().numThreads);
-        fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps, mode);
+        fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
 
         // Wait for writes to finish before applying ops.
         _writerPool->waitForIdle();

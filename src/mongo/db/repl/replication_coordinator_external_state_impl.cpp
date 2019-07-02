@@ -226,15 +226,15 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     // interface. During steady state replication, there is no need to log details on every batch
     // we apply (recovery); or track missing documents that are fetched from the sync source
     // (initial sync).
-    _oplogApplier =
-        stdx::make_unique<OplogApplierImpl>(_oplogApplierTaskExecutor.get(),
-                                            _oplogBuffer.get(),
-                                            &noopOplogApplierObserver,
-                                            replCoord,
-                                            _replicationProcess->getConsistencyMarkers(),
-                                            _storageInterface,
-                                            OplogApplier::Options(),
-                                            _writerPool.get());
+    _oplogApplier = stdx::make_unique<OplogApplierImpl>(
+        _oplogApplierTaskExecutor.get(),
+        _oplogBuffer.get(),
+        &noopOplogApplierObserver,
+        replCoord,
+        _replicationProcess->getConsistencyMarkers(),
+        _storageInterface,
+        OplogApplier::Options(OplogApplication::Mode::kSecondary),
+        _writerPool.get());
 
     invariant(!_bgSync);
     _bgSync =
