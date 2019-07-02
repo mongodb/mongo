@@ -172,6 +172,16 @@ DEF_OPT_AS_UINT32(sample_interval, 0,
 DEF_OPT_AS_UINT32(sample_rate, 50,
     "how often the latency of operations is measured. One for every operation,"
     "two for every second operation, three for every third operation etc.")
+DEF_OPT_AS_UINT32(scan_icount, 0,
+    "number of records in scan tables to populate")
+DEF_OPT_AS_UINT32(scan_interval, 0,
+    "scan tables every interval seconds during the workload phase,"
+    " 0 to disable")
+DEF_OPT_AS_UINT32(scan_pct, 10,
+    "percentage of entire data set scanned, if scan_interval is enabled")
+DEF_OPT_AS_UINT32(scan_table_count, 0,
+    "number of separate tables to be used for scanning. Zero indicates "
+    "that tables are shared with other operations")
 DEF_OPT_AS_CONFIG_STRING(sess_config, "", "session configuration string")
 DEF_OPT_AS_UINT32(session_count_idle, 0,
     "number of idle sessions to create. Default 0.")

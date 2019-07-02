@@ -139,8 +139,10 @@ op(WT_SESSION *session, WT_RAND_STATE *rnd, WT_CURSOR **cpp)
 	/* Close the cursor half the time, otherwise cache it. */
 	if (__wt_random(rnd) % 2 == 0)
 		testutil_check(cursor->close(cursor));
-	else
+	else {
+		testutil_check(cursor->reset(cursor));
 		*cpp = cursor;
+	}
 
 	(void)__wt_atomic_add64(&worker, 1);
 }

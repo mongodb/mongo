@@ -1021,6 +1021,7 @@ tasks:
     run_on:
       - rhel62-large
     commands:
+      - func: "fetch source"
       - func: "fetch mongo-tests repo"
       - command: shell.exec
         params:

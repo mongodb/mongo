@@ -41,6 +41,7 @@ static WT_THREAD_RET monitor(void *);
 static WT_THREAD_RET populate_thread(void *);
 static void	 randomize_value(WTPERF_THREAD *, char *);
 static void	 recreate_dir(const char *);
+static WT_THREAD_RET scan_worker(void *);
 static int	 start_all_runs(WTPERF *);
 static int	 start_run(WTPERF *);
 static void	 start_threads(WTPERF *, WORKLOAD *,
@@ -119,6 +120,15 @@ randomize_value(WTPERF_THREAD *thread, char *value_buf)
 static uint32_t
 map_key_to_table(CONFIG_OPTS *opts, uint64_t k)
 {
+	/*
+	 * The first part of the key range is reserved for dedicated
+	 * scan tables, if any.  The scan tables do not grow, but the
+	 * rest of the key space may.
+	 */
+	if (k < opts->scan_icount)
+		return ((uint32_t)
+		    (opts->table_count + k % opts->scan_table_count));
+	k -= opts->scan_icount;
 	if (opts->range_partition) {
 		/* Take care to return a result in [0..table_count-1]. */
 		if (k > opts->icount + opts->random_range)
@@ -362,6 +372,7 @@ worker_async(void *arg)
 				continue;
 			break;
 		default:
+			lprintf(wtperf, 0, 0, "invalid op!");
 			goto err;		/* can't happen */
 		}
 
@@ -376,8 +387,10 @@ worker_async(void *arg)
 		    wtperf->uris[map_key_to_table(wtperf->opts, next_val)],
 		    NULL, &cb, &asyncop)) == EBUSY)
 			(void)usleep(10000);
-		if (ret != 0)
+		if (ret != 0) {
+			lprintf(wtperf, ret, 0, "failed async_new_op");
 			goto err;
+		}
 
 		asyncop->app_private = thread;
 		asyncop->set_key(asyncop, key_buf);
@@ -513,6 +526,7 @@ worker(void *arg)
 	WT_CURSOR **cursors, *cursor, *log_table_cursor, *tmp_cursor;
 	WT_SESSION *session;
 	size_t i;
+	uint32_t total_table_count;
 	int64_t ops, ops_per_txn;
 	uint64_t log_id, next_val, usecs;
 	uint8_t *op, *op_end;
@@ -570,8 +584,9 @@ worker(void *arg)
 			goto err;
 		}
 	} else {
-		cursors = dcalloc(opts->table_count, sizeof(WT_CURSOR *));
-		for (i = 0; i < opts->table_count; i++) {
+		total_table_count = opts->table_count + opts->scan_table_count;
+		cursors = dcalloc(total_table_count, sizeof(WT_CURSOR *));
+		for (i = 0; i < total_table_count; i++) {
 			if ((ret = session->open_cursor(session,
 			    wtperf->uris[i], NULL, NULL, &cursors[i])) != 0) {
 				lprintf(wtperf, ret, 0,
@@ -669,7 +684,6 @@ worker(void *arg)
 			__wt_epoch(NULL, &start);
 
 		cursor->set_key(cursor, key_buf);
-
 		switch (*op) {
 		case WORKER_READ:
 			/*
@@ -764,7 +778,8 @@ worker(void *arg)
 			if (ret == WT_NOTFOUND)
 				break;
 
-op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
+op_err:			if (ret == WT_ROLLBACK &&
+			    (ops_per_txn != 0 || opts->log_like_table)) {
 				/*
 				 * If we are running with explicit transactions
 				 * configured and we hit a WT_ROLLBACK, then we
@@ -1031,7 +1046,7 @@ populate_thread(void *arg)
 	WT_SESSION *session;
 	size_t i;
 	uint64_t op, usecs;
-	uint32_t opcount;
+	uint32_t opcount, total_table_count;
 	int intxn, measure_latency, ret, stress_checkpoint_due;
 	char *value_buf, *key_buf;
 	const char *cursor_config;
@@ -1044,6 +1059,7 @@ populate_thread(void *arg)
 	cursors = NULL;
 	ret = stress_checkpoint_due = 0;
 	trk = &thread->insert;
+	total_table_count = opts->table_count + opts->scan_table_count;
 
 	key_buf = thread->key_buf;
 	value_buf = thread->value_buf;
@@ -1058,8 +1074,8 @@ populate_thread(void *arg)
 	cursor_config =
 	    (opts->populate_threads == 1 && !opts->index) ? "bulk" : NULL;
 	/* Create the cursors. */
-	cursors = dcalloc(opts->table_count, sizeof(WT_CURSOR *));
-	for (i = 0; i < opts->table_count; i++) {
+	cursors = dcalloc(total_table_count, sizeof(WT_CURSOR *));
+	for (i = 0; i < total_table_count; i++) {
 		if ((ret = session->open_cursor(
 		    session, wtperf->uris[i], NULL,
 		    cursor_config, &cursors[i])) != 0) {
@@ -1073,7 +1089,7 @@ populate_thread(void *arg)
 	/* Populate the databases. */
 	for (intxn = 0, opcount = 0;;) {
 		op = get_next_incr(wtperf);
-		if (op > opts->icount)
+		if (op > (uint64_t)opts->icount + (uint64_t)opts->scan_icount)
 			break;
 
 		if (opts->populate_ops_per_txn != 0 && !intxn) {
@@ -1166,7 +1182,6 @@ populate_thread(void *arg)
 err:		wtperf->error = wtperf->stop = true;
 	}
 	free(cursors);
-
 	return (WT_THREAD_RET_VALUE);
 }
 
@@ -1216,7 +1231,7 @@ populate_async(void *arg)
 	/* Populate the databases. */
 	for (;;) {
 		op = get_next_incr(wtperf);
-		if (op > opts->icount)
+		if (op > (uint64_t)opts->icount + (uint64_t)opts->scan_icount)
 			break;
 		/*
 		 * Allocate an async op for whichever table.
@@ -1225,8 +1240,10 @@ populate_async(void *arg)
 		    conn, wtperf->uris[map_key_to_table(wtperf->opts, op)],
 		    NULL, &cb, &asyncop)) == EBUSY)
 			(void)usleep(10000);
-		if (ret != 0)
+		if (ret != 0) {
+			lprintf(wtperf, ret, 0, "Failed async_new_op");
 			goto err;
+		}
 
 		asyncop->app_private = thread;
 		generate_key(opts, key_buf, op);
@@ -1248,8 +1265,10 @@ populate_async(void *arg)
 	 * async_flush and those calls will convoy.  That is not the
 	 * most efficient way, but we want to flush before measuring latency.
 	 */
-	if (conn->async_flush(conn) != 0)
+	if (conn->async_flush(conn) != 0) {
+		lprintf(wtperf, ret, 0, "Failed async flush");
 		goto err;
+	}
 	if (measure_latency) {
 		__wt_epoch(NULL, &stop);
 		++trk->latency_ops;
@@ -1327,6 +1346,7 @@ monitor(void *arg)
 	    "insert ops per second,"
 	    "update ops per second,"
 	    "checkpoints,"
+	    "scans,"
 	    "read average latency(uS),"
 	    "read minimum latency(uS),"
 	    "read maximum latency(uS),"
@@ -1378,7 +1398,7 @@ monitor(void *arg)
 		(void)fprintf(fp,
 		    "%s,%" PRIu32
 		    ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
-		    ",%c"
+		    ",%c,%c"
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
@@ -1386,6 +1406,7 @@ monitor(void *arg)
 		    buf, wtperf->totalsec,
 		    cur_reads, cur_inserts, cur_updates,
 		    wtperf->ckpt ? 'Y' : 'N',
+		    wtperf->scan ? 'Y' : 'N',
 		    read_avg, read_min, read_max,
 		    insert_avg, insert_min, insert_max,
 		    update_avg, update_min, update_max);
@@ -1547,6 +1568,141 @@ err:		wtperf->error = wtperf->stop = true;
 	return (WT_THREAD_RET_VALUE);
 }
 
+static WT_THREAD_RET
+scan_worker(void *arg)
+{
+	CONFIG_OPTS *opts;
+	WTPERF *wtperf;
+	WTPERF_THREAD *thread;
+	WT_CONNECTION *conn;
+	WT_CURSOR *cursor, **cursors;
+	WT_SESSION *session;
+	const char *uri;
+	char *key_buf;
+	struct timespec e, s;
+	uint32_t i, ntables, pct, table_start;
+	uint64_t cur_id, end_id, incr, items, start_id, tot_items;
+	int ret;
+
+	thread = (WTPERF_THREAD *)arg;
+	key_buf = thread->key_buf;
+	wtperf = thread->wtperf;
+	opts = wtperf->opts;
+	conn = wtperf->conn;
+	session = NULL;
+	cursors = NULL;
+	items = 0;
+	uri = NULL;
+
+	/*
+	 * Figure out how many items we should scan.
+	 * We base the percentage on the icount.
+	 */
+	pct = opts->scan_pct == 0 ? 100 : opts->scan_pct;
+	start_id = cur_id = 1;
+
+	/*
+	 * When we scan the tables, we will increment the key by an amount
+	 * that causes us to visit each table in order, and jump ahead in
+	 * the key space when returning to a table. By doing this, we don't
+	 * repeat keys until we visit them all, but we don't visit keys in
+	 * sequential order.  This might better emulate the access pattern
+	 * to a main table when an index is scanned, or a more complex query
+	 * is performed.
+	 */
+	if (opts->scan_icount != 0) {
+		end_id = opts->scan_icount;
+		tot_items = (opts->scan_icount * pct) / 100;
+		incr = opts->scan_table_count * 1000 + 1;
+		table_start = opts->table_count;
+		ntables = opts->scan_table_count;
+	} else {
+		end_id = opts->icount;
+		tot_items = (opts->icount * pct) / 100;
+		incr = opts->table_count * 1000 + 1;
+		table_start = 0;
+		ntables = opts->table_count;
+	}
+	if ((ret = conn->open_session(
+	    conn, NULL, opts->sess_config, &session)) != 0) {
+		lprintf(wtperf, ret, 0,
+		    "open_session failed in scan thread.");
+		goto err;
+	}
+	cursors = dmalloc(ntables * sizeof(WT_CURSOR *));
+	for (i = 0; i < ntables; i++)
+		if ((ret = session->open_cursor(
+		    session, wtperf->uris[i + table_start], NULL, NULL,
+		    &cursors[i])) != 0) {
+			lprintf(wtperf, ret, 0,
+			    "open_cursor failed in scan thread.");
+			goto err;
+		}
+
+	while (!wtperf->stop) {
+		/* Break the sleep up, so we notice interrupts faster. */
+		for (i = 0; i < opts->scan_interval; i++) {
+			sleep(1);
+			if (wtperf->stop)
+				break;
+		}
+		/* If the workers are done, don't bother with a final call. */
+		if (wtperf->stop)
+			break;
+
+		__wt_epoch(NULL, &s);
+
+		wtperf->scan = true;
+		items = 0;
+		while (items < tot_items && !wtperf->stop) {
+			cursor = cursors[map_key_to_table(opts, cur_id) -
+			    table_start];
+			generate_key(opts, key_buf, cur_id);
+			cursor->set_key(cursor, key_buf);
+			if ((ret = cursor->search(cursor)) != 0) {
+				lprintf(wtperf, ret, 0, "Failed scan search "
+				    "key %s, items %d", key_buf, (int)items);
+				goto err;
+			}
+
+			items++;
+			cur_id += incr;
+			if (cur_id >= end_id) {
+				/*
+				 * Continue with the next slice of the key
+				 * space.
+				 */
+				cur_id = ++start_id;
+				if (cur_id >= end_id)
+					cur_id = start_id = 1;
+			}
+		}
+		wtperf->scan = false;
+		if (ret == 0)
+			++thread->scan.ops;
+		else {
+			lprintf(wtperf, ret, 0, "Scan operation failed for %s.",
+			    uri);
+			goto err;
+		}
+		__wt_epoch(NULL, &e);
+	}
+
+	if (session != NULL &&
+	    ((ret = session->close(session, NULL)) != 0)) {
+		lprintf(wtperf, ret, 0,
+		    "Error closing session in scan worker.");
+		goto err;
+	}
+
+	/* Notify our caller we failed and shut the system down. */
+	if (0) {
+err:		wtperf->error = wtperf->stop = true;
+	}
+	free(cursors);
+	return (WT_THREAD_RET_VALUE);
+}
+
 static int
 execute_populate(WTPERF *wtperf)
 {
@@ -1556,18 +1712,19 @@ execute_populate(WTPERF *wtperf)
 	WTPERF_THREAD *popth;
 	WT_THREAD_CALLBACK(*pfunc)(void *);
 	size_t i;
-	uint64_t last_ops, msecs, print_ops_sec;
+	uint64_t last_ops, msecs, print_ops_sec, max_key;
 	uint32_t interval, tables;
 	wt_thread_t idle_table_cycle_thread;
 	double print_secs;
 	int elapsed, ret;
 
 	opts = wtperf->opts;
+	max_key = (uint64_t)opts->icount + (uint64_t)opts->scan_icount;
 
 	lprintf(wtperf, 0, 1,
 	    "Starting %" PRIu32
-	    " populate thread(s) for %" PRIu32 " items",
-	    opts->populate_threads, opts->icount);
+	    " populate thread(s) for %" PRIu64 " items",
+	    opts->populate_threads, max_key);
 
 	/* Start cycling idle tables if configured. */
 	start_idle_table_cycle(wtperf, &idle_table_cycle_thread);
@@ -1587,7 +1744,7 @@ execute_populate(WTPERF *wtperf)
 
 	__wt_epoch(NULL, &start);
 	for (elapsed = 0, interval = 0, last_ops = 0;
-	    wtperf->insert_key < opts->icount && !wtperf->error;) {
+	     wtperf->insert_key < max_key && !wtperf->error;) {
 		/*
 		 * Sleep for 100th of a second, report_interval is in second
 		 * granularity, each 100th increment of elapsed is a single
@@ -1751,8 +1908,8 @@ execute_workload(WTPERF *wtperf)
 	WT_SESSION **sessions;
 	WT_THREAD_CALLBACK(*pfunc)(void *);
 	wt_thread_t idle_table_cycle_thread;
-	uint64_t last_ckpts, last_inserts, last_reads, last_truncates;
-	uint64_t last_updates;
+	uint64_t last_ckpts, last_scans;
+	uint64_t last_inserts, last_reads, last_truncates, last_updates;
 	uint32_t interval, run_ops, run_time;
 	u_int i;
 	int ret;
@@ -1763,8 +1920,8 @@ execute_workload(WTPERF *wtperf)
 	wtperf->insert_ops = wtperf->read_ops = wtperf->truncate_ops = 0;
 	wtperf->update_ops = 0;
 
-	last_ckpts = last_inserts = last_reads = last_truncates = 0;
-	last_updates = 0;
+	last_ckpts = last_scans = 0;
+	last_inserts = last_reads = last_truncates = last_updates = 0;
 	ret = 0;
 
 	sessions = NULL;
@@ -1844,6 +2001,7 @@ execute_workload(WTPERF *wtperf)
 
 		/* Sum the operations we've done. */
 		wtperf->ckpt_ops = sum_ckpt_ops(wtperf);
+		wtperf->scan_ops = sum_scan_ops(wtperf);
 		wtperf->insert_ops = sum_insert_ops(wtperf);
 		wtperf->read_ops = sum_read_ops(wtperf);
 		wtperf->update_ops = sum_update_ops(wtperf);
@@ -1863,18 +2021,21 @@ execute_workload(WTPERF *wtperf)
 		lprintf(wtperf, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
 		    " updates, %" PRIu64 " truncates, %" PRIu64
-		    " checkpoints in %" PRIu32 " secs (%" PRIu32 " total secs)",
+		    " checkpoints, %" PRIu64 " scans in %" PRIu32
+		    " secs (%" PRIu32 " total secs)",
 		    wtperf->read_ops - last_reads,
 		    wtperf->insert_ops - last_inserts,
 		    wtperf->update_ops - last_updates,
 		    wtperf->truncate_ops - last_truncates,
 		    wtperf->ckpt_ops - last_ckpts,
+		    wtperf->scan_ops - last_scans,
 		    opts->report_interval, wtperf->totalsec);
 		last_reads = wtperf->read_ops;
 		last_inserts = wtperf->insert_ops;
 		last_updates = wtperf->update_ops;
 		last_truncates = wtperf->truncate_ops;
 		last_ckpts = wtperf->ckpt_ops;
+		last_scans = wtperf->scan_ops;
 	}
 
 	/* Notify the worker threads they are done. */
@@ -1971,16 +2132,17 @@ create_uris(WTPERF *wtperf)
 {
 	CONFIG_OPTS *opts;
 	size_t len;
-	uint32_t i;
+	uint32_t i, total_table_count;
 
 	opts = wtperf->opts;
 
-	wtperf->uris = dcalloc(opts->table_count, sizeof(char *));
+	total_table_count = opts->table_count + opts->scan_table_count;
+	wtperf->uris = dcalloc(total_table_count, sizeof(char *));
 	len = strlen("table:") + strlen(opts->table_name) + 20;
-	for (i = 0; i < opts->table_count; i++) {
+	for (i = 0; i < total_table_count; i++) {
 		/* If there is only one table, just use the base name. */
 		wtperf->uris[i] = dmalloc(len);
-		if (opts->table_count == 1)
+		if (total_table_count == 1)
 			testutil_check(__wt_snprintf(wtperf->uris[i],
 			    len, "table:%s", opts->table_name));
 		else
@@ -2003,6 +2165,7 @@ create_tables(WTPERF *wtperf)
 	WT_SESSION *session;
 	size_t i;
 	int ret;
+	uint32_t total_table_count;
 	char buf[512];
 
 	opts = wtperf->opts;
@@ -2030,7 +2193,8 @@ create_tables(WTPERF *wtperf)
 		return (ret);
 	}
 
-	for (i = 0; i < opts->table_count; i++) {
+	total_table_count = opts->table_count + opts->scan_table_count;
+	for (i = 0; i < total_table_count; i++) {
 		if (opts->log_partial && i > 0) {
 			if (((ret = session->create(session,
 			    wtperf->uris[i], wtperf->partial_config)) != 0)) {
@@ -2075,8 +2239,10 @@ wtperf_copy(const WTPERF *src, WTPERF **retp)
 	CONFIG_OPTS *opts;
 	WTPERF *dest;
 	size_t i;
+	uint32_t total_table_count;
 
 	opts = src->opts;
+	total_table_count = opts->table_count + opts->scan_table_count;
 
 	dest = dcalloc(1, sizeof(WTPERF));
 
@@ -2091,8 +2257,8 @@ wtperf_copy(const WTPERF *src, WTPERF **retp)
 		dest->reopen_config = dstrdup(src->reopen_config);
 
 	if (src->uris != NULL) {
-		dest->uris = dcalloc(opts->table_count, sizeof(char *));
-		for (i = 0; i < opts->table_count; i++)
+		dest->uris = dcalloc(total_table_count, sizeof(char *));
+		for (i = 0; i < total_table_count; i++)
 			dest->uris[i] = dstrdup(src->uris[i]);
 	}
 
@@ -2100,6 +2266,7 @@ wtperf_copy(const WTPERF *src, WTPERF **retp)
 		dest->async_config = dstrdup(src->async_config);
 
 	dest->ckptthreads = NULL;
+	dest->scanthreads = NULL;
 	dest->popthreads = NULL;
 
 	dest->workers = NULL;
@@ -2137,7 +2304,7 @@ wtperf_free(WTPERF *wtperf)
 	free(wtperf->log_table_uri);
 
 	if (wtperf->uris != NULL) {
-		for (i = 0; i < opts->table_count; i++)
+		for (i = 0; i < opts->table_count + opts->scan_table_count; i++)
 			free(wtperf->uris[i]);
 		free(wtperf->uris);
 	}
@@ -2145,6 +2312,7 @@ wtperf_free(WTPERF *wtperf)
 	free(wtperf->async_config);
 
 	free(wtperf->ckptthreads);
+	free(wtperf->scanthreads);
 	free(wtperf->popthreads);
 
 	free(wtperf->workers);
@@ -2336,9 +2504,18 @@ start_run(WTPERF *wtperf)
 			    "Starting %" PRIu32 " checkpoint thread(s)",
 			    opts->checkpoint_threads);
 			wtperf->ckptthreads = dcalloc(
-			     opts->checkpoint_threads, sizeof(WTPERF_THREAD));
+			    opts->checkpoint_threads, sizeof(WTPERF_THREAD));
 			start_threads(wtperf, NULL, wtperf->ckptthreads,
 			    opts->checkpoint_threads, checkpoint_worker);
+		}
+		/* Start the scan thread. */
+		if (opts->scan_interval != 0) {
+			lprintf(wtperf, 0, 1,
+			    "Starting 1 scan thread");
+			wtperf->scanthreads = dcalloc(
+			    1, sizeof(WTPERF_THREAD));
+			start_threads(wtperf, NULL, wtperf->scanthreads,
+			    1, scan_worker);
 		}
 		if (opts->pre_load_data)
 			pre_load_data(wtperf);
@@ -2353,6 +2530,7 @@ start_run(WTPERF *wtperf)
 		wtperf->truncate_ops = sum_truncate_ops(wtperf);
 		wtperf->update_ops = sum_update_ops(wtperf);
 		wtperf->ckpt_ops = sum_ckpt_ops(wtperf);
+		wtperf->scan_ops = sum_scan_ops(wtperf);
 		total_ops =
 		    wtperf->read_ops + wtperf->insert_ops + wtperf->update_ops;
 
@@ -2381,6 +2559,9 @@ start_run(WTPERF *wtperf)
 		lprintf(wtperf, 0, 1,
 		    "Executed %" PRIu64 " checkpoint operations",
 		    wtperf->ckpt_ops);
+		lprintf(wtperf, 0, 1,
+		    "Executed %" PRIu64 " scan operations",
+		    wtperf->scan_ops);
 
 		latency_print(wtperf);
 	}
@@ -2394,6 +2575,7 @@ err:		if (ret == 0)
 	wtperf->stop = true;
 
 	stop_threads(1, wtperf->ckptthreads);
+	stop_threads(1, wtperf->scanthreads);
 
 	if (monitor_created != 0)
 		testutil_check(__wt_thread_join(NULL, &monitor_thread));
@@ -2794,9 +2976,11 @@ start_threads(WTPERF *wtperf, WORKLOAD *workp,
 		 * for latency measurements, for the same reason.
 		 */
 		thread->ckpt.min_latency =
+		thread->scan.min_latency =
 		thread->insert.min_latency = thread->read.min_latency =
 		thread->update.min_latency = UINT32_MAX;
-		thread->ckpt.max_latency = thread->insert.max_latency =
+		thread->ckpt.max_latency = thread->scan.max_latency =
+		thread->insert.max_latency =
 		thread->read.max_latency = thread->update.max_latency = 0;
 	}
 
@@ -2852,10 +3036,12 @@ drop_all_tables(WTPERF *wtperf)
 	CONFIG_OPTS *opts;
 	WT_SESSION *session;
 	size_t i;
+	uint32_t total_table_count;
 	uint64_t msecs;
 	int ret, t_ret;
 
 	opts = wtperf->opts;
+	total_table_count = opts->table_count + opts->scan_table_count;
 
 	/* Drop any tables. */
 	if ((ret = wtperf->conn->open_session(
@@ -2865,7 +3051,7 @@ drop_all_tables(WTPERF *wtperf)
 		return (ret);
 	}
 	__wt_epoch(NULL, &start);
-	for (i = 0; i < opts->table_count; i++) {
+	for (i = 0; i < total_table_count; i++) {
 		if ((ret =
 		    session->drop(session, wtperf->uris[i], NULL)) != 0) {
 			lprintf(wtperf, ret, 0,
@@ -2877,7 +3063,7 @@ drop_all_tables(WTPERF *wtperf)
 	msecs = WT_TIMEDIFF_MS(stop, start);
 	lprintf(wtperf, 0, 1,
 	    "Executed %" PRIu32 " drop operations average time %" PRIu64 "ms",
-	    opts->table_count, msecs / opts->table_count);
+	    total_table_count, msecs / total_table_count);
 
 err:	if ((t_ret = session->close(session, NULL)) != 0 && ret == 0)
 		ret = t_ret;
@@ -2888,18 +3074,20 @@ static uint64_t
 wtperf_value_range(WTPERF *wtperf)
 {
 	CONFIG_OPTS *opts;
+	uint64_t total_icount;
 
 	opts = wtperf->opts;
+	total_icount = (uint64_t)opts->scan_icount + (uint64_t)opts->icount;
 
 	if (opts->random_range)
-		return (opts->icount + opts->random_range);
+		return (total_icount + opts->random_range);
 	/*
 	 * It is legal to configure a zero size populate phase, hide that
 	 * from other code by pretending the range is 1 in that case.
 	 */
-	if (opts->icount + wtperf->insert_key == 0)
+	if (total_icount + wtperf->insert_key == 0)
 		return (1);
-	return (opts->icount +
+	return (total_icount +
 	    wtperf->insert_key - (u_int)(wtperf->workers_cnt + 1));
 }
 
@@ -2910,12 +3098,15 @@ wtperf_rand(WTPERF_THREAD *thread)
 	WT_CURSOR *rnd_cursor;
 	WTPERF *wtperf;
 	double S1, S2, U;
-	uint64_t rval;
+	uint64_t end_range, range, rval, start_range;
 	int ret;
 	char *key_buf;
 
 	wtperf = thread->wtperf;
 	opts = wtperf->opts;
+	end_range = wtperf_value_range(wtperf);
+	start_range = opts->scan_icount;
+	range = end_range - start_range;
 
 	/*
 	 * If we have a random cursor set up then use it.
@@ -2953,7 +3144,7 @@ wtperf_rand(WTPERF_THREAD *thread)
 	if (opts->pareto != 0) {
 #define	PARETO_SHAPE	1.5
 		S1 = (-1 / PARETO_SHAPE);
-		S2 = wtperf_value_range(wtperf) *
+		S2 = range *
 		    (opts->pareto / 100.0) * (PARETO_SHAPE - 1);
 		U = 1 - (double)rval / (double)UINT32_MAX;
 		rval = (uint64_t)((pow(U, S1) - 1) * S2);
@@ -2962,13 +3153,13 @@ wtperf_rand(WTPERF_THREAD *thread)
 		 * 2% of the time, from my testing. That will lead to the
 		 * first item in the table being "hot".
 		 */
-		if (rval > wtperf_value_range(wtperf))
+		if (rval > end_range)
 			rval = 0;
 	}
 	/*
 	 * Wrap the key to within the expected range and avoid zero: we never
 	 * insert that key.
 	 */
-	rval = (rval % wtperf_value_range(wtperf)) + 1;
-	return (rval);
+	rval = (rval % range) + 1;
+	return (start_range + rval);
 }

@@ -131,6 +131,7 @@ struct __wtperf {			/* Per-database structure */
 
 	WTPERF_THREAD *ckptthreads;	/* Checkpoint threads */
 	WTPERF_THREAD *popthreads;	/* Populate threads */
+	WTPERF_THREAD *scanthreads;	/* Scan threads */
 
 #define	WORKLOAD_MAX	50
 	WTPERF_THREAD	*workers;	/* Worker threads */
@@ -141,6 +142,7 @@ struct __wtperf {			/* Per-database structure */
 
 	/* State tracking variables. */
 	uint64_t ckpt_ops;		/* checkpoint operations */
+	uint64_t scan_ops;		/* scan operations */
 	uint64_t insert_ops;		/* insert operations */
 	uint64_t read_ops;		/* read operations */
 	uint64_t truncate_ops;		/* truncate operations */
@@ -150,6 +152,7 @@ struct __wtperf {			/* Per-database structure */
 	uint64_t log_like_table_key;	/* used to allocate IDs for log table */
 
 	volatile bool ckpt;		/* checkpoint in progress */
+	volatile bool scan;		/* scan in progress */
 	volatile bool error;		/* thread error */
 	volatile bool stop;		/* notify threads to stop */
 	volatile bool in_warmup;	/* running warmup phase */
@@ -245,6 +248,7 @@ struct __wtperf_thread {		/* Per-thread structure */
 	TRACK ckpt;			/* Checkpoint operations */
 	TRACK insert;			/* Insert operations */
 	TRACK read;			/* Read operations */
+	TRACK scan;			/* Scan operations */
 	TRACK update;			/* Update operations */
 	TRACK truncate;			/* Truncate operations */
 	TRACK truncate_sleep;		/* Truncate sleep operations */
@@ -273,6 +277,7 @@ void	 start_idle_table_cycle(WTPERF *, wt_thread_t *);
 void	 stop_idle_table_cycle(WTPERF *, wt_thread_t);
 void	 worker_throttle(WTPERF_THREAD *);
 uint64_t sum_ckpt_ops(WTPERF *);
+uint64_t sum_scan_ops(WTPERF *);
 uint64_t sum_insert_ops(WTPERF *);
 uint64_t sum_pop_ops(WTPERF *);
 uint64_t sum_read_ops(WTPERF *);

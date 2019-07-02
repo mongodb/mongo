@@ -202,6 +202,14 @@ total workload seconds
 performance logging every interval seconds, 0 to disable
 @par sample_rate (unsigned int, default=50)
 how often the latency of operations is measured. One for every operation, two for every second operation, three for every third operation etc.
+@par scan_icount (unsigned int, default=0)
+number of records in scan tables to populate
+@par scan_interval (unsigned int, default=0)
+scan tables every interval seconds during the workload phase,  0 to disable
+@par scan_pct (unsigned int, default=10)
+percentage of entire data set scanned, if scan_interval is enabled
+@par scan_table_count (unsigned int, default=0)
+number of separate tables to be used for scanning. Zero indicates  that tables are shared with other operations
 @par sess_config (string, default="")
 session configuration string
 @par session_count_idle (unsigned int, default=0)

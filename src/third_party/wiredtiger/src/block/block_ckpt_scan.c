@@ -91,6 +91,8 @@ __wt_block_checkpoint_final(WT_SESSION_IMPL *session,
 	 */
 	size = buf->size + WT_INTPACK64_MAXSIZE;
 	WT_RET(__wt_buf_extend(session, buf, size));
+	p = (uint8_t *)buf->mem + buf->size;
+	memset(p, 0, WT_INTPACK64_MAXSIZE);
 	file_size_offset = buf->size;
 	buf->size = size;
 
