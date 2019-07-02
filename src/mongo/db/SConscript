@@ -1036,6 +1036,7 @@ env.Library(
         'db_raii',
         'dbdirectclient',
         'exec/scoped_timer',
+        'exec/sort_executor',
         'exec/working_set',
         'fts/base_fts',
         'index/index_descriptor',

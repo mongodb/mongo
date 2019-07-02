@@ -414,7 +414,7 @@ getSortAndGroupStagesFromPipeline(const Pipeline::SourceContainer& sources) {
     if (sourcesIt != sources.end()) {
         sortStage = dynamic_cast<DocumentSourceSort*>(sourcesIt->get());
         if (sortStage) {
-            if (!sortStage->getLimitSrc()) {
+            if (!sortStage->hasLimit()) {
                 ++sourcesIt;
             } else {
                 // This $sort stage was previously followed by a $limit stage.
@@ -664,7 +664,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         if (swExecutorGrouped.isOK()) {
             // Any $limit stage before the $group stage should make the pipeline ineligible for this
             // optimization.
-            invariant(!sortStage || !sortStage->getLimitSrc());
+            invariant(!sortStage || !sortStage->hasLimit());
 
             // We remove the $sort and $group stages that begin the pipeline, because the executor
             // will handle the sort, and the groupTransform (added below) will handle the $group
@@ -751,9 +751,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
             // We know the sort is being handled by the query system, so remove the $sort stage.
             pipeline->_sources.pop_front();
 
-            if (sortStage->getLimitSrc()) {
+            if (sortStage->hasLimit()) {
                 // We need to reinsert the coalesced $limit after removing the $sort.
-                pipeline->_sources.push_front(sortStage->getLimitSrc());
+                pipeline->_sources.push_front(
+                    DocumentSourceLimit::create(expCtx, sortStage->getLimit()));
             }
             return std::move(exec);
         } else if (swExecutorSort == ErrorCodes::QueryPlanKilled) {

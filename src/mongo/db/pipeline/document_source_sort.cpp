@@ -96,28 +96,27 @@ Value deserializeSortKey(size_t sortPatternSize, BSONObj bsonSortKey) {
     return Value{std::move(keys)};
 }
 
-/**
- * Generates a new file name on each call using a static, atomic and monotonically increasing
- * number.
- *
- * Each user of the Sorter must implement this function to ensure that all temporary files that the
- * Sorter instances produce are uniquely identified using a unique file name extension with separate
- * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
- * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
- */
-std::string nextFileName() {
-    static AtomicWord<unsigned> documentSourceSortFileCounter;
-    return "extsort-doc-source-sort." +
-        std::to_string(documentSourceSortFileCounter.fetchAndAdd(1));
-}
-
 }  // namespace
 
 constexpr StringData DocumentSourceSort::kStageName;
 
-DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext>& pExpCtx,
-                                       const BSONObj& sortOrder)
-    : DocumentSource(pExpCtx), _rawSort(sortOrder), _sortPattern({_rawSort, pExpCtx}) {}
+DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                                       const BSONObj& sortOrder,
+                                       uint64_t limit,
+                                       uint64_t maxMemoryUsageBytes)
+    : DocumentSource(pExpCtx),
+      _sortExecutor({{sortOrder, pExpCtx},
+                     limit,
+                     maxMemoryUsageBytes,
+                     pExpCtx->tempDir,
+                     pExpCtx->allowDiskUse}),
+      // The SortKeyGenerator expects the expressions to be serialized in order to detect a sort
+      // by a metadata field.
+      _sortKeyGen({sortOrder, pExpCtx->getCollator()}) {
+    uassert(15976,
+            "$sort stage must have at least one sort key",
+            !_sortExecutor->sortPattern().empty());
+}
 
 REGISTER_DOCUMENT_SOURCE(sort,
                          LiteParsedDocumentSourceDefault::parse,
@@ -134,39 +133,37 @@ DocumentSource::GetNextResult DocumentSourceSort::getNext() {
         invariant(populationResult.isEOF());
     }
 
-    if (!_output || !_output->more()) {
-        dispose();
+    auto result = _sortExecutor->getNext();
+    if (!result)
         return GetNextResult::makeEOF();
-    }
-
-    return _output->next().second;
+    return GetNextResult(std::move(*result));
 }
 
 void DocumentSourceSort::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+    uint64_t limit = _sortExecutor->getLimit();
     if (explain) {  // always one Value for combined $sort + $limit
         array.push_back(Value(DOC(
-            kStageName << DOC(
-                "sortKey" << _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain)
-                          << "limit"
-                          << (_limitSrc ? Value(_limitSrc->getLimit()) : Value())))));
+            kStageName << DOC("sortKey"
+                              << _sortExecutor->sortPattern().serialize(
+                                     SortPattern::SortKeySerialization::kForExplain)
+                              << "limit"
+                              << (_sortExecutor->hasLimit() ? Value(static_cast<long long>(limit))
+                                                            : Value())))));
     } else {  // one Value for $sort and maybe a Value for $limit
-        MutableDocument inner(
-            _sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization));
+        MutableDocument inner(_sortExecutor->sortPattern().serialize(
+            SortPattern::SortKeySerialization::kForPipelineSerialization));
         array.push_back(Value(DOC(kStageName << inner.freeze())));
 
-        if (_limitSrc) {
-            _limitSrc->serializeToArray(array);
+        if (_sortExecutor->hasLimit()) {
+            auto limitSrc = DocumentSourceLimit::create(pExpCtx, limit);
+            limitSrc->serializeToArray(array);
         }
     }
 }
 
-void DocumentSourceSort::doDispose() {
-    _output.reset();
-}
-
 long long DocumentSourceSort::getLimit() const {
-    return _limitSrc ? _limitSrc->getLimit() : -1;
+    return _sortExecutor->hasLimit() ? _sortExecutor->getLimit() : -1;
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
@@ -182,14 +179,13 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
         int64_t safeSum = 0;
 
         // The skip and limit values can be very large, so we need to make sure the sum doesn't
-        // overflow before applying an optimiztion to pull the limit into the sort stage.
+        // overflow before applying an optimization to pull the limit into the sort stage.
         if (nextSkip && !mongoSignedAddOverflow64(skipSum, nextSkip->getSkip(), &safeSum)) {
             skipSum = safeSum;
             ++stageItr;
         } else if (nextLimit &&
                    !mongoSignedAddOverflow64(nextLimit->getLimit(), skipSum, &safeSum)) {
-            nextLimit->setLimit(safeSum);
-            setLimitSrc(nextLimit);
+            _sortExecutor->setLimit(safeSum);
             container->erase(stageItr);
             stageItr = std::next(itr);
             skipSum = 0;
@@ -204,7 +200,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
 }
 
 DepsTracker::State DocumentSourceSort::getDependencies(DepsTracker* deps) const {
-    for (auto&& keyPart : _sortPattern) {
+    for (auto&& keyPart : _sortExecutor->sortPattern()) {
         if (keyPart.expression) {
             keyPart.expression->addDependencies(deps);
         } else {
@@ -229,44 +225,15 @@ intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
 intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     BSONObj sortOrder,
-    long long limit,
+    uint64_t limit,
     boost::optional<uint64_t> maxMemoryUsageBytes) {
-    intrusive_ptr<DocumentSourceSort> pSort(new DocumentSourceSort(pExpCtx, sortOrder.getOwned()));
-    pSort->_maxMemoryUsageBytes = maxMemoryUsageBytes
+    auto resolvedMaxBytes = maxMemoryUsageBytes
         ? *maxMemoryUsageBytes
         : internalDocumentSourceSortMaxBlockingSortBytes.load();
-
-    uassert(15976, "$sort stage must have at least one sort key", !pSort->_sortPattern.empty());
-
-    pSort->_sortKeyGen = SortKeyGenerator{
-        // The SortKeyGenerator expects the expressions to be serialized in order to detect a sort
-        // by a metadata field.
-        pSort->_sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
-            .toBson(),
-        pExpCtx->getCollator()};
-
-    if (limit > 0) {
-        pSort->setLimitSrc(DocumentSourceLimit::create(pExpCtx, limit));
-    }
+    intrusive_ptr<DocumentSourceSort> pSort(
+        new DocumentSourceSort(pExpCtx, sortOrder.getOwned(), limit, resolvedMaxBytes));
 
     return pSort;
-}
-
-SortOptions DocumentSourceSort::makeSortOptions() const {
-    /* make sure we've got a sort key */
-    verify(_sortPattern.size());
-
-    SortOptions opts;
-    if (_limitSrc)
-        opts.limit = _limitSrc->getLimit();
-
-    opts.maxMemoryUsageBytes = _maxMemoryUsageBytes;
-    if (pExpCtx->allowDiskUse && !pExpCtx->inMongos) {
-        opts.extSortAllowed = true;
-        opts.tempDir = pExpCtx->tempDir;
-    }
-
-    return opts;
 }
 
 DocumentSource::GetNextResult DocumentSourceSort::populate() {
@@ -282,9 +249,6 @@ DocumentSource::GetNextResult DocumentSourceSort::populate() {
 
 void DocumentSourceSort::loadDocument(Document&& doc) {
     invariant(!_populated);
-    if (!_sorter) {
-        _sorter.reset(MySorter::make(makeSortOptions(), Comparator(*this)));
-    }
 
     Value sortKey;
     Document docForSorter;
@@ -292,21 +256,16 @@ void DocumentSourceSort::loadDocument(Document&& doc) {
     // already computed the sort key we'd have split the pipeline there, would be merging presorted
     // documents, and wouldn't use this method.
     std::tie(sortKey, docForSorter) = extractSortKey(std::move(doc));
-    _sorter->add(sortKey, docForSorter);
+    _sortExecutor->add(sortKey, docForSorter);
 }
 
 void DocumentSourceSort::loadingDone() {
-    if (!_sorter) {
-        _sorter.reset(MySorter::make(makeSortOptions(), Comparator(*this)));
-    }
-    _output.reset(_sorter->done());
-    _usedDisk = _sorter->usedDisk() || _usedDisk;
-    _sorter.reset();
+    _sortExecutor->loadingDone();
     _populated = true;
 }
 
 bool DocumentSourceSort::usedDisk() {
-    return _usedDisk;
+    return _sortExecutor->wasDiskUsed();
 }
 
 Value DocumentSourceSort::getCollationComparisonKey(const Value& val) const {
@@ -358,13 +317,13 @@ StatusWith<Value> DocumentSourceSort::extractKeyPart(
 }
 
 StatusWith<Value> DocumentSourceSort::extractKeyFast(const Document& doc) const {
-    if (_sortPattern.size() == 1u) {
-        return extractKeyPart(doc, _sortPattern[0]);
+    if (_sortExecutor->sortPattern().size() == 1u) {
+        return extractKeyPart(doc, _sortExecutor->sortPattern()[0]);
     }
 
     vector<Value> keys;
-    keys.reserve(_sortPattern.size());
-    for (auto&& keyPart : _sortPattern) {
+    keys.reserve(_sortExecutor->sortPattern().size());
+    for (auto&& keyPart : _sortExecutor->sortPattern()) {
         auto extractedKey = extractKeyPart(doc, keyPart);
         if (!extractedKey.isOK()) {
             // We can't use the fast path, so bail out.
@@ -387,7 +346,7 @@ BSONObj DocumentSourceSort::extractKeyWithArray(const Document& doc) const {
 
     // Convert the Document to a BSONObj, but only do the conversion for the paths we actually need.
     // Then run the result through the SortKeyGenerator to obtain the final sort key.
-    auto bsonDoc = _sortPattern.documentToBsonWithSortPaths(doc);
+    auto bsonDoc = _sortExecutor->sortPattern().documentToBsonWithSortPaths(doc);
     return uassertStatusOK(_sortKeyGen->getSortKey(std::move(bsonDoc), &metadata));
 }
 
@@ -403,7 +362,8 @@ std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) co
     if (fastKey.isOK()) {
         inMemorySortKey = std::move(fastKey.getValue());
         if (pExpCtx->needsMerge) {
-            serializedSortKey = serializeSortKey(_sortPattern.size(), inMemorySortKey);
+            serializedSortKey =
+                serializeSortKey(_sortExecutor->sortPattern().size(), inMemorySortKey);
         }
     } else {
         // We have to do it the slow way - through the sort key generator. This will generate a BSON
@@ -411,7 +371,8 @@ std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) co
         // representation into the corresponding array of keys as a Value. BSONObj {'': 1, '': [2,
         // 3]} becomes Value [1, [2, 3]].
         serializedSortKey = extractKeyWithArray(doc);
-        inMemorySortKey = deserializeSortKey(_sortPattern.size(), *serializedSortKey);
+        inMemorySortKey =
+            deserializeSortKey(_sortExecutor->sortPattern().size(), *serializedSortKey);
     }
 
     MutableDocument toBeSorted(std::move(doc));
@@ -424,48 +385,14 @@ std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) co
     return {inMemorySortKey, toBeSorted.freeze()};
 }
 
-int DocumentSourceSort::compare(const Value& lhs, const Value& rhs) const {
-    // DocumentSourceSort::populate() has already guaranteed that the sort key is non-empty.
-    // However, the tricky part is deciding what to do if none of the sort keys are present. In that
-    // case, consider the document "less".
-    //
-    // Note that 'comparator' must use binary comparisons here, as both 'lhs' and 'rhs' are
-    // collation comparison keys.
-    ValueComparator comparator;
-    const size_t n = _sortPattern.size();
-    if (n == 1) {  // simple fast case
-        if (_sortPattern[0].isAscending)
-            return comparator.compare(lhs, rhs);
-        else
-            return -comparator.compare(lhs, rhs);
-    }
-
-    // compound sort
-    for (size_t i = 0; i < n; i++) {
-        int cmp = comparator.compare(lhs[i], rhs[i]);
-        if (cmp) {
-            /* if necessary, adjust the return value by the key ordering */
-            if (!_sortPattern[i].isAscending)
-                cmp = -cmp;
-
-            return cmp;
-        }
-    }
-
-    /*
-      If we got here, everything matched (or didn't exist), so we'll
-      consider the documents equal for purposes of this sort.
-    */
-    return 0;
-}
-
 boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distributedPlanLogic() {
     DistributedPlanLogic split;
     split.shardsStage = this;
-    split.inputSortPattern =
-        _sortPattern.serialize(SortPattern::SortKeySerialization::kForSortKeyMerging).toBson();
-    if (_limitSrc) {
-        split.mergingStage = DocumentSourceLimit::create(pExpCtx, _limitSrc->getLimit());
+    split.inputSortPattern = _sortExecutor->sortPattern()
+                                 .serialize(SortPattern::SortKeySerialization::kForSortKeyMerging)
+                                 .toBson();
+    if (_sortExecutor->hasLimit()) {
+        split.mergingStage = DocumentSourceLimit::create(pExpCtx, getLimit());
     }
     return split;
 }
@@ -482,6 +409,3 @@ bool DocumentSourceSort::canRunInParallelBeforeWriteStage(
 }
 
 }  // namespace mongo
-
-#include "mongo/db/sorter/sorter.cpp"
-// Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

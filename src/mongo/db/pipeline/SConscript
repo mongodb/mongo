@@ -269,9 +269,9 @@ env.Library(
     ],
 )
 
-pipelineeEnv = env.Clone()
-pipelineeEnv.InjectThirdParty(libraries=['snappy'])
-pipelineeEnv.Library(
+pipelineEnv = env.Clone()
+pipelineEnv.InjectThirdParty(libraries=['snappy'])
+pipelineEnv.Library(
     target='pipeline',
     source=[
         'document_source.cpp',
@@ -330,6 +330,7 @@ pipelineeEnv.Library(
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
+        '$BUILD_DIR/mongo/db/exec/sort_executor',
         '$BUILD_DIR/mongo/db/generic_cursor',
         '$BUILD_DIR/mongo/db/index/key_generator',
         '$BUILD_DIR/mongo/db/logical_session_cache',

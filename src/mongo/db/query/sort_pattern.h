@@ -33,10 +33,8 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/field_path.h"
 
 namespace mongo {
-
 class SortPattern {
 public:
     enum class SortKeySerialization {

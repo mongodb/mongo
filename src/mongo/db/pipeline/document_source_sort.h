@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/sort_executor.h"
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -69,7 +70,7 @@ public:
                                      ChangeStreamRequirement::kBlacklist);
 
         // Can't swap with a $match if a limit has been absorbed, as $match can't swap with $limit.
-        constraints.canSwapWithMatch = !_limitSrc;
+        constraints.canSwapWithMatch = !_sortExecutor->hasLimit();
         return constraints;
     }
 
@@ -83,7 +84,7 @@ public:
      * Returns the sort key pattern.
      */
     const SortPattern& getSortKeyPattern() const {
-        return _sortPattern;
+        return _sortExecutor->sortPattern();
     }
 
     /**
@@ -99,7 +100,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceSort> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         BSONObj sortOrder,
-        long long limit = -1,
+        uint64_t limit = 0,
         boost::optional<uint64_t> maxMemoryUsageBytes = boost::none);
 
     /**
@@ -125,45 +126,26 @@ public:
      */
     bool usedDisk() final;
 
-    /**
-     * Instructs the sort stage to use the given set of cursors as inputs, to merge documents that
-     * have already been sorted.
-     */
-    void populateFromCursors(const std::vector<DBClientCursor*>& cursors);
-
     bool isPopulated() {
         return _populated;
     };
 
-    boost::intrusive_ptr<DocumentSourceLimit> getLimitSrc() const {
-        return _limitSrc;
+    bool hasLimit() const {
+        return _sortExecutor->hasLimit();
     }
 
 protected:
     /**
-     * Attempts to absorb a subsequent $limit stage so that it an perform a top-k sort.
+     * Attempts to absorb a subsequent $limit stage so that it can perform a top-k sort.
      */
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
-    void doDispose() final;
 
 private:
-    using MySorter = Sorter<Value, Document>;
-
-    // For MySorter.
-    class Comparator {
-    public:
-        explicit Comparator(const DocumentSourceSort& source) : _source(source) {}
-        int operator()(const MySorter::Data& lhs, const MySorter::Data& rhs) const {
-            return _source.compare(lhs.first, rhs.first);
-        }
-
-    private:
-        const DocumentSourceSort& _source;
-    };
-
-    explicit DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                const BSONObj& sortOrder);
+    DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                       const BSONObj& sortOrder,
+                       uint64_t limit,
+                       uint64_t maxMemoryUsageBytes);
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         MONGO_UNREACHABLE;  // Should call serializeToArray instead.
@@ -178,8 +160,6 @@ private:
      * GetNextResult encountered, which may be either kEOF or kPauseExecution.
      */
     GetNextResult populate();
-
-    SortOptions makeSortOptions() const;
 
     /**
      * Returns the sort key for 'doc', as well as the document that should be entered into the
@@ -218,33 +198,11 @@ private:
      */
     Value getCollationComparisonKey(const Value& val) const;
 
-    int compare(const Value& lhs, const Value& rhs) const;
-
-    /**
-     * Absorbs 'limit', enabling a top-k sort. It is safe to call this multiple times, it will keep
-     * the smallest limit.
-     */
-    void setLimitSrc(boost::intrusive_ptr<DocumentSourceLimit> limit) {
-        if (!_limitSrc || limit->getLimit() < _limitSrc->getLimit()) {
-            _limitSrc = limit;
-        }
-    }
-
     bool _populated = false;
 
-    BSONObj _rawSort;
+    boost::optional<SortExecutor> _sortExecutor;
 
     boost::optional<SortKeyGenerator> _sortKeyGen;
-
-    SortPattern _sortPattern;
-
-    boost::intrusive_ptr<DocumentSourceLimit> _limitSrc;
-
-    uint64_t _maxMemoryUsageBytes;
-    bool _done;
-    std::unique_ptr<MySorter> _sorter;
-    std::unique_ptr<MySorter::Iterator> _output;
-    bool _usedDisk = false;
 };
 
 }  // namespace mongo
