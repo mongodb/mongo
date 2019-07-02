@@ -155,13 +155,6 @@ public:
     }
 
     /**
-     * Returns whether or not the transaction has ended (aborted or committed).
-     */
-    bool isEnded() const {
-        return _endTime != 0;
-    }
-
-    /**
      * Returns whether these stats are for a multi-document transaction.
      */
     bool isForMultiDocumentTransaction() const {
