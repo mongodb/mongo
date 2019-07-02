@@ -142,8 +142,6 @@ selector:
   - jstests/sharding/refine_collection_shard_key_basic.js
   # Enable if SERVER-41813 is backported or 4.4 becomes last-stable
   - jstests/sharding/invalid_system_views_sharded_collection.js
-  # Enable when SERVER-41237 is backported
-  - jstests/sharding/graph_lookup.js
 
 executor:
   config:
