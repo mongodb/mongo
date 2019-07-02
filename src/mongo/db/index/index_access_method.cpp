@@ -593,10 +593,19 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         // Get the next datum and add it to the builder.
         BulkBuilder::Sorter::Data data = it->next();
 
+        // Assert that keys are retrieved from the sorter in non-decreasing order.
+        int cmpData = data.first.woCompare(previousKey, ordering);
+
+        if (cmpData < 0) {
+            severe() << "expected the next key" << data.first.toString()
+                     << " to be greater than the previous key" << previousKey.toString();
+            fassertFailedNoTrace(31171);
+        }
+
         // Before attempting to insert, perform a duplicate key check.
         bool isDup = false;
         if (_descriptor->unique()) {
-            isDup = data.first.woCompare(previousKey, ordering) == 0;
+            isDup = cmpData == 0;
             if (isDup && !dupsAllowed) {
                 if (dupRecords) {
                     dupRecords->insert(data.second);
