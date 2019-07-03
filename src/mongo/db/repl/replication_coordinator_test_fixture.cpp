@@ -55,6 +55,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/system_clock_source.h"
 
 namespace mongo {
 namespace repl {
@@ -94,6 +95,9 @@ ReplCoordTest::~ReplCoordTest() {
         auto opCtx = makeOperationContext();
         shutdown(opCtx.get());
     }
+
+    getGlobalServiceContext()->setFastClockSource(std::make_unique<SystemClockSource>());
+    getGlobalServiceContext()->setPreciseClockSource(std::make_unique<SystemClockSource>());
 }
 
 void ReplCoordTest::assertRunUntil(Date_t newTime) {
