@@ -117,6 +117,7 @@
         confirmFunc: function(res) {
             assert.commandWorkedIgnoringWriteConcernErrors(res);
             assert.eq(res.numIndexesBefore, res.numIndexesAfter);
+            assert.eq(res.note, 'all indexes already exist');
         }
     });
 
