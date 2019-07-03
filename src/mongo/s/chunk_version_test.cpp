@@ -153,5 +153,30 @@ TEST(ChunkVersionConstruction, CreateWithLargeValues) {
     ASSERT_EQ(epoch, version.epoch());
 }
 
+TEST(ChunkVersionManipulation, ThrowsErrorIfOverflowIsAttemptedForMajorVersion) {
+    const uint32_t minorVersion = 0;
+    const uint32_t majorVersion = std::numeric_limits<uint32_t>::max();
+    const auto epoch = OID::gen();
+
+    ChunkVersion version(majorVersion, minorVersion, epoch);
+    ASSERT_EQ(majorVersion, version.majorVersion());
+    ASSERT_EQ(minorVersion, version.minorVersion());
+    ASSERT_EQ(epoch, version.epoch());
+
+    ASSERT_THROWS_CODE(version.incMajor(), DBException, 31180);
+}
+
+TEST(ChunkVersionManipulation, ThrowsErrorIfOverflowIsAttemptedForMinorVersion) {
+    const uint32_t minorVersion = std::numeric_limits<uint32_t>::max();
+    const uint32_t majorVersion = 0;
+    const auto epoch = OID::gen();
+
+    ChunkVersion version(majorVersion, minorVersion, epoch);
+    ASSERT_EQ(majorVersion, version.majorVersion());
+    ASSERT_EQ(minorVersion, version.minorVersion());
+    ASSERT_EQ(epoch, version.epoch());
+
+    ASSERT_THROWS_CODE(version.incMinor(), DBException, 31181);
+}
 }  // namespace
 }  // namespace mongo
