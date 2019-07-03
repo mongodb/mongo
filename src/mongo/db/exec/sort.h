@@ -54,6 +54,9 @@ public:
 
     // Equal to 0 for no limit.
     size_t limit = 0;
+
+    // Whether we allow disk use, disabled by default.
+    bool allowDiskUse = false;
 };
 
 /**
@@ -98,6 +101,8 @@ private:
 
     // Equal to 0 for no limit.
     size_t _limit;
+
+    bool _allowDiskUse;
 
     //
     // Data storage

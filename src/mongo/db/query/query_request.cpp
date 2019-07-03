@@ -63,6 +63,8 @@ const string QueryRequest::metaRecordId("recordId");
 const string QueryRequest::metaSortKey("sortKey");
 const string QueryRequest::metaTextScore("textScore");
 
+const string QueryRequest::kAllowDiskUseField("allowDiskUse");
+
 const long long QueryRequest::kDefaultBatchSize = 101;
 
 namespace {
@@ -262,6 +264,17 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
             }
 
             qr->_wantMore = !el.boolean();
+        } else if (fieldName == kAllowDiskUseField) {
+            if (!getTestCommandsEnabled()) {
+                return Status(ErrorCodes::FailedToParse,
+                              "allowDiskUse is not allowed unless test commands are enabled.");
+            }
+            Status status = checkFieldType(el, Bool);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            qr->_allowDiskUse = el.boolean();
         } else if (fieldName == kCommentField) {
             Status status = checkFieldType(el, String);
             if (!status.isOK()) {
@@ -493,6 +506,10 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
 
     if (_limit) {
         cmdBuilder->append(kLimitField, *_limit);
+    }
+
+    if (_allowDiskUse) {
+        cmdBuilder->append(kAllowDiskUseField, true);
     }
 
     if (_batchSize) {
@@ -1131,6 +1148,9 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     }
     if (!_unwrappedReadPref.isEmpty()) {
         aggregationBuilder.append(QueryRequest::kUnwrappedReadPrefField, _unwrappedReadPref);
+    }
+    if (_allowDiskUse) {
+        aggregationBuilder.append(QueryRequest::kAllowDiskUseField, _allowDiskUse);
     }
     if (_runtimeConstants) {
         BSONObjBuilder rtcBuilder(aggregationBuilder.subobjStart(kRuntimeConstantsField));

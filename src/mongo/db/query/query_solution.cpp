@@ -974,6 +974,7 @@ QuerySolutionNode* SortNode::clone() const {
     copy->_sorts = this->_sorts;
     copy->pattern = this->pattern;
     copy->limit = this->limit;
+    copy->allowDiskUse = this->allowDiskUse;
 
     return copy;
 }

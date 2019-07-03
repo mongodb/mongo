@@ -659,6 +659,7 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
     sort->pattern = sortObj;
     sort->children.push_back(solnRoot);
     solnRoot = sort;
+    sort->allowDiskUse = qr.allowDiskUse();
     // When setting the limit on the sort, we need to consider both
     // the limit N and skip count M. The sort should return an ordered list
     // N + M items so that the skip stage can discard the first M results.

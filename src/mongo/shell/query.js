@@ -47,6 +47,7 @@ DBQuery.prototype.help = function() {
     print("\t.allowPartialResults()");
     print("\t.returnKey()");
     print("\t.showRecordId() - adds a $recordId field to each returned object");
+    print("\t.allowDiskUse() - allow using disk in completing the query");
 
     print("\nCursor methods");
     print("\t.toArray() - iterates through docs and returns an array of the results");
@@ -125,6 +126,10 @@ DBQuery.prototype._exec = function() {
 
             if (this._special && this._query.collation) {
                 throw new Error("collation requires use of read commands");
+            }
+
+            if (this._special && this._query._allowDiskUse) {
+                throw new Error("allowDiskUse option requires use of read commands");
             }
 
             this._cursor = this._mongo.find(this._ns,
@@ -223,6 +228,10 @@ DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
 
     if ("collation" in this._query) {
         cmd["collation"] = this._query.collation;
+    }
+
+    if ("allowDiskUse" in this._query) {
+        cmd["allowDiskUse"] = this._query.allowDiskUse;
     }
 
     if ((this._options & DBQuery.Option.tailable) != 0) {
@@ -469,6 +478,10 @@ DBQuery.prototype.readConcern = function(level) {
 
 DBQuery.prototype.collation = function(collationSpec) {
     return this._addSpecial("collation", collationSpec);
+};
+
+DBQuery.prototype.allowDiskUse = function() {
+    return this._addSpecial("allowDiskUse", true);
 };
 
 /**

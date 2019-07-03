@@ -140,6 +140,9 @@ public:
     static const std::string metaSortKey;
     static const std::string metaTextScore;
 
+    // Allow using disk during the find command.
+    static const std::string kAllowDiskUseField;
+
     const NamespaceString& nss() const {
         invariant(!_nss.isEmpty());
         return _nss;
@@ -239,6 +242,14 @@ public:
 
     void setWantMore(bool wantMore) {
         _wantMore = wantMore;
+    }
+
+    bool allowDiskUse() const {
+        return _allowDiskUse;
+    }
+
+    void setAllowDiskUse(bool allowDiskUse) {
+        _allowDiskUse = allowDiskUse;
     }
 
     bool isExplain() const {
@@ -503,6 +514,8 @@ private:
     // Must be either unset or non-negative. Negative batchSize is illegal but batchSize of 0 is
     // allowed.
     boost::optional<long long> _batchSize;
+
+    bool _allowDiskUse = false;
 
     // Set only when parsed from an OP_QUERY find message. The value is computed by driver or shell
     // and is set to be a min of batchSize and limit provided by user. QR can have set either

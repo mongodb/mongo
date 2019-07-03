@@ -135,9 +135,12 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/repl/read_concern_args",
         "$BUILD_DIR/mongo/db/catalog/collection_catalog",
-        "$BUILD_DIR/mongo/db/pipeline/runtime_constants_idl"
+        # TODO: This dependency edge can be removed when the 'allowDiskUse' option no longer depends
+        # on enabling test commands.
+        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
+        "$BUILD_DIR/mongo/db/pipeline/runtime_constants_idl",
+        "$BUILD_DIR/mongo/db/repl/read_concern_args",
     ],
 )
 

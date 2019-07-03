@@ -129,6 +129,7 @@ PlanStage* buildStages(OperationContext* opCtx,
             SortStageParams params;
             params.pattern = sn->pattern;
             params.limit = sn->limit;
+            params.allowDiskUse = sn->allowDiskUse;
             return new SortStage(opCtx, params, ws, childStage);
         }
         case STAGE_SORT_KEY_GENERATOR: {

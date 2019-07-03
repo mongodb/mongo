@@ -75,6 +75,7 @@ SortStage::SortStage(OperationContext* opCtx,
       _ws(ws),
       _pattern(params.pattern),
       _limit(params.limit),
+      _allowDiskUse(params.allowDiskUse),
       _sorted(false),
       _resultIterator(_data.end()),
       _memUsage(0) {

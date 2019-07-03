@@ -35,6 +35,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
@@ -1089,6 +1090,51 @@ TEST(QueryRequestTest, DefaultQueryParametersCorrect) {
     ASSERT_EQUALS(false, qr->isExhaust());
     ASSERT_EQUALS(false, qr->isAllowPartialResults());
     ASSERT_EQUALS(false, qr->getRuntimeConstants().has_value());
+    ASSERT_EQUALS(false, qr->allowDiskUse());
+}
+
+TEST(QueryRequestTest, ParseCommandAllowDiskUseTrue) {
+    const bool oldTestCommandsEnabledVal = getTestCommandsEnabled();
+    ON_BLOCK_EXIT([&] { setTestCommandsEnabled(oldTestCommandsEnabledVal); });
+    setTestCommandsEnabled(true);
+
+    BSONObj cmdObj = fromjson("{find: 'testns', allowDiskUse: true}");
+    const NamespaceString nss("test.testns");
+    const bool isExplain = false;
+    auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
+
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(true, result.getValue()->allowDiskUse());
+}
+
+TEST(QueryRequestTest, ParseCommandAllowDiskUseFalse) {
+    const bool oldTestCommandsEnabledVal = getTestCommandsEnabled();
+    ON_BLOCK_EXIT([&] { setTestCommandsEnabled(oldTestCommandsEnabledVal); });
+    setTestCommandsEnabled(true);
+
+    BSONObj cmdObj = fromjson("{find: 'testns', allowDiskUse: false}");
+    const NamespaceString nss("test.testns");
+    const bool isExplain = false;
+    auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
+
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(false, result.getValue()->allowDiskUse());
+}
+
+TEST(QueryRequestTest, ParseCommandAllowDiskUseTestCommandsDisabled) {
+    const bool oldTestCommandsEnabledVal = getTestCommandsEnabled();
+    ON_BLOCK_EXIT([&] { setTestCommandsEnabled(oldTestCommandsEnabledVal); });
+    setTestCommandsEnabled(false);
+
+    BSONObj cmdObj = fromjson("{find: 'testns', allowDiskUse: true}");
+    const NamespaceString nss("test.testns");
+    const bool isExplain = false;
+    auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
+
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(ErrorCodes::FailedToParse, result.getStatus().code());
+    ASSERT_STRING_CONTAINS(result.getStatus().toString(),
+                           "allowDiskUse is not allowed unless test commands are enabled.");
 }
 
 //
@@ -1382,6 +1428,46 @@ TEST(QueryRequestTest, ConvertToAggregationWithRuntimeConstantsSucceeds) {
     ASSERT(ar.getValue().getRuntimeConstants().has_value());
     ASSERT_EQ(ar.getValue().getRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
     ASSERT_EQ(ar.getValue().getRuntimeConstants()->getClusterTime(), rtc.getClusterTime());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseTrueSucceeds) {
+    QueryRequest qr(testns);
+    qr.setAllowDiskUse(true);
+    const auto aggCmd = qr.asAggregationCommand();
+    ASSERT_OK(aggCmd.getStatus());
+
+    auto ar = AggregationRequest::parseFromBSON(testns, aggCmd.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT_EQ(true, ar.getValue().shouldAllowDiskUse());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseFalseSucceeds) {
+    QueryRequest qr(testns);
+    qr.setAllowDiskUse(false);
+    const auto aggCmd = qr.asAggregationCommand();
+    ASSERT_OK(aggCmd.getStatus());
+
+    auto ar = AggregationRequest::parseFromBSON(testns, aggCmd.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT_EQ(false, ar.getValue().shouldAllowDiskUse());
+}
+
+TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseTrueSucceeds) {
+    QueryRequest qr(testns);
+    qr.setAllowDiskUse(true);
+    const auto findCmd = qr.asFindCommand();
+
+    BSONElement elem = findCmd[QueryRequest::kAllowDiskUseField];
+    ASSERT_EQ(true, elem.isBoolean());
+    ASSERT_EQ(true, elem.Bool());
+}
+
+TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseFalseSucceeds) {
+    QueryRequest qr(testns);
+    qr.setAllowDiskUse(false);
+    const auto findCmd = qr.asFindCommand();
+
+    ASSERT_FALSE(findCmd[QueryRequest::kAllowDiskUseField]);
 }
 
 TEST(QueryRequestTest, ParseFromLegacyObjMetaOpComment) {
