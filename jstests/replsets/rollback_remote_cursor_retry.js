@@ -48,7 +48,7 @@
     jsTestLog("Failing the next two 'find' commands.");
     assert.commandWorked(syncSource.adminCommand({
         configureFailPoint: "failCommand",
-        data: {closeConnection: true, failInternalCommands: true, failCommands: ["find"]},
+        data: {errorCode: 279, failInternalCommands: true, failCommands: ["find"]},
         mode: {times: 2}
     }));
 
