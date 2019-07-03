@@ -2272,12 +2272,12 @@ TEST_F(TransactionRouterTestWithDefaultSession, AbortPropagatesWriteConcern) {
     WriteConcernOptions writeConcern(10, WriteConcernOptions::SyncMode::NONE, 0);
     opCtx->setWriteConcern(writeConcern);
 
-    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kStart);
 
-    txnRouter->setDefaultAtClusterTime(opCtx);
-    txnRouter->attachTxnFieldsIfNeeded(opCtx, shard1, {});
+    txnRouter.setDefaultAtClusterTime(opCtx);
+    txnRouter.attachTxnFieldsIfNeeded(opCtx, shard1, {});
 
-    auto future = launchAsync([&] { return txnRouter->abortTransaction(operationContext()); });
+    auto future = launchAsync([&] { return txnRouter.abortTransaction(operationContext()); });
 
     onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
