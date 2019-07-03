@@ -117,6 +117,11 @@ protected:
     int _applyProfilingLevel(OperationContext* opCtx,
                              const std::string& dbName,
                              int profilingLevel) const final {
+
+        // The system.profile collection is non-replicated, so writes to it do not cause
+        // replication lag. As such, they should be excluded from Flow Control.
+        opCtx->setShouldParticipateInFlowControl(false);
+
         const bool readOnly = (profilingLevel < 0 || profilingLevel > 2);
         const LockMode dbMode = readOnly ? MODE_S : MODE_X;
 

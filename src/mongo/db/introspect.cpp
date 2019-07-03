@@ -121,7 +121,18 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     // collection.
     bool acquireDbXLock = false;
 
+    auto origFlowControl = opCtx->shouldParticipateInFlowControl();
+
+    // The system.profile collection is non-replicated, so writes to it do not cause
+    // replication lag. As such, they should be excluded from Flow Control.
+    opCtx->setShouldParticipateInFlowControl(false);
+
+    // IX lock acquisitions beyond this block will not be related to writes to system.profile.
+    ON_BLOCK_EXIT(
+        [opCtx, origFlowControl] { opCtx->setShouldParticipateInFlowControl(origFlowControl); });
+
     try {
+
         // Even if the operation we are profiling was interrupted, we still want to output the
         // profiler entry.  This lock guard will prevent lock acquisitions from throwing exceptions
         // before we finish writing the entry. However, our maximum lock timeout overrides
@@ -167,6 +178,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
             Collection* const coll = db->getCollection(opCtx, db->getProfilingNS());
             if (coll) {
+                invariant(!opCtx->shouldParticipateInFlowControl());
                 WriteUnitOfWork wuow(opCtx);
                 OpDebug* const nullOpDebug = nullptr;
                 coll->insertDocument(opCtx, InsertStatement(p), nullOpDebug, false)
@@ -202,6 +214,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
 Status createProfileCollection(OperationContext* opCtx, Database* db) {
     invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_X));
+    invariant(!opCtx->shouldParticipateInFlowControl());
 
     auto& dbProfilingNS = db->getProfilingNS();
     Collection* const collection = db->getCollection(opCtx, dbProfilingNS);
