@@ -287,7 +287,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
         indexInfoObjs.push_back(info);
 
         IndexToBuild index;
-        index.block = collection->getIndexCatalog()->createIndexBuildBlock(opCtx, info, _method);
+        index.block = std::make_unique<IndexBuildBlock>(
+            collection->getIndexCatalog(), collection->ns(), info, _method);
         status = index.block->init(opCtx, collection);
         if (!status.isOK())
             return status;

@@ -174,6 +174,11 @@ public:
 
     // ---- index set modifiers ------
 
+    IndexCatalogEntry* createIndexEntry(OperationContext* opCtx,
+                                        std::unique_ptr<IndexDescriptor> descriptor,
+                                        bool initFromDisk,
+                                        bool isReadyIndex) override;
+
     /**
      * Call this only on an empty collection from inside a WriteUnitOfWork. Index creation on an
      * empty collection can be rolled back as part of a larger WUOW. Returns the full specification
@@ -203,13 +208,14 @@ public:
                         std::function<void(const IndexDescriptor*)> onDropFn) override;
     void dropAllIndexes(OperationContext* opCtx, bool includingIdIndex) override;
 
-    /**
-     * Drops the index.
-     *
-     * The caller must hold the collection X lock and ensure no index builds are in progress on the
-     * collection.
-     */
+
     Status dropIndex(OperationContext* opCtx, const IndexDescriptor* desc) override;
+
+
+    Status dropIndexEntry(OperationContext* opCtx, IndexCatalogEntry* entry) override;
+
+
+    void deleteIndexFromDisk(OperationContext* opCtx, const std::string& indexName) override;
 
     struct IndexKillCriteria {
         std::string ns;
@@ -238,68 +244,6 @@ public:
     void setMultikeyPaths(OperationContext* const opCtx,
                           const IndexDescriptor* desc,
                           const MultikeyPaths& multikeyPaths) override;
-
-    // --- these probably become private?
-
-    class IndexBuildBlock : public IndexCatalog::IndexBuildBlockInterface {
-        IndexBuildBlock(const IndexBuildBlock&) = delete;
-        IndexBuildBlock& operator=(const IndexBuildBlock&) = delete;
-
-    public:
-        IndexBuildBlock(IndexCatalogImpl* catalog,
-                        const NamespaceString& nss,
-                        const BSONObj& spec,
-                        IndexBuildMethod method);
-
-        ~IndexBuildBlock();
-
-        /**
-         * Being called in a 'WriteUnitOfWork' has no effect.
-         */
-        void deleteTemporaryTables(OperationContext* opCtx);
-
-        /**
-         * Must be called from within a `WriteUnitOfWork`
-         */
-        Status init(OperationContext* opCtx, Collection* collection);
-
-        /**
-         * Must be called from within a `WriteUnitOfWork`
-         */
-        void success(OperationContext* opCtx, Collection* collection);
-
-        /**
-         * index build failed, clean up meta data
-         *
-         * Must be called from within a `WriteUnitOfWork`
-         */
-        void fail(OperationContext* opCtx, const Collection* collection);
-
-        IndexCatalogEntry* getEntry() {
-            return _entry;
-        }
-
-        const std::string& getIndexName() const {
-            return _indexName;
-        }
-
-        const BSONObj& getSpec() const {
-            return _spec;
-        }
-
-    private:
-        IndexCatalogImpl* const _catalog;
-        const NamespaceString _nss;
-
-        BSONObj _spec;
-        IndexBuildMethod _method;
-
-        std::string _indexName;
-
-        IndexCatalogEntry* _entry;
-
-        std::unique_ptr<IndexBuildInterceptor> _indexBuildInterceptor;
-    };
 
     // ----- data modifiers ------
 
@@ -337,9 +281,6 @@ public:
     inline std::string getAccessMethodName(const BSONObj& keyPattern) override {
         return _getAccessMethodName(keyPattern);
     }
-
-    std::unique_ptr<IndexCatalog::IndexBuildBlockInterface> createIndexBuildBlock(
-        OperationContext* opCtx, const BSONObj& spec, IndexBuildMethod method) override;
 
     std::string::size_type getLongestIndexNameLength(OperationContext* opCtx) const override;
 
@@ -414,25 +355,6 @@ private:
                         const RecordId& loc,
                         bool logIfError,
                         int64_t* keysDeletedOut);
-
-    /**
-     * this does no sanity checks
-     */
-    Status _dropIndex(OperationContext* opCtx, IndexCatalogEntry* entry);
-
-    // just does disk hanges
-    // doesn't change memory state, etc...
-    void _deleteIndexFromDisk(OperationContext* opCtx, const std::string& indexName);
-
-    // descriptor ownership passes to _setupInMemoryStructures
-    // initFromDisk: Avoids registering a change to undo this operation when set to true.
-    //               You must set this flag if calling this function outside of a UnitOfWork.
-    // isReadyIndex: The index will be directly available for query usage without needing to
-    //               complete the IndexBuildBlock process.
-    IndexCatalogEntry* _setupInMemoryStructures(OperationContext* opCtx,
-                                                std::unique_ptr<IndexDescriptor> descriptor,
-                                                bool initFromDisk,
-                                                bool isReadyIndex);
 
     /**
      * Applies a set of transformations to the user-provided index object 'spec' to make it

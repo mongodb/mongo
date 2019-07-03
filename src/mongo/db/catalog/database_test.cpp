@@ -36,6 +36,7 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -304,8 +305,8 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
                 << "ns"
                 << nss.ns());
 
-        auto indexBuildBlock =
-            indexCatalog->createIndexBuildBlock(opCtx, indexInfoObj, IndexBuildMethod::kHybrid);
+        auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
+            indexCatalog, collection->ns(), indexInfoObj, IndexBuildMethod::kHybrid);
         {
             WriteUnitOfWork wuow(opCtx);
             ASSERT_OK(indexBuildBlock->init(opCtx, collection));

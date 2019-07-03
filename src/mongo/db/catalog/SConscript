@@ -181,6 +181,23 @@ env.Library(
 )
 
 env.Library(
+    target='index_build_block',
+    source=[
+        "index_build_block.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/db/index_names',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/index/index_build_interceptor',
+        '$BUILD_DIR/mongo/db/logical_clock',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+    ]
+)
+
+env.Library(
     target='collection',
     source=[
         "collection.cpp",
@@ -223,6 +240,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/progress_meter',
     ],
     LIBDEPS_PRIVATE=[
+        'index_build_block',
         '$BUILD_DIR/mongo/db/index/index_build_interceptor',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -278,7 +296,6 @@ env.Library(
         "collection_info_cache_impl.cpp",
         "database_holder_impl.cpp",
         "database_impl.cpp",
-        "index_build_block.cpp",
         "index_catalog_entry_impl.cpp",
         "index_catalog_impl.cpp",
         "index_consistency.cpp",
@@ -314,6 +331,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/views_mongod',
     ],
     LIBDEPS_PRIVATE=[
+        'index_build_block',
         'disable_index_spec_namespace_generation',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
@@ -407,6 +425,7 @@ env.CppUnitTest(
         'collection_options',
         'commit_quorum_options',
         'database_holder',
+        'index_build_block',
         'index_build_entry_idl',
         'index_builds_manager',
         'index_key_validate',

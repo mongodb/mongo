@@ -133,6 +133,13 @@ public:
         return {};
     }
 
+    IndexCatalogEntry* createIndexEntry(OperationContext* opCtx,
+                                        std::unique_ptr<IndexDescriptor> descriptor,
+                                        bool initFromDisk,
+                                        bool isReadyIndex) override {
+        return nullptr;
+    }
+
     StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext* const opCtx,
                                                      const BSONObj spec) override {
         return spec;
@@ -164,6 +171,12 @@ public:
     Status dropIndex(OperationContext* const opCtx, const IndexDescriptor* const desc) override {
         return Status::OK();
     }
+
+    Status dropIndexEntry(OperationContext* opCtx, IndexCatalogEntry* entry) override {
+        return Status::OK();
+    }
+
+    void deleteIndexFromDisk(OperationContext* opCtx, const std::string& indexName) override {}
 
     std::vector<BSONObj> getAndClearUnfinishedIndexes(OperationContext* const opCtx) {
         return {};
@@ -209,11 +222,6 @@ public:
 
     std::string getAccessMethodName(const BSONObj& keyPattern) override {
         return "";
-    }
-
-    std::unique_ptr<IndexBuildBlockInterface> createIndexBuildBlock(
-        OperationContext* opCtx, const BSONObj& spec, IndexBuildMethod method) override {
-        return {};
     }
 
     std::string::size_type getLongestIndexNameLength(OperationContext* opCtx) const override {

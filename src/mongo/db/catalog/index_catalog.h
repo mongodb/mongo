@@ -42,6 +42,7 @@
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {
+
 class Client;
 class Collection;
 
@@ -85,8 +86,8 @@ enum class IndexBuildMethod {
  * To inspect the contents of this IndexCatalog, callers may obtain an iterator from
  * getIndexIterator().
  *
- * Index building functionality is supported by the IndexBuildBlockInterface interface. However, it
- * is recommended to use the higher level MultiIndexBlock interface.
+ * Index building functionality is supported by the IndexBuildBlock interface. However, it is
+ * recommended to use the higher level MultiIndexBlock interface.
  *
  * Due to the resource-intensive nature of the index building process, this interface also provides
  * information on which indexes are available for queries through the following functions:
@@ -146,61 +147,6 @@ public:
         std::vector<IndexCatalogEntry*>::const_iterator _iterator;
         std::vector<IndexCatalogEntry*>::const_iterator _endIterator;
         std::unique_ptr<std::vector<IndexCatalogEntry*>> _ownedContainer;
-    };
-
-    /**
-     * Interface for building a single index from an index spec and persisting its state to disk.
-     */
-    class IndexBuildBlockInterface {
-    public:
-        virtual ~IndexBuildBlockInterface() = default;
-
-        /**
-         * Must be called before the object is destructed if init() has been called.
-         * Cleans up the temporary tables that are created for an index build.
-         */
-        virtual void deleteTemporaryTables(OperationContext* opCtx) = 0;
-
-        /**
-         * Initializes a new entry for the index in the IndexCatalog.
-         *
-         * On success, holds pointer to newly created IndexCatalogEntry that can be accessed using
-         * getEntry(). IndexCatalog will still own the entry.
-         *
-         * Must be called from within a `WriteUnitOfWork`
-         */
-        virtual Status init(OperationContext* opCtx, Collection* collection) = 0;
-
-        /**
-         * Marks the state of the index as 'ready' and commits the index to disk.
-         *
-         * Must be called from within a `WriteUnitOfWork`
-         */
-        virtual void success(OperationContext* opCtx, Collection* collection) = 0;
-
-        /**
-         * Aborts the index build and removes any on-disk state where applicable.
-         *
-         * Must be called from within a `WriteUnitOfWork`
-         */
-        virtual void fail(OperationContext* opCtx, const Collection* collection) = 0;
-
-        /**
-         * Returns the IndexCatalogEntry that was created in init().
-         *
-         * This entry is owned by the IndexCatalog.
-         */
-        virtual IndexCatalogEntry* getEntry() = 0;
-
-        /**
-         * Returns the name of the index managed by this index builder.
-         */
-        virtual const std::string& getIndexName() const = 0;
-
-        /**
-         * Returns the index spec used to build this index.
-         */
-        virtual const BSONObj& getSpec() const = 0;
     };
 
     IndexCatalog() = default;
@@ -337,6 +283,20 @@ public:
 
     // ---- index set modifiers ------
 
+    /*
+     * Creates an index entry with the provided descriptor on the catalog's collection.
+     *
+     * 'initFromDisk' avoids registering a change to undo this operation when set to true. You must
+     * set this flag if calling this function outside of a WriteUnitOfWork.
+     *
+     * 'isReadyIndex' controls whether the index will be directly available for query usage without
+     * needing to complete the IndexBuildBlock process.
+     */
+    virtual IndexCatalogEntry* createIndexEntry(OperationContext* opCtx,
+                                                std::unique_ptr<IndexDescriptor> descriptor,
+                                                bool initFromDisk,
+                                                bool isReadyIndex) = 0;
+
     /**
      * Call this only on an empty collection from inside a WriteUnitOfWork. Index creation on an
      * empty collection can be rolled back as part of a larger WUOW. Returns the full specification
@@ -399,12 +359,24 @@ public:
     virtual void dropAllIndexes(OperationContext* opCtx, bool includingIdIndex) = 0;
 
     /**
-     * Drops the index.
+     * Drops the index given its descriptor.
      *
      * The caller must hold the collection X lock and ensure no index builds are in progress on the
      * collection.
      */
     virtual Status dropIndex(OperationContext* const opCtx, const IndexDescriptor* const desc) = 0;
+
+    /**
+     * Drops the index given its catalog entry.
+     *
+     * The caller must hold the collection X lock.
+     */
+    virtual Status dropIndexEntry(OperationContext* opCtx, IndexCatalogEntry* entry) = 0;
+
+    /**
+     * Deletes the index from the durable catalog on disk.
+     */
+    virtual void deleteIndexFromDisk(OperationContext* opCtx, const std::string& indexName) = 0;
 
     // ---- modify single index
 
@@ -476,13 +448,6 @@ public:
     virtual Status compactIndexes(OperationContext* opCtx) = 0;
 
     virtual std::string getAccessMethodName(const BSONObj& keyPattern) = 0;
-
-    /**
-     * Creates an instance of IndexBuildBlockInterface for building an index with the provided index
-     * spex and OperationContext.
-     */
-    virtual std::unique_ptr<IndexBuildBlockInterface> createIndexBuildBlock(
-        OperationContext* opCtx, const BSONObj& spec, IndexBuildMethod method) = 0;
 
     // public helpers
 
