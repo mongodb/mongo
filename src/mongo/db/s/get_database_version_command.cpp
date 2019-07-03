@@ -78,13 +78,12 @@ public:
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer);
             BSONObj versionObj;
             AutoGetDb autoDb(opCtx, _targetDb(), MODE_IS);
-            if (auto db = autoDb.getDb()) {
-                auto& dss = DatabaseShardingState::get(db);
-                auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
 
-                if (auto dbVersion = dss.getDbVersion(opCtx, dssLock)) {
-                    versionObj = dbVersion->toBSON();
-                }
+            const auto dss = DatabaseShardingState::get(opCtx, _targetDb());
+            auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+
+            if (auto dbVersion = dss->getDbVersion(opCtx, dssLock)) {
+                versionObj = dbVersion->toBSON();
             }
             result->getBodyBuilder().append("dbVersion", versionObj);
         }

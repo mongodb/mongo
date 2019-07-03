@@ -89,10 +89,10 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
         // data was inserted into the database.
         AutoGetOrCreateDb autoDb(opCtx, getNss().toString(), MODE_X);
 
-        auto& dss = DatabaseShardingState::get(autoDb.getDb());
-        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
+        auto dss = DatabaseShardingState::get(opCtx, getNss().toString());
+        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
 
-        dss.setMovePrimarySourceManager(opCtx, this, dssLock);
+        dss->setMovePrimarySourceManager(opCtx, this, dssLock);
     }
 
     _state = kCloning;
@@ -149,11 +149,11 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
                                     << " was dropped during the movePrimary operation.");
         }
 
-        auto& dss = DatabaseShardingState::get(autoDb.getDb());
-        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
+        auto dss = DatabaseShardingState::get(opCtx, getNss().toString());
+        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
 
         // IMPORTANT: After this line, the critical section is in place and needs to be signaled
-        dss.enterCriticalSectionCatchUpPhase(opCtx, dssLock);
+        dss->enterCriticalSectionCatchUpPhase(opCtx, dssLock);
     }
 
     _state = kCriticalSection;
@@ -201,12 +201,12 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
                                     << " was dropped during the movePrimary operation.");
         }
 
-        auto& dss = DatabaseShardingState::get(autoDb.getDb());
-        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
+        auto dss = DatabaseShardingState::get(opCtx, getNss().toString());
+        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
 
         // Read operations must begin to wait on the critical section just before we send the
         // commit operation to the config server
-        dss.enterCriticalSectionCommitPhase(opCtx, dssLock);
+        dss->enterCriticalSectionCommitPhase(opCtx, dssLock);
     }
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -262,10 +262,10 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
             }
 
             if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, getNss())) {
-                auto& dss = DatabaseShardingState::get(autoDb.getDb());
-                auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
+                auto dss = DatabaseShardingState::get(opCtx, getNss().toString());
+                auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
 
-                dss.setDbVersion(opCtx, boost::none, dssLock);
+                dss->setDbVersion(opCtx, boost::none, dssLock);
                 uassertStatusOK(validateStatus.withContext(
                     str::stream() << "Unable to verify movePrimary commit for database: "
                                   << getNss().ns()
@@ -359,15 +359,13 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetDb autoDb(opCtx, getNss().toString(), MODE_IX);
 
-        if (autoDb.getDb()) {
-            auto& dss = DatabaseShardingState::get(autoDb.getDb());
-            auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
+        auto dss = DatabaseShardingState::get(opCtx, getNss().toString());
+        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
 
-            dss.clearMovePrimarySourceManager(opCtx, dssLock);
+        dss->clearMovePrimarySourceManager(opCtx, dssLock);
 
-            // Leave the critical section if we're still registered.
-            dss.exitCriticalSection(opCtx, boost::none, dssLock);
-        }
+        // Leave the critical section if we're still registered.
+        dss->exitCriticalSection(opCtx, boost::none, dssLock);
     }
 
     if (_state == kCriticalSection || _state == kCloneCompleted) {

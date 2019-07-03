@@ -41,34 +41,77 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace {
 
-const Database::Decoration<DatabaseShardingState> DatabaseShardingState::get =
-    Database::declareDecoration<DatabaseShardingState>();
+class DatabaseShardingStateMap {
+    DatabaseShardingStateMap& operator=(const DatabaseShardingStateMap&) = delete;
+    DatabaseShardingStateMap(const DatabaseShardingStateMap&) = delete;
 
-DatabaseShardingState::DatabaseShardingState() = default;
+public:
+    static const ServiceContext::Decoration<DatabaseShardingStateMap> get;
+
+    DatabaseShardingStateMap() {}
+
+    DatabaseShardingState& getOrCreate(const StringData dbName) {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+        auto it = _databases.find(dbName);
+        if (it == _databases.end()) {
+            auto inserted =
+                _databases.try_emplace(dbName, std::make_unique<DatabaseShardingState>(dbName));
+            invariant(inserted.second);
+            it = std::move(inserted.first);
+        }
+
+        return *it->second;
+    }
+
+private:
+    using DatabasesMap = StringMap<std::shared_ptr<DatabaseShardingState>>;
+
+    stdx::mutex _mutex;
+    DatabasesMap _databases;
+};
+
+const ServiceContext::Decoration<DatabaseShardingStateMap> DatabaseShardingStateMap::get =
+    ServiceContext::declareDecoration<DatabaseShardingStateMap>();
+
+}  // namespace
+
+DatabaseShardingState::DatabaseShardingState(const StringData dbName)
+    : _dbName(dbName.toString()) {}
+
+DatabaseShardingState* DatabaseShardingState::get(OperationContext* opCtx,
+                                                  const StringData dbName) {
+    // db lock must be held to have a reference to the database sharding state
+    dassert(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS));
+
+    auto& databasesMap = DatabaseShardingStateMap::get(opCtx->getServiceContext());
+    return &databasesMap.getOrCreate(dbName);
+}
 
 void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx, DSSLock&) {
-    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
     _critSec.enterCriticalSectionCatchUpPhase();
 }
 
 void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx, DSSLock&) {
-    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
     _critSec.enterCriticalSectionCommitPhase();
 }
 
 void DatabaseShardingState::exitCriticalSection(OperationContext* opCtx,
                                                 boost::optional<DatabaseVersion> newDbVersion,
                                                 DSSLock&) {
-    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_IX));
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
     _critSec.exitCriticalSection();
     _dbVersion = newDbVersion;
 }
 
 boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(OperationContext* opCtx,
                                                                      DSSLock&) const {
-    if (!opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X)) {
-        invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_IS));
+    if (!opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X)) {
+        invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IS));
     }
     return _dbVersion;
 }
@@ -76,20 +119,18 @@ boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(OperationCo
 void DatabaseShardingState::setDbVersion(OperationContext* opCtx,
                                          boost::optional<DatabaseVersion> newDbVersion,
                                          DSSLock&) {
-    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
-    log() << "setting this node's cached database version for " << get.owner(this)->name() << " to "
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
+    log() << "setting this node's cached database version for " << _dbName << " to "
           << (newDbVersion ? newDbVersion->toBSON() : BSONObj());
     _dbVersion = newDbVersion;
 }
 
 void DatabaseShardingState::checkDbVersion(OperationContext* opCtx, DSSLock&) const {
     invariant(opCtx->lockState()->isLocked());
-    const auto dbName = get.owner(this)->name();
 
-    const auto clientDbVersion = OperationShardingState::get(opCtx).getDbVersion(dbName);
-    if (!clientDbVersion) {
+    const auto clientDbVersion = OperationShardingState::get(opCtx).getDbVersion(_dbName);
+    if (!clientDbVersion)
         return;
-    }
 
     auto criticalSectionSignal = _critSec.getSignal(opCtx->lockState()->isWriteLocked()
                                                         ? ShardingMigrationCriticalSection::kWrite
@@ -98,14 +139,14 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx, DSSLock&) co
         OperationShardingState::get(opCtx).setMovePrimaryCriticalSectionSignal(
             criticalSectionSignal);
 
-        uasserted(StaleDbRoutingVersion(dbName, *clientDbVersion, boost::none),
+        uasserted(StaleDbRoutingVersion(_dbName, *clientDbVersion, boost::none),
                   "movePrimary critical section active");
     }
 
-    uassert(StaleDbRoutingVersion(dbName, *clientDbVersion, boost::none),
+    uassert(StaleDbRoutingVersion(_dbName, *clientDbVersion, boost::none),
             "don't know dbVersion",
             _dbVersion);
-    uassert(StaleDbRoutingVersion(dbName, *clientDbVersion, *_dbVersion),
+    uassert(StaleDbRoutingVersion(_dbName, *clientDbVersion, *_dbVersion),
             "dbVersion mismatch",
             databaseVersion::equal(*clientDbVersion, *_dbVersion));
 }
@@ -117,7 +158,7 @@ MovePrimarySourceManager* DatabaseShardingState::getMovePrimarySourceManager(DSS
 void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,
                                                         MovePrimarySourceManager* sourceMgr,
                                                         DSSLock&) {
-    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
     invariant(sourceMgr);
     invariant(!_sourceMgr);
 
@@ -125,7 +166,7 @@ void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,
 }
 
 void DatabaseShardingState::clearMovePrimarySourceManager(OperationContext* opCtx, DSSLock&) {
-    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_IX));
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
     _sourceMgr = nullptr;
 }
 

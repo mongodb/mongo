@@ -320,11 +320,9 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
 
             if (setField.hasField(ShardDatabaseType::enterCriticalSectionCounter.name())) {
                 AutoGetDb autoDb(opCtx, db, MODE_X);
-                if (autoDb.getDb()) {
-                    auto& dss = DatabaseShardingState::get(autoDb.getDb());
-                    auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
-                    dss.setDbVersion(opCtx, boost::none, dssLock);
-                }
+                auto dss = DatabaseShardingState::get(opCtx, db);
+                auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
+                dss->setDbVersion(opCtx, boost::none, dssLock);
             }
         }
     }
@@ -368,11 +366,9 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
             bsonExtractStringField(documentKey, ShardDatabaseType::name.name(), &deletedDatabase));
 
         AutoGetDb autoDb(opCtx, deletedDatabase, MODE_X);
-        if (autoDb.getDb()) {
-            auto& dss = DatabaseShardingState::get(autoDb.getDb());
-            auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
-            dss.setDbVersion(opCtx, boost::none, dssLock);
-        }
+        auto dss = DatabaseShardingState::get(opCtx, deletedDatabase);
+        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
+        dss->setDbVersion(opCtx, boost::none, dssLock);
     }
 
     if (nss == NamespaceString::kServerConfigurationNamespace) {

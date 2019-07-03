@@ -34,6 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
@@ -156,14 +157,12 @@ public:
         _dropDatabaseFromShard(opCtx, dbType.getPrimary(), dbname);
 
         // Drop the database from each of the remaining shards.
-        {
-            std::vector<ShardId> allShardIds;
-            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&allShardIds);
-
-            for (const ShardId& shardId : allShardIds) {
-                _dropDatabaseFromShard(opCtx, shardId, dbname);
-            }
+        std::vector<ShardId> allShardIds;
+        Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&allShardIds);
+        for (const ShardId& shardId : allShardIds) {
+            _dropDatabaseFromShard(opCtx, shardId, dbname);
         }
+
 
         // Remove the database entry from the metadata.
         const Status status =
@@ -173,6 +172,19 @@ public:
                                                  ShardingCatalogClient::kMajorityWriteConcern);
         uassertStatusOKWithContext(
             status, str::stream() << "Could not remove database '" << dbname << "' from metadata");
+
+        // Send _flushDatabaseCacheUpdates to all shards
+        for (const ShardId& shardId : allShardIds) {
+            const auto shard =
+                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
+            auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                "admin",
+                BSON("_flushDatabaseCacheUpdates" << dbname),
+                Shard::RetryPolicy::kIdempotent));
+            // TODO SERVER-42112: uassert on the cmdResponse.
+        }
 
         ShardingLogging::get(opCtx)->logChange(
             opCtx, "dropDatabase", dbname, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);

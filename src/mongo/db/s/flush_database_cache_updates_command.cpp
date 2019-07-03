@@ -115,23 +115,16 @@ public:
 
             {
                 AutoGetDb autoDb(opCtx, _dbName(), MODE_IS);
-                if (!autoDb.getDb()) {
-                    uasserted(ErrorCodes::NamespaceNotFound,
-                              str::stream()
-                                  << "Can't issue _flushDatabaseCacheUpdates on the database "
-                                  << _dbName()
-                                  << " because it does not exist on this shard.");
-                }
 
                 // If the primary is in the critical section, secondaries must wait for the commit
                 // to finish on the primary in case a secondary's caller has an afterClusterTime
                 // inclusive of the commit (and new writes to the committed chunk) that hasn't yet
                 // propagated back to this shard. This ensures the read your own writes causal
                 // consistency guarantee.
-                auto& dss = DatabaseShardingState::get(autoDb.getDb());
-                auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
+                const auto dss = DatabaseShardingState::get(opCtx, _dbName());
+                auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
 
-                if (auto criticalSectionSignal = dss.getCriticalSectionSignal(
+                if (auto criticalSectionSignal = dss->getCriticalSectionSignal(
                         ShardingMigrationCriticalSection::kRead, dssLock)) {
                     oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
                 }

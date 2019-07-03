@@ -228,29 +228,32 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
     auto const shardingState = ShardingState::get(opCtx);
     invariant(shardingState->canAcceptShardedCommands());
 
-    const auto refreshedDbVersion =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName))
-            .databaseVersion();
+    DatabaseVersion refreshedDbVersion;
+    try {
+        refreshedDbVersion =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName))
+                .databaseVersion();
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // db has been dropped, set the db version to boost::none
+        Lock::DBLock dbLock(opCtx, dbName, MODE_X);
+        auto dss = DatabaseShardingState::get(opCtx, dbName);
+        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
+
+        dss->setDbVersion(opCtx, boost::none, dssLock);
+        return;
+    }
 
     // First, check under a shared lock if another thread already updated the cached version.
     // This is a best-effort optimization to make as few threads as possible to convoy on the
     // exclusive lock below.
-    auto databaseHolder = DatabaseHolder::get(opCtx);
     {
         // Take the DBLock directly rather than using AutoGetDb, to prevent a recursive call
         // into checkDbVersion().
         Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-        auto db = databaseHolder->getDb(opCtx, dbName);
-        if (!db) {
-            log() << "Database " << dbName
-                  << " has been dropped; not caching the refreshed databaseVersion";
-            return;
-        }
+        auto dss = DatabaseShardingState::get(opCtx, dbName);
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
 
-        auto& dss = DatabaseShardingState::get(db);
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
-
-        const auto cachedDbVersion = dss.getDbVersion(opCtx, dssLock);
+        const auto cachedDbVersion = dss->getDbVersion(opCtx, dssLock);
         if (cachedDbVersion && cachedDbVersion->getUuid() == refreshedDbVersion.getUuid() &&
             cachedDbVersion->getLastMod() >= refreshedDbVersion.getLastMod()) {
             LOG(2) << "Skipping setting cached databaseVersion for " << dbName
@@ -263,17 +266,10 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
 
     // The cached version is older than the refreshed version; update the cached version.
     Lock::DBLock dbLock(opCtx, dbName, MODE_X);
-    auto db = databaseHolder->getDb(opCtx, dbName);
-    if (!db) {
-        log() << "Database " << dbName
-              << " has been dropped; not caching the refreshed databaseVersion";
-        return;
-    }
+    auto dss = DatabaseShardingState::get(opCtx, dbName);
+    auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
 
-    auto& dss = DatabaseShardingState::get(db);
-    auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
-
-    dss.setDbVersion(opCtx, std::move(refreshedDbVersion), dssLock);
+    dss->setDbVersion(opCtx, std::move(refreshedDbVersion), dssLock);
 }
 
 }  // namespace mongo

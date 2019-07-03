@@ -13,8 +13,8 @@
 
     const st = new ShardingTest({
         mongos: 2,
-        rs0: {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]},
-        rs1: {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]},
+        rs0: {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0}}]},
+        rs1: {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0}}]},
         verbose: 2
     });
 
@@ -30,42 +30,55 @@
     checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
 
     // Use 'enableSharding' to create the database only in the sharding catalog (the database will
-    // not exist on any shards).
+    // not exist on any shards). Manually update the 'primary' field in the new dbEntry in
+    // config.databases so that we know which shard is the primary.
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+    assert.commandWorked(st.s.getDB("config").getCollection("databases").update({_id: dbName}, {
+        $set: {primary: st.rs1.name}
+    }));
 
     // Check that a command that attaches databaseVersion returns empty results, even though the
-    // database does not actually exist on any shard (because the version won't be checked).
+    // database does not actually exist on any shard.
     assert.commandWorked(st.s.getDB(dbName).runCommand({listCollections: 1}));
 
-    // Once SERVER-34431 goes in, this should have caused the primary shard's primary to refresh its
-    // in-memory and on-disk caches.
+    // Ensure the current primary shard's primary has written the new database entry to disk.
+    st.rs1.getPrimary().adminCommand({_flushDatabaseCacheUpdates: dbName, syncFromConfig: false});
+
+    // Ensure the database entry on the current primary shard has replicated to the secondary.
+    st.rs1.awaitReplication();
+
+    const dbEntry0 = st.s.getDB("config").getCollection("databases").findOne({_id: dbName});
+
+    // The primary shard's primary should have refreshed its in-memory and on-disk caches. The
+    // primary shard's secondary should have refreshed its on-disk entry.
     checkInMemoryDatabaseVersion(st.rs0.getPrimary(), dbName, {});
-    checkInMemoryDatabaseVersion(st.rs1.getPrimary(), dbName, {});
+    checkInMemoryDatabaseVersion(st.rs1.getPrimary(), dbName, dbEntry0.version);
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), dbName, {});
     checkInMemoryDatabaseVersion(st.rs1.getSecondary(), dbName, {});
     checkOnDiskDatabaseVersion(st.rs0.getPrimary(), dbName, undefined);
-    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, dbEntry0);
     checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, undefined);
-    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, dbEntry0);
 
     assert.commandWorked(st.s.getDB(dbName).runCommand(
         {listCollections: 1, $readPreference: {mode: "secondary"}, readConcern: {level: "local"}}));
 
-    // Once SERVER-34431 goes in, this should have caused the primary shard's secondary to refresh
-    // its in-memory cache (its on-disk cache was updated when the primary refreshed, above).
+    // The primary shard's secondary should have refreshed its in-memory cache (its on-disk cache
+    // was updated when the primary refreshed, above).
     checkInMemoryDatabaseVersion(st.rs0.getPrimary(), dbName, {});
-    checkInMemoryDatabaseVersion(st.rs1.getPrimary(), dbName, {});
+    checkInMemoryDatabaseVersion(st.rs1.getPrimary(), dbName, dbEntry0.version);
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), dbName, {});
-    checkInMemoryDatabaseVersion(st.rs1.getSecondary(), dbName, {});
+    checkInMemoryDatabaseVersion(st.rs1.getSecondary(), dbName, dbEntry0.version);
     checkOnDiskDatabaseVersion(st.rs0.getPrimary(), dbName, undefined);
-    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, dbEntry0);
     checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, undefined);
-    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, dbEntry0);
 
-    // Use 'movePrimary' to ensure shard0 is the primary shard. This will create the database on the
-    // shards only if shard0 was not already the primary shard.
+    // Use 'movePrimary' to ensure shard0 is the primary shard.
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
     const dbEntry1 = st.s.getDB("config").getCollection("databases").findOne({_id: dbName});
+    assert.eq(dbEntry1.version.uuid, dbEntry0.version.uuid);
+    assert.eq(dbEntry1.version.lastMod, dbEntry0.version.lastMod + 1);
 
     // Ensure the database actually gets created on the primary shard by creating a collection in
     // it.
@@ -82,15 +95,16 @@
     // Ensure the database entry on the current primary shard has replicated to the secondary.
     st.rs0.awaitReplication();
 
-    // The primary shard's primary should have refreshed.
+    // The primary shard's primary should have refreshed its in-memory cache and on-disk entry. The
+    // primary shard's secondary will have refreshed its on-disk entry.
     checkInMemoryDatabaseVersion(st.rs0.getPrimary(), dbName, dbEntry1.version);
     checkInMemoryDatabaseVersion(st.rs1.getPrimary(), dbName, {});
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), dbName, {});
     checkInMemoryDatabaseVersion(st.rs1.getSecondary(), dbName, {});
     checkOnDiskDatabaseVersion(st.rs0.getPrimary(), dbName, dbEntry1);
-    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, dbEntry0);
     checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry1);
-    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, dbEntry0);
 
     // Now run a command that attaches databaseVersion with readPref=secondary to make the current
     // primary shard's secondary refresh its in-memory database version from its on-disk entry.
@@ -98,15 +112,15 @@
     assert.commandWorked(st.s.getDB(dbName).runCommand(
         {listCollections: 1, $readPreference: {mode: "secondary"}, readConcern: {level: "local"}}));
 
-    // The primary shard's secondary should have refreshed.
+    // The primary shard's secondary should have refreshed its in memory-cache.
     checkInMemoryDatabaseVersion(st.rs0.getPrimary(), dbName, dbEntry1.version);
     checkInMemoryDatabaseVersion(st.rs1.getPrimary(), dbName, {});
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry1.version);
     checkInMemoryDatabaseVersion(st.rs1.getSecondary(), dbName, {});
     checkOnDiskDatabaseVersion(st.rs0.getPrimary(), dbName, dbEntry1);
-    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, dbEntry0);
     checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry1);
-    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, dbEntry0);
 
     // Make "staleMongos" load the stale database info into memory.
     const freshMongos = st.s0;
@@ -135,9 +149,9 @@
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), dbName, {});
     checkInMemoryDatabaseVersion(st.rs1.getSecondary(), dbName, {});
     checkOnDiskDatabaseVersion(st.rs0.getPrimary(), dbName, dbEntry1);
-    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, dbEntry0);
     checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry1);
-    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, dbEntry0);
 
     // Run listCollections with readPref=secondary from the stale mongos. First, this should cause
     // the old primary shard's secondary to provoke the old primary shard's primary to refresh. Then
@@ -157,8 +171,7 @@
     checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry2);
     checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, dbEntry2);
 
-    // Ensure that dropping the database drops it from all shards, which clears their in-memory
-    // caches but not their on-disk caches.
+    // Drop the database
     jsTest.log("About to drop database from the cluster");
     assert.commandWorked(freshMongos.getDB(dbName).runCommand({dropDatabase: 1}));
 
@@ -166,19 +179,16 @@
     st.rs0.awaitReplication();
     st.rs1.awaitReplication();
 
-    // Once SERVER-34431 goes in, this should not have caused the in-memory versions to be cleared.
+    // The in-memory caches will be cleared on both shard's primary nodes and the on-disk database
+    // entries will be cleared on all shards.
     checkInMemoryDatabaseVersion(st.rs0.getPrimary(), dbName, {});
     checkInMemoryDatabaseVersion(st.rs1.getPrimary(), dbName, {});
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), dbName, {});
     checkInMemoryDatabaseVersion(st.rs1.getSecondary(), dbName, {});
-    checkOnDiskDatabaseVersion(st.rs0.getPrimary(), dbName, dbEntry2);
-    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, dbEntry2);
-    checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry2);
-    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, dbEntry2);
-
-    // Confirm that we have a bug (SERVER-34431), where if a database is dropped and recreated on a
-    // different shard, a stale mongos that has cached the old database's primary shard will *not*
-    // be routed to the new database's primary shard (and will see an empty database).
+    checkOnDiskDatabaseVersion(st.rs0.getPrimary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
 
     // Use 'enableSharding' to create the database only in the sharding catalog (the database will
     // not exist on any shards).
@@ -186,37 +196,42 @@
 
     // Simulate that the database was created on 'shard0' by directly modifying the database entry
     // (we cannot use movePrimary, since movePrimary creates the database on the shards).
-    const dbEntry = st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
     assert.writeOK(st.s.getDB("config").getCollection("databases").update({_id: dbName}, {
         $set: {primary: st.shard0.shardName}
     }));
+    const dbEntry = st.s.getDB("config").getCollection("databases").findOne({_id: dbName});
 
     assert.commandWorked(st.s.getDB(dbName).runCommand({listCollections: 1}));
 
-    // Once SERVER-34431 goes in, this should have caused the primary shard's primary to refresh its
-    // in-memory and on-disk caches.
-    checkInMemoryDatabaseVersion(st.rs0.getPrimary(), dbName, {});
+    // Ensure the current primary shard's primary has written the new database entry to disk.
+    st.rs0.getPrimary().adminCommand({_flushDatabaseCacheUpdates: dbName, syncFromConfig: false});
+
+    // Ensure the database entry on the current primary shard has replicated to the secondary.
+    st.rs0.awaitReplication();
+
+    // The primary shard's primary should have refreshed its in-memory and on-disk caches.
+    checkInMemoryDatabaseVersion(st.rs0.getPrimary(), dbName, dbEntry.version);
     checkInMemoryDatabaseVersion(st.rs1.getPrimary(), dbName, {});
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), dbName, {});
     checkInMemoryDatabaseVersion(st.rs1.getSecondary(), dbName, {});
-    checkOnDiskDatabaseVersion(st.rs0.getPrimary(), dbName, dbEntry2);
-    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, dbEntry2);
-    checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry2);
-    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, dbEntry2);
+    checkOnDiskDatabaseVersion(st.rs0.getPrimary(), dbName, dbEntry);
+    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry);
+    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
 
     assert.commandWorked(st.s.getDB(dbName).runCommand(
         {listCollections: 1, $readPreference: {mode: "secondary"}, readConcern: {level: "local"}}));
 
-    // Once SERVER-34431 goes in, this should have caused the primary shard's secondary to refresh
-    // its in-memory cache (its on-disk cache was already updated when the primary refreshed).
-    checkInMemoryDatabaseVersion(st.rs0.getPrimary(), dbName, {});
+    // The primary shard's secondary should have refreshed its in-memory cache (its on-disk cache
+    // was already updated when the primary refreshed).
+    checkInMemoryDatabaseVersion(st.rs0.getPrimary(), dbName, dbEntry.version);
     checkInMemoryDatabaseVersion(st.rs1.getPrimary(), dbName, {});
-    checkInMemoryDatabaseVersion(st.rs0.getSecondary(), dbName, {});
+    checkInMemoryDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry.version);
     checkInMemoryDatabaseVersion(st.rs1.getSecondary(), dbName, {});
-    checkOnDiskDatabaseVersion(st.rs0.getPrimary(), dbName, dbEntry2);
-    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, dbEntry2);
-    checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry2);
-    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, dbEntry2);
+    checkOnDiskDatabaseVersion(st.rs0.getPrimary(), dbName, dbEntry);
+    checkOnDiskDatabaseVersion(st.rs1.getPrimary(), dbName, undefined);
+    checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry);
+    checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
 
     st.stop();
 })();

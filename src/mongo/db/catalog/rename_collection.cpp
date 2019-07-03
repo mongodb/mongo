@@ -108,12 +108,6 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
     if (!db)
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
 
-    {
-        auto& dss = DatabaseShardingState::get(db);
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
-        dss.checkDbVersion(opCtx, dssLock);
-    }
-
     Collection* const sourceColl = db->getCollection(opCtx, source);
     if (!sourceColl) {
         if (ViewCatalog::get(db)->lookup(opCtx, source.ns()))
@@ -286,6 +280,13 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     DisableDocumentValidation validationDisabler(opCtx);
 
     Lock::DBLock dbWriteLock(opCtx, source.db(), MODE_IX);
+
+    {
+        auto dss = DatabaseShardingState::get(opCtx, source.db());
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+        dss->checkDbVersion(opCtx, dssLock);
+    }
+
     boost::optional<Lock::CollectionLock> sourceLock;
     boost::optional<Lock::CollectionLock> targetLock;
     // To prevent deadlock, always lock system.views collection in the end because concurrent
@@ -333,6 +334,12 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     DisableDocumentValidation validationDisabler(opCtx);
 
     Lock::DBLock dbWriteLock(opCtx, source.db(), MODE_X);
+
+    {
+        auto dss = DatabaseShardingState::get(opCtx, source.db());
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+        dss->checkDbVersion(opCtx, dssLock);
+    }
 
     auto status = checkSourceAndTargetNamespaces(opCtx, source, target, options);
     if (!status.isOK())
@@ -420,17 +427,17 @@ Status renameBetweenDBs(OperationContext* opCtx,
     if (!opCtx->lockState()->isW())
         globalWriteLock.emplace(opCtx);
 
+    {
+        auto dss = DatabaseShardingState::get(opCtx, source.db());
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+        dss->checkDbVersion(opCtx, dssLock);
+    }
+
     DisableDocumentValidation validationDisabler(opCtx);
 
     auto sourceDB = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
     if (!sourceDB)
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
-
-    {
-        auto& dss = DatabaseShardingState::get(sourceDB);
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
-        dss.checkDbVersion(opCtx, dssLock);
-    }
 
     boost::optional<AutoStatsTracker> statsTracker(boost::in_place_init,
                                                    opCtx,

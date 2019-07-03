@@ -925,10 +925,11 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
 
     // We hold the database MODE_IX lock throughout the index build.
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, nss.db());
-    if (db) {
-        auto& dss = DatabaseShardingState::get(db);
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
-        dss.checkDbVersion(opCtx, dssLock);
+
+    {
+        auto dss = DatabaseShardingState::get(opCtx, nss.db());
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+        dss->checkDbVersion(opCtx, dssLock);
     }
 
     invariant(db,

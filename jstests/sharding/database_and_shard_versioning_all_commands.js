@@ -449,7 +449,7 @@
         testCases[cmd] = {skip: "must define test coverage for 4.0 backwards compatibility"};
     });
 
-    class AllCommandsTestRunner {
+    class TestRunner {
         constructor() {
             this.st = new ShardingTest(this.getShardingTestOptions());
             let db = this.st.s.getDB(dbName);
@@ -474,10 +474,26 @@
         }
 
         getShardingTestOptions() {
-            throw new Error("not implemented");
+            return {shards: 2};
         }
         makeShardDatabaseCacheStale() {
-            throw new Error("not implemented");
+            let fromShard = this.st.getPrimaryShard(dbName);
+            let toShard = this.st.getOther(fromShard);
+
+            this.primaryShard = toShard;
+            this.previousDbVersion = this.dbVersion;
+
+            assert.commandWorked(this.st.s0.adminCommand({movePrimary: dbName, to: toShard.name}));
+            this.dbVersion =
+                this.st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+
+            // The dbVersion should have changed due to the movePrimary operation.
+            assert.eq(this.dbVersion.lastMod, this.previousDbVersion.lastMod + 1);
+
+            // The fromShard should have cleared its in-memory database info.
+            const res = fromShard.adminCommand({getDatabaseVersion: dbName});
+            assert.commandWorked(res);
+            assert.eq({}, res.dbVersion);
         }
 
         assertSentDatabaseVersion(testCase, commandProfile) {
@@ -586,43 +602,7 @@
         }
     }
 
-    class DropDatabaseTestRunner extends AllCommandsTestRunner {
-        getShardingTestOptions() {
-            return {shards: 1};
-        }
-
-        makeShardDatabaseCacheStale() {
-            // Drop the database from the shard to clear the shard's cached in-memory database info.
-            assert.commandWorked(this.primaryShard.getDB(dbName).runCommand({dropDatabase: 1}));
-        }
-    }
-
-    class MovePrimaryTestRunner extends AllCommandsTestRunner {
-        getShardingTestOptions() {
-            return {shards: 2};
-        }
-
-        makeShardDatabaseCacheStale() {
-            let fromShard = this.st.getPrimaryShard(dbName);
-            let toShard = this.st.getOther(fromShard);
-
-            this.primaryShard = toShard;
-            this.previousDbVersion = this.dbVersion;
-
-            assert.commandWorked(this.st.s0.adminCommand({movePrimary: dbName, to: toShard.name}));
-            this.dbVersion =
-                this.st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
-
-            // The dbVersion should have changed due to the movePrimary operation.
-            assert.eq(this.dbVersion.lastMod, this.previousDbVersion.lastMod + 1);
-        }
-    }
-
-    let dropDatabaseTestRunner = new DropDatabaseTestRunner();
-    dropDatabaseTestRunner.runCommands();
-    dropDatabaseTestRunner.shutdown();
-
-    let movePrimaryTestRunner = new MovePrimaryTestRunner();
-    movePrimaryTestRunner.runCommands();
-    movePrimaryTestRunner.shutdown();
+    let testRunner = new TestRunner();
+    testRunner.runCommands();
+    testRunner.shutdown();
 })();

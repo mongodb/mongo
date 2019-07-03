@@ -49,11 +49,9 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, 
           auto databaseHolder = DatabaseHolder::get(opCtx);
           return databaseHolder->getDb(opCtx, dbName);
       }()) {
-    if (_db) {
-        auto& dss = DatabaseShardingState::get(_db);
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
-        dss.checkDbVersion(opCtx, dssLock);
-    }
+    auto dss = DatabaseShardingState::get(opCtx, dbName);
+    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+    dss->checkDbVersion(opCtx, dssLock);
 }
 
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
@@ -183,9 +181,9 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
         _db = databaseHolder->openDb(opCtx, dbName, &_justCreated);
     }
 
-    auto& dss = DatabaseShardingState::get(_db);
-    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
-    dss.checkDbVersion(opCtx, dssLock);
+    auto dss = DatabaseShardingState::get(opCtx, dbName);
+    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+    dss->checkDbVersion(opCtx, dssLock);
 }
 
 ConcealCollectionCatalogChangesBlock::ConcealCollectionCatalogChangesBlock(OperationContext* opCtx)

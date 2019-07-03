@@ -339,6 +339,15 @@ bool indexesAlreadyExist(OperationContext* opCtx,
 }
 
 /**
+ * Checks database sharding state. Throws exception on error.
+ */
+void checkDatabaseShardingState(OperationContext* opCtx, StringData dbName) {
+    auto dss = DatabaseShardingState::get(opCtx, dbName);
+    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+    dss->checkDbVersion(opCtx, dssLock);
+}
+
+/**
  * Opens or creates database for index creation.
  * On database creation, the lock will be made exclusive.
  */
@@ -353,16 +362,9 @@ Database* getOrCreateDatabase(OperationContext* opCtx, StringData dbName, Lock::
     // replication state from changing. Abandon the current snapshot to see changed metadata.
     opCtx->recoveryUnit()->abandonSnapshot();
     dbLock->relockWithMode(MODE_X);
-    return databaseHolder->openDb(opCtx, dbName);
-}
 
-/**
- * Checks database sharding state. Throws exception on error.
- */
-void checkDatabaseShardingState(OperationContext* opCtx, Database* db) {
-    auto& dss = DatabaseShardingState::get(db);
-    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, &dss);
-    dss.checkDbVersion(opCtx, dssLock);
+    checkDatabaseShardingState(opCtx, dbName);
+    return databaseHolder->openDb(opCtx, dbName);
 }
 
 /**
@@ -428,6 +430,7 @@ bool runCreateIndexes(OperationContext* opCtx,
 
     // Do not use AutoGetOrCreateDb because we may relock the database in mode X.
     Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
+    checkDatabaseShardingState(opCtx, ns.db());
     if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
         uasserted(ErrorCodes::NotMaster,
                   str::stream() << "Not primary while creating indexes in " << ns.ns());
@@ -438,8 +441,6 @@ bool runCreateIndexes(OperationContext* opCtx,
     }
 
     auto db = getOrCreateDatabase(opCtx, ns.db(), &dbLock);
-
-    checkDatabaseShardingState(opCtx, db);
 
     opCtx->recoveryUnit()->abandonSnapshot();
     boost::optional<Lock::CollectionLock> exclusiveCollectionLock(
@@ -566,8 +567,6 @@ bool runCreateIndexes(OperationContext* opCtx,
     db = databaseHolder->getDb(opCtx, ns.db());
     invariant(db->getCollection(opCtx, ns));
 
-    checkDatabaseShardingState(opCtx, db);
-
     // Perform the third and final drain while holding the exclusive collection lock.
     uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
 
@@ -624,6 +623,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
     {
         // Do not use AutoGetOrCreateDb because we may relock the database in mode X.
         Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
+        checkDatabaseShardingState(opCtx, ns.db());
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
             uasserted(ErrorCodes::NotMaster,
                       str::stream() << "Not primary while creating indexes in " << ns.ns());
@@ -634,8 +634,6 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         }
 
         auto db = getOrCreateDatabase(opCtx, ns.db(), &dbLock);
-
-        checkDatabaseShardingState(opCtx, db);
 
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock collLock(opCtx, ns, MODE_X);
