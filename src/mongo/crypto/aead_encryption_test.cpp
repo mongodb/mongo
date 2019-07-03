@@ -147,6 +147,17 @@ TEST(AEAD, EncryptAndDecrypt) {
                                   &plainTextDecryptLen));
 
     ASSERT_EQ(0, std::memcmp(plainText.data(), plainTextTest.data(), 128));
+
+    // Decrypt should fail if we alter the key.
+    (*aesVector)[0] ^= 1;
+    key = SymmetricKey(aesVector, aesAlgorithm, "aeadEncryptDecryptTest");
+    ASSERT_NOT_OK(crypto::aeadDecrypt(key,
+                                      cryptoBuffer.data(),
+                                      cryptoBuffer.size(),
+                                      associatedData.data(),
+                                      dataLen,
+                                      plainText.data(),
+                                      &plainTextDecryptLen));
 }
 }  // namespace
 }  // namespace mongo
