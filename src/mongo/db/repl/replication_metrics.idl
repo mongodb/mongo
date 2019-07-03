@@ -81,6 +81,11 @@ structs:
                 description: "Number of times this node stepped down because it saw a higher term"
                 type: long
                 default: 0
+            numCatchUps:
+                description: "Number of elections that required the primary to catch up because it
+                              was behind"
+                type: long
+                default: 0
 
     ElectionCandidateMetrics:
         description: "Stores metrics that are specific to the last election in which the node was a

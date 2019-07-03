@@ -35,6 +35,7 @@ ${tojson(serverStatusResponse)}`));
         verifyElectionReasonCounterFields(serverStatusResponse, "electionTimeout");
         verifyElectionReasonCounterFields(serverStatusResponse, "freezeTimeout");
         verifyElectionMetricsField(serverStatusResponse, "numStepDownsCausedByHigherTerm");
+        verifyElectionMetricsField(serverStatusResponse, "numCatchUps");
     }
 
     // Set up the replica set.
