@@ -5,6 +5,7 @@
 
     load("jstests/libs/check_log.js");
     load("jstests/libs/write_concern_util.js");
+    load("jstests/replsets/libs/election_metrics.js");
     load("jstests/replsets/rslib.js");
 
     var name = "catch_up";
@@ -65,6 +66,7 @@
             assert.writeOK(oldPrimary.getDB("test").foo.insert({x: i}));
         }
         var latestOpOnOldPrimary = getLatestOp(oldPrimary);
+
         // New primary wins immediately, but needs to catch up.
         var newPrimary = stepUpNode(oldSecondaries[0]);
         var latestOpOnNewPrimary = getLatestOp(newPrimary);
@@ -104,12 +106,24 @@
     rst.awaitReplication();
 
     jsTest.log("Case 2: The primary needs to catch up, succeeds in time.");
+    let initialNewPrimaryStatus =
+        assert.commandWorked(rst.getSecondaries()[0].adminCommand({serverStatus: 1}));
+
     var stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
 
     // Disable fail point to allow replication.
     restartServerReplication(stepUpResults.oldSecondaries);
     // getPrimary() blocks until the primary finishes drain mode.
     assert.eq(stepUpResults.newPrimary, rst.getPrimary());
+
+    // Check that the 'numCatchUps' field has been incremented in serverStatus.
+    let newNewPrimaryStatus =
+        assert.commandWorked(stepUpResults.newPrimary.adminCommand({serverStatus: 1}));
+    verifyServerStatusChange(initialNewPrimaryStatus.electionMetrics,
+                             newNewPrimaryStatus.electionMetrics,
+                             'numCatchUps',
+                             1);
+
     // Wait for all secondaries to catch up
     rst.awaitReplication();
     // Check the latest op on old primary is preserved on the new one.

@@ -128,6 +128,11 @@ void ReplicationMetrics::incrementNumStepDownsCausedByHigherTerm() {
         _electionMetrics.getNumStepDownsCausedByHigherTerm() + 1);
 }
 
+void ReplicationMetrics::incrementNumCatchUps() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _electionMetrics.setNumCatchUps(_electionMetrics.getNumCatchUps() + 1);
+}
+
 int ReplicationMetrics::getNumStepUpCmdsCalled_forTesting() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _electionMetrics.getStepUpCmd().getCalled();
@@ -181,6 +186,11 @@ int ReplicationMetrics::getNumFreezeTimeoutsSuccessful_forTesting() {
 int ReplicationMetrics::getNumStepDownsCausedByHigherTerm_forTesting() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _electionMetrics.getNumStepDownsCausedByHigherTerm();
+}
+
+int ReplicationMetrics::getNumCatchUps_forTesting() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _electionMetrics.getNumCatchUps();
 }
 
 BSONObj ReplicationMetrics::getElectionMetricsBSON() {

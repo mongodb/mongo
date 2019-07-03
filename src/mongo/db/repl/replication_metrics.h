@@ -51,6 +51,7 @@ public:
     void incrementNumElectionsCalledForReason(TopologyCoordinator::StartElectionReason reason);
     void incrementNumElectionsSuccessfulForReason(TopologyCoordinator::StartElectionReason reason);
     void incrementNumStepDownsCausedByHigherTerm();
+    void incrementNumCatchUps();
 
     int getNumStepUpCmdsCalled_forTesting();
     int getNumPriorityTakeoversCalled_forTesting();
@@ -63,6 +64,7 @@ public:
     int getNumElectionTimeoutsSuccessful_forTesting();
     int getNumFreezeTimeoutsSuccessful_forTesting();
     int getNumStepDownsCausedByHigherTerm_forTesting();
+    int getNumCatchUps_forTesting();
 
     BSONObj getElectionMetricsBSON();
 
