@@ -59,6 +59,7 @@ StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj
         return Status(ErrorCodes::FailedToParse, "explain command requires a nested object");
     }
 
+    bool verbositySpecified = false;
     auto verbosity = Verbosity::kExecAllPlans;
     if (auto verbosityElt = cmdObj[kVerbosityName]) {
         if (verbosityElt.type() != BSONType::String) {
@@ -77,7 +78,11 @@ StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj
                               << "', '" << kExecStatsVerbosityStr << "', '"
                               << kAllPlansExecutionVerbosityStr << "'}");
         }
+        verbositySpecified = true;
     }
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "explain command requires a single argument with an optional verbosity",
+            cmdObj.nFields() == (verbositySpecified ? 3 : 2));
 
     return verbosity;
 }
