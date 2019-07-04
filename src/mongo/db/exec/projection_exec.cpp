@@ -35,6 +35,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/update/path_support.h"
+#include "mongo/util/decimal_counter.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -406,7 +407,7 @@ void ProjectionExec::appendArray(BSONObjBuilder* bob, const BSONObj& array, bool
         skip = std::max(0, skip + array.nFields());
     }
 
-    int index = 0;
+    DecimalCounter<size_t> index;
     BSONObjIterator it(array);
     while (it.more()) {
         BSONElement elt = it.next();
@@ -424,7 +425,8 @@ void ProjectionExec::appendArray(BSONObjBuilder* bob, const BSONObj& array, bool
             case Array: {
                 BSONObjBuilder subBob;
                 appendArray(&subBob, elt.embeddedObject(), true);
-                bob->appendArray(bob->numStr(index++), subBob.obj());
+                bob->appendArray(StringData{index}, subBob.obj());
+                ++index;
                 break;
             }
             case Object: {
@@ -433,12 +435,14 @@ void ProjectionExec::appendArray(BSONObjBuilder* bob, const BSONObj& array, bool
                 while (jt.more()) {
                     append(&subBob, jt.next()).transitional_ignore();
                 }
-                bob->append(bob->numStr(index++), subBob.obj());
+                bob->append(StringData{index}, subBob.obj());
+                ++index;
                 break;
             }
             default:
                 if (_include) {
-                    bob->appendAs(elt, bob->numStr(index++));
+                    bob->appendAs(elt, StringData{index});
+                    ++index;
                 }
         }
     }

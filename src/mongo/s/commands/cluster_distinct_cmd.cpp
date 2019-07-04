@@ -43,6 +43,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/decimal_counter.h"
 
 namespace mongo {
 namespace {
@@ -242,9 +243,10 @@ public:
         }
 
         BSONObjBuilder b(32);
-        int n = 0;
+        DecimalCounter<unsigned> n;
         for (auto&& obj : all) {
-            b.appendAs(obj.firstElement(), b.numStr(n++));
+            b.appendAs(obj.firstElement(), StringData{n});
+            ++n;
         }
 
         result.appendArray("values", b.obj());

@@ -1611,59 +1611,62 @@ struct NestedDottedConversions {
 
 struct BSONArrayBuilderTest {
     void run() {
-        int i = 0;
         BSONObjBuilder objb;
         BSONArrayBuilder arrb;
 
-        objb << objb.numStr(i++) << 100;
+        auto fieldNameGenerator = [i = 0]() mutable {
+            return std::to_string(i++);
+        };
+
+        objb << fieldNameGenerator() << 100;
         arrb << 100;
 
-        objb << objb.numStr(i++) << 1.0;
+        objb << fieldNameGenerator() << 1.0;
         arrb << 1.0;
 
-        objb << objb.numStr(i++) << "Hello";
+        objb << fieldNameGenerator() << "Hello";
         arrb << "Hello";
 
-        objb << objb.numStr(i++) << string("World");
+        objb << fieldNameGenerator() << string("World");
         arrb << string("World");
 
-        objb << objb.numStr(i++) << BSON("a" << 1 << "b"
-                                             << "foo");
+        objb << fieldNameGenerator() << BSON("a" << 1 << "b"
+                                                 << "foo");
         arrb << BSON("a" << 1 << "b"
                          << "foo");
 
-        objb << objb.numStr(i++) << BSON("a" << 1)["a"];
+        objb << fieldNameGenerator() << BSON("a" << 1)["a"];
         arrb << BSON("a" << 1)["a"];
 
         OID oid;
         oid.init();
-        objb << objb.numStr(i++) << oid;
+        objb << fieldNameGenerator() << oid;
         arrb << oid;
 
-        objb.appendUndefined(objb.numStr(i++));
+        objb.appendUndefined(fieldNameGenerator());
         arrb.appendUndefined();
 
-        objb.appendRegex(objb.numStr(i++), "test", "imx");
+        objb.appendRegex(fieldNameGenerator(), "test", "imx");
         arrb.appendRegex("test", "imx");
 
-        objb.appendBinData(objb.numStr(i++), 4, BinDataGeneral, "wow");
+        objb.appendBinData(fieldNameGenerator(), 4, BinDataGeneral, "wow");
         arrb.appendBinData(4, BinDataGeneral, "wow");
 
-        objb.appendCode(objb.numStr(i++), "function(){ return 1; }");
+        objb.appendCode(fieldNameGenerator(), "function(){ return 1; }");
         arrb.appendCode("function(){ return 1; }");
 
-        objb.appendCodeWScope(objb.numStr(i++), "function(){ return a; }", BSON("a" << 1));
+        objb.appendCodeWScope(fieldNameGenerator(), "function(){ return a; }", BSON("a" << 1));
         arrb.appendCodeWScope("function(){ return a; }", BSON("a" << 1));
 
         time_t dt(0);
-        objb.appendTimeT(objb.numStr(i++), dt);
+        objb.appendTimeT(fieldNameGenerator(), dt);
         arrb.appendTimeT(dt);
 
         Date_t date{};
-        objb.appendDate(objb.numStr(i++), date);
+        objb.appendDate(fieldNameGenerator(), date);
         arrb.appendDate(date);
 
-        objb.append(objb.numStr(i++), BSONRegEx("test2", "s"));
+        objb.append(fieldNameGenerator(), BSONRegEx("test2", "s"));
         arrb.append(BSONRegEx("test2", "s"));
 
         BSONObj obj = objb.obj();

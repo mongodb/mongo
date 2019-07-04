@@ -39,6 +39,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/strtoll.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/decimal_counter.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -690,7 +691,6 @@ Status JParse::maxKeyObject(StringData fieldName, BSONObjBuilder& builder) {
 
 Status JParse::array(StringData fieldName, BSONObjBuilder& builder, bool subObject) {
     MONGO_JSON_DEBUG("fieldName: " << fieldName);
-    uint32_t index(0);
     if (!readToken(LBRACKET)) {
         return parseError("Expecting '['");
     }
@@ -703,12 +703,13 @@ Status JParse::array(StringData fieldName, BSONObjBuilder& builder, bool subObje
     }
 
     if (!peekToken(RBRACKET)) {
+        DecimalCounter<uint32_t> index;
         do {
-            Status ret = value(builder.numStr(index), *arrayBuilder);
-            if (ret != Status::OK()) {
+            Status ret = value(StringData{index}, *arrayBuilder);
+            if (!ret.isOK()) {
                 return ret;
             }
-            index++;
+            ++index;
         } while (readToken(COMMA));
     }
     arrayBuilder->done();

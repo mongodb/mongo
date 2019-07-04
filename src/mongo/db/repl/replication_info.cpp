@@ -58,6 +58,7 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/util/decimal_counter.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
@@ -92,7 +93,7 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
     if (level) {
         BSONObjBuilder sources(result.subarrayStart("sources"));
 
-        int n = 0;
+        DecimalCounter<unsigned> n;
         list<BSONObj> src;
         {
             const NamespaceString localSources{"local.sources"};
@@ -144,7 +145,8 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
                 conn.done();
             }
 
-            sources.append(BSONObjBuilder::numStr(n++), bb.obj());
+            sources.append(StringData{n}, bb.obj());
+            ++n;
         }
 
         sources.done();

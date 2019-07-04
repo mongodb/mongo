@@ -40,6 +40,7 @@
 #include "mongo/base/data_view.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/strnlen.h"
+#include "mongo/util/decimal_counter.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 
@@ -1289,15 +1290,12 @@ void toBsonValue(uint8_t ctype,
 
         case CType::kArray: {
             BSONObjBuilder subArr(stream->subarrayStart());
-            int index = 0;
+            DecimalCounter<unsigned> index;
             uint8_t elemType;
             while ((elemType = readType<uint8_t>(reader, inverted)) != 0) {
-                toBsonValue(elemType,
-                            reader,
-                            typeBits,
-                            inverted,
-                            version,
-                            &(subArr << BSONObjBuilder::numStr(index++)));
+                toBsonValue(
+                    elemType, reader, typeBits, inverted, version, &(subArr << StringData{index}));
+                ++index;
             }
             break;
         }

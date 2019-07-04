@@ -112,7 +112,7 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_family = (ipv6enabled ? AF_UNSPEC : AF_INET);
 
-    const std::string portNum = BSONObjBuilder::numStr(port);
+    const std::string portNum = std::to_string(port);
 
     std::vector<std::string> out;
 

@@ -63,6 +63,7 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/decimal_counter.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
@@ -327,12 +328,18 @@ public:
             b.append("version", 1);
             BSONObjBuilder members;
             HostAndPort me = someHostAndPortForMe();
-            members.append("0", BSON("_id" << 0 << "host" << me.toString()));
-            result.append("me", me.toString());
-            for (unsigned i = 0; i < seeds.size(); i++) {
+
+            auto appendMember =
+                [&members, serial = DecimalCounter<uint32_t>() ](const HostAndPort& host) mutable {
                 members.append(
-                    BSONObjBuilder::numStr(i + 1),
-                    BSON("_id" << static_cast<int>(i + 1) << "host" << seeds[i].toString()));
+                    StringData{serial},
+                    BSON("_id" << static_cast<int>(serial) << "host" << host.toString()));
+                ++serial;
+            };
+            appendMember(me);
+            result.append("me", me.toString());
+            for (const HostAndPort& seed : seeds) {
+                appendMember(seed);
             }
             b.appendArray("members", members.obj());
             configObj = b.obj();
