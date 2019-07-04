@@ -384,7 +384,12 @@ std::unique_ptr<ProjectionNode> analyzeProjection(const CanonicalQuery& query,
             }
         }
     }
-
+    auto wantShardName = query.metadataDeps()[DocumentMetadataFields::kShardName];
+    if (wantShardName) {
+        auto shardNameNode = std::make_unique<ShardNameNode>();
+        shardNameNode->children.push_back(solnRoot.release());
+        solnRoot = std::move(shardNameNode);
+    }
     return std::make_unique<ProjectionNodeDefault>(
         addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
         *query.root(),

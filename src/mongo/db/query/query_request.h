@@ -110,6 +110,12 @@ public:
     static bool isTextScoreMeta(BSONElement elt);
 
     /**
+     * Helper function to identify shard name.
+     * Example: {a: {$meta: "shardName"}}
+     */
+    static bool isShardNameMeta(BSONElement elt);
+
+    /**
      * Helper function to validate a sort object.
      * Returns true if each element satisfies one of:
      * 1. a number with value 1
@@ -138,6 +144,7 @@ public:
     static const std::string metaRecordId;
     static const std::string metaSortKey;
     static const std::string metaTextScore;
+    static const std::string metaShardName;
 
     // Allow using disk during the find command.
     static const std::string kAllowDiskUseField;
@@ -434,6 +441,12 @@ public:
                                                                      int queryOptions);
 
 private:
+    /**
+     * Helper function to identify meta with names.
+     * Example: {a: {$meta: "textScore"}} for metaName=metaTextScore.
+     */
+    static bool isMeta(BSONElement elt, const std::string& metaName);
+
     static StatusWith<std::unique_ptr<QueryRequest>> parseFromFindCommand(
         std::unique_ptr<QueryRequest> qr, const BSONObj& cmdObj, bool isExplain);
     Status init(int ntoskip,

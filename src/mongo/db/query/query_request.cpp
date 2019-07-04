@@ -61,6 +61,7 @@ const string QueryRequest::metaGeoNearPoint("geoNearPoint");
 const string QueryRequest::metaRecordId("recordId");
 const string QueryRequest::metaSortKey("sortKey");
 const string QueryRequest::metaTextScore("textScore");
+const string QueryRequest::metaShardName("shardName");
 
 const string QueryRequest::kAllowDiskUseField("allowDiskUse");
 
@@ -600,9 +601,10 @@ Status QueryRequest::validate() const {
     BSONObjIterator projIt(_proj);
     while (projIt.more()) {
         BSONElement projElt = projIt.next();
-        if (isTextScoreMeta(projElt)) {
+        if (isTextScoreMeta(projElt) || isShardNameMeta(projElt)) {
             BSONElement sortElt = _sort[projElt.fieldName()];
-            if (!sortElt.eoo() && !isTextScoreMeta(sortElt)) {
+            if (!sortElt.eoo() && ((isTextScoreMeta(projElt) && !isTextScoreMeta(sortElt)) ||
+                (isShardNameMeta(projElt) && !isShardNameMeta(sortElt)))) {
                 return Status(ErrorCodes::BadValue,
                               "can't have a non-$meta sort on a $meta projection");
             }
@@ -617,9 +619,10 @@ Status QueryRequest::validate() const {
     BSONObjIterator sortIt(_sort);
     while (sortIt.more()) {
         BSONElement sortElt = sortIt.next();
-        if (isTextScoreMeta(sortElt)) {
+        if (isTextScoreMeta(sortElt) || isShardNameMeta(sortElt)) {
             BSONElement projElt = _proj[sortElt.fieldName()];
-            if (projElt.eoo() || !isTextScoreMeta(projElt)) {
+            if (projElt.eoo() || (isTextScoreMeta(sortElt) && !isTextScoreMeta(projElt)) ||
+             (isShardNameMeta(sortElt) && !isShardNameMeta(projElt))) {
                 return Status(ErrorCodes::BadValue,
                               "must have $meta projection for all $meta sort keys");
             }
@@ -704,8 +707,8 @@ StatusWith<int> QueryRequest::parseMaxTimeMS(BSONElement maxTimeMSElt) {
 }
 
 // static
-bool QueryRequest::isTextScoreMeta(BSONElement elt) {
-    // elt must be foo: {$meta: "textScore"}
+bool QueryRequest::isMeta(BSONElement elt, const string& metaName) {
+    // elt must be foo: {$meta: "metaName"}
     if (mongo::Object != elt.type()) {
         return false;
     }
@@ -722,7 +725,7 @@ bool QueryRequest::isTextScoreMeta(BSONElement elt) {
     if (mongo::String != metaElt.type()) {
         return false;
     }
-    if (QueryRequest::metaTextScore != metaElt.valuestr()) {
+    if (metaName != metaElt.valuestr()) {
         return false;
     }
     // must have exactly 1 element
@@ -730,6 +733,18 @@ bool QueryRequest::isTextScoreMeta(BSONElement elt) {
         return false;
     }
     return true;
+}
+
+// static
+bool QueryRequest::isTextScoreMeta(BSONElement elt) {
+    // elt must be foo: {$meta: "textScore"}
+    return isMeta(elt, QueryRequest::metaTextScore);
+}
+
+// static
+bool QueryRequest::isShardNameMeta(BSONElement elt) {
+    // elt must be foo: {$meta: "shardName"}
+    return isMeta(elt, QueryRequest::metaShardName);
 }
 
 // static

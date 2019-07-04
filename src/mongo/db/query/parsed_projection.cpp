@@ -60,6 +60,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
     bool wantGeoNearPoint = false;
     bool wantGeoNearDistance = false;
     bool wantSortKey = false;
+    bool wantShardName = false;
 
     // Until we see a positional or elemMatch operator we're normal.
     ArrayOpType arrayOpType = ARRAY_OP_NORMAL;
@@ -161,7 +162,8 @@ Status ParsedProjection::make(OperationContext* opCtx,
                     e2.valuestr() != QueryRequest::metaRecordId &&
                     e2.valuestr() != QueryRequest::metaGeoNearDistance &&
                     e2.valuestr() != QueryRequest::metaGeoNearPoint &&
-                    e2.valuestr() != QueryRequest::metaSortKey) {
+                    e2.valuestr() != QueryRequest::metaSortKey &&
+                    e2.valuestr() != QueryRequest::metaShardName) {
                     return Status(ErrorCodes::BadValue, "unsupported $meta operator: " + e2.str());
                 }
 
@@ -174,6 +176,8 @@ Status ParsedProjection::make(OperationContext* opCtx,
                     wantGeoNearPoint = true;
                 } else if (e2.valuestr() == QueryRequest::metaSortKey) {
                     wantSortKey = true;
+                } else if (e2.valuestr() == QueryRequest::metaShardName) {
+                    wantShardName = true;
                 }
 
                 // Of the $meta projections, only sortKey can be covered.
@@ -270,6 +274,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
     pp->_wantGeoNearPoint = wantGeoNearPoint;
     pp->_wantGeoNearDistance = wantGeoNearDistance;
     pp->_wantSortKey = wantSortKey;
+    pp->_wantShardName = wantShardName;
 
     // If it's possible to compute the projection in a covered fashion, populate _requiredFields
     // so the planner can perform projection analysis.

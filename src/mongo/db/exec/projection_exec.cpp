@@ -116,6 +116,9 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
                 } else if (e2.valuestr() == QueryRequest::metaGeoNearDistance) {
                     _meta[e.fieldName()] = META_GEONEAR_DIST;
                     _needsGeoNearDistance = true;
+                } else if (e2.valuestr() == QueryRequest::metaShardName) {
+                    _meta[e.fieldName()] = META_SHARD_NAME;
+                    _needsShardName = true;
                 } else {
                     // This shouldn't happen, should be caught by parsing.
                     MONGO_UNREACHABLE;
@@ -202,7 +205,8 @@ StatusWith<BSONObj> ProjectionExec::project(const BSONObj& in,
                                             Value geoNearPoint,
                                             const BSONObj& sortKey,
                                             const boost::optional<const double> textScore,
-                                            const int64_t recordId) const {
+                                            const int64_t recordId,
+                                            const StringData& shardName) const {
     BSONObjBuilder bob;
     MatchDetails matchDetails;
 
@@ -217,7 +221,7 @@ StatusWith<BSONObj> ProjectionExec::project(const BSONObj& in,
     if (!projStatus.isOK())
         return projStatus;
     else
-        return {addMeta(std::move(bob), geoDistance, geoNearPoint, sortKey, textScore, recordId)};
+        return {addMeta(std::move(bob), geoDistance, geoNearPoint, sortKey, textScore, recordId, shardName)};
 }
 
 StatusWith<BSONObj> ProjectionExec::projectCovered(const std::vector<IndexKeyDatum>& keyData,
@@ -225,7 +229,8 @@ StatusWith<BSONObj> ProjectionExec::projectCovered(const std::vector<IndexKeyDat
                                                    Value geoNearPoint,
                                                    const BSONObj& sortKey,
                                                    const boost::optional<const double> textScore,
-                                                   const int64_t recordId) const {
+                                                   const int64_t recordId,
+                                                   const StringData& shardName) const {
     invariant(!_include);
     BSONObjBuilder bob;
     // Go field by field.
@@ -270,7 +275,7 @@ StatusWith<BSONObj> ProjectionExec::projectCovered(const std::vector<IndexKeyDat
     }
 
     bob.appendElements(projectedDoc.getObject());
-    return {addMeta(std::move(bob), geoDistance, geoNearPoint, sortKey, textScore, recordId)};
+    return {addMeta(std::move(bob), geoDistance, geoNearPoint, sortKey, textScore, recordId, shardName)};
 }
 
 BSONObj ProjectionExec::addMeta(BSONObjBuilder bob,
@@ -278,7 +283,8 @@ BSONObj ProjectionExec::addMeta(BSONObjBuilder bob,
                                 Value geoNearPoint,
                                 const BSONObj& sortKey,
                                 const boost::optional<const double> textScore,
-                                const int64_t recordId) const {
+                                const int64_t recordId,
+                                const StringData& shardName) const {
     for (MetaMap::const_iterator it = _meta.begin(); it != _meta.end(); ++it) {
         switch (it->second) {
             case META_GEONEAR_DIST:
@@ -297,6 +303,10 @@ BSONObj ProjectionExec::addMeta(BSONObjBuilder bob,
             case META_SORT_KEY: {
                 invariant(!sortKey.isEmpty());
                 bob.append(it->first, sortKey);
+                break;
+            }
+            case META_SHARD_NAME: {
+                bob.append(it->first, shardName);
                 break;
             }
             case META_RECORDID:

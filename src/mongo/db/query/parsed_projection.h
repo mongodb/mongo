@@ -104,6 +104,10 @@ public:
         return _wantSortKey;
     }
 
+    bool wantShardName() const {
+        return _wantShardName;
+    }
+
     /**
      * Returns true if the element at 'path' is preserved entirely after this projection is applied,
      * and false otherwise. For example, the projection {a: 1} will preserve the element located at
@@ -191,6 +195,8 @@ private:
 
     // Whether this projection includes a sortKey meta-projection.
     bool _wantSortKey = false;
+
+    bool _wantShardName = false;
 
     bool _hasDottedFieldPath = false;
 };

@@ -418,7 +418,8 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
             // document, so we don't support covered projections. However, we might use the
             // simple inclusion fast path.
             // Stuff the right data into the params depending on what proj impl we use.
-            if (!cqProjection->isSimple()) {
+            if (!cqProjection->isSimple() ||
+                canonicalQuery->metadataDeps()[DocumentMetadataFields::kShardName]) {
                 root = std::make_unique<ProjectionStageDefault>(
                     canonicalQuery->getExpCtx(),
                     canonicalQuery->getQueryRequest().getProj(),

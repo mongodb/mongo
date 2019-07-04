@@ -48,6 +48,7 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
     metadata.setSearchScore(5.4);
     metadata.setSearchHighlights(Value{"foo"_sd});
     metadata.setIndexKey(BSON("b" << 1));
+    metadata.setShardName("bar");
 
     BufBuilder builder;
     metadata.serializeForSorter(builder);
@@ -64,6 +65,7 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
     ASSERT_EQ(deserialized.getSearchScore(), 5.4);
     ASSERT_VALUE_EQ(deserialized.getSearchHighlights(), Value{"foo"_sd});
     ASSERT_BSONOBJ_EQ(deserialized.getIndexKey(), BSON("b" << 1));
+    ASSERT_EQ(deserialized.getShardName(), "bar");
 }
 
 TEST(DocumentMetadataFieldsTest, HasMethodsReturnFalseForEmptyMetadata) {
@@ -77,6 +79,7 @@ TEST(DocumentMetadataFieldsTest, HasMethodsReturnFalseForEmptyMetadata) {
     ASSERT_FALSE(metadata.hasSearchScore());
     ASSERT_FALSE(metadata.hasSearchHighlights());
     ASSERT_FALSE(metadata.hasIndexKey());
+    ASSERT_FALSE(metadata.hasShardName());
 }
 
 TEST(DocumentMetadataFieldsTest, HasMethodsReturnTrueForInitializedMetadata) {
@@ -114,6 +117,10 @@ TEST(DocumentMetadataFieldsTest, HasMethodsReturnTrueForInitializedMetadata) {
     ASSERT_FALSE(metadata.hasIndexKey());
     metadata.setIndexKey(BSON("b" << 1));
     ASSERT_TRUE(metadata.hasIndexKey());
+
+    ASSERT_FALSE(metadata.hasShardName());
+    metadata.setShardName("bar");
+    ASSERT_TRUE(metadata.hasShardName());
 }
 
 TEST(DocumentMetadataFieldsTest, MoveConstructor) {
@@ -126,6 +133,7 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     metadata.setSearchScore(5.4);
     metadata.setSearchHighlights(Value{"foo"_sd});
     metadata.setIndexKey(BSON("b" << 1));
+    metadata.setShardName("bar");
 
     DocumentMetadataFields moveConstructed(std::move(metadata));
     ASSERT_TRUE(moveConstructed);
@@ -138,6 +146,7 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     ASSERT_EQ(moveConstructed.getSearchScore(), 5.4);
     ASSERT_VALUE_EQ(moveConstructed.getSearchHighlights(), Value{"foo"_sd});
     ASSERT_BSONOBJ_EQ(moveConstructed.getIndexKey(), BSON("b" << 1));
+    ASSERT_EQ(moveConstructed.getShardName(), "bar");
 
     ASSERT_FALSE(metadata);
 }
@@ -152,6 +161,7 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
     metadata.setSearchScore(5.4);
     metadata.setSearchHighlights(Value{"foo"_sd});
     metadata.setIndexKey(BSON("b" << 1));
+    metadata.setShardName("bar");
 
     DocumentMetadataFields moveAssigned;
     moveAssigned.setTextScore(12.3);
@@ -167,6 +177,7 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
     ASSERT_EQ(moveAssigned.getSearchScore(), 5.4);
     ASSERT_VALUE_EQ(moveAssigned.getSearchHighlights(), Value{"foo"_sd});
     ASSERT_BSONOBJ_EQ(moveAssigned.getIndexKey(), BSON("b" << 1));
+    ASSERT_EQ(moveAssigned.getShardName(), "bar");
 
     ASSERT_FALSE(metadata);
 }

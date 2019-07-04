@@ -940,6 +940,35 @@ struct ShardingFilterNode : public QuerySolutionNode {
 };
 
 /**
+ * If we're answering a query on a that has shardName metadata, docs must be appended with
+ * the shard name.
+ */
+struct ShardNameNode : public QuerySolutionNode {
+    ShardNameNode() {}
+    virtual ~ShardNameNode() {}
+
+    virtual StageType getType() const {
+        return STAGE_SHARD_NAME;
+    }
+    virtual void appendToString(str::stream* ss, int indent) const;
+
+    bool fetched() const {
+        return children[0]->fetched();
+    }
+    bool hasField(const std::string& field) const {
+        return children[0]->hasField(field);
+    }
+    bool sortedByDiskLoc() const {
+        return children[0]->sortedByDiskLoc();
+    }
+    const BSONObjSet& getSort() const {
+        return children[0]->getSort();
+    }
+
+    QuerySolutionNode* clone() const;
+};
+
+/**
  * Distinct queries only want one value for a given field.  We run an index scan but
  * *always* skip over the current key to the next key.
  */
