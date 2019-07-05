@@ -298,7 +298,7 @@ TEST_F(ProjectStageTest, CannotAddNestedDocumentExceedingDepthLimit) {
         ErrorCodes::Overflow);
 }
 
-TEST_F(UnsetTest, AcceptsValidUnsetSpec) {
+TEST_F(UnsetTest, AcceptsValidUnsetSpecWithArray) {
     auto spec = BSON("$unset" << BSON_ARRAY("a"
                                             << "b"
                                             << "c.d"));
@@ -307,9 +307,16 @@ TEST_F(UnsetTest, AcceptsValidUnsetSpec) {
     ASSERT(stage);
 }
 
-TEST_F(UnsetTest, RejectsUnsetSpecWhichIsNotAnArray) {
+TEST_F(UnsetTest, AcceptsValidUnsetSpecWithSingleString) {
     auto spec = BSON("$unset"
-                     << "foo");
+                     << "a");
+    auto specElement = spec.firstElement();
+    auto stage = DocumentSourceProject::createFromBson(specElement, getExpCtx());
+    ASSERT(stage);
+}
+
+TEST_F(UnsetTest, RejectsUnsetSpecWhichIsNotAnArrayOrString) {
+    auto spec = BSON("$unset" << 1);
     auto specElement = spec.firstElement();
     ASSERT_THROWS_CODE(
         DocumentSourceProject::createFromBson(specElement, getExpCtx()), AssertionException, 31002);

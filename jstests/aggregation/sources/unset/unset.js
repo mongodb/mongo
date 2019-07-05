@@ -14,6 +14,10 @@
     let result = coll.aggregate([{$unset: ["a"]}]).toArray();
     assertArrayEq({actual: result, expected: [{_id: 0}, {_id: 1}, {_id: 2}]});
 
+    // unset should work with string directive.
+    result = coll.aggregate([{$unset: "a"}]).toArray();
+    assertArrayEq({actual: result, expected: [{_id: 0}, {_id: 1}, {_id: 2}]});
+
     // unset multiple fields.
     result = coll.aggregate([{$unset: ["_id", "a"]}]).toArray();
     assertArrayEq({actual: result, expected: [{}, {}, {}]});
