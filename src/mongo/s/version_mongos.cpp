@@ -42,15 +42,15 @@
 
 namespace mongo {
 
-void printShardingVersionInfo(bool out) {
+void printShardingVersionInfo(bool isForVersionReportingOnly) {
     auto&& vii = VersionInfoInterface::instance();
-    if (out) {
+
+    if (isForVersionReportingOnly) {
         setPlainConsoleLogger();
         log() << mongosVersion(vii);
         vii.logBuildInfo();
     } else {
         log() << mongosVersion(vii);
-        vii.logBuildInfo();
         logProcessDetails();
     }
 }
