@@ -84,15 +84,18 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
     }
 
     invariant(elem.fieldNameStringData() == kAliasNameUnset);
-    uassert(31002, "$unset specification must be an array", elem.type() == BSONType::Array);
+    uassert(31002,
+            "$unset specification must be a string or an array",
+            (elem.type() == BSONType::Array || elem.type() == BSONType::String));
 
-    const auto unsetSpec = elem.Array();
+    const auto unsetSpec =
+        elem.type() == BSONType::Array ? elem.Array() : std::vector<mongo::BSONElement>{1, elem};
     uassert(31119,
-            "$unset specification must be an array with at least one field",
+            "$unset specification must be a string or an array with at least one field",
             unsetSpec.size() > 0);
 
     uassert(31120,
-            "$unset specification must be an array containing only string values",
+            "$unset specification must be a string or an array containing only string values",
             std::all_of(unsetSpec.cbegin(), unsetSpec.cend(), [](BSONElement elem) {
                 return elem.type() == BSONType::String;
             }));
