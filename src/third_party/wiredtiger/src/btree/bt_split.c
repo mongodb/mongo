@@ -855,6 +855,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 			}
 		}
 
+		/* Check that we are not discarding active history. */
+		WT_ASSERT(session, !__wt_page_las_active(session, next_ref));
+
 		/*
 		 * The page-delete and lookaside memory weren't added to the
 		 * parent's footprint, ignore it here.

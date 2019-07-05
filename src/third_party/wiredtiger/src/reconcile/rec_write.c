@@ -1299,7 +1299,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	wt_timestamp_t *timestampp;
 	size_t upd_memsize;
 	uint64_t max_txn, txnid;
-	bool all_visible, prepared, skipped_birthmark, uncommitted;
+	bool all_visible, prepared, skipped_birthmark, uncommitted, upd_saved;
 
 #ifdef HAVE_TIMESTAMPS
 	WT_UPDATE *first_ts_upd;
@@ -1314,7 +1314,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	first_txn_upd = NULL;
 	upd_memsize = 0;
 	max_txn = WT_TXN_NONE;
-	prepared = skipped_birthmark = uncommitted = false;
+	prepared = skipped_birthmark = uncommitted = upd_saved = false;
 
 	/*
 	 * If called with a WT_INSERT item, use its WT_UPDATE list (which must
@@ -1557,6 +1557,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * unresolved updates, move the entire update list.
 	 */
 	WT_RET(__rec_update_save(session, r, ins, ripcip, *updp, upd_memsize));
+	upd_saved = true;
 	if (upd_savedp != NULL)
 		*upd_savedp = true;
 
@@ -1602,18 +1603,15 @@ check_original_value:
 
 	/*
 	 * Returning an update means the original on-page value might be lost,
-	 * and that's a problem if there's a reader that needs it. There are
-	 * several cases:
-	 * - any update from a modify operation (because the modify has to be
-	 *   applied to a stable update, not the new on-page update),
-	 * - any lookaside table eviction (because the backing disk image is
-	 *   rewritten),
-	 * - or any reconciliation of a backing overflow record that will be
-	 *   physically removed once it's no longer needed.
+	 * and that's a problem if there's a reader that needs it.  This call
+	 * makes a copy of the on-page value and if there is a birthmark in the
+	 * update list, replaces it.  We do that any time there are saved
+	 * updates and during reconciliation of a backing overflow record that
+	 * will be physically removed once it's no longer needed.
 	 */
-	if (*updp != NULL && (!WT_UPDATE_DATA_VALUE(*updp) ||
-	    F_ISSET(r, WT_REC_LOOKASIDE) || (vpack != NULL &&
-	    vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)))
+	if (*updp != NULL && (upd_saved ||
+	    (vpack != NULL && vpack->ovfl &&
+	    vpack->raw != WT_CELL_VALUE_OVFL_RM)))
 		WT_RET(
 		    __rec_append_orig_value(session, page, first_upd, vpack));
 

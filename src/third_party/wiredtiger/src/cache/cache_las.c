@@ -57,6 +57,46 @@ __las_entry_count(WT_CACHE *cache)
 }
 
 /*
+ * __wt_las_config --
+ *	Configure the lookaside table.
+ */
+int
+__wt_las_config(WT_SESSION_IMPL *session, const char **cfg)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CURSOR_BTREE *las_cursor;
+	WT_SESSION_IMPL *las_session;
+
+	WT_RET(__wt_config_gets(
+	    session, cfg, "cache_overflow.file_max", &cval));
+
+	if (cval.val != 0 && cval.val < WT_LAS_FILE_MIN)
+		WT_RET_MSG(session, EINVAL,
+		    "max cache overflow size %" PRId64 " below minimum %d",
+		    cval.val, WT_LAS_FILE_MIN);
+
+	/* This is expected for in-memory configurations. */
+	las_session = S2C(session)->cache->las_session[0];
+	WT_ASSERT(session,
+	    las_session != NULL || F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+
+	if (las_session == NULL)
+		return (0);
+
+	/*
+	 * We need to set file_max on the btree associated with one of the
+	 * lookaside sessions.
+	 */
+	las_cursor = (WT_CURSOR_BTREE *)las_session->las_cursor;
+	las_cursor->btree->file_max = (uint64_t)cval.val;
+
+	WT_STAT_CONN_SET(
+	    session, cache_lookaside_ondisk_max, las_cursor->btree->file_max);
+
+	return (0);
+}
+
+/*
  * __wt_las_empty --
  *	Return when there are entries in the lookaside table.
  */
@@ -126,7 +166,7 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
  *	Initialize the database's lookaside store.
  */
 int
-__wt_las_create(WT_SESSION_IMPL *session)
+__wt_las_create(WT_SESSION_IMPL *session, const char **cfg)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
@@ -165,6 +205,8 @@ __wt_las_create(WT_SESSION_IMPL *session)
 		    true, WT_LAS_SESSION_FLAGS, &cache->las_session[i]));
 		WT_RET(__wt_las_cursor_open(cache->las_session[i]));
 	}
+
+	WT_RET(__wt_las_config(session, cfg));
 
 	/* The statistics server is already running, make sure we don't race. */
 	WT_WRITE_BARRIER();
@@ -622,8 +664,9 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 	WT_SESSION_IMPL *session;
 	WT_TXN_ISOLATION saved_isolation;
 	WT_UPDATE *upd;
+	wt_off_t las_size;
 	uint64_t insert_cnt;
-	uint64_t las_counter, las_pageid;
+	uint64_t las_counter, las_pageid, max_las_size;
 	uint32_t btree_id, i, slot;
 	uint8_t *p;
 	bool local_txn;
@@ -766,6 +809,14 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 		} while ((upd = upd->next) != NULL);
 	}
 
+	WT_ERR(__wt_block_manager_named_size(session, WT_LAS_FILE, &las_size));
+	WT_STAT_CONN_SET(session, cache_lookaside_ondisk, las_size);
+	max_las_size = ((WT_CURSOR_BTREE *)cursor)->btree->file_max;
+	if (max_las_size != 0 && (uint64_t)las_size > max_las_size)
+		WT_PANIC_MSG(session, WT_PANIC,
+		    "WiredTigerLAS: file size of %" PRIu64 " exceeds maximum "
+		    "size %" PRIu64, (uint64_t)las_size, max_las_size);
+
 err:	/* Resolve the transaction. */
 	if (local_txn) {
 		if (ret == 0)
@@ -882,6 +933,33 @@ __wt_las_remove_block(
 }
 
 /*
+ * __wt_las_remove_dropped --
+ *	Remove an opened btree ID if it is in the dropped table.
+ */
+void
+__wt_las_remove_dropped(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_CACHE *cache;
+	u_int i, j;
+
+	btree = S2BT(session);
+	cache = S2C(session)->cache;
+
+	__wt_spin_lock(session, &cache->las_sweep_lock);
+	for (i = 0; i < cache->las_dropped_next &&
+	    cache->las_dropped[i] != btree->id; i++)
+		;
+
+	if (i < cache->las_dropped_next) {
+		cache->las_dropped_next--;
+		for (j = i; j < cache->las_dropped_next; j++)
+			cache->las_dropped[j] = cache->las_dropped[j + 1];
+	}
+	__wt_spin_unlock(session, &cache->las_sweep_lock);
+}
+
+/*
  * __wt_las_save_dropped --
  *	Save a dropped btree ID to be swept from the lookaside table.
  */
@@ -957,6 +1035,19 @@ __las_sweep_init(WT_SESSION_IMPL *session)
 			ret = WT_NOTFOUND;
 		goto err;
 	}
+
+	/*
+	 * Record the current page ID: sweep will stop after this point.
+	 *
+	 * Since the btree IDs we're scanning are closed, any eviction must
+	 * have already completed, so we won't miss anything with this
+	 * approach.
+	 *
+	 * Also, if a tree is reopened and there is lookaside activity before
+	 * this sweep completes, it will have a higher page ID and should not
+	 * be removed.
+	 */
+	cache->las_sweep_max_pageid = cache->las_pageid;
 
 	/* Scan the btree IDs to find min/max. */
 	cache->las_sweep_dropmin = UINT32_MAX;
@@ -1058,7 +1149,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * table. Searching for the same key could leave us stuck at
 		 * the end of the table, repeatedly checking the same rows.
 		 */
-		sweep_key->size = 0;
+		__wt_buf_free(session, sweep_key);
 	} else
 		ret = __las_sweep_init(session);
 	if (ret != 0)
@@ -1086,6 +1177,17 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 */
 		if (__wt_cache_stuck(session))
 			cnt = 0;
+
+		/*
+		 * Don't go past the end of lookaside from when sweep started.
+		 * If a file is reopened, its ID may be reused past this point
+		 * so the bitmap we're using is not valid.
+		 */
+		if (las_pageid > cache->las_sweep_max_pageid) {
+			__wt_buf_free(session, sweep_key);
+			ret = WT_NOTFOUND;
+			break;
+		}
 
 		/*
 		 * We only want to break between key blocks. Stop if we've

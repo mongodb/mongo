@@ -237,7 +237,7 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_meta_track_init(session));
 
 	/* Create the lookaside table. */
-	WT_RET(__wt_las_create(session));
+	WT_RET(__wt_las_create(session, cfg));
 
 	/*
 	 * Start eviction threads.

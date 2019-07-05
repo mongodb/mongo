@@ -151,6 +151,41 @@ from packing import pack, unpack
 	}
 }
 
+%typemap(in,numinputs=1) (WT_MODIFY *entries, int *nentriesp) (WT_MODIFY *mod, int nentries) {
+	nentries = (int) PyLong_AsLong($input);
+	if (__wt_calloc_def(NULL, (size_t)nentries, &mod) != 0)
+		SWIG_exception_fail(SWIG_MemoryError, "WT calloc failed");
+	$1 = mod;
+	$2 = &nentries;
+}
+
+%typemap(argout) (WT_MODIFY *entries, int *nentriesp) {
+	int i;
+	$result = PyList_New(*$2);
+	for (i = 0; i < *$2; i++) {
+		PyObject *o = SWIG_NewPointerObj(Py_None, SWIGTYPE_p___wt_modify, 0);
+		PyObject_SetAttrString(o, "data", PyString_FromStringAndSize(
+		    $1[i].data.data, $1[i].data.size));
+		PyObject_SetAttrString(o, "offset",
+		    PyInt_FromLong($1[i].offset));
+		PyObject_SetAttrString(o, "size",
+		    PyInt_FromLong($1[i].size));
+		PyList_SetItem($result, i, o);
+	}
+}
+
+%typemap(in) const WT_ITEM * (WT_ITEM val, long sz) {
+	if (PyString_AsStringAndSize($input, &val.data, &sz) < 0)
+		SWIG_exception_fail(SWIG_AttributeError,
+		    "bad string value for WT_ITEM");
+	val.size = (size_t)sz;
+	$1 = &val;
+}
+
+%typemap(freearg) (WT_MODIFY *entries, int *nentriesp) {
+	__wt_free(NULL, $1);
+}
+
 %typemap(in) WT_MODIFY * (int len, WT_MODIFY *modarray, int i) {
 	len = PyList_Size($input);
 	/*
@@ -209,7 +244,7 @@ from packing import pack, unpack
 }
 
 %typemap(freearg) WT_MODIFY * {
-	/* The WT_MODIFY arg is in position 2.  Is there a better way? */
+	/* The WT_MODIFY arg is in position 2.	Is there a better way? */
 	WT_MODIFY *modarray = modarray2;
 	size_t i, len;
 
@@ -981,6 +1016,9 @@ typedef int int_void;
 		self.data = data
 		self.offset = offset
 		self.size = size
+
+	def __repr__(self):
+		return 'Modify(\'%s\', %d, %d)' % (self.data, self.offset, self.size)
 %}
 };
 
@@ -1013,6 +1051,7 @@ int timestamp_build() {
 	return WT_TIMESTAMP_SIZE > 0;
 }
 %}
+
 int diagnostic_build();
 int timestamp_build();
 

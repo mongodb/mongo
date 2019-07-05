@@ -189,11 +189,19 @@ class test_reconfig_fail(wttest.WiredTigerTestCase):
         ds = SimpleDataSet(self, uri, 100, key_format='S')
         ds.populate()
 
+        # Reconfigure to an older version.
+        compat_str = 'compatibility=(release="2.6")'
+        self.conn.reconfigure(compat_str)
+
         self.session.begin_transaction("isolation=snapshot")
         c = self.session.open_cursor(uri, None)
         c.set_key(ds.key(20))
         c.set_value("abcde")
         self.assertEquals(c.update(), 0)
+
+        # Make sure we can reconfigure unrelated things while downgraded
+        # and we have an active transaction.
+        self.conn.reconfigure("cache_size=100M")
 
         compat_str = 'compatibility=(release="3.0.0")'
         msg = '/system must be quiescent/'

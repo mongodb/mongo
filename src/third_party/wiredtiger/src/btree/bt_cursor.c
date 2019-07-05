@@ -1393,12 +1393,13 @@ __cursor_chain_exceeded(WT_CURSOR_BTREE *cbt)
 	    upd != NULL && upd->type == WT_UPDATE_MODIFY;
 	    ++i, upd = upd->next) {
 		upd_size += WT_UPDATE_MEMSIZE(upd);
-		if (upd_size >= WT_MODIFY_MEM_FACTOR * cursor->value.size)
+		if (i >= WT_MAX_MODIFY_UPDATE &&
+		    upd_size * WT_MODIFY_MEM_FRACTION >= cursor->value.size)
 			return (true);
 	}
-	if (upd != NULL && upd->type == WT_UPDATE_STANDARD &&
-	    __wt_txn_upd_visible_all(session, upd) &&
-	    i >= WT_MAX_MODIFY_UPDATE)
+	if (i >= WT_MAX_MODIFY_UPDATE && upd != NULL &&
+	    upd->type == WT_UPDATE_STANDARD &&
+	    __wt_txn_upd_visible_all(session, upd))
 		return (true);
 	return (false);
 }

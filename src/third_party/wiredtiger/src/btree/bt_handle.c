@@ -115,6 +115,12 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	/* Initialize and configure the WT_BTREE structure. */
 	WT_ERR(__btree_conf(session, &ckpt));
 
+	/*
+	 * We could be a re-open of a table that was put in the lookaside
+	 * dropped list. Remove our id from that list.
+	 */
+	__wt_las_remove_dropped(session);
+
 	/* Connect to the underlying block manager. */
 	filename = dhandle->name;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
@@ -234,6 +240,16 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	if (F_ISSET(btree, WT_BTREE_CLOSED))
 		return (0);
 	F_SET(btree, WT_BTREE_CLOSED);
+
+	/*
+	 * If closing a tree let sweep drop lookaside entries for it.
+	 */
+	if (F_ISSET(S2C(session), WT_CONN_LOOKASIDE_OPEN) &&
+	    btree->lookaside_entries) {
+		WT_ASSERT(session, !WT_IS_METADATA(btree->dhandle) &&
+		    !F_ISSET(btree, WT_BTREE_LOOKASIDE));
+		WT_TRET(__wt_las_save_dropped(session));
+	}
 
 	/*
 	 * If we turned eviction off and never turned it back on, do that now,

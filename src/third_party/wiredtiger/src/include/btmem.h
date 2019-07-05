@@ -239,6 +239,7 @@ struct __wt_page_lookaside {
 	WT_DECL_TIMESTAMP(max_timestamp)/* Maximum timestamp */
 	WT_DECL_TIMESTAMP(unstable_timestamp)/* First timestamp not on page */
 	bool eviction_to_lookaside;	/* Revert to lookaside on eviction */
+	bool resolved;			/* History has been read into cache */
 	bool skew_newest;		/* Page image has newest versions */
 };
 
@@ -1083,9 +1084,9 @@ struct __wt_update {
 
 /*
  * WT_MODIFY_MEM_FACTOR	--
- *	Limit update chains to a factor of the base document size.
+ *	Limit update chains to a fraction of the base document size.
  */
-#define	WT_MODIFY_MEM_FACTOR	1
+#define	WT_MODIFY_MEM_FRACTION	10
 
 /*
  * WT_INSERT --

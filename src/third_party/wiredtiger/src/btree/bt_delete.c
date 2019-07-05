@@ -279,13 +279,14 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 	 * the page could switch to an in-memory state at any time.  Lock down
 	 * the structure, just to be safe.
 	 */
-	if (ref->page_del == NULL)
+	if (ref->page_del == NULL && ref->page_las == NULL)
 		return (true);
 
 	if (!__wt_atomic_casv32(&ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		return (false);
 
-	skip = !__wt_page_del_active(session, ref, visible_all);
+	skip = !__wt_page_del_active(session, ref, visible_all) &&
+	    !__wt_page_las_active(session, ref);
 
 	/*
 	 * The page_del structure can be freed as soon as the delete is stable:
