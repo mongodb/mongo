@@ -28,6 +28,11 @@
  */
 
 namespace mongo {
-// print mongos version info
-void printShardingVersionInfo(bool out);
+
+/**
+ * Outputs the version of MongoS either to the standard output (as part of the --version option,
+ * which case isForVersionReportingOnly = true) or to the log file as part of server startup.
+ */
+void printShardingVersionInfo(bool isForVersionReportingOnly);
+
 }  // namespace mongo
