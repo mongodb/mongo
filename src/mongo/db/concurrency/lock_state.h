@@ -58,18 +58,18 @@ public:
     /**
      * Uninterruptible blocking method, which waits for the notification to fire.
      *
-     * @param deadline When to return LOCK_TIMEOUT.
+     * @param timeout How many milliseconds to wait before returning LOCK_TIMEOUT.
      */
-    LockResult wait(Date_t deadline);
+    LockResult wait(Milliseconds timeout);
 
     /**
      * Interruptible blocking method, which waits for the notification to fire or an interrupt from
      * the operation context.
      *
      * @param opCtx OperationContext to wait on for an interrupt.
-     * @param deadline When to return LOCK_TIMEOUT.
+     * @param timeout How many milliseconds to wait before returning LOCK_TIMEOUT.
      */
-    LockResult wait(OperationContext* opCtx, Date_t deadline);
+    LockResult wait(OperationContext* opCtx, Milliseconds timeout);
 
 private:
     virtual void notify(ResourceId resId, LockResult result);
@@ -249,15 +249,12 @@ public:
      * acquisition.
      * @param resId Resource id which was passed to an earlier lockBegin call. Must match.
      * @param mode Mode which was passed to an earlier lockBegin call. Must match.
-     * @param requestedDeadline The absolute time point when this lock acquisition will time out,
-     * if not yet granted.
+     * @param deadline The absolute time point when this lock acquisition will time out, if not yet
+     * granted.
      *
      * Throws an exception if it is interrupted.
      */
-    void lockComplete(OperationContext* opCtx,
-                      ResourceId resId,
-                      LockMode mode,
-                      Date_t requestedDeadline);
+    void lockComplete(OperationContext* opCtx, ResourceId resId, LockMode mode, Date_t deadline);
 
     void lockComplete(ResourceId resId, LockMode mode, Date_t deadline) {
         lockComplete(nullptr, resId, mode, deadline);

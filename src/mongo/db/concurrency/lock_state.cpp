@@ -218,20 +218,20 @@ void CondVarLockGrantNotification::clear() {
     _result = LOCK_INVALID;
 }
 
-LockResult CondVarLockGrantNotification::wait(Date_t deadline) {
+LockResult CondVarLockGrantNotification::wait(Milliseconds timeout) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    return getGlobalServiceContext()->getPreciseClockSource()->waitForConditionUntil(
-               _cond, lock, deadline, [this] { return _result != LOCK_INVALID; })
+    return _cond.wait_for(
+               lock, timeout.toSystemDuration(), [this] { return _result != LOCK_INVALID; })
         ? _result
         : LOCK_TIMEOUT;
 }
 
-LockResult CondVarLockGrantNotification::wait(OperationContext* opCtx, Date_t deadline) {
+LockResult CondVarLockGrantNotification::wait(OperationContext* opCtx, Milliseconds timeout) {
     invariant(opCtx);
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    if (opCtx->waitForConditionOrInterruptUntil(
-            _cond, lock, deadline, [this] { return _result != LOCK_INVALID; })) {
-        // Because waitForConditionOrInterruptUntil evaluates the predicate before checking for
+    if (opCtx->waitForConditionOrInterruptFor(
+            _cond, lock, timeout, [this] { return _result != LOCK_INVALID; })) {
+        // Because waitForConditionOrInterruptFor evaluates the predicate before checking for
         // interrupt, it is possible that a killed operation can acquire a lock if the request is
         // granted quickly. For that reason, it is necessary to check if the operation has been
         // killed at least once before accepting the lock grant.
@@ -363,14 +363,13 @@ LockResult LockerImpl::_lockGlobalBegin(OperationContext* opCtx, LockMode mode, 
             // Ignore deadline and _maxLockTimeout.
             invariant(_acquireTicket(opCtx, mode, Date_t::max()));
         } else {
-            auto beforeAcquire = getGlobalServiceContext()->getPreciseClockSource()->now();
+            auto beforeAcquire = Date_t::now();
             deadline = std::min(deadline,
                                 _maxLockTimeout ? beforeAcquire + *_maxLockTimeout : Date_t::max());
             uassert(ErrorCodes::LockTimeout,
                     str::stream() << "Unable to acquire ticket with mode '" << _modeForTicket
                                   << "' within a max lock request timeout of '"
-                                  << getGlobalServiceContext()->getPreciseClockSource()->now() -
-                            beforeAcquire
+                                  << Date_t::now() - beforeAcquire
                                   << "' milliseconds.",
                     _acquireTicket(opCtx, mode, deadline));
         }
@@ -894,7 +893,7 @@ LockResult LockerImpl::lockBegin(OperationContext* opCtx, ResourceId resId, Lock
 void LockerImpl::lockComplete(OperationContext* opCtx,
                               ResourceId resId,
                               LockMode mode,
-                              Date_t requestedDeadline) {
+                              Date_t deadline) {
 
     // Clean up the state on any failed lock attempts.
     auto unlockOnErrorGuard = makeGuard([&] {
@@ -913,18 +912,21 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
     }
 
     LockResult result;
-    auto now = getGlobalServiceContext()->getPreciseClockSource()->now();
-
-    requestedDeadline = std::max(requestedDeadline, Date_t());
-    if (_maxLockTimeout) {
-        requestedDeadline = std::min(requestedDeadline, now + (*_maxLockTimeout));
+    Milliseconds timeout;
+    if (deadline == Date_t::max()) {
+        timeout = Milliseconds::max();
+    } else if (deadline <= Date_t()) {
+        timeout = Milliseconds(0);
+    } else {
+        timeout = deadline - Date_t::now();
     }
+    timeout = std::min(timeout, _maxLockTimeout ? *_maxLockTimeout : Milliseconds::max());
     if (_uninterruptibleLocksRequested) {
-        requestedDeadline = Date_t::max();
+        timeout = Milliseconds::max();
     }
 
     // Don't go sleeping without bound in order to be able to report long waits.
-    Date_t deadline = std::min(requestedDeadline, now + MaxWaitTime);
+    Milliseconds waitTime = std::min(timeout, MaxWaitTime);
     const uint64_t startOfTotalWaitTime = curTimeMicros64();
     uint64_t startOfCurrentWaitTime = startOfTotalWaitTime;
 
@@ -935,9 +937,9 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
         // pending lock acquisitions can be cancelled, so long as no callers have requested an
         // uninterruptible lock.
         if (opCtx && _uninterruptibleLocksRequested == 0) {
-            result = _notify.wait(opCtx, deadline);
+            result = _notify.wait(opCtx, waitTime);
         } else {
-            result = _notify.wait(deadline);
+            result = _notify.wait(waitTime);
         }
 
         // Account for the time spent waiting on the notification object
@@ -952,18 +954,21 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
             break;
 
         // If infinite timeout was requested, just keep waiting
-        if (requestedDeadline == Date_t::max()) {
+        if (timeout == Milliseconds::max()) {
             continue;
         }
 
+        const auto totalBlockTime = duration_cast<Milliseconds>(
+            Microseconds(int64_t(curTimeMicros - startOfTotalWaitTime)));
+        waitTime = (totalBlockTime < timeout) ? std::min(timeout - totalBlockTime, MaxWaitTime)
+                                              : Milliseconds(0);
+
         // Check if the lock acquisition has timed out. If we have an operation context and client
         // we can provide additional diagnostics data.
-        if (deadline >= requestedDeadline) {
-            auto duration = deadline.toDurationSinceEpoch() -
-                duration_cast<Milliseconds>(Microseconds(int64_t(startOfTotalWaitTime)));
-            std::string timeoutMessage = str::stream()
-                << "Unable to acquire " << modeName(mode) << " lock on '" << resId.toString()
-                << "' within " << duration << " milliseconds.";
+        if (waitTime == Milliseconds(0)) {
+            std::string timeoutMessage = str::stream() << "Unable to acquire " << modeName(mode)
+                                                       << " lock on '" << resId.toString()
+                                                       << "' within " << timeout << ".";
             if (opCtx && opCtx->getClient()) {
                 timeoutMessage = str::stream()
                     << timeoutMessage << " opId: " << opCtx->getOpID()
@@ -972,8 +977,6 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
             }
             uasserted(ErrorCodes::LockTimeout, timeoutMessage);
         }
-
-        deadline = std::min(requestedDeadline, deadline + MaxWaitTime);
     }
 
     invariant(result == LOCK_OK);
