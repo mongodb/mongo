@@ -47,6 +47,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -155,51 +156,71 @@ public:
     }
 
     CmdSleep() : Command("sleep") {}
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& ns,
              BSONObj& cmdObj,
              int,
              string& errmsg,
              BSONObjBuilder& result) {
         log() << "test only command sleep invoked";
-        long long millis = 0;
+        Milliseconds msToSleep(0);
 
         if (cmdObj["secs"] || cmdObj["millis"]) {
             if (cmdObj["secs"]) {
                 uassert(34344, "'secs' must be a number.", cmdObj["secs"].isNumber());
-                millis += cmdObj["secs"].numberLong() * 1000;
+                msToSleep += Milliseconds(cmdObj["secs"].numberLong() * 1000);
             }
             if (cmdObj["millis"]) {
                 uassert(34345, "'millis' must be a number.", cmdObj["millis"].isNumber());
-                millis += cmdObj["millis"].numberLong();
+                msToSleep += Milliseconds(cmdObj["millis"].numberLong());
             }
         } else {
-            millis = 10 * 1000;
+            msToSleep = Milliseconds(10 * 1000);
         }
 
-        if (!cmdObj["lock"]) {
-            // Legacy implementation
-            if (cmdObj.getBoolField("w")) {
-                _sleepInWriteLock(txn, millis);
-            } else {
-                _sleepInReadLock(txn, millis);
-            }
-        } else {
-            uassert(34346, "Only one of 'w' and 'lock' may be set.", !cmdObj["w"]);
+        auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+        auto deadline = now + Milliseconds(msToSleep);
 
-            std::string lock(cmdObj.getStringField("lock"));
-            if (lock == "none") {
-                sleepmillis(millis);
-            } else if (lock == "w") {
-                _sleepInWriteLock(txn, millis);
+        // Note that if the system clock moves _backwards_ (which has been known to happen), this
+        // could result in a much longer sleep than requested. Since this command is only used for
+        // testing, we're okay with this imprecision.
+        while (deadline > now) {
+            Milliseconds msRemaining = deadline - now;
+
+            // If the clock moves back by an absurd amount then uassert.
+            Milliseconds threshold(10000);
+            uassert(31173,
+                    str::stream() << "Clock must have moved backwards by at least " << threshold
+                                  << " ms during sleep command",
+                    msRemaining < msToSleep + threshold);
+
+            ON_BLOCK_EXIT(
+                [&now, opCtx] { now = opCtx->getServiceContext()->getFastClockSource()->now(); });
+
+            if (!cmdObj["lock"]) {
+                // Legacy implementation
+                if (cmdObj.getBoolField("w")) {
+                    _sleepInWriteLock(opCtx, msRemaining.count());
+                } else {
+                    _sleepInReadLock(opCtx, msRemaining.count());
+                }
             } else {
-                uassert(34347, "'lock' must be one of 'r', 'w', 'none'.", lock == "r");
-                _sleepInReadLock(txn, millis);
+                uassert(34346, "Only one of 'w' and 'lock' may be set.", !cmdObj["w"]);
+
+                std::string lock(cmdObj.getStringField("lock"));
+                if (lock == "none") {
+                    sleepmillis(msRemaining.count());
+                } else if (lock == "w") {
+                    _sleepInWriteLock(opCtx, msRemaining.count());
+                } else {
+                    uassert(34347, "'lock' must be one of 'r', 'w', 'none'.", lock == "r");
+                    _sleepInReadLock(opCtx, msRemaining.count());
+                }
             }
         }
 
         // Interrupt point for testing (e.g. maxTimeMS).
-        txn->checkForInterrupt();
+        opCtx->checkForInterrupt();
 
         return true;
     }
