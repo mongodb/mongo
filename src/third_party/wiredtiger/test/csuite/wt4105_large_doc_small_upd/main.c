@@ -136,8 +136,8 @@ main(int argc, char *argv[])
 	while (++j < MODIFY_COUNT) {
 		for (i = 0; i < NUM_DOCS; i++) {
 			/* Position the cursor. */
-			testutil_check(
-			    session2->begin_transaction(session2, NULL));
+			testutil_check(session2->begin_transaction(
+			    session2, "isolation=snapshot"));
 			c->set_key(c, i);
 			modify_entry.data.data =
 			    "abcdefghijklmnopqrstuvwxyz";

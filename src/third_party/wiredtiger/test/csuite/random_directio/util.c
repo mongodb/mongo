@@ -100,9 +100,11 @@ copy_directory(const char *fromdir, const char *todir, bool directio)
 		testutil_check(__wt_snprintf(tofile, sizeof(tofile),
 		    "%s/%s", todir, dp->d_name));
 		rfd = open(fromfile, O_RDONLY | openflags, 0);
-		testutil_assert(rfd >= 0);
+		testutil_assertfmt(rfd >= 0,
+		    "Open of source %s failed with %d\n", fromfile, errno);
 		wfd = open(tofile, O_WRONLY | O_CREAT, 0666);
-		testutil_assert(wfd >= 0);
+		testutil_assertfmt(wfd >= 0,
+		    "Open of dest %s failed with %d\n", tofile, errno);
 		testutil_check(fstat(rfd, &sb));
 
 		/*

@@ -239,16 +239,6 @@ AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,
 
 AC_SUBST(AM_CFLAGS)
 
-# test/format optionally uses a Oracle Berkeley DB release for verification.
-AC_MSG_CHECKING([if --with-berkeleydb=DIR option specified])
-AC_ARG_WITH(berkeleydb,
-    [AS_HELP_STRING([--with-berkeleydb=DIR],
-	[Specify installed library directory of Berkeley DB])],
-    [with_berkeleydb="$withval"], [with_berkeleydb="NO_BERKELEY_DB_LIBRARY"])
-AC_MSG_RESULT($with_berkeleydb)
-AM_CONDITIONAL([HAVE_BERKELEY_DB], [test -d $with_berkeleydb])
-AC_SUBST(BERKELEY_DB_PATH, [$with_berkeleydb])
-
 # Warn that diagnostic builds should not be used in production
 if test "$wt_cv_enable_diagnostic" = "yes"; then
 	AC_MSG_WARN(

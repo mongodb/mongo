@@ -229,8 +229,6 @@ LZO
 LeafGreen
 LevelDB
 Levyx
-Llqr
-Llqrt
 LmT
 LoadLoad
 LockFile
@@ -499,7 +497,6 @@ basecfg
 basho
 bbb
 bcr
-bdb
 beginthreadex
 bigram
 binutils
@@ -907,7 +904,6 @@ keyv
 kv
 kvraw
 kvs
-kvsbdb
 lang
 las
 latencies
@@ -948,6 +944,8 @@ lookaside
 lookup
 lookups
 lossy
+lqr
+lqrt
 lr
 lrt
 lru

@@ -1081,7 +1081,8 @@ __wt_txn_search_check(WT_SESSION_IMPL *session)
 	 * verify this transaction has one.  Same if it should never have
 	 * a read timestamp.
 	 */
-	if (FLD_ISSET(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS) &&
+	if (!F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
+	    FLD_ISSET(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS) &&
 	    !F_ISSET(txn, WT_TXN_PUBLIC_TS_READ))
 		WT_RET_MSG(session, EINVAL, "read_timestamp required and "
 		    "none set on this transaction");

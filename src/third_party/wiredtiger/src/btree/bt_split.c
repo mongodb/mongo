@@ -1182,8 +1182,49 @@ err:	__split_ref_final(session, &locked);
 
 	switch (complete) {
 	case WT_ERR_RETURN:
+		/*
+		 * The replace-index variable is the internal page being split's
+		 * new page index, referencing the first chunk of WT_REFs that
+		 * aren't being moved to other pages. Those WT_REFs survive the
+		 * failure, they're referenced from the page's current index.
+		 * Simply free that memory, but nothing it references.
+		 */
+		__wt_free(session, replace_index);
+
+		/*
+		 * The alloc-index variable is the array of new WT_REF entries
+		 * intended to be inserted into the page being split's parent.
+		 *
+		 * Except for the first slot (the original page's WT_REF), it's
+		 * an array of newly allocated combined WT_PAGE_INDEX and WT_REF
+		 * structures, each of which references a newly allocated (and
+		 * modified) child page, each of which references an index of
+		 * WT_REFs from the page being split. Free everything except for
+		 * slot 1 and the WT_REFs in the child page indexes.
+		 *
+		 * First, skip slot 1. Second, we want to free all of the child
+		 * pages referenced from the alloc-index array, but we can't
+		 * just call the usual discard function because the WT_REFs
+		 * referenced by the child pages remain referenced by the
+		 * original page, after error. For each entry, free the child
+		 * page's page index (so the underlying page-free function will
+		 * ignore it), then call the general-purpose discard function.
+		 */
+		if (alloc_index == NULL)
+			break;
+		alloc_refp = alloc_index->index;
+		*alloc_refp++ = NULL;
+		for (i = 1; i < children; ++alloc_refp, ++i) {
+			ref = *alloc_refp;
+			if (ref == NULL || ref->page == NULL)
+				continue;
+
+			child = ref->page;
+			child_pindex = WT_INTL_INDEX_GET_SAFE(child);
+			__wt_free(session, child_pindex);
+			WT_INTL_INDEX_SET(child, NULL);
+		}
 		__wt_free_ref_index(session, page, alloc_index, true);
-		__wt_free_ref_index(session, page, replace_index, false);
 		break;
 	case WT_ERR_PANIC:
 		__wt_err(session, ret,
@@ -1408,8 +1449,20 @@ err:	if (parent != NULL)
 	__split_internal_unlock(session, page);
 
 	/* A page may have been busy, in which case return without error. */
-	WT_RET_BUSY_OK(ret);
-	return (0);
+	switch (ret) {
+	case 0:
+	case WT_PANIC:
+		break;
+	case EBUSY:
+		ret = 0;
+		break;
+	default:
+		__wt_err(session, ret,
+		    "ignoring not-fatal error during parent page split");
+		ret = 0;
+		break;
+	}
+	return (ret);
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -1625,7 +1678,7 @@ __split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref)
 	/*
 	 * We failed creating new in-memory pages. For error-handling reasons,
 	 * we've left the update chains referenced by both the original and
-	 * new pages. Discard the new allocated WT_REF structures and their
+	 * new pages. Discard the newly allocated WT_REF structures and their
 	 * pages (setting a flag so the discard code doesn't discard the updates
 	 * on the page).
 	 *

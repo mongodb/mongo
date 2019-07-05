@@ -30,18 +30,6 @@
 
 #include <signal.h>
 
-#ifdef BDB
-/*
- * Berkeley DB has an #ifdef we need to provide a value for, we'll see an
- * undefined error if it's unset during a strict compile.
- */
-#ifndef	DB_DBM_HSEARCH
-#define	DB_DBM_HSEARCH	0
-#endif
-#include <assert.h>
-#include <db.h>
-#endif
-
 #define	EXTPATH	"../../ext/"			/* Extensions path */
 
 #define	LZ4_PATH							\
@@ -58,9 +46,6 @@
 
 #define	ROTN_PATH							\
 	EXTPATH "encryptors/rotn/.libs/libwiredtiger_rotn.so"
-
-#define	KVS_BDB_PATH							\
-	EXTPATH "test/kvs_bdb/.libs/libwiredtiger_kvs_bdb.so"
 
 #undef	M
 #define	M(v)		((v) * WT_MILLION)	/* Million */
@@ -82,7 +67,6 @@ typedef struct {
 	char *home;				/* Home directory */
 	char *home_backup;			/* Hot-backup directory */
 	char *home_backup_init;			/* Initialize backup command */
-	char *home_bdb;				/* BDB directory */
 	char *home_config;			/* Run CONFIG file path */
 	char *home_init;			/* Initialize home command */
 	char *home_log;				/* Operation log file path */
@@ -92,11 +76,6 @@ typedef struct {
 
 	char wiredtiger_open_config[8 * 1024];	/* Database open config */
 
-#ifdef HAVE_BERKELEY_DB
-	void *bdb;				/* BDB comparison handle */
-	void *dbc;				/* BDB cursor handle */
-#endif
-
 	WT_CONNECTION	 *wts_conn;
 	WT_EXTENSION_API *wt_api;
 
@@ -105,11 +84,8 @@ typedef struct {
 
 	uint32_t run_cnt;			/* Run counter */
 
-	enum {
-	    LOG_FILE=1,				/* Use a log file */
-	    LOG_OPS=2				/* Log all operations */
-	} logging;
-	FILE *logfp;				/* Log file */
+	bool  logging;				/* log operations  */
+	FILE *logfp;				/* log file */
 
 	bool replay;				/* Replaying a run. */
 	bool workers_finished;			/* Operations completed */
@@ -151,6 +127,8 @@ typedef struct {
 
 	uint32_t c_abort;			/* Config values */
 	uint32_t c_alter;
+	uint32_t c_assert_commit_timestamp;
+	uint32_t c_assert_read_timestamp;
 	uint32_t c_auto_throttle;
 	uint32_t c_backups;
 	uint32_t c_bitcnt;
@@ -280,13 +258,35 @@ typedef struct {
 } GLOBAL;
 extern GLOBAL g;
 
+/* Worker thread operations. */
+typedef enum { INSERT, MODIFY, READ, REMOVE, TRUNCATE, UPDATE } thread_op;
+
+/* Worker read operations. */
+typedef enum { NEXT, PREV, SEARCH, SEARCH_NEAR } read_operation;
+
+typedef struct {
+	thread_op op;				/* Operation */
+	uint64_t  keyno;			/* Row number */
+
+	uint64_t  ts;				/* Read/commit timestamp */
+	bool	  repeatable;			/* Operation can be repeated */
+
+	uint64_t  last;			/* Inclusive end of a truncate range */
+
+	void    *kdata;			/* If an insert, the generated key */
+	size_t   ksize;
+	size_t   kmemsize;
+
+	void    *vdata;			/* If not a delete, the value */
+	size_t   vsize;
+	size_t   vmemsize;
+} SNAP_OPS;
+
 typedef struct {
 	int	    id;				/* simple thread ID */
 	wt_thread_t tid;			/* thread ID */
 
 	WT_RAND_STATE rnd;			/* thread RNG state */
-
-	bool prepare_txn;			/* is prepare transaction */
 
 	volatile bool quit;			/* thread should quit */
 
@@ -300,12 +300,20 @@ typedef struct {
 	uint64_t truncate;
 	uint64_t update;
 
+	WT_SESSION *session;			/* WiredTiger session */
+	WT_CURSOR  *cursor;			/* WiredTiger cursor */
+
 	uint64_t keyno;				/* key */
 	WT_ITEM	 *key, _key;			/* key, value */
 	WT_ITEM	 *value, _value;
 
 	uint64_t last;				/* truncate range */
 	WT_ITEM	 *lastkey, _lastkey;
+
+	bool repeatable_reads;			/* if read ops repeatable */
+	uint64_t read_ts;			/* read timestamp */
+	uint64_t commit_ts;			/* commit timestamp */
+	SNAP_OPS *snap, *snap_first, snap_list[512];
 
 	WT_ITEM  *tbuf, _tbuf;			/* temporary buffer */
 
@@ -314,17 +322,13 @@ typedef struct {
 #define	TINFO_JOINED	3			/* Resolved */
 	volatile int state;			/* state */
 } TINFO;
+extern TINFO **tinfo_list;
 
-#ifdef HAVE_BERKELEY_DB
-void	 bdb_close(void);
-void	 bdb_insert(const void *, size_t, const void *, size_t);
-void	 bdb_np(bool, void *, size_t *, void *, size_t *, int *);
-void	 bdb_open(void);
-void	 bdb_read(uint64_t, void *, size_t *, int *);
-void	 bdb_remove(uint64_t, int *);
-void	 bdb_truncate(uint64_t, uint64_t);
-void	 bdb_update(const void *, size_t, const void *, size_t);
-#endif
+#define	logop(wt_session, fmt, ...) do {				\
+	if (g.logging)							\
+		testutil_check(g.wt_api->msg_printf(			\
+		    g.wt_api, wt_session, fmt, __VA_ARGS__));		\
+} while (0)
 
 WT_THREAD_RET alter(void *);
 WT_THREAD_RET backup(void *);
@@ -333,9 +337,9 @@ WT_THREAD_RET compact(void *);
 void	 config_clear(void);
 void	 config_error(void);
 void	 config_file(const char *);
-void	 config_print(int);
+void	 config_print(bool);
 void	 config_setup(void);
-void	 config_single(const char *, int);
+void	 config_single(const char *, bool);
 void	 fclose_and_clear(FILE **);
 void	 key_gen(WT_ITEM *, uint64_t);
 void	 key_gen_init(WT_ITEM *);
@@ -348,6 +352,10 @@ void	 print_item(const char *, WT_ITEM *);
 void	 print_item_data(const char *, const uint8_t *, size_t);
 int	 read_row_worker(WT_CURSOR *, uint64_t, WT_ITEM *, WT_ITEM *, bool);
 uint32_t rng(WT_RAND_STATE *);
+void	 snap_repeat_single(WT_CURSOR *, TINFO *);
+int	 snap_repeat_txn(WT_CURSOR *, TINFO *);
+void	 snap_repeat_update(TINFO *, bool);
+void	 snap_track(TINFO *, thread_op);
 WT_THREAD_RET timestamp(void *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen(WT_RAND_STATE *, WT_ITEM *, uint64_t);
@@ -356,11 +364,11 @@ void	 val_gen_teardown(WT_ITEM *);
 void	 val_init(void);
 void	 val_teardown(void);
 void	 wts_close(void);
-void	 wts_dump(const char *, int);
+void	 wts_dump(const char *, bool);
 void	 wts_init(void);
 void	 wts_load(void);
 void	 wts_open(const char *, bool, WT_CONNECTION **);
-void	 wts_ops(int);
+void	 wts_ops(bool);
 void	 wts_read_scan(void);
 void	 wts_rebalance(void);
 void	 wts_reopen(void);
@@ -368,50 +376,4 @@ void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);
 
-/*
- * mmrand --
- *	Return a random value between a min/max pair, inclusive.
- */
-static inline uint32_t
-mmrand(WT_RAND_STATE *rnd, u_int min, u_int max)
-{
-	uint32_t v;
-	u_int range;
-
-	/*
-	 * Test runs with small row counts can easily pass a max of 0 (for
-	 * example, "g.rows / 20"). Avoid the problem.
-	 */
-	if (max <= min)
-		return (min);
-
-	v = rng(rnd);
-	range = (max - min) + 1;
-	v %= range;
-	v += min;
-	return (v);
-}
-
-static inline void
-random_sleep(WT_RAND_STATE *rnd, u_int max_seconds)
-{
-	uint64_t i, micro_seconds;
-
-	/*
-	 * We need a fast way to choose a sleep time. We want to sleep a short
-	 * period most of the time, but occasionally wait longer. Divide the
-	 * maximum period of time into 10 buckets (where bucket 0 doesn't sleep
-	 * at all), and roll dice, advancing to the next bucket 50% of the time.
-	 * That means we'll hit the maximum roughly every 1K calls.
-	 */
-	for (i = 0;;)
-		if (rng(rnd) & 0x1 || ++i > 9)
-			break;
-
-	if (i == 0)
-		__wt_yield();
-	else {
-		micro_seconds = (uint64_t)max_seconds * WT_MILLION;
-		__wt_sleep(0, i * (micro_seconds / 10));
-	}
-}
+#include "format.i"

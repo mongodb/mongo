@@ -120,8 +120,6 @@ autogen
 automake
 basecfg
 basho
-bdb
-bdbmap
 benchmarking
 bigram
 bindir

@@ -1,0 +1,16 @@
+# Create a lot of tables with a big metadata footprint.
+# There have been cases where WiredTiger has done a bad job of splitting
+# metadata pages, which leads to poor performance - this configuration looks
+# for those. See JIRA ticket WT-4882 for context.
+conn_config="cache_size=1G,eviction=(threads_max=8),file_manager=(close_idle_time=100000),checkpoint=(wait=2000,log_size=2GB),statistics_log=(wait=1,json,on_close),session_max=1000"
+table_config="type=file,app_metadata=\"this_is_a_fairly_long_string_to_cause_splits_in_metadata_more_often_abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyabcdefghijklmnopqrstuvwxyabcdefghijklmnopqrstuvwxyabcdefghijklmnopqrstuvwxyabcdefghijklmnopqrstuvwxyabcdefghijklmnopqrstuvwxyabcdefghijklmnopqrstuvwxyabcdefghijklmnopqrstuvwxyzzzzzzzz\""
+table_count=2000
+icount=0
+random_range=1000000000
+pareto=10
+range_partition=true
+report_interval=5
+
+run_ops=0
+populate_threads=0
+

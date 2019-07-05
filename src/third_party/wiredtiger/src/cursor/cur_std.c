@@ -916,11 +916,16 @@ __cursor_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
 
 	/*
 	 * The underlying btree code cannot support WT_CURSOR.modify within
-	 * a read-uncommitted transaction. Disallow it here for consistency.
+	 * a read-committed or read-uncommitted transaction, or outside of
+	 * an explicit transaction. Disallow here as well, for consistency.
 	 */
-	if (session->txn.isolation == WT_ISO_READ_UNCOMMITTED)
+	if (session->txn.isolation != WT_ISO_SNAPSHOT)
 		WT_ERR_MSG(session, ENOTSUP,
-		    "not supported in read-uncommitted transactions");
+		    "not supported in read-committed or read-uncommitted "
+		    "transactions");
+	if (F_ISSET(&session->txn, WT_TXN_AUTOCOMMIT))
+		WT_ERR_MSG(session, ENOTSUP,
+		    "not supported in implicit transactions");
 
 	WT_ERR(__cursor_checkkey(cursor));
 

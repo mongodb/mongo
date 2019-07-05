@@ -646,41 +646,39 @@ __evict_review(
 
 	if (closing)
 		LF_SET(WT_REC_VISIBILITY_ERR);
-	else if (!WT_PAGE_IS_INTERNAL(page) &&
-	    !F_ISSET(S2BT(session), WT_BTREE_LOOKASIDE)) {
-		if (F_ISSET(conn, WT_CONN_IN_MEMORY))
-			LF_SET(WT_REC_IN_MEMORY |
-			    WT_REC_SCRUB | WT_REC_UPDATE_RESTORE);
-		else if (WT_SESSION_BTREE_SYNC(session))
-			LF_SET(WT_REC_LOOKASIDE);
-		else if (!WT_IS_METADATA(session->dhandle)) {
-			LF_SET(WT_REC_UPDATE_RESTORE);
+	else if (WT_PAGE_IS_INTERNAL(page) ||
+	    F_ISSET(S2BT(session), WT_BTREE_LOOKASIDE))
+		;
+	else if (WT_SESSION_BTREE_SYNC(session))
+		LF_SET(WT_REC_LOOKASIDE);
+	else if (F_ISSET(conn, WT_CONN_IN_MEMORY))
+		LF_SET(WT_REC_IN_MEMORY | WT_REC_SCRUB | WT_REC_UPDATE_RESTORE);
+	else {
+		LF_SET(WT_REC_UPDATE_RESTORE);
 
-			/*
-			 * Scrub if we're supposed to or toss it in sometimes
-			 * if we are in debugging mode.
-			 */
-			if (F_ISSET(cache, WT_CACHE_EVICT_SCRUB) ||
-			    (F_ISSET(cache, WT_CACHE_EVICT_DEBUG_MODE) &&
-			    __wt_random(&session->rnd) % 3 == 0))
-				LF_SET(WT_REC_SCRUB);
+		/*
+		 * Scrub if we're supposed to or toss it in sometimes if we are
+		 * in debugging mode.
+		 */
+		if (F_ISSET(cache, WT_CACHE_EVICT_SCRUB) ||
+		    (F_ISSET(cache, WT_CACHE_EVICT_DEBUG_MODE) &&
+		    __wt_random(&session->rnd) % 3 == 0))
+			LF_SET(WT_REC_SCRUB);
 
-			/*
-			 * If the cache is under pressure with many updates
-			 * that can't be evicted, check if reconciliation
-			 * suggests trying the lookaside table.
-			 */
-			if (F_ISSET(cache, WT_CACHE_EVICT_LOOKASIDE) &&
-			    !F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE)) {
-				if (F_ISSET(cache,
-				    WT_CACHE_EVICT_DEBUG_MODE) &&
-				    __wt_random(&session->rnd) % 10 == 0) {
-					LF_CLR(WT_REC_SCRUB |
-					    WT_REC_UPDATE_RESTORE);
-					LF_SET(WT_REC_LOOKASIDE);
-				}
-				lookaside_retryp = &lookaside_retry;
+		/*
+		 * If the cache is under pressure with many updates that can't
+		 * be evicted, check if reconciliation suggests trying the
+		 * lookaside table.
+		 */
+		if (!WT_IS_METADATA(session->dhandle) &&
+		    F_ISSET(cache, WT_CACHE_EVICT_LOOKASIDE) &&
+		    !F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE)) {
+			if (F_ISSET(cache, WT_CACHE_EVICT_DEBUG_MODE) &&
+			    __wt_random(&session->rnd) % 10 == 0) {
+				LF_CLR(WT_REC_SCRUB | WT_REC_UPDATE_RESTORE);
+				LF_SET(WT_REC_LOOKASIDE);
 			}
+			lookaside_retryp = &lookaside_retry;
 		}
 	}
 

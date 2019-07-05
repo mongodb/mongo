@@ -96,6 +96,15 @@ handle_message(WT_EVENT_HANDLER *handler,
 	(void)(handler);
 	(void)(session);
 
+	/*
+	 * WiredTiger logs a verbose message when the read timestamp is set to a
+	 * value older than the oldest timestamp. Ignore the message, it happens
+	 * when repeating operations to confirm timestamped values don't change
+	 * underneath us.
+	 */
+	if (strstr(message, "less than the oldest timestamp") != NULL)
+		return (0);
+
 	/* Write and flush the message so we're up-to-date on error. */
 	if (g.logfp == NULL) {
 		out = printf("%p:%s\n", (void *)session, message);
@@ -261,14 +270,13 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 	/* Extensions. */
 	CONFIG_APPEND(p,
 	    ",extensions=["
-	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
+	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(LZ4_PATH, R_OK) == 0 ? LZ4_PATH : "",
 	    access(ROTN_PATH, R_OK) == 0 ? ROTN_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",
-	    access(ZSTD_PATH, R_OK) == 0 ? ZSTD_PATH : "",
-	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "");
+	    access(ZSTD_PATH, R_OK) == 0 ? ZSTD_PATH : "");
 
 	/*
 	 * Put configuration file configuration options second to last. Put
@@ -413,10 +421,16 @@ wts_init(void)
 	/* Configure Btree split page percentage. */
 	CONFIG_APPEND(p, ",split_pct=%" PRIu32, g.c_split_pct);
 
-	/* Configure LSM and data-sources. */
-	if (DATASOURCE("kvsbdb"))
-		CONFIG_APPEND(p, ",type=kvsbdb");
+	/*
+	 * Assertions.
+	 * Assertions slow down the code for additional diagnostic checking.
+	 */
+	if (g.c_txn_timestamps && g.c_assert_commit_timestamp)
+		CONFIG_APPEND(p, ",assert=(commit_timestamp=key_consistent)");
+	if (g.c_txn_timestamps && g.c_assert_read_timestamp)
+		CONFIG_APPEND(p, ",assert=(read_timestamp=always)");
 
+	/* Configure LSM. */
 	if (DATASOURCE("lsm")) {
 		CONFIG_APPEND(p, ",type=lsm,lsm=(");
 		CONFIG_APPEND(p,
@@ -467,43 +481,6 @@ wts_close(void)
 }
 
 void
-wts_dump(const char *tag, int dump_bdb)
-{
-#ifdef HAVE_BERKELEY_DB
-	size_t len;
-	char *cmd;
-
-	/*
-	 * In-memory configurations and data-sources don't support dump through
-	 * the wt utility.
-	 */
-	if (g.c_in_memory != 0)
-		return;
-	if (DATASOURCE("kvsbdb"))
-		return;
-
-	track("dump files and compare", 0ULL, NULL);
-
-	len = strlen(g.home) + strlen(BERKELEY_DB_PATH) + strlen(g.uri) + 100;
-	cmd = dmalloc(len);
-	testutil_check(__wt_snprintf(cmd, len,
-	    "sh s_dumpcmp -h %s %s %s %s %s %s",
-	    g.home,
-	    dump_bdb ? "-b " : "",
-	    dump_bdb ? BERKELEY_DB_PATH : "",
-	    g.type == FIX || g.type == VAR ? "-c" : "",
-	    g.uri == NULL ? "" : "-n",
-	    g.uri == NULL ? "" : g.uri));
-
-	testutil_checkfmt(system(cmd), "%s: dump comparison failed", tag);
-	free(cmd);
-#else
-	(void)tag;				/* [-Wunused-variable] */
-	(void)dump_bdb;				/* [-Wunused-variable] */
-#endif
-}
-
-void
 wts_verify(const char *tag)
 {
 	WT_CONNECTION *conn;
@@ -517,9 +494,7 @@ wts_verify(const char *tag)
 	track("verify", 0ULL, NULL);
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
-	if (g.logging != 0)
-		(void)g.wt_api->msg_printf(g.wt_api, session,
-		    "=============== verify start ===============");
+	logop(session, "%s", "=============== verify start");
 
 	/*
 	 * Verify can return EBUSY if the handle isn't available. Don't yield
@@ -530,9 +505,7 @@ wts_verify(const char *tag)
 	testutil_assertfmt(
 	    ret == 0 || ret == EBUSY, "session.verify: %s: %s", g.uri, tag);
 
-	if (g.logging != 0)
-		(void)g.wt_api->msg_printf(g.wt_api, session,
-		    "=============== verify stop ===============");
+	logop(session, "%s", "=============== verify stop");
 	testutil_check(session->close(session, NULL));
 }
 
@@ -555,10 +528,6 @@ wts_stats(void)
 
 	/* Ignore statistics if they're not configured. */
 	if (g.c_statistics == 0)
-		return;
-
-	/* Some data-sources don't support statistics. */
-	if (DATASOURCE("kvsbdb"))
 		return;
 
 	conn = g.wts_conn;

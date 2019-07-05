@@ -6,12 +6,6 @@ support a set of methods for a different URI type (for example, in the
 same way WiredTiger supports the built-in type "file:", an application
 data source might support the type "dsrc:").
 
-The WiredTiger distribution includes an example of a complete custom
-data source implementation (based on Oracle's Berkeley DB database
-engine), in the file test/format/kvs_bdb.c.  This example implementation is
-public domain software, please feel free to use this code as a prototype
-implementation of other custom data sources.
-
 Applications register their WT_DATA_SOURCE interface implementations
 with WiredTiger using the WT_CONNECTION::add_data_source method:
 

@@ -901,22 +901,23 @@ struct __wt_ref {
 #define	WT_REF_CAS_STATE(session, ref, old_state, new_state)          \
 	__wt_ref_cas_state_int((session), (ref), (old_state), (new_state),\
 	__FILE__, __LINE__)
+#define	WT_REF_SAVE_STATE_MAX	3
 #ifdef HAVE_DIAGNOSTIC
 	/* Capture history of ref state changes. */
 	struct __wt_ref_hist {
 		WT_SESSION_IMPL *session;
 		const char *name;
 		const char *file;
-		int line;
-		uint32_t state;
-	} hist[3];
+		uint16_t line;
+		uint16_t state;
+	} hist[WT_REF_SAVE_STATE_MAX];
 	uint64_t histoff;
 #define	WT_REF_SAVE_STATE(ref, s, f, l) do {				\
 	(ref)->hist[(ref)->histoff].session = session;			\
 	(ref)->hist[(ref)->histoff].name = session->name;		\
 	(ref)->hist[(ref)->histoff].file = (f);				\
-	(ref)->hist[(ref)->histoff].line = (l);				\
-	(ref)->hist[(ref)->histoff].state = s;				\
+	(ref)->hist[(ref)->histoff].line = (uint16_t)(l);		\
+	(ref)->hist[(ref)->histoff].state = (uint16_t)(s);		\
 	(ref)->histoff =						\
 	    ((ref)->histoff + 1) % WT_ELEMENTS((ref)->hist);		\
 } while (0)
@@ -933,7 +934,7 @@ struct __wt_ref {
  * the compiler hasn't inserted padding which would break the world.
  */
 #ifdef HAVE_DIAGNOSTIC
-#define	WT_REF_SIZE	(56 + 3 * sizeof(WT_REF_HIST) + 8)
+#define	WT_REF_SIZE	(56 + WT_REF_SAVE_STATE_MAX * sizeof(WT_REF_HIST) + 8)
 #else
 #define	WT_REF_SIZE	56
 #endif

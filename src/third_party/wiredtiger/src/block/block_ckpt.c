@@ -140,7 +140,7 @@ err:		/*
 	}
 
 	/* Checkpoints don't need the original information, discard it. */
-	if (checkpoint && ci != NULL)
+	if (checkpoint)
 		__wt_block_ckpt_destroy(session, ci);
 
 	return (ret);

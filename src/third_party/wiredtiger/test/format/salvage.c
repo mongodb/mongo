@@ -144,10 +144,6 @@ wts_salvage(void)
 {
 	WT_DECL_RET;
 
-	/* Some data-sources don't support salvage. */
-	if (DATASOURCE("kvsbdb"))
-		return;
-
 	if (g.c_salvage == 0)
 		return;
 
@@ -163,15 +159,6 @@ wts_salvage(void)
 	salvage();
 	wts_verify("post-salvage verify");
 	wts_close();
-
-	/*
-	 * If no records were deleted, dump and compare against Berkeley DB.
-	 * (The problem with deleting records is salvage restores deleted
-	 * records if a page splits leaving a deleted record on one side of
-	 * the split, so we cannot depend on correctness in that case.)
-	 */
-	if (g.c_delete_pct == 0)
-		wts_dump("salvage", SINGLETHREADED);
 
 	/* Corrupt the file randomly, salvage, then verify. */
 	if (corrupt()) {

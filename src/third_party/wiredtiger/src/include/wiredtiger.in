@@ -498,11 +498,7 @@ struct __wt_cursor {
 	 * format type \c u).
 	 *
 	 * The WT_CURSOR::modify method can only be called from within an
-	 * explicit transaction configured at a higher isolation level than
-	 * \c read-uncommitted. Using \c read-committed isolation is allowed,
-	 * but requires caution: reading a value, re-positioning the cursor
-	 * and then modifying the value based on the initial read could lead
-	 * to unexpected results. Using \c snapshot isolation is recommended.
+	 * explicit transaction configured at the snapshot isolation level.
 	 *
 	 * The WT_CURSOR::modify method stores a change record in cache and
 	 * writes a change record to the log instead of the usual complete

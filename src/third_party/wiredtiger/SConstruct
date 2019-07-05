@@ -46,9 +46,6 @@ AddOption("--enable-zlib", dest="zlib", type="string", nargs=1, action="store",
 AddOption("--prefix", dest="prefix", type="string", nargs=1, action="store", default="package",
           help="Install directory")
 
-AddOption("--with-berkeley-db", dest="bdb", type="string", nargs=1, action="store",
-          help="Berkeley DB install path, ie, /usr/local")
-
 # Get the swig binary from the command line option since SCONS cannot find it automatically
 #
 swig_binary = GetOption("lang-python")
@@ -112,13 +109,12 @@ env['STATIC_AND_SHARED_OBJECTS_ARE_THE_SAME'] = 1
 useZlib = GetOption("zlib")
 useSnappy = GetOption("snappy")
 useLz4 = GetOption("lz4")
-useBdb = GetOption("bdb")
 useTcmalloc = GetOption("tcmalloc")
 wtlibs = []
 
 conf = Configure(env)
 if not conf.CheckCHeader('stdlib.h'):
-    print 'stdlib.h must be installed!'
+    print('stdlib.h must be installed!')
     Exit(1)
 
 if useZlib:
@@ -128,7 +124,7 @@ if useZlib:
         conf.env.Append(CPPDEFINES=["HAVE_BUILTIN_EXTENSION_ZLIB"])
         wtlibs.append("zlib")
     else:
-        print 'zlib.h must be installed!'
+        print('zlib.h must be installed!')
         Exit(1)
 
 if useSnappy:
@@ -138,7 +134,7 @@ if useSnappy:
         conf.env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_SNAPPY'])
         wtlibs.append("snappy")
     else:
-        print 'snappy-c.h must be installed!'
+        print('snappy-c.h must be installed!')
         Exit(1)
 
 if useLz4:
@@ -148,14 +144,7 @@ if useLz4:
         conf.env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_LZ4'])
         wtlibs.append("lz4")
     else:
-        print 'lz4.h must be installed!'
-        Exit(1)
-
-if useBdb:
-    conf.env.Append(CPPPATH=[useBdb+ "/include"])
-    conf.env.Append(LIBPATH=[useBdb+ "/lib"])
-    if not conf.CheckCHeader('db.h'):
-        print 'db.h must be installed!'
+        print('lz4.h must be installed!')
         Exit(1)
 
 if useTcmalloc:
@@ -166,7 +155,7 @@ if useTcmalloc:
         conf.env.Append(CPPDEFINES=['HAVE_LIBTCMALLOC'])
         conf.env.Append(CPPDEFINES=['HAVE_POSIX_MEMALIGN'])
     else:
-        print 'tcmalloc.h must be installed!'
+        print('tcmalloc.h must be installed!')
         Exit(1)
 
 env = conf.Finish()
@@ -202,7 +191,7 @@ if (VERSION_MAJOR == None or
     VERSION_MINOR == None or
     VERSION_PATCH == None or
     VERSION_STRING == None):
-    print "Failed to find version variables in " + version_file
+    print("Failed to find version variables in " + version_file)
     Exit(1)
 
 wiredtiger_includes = """
@@ -323,7 +312,7 @@ if GetOption("lang-python"):
     # Check that this version of python is 64-bit
     #
     if sys.maxsize < 2**32:
-        print "The Python Interpreter must be 64-bit in order to build the python bindings"
+        print("The Python Interpreter must be 64-bit in order to build the python bindings")
         Exit(1)
 
     pythonMajorVersion = sys.version_info.major
@@ -408,7 +397,7 @@ if enableJava and enableJava.count(",") == 1:
     env.Depends(wtJar, wtClasses)
     Default(wtJar)
 else:
-    print "Error using --enable-java, this option may contain two paths separated by comma, the first is the swig.exe binary and the second is the Java JDK directory. e.g. C:\Python27\python.exe C:\Python27\Scripts\scons.py --enable-java=\"C:\Program Files\swigwin-3.0.12\swig.exe\",\"C:\Program Files\Java\jdk1.8.0_151\""
+    print("Error using --enable-java, this option may contain two paths separated by comma, the first is the swig.exe binary and the second is the Java JDK directory. e.g. C:\Python27\python.exe C:\Python27\Scripts\scons.py --enable-java=\"C:\Program Files\swigwin-3.0.12\swig.exe\",\"C:\Program Files\Java\jdk1.8.0_151\"")
 
 # Shim library of functions to emulate POSIX on Windows
 shim = env.Library("window_shim",
@@ -439,7 +428,7 @@ examples = [
 # WiredTiger Smoke Test support
 # Runs each test in a custom temporary directory
 def run_smoke_test(x):
-    print "Running Smoke Test: " + x
+    print("Running Smoke Test: " + x)
 
     # Make temp dir
     temp_dir = tempfile.mkdtemp(prefix="wt_home")
@@ -508,6 +497,7 @@ t = env.Program("t_format",
     "test/format/ops.c",
     "test/format/rebalance.c",
     "test/format/salvage.c",
+    "test/format/snap.c",
     "test/format/t.c",
     "test/format/util.c",
     "test/format/wts.c"],
@@ -541,7 +531,7 @@ for ex in examples:
     exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim, testutil] + wtlibs)
     Default(exp)
     if not ex == 'ex_log':
-	env.Alias("check", env.SmokeTest(exp))
+        env.Alias("check", env.SmokeTest(exp))
 
 # Install Target
 #

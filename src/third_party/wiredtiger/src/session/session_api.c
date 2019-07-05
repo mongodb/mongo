@@ -1127,6 +1127,8 @@ __session_import(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	WT_UNUSED(config);
 
+	value = NULL;
+
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL_NOCONF(session, import);
 
@@ -1148,6 +1150,7 @@ err:
 		WT_STAT_CONN_INCR(session, session_table_import_fail);
 	else
 		WT_STAT_CONN_INCR(session, session_table_import_success);
+	__wt_free(session, value);
 	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 

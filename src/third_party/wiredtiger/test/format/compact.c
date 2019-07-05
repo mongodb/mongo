@@ -42,10 +42,6 @@ compact(void *arg)
 
 	(void)(arg);
 
-	/* Compaction isn't supported for all data sources. */
-	if (DATASOURCE("kvsbdb"))
-		return (WT_THREAD_RET_VALUE);
-
 	/* Open a session. */
 	conn = g.wts_conn;
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
