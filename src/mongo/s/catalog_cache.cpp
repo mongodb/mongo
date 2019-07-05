@@ -428,11 +428,6 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
 void CatalogCache::_scheduleDatabaseRefresh(WithLock,
                                             const std::string& dbName,
                                             std::shared_ptr<DatabaseInfoEntry> dbEntry) {
-
-    LOG_CATALOG_REFRESH(1) << "Refreshing cached database entry for " << dbName
-                           << "; current cached database info is "
-                           << (dbEntry->dbt ? dbEntry->dbt->toBSON() : BSONObj());
-
     const auto onRefreshCompleted =
         [ this, t = Timer(), dbName ](const StatusWith<DatabaseType>& swDbt) {
         // TODO (SERVER-34164): Track and increment stats for database refreshes.
@@ -445,8 +440,11 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock,
                                << " ms and found " << swDbt.getValue().toBSON();
     };
 
+    // Invoked if getDatabase resulted in error or threw and exception
     const auto onRefreshFailed =
-        [ this, dbName, dbEntry ](WithLock lk, const Status& status) noexcept {
+        [ this, dbName, dbEntry, onRefreshCompleted ](WithLock, const Status& status) noexcept {
+        onRefreshCompleted(status);
+
         // Clear the notification so the next 'getDatabase' kicks off a new refresh attempt.
         dbEntry->refreshCompletionNotification->set(status);
         dbEntry->refreshCompletionNotification = nullptr;
@@ -459,32 +457,34 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock,
         }
     };
 
-    const auto onRefreshSucceeded = [this, dbName, dbEntry](WithLock lk, DatabaseType dbt) {
-        // Update the cached entry with the refreshed metadata and mark the entry as fresh.
-        dbEntry->dbt = std::move(dbt);
-        dbEntry->needsRefresh = false;
-        dbEntry->refreshCompletionNotification->set(Status::OK());
-        dbEntry->refreshCompletionNotification = nullptr;
-    };
-
-    const auto updateCatalogCacheFn =
-        [ this, dbName, dbEntry, onRefreshFailed, onRefreshSucceeded, onRefreshCompleted ](
-            OperationContext * opCtx, StatusWith<DatabaseType> swDbt) noexcept {
-        onRefreshCompleted(swDbt);
+    const auto refreshCallback = [ this, dbName, dbEntry, onRefreshFailed, onRefreshCompleted ](
+        OperationContext * opCtx, StatusWith<DatabaseType> swDbt) noexcept {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
+
         if (!swDbt.isOK()) {
             onRefreshFailed(lg, swDbt.getStatus());
             return;
         }
-        onRefreshSucceeded(lg, std::move(swDbt.getValue()));
+
+        onRefreshCompleted(swDbt);
+
+        dbEntry->needsRefresh = false;
+        dbEntry->refreshCompletionNotification->set(Status::OK());
+        dbEntry->refreshCompletionNotification = nullptr;
+
+        dbEntry->dbt = std::move(swDbt.getValue());
     };
 
+    LOG_CATALOG_REFRESH(1) << "Refreshing cached database entry for " << dbName
+                           << "; current cached database info is "
+                           << (dbEntry->dbt ? dbEntry->dbt->toBSON() : BSONObj());
+
     try {
-        _cacheLoader.getDatabase(dbName, updateCatalogCacheFn);
+        _cacheLoader.getDatabase(dbName, refreshCallback);
     } catch (const DBException& ex) {
         const auto status = ex.toStatus();
+
         stdx::lock_guard<stdx::mutex> lg(_mutex);
-        onRefreshCompleted(status);
         onRefreshFailed(lg, status);
     }
 }
@@ -540,7 +540,7 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
         }
     };
 
-    // Invoked if getChunksSince resulted in error
+    // Invoked if getChunksSince resulted in error or threw an exception
     const auto onRefreshFailed = [ this, collEntry, nss, refreshAttempt, onRefreshCompleted ](
         WithLock lk, const Status& status) noexcept {
         onRefreshCompleted(status, nullptr);
@@ -596,8 +596,8 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
     const ChunkVersion startingCollectionVersion =
         (existingRoutingInfo ? existingRoutingInfo->getVersion() : ChunkVersion::UNSHARDED());
 
-    LOG_CATALOG_REFRESH(1) << "Refreshing chunks for collection " << nss << " based on version "
-                           << startingCollectionVersion;
+    LOG_CATALOG_REFRESH(1) << "Refreshing chunks for collection " << nss
+                           << "; current collection version is " << startingCollectionVersion;
 
     try {
         _cacheLoader.getChunksSince(nss, startingCollectionVersion, refreshCallback);
