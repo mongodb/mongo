@@ -10609,6 +10609,7 @@ buildvariants:
     distros:
     - rhel62-large
   - name: .jscore .common
+  - name: noPassthrough_gen
   - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel62-large
