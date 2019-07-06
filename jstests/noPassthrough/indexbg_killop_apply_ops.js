@@ -52,7 +52,7 @@
         'assert.commandWorked(db.adminCommand(' + tojson(applyOpsCmd) + '))', primary.port);
 
     // When the index build starts, find its op id.
-    const opId = IndexBuildTest.waitForIndexBuildToStart(testDB);
+    const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
 
     IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId);
 

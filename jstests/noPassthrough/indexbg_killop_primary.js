@@ -34,7 +34,7 @@
         IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {background: true});
 
     // When the index build starts, find its op id.
-    const opId = IndexBuildTest.waitForIndexBuildToStart(testDB);
+    const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
 
     IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId);
 

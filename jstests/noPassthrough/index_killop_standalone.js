@@ -21,7 +21,8 @@
         const createIdx = IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {a: 1}, options);
 
         // When the index build starts, find its op id.
-        const opId = IndexBuildTest.waitForIndexBuildToStart(testDB);
+        const opId =
+            IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
 
         // Kill the index build.
         assert.commandWorked(testDB.killOp(opId));
