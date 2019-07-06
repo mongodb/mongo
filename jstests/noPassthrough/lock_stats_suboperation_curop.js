@@ -66,8 +66,12 @@
     // Wait for sub-operation createIndex to get blocked after acquiring all the locks.
     let res;
     assert.soon(function() {
-        res = db.currentOp(
-            {"command.createIndexes": {$exists: true}, "lockStats.Global": {$exists: true}});
+        res = db.currentOp({
+            'command.createIndexes': {$exists: true},
+            'lockStats.Global': {$exists: true},
+            'locks.Global': {$exists: true},
+            progress: {$exists: true},
+        });
         return res.inprog.length == 1;
     });
     jsTestLog(tojson(res.inprog[0]));

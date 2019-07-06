@@ -52,7 +52,7 @@
         // Start and pause an index build.
         IndexBuildTest.pauseIndexBuilds(conn);
         const awaitBuild = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1});
-        const opId = IndexBuildTest.waitForIndexBuildToStart(testDB, collName, "i_1");
+        const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, collName, 'i_1');
 
         // This insert will block until the index build pauses and releases its exclusive lock.
         // This guarantees that the subsequent transaction can immediately acquire a lock and not

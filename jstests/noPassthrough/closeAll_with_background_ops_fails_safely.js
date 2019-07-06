@@ -7,6 +7,9 @@
 
 (function() {
     "use strict";
+
+    load('jstests/noPassthrough/libs/index_build.js');
+
     let replSet = new ReplSetTest({name: "server35671", nodes: 1});
     let setFailpointBool = (failpointName, alwaysOn, times) => {
         if (times) {
@@ -27,10 +30,9 @@
                                   replSet.ports[0]);
 
     // Let the createIndex start to run.
-    assert.soon(function() {
-        // Need to do getDB because getPrimary returns something slightly different.
-        let res = db.getDB("test").currentOp({"command.createIndexes": "coll"});
-        return res['ok'] === 1 && res["inprog"].length > 0;
+    IndexBuildTest.waitForIndexBuildToStart(db.getDB('test'), 'coll', 'a_1_b_1', {
+        'locks.Global': {$exists: false},
+        progress: {$exists: true},
     });
 
     // Repeated calls should continue to fail without crashing.

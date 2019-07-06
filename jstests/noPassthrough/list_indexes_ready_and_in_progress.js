@@ -22,7 +22,7 @@
     IndexBuildTest.pauseIndexBuilds(conn);
     const createIdx =
         IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {b: 1}, {background: true});
-    IndexBuildTest.waitForIndexBuildToStart(testDB);
+    IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'b_1');
 
     // The listIndexes command supports returning all indexes, including ones that are not ready.
     IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1"], ["b_1"], {includeBuildUUIDs: true});
