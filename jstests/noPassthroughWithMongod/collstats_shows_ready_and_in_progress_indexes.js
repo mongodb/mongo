@@ -37,13 +37,7 @@
         // Note that we cannot use checkLog here to wait for the failpoint logging because this test
         // shares a mongod with other tests that might have already provoked identical failpoint
         // logging.
-        // Due to the hangAfterStartingIndexBuildUnlocked fail point, we cannot use the test helper
-        // IndexBuildTest.waitForIndexBuildToScanCollection() because locks will not be held while
-        // the fail point is active.
-        IndexBuildTest.waitForIndexBuildToStart(testDB, testColl.getName(), 'b_1', {
-            'locks.Global': {$exists: false},
-            progress: {$exists: true},
-        });
+        IndexBuildTest.waitForIndexBuildToScanCollection(testDB, testColl.getName(), 'b_1');
 
         jsTest.log("Running collStats on collection '" + collName +
                    "' to check for expected 'indexSizes', 'nindexes' and 'indexBuilds' results");

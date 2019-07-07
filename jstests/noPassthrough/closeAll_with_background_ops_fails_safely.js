@@ -30,10 +30,7 @@
                                   replSet.ports[0]);
 
     // Let the createIndex start to run.
-    IndexBuildTest.waitForIndexBuildToStart(db.getDB('test'), 'coll', 'a_1_b_1', {
-        'locks.Global': {$exists: false},
-        progress: {$exists: true},
-    });
+    IndexBuildTest.waitForIndexBuildToScanCollection(db.getDB('test'), 'coll', 'a_1_b_1');
 
     // Repeated calls should continue to fail without crashing.
     assert.commandFailed(db.adminCommand({restartCatalog: 1}));
