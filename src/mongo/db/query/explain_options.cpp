@@ -80,9 +80,10 @@ StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj
         }
         verbositySpecified = true;
     }
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "explain command requires a single argument with an optional verbosity",
-            cmdObj.nFields() == (verbositySpecified ? 3 : 2));
+    uassert(
+        ErrorCodes::InvalidOptions,
+        str::stream() << "explain command requires a single argument with an optional verbosity",
+        cmdObj.nFields() == (verbositySpecified ? 3 : 2));
 
     return verbosity;
 }
