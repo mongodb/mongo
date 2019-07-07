@@ -80,11 +80,20 @@ StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj
         }
         verbositySpecified = true;
     }
-    if (cmdObj.nFields() != (verbositySpecified ? 2 : 1)) {
-        return Status(
-            ErrorCodes::InvalidOptions,
-            str::stream()
-                << "explain command requires a single argument with an optional verbosity.");
+
+    int numFields = 0;
+    BSONObjIterator i(cmdObj);
+    while (i.moreWithEOO()) {
+        BSONElement e = i.next();
+        if (e.eoo())
+            break;
+        if (e.fieldNameStringData() == "$db")
+            continue;
+        numFields++;
+    }
+    if (numFields != (verbositySpecified ? 2 : 1)) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "explain command supports an optional verbosity argument.");
     }
     return verbosity;
 }
