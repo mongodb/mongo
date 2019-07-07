@@ -60,6 +60,18 @@ TEST(ExplainOptionsTest, ExplainOptionsSerializeToBSONCorrectly) {
                       ExplainOptions::toBSON(ExplainOptions::Verbosity::kExecAllPlans));
 }
 
+TEST(ExplainOptionsTest, InvalidOptionsIfAgumentNotRecognized) {
+    ASSERT_EQ(ExplainOptions::parseCmdBSON(fromjson("{explain: {}, foo: 1}")).getStatus(),
+              ErrorCodes::InvalidOptions);
+    ASSERT_EQ(
+        ExplainOptions::parseCmdBSON(fromjson("{explain: {}, verbosity: 'queryPlanner', foo: 1}"))
+            .getStatus(),
+        ErrorCodes::InvalidOptions);
+    ASSERT_EQ(
+        ExplainOptions::parseCmdBSON(fromjson("{explain: {}, verosity: {foo: 'bar'}}")).getStatus(),
+        ErrorCodes::InvalidOptions);
+}
+
 TEST(ExplainOptionsTest, CanParseExplainVerbosity) {
     auto verbosity = unittest::assertGet(
         ExplainOptions::parseCmdBSON(fromjson("{explain: {}, verbosity: 'queryPlanner'}")));
