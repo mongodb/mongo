@@ -73,11 +73,7 @@ class IndexBuildTest {
         // The collection scan is the only phase of an index build that uses a progress meter.
         // Since the progress meter can be detected in the db.currentOp() output, we will use this
         // information to determine when we are scanning the collection during the index build.
-        // This function is intended to check for index builds that are currently holding the global
-        // lock, so caution should be used when calling this function in conjunction with the
-        // hangAfterStartingIndexBuildUnlocked failpoint.
         const filter = {
-            'locks.Global': {$exists: true},
             progress: {$exists: true},
         };
         return IndexBuildTest.waitForIndexBuildToStart(database, collectionName, indexName, filter);
