@@ -36,7 +36,7 @@
     const partialIndex = {b: '2dsphere'};
     const createIdx = IndexBuildTest.startIndexBuild(
         primary, coll.getFullName(), partialIndex, {partialFilterExpression: {a: {$gt: 0}}});
-    IndexBuildTest.waitForIndexBuildToStart(testDB);
+    IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'b_2dsphere');
 
     // This document has an invalid geoJSON format (duplicated points), but will not be indexed.
     const unindexedDoc = {

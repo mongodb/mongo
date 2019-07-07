@@ -34,7 +34,7 @@
 
     const createIdx = IndexBuildTest.startIndexBuild(
         primary, coll.getFullName(), {a: 1, b: '2dsphere'}, {sparse: true});
-    IndexBuildTest.waitForIndexBuildToStart(testDB);
+    IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1_b_2dsphere');
 
     assert.commandWorked(coll.insert({a: [1, 2]}));
 

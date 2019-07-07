@@ -36,7 +36,7 @@
     const partialIndex = {a: 1};
     const createIdx = IndexBuildTest.startIndexBuild(
         primary, coll.getFullName(), partialIndex, {partialFilterExpression: {a: 1}});
-    IndexBuildTest.waitForIndexBuildToStart(testDB);
+    IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
 
     assert.commandWorked(coll.insert({_id: 0, a: 1}));
 

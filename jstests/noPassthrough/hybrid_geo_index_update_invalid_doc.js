@@ -46,7 +46,7 @@
         {configureFailPoint: 'hangAfterSettingUpIndexBuild', mode: 'alwaysOn'}));
 
     const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {b: '2dsphere'});
-    IndexBuildTest.waitForIndexBuildToStart(testDB);
+    IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'b_2dsphere');
 
     // Fixing the invalid geo document should not cause any issues for the side table accounting.
     assert.commandWorked(coll.update(

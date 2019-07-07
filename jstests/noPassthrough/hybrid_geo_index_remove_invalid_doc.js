@@ -46,7 +46,7 @@
         {configureFailPoint: 'hangAfterSettingUpIndexBuild', mode: 'alwaysOn'}));
 
     const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {b: '2dsphere'});
-    IndexBuildTest.waitForIndexBuildToStart(testDB);
+    IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'b_2dsphere');
 
     // Insert a valid geo document to initialize the hybrid index builder's side table state.
     assert.commandWorked(coll.insert({
