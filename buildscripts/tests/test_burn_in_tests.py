@@ -870,94 +870,47 @@ class RunTests(unittest.TestCase):
 
 
 class FindLastActivated(unittest.TestCase):
-
-    REVISION_BUILDS = {
-        "rev1": {
-            "not_mongodb_mongo_master_variant1_build1": {"activated": False},  # force line break
-            "mongodb_mongo_unmaster_variant_build1": {"activated": True},
-            "mongodb_mongo_master_variant1_build1": {"activated": True},
-            "mongodb_mongo_master_variant2_build1": {"activated": False},
-            "mongodb_mongo_master_variant3_build1": {"activated": False}
-        },
-        "rev2": {
-            "not_mongodb_mongo_master_variant1_build1": {"activated": True},
-            "mongodb_mongo_unmaster_variant_build1": {"activated": True},
-            "mongodb_mongo_master_variant1_build1": {"activated": True},
-            "mongodb_mongo_master_variant2_build1": {"activated": False}
-        },
-        "rev3": {
-            "not_mongodb_mongo_master_variant1_build1": {"activated": True},
-            "mongodb_mongo_unmaster_variant_build1": {"activated": True},
-            "mongodb_mongo_master_variant1_build1": {"activated": True},
-            "mongodb_mongo_master_variant2_build1": {"activated": False},
-        },
-        "rev4": {
-            "not_mongodb_mongo_master_variant1_build1": {"activated": True},
-            "mongodb_mongo_unmaster_variant_build1": {"activated": True},
-            "mongodb_mongo_master_variant1_build1": {"activated": True},  # force line break
-            "mongodb_mongo_master_variant2_build1": {"activated": False},
-            "mongodb_mongo_master_variant3_build1": {"activated": True}
-        },
-    }
-
-    @staticmethod
-    def builds_url(build):
-        """Return build URL."""
-        return "{}{}builds/{}".format(burn_in.API_SERVER_DEFAULT, burn_in.API_REST_PREFIX, build)
-
-    @staticmethod
-    def revisions_url(project, revision):
-        """Return revisions URL."""
-        return "{}{}projects/{}/revisions/{}".format(burn_in.API_SERVER_DEFAULT,
-                                                     burn_in.API_REST_PREFIX, project, revision)
-
-    @staticmethod
-    def load_urls(request, project, revision_builds):
-        """Store request in URLs to support REST APIs."""
-
-        for revision in revision_builds:
-            builds = revision_builds[revision]
-            # The 'revisions' endpoint contains the list of builds.
-            url = FindLastActivated.revisions_url(project, revision)
-            build_list = []
-            for build in builds:
-                build_list.append("{}_{}".format(build, revision))
-            build_data = {"builds": build_list}
-            request.put(url, None, build_data)
-
-            for build in builds:
-                # The 'builds' endpoint contains the activated & revision field.
-                url = FindLastActivated.builds_url("{}_{}".format(build, revision))
-                build_data = builds[build]
-                build_data["revision"] = revision
-                request.put(url, None, build_data)
-
-    def _test_find_last_activated_task(self, branch, variant, revision,
-                                       revisions=REVISION_BUILDS.keys()):
-        with patch(BURN_IN + ".requests", MockRequests()),\
-             patch(EVG_CLIENT + ".read_evg_config", return_value=None):
-            self.load_urls(burn_in.requests, "mongodb-mongo-master", self.REVISION_BUILDS)
-            last_revision = burn_in.find_last_activated_task(revisions, variant, branch)
-        self.assertEqual(last_revision, revision)
-
     def test_find_last_activated_task_first_rev(self):
-        self._test_find_last_activated_task("master", "variant1", "rev1")
+        rev_list = ["rev1", "rev2", "rev3"]
+        variant = "build_variant_0"
+        branch = "master"
+        evg_api = MagicMock()
+
+        revision = burn_in.find_last_activated_task(rev_list, variant, branch, evg_api)
+        self.assertEqual(revision, rev_list[0])
 
     def test_find_last_activated_task_last_rev(self):
-        self._test_find_last_activated_task("master", "variant3", "rev4")
+        rev_list = ["rev1", "rev2", "rev3"]
+        variant = "build_variant_0"
+        branch = "master"
+        evg_api = MagicMock()
+        evg_api.version_by_id.return_value.build_by_variant.side_effect = [
+            MagicMock(activated=False),
+            MagicMock(activated=False),
+            MagicMock(activated=True),
+        ]
+
+        revision = burn_in.find_last_activated_task(rev_list, variant, branch, evg_api)
+        self.assertEqual(revision, rev_list[2])
 
     def test_find_last_activated_task_no_rev(self):
-        self._test_find_last_activated_task("master", "variant2", None)
+        rev_list = ["rev1", "rev2", "rev3"]
+        variant = "build_variant_0"
+        branch = "master"
+        evg_api = MagicMock()
+        evg_api.version_by_id.return_value.build_by_variant.return_value.activated = False
 
-    def test_find_last_activated_task_no_variant(self):
-        self._test_find_last_activated_task("master", "novariant", None)
-
-    def test_find_last_activated_task_no_branch(self):
-        with self.assertRaises(AttributeError):
-            self._test_find_last_activated_task("nobranch", "variant2", None)
+        revision = burn_in.find_last_activated_task(rev_list, variant, branch, evg_api)
+        self.assertIsNone(revision)
 
     def test_find_last_activated_norevisions(self):
-        self._test_find_last_activated_task("master", "novariant", None, [])
+        rev_list = []
+        variant = "build_variant_0"
+        branch = "master"
+        evg_api = MagicMock()
+
+        revision = burn_in.find_last_activated_task(rev_list, variant, branch, evg_api)
+        self.assertIsNone(revision)
 
 
 MEMBERS_MAP = {
@@ -1175,6 +1128,7 @@ class FindChangedTests(unittest.TestCase):
             self, commit, max_revisions, variant, check_evg, rev1, rev2, rev_diff, untracked_files,
             last_activated_task=None):
         branch = "master"
+        project = "project"
         # pylint: disable=attribute-defined-outside-init
         self.rev1 = rev1
         self.rev2 = rev2
@@ -1187,11 +1141,12 @@ class FindChangedTests(unittest.TestCase):
             self.expected_changed_tests += rev_diff.get(commit, [])
         self.expected_changed_tests += untracked_files
         # pylint: enable=attribute-defined-outside-init
-        with patch(EVG_CLIENT + ".read_evg_config", return_value=None),\
-             patch(GIT + ".Repository", self._mock_git_repository),\
+        evg_api = MagicMock()
+        with patch(GIT + ".Repository", self._mock_git_repository),\
              patch("os.path.isfile", return_value=True),\
              patch(BURN_IN + ".find_last_activated_task", return_value=last_activated_task):
-            return burn_in.find_changed_tests(branch, commit, max_revisions, variant, check_evg)
+            return burn_in.find_changed_tests(branch, commit, max_revisions, variant, project,
+                                              check_evg, evg_api)
 
     def test_find_changed_tests(self):
         commit = "3"
@@ -1350,25 +1305,3 @@ class MockGitRepository(object):
                 modified_files = [" M {}".format(untracked) for untracked in diff_list]
         untracked_files = ["?? {}".format(untracked) for untracked in self.untracked_files]
         return "\n".join(modified_files + untracked_files)
-
-
-class MockResponse(object):
-    def __init__(self, response, json_data):
-        self.response = response
-        self.json_data = json_data
-
-    def json(self):
-        return self.json_data
-
-
-class MockRequests(object):
-    def __init__(self):
-        self.responses = {}
-
-    def put(self, url, response, json_data):
-        self.responses[url] = MockResponse(response, json_data)
-
-    def get(self, url):
-        if url in self.responses:
-            return self.responses[url]
-        return None

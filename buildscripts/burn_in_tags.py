@@ -125,7 +125,7 @@ def _generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data, build
     """
     for buildvariant, run_buildvariant in buildvariant_map.items():
         config_options = _get_config_options(expansions_file_data, buildvariant, run_buildvariant)
-        tests_by_task = create_tests_by_task(config_options)
+        tests_by_task = create_tests_by_task(config_options, evergreen_api)
         if tests_by_task:
             _generate_evg_buildvariant(shrub_config, buildvariant, run_buildvariant)
             create_generate_tasks_config(evergreen_api, shrub_config, config_options, tests_by_task,

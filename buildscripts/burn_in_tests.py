@@ -7,10 +7,8 @@ import json
 import optparse
 import os.path
 import subprocess
-import re
 import shlex
 import sys
-import urllib.parse
 import datetime
 import logging
 
@@ -36,14 +34,11 @@ if __name__ == "__main__" and __package__ is None:
 from buildscripts import git
 from buildscripts import resmokelib
 from buildscripts.ciconfig import evergreen
-from buildscripts.client import evergreen as evergreen_client
 from buildscripts.util import teststats
 # pylint: enable=wrong-import-position
 
 LOGGER = logging.getLogger(__name__)
 
-API_REST_PREFIX = "/rest/v1/"
-API_SERVER_DEFAULT = "https://evergreen.mongodb.com"
 AVG_TEST_RUNTIME_ANALYSIS_DAYS = 14
 AVG_TEST_TIME_MULTIPLIER = 3
 CONFIG_FILE = "../src/.evergreen.yml"
@@ -185,48 +180,46 @@ def validate_options(parser, options):
         check_variant(options.run_buildvariant, parser)
 
 
-def find_last_activated_task(revisions, variant, branch_name):
-    """Get the git hash of the most recently activated build before this one."""
+def find_last_activated_task(revisions, variant, project, evg_api):
+    """
+    Search the given list of revisions for the first build that was activated in evergreen.
 
-    project = "mongodb-mongo-" + branch_name
-    build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace("-", "_")
-
-    evg_cfg = evergreen_client.read_evg_config()
-    if evg_cfg is not None and "api_server_host" in evg_cfg:
-        api_server = "{url.scheme}://{url.netloc}".format(
-            url=urllib.parse.urlparse(evg_cfg["api_server_host"]))
-    else:
-        api_server = API_SERVER_DEFAULT
-
-    api_prefix = api_server + API_REST_PREFIX
+    :param revisions: List of revisions to search.
+    :param variant: Build variant to query for.
+    :param project: Project being run against.
+    :param evg_api: Evergreen api.
+    :return: First revision from list that has been activated.
+    """
+    prefix = project.replace("-", "_")
 
     for githash in revisions:
-        url = "{}projects/{}/revisions/{}".format(api_prefix, project, githash)
-        response = requests.get(url)
-        revision_data = response.json()
+        version_id = f"{prefix}_{githash}"
+        version = evg_api.version_by_id(version_id)
 
-        try:
-            for build in revision_data["builds"]:
-                if build.startswith(build_prefix):
-                    url = "{}builds/{}".format(api_prefix, build)
-                    build_resp = requests.get(url)
-                    build_data = build_resp.json()
-                    if build_data["activated"]:
-                        return build_data["revision"]
-        except:  # pylint: disable=bare-except
-            # Sometimes build data is incomplete, as was the related build.
-            pass
+        build = version.build_by_variant(variant)
+        if build.activated:
+            return githash
 
     return None
 
 
-def find_changed_tests(  # pylint: disable=too-many-locals
-        branch_name, base_commit, max_revisions, buildvariant, check_evergreen):
-    """Find the changed tests.
+def find_changed_tests(  # pylint: disable=too-many-locals,too-many-arguments
+        branch_name, base_commit, max_revisions, buildvariant, project, check_evergreen, evg_api):
+    """
+    Find the changed tests.
 
     Use git to find which files have changed in this patch.
     TODO: This should be expanded to search for enterprise modules.
     The returned file paths are in normalized form (see os.path.normpath(path)).
+
+    :param branch_name: Branch being run against.
+    :param base_commit: Commit changes are made on top of.
+    :param max_revisions: Max number of revisions to search through.
+    :param buildvariant: Build variant burn is being run on.
+    :param project: Project that is being run on.
+    :param check_evergreen: Should evergreen be checked for an activated build.
+    :param evg_api: Evergreen api.
+    :returns: List of changed tests.
     """
 
     changed_tests = []
@@ -242,7 +235,7 @@ def find_changed_tests(  # pylint: disable=too-many-locals
         # previous commit when trying to find the most recent preceding commit that has been
         # activated.
         revs_to_check = repo.git_rev_list([base_commit, "--max-count=200", "--skip=1"]).splitlines()
-        last_activated = find_last_activated_task(revs_to_check, buildvariant, branch_name)
+        last_activated = find_last_activated_task(revs_to_check, buildvariant, project, evg_api)
         if last_activated is None:
             # When the current commit is the first time 'buildvariant' has run, there won't be a
             # commit among 'revs_to_check' that's been activated in Evergreen. We handle this by
@@ -289,7 +282,7 @@ def find_excludes(selector_file):
         return ([], [], [])
 
     with open(selector_file, "r") as fstream:
-        yml = yaml.load(fstream)
+        yml = yaml.safe_load(fstream)
 
     try:
         js_test = yml["selector"]["js_test"]
@@ -543,11 +536,11 @@ def _generate_timeouts(options, commands, test, task_avg_test_runtime_stats):
             commands.append(cmd_timeout.validate().resolve())
 
 
-def _get_task_runtime_history(evergreen_api, project, task, variant):
+def _get_task_runtime_history(evg_api, project, task, variant):
     """
     Fetch historical average runtime for all tests in a task from Evergreen API.
 
-    :param evergreen_api: Evergreen API.
+    :param evg_api: Evergreen API.
     :param project: Project name.
     :param task: Task name.
     :param variant: Variant name.
@@ -556,10 +549,10 @@ def _get_task_runtime_history(evergreen_api, project, task, variant):
     try:
         end_date = datetime.datetime.utcnow().replace(microsecond=0)
         start_date = end_date - datetime.timedelta(days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
-        data = evergreen_api.test_stats_by_project(
-            project, after_date=start_date.strftime("%Y-%m-%d"),
-            before_date=end_date.strftime("%Y-%m-%d"), tasks=[task], variants=[variant],
-            group_by="test", group_num_days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
+        data = evg_api.test_stats_by_project(project, after_date=start_date.strftime("%Y-%m-%d"),
+                                             before_date=end_date.strftime("%Y-%m-%d"),
+                                             tasks=[task], variants=[variant], group_by="test",
+                                             group_num_days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
         test_runtimes = teststats.TestStats(data).get_tests_runtimes()
         LOGGER.debug("Test_runtime data parsed from Evergreen history: %s", test_runtimes)
         return test_runtimes
@@ -572,8 +565,7 @@ def _get_task_runtime_history(evergreen_api, project, task, variant):
             raise
 
 
-def create_generate_tasks_config(evergreen_api, evg_config, options, tests_by_task,
-                                 include_gen_task):
+def create_generate_tasks_config(evg_api, evg_config, options, tests_by_task, include_gen_task):
     """Create the config for the Evergreen generate.tasks file."""
     # pylint: disable=too-many-locals
     task_specs = []
@@ -582,8 +574,8 @@ def create_generate_tasks_config(evergreen_api, evg_config, options, tests_by_ta
         task_names.append(BURN_IN_TESTS_GEN_TASK)
     for task in sorted(tests_by_task):
         multiversion_path = tests_by_task[task].get("use_multiversion")
-        task_avg_test_runtime_stats = _get_task_runtime_history(evergreen_api, options.project,
-                                                                task, options.buildvariant)
+        task_avg_test_runtime_stats = _get_task_runtime_history(evg_api, options.project, task,
+                                                                options.buildvariant)
         for test_num, test in enumerate(tests_by_task[task]["tests"]):
             sub_task_name = _sub_task_name(options, task, test_num)
             task_names.append(sub_task_name)
@@ -612,18 +604,20 @@ def create_generate_tasks_config(evergreen_api, evg_config, options, tests_by_ta
     return evg_config
 
 
-def create_tests_by_task(options):
+def create_tests_by_task(options, evg_api):
     """
     Create a list of tests by task.
 
     :param options: Options.
+    :param evg_api: Evergreen api.
     :return: Tests by task
     """
     # Parse the Evergreen project configuration file.
     evergreen_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
 
     changed_tests = find_changed_tests(options.branch, options.base_commit, options.max_revisions,
-                                       options.buildvariant, options.check_evergreen)
+                                       options.buildvariant, options.project,
+                                       options.check_evergreen, evg_api)
     exclude_suites, exclude_tasks, exclude_tests = find_excludes(SELECTOR_FILE)
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
@@ -640,11 +634,11 @@ def create_tests_by_task(options):
     return tests_by_task
 
 
-def create_generate_tasks_file(evergreen_api, options, tests_by_task):
+def create_generate_tasks_file(evg_api, options, tests_by_task):
     """Create the Evergreen generate.tasks file."""
 
     evg_config = Configuration()
-    evg_config = create_generate_tasks_config(evergreen_api, evg_config, options, tests_by_task,
+    evg_config = create_generate_tasks_config(evg_api, evg_config, options, tests_by_task,
                                               include_gen_task=True)
     _write_json_file(evg_config.to_map(), options.generate_tasks_file)
 
@@ -676,7 +670,7 @@ def run_tests(no_exec, tests_by_task, resmoke_cmd, report_file):
     _write_json_file(test_results, report_file)
 
 
-def main(evergreen_api):
+def main(evg_api):
     """Execute Main program."""
 
     logging.basicConfig(
@@ -700,13 +694,13 @@ def main(evergreen_api):
 
     # Run the executor finder.
     else:
-        tests_by_task = create_tests_by_task(options)
+        tests_by_task = create_tests_by_task(options, evg_api)
 
         if options.test_list_outfile:
             _write_json_file(tests_by_task, options.test_list_outfile)
 
     if options.generate_tasks_file:
-        create_generate_tasks_file(evergreen_api, options, tests_by_task)
+        create_generate_tasks_file(evg_api, options, tests_by_task)
     else:
         run_tests(options.no_exec, tests_by_task, resmoke_cmd, options.report_file)
 
