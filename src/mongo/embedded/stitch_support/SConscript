@@ -68,9 +68,9 @@ if get_option('link-model') != 'dynamic-sdk':
             '$BUILD_DIR/mongo/unittest/unittest',
             'stitch_support',
         ],
-        AIB_COMPONENT='stitch-support',
+        AIB_COMPONENT='stitch-support-test',
         AIB_COMPONENTS_EXTRA=[
-            'test',
+            'tests',
             'unittests',
         ],
     )
