@@ -5,12 +5,28 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/storage_engine_utils.js");
 
 function test(t) {
-    t.drop();
-    assert.commandWorked(t.getDB().createCollection(t.getName(), {capped: true, size: 16 * 1024}));
-
     const isOplog = t.getName().startsWith("oplog.");
+
+    if (storageEngineIsWiredTigerOrInMemory() && isOplog) {
+        // We forbid dropping the oplog when using the WiredTiger or in-memory storage engines
+        // and so we can't drop the oplog here. Because Evergreen reuses nodes for testing,
+        // the oplog may already exist on the test node; in this case, trying to create the
+        // oplog once again would fail.
+        // To ensure we are working with a clean oplog (an oplog without entries), we resort
+        // to truncating the oplog instead.
+        if (!t.getDB().getCollectionNames().includes(t.getName())) {
+            t.getDB().createCollection(t.getName(), {capped: true, size: 16 * 1024});
+        }
+        t.runCommand('emptycapped');
+        t.getDB().adminCommand({replSetResizeOplog: 1, size: 16 * 1024});
+    } else {
+        t.drop();
+        assert.commandWorked(
+            t.getDB().createCollection(t.getName(), {capped: true, size: 16 * 1024}));
+    }
 
     /**
      * Helper function for making timestamps with the property that if i < j, then makeTS(i) <
