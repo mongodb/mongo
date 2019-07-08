@@ -21,32 +21,38 @@ try:
     import collections
     from bson import json_util
     from bson.codec_options import CodecOptions
-except ImportError as err:
+except ImportError:
     print("Warning: Could not load bson library for Python {}.".format(sys.version))
     print("Check with the pip command if pymongo 3.x is installed.")
     bson = None
 
 
-def __lldb_init_module(debugger, dict):
-    ############################
-    # register pretty printers #
-    ############################
-    debugger.HandleCommand("type summary add -s 'A${*var.__ptr_.__value_}' -x '^std::__1::unique_ptr<.+>$'")
+def __lldb_init_module(debugger, *_args):
+    """Register pretty printers."""
+    debugger.HandleCommand(
+        "type summary add -s 'A${*var.__ptr_.__value_}' -x '^std::__1::unique_ptr<.+>$'")
     debugger.HandleCommand("type summary add mongo::BSONObj -F lldb_printers.BSONObjPrinter")
     debugger.HandleCommand("type summary add mongo::Status -F lldb_printers.StatusPrinter")
     debugger.HandleCommand("type summary add mongo::StatusWith -F lldb_printers.StatusWithPrinter")
     debugger.HandleCommand("type summary add mongo::StringData -F lldb_printers.StringDataPrinter")
     debugger.HandleCommand("type summary add mongo::UUID -F lldb_printers.UUIDPrinter")
-    debugger.HandleCommand("type summary add --summary-string '${var.m_pathname}' 'boost::filesystem::path'")
-    debugger.HandleCommand("type synthetic add -x '^boost::optional<.+>$' --python-class lldb_printers.OptionalPrinter")
-    debugger.HandleCommand("type synthetic add -x '^std::unique_ptr<.+>$' --python-class lldb_printers.UniquePtrPrinter")
+    debugger.HandleCommand(
+        "type summary add --summary-string '${var.m_pathname}' 'boost::filesystem::path'")
+    debugger.HandleCommand(
+        "type synthetic add -x '^boost::optional<.+>$' --python-class lldb_printers.OptionalPrinter"
+    )
+    debugger.HandleCommand(
+        "type synthetic add -x '^std::unique_ptr<.+>$' --python-class lldb_printers.UniquePtrPrinter"
+    )
 
 
 #############################
 # Pretty Printer Defintions #
 #############################
 
-def StatusPrinter(valobj, *args):
+
+def StatusPrinter(valobj, *_args):  # pylint: disable=invalid-name
+    """Pretty-Prints MongoDB Status objects."""
     err = valobj.GetChildMemberWithName("_error")
     code = err.\
         GetChildMemberWithName("code").\
@@ -59,7 +65,8 @@ def StatusPrinter(valobj, *args):
     return "Status({}, {})".format(code, reason)
 
 
-def StatusWithPrinter(valobj, *args):
+def StatusWithPrinter(valobj, *_args):  # pylint: disable=invalid-name
+    """Extend the StatusPrinter to print the value of With for a StatusWith."""
     status = valobj.GetChildMemberWithName("_status")
     code = status.GetChildMemberWithName("_error").\
         GetChildMemberWithName("code").\
@@ -70,17 +77,19 @@ def StatusWithPrinter(valobj, *args):
     return rep.replace("Status", "StatusWith", 1)
 
 
-def StringDataPrinter(valobj, *args):
+def StringDataPrinter(valobj, *_args):  # pylint: disable=invalid-name
+    """Print StringData value."""
     ptr = valobj.GetChildMemberWithName("_data").GetValueAsUnsigned()
     size1 = valobj.GetChildMemberWithName("_size").GetValueAsUnsigned(0)
     return '"{}"'.format(valobj.GetProcess().ReadMemory(ptr, size1, lldb.SBError()).encode("utf-8"))
 
 
-def BSONObjPrinter(valobj, *args):
+def BSONObjPrinter(valobj, *_args):  # pylint: disable=invalid-name
+    """Print a BSONObj in a JSON format."""
     ptr = valobj.GetChildMemberWithName("_objdata").GetValueAsUnsigned()
     size = struct.unpack("<I", valobj.GetProcess().ReadMemory(ptr, 4, lldb.SBError()))[0]
     if size < 5 or size > 17 * 1024 * 1024:
-        return
+        return None
     buf = bson.BSON(bytes(valobj.GetProcess().ReadMemory(ptr, size, lldb.SBError())))
     buf_str = buf.decode()
     obj = json_util.dumps(buf_str, indent=4)
@@ -91,7 +100,8 @@ def BSONObjPrinter(valobj, *args):
     return obj
 
 
-def UUIDPrinter(valobj, *args):
+def UUIDPrinter(valobj, *_args):  # pylint: disable=invalid-name
+    """Print the UUID's hex string value."""
     char_array = valobj.GetChildMemberWithName("_uuid").GetChildAtIndex(0)
     raw_bytes = [x.GetValueAsUnsigned() for x in char_array]
     uuid_hex_bytes = [hex(b)[2:].zfill(2) for b in raw_bytes]
@@ -99,60 +109,79 @@ def UUIDPrinter(valobj, *args):
 
 
 class UniquePtrPrinter:
-    def __init__(self, valobj, dict):
+    """Pretty printer for std::unique_ptr."""
+
+    def __init__(self, valobj, *_args):
+        """Store valobj and retrieve object held at the unique_ptr."""
         self.valobj = valobj
         self.update()
 
-    def num_children(self):
+    def num_children(self):  # pylint: disable=no-self-use,no-method-argument
+        """Match LLDB's expected API."""
         return 1
 
-    def get_child_index(self, name):
+    def get_child_index(self, name):  # pylint: disable=no-self-use,no-method-argument
+        """Match LLDB's expected API."""
         if name == "ptr":
             return 0
         else:
             return None
 
-    def get_child_at_index(self, index):
+    def get_child_at_index(self, index):  # pylint: disable=no-self-use,no-method-argument
+        """Match LLDB's expected API.
+
+        Always prints object pointed at by the ptr.
+        """
         if index == 0:
-            return self.valobj.GetChildMemberWithName("__ptr_").GetChildMemberWithName("__value_").Dereference()
+            return self.valobj.GetChildMemberWithName("__ptr_").GetChildMemberWithName(
+                "__value_").Dereference()
         else:
             return None
 
-    def has_children():
+    def has_children():  # pylint: disable=no-self-use,no-method-argument
+        """Match LLDB's expected API."""
         return True
 
-    def update(self):
+    def update(self):  # pylint: disable=no-self-use,no-method-argument
+        """Match LLDB's expected API."""
         pass
 
 
 class OptionalPrinter:
-    def __init__(self, valobj, dict):
+    """Pretty printer for boost::optional."""
+
+    def __init__(self, valobj, *_args):
+        """Store the valobj and get the value of the optional."""
         self.valobj = valobj
         self.update()
 
-    def num_children(self):
+    def num_children(self):  # pylint: disable=no-self-use,no-method-argument
+        """Match LLDB's expected API."""
         return 1
 
-    def get_child_index(self, name):
+    def get_child_index(self, name):  # pylint: disable=no-self-use,no-method-argument
+        """Match LLDB's expected API."""
         if name == "value":
             return 0
         else:
             return None
 
-    def get_child_at_index(self, index):
+    def get_child_at_index(self, index):  # pylint: disable=no-self-use,no-method-argument
+        """Match LLDB's expected API."""
         if index == 0:
             return self.value
         else:
             return None
 
-    def has_children():
+    def has_children():  # pylint: disable=no-self-use,no-method-argument
+        """Match LLDB's expected API."""
         return True
 
     def update(self):
+        """Check if the optional has changed."""
         self.is_init = self.valobj.GetChildMemberWithName("m_initialized").GetValueAsUnsigned() != 0
         self.value = None
         if self.is_init:
             temp_type = self.valobj.GetType().GetTemplateArgumentType(0)
             storage = self.valobj.GetChildMemberWithName("m_storage")
             self.value = storage.Cast(temp_type)
-
