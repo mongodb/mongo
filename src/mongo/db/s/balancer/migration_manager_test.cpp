@@ -440,8 +440,9 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
         MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
             opCtx.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
-        ASSERT_OK(migrationStatuses.at(chunk1.getName()));
-        ASSERT_EQ(ErrorCodes::ReplicaSetNotFound, migrationStatuses.at(chunk2.getName()));
+        ASSERT_OK(migrationStatuses.at(MigrationType::genID(chunk1.getNS(), chunk1.getMin())));
+        ASSERT_EQ(ErrorCodes::ReplicaSetNotFound,
+                  migrationStatuses.at(MigrationType::genID(chunk2.getNS(), chunk2.getMin())));
     });
 
     // Expect only one moveChunk command to be called.
@@ -483,7 +484,8 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
         MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
             opCtx.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
-        ASSERT_EQ(ErrorCodes::ChunkTooBig, migrationStatuses.at(chunk1.getName()));
+        ASSERT_EQ(ErrorCodes::ChunkTooBig,
+                  migrationStatuses.at(MigrationType::genID(chunk1.getNS(), chunk1.getMin())));
     });
 
     // Expect only one moveChunk command to be called.
@@ -558,17 +560,18 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kMajorityReadConcern,
             MigrationType::ConfigNS,
-            BSON(MigrationType::name(chunk.getName())),
+            BSON(MigrationType::name(MigrationType::genID(collName, chunk.getMin()))),
             BSONObj(),
             boost::none);
     Shard::QueryResponse migrationsQueryResponse =
         uassertStatusOK(statusWithMigrationsQueryResponse);
     ASSERT_EQUALS(1U, migrationsQueryResponse.docs.size());
 
-    ASSERT_OK(catalogClient()->removeConfigDocuments(operationContext(),
-                                                     MigrationType::ConfigNS,
-                                                     BSON(MigrationType::name(chunk.getName())),
-                                                     kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->removeConfigDocuments(
+        operationContext(),
+        MigrationType::ConfigNS,
+        BSON(MigrationType::name(MigrationType::genID(collName, chunk.getMin()))),
+        kMajorityWriteConcern));
 
     // Restore the migration manager back to the started state, which is expected by tearDown
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
@@ -769,8 +772,10 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
             kDefaultSecondaryThrottle,
             false);
 
-        ASSERT_EQ(ErrorCodes::OperationFailed, migrationStatuses.at(chunk1.getName()));
-        ASSERT_EQ(ErrorCodes::OperationFailed, migrationStatuses.at(chunk2.getName()));
+        ASSERT_EQ(ErrorCodes::OperationFailed,
+                  migrationStatuses.at(MigrationType::genID(collName, chunk1.getMin())));
+        ASSERT_EQ(ErrorCodes::OperationFailed,
+                  migrationStatuses.at(MigrationType::genID(collName, chunk2.getMin())));
     });
 
     // Expect a moveChunk command that will fail with a retriable error.

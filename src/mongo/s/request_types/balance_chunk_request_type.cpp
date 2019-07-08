@@ -57,7 +57,7 @@ BalanceChunkRequest::BalanceChunkRequest(ChunkType chunk,
     : _chunk(std::move(chunk)), _secondaryThrottle(std::move(secondaryThrottle)) {}
 
 StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(const BSONObj& obj) {
-    auto chunkStatus = ChunkType::fromConfigBSON(obj);
+    auto chunkStatus = ChunkType::parseFromConfigBSONCommand(obj);
     if (!chunkStatus.isOK()) {
         return chunkStatus.getStatus();
     }

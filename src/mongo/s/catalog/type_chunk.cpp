@@ -205,8 +205,20 @@ ChunkType::ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version
       _version(version),
       _shard(std::move(shardId)) {}
 
-StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source) {
+StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& source) {
     ChunkType chunk;
+
+    {
+        std::string chunkID;
+        Status status = bsonExtractStringField(source, name.name(), &chunkID);
+        if (status.isOK()) {
+            chunk._id = chunkID;
+        } else if (status == ErrorCodes::NoSuchKey || status == ErrorCodes::TypeMismatch) {
+            // ID status is missing or of type objectid, so we just ignore it.
+        } else {
+            return status;
+        }
+    }
 
     {
         std::string chunkNS;
@@ -273,9 +285,34 @@ StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source) {
     return chunk;
 }
 
+StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source) {
+    StatusWith<ChunkType> chunkStatus = parseFromConfigBSONCommand(source);
+    if (!chunkStatus.isOK()) {
+        return chunkStatus.getStatus();
+    }
+
+    ChunkType chunk = chunkStatus.getValue();
+
+    if (!chunk._id) {
+        {
+            std::string chunkID;
+            Status status = bsonExtractStringField(source, name.name(), &chunkID);
+            if (status.isOK()) {
+                chunk._id = chunkID;
+            } else if (status == ErrorCodes::TypeMismatch) {
+                // ID status is of type objectid, so we just ignore it.
+            } else {
+                return status;
+            }
+        }
+    }
+
+    return chunk;
+}
+
 BSONObj ChunkType::toConfigBSON() const {
     BSONObjBuilder builder;
-    if (_nss && _min)
+    if (_id)
         builder.append(name.name(), getName());
     if (_nss)
         builder.append(ns.name(), getNS().ns());
@@ -371,9 +408,16 @@ BSONObj ChunkType::toShardBSON() const {
 }
 
 std::string ChunkType::getName() const {
-    invariant(_nss);
-    invariant(_min);
-    return genID(*_nss, *_min);
+    invariant(_id);
+    return *_id;
+}
+
+void ChunkType::setName(const std::string& id) {
+    _id = id;
+}
+
+void ChunkType::setName(const OID& id) {
+    _id = id.toString();
 }
 
 void ChunkType::setNS(const NamespaceString& nss) {
@@ -413,19 +457,6 @@ void ChunkType::addHistoryToBSON(BSONObjBuilder& builder) const {
             item.serialize(&subObjBuilder);
         }
     }
-}
-
-std::string ChunkType::genID(const NamespaceString& nss, const BSONObj& o) {
-    StringBuilder buf;
-    buf << nss.ns() << "-";
-
-    BSONObjIterator i(o);
-    while (i.more()) {
-        BSONElement e = i.next();
-        buf << e.fieldName() << "_" << e.toString(false, true);
-    }
-
-    return buf.str();
 }
 
 Status ChunkType::validate() const {

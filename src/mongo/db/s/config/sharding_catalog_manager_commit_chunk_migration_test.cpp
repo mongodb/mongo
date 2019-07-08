@@ -63,6 +63,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithControlChunk) {
     {
         ChunkVersion origVersion(12, 7, OID::gen());
 
+        migratedChunk.setName(OID::gen());
         migratedChunk.setNS(kNamespace);
         migratedChunk.setVersion(origVersion);
         migratedChunk.setShard(shard0.getName());
@@ -72,6 +73,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithControlChunk) {
 
         origVersion.incMinor();
 
+        controlChunk.setName(OID::gen());
         controlChunk.setNS(kNamespace);
         controlChunk.setVersion(origVersion);
         controlChunk.setShard(shard0.getName());
@@ -144,6 +146,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
     auto const origVersion = ChunkVersion(origMajorVersion, 4, OID::gen());
 
     ChunkType chunk0;
+    chunk0.setName(OID::gen());
     chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
@@ -204,6 +207,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     auto const origVersion = ChunkVersion(origMajorVersion, 4, OID::gen());
 
     ChunkType chunk0;
+    chunk0.setName(OID::gen());
     chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
@@ -265,6 +269,7 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
     auto const origVersion = ChunkVersion(origMajorVersion, 4, OID::gen());
 
     ChunkType chunk0;
+    chunk0.setName(OID::gen());
     chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
@@ -309,6 +314,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
     auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
 
     ChunkType chunk0;
+    chunk0.setName(OID::gen());
     chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
@@ -320,6 +326,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
     chunk0.setMax(chunkMax);
 
     ChunkType chunk1;
+    chunk1.setName(OID::gen());
     chunk1.setNS(kNamespace);
     chunk1.setVersion(origVersion);
     chunk1.setShard(shard0.getName());
@@ -361,6 +368,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     auto const otherVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
 
     ChunkType chunk0;
+    chunk0.setName(OID::gen());
     chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
@@ -372,6 +380,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     chunk0.setMax(chunkMax);
 
     ChunkType chunk1;
+    chunk1.setName(OID::gen());
     chunk1.setNS(kNamespace);
     chunk1.setVersion(otherVersion);
     chunk1.setShard(shard0.getName());
@@ -413,6 +422,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
     auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
 
     ChunkType chunk0;
+    chunk0.setName(OID::gen());
     chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
@@ -424,6 +434,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
     chunk0.setMax(chunkMax);
 
     ChunkType chunk1;
+    chunk1.setName(OID::gen());
     chunk1.setNS(kNamespace);
     chunk1.setVersion(origVersion);
     chunk1.setShard(shard0.getName());
@@ -464,6 +475,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
 
     ChunkType chunk0;
+    chunk0.setName(OID::gen());
     chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
@@ -476,6 +488,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     chunk0.setMax(chunkMax);
 
     ChunkType chunk1;
+    chunk1.setName(OID::gen());
     chunk1.setNS(kNamespace);
     chunk1.setVersion(origVersion);
     chunk1.setShard(shard1.getName());

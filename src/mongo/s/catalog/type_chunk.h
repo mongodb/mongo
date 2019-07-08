@@ -192,8 +192,10 @@ public:
      * Constructs a new ChunkType object from BSON that has the config server's config.chunks
      * collection format.
      *
-     * Also does validation of the contents.
+     * Also does validation of the contents. Note that 'parseFromConfigBSONCommand' does not return
+     * ErrorCodes::NoSuchKey if the '_id' field is missing while 'fromConfigBSON' does.
      */
+    static StatusWith<ChunkType> parseFromConfigBSONCommand(const BSONObj& source);
     static StatusWith<ChunkType> fromConfigBSON(const BSONObj& source);
 
     /**
@@ -217,6 +219,13 @@ public:
     BSONObj toShardBSON() const;
 
     std::string getName() const;
+    void setName(const OID& id);
+
+    /**
+     * TODO SERVER-42299: Remove this method once _id is stored as an OID on disk instead of as a
+     * string.
+     */
+    void setName(const std::string& id);
 
     /**
      * Getters and setters.
@@ -271,11 +280,6 @@ public:
     void addHistoryToBSON(BSONObjBuilder& builder) const;
 
     /**
-     * Generates chunk id based on the namespace name and the lower bound of the chunk.
-     */
-    static std::string genID(const NamespaceString& nss, const BSONObj& min);
-
-    /**
      * Returns OK if all the mandatory fields have been set. Otherwise returns NoSuchKey and
      * information about the first field that is missing.
      */
@@ -289,6 +293,8 @@ public:
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial; (C)onfig, (S)hard.
 
+    // (M)(C)     auto-generated object id
+    boost::optional<std::string> _id;
     // (O)(C)     collection this chunk is in
     boost::optional<NamespaceString> _nss;
     // (M)(C)(S)  first key of the range, inclusive

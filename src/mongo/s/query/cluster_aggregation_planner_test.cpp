@@ -95,6 +95,7 @@ public:
         std::vector<ChunkType> chunks;
         for (auto&& pair : chunkInfos) {
             chunks.emplace_back(nss, pair.first, version, pair.second);
+            chunks.back().setName(OID::gen());
             version.incMinor();
         }
         return chunks;
@@ -615,18 +616,21 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
                                        BSON("x" << xBoundaries[0] << "y" << MINKEY)},
                             version,
                             ShardId("0"));
+        chunks.back().setName(OID::gen());
         for (std::size_t i = 0; i < xBoundaries.size() - 1; ++i) {
             chunks.emplace_back(kTestOutNss,
                                 ChunkRange{BSON("x" << xBoundaries[i] << "y" << MINKEY),
                                            BSON("x" << xBoundaries[i + 1] << "y" << MINKEY)},
                                 version,
                                 ShardId(str::stream() << (i + 1) % 3));
+            chunks.back().setName(OID::gen());
         }
         chunks.emplace_back(kTestOutNss,
                             ChunkRange{BSON("x" << xBoundaries.back() << "y" << MINKEY),
                                        BSON("x" << MAXKEY << "y" << MAXKEY)},
                             version,
                             ShardId(str::stream() << xBoundaries.size() % 3));
+        chunks.back().setName(OID::gen());
         return chunks;
     }();
 

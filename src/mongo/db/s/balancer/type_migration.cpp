@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/balancer/type_migration.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/s/catalog/type_chunk.h"
 
@@ -148,7 +149,20 @@ MigrateInfo MigrationType::toMigrateInfo() const {
 }
 
 std::string MigrationType::getName() const {
-    return ChunkType::genID(_nss, _min);
+    return genID(_nss, _min);
+}
+
+std::string MigrationType::genID(const NamespaceString& nss, const BSONObj& o) {
+    StringBuilder buf;
+    buf << nss.ns() << "-";
+
+    BSONObjIterator i(o);
+    while (i.more()) {
+        BSONElement e = i.next();
+        buf << e.fieldName() << "_" << e.toString(false, true);
+    }
+
+    return buf.str();
 }
 
 }  // namespace mongo

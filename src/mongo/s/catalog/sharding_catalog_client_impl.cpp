@@ -809,7 +809,6 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
     invariant(nss.db() == NamespaceString::kAdminDb || nss.db() == NamespaceString::kConfigDb);
 
     const BSONElement idField = doc.getField("_id");
-    invariant(!idField.eoo());
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -845,7 +844,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                         repl::ReadConcernLevel::kMajorityReadConcern,
                                         nss,
-                                        idField.wrap(),
+                                        idField.eoo() ? doc : idField.wrap(),
                                         BSONObj(),
                                         boost::none);
             if (!fetchDuplicate.isOK()) {
@@ -937,9 +936,6 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
     bool upsert,
     const WriteConcernOptions& writeConcern) {
     invariant(nss.db() == NamespaceString::kConfigDb);
-
-    const BSONElement idField = query.getField("_id");
-    invariant(!idField.eoo());
 
     BatchedCommandRequest request([&] {
         write_ops::Update updateOp(nss);

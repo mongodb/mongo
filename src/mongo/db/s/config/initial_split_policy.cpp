@@ -58,6 +58,7 @@ void appendChunk(const NamespaceString& nss,
                  std::vector<ChunkType>* chunks) {
     chunks->emplace_back(nss, ChunkRange(min, max), *version, shardId);
     auto& chunk = chunks->back();
+    chunk.setName(OID::gen());  // TODO SERVER-42299: Remove this line.
     chunk.setHistory({ChunkHistory(validAfter, shardId)});
     version->incMinor();
 }

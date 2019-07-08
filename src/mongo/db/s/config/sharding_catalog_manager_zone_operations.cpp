@@ -373,12 +373,9 @@ Status ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
         return overlapStatus;
     }
 
-    BSONObj updateQuery(
-        BSON("_id" << BSON(TagsType::ns(nss.ns()) << TagsType::min(fullShardKeyRange.getMin()))));
+    BSONObj updateQuery(BSON(TagsType::ns(nss.ns()) << TagsType::min(fullShardKeyRange.getMin())));
 
     BSONObjBuilder updateBuilder;
-    updateBuilder.append("_id",
-                         BSON(TagsType::ns(nss.ns()) << TagsType::min(fullShardKeyRange.getMin())));
     updateBuilder.append(TagsType::ns(), nss.ns());
     updateBuilder.append(TagsType::min(), fullShardKeyRange.getMin());
     updateBuilder.append(TagsType::max(), fullShardKeyRange.getMax());
@@ -411,7 +408,8 @@ Status ShardingCatalogManager::removeKeyRangeFromZone(OperationContext* opCtx,
     }
 
     BSONObjBuilder removeBuilder;
-    removeBuilder.append("_id", BSON(TagsType::ns(nss.ns()) << TagsType::min(range.getMin())));
+    removeBuilder.append(TagsType::ns(), nss.ns());
+    removeBuilder.append(TagsType::min(), range.getMin());
     removeBuilder.append(TagsType::max(), range.getMax());
 
     return Grid::get(opCtx)->catalogClient()->removeConfigDocuments(

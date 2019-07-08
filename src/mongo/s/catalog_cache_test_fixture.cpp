@@ -139,6 +139,7 @@ std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
              shardKeyPattern.getKeyPattern().extendRangeBound(splitPointsIncludingEnds[i], false)},
             version,
             ShardId{str::stream() << (i - 1)});
+        chunk.setName(OID::gen());
 
         initialChunks.push_back(chunk.toConfigBSON());
 
@@ -212,10 +213,12 @@ CachedCollectionRoutingInfo CatalogCacheTestFixture::loadRoutingTableWithTwoChun
 
         ChunkType chunk1(
             nss, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});
+        chunk1.setName(OID::gen());
         version.incMinor();
 
         ChunkType chunk2(
             nss, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"1"});
+        chunk2.setName(OID::gen());
         version.incMinor();
 
         return std::vector<BSONObj>{chunk1.toConfigBSON(), chunk2.toConfigBSON()};

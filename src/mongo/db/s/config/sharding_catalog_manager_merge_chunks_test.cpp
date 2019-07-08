@@ -45,6 +45,7 @@ using MergeChunkTest = ConfigServerTestFixture;
 
 TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     ChunkType chunk;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
@@ -53,6 +54,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
 
     // Construct chunk to be merged
     auto chunk2(chunk);
+    chunk2.setName(OID::gen());
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -110,6 +112,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
 
 TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     ChunkType chunk;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
@@ -119,6 +122,8 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     // Construct chunks to be merged
     auto chunk2(chunk);
     auto chunk3(chunk);
+    chunk2.setName(OID::gen());
+    chunk3.setName(OID::gen());
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -181,7 +186,9 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
 
 TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     ChunkType chunk, otherChunk;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
+    otherChunk.setName(OID::gen());
     otherChunk.setNS(kNamespace);
     auto collEpoch = OID::gen();
 
@@ -191,6 +198,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
 
     // Construct chunk to be merged
     auto chunk2(chunk);
+    chunk2.setName(OID::gen());
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -256,6 +264,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
 
 TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     ChunkType chunk;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 2, OID::gen());
@@ -264,6 +273,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
 
     // Construct chunk to be merged
     auto chunk2(chunk);
+    chunk2.setName(OID::gen());
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -280,6 +290,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
 
     // Set up unmerged chunk
     auto otherChunk(chunk);
+    otherChunk.setName(OID::gen());
     otherChunk.setMin(BSON("a" << 10));
     otherChunk.setMax(BSON("a" << 20));
 
@@ -402,6 +413,7 @@ TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
 
 TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
     ChunkType chunk;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
@@ -410,6 +422,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
 
     // Construct chunk to be merged
     auto chunk2(chunk);
+    chunk2.setName(OID::gen());
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -433,7 +446,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
 
     Timestamp validAfter{1};
 
-    ASSERT_EQ(ErrorCodes::BadValue,
+    ASSERT_EQ(ErrorCodes::IncompatibleShardingMetadata,
               ShardingCatalogManager::get(operationContext())
                   ->commitChunkMerge(operationContext(),
                                      kNamespace,
@@ -472,6 +485,7 @@ TEST_F(MergeChunkTest, ChunkBoundariesOutOfOrderFails) {
         ChunkVersion version = ChunkVersion(1, 0, epoch);
 
         ChunkType chunk;
+        chunk.setName(OID::gen());
         chunk.setNS(kNamespace);
         chunk.setShard(ShardId("shard0000"));
 
@@ -481,12 +495,14 @@ TEST_F(MergeChunkTest, ChunkBoundariesOutOfOrderFails) {
         originalChunks.push_back(chunk);
 
         version.incMinor();
+        chunk.setName(OID::gen());
         chunk.setMin(BSON("a" << 200));
         chunk.setMax(BSON("a" << 300));
         chunk.setVersion(version);
         originalChunks.push_back(chunk);
 
         version.incMinor();
+        chunk.setName(OID::gen());
         chunk.setMin(BSON("a" << 300));
         chunk.setMax(BSON("a" << 400));
         chunk.setVersion(version);
@@ -506,6 +522,7 @@ TEST_F(MergeChunkTest, ChunkBoundariesOutOfOrderFails) {
 
 TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     ChunkType chunk1;
+    chunk1.setName(OID::gen());
     chunk1.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
@@ -514,6 +531,8 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
 
     auto chunk2(chunk1);
     auto chunk3(chunk1);
+    chunk2.setName(OID::gen());
+    chunk3.setName(OID::gen());
 
     auto chunkMin = BSON("a" << kMinBSONKey);
     auto chunkBound1 = BSON("a" << BSON("$maxKey" << 1));

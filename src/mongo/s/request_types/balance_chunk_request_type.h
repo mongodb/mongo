@@ -50,7 +50,7 @@ class BalanceChunkRequest {
 public:
     /**
      * Parses the provided BSON content and if it is correct construct a request object with the
-     * request parameters.
+     * request parameters. If the '_id' field is missing in obj, ignore it.
      */
     static StatusWith<BalanceChunkRequest> parseFromConfigCommand(const BSONObj& obj);
 

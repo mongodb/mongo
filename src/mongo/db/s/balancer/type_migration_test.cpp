@@ -52,7 +52,7 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     const ChunkVersion version(1, 2, OID::gen());
 
     BSONObjBuilder chunkBuilder;
-    chunkBuilder.append(ChunkType::name(), kName);
+    chunkBuilder.append(ChunkType::name(), OID::gen());
     chunkBuilder.append(ChunkType::ns(), kNs);
     chunkBuilder.append(ChunkType::min(), kMin);
     chunkBuilder.append(ChunkType::max(), kMax);

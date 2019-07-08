@@ -33,6 +33,7 @@
 
 #include "mongo/db/s/balancer/balancer_policy.h"
 
+#include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/util/log.h"
@@ -538,7 +539,7 @@ MigrateInfo::MigrateInfo(const ShardId& a_to, const ChunkType& a_chunk) {
 }
 
 std::string MigrateInfo::getName() const {
-    return ChunkType::genID(nss, minKey);
+    return MigrationType::genID(nss, minKey);
 }
 
 string MigrateInfo::toString() const {

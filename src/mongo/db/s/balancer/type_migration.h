@@ -83,6 +83,11 @@ public:
      */
     std::string getName() const;
 
+    /**
+     * Generates id based on the namespace and the lower bound of the chunk being moved.
+     */
+    static std::string genID(const NamespaceString& nss, const BSONObj& o);
+
     const NamespaceString& getNss() const {
         return _nss;
     }

@@ -362,6 +362,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     OID oid = OID::gen();
 
     ChunkType chunkA;
+    chunkA.setName(OID::gen());
     chunkA.setNS(kNamespace);
     chunkA.setMin(BSON("a" << 1));
     chunkA.setMax(BSON("a" << 100));
@@ -369,6 +370,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     chunkA.setShard(ShardId("shard0000"));
 
     ChunkType chunkB;
+    chunkB.setName(OID::gen());
     chunkB.setNS(kNamespace);
     chunkB.setMin(BSON("a" << 100));
     chunkB.setMax(BSON("a" << 200));
@@ -1249,12 +1251,12 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
     });
 
     onFindCommand([this](const RemoteCommandRequest& request) {
-        OID oid = OID::gen();
         ChunkType chunk;
+        chunk.setName(OID::gen());
         chunk.setNS(kNamespace);
         chunk.setMin(BSON("a" << 1));
         chunk.setMax(BSON("a" << 100));
-        chunk.setVersion({1, 2, oid});
+        chunk.setVersion({1, 2, OID::gen()});
         chunk.setShard(ShardId("shard0000"));
         return vector<BSONObj>{chunk.toConfigBSON()};
     });

@@ -633,17 +633,16 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
             log() << "Marking chunk " << redact(chunk.toString()) << " as jumbo.";
             chunk.markAsJumbo();
 
-            const std::string chunkName = ChunkType::genID(nss, chunk.getMin());
-
             auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
                 opCtx,
                 ChunkType::ConfigNS,
-                BSON(ChunkType::name(chunkName)),
+                BSON(ChunkType::ns(nss.ns()) << ChunkType::min(chunk.getMin())),
                 BSON("$set" << BSON(ChunkType::jumbo(true))),
                 false,
                 ShardingCatalogClient::kMajorityWriteConcern);
             if (!status.isOK()) {
-                log() << "Couldn't set jumbo for chunk: " << redact(chunkName)
+                log() << "Couldn't set jumbo for chunk with namespace " << redact(nss.ns())
+                      << " and min key " << redact(chunk.getMin())
                       << causedBy(redact(status.getStatus()));
             }
 

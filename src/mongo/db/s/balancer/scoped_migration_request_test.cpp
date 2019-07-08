@@ -47,7 +47,6 @@ const BSONObj kMax = BSON("a" << 20);
 const ShardId kFromShard("shard0000");
 const ShardId kToShard("shard0001");
 const ShardId kDifferentToShard("shard0002");
-const std::string kName = "TestDB.TestColl-a_10";
 
 class ScopedMigrationRequestTest : public ConfigServerTestFixture {
 public:
@@ -95,14 +94,13 @@ MigrateInfo makeMigrateInfo() {
     const ChunkVersion kChunkVersion{1, 2, OID::gen()};
 
     BSONObjBuilder chunkBuilder;
-    chunkBuilder.append(ChunkType::name(), kName);
     chunkBuilder.append(ChunkType::ns(), kNs);
     chunkBuilder.append(ChunkType::min(), kMin);
     chunkBuilder.append(ChunkType::max(), kMax);
     kChunkVersion.appendLegacyWithField(&chunkBuilder, ChunkType::lastmod());
     chunkBuilder.append(ChunkType::shard(), kFromShard.toString());
 
-    ChunkType chunkType = assertGet(ChunkType::fromConfigBSON(chunkBuilder.obj()));
+    ChunkType chunkType = assertGet(ChunkType::parseFromConfigBSONCommand(chunkBuilder.obj()));
     ASSERT_OK(chunkType.validate());
 
     return MigrateInfo(kToShard, chunkType);

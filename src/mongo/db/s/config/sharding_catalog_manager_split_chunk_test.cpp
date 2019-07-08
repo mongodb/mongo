@@ -44,6 +44,7 @@ using SplitChunkTest = ConfigServerTestFixture;
 
 TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     ChunkType chunk;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
@@ -104,6 +105,7 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
 
 TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     ChunkType chunk;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
@@ -180,7 +182,9 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
 
 TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     ChunkType chunk, chunk2;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
+    chunk2.setName(OID::gen());
     chunk2.setNS(kNamespace);
     auto collEpoch = OID::gen();
 
@@ -351,6 +355,7 @@ TEST_F(SplitChunkTest, SplitsOnShardWithHighestShardVersionIncreasesCollectionVe
 
 TEST_F(SplitChunkTest, PreConditionFailErrors) {
     ChunkType chunk;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
@@ -434,6 +439,7 @@ TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
 
 TEST_F(SplitChunkTest, SplitPointsOutOfOrderShouldFail) {
     ChunkType chunk;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
@@ -488,6 +494,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMinShouldFail) {
 
 TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMaxShouldFail) {
     ChunkType chunk;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
