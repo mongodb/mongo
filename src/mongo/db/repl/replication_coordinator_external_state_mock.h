@@ -111,6 +111,11 @@ public:
     void setLocalConfigDocument(const StatusWith<BSONObj>& localConfigDocument);
 
     /**
+     * Initializes the return value for subsequent calls to loadLocalLastVoteDocument().
+     */
+    Status createLocalLastVoteCollection(OperationContext* opCtx) final;
+
+    /**
      * Sets the return value for subsequent calls to loadLocalLastVoteDocument().
      */
     void setLocalLastVoteDocument(const StatusWith<LastVote>& localLastVoteDocument);

@@ -159,6 +159,12 @@ public:
      */
     virtual Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) = 0;
 
+
+    /**
+     * Creates the collection for "lastVote" documents and initializes it, or returns an error.
+     */
+    virtual Status createLocalLastVoteCollection(OperationContext* opCtx) = 0;
+
     /**
      * Gets the replica set lastVote document from local storage, or returns an error.
      */
