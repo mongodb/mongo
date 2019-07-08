@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+
 #include "mongo/platform/basic.h"
 
 #include <array>
@@ -36,79 +37,55 @@
 #include <string>
 #include <vector>
 
+#include <benchmark/benchmark.h>
+
 #include "mongo/base/string_data.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/itoa.h"
 
 namespace mongo {
 namespace {
 
-TEST(ItoA, StringDataEquality) {
-    std::vector<uint64_t> cases;
-    auto caseInsert = std::back_inserter(cases);
-    static constexpr auto kMax = std::numeric_limits<uint64_t>::max();
-    {
-        // Manually-specified basics.
-        const uint64_t interesting[]{
-            0,
-            1,
-            10,
-            11,
-            12,
-            99,
-            100,
-            101,
-            110,
-            133,
-            1446,
-            17789,
-            192923,
-            2389489,
-            29313479,
-            1928127389,
-            kMax - 1,
-            kMax,
-        };
-        cases.insert(cases.end(), std::begin(interesting), std::end(interesting));
-    }
-
-    {
-        // Test the neighborhood of several powers of ten.
-        uint64_t tenPower = 10;
-        for (int i = 0; i < 10; ++i) {
-            *caseInsert++ = tenPower - 1;
-            *caseInsert++ = tenPower;
-            *caseInsert++ = tenPower + 1;
-            tenPower *= 10;
+void BM_ItoA(benchmark::State& state) {
+    std::uint64_t n = state.range(0);
+    std::uint64_t items = 0;
+    for (auto _ : state) {
+        for (std::uint64_t i = 0; i < n; ++i) {
+            benchmark::DoNotOptimize(ItoA(i));
+            ++items;
         }
     }
-
-    static constexpr uint64_t kRampTop = 100'000;
-
-    // Ramp of first several thousand values.
-    for (uint64_t i = 0; i < kRampTop; ++i) {
-        *caseInsert++ = i;
-    }
-
-    {
-        // Large # of pseudorandom integers, spread over the remaining powers of ten.
-        std::mt19937 gen(0);  // deterministic seed 0
-        for (uint64_t i = kRampTop;; i *= 10) {
-            auto upper = (i >= kMax / 10) ? kMax : 10 * i;
-            std::uniform_int_distribution<uint64_t> dis(i, upper);
-            for (uint64_t i = 0; i < 100'000; ++i) {
-                *caseInsert++ = dis(gen);
-            }
-            if (upper == kMax)
-                break;
-        }
-    }
-
-    for (const auto& i : cases) {
-        ASSERT_EQ(StringData(ItoA{i}), std::to_string(i));
-    }
+    state.SetItemsProcessed(items);
 }
+
+void BM_ItoADigits(benchmark::State& state) {
+    std::uint64_t n = state.range(0);
+    std::uint64_t items = 0;
+
+    std::uint64_t v = 0;
+    for (std::uint64_t i = 0; i < n; ++i) {
+        v = v * 10 + 9;
+    }
+
+    for (auto _ : state) {
+        for (std::uint64_t i = 0; i < n; ++i) {
+            benchmark::DoNotOptimize(ItoA(v));
+            ++items;
+        }
+    }
+    state.SetItemsProcessed(items);
+}
+
+BENCHMARK(BM_ItoA)
+    ->Arg(1)
+    ->Arg(10)
+    ->Arg(100)
+    ->Arg(1000)
+    ->Arg(10000)
+    ->Arg(100000)
+    ->Arg(1000000)
+    ->Arg(10000000);
+BENCHMARK(BM_ItoADigits)->DenseRange(1, 20);
 
 }  // namespace
 }  // namespace mongo
