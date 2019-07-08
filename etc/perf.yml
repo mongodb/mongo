@@ -180,6 +180,17 @@ functions:
         script: |
           set -v
           ../dsi/run-dsi detect-changes
+    - command: json.get_history
+      params:
+        task: ${task_name}
+        file: "src/history.json"
+        name: "perf"
+    - command: json.get_history
+      params:
+        tags: true
+        task: ${task_name}
+        file: "src/tags.json"
+        name: "perf"
     - command: shell.exec
       type: test
       params:
@@ -196,7 +207,7 @@ functions:
           cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
           REFTAG="3.6.5-Baseline"
           OVERRIDE="../dsi/analysis/${branch_name}/perf_override.json"
-          python ../dsi/analysis/perf_regression_check.py $cmd_flags --rev ${revision} --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.075 --threadThreshold 0.12
+          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.075 --threadThreshold 0.12
 
   # Params:
   #   workload: the path relative to genny/src/workloads to run e.g.
