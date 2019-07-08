@@ -6,6 +6,7 @@
  * @tags: [requires_fsync]
  */
 
+load("jstests/replsets/libs/election_metrics.js");
 load("jstests/replsets/rslib.js");
 
 // We are bypassing collection validation because this test runs "shutdown" command so the server is
@@ -60,12 +61,26 @@ try {
         assert.writeOK(master.getDB("foo").bar.insert({x: i}));
     }
 
+    const intitialServerStatus = assert.commandWorked(master.adminCommand({serverStatus: 1}));
+
     jsTestLog('Do stepdown of primary ' + master + ' that should not work');
 
     // this should fail, so we don't need to try/catch
     jsTestLog(
         'Step down ' + master + ' expected error: ' +
         tojson(assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown: 10}))));
+
+    // Check that the 'total' field of 'replSetStepDown' has been incremented in serverStatus and
+    // that it has not been incremented for 'replSetStepDownWithForce'.
+    let newServerStatus = assert.commandWorked(master.adminCommand({serverStatus: 1}));
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDown,
+                             newServerStatus.metrics.commands.replSetStepDown,
+                             "total",
+                             1);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDownWithForce,
+                             newServerStatus.metrics.commands.replSetStepDownWithForce,
+                             "total",
+                             0);
 
     // The server will disconnect the client on a successful forced stepdown so we use the
     // presence of an exception to confirm the forced stepdown result.
@@ -76,6 +91,18 @@ try {
     });
     jsTestLog('Forced stepdown ' + master + ' expected failure: ' +
               tojson(exceptionFromForcedStepDown));
+
+    // Check that the 'total' fields of 'replSetStepDown' and 'replSetStepDownWithForce' have been
+    // incremented in serverStatus.
+    newServerStatus = assert.commandWorked(master.adminCommand({serverStatus: 1}));
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDown,
+                             newServerStatus.metrics.commands.replSetStepDown,
+                             "total",
+                             2);
+    verifyServerStatusChange(intitialServerStatus.metrics.commands.replSetStepDownWithForce,
+                             newServerStatus.metrics.commands.replSetStepDownWithForce,
+                             "total",
+                             1);
 
     jsTestLog('Checking isMaster on ' + master);
     var r2 = assert.commandWorked(master.getDB("admin").runCommand({ismaster: 1}));

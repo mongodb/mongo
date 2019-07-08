@@ -452,15 +452,22 @@ public:
                "primary.)\n"
                "http://dochub.mongodb.org/core/replicasetcommands";
     }
-    CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") {}
+    CmdReplSetStepDown()
+        : ReplSetCommand("replSetStepDown"),
+          _stepDownCmdsWithForceExecutedMetric("commands.replSetStepDownWithForce.total",
+                                               &_stepDownCmdsWithForceExecuted) {}
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
+        const bool force = cmdObj["force"].trueValue();
+
+        if (force) {
+            _stepDownCmdsWithForceExecuted.increment();
+        }
+
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         uassertStatusOK(status);
-
-        const bool force = cmdObj["force"].trueValue();
 
         long long stepDownForSecs = cmdObj.firstElement().numberLong();
         if (stepDownForSecs == 0) {
@@ -505,6 +512,9 @@ public:
     }
 
 private:
+    mutable Counter64 _stepDownCmdsWithForceExecuted;
+    ServerStatusMetricField<Counter64> _stepDownCmdsWithForceExecutedMetric;
+
     ActionSet getAuthActionSet() const override {
         return ActionSet{ActionType::replSetStateChange};
     }
