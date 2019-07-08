@@ -66,7 +66,7 @@ MovePrimarySourceManager::MovePrimarySourceManager(OperationContext* opCtx,
 MovePrimarySourceManager::~MovePrimarySourceManager() {}
 
 NamespaceString MovePrimarySourceManager::getNss() const {
-    return _requestArgs.get_movePrimary();
+    return _requestArgs.get_shardsvrMovePrimary().get();
 }
 
 Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
@@ -102,7 +102,7 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
     auto toShardObj = uassertStatusOK(shardRegistry->getShard(opCtx, _toShard));
 
     BSONObjBuilder cloneCatalogDataCommandBuilder;
-    cloneCatalogDataCommandBuilder << "_cloneCatalogData" << _dbname << "from"
+    cloneCatalogDataCommandBuilder << "_shardsvrCloneCatalogData" << _dbname << "from"
                                    << fromShardObj->getConnString().toString();
 
 
@@ -114,6 +114,24 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
         Shard::RetryPolicy::kIdempotent);
 
     auto cloneCommandStatus = Shard::CommandResponse::getEffectiveStatus(cloneCommandResponse);
+
+    // If the `toShard` is on v4.2 or earlier, it will not recognize the command name
+    // _shardsvrCloneCatalogData. We will retry the command with the old name _cloneCatalogData.
+    if (cloneCommandStatus == ErrorCodes::CommandNotFound) {
+        BSONObjBuilder legacyCloneCatalogDataCommandBuilder;
+        legacyCloneCatalogDataCommandBuilder << "_cloneCatalogData" << _dbname << "from"
+                                             << fromShardObj->getConnString().toString();
+
+
+        cloneCommandResponse = toShardObj->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            "admin",
+            CommandHelpers::appendMajorityWriteConcern(legacyCloneCatalogDataCommandBuilder.obj()),
+            Shard::RetryPolicy::kIdempotent);
+
+        cloneCommandStatus = Shard::CommandResponse::getEffectiveStatus(cloneCommandResponse);
+    }
 
     uassertStatusOK(cloneCommandStatus);
 

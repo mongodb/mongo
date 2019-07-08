@@ -46,7 +46,7 @@ protected:
 
 ShardMovePrimary createMovePrimaryRequest(const NamespaceString& nss) {
     ShardMovePrimary request;
-    request.set_movePrimary(std::move(nss));
+    request.set_shardsvrMovePrimary(std::move(nss));
     request.setTo("shard0001");
 
     return request;

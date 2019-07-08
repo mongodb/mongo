@@ -56,7 +56,7 @@ void uassertStatusOKWithWarning(const Status& status) {
 
 class MovePrimaryCommand : public BasicCommand {
 public:
-    MovePrimaryCommand() : BasicCommand("_movePrimary") {}
+    MovePrimaryCommand() : BasicCommand("_shardsvrMovePrimary", "_movePrimary") {}
 
     std::string help() const override {
         return "should not be calling this directly";
@@ -100,7 +100,7 @@ public:
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
         const auto movePrimaryRequest =
-            ShardMovePrimary::parse(IDLParserErrorContext("_movePrimary"), cmdObj);
+            ShardMovePrimary::parse(IDLParserErrorContext("_shardsvrMovePrimary"), cmdObj);
         const auto dbname = parseNs("", cmdObj);
 
         uassert(
@@ -113,10 +113,11 @@ public:
                 dbname != NamespaceString::kAdminDb && dbname != NamespaceString::kConfigDb &&
                     dbname != NamespaceString::kLocalDb);
 
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "_movePrimary must be called with majority writeConcern, got "
-                              << cmdObj,
-                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+        uassert(
+            ErrorCodes::InvalidOptions,
+            str::stream() << "_shardsvrMovePrimary must be called with majority writeConcern, got "
+                          << cmdObj,
+            opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
         uassert(ErrorCodes::InvalidOptions,
                 "you have to specify where you want to move it",

@@ -45,7 +45,7 @@
 
     let testCases = {
         _addShard: {skip: "primary only"},
-        _cloneCatalogData: {skip: "primary only"},
+        _shardsvrCloneCatalogData: {skip: "primary only"},
         _configsvrAddShard: {skip: "primary only"},
         _configsvrAddShardToZone: {skip: "primary only"},
         _configsvrBalancerStart: {skip: "primary only"},
@@ -68,7 +68,7 @@
         _isSelf: {skip: "does not return user data"},
         _mergeAuthzCollections: {skip: "primary only"},
         _migrateClone: {skip: "primary only"},
-        _movePrimary: {skip: "primary only"},
+        _shardsvrMovePrimary: {skip: "primary only"},
         _recvChunkAbort: {skip: "primary only"},
         _recvChunkCommit: {skip: "primary only"},
         _recvChunkStart: {skip: "primary only"},

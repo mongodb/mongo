@@ -47,13 +47,14 @@ namespace mongo {
 namespace {
 
 /**
- * Currently, _cloneCatalogData will clone all data (including metadata). In the second part of
+ * Currently, _shardsvrCloneCatalogData will clone all data (including metadata). In the second part
+ * of
  * PM-1017 (Introduce Database Versioning in Sharding Config) this command will be changed to only
  * clone catalog metadata, as the name would suggest.
  */
 class CloneCatalogDataCommand : public BasicCommand {
 public:
-    CloneCatalogDataCommand() : BasicCommand("_cloneCatalogData") {}
+    CloneCatalogDataCommand() : BasicCommand("_shardsvrCloneCatalogData", "_cloneCatalogData") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -87,16 +88,17 @@ public:
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
         uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "_cloneCatalogData can only be run on shard servers",
+                str::stream() << "_shardsvrCloneCatalogData can only be run on shard servers",
                 serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "_cloneCatalogData must be called with majority writeConcern, got "
-                              << cmdObj,
+                str::stream()
+                    << "_shardsvrCloneCatalogData must be called with majority writeConcern, got "
+                    << cmdObj,
                 opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
         const auto cloneCatalogDataRequest =
-            CloneCatalogData::parse(IDLParserErrorContext("_cloneCatalogData"), cmdObj);
+            CloneCatalogData::parse(IDLParserErrorContext("_shardsvrCloneCatalogData"), cmdObj);
         const auto dbname = cloneCatalogDataRequest.getCommandParameter().toString();
 
         uassert(
@@ -112,7 +114,7 @@ public:
         auto from = cloneCatalogDataRequest.getFrom();
 
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Can't run _cloneCatalogData without a source",
+                str::stream() << "Can't run _shardsvrCloneCatalogData without a source",
                 !from.empty());
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
