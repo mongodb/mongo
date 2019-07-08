@@ -464,7 +464,7 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
     _stats.report(&cacheStatsBuilder);
 }
 
-void CatalogCache::_scheduleDatabaseRefresh(WithLock,
+void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
                                             const std::string& dbName,
                                             std::shared_ptr<DatabaseInfoEntry> dbEntry) {
     const auto onRefreshCompleted =
@@ -533,8 +533,7 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock,
     } catch (const DBException& ex) {
         const auto status = ex.toStatus();
 
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
-        onRefreshFailed(lg, status);
+        onRefreshFailed(lk, status);
     }
 }
 
@@ -658,8 +657,7 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
         // attempt.
         invariant(status != ErrorCodes::ConflictingOperationInProgress);
 
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
-        onRefreshFailed(lg, status);
+        onRefreshFailed(lk, status);
     }
 
     // The routing info for this collection shouldn't change, as other threads may try to use the
