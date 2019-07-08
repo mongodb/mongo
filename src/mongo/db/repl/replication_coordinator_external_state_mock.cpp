@@ -133,6 +133,14 @@ void ReplicationCoordinatorExternalStateMock::setLocalConfigDocument(
     _localRsConfigDocument = localConfigDocument;
 }
 
+Status ReplicationCoordinatorExternalStateMock::createLocalLastVoteCollection(
+    OperationContext* opCtx) {
+    if (!_localRsLastVoteDocument.isOK()) {
+        setLocalLastVoteDocument(LastVote{OpTime::kInitialTerm, -1});
+    }
+    return Status::OK();
+}
+
 StatusWith<LastVote> ReplicationCoordinatorExternalStateMock::loadLocalLastVoteDocument(
     OperationContext* opCtx) {
     return _localRsLastVoteDocument;
