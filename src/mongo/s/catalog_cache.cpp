@@ -474,8 +474,7 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
         // attempt.
         invariant(status != ErrorCodes::ConflictingOperationInProgress);
 
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
-        onRefreshFailed(lg, status);
+        onRefreshFailed(lk, status);
     }
 }
 
