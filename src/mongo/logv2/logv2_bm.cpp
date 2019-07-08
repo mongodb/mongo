@@ -41,17 +41,24 @@
 #include "mongo/util/log.h"
 
 #include <benchmark/benchmark.h>
+#include <boost/iostreams/device/null.hpp>
+#include <boost/iostreams/stream.hpp>
 #include <boost/log/sinks/sync_frontend.hpp>
 #include <boost/log/sinks/text_ostream_backend.hpp>
 #include <boost/make_shared.hpp>
-#include <sstream>
+#include <iostream>
 
 
 namespace mongo {
 namespace {
 
-// Class with same interface as Console but uses a stringstream internally. So the ConsoleAppender
-// can be benchmarked.
+boost::shared_ptr<std::ostream> makeNullStream() {
+    namespace bios = boost::iostreams;
+    return boost::make_shared<bios::stream<bios::null_sink>>(bios::null_sink{});
+}
+
+// Class with same interface as Console but uses a boost null_sink internally. So the
+// ConsoleAppender can be benchmarked.
 class StringstreamConsole {
 public:
     stdx::mutex& mutex() {
@@ -62,45 +69,48 @@ public:
     StringstreamConsole() {
         stdx::unique_lock<stdx::mutex> lk(mutex());
         lk.swap(_consoleLock);
+        _out = makeNullStream();
     }
 
     std::ostream& out() {
-        static std::stringstream _ss;
-        return _ss;
-    }
-
-    void reset() {
-        std::stringstream ss;
-        std::swap(ss, static_cast<std::stringstream&>(out()));
+        return *_out;
     }
 
 private:
+    boost::shared_ptr<std::ostream> _out;
     stdx::unique_lock<stdx::mutex> _consoleLock;
 };
 
 // RAII style helper class for init/deinit log system
 class ScopedLogBench {
 public:
-    ScopedLogBench(bool shouldInit) : _shouldInit(shouldInit) {
-        using namespace logger;
+    ScopedLogBench(benchmark::State& state) {
+        _shouldInit = state.thread_index == 0;
         if (_shouldInit) {
-            StringstreamConsole().reset();
-            globalLogManager()->detachDefaultConsoleAppender();
-            _appender = globalLogDomain()->attachAppender(
-                std::make_unique<ConsoleAppender<MessageEventEphemeral, StringstreamConsole>>(
-                    std::make_unique<MessageEventDetailsEncoder>()));
+            setupAppender();
         }
     }
 
     ~ScopedLogBench() {
-        using namespace logger;
         if (_shouldInit) {
-            globalLogDomain()->detachAppender(_appender);
-            globalLogManager()->reattachDefaultConsoleAppender();
+            tearDownAppender();
         }
     }
 
 private:
+    void setupAppender() {
+        logger::globalLogManager()->detachDefaultConsoleAppender();
+        _appender = logger::globalLogDomain()->attachAppender(
+            std::make_unique<
+                logger::ConsoleAppender<logger::MessageEventEphemeral, StringstreamConsole>>(
+                std::make_unique<logger::MessageEventDetailsEncoder>()));
+    }
+
+    void tearDownAppender() {
+        logger::globalLogDomain()->detachAppender(_appender);
+        logger::globalLogManager()->reattachDefaultConsoleAppender();
+    }
+
     logger::ComponentMessageLogDomain::AppenderHandle _appender;
     bool _shouldInit;
 };
@@ -108,34 +118,40 @@ private:
 // RAII style helper class for init/deinit new log system
 class ScopedLogV2Bench {
 public:
-    ScopedLogV2Bench(bool shouldInit) : _shouldInit(shouldInit) {
-        using namespace logv2;
+    ScopedLogV2Bench(benchmark::State& state) {
+        _shouldInit = state.thread_index == 0;
         if (_shouldInit) {
-            LogManager::global().detachDefaultBackends();
-
-            auto backend = boost::make_shared<boost::log::sinks::text_ostream_backend>();
-            backend->add_stream(boost::shared_ptr<std::ostream>(new std::stringstream()));
-            backend->auto_flush(true);
-
-            _sink = boost::make_shared<
-                boost::log::sinks::synchronous_sink<boost::log::sinks::text_ostream_backend>>(
-                backend);
-            _sink->set_filter(
-                ComponentSettingsFilter(LogManager::global().getGlobalDomain().settings()));
-            _sink->set_formatter(TextFormatter());
-            LogManager::global().getGlobalDomain().impl().core()->add_sink(_sink);
+            setupAppender();
         }
     }
 
     ~ScopedLogV2Bench() {
-        using namespace logv2;
         if (_shouldInit) {
-            LogManager::global().getGlobalDomain().impl().core()->remove_sink(_sink);
-            LogManager::global().reattachDefaultBackends();
+            tearDownAppender();
         }
     }
 
 private:
+    void setupAppender() {
+        logv2::LogManager::global().detachDefaultBackends();
+
+        auto backend = boost::make_shared<boost::log::sinks::text_ostream_backend>();
+        backend->add_stream(makeNullStream());
+        backend->auto_flush(true);
+
+        _sink = boost::make_shared<
+            boost::log::sinks::synchronous_sink<boost::log::sinks::text_ostream_backend>>(backend);
+        _sink->set_filter(logv2::ComponentSettingsFilter(
+            logv2::LogManager::global().getGlobalDomain().settings()));
+        _sink->set_formatter(logv2::TextFormatter());
+        logv2::LogManager::global().getGlobalDomain().impl().core()->add_sink(_sink);
+    }
+
+    void tearDownAppender() {
+        logv2::LogManager::global().getGlobalDomain().impl().core()->remove_sink(_sink);
+        logv2::LogManager::global().reattachDefaultBackends();
+    }
+
     boost::shared_ptr<boost::log::sinks::synchronous_sink<boost::log::sinks::text_ostream_backend>>
         _sink;
     bool _shouldInit;
@@ -148,49 +164,49 @@ std::string createLongString() {
 }
 
 static void BM_NoopLog(benchmark::State& state) {
-    ScopedLogBench init(state.thread_index == 0);
+    ScopedLogBench init(state);
 
     for (auto _ : state)
         MONGO_LOG(1) << "noop log";
 }
 
 static void BM_NoopLogV2Inline(benchmark::State& state) {
-    ScopedLogV2Bench init(state.thread_index == 0);
+    ScopedLogV2Bench init(state);
 
     for (auto _ : state)
         LOGV2_DEBUG_INLINE(1, "noop log");
 }
 
 static void BM_NoopLogV2PimplRecord(benchmark::State& state) {
-    ScopedLogV2Bench init(state.thread_index == 0);
+    ScopedLogV2Bench init(state);
 
     for (auto _ : state)
         LOGV2_DEBUG(1, "noop log");
 }
 
 static void BM_NoopLogArg(benchmark::State& state) {
-    ScopedLogBench init(state.thread_index == 0);
+    ScopedLogBench init(state);
 
     for (auto _ : state)
         MONGO_LOG(1) << "noop log " << createLongString();
 }
 
 static void BM_NoopLogV2InlineArg(benchmark::State& state) {
-    ScopedLogV2Bench init(state.thread_index == 0);
+    ScopedLogV2Bench init(state);
 
     for (auto _ : state)
         LOGV2_DEBUG_INLINE(1, "noop log {}", "str"_attr = createLongString());
 }
 
 static void BM_NoopLogV2PimplRecordArg(benchmark::State& state) {
-    ScopedLogV2Bench init(state.thread_index == 0);
+    ScopedLogV2Bench init(state);
 
     for (auto _ : state)
         LOGV2_DEBUG(1, "noop log {}", "str"_attr = createLongString());
 }
 
 static void BM_EnabledLog(benchmark::State& state) {
-    ScopedLogBench init(state.thread_index == 0);
+    ScopedLogBench init(state);
 
     for (auto _ : state)
         log() << "enabled log";
@@ -198,14 +214,14 @@ static void BM_EnabledLog(benchmark::State& state) {
 
 
 static void BM_EnabledLogV2(benchmark::State& state) {
-    ScopedLogV2Bench init(state.thread_index == 0);
+    ScopedLogV2Bench init(state);
 
     for (auto _ : state)
         LOGV2("enabled log");
 }
 
 static void BM_EnabledLogExpensiveArg(benchmark::State& state) {
-    ScopedLogBench init(state.thread_index == 0);
+    ScopedLogBench init(state);
 
     for (auto _ : state)
         log() << "enabled log " << createLongString();
@@ -213,14 +229,14 @@ static void BM_EnabledLogExpensiveArg(benchmark::State& state) {
 
 
 static void BM_EnabledLogV2ExpensiveArg(benchmark::State& state) {
-    ScopedLogV2Bench init(state.thread_index == 0);
+    ScopedLogV2Bench init(state);
 
     for (auto _ : state)
         LOGV2("enabled log {}", "str"_attr = createLongString());
 }
 
 static void BM_EnabledLogManySmallArg(benchmark::State& state) {
-    ScopedLogBench init(state.thread_index == 0);
+    ScopedLogBench init(state);
 
     for (auto _ : state)
         log() << "enabled log " << 1 << 2 << "3" << 4.0 << "5"
@@ -230,7 +246,7 @@ static void BM_EnabledLogManySmallArg(benchmark::State& state) {
 
 
 static void BM_EnabledLogV2ManySmallArg(benchmark::State& state) {
-    ScopedLogV2Bench init(state.thread_index == 0);
+    ScopedLogV2Bench init(state);
 
     for (auto _ : state) {
         LOGV2("enabled log {}{}{}{}{}{}{}{}{}{}",
