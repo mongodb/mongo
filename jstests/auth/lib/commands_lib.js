@@ -3962,10 +3962,15 @@ var authCommandsLib = {
           command: {insert: "oplog.rs", documents: [{ts: Timestamp()}]},
           skipSharded: true,
           setup: function(db) {
-              db.createCollection("oplog.rs", {capped: true, size: 10000});
+              if (!db.getCollectionNames().includes("oplog.rs")) {
+                  assert.commandWorked(
+                      db.runCommand({create: "oplog.rs", capped: true, size: 10000}));
+              } else {
+                  assert.commandWorked(db.adminCommand({replSetResizeOplog: 1, size: 10000}));
+              }
           },
           teardown: function(db) {
-              db.oplog.rs.drop();
+              assert.commandWorked(db.oplog.rs.runCommand('emptycapped'));
           },
           testcases: [
               {

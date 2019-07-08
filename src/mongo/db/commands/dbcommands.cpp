@@ -233,11 +233,22 @@ public:
                            BSONObjBuilder& result) {
         const NamespaceString nsToDrop(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
-        if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-             repl::ReplicationCoordinator::modeNone) &&
-            nsToDrop.isOplog()) {
-            errmsg = "can't drop live oplog while replicating";
-            return false;
+        if (nsToDrop.isOplog()) {
+            if (repl::ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
+                errmsg = "can't drop live oplog while replicating";
+                return false;
+            }
+
+            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            invariant(storageEngine);
+            if (storageEngine->supportsRecoveryTimestamp()) {
+                // We use the method supportsRecoveryTimestamp() to detect whether we are using
+                // the WiredTiger storage engine, which is currently only storage engine that
+                // supports the replSetResizeOplog command.
+                errmsg =
+                    "can't drop oplog on storage engines that support replSetResizeOplog command";
+                return false;
+            }
         }
 
         uassertStatusOK(
