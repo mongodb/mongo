@@ -239,11 +239,13 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
         $project:
             {date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: 5}}}
     }];
-    assertErrMsgContains(coll, pipeline, 18533, "$dateToString requires that 'format' be a string");
+    assertErrCodeAndErrMsgContains(
+        coll, pipeline, 18533, "$dateToString requires that 'format' be a string");
 
     pipeline =
         [{$project: {date: {$dateToString: {format: "%Y-%m-%d %H:%M:%S", timezone: "$tz"}}}}];
-    assertErrMsgContains(coll, pipeline, 18628, "Missing 'date' parameter to $dateToString");
+    assertErrCodeAndErrMsgContains(
+        coll, pipeline, 18628, "Missing 'date' parameter to $dateToString");
 
     pipeline = [{
         $project: {
@@ -256,10 +258,11 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
             }
         }
     }];
-    assertErrMsgContains(coll, pipeline, 40517, "timezone must evaluate to a string");
+    assertErrCodeAndErrMsgContains(coll, pipeline, 40517, "timezone must evaluate to a string");
 
     pipeline = [{$project: {date: {$dateToString: {format: "%Y-%m-%d %H:%M:%S", date: 42}}}}];
-    assertErrMsgContains(coll, pipeline, 16006, "can't convert from BSON type double to Date");
+    assertErrCodeAndErrMsgContains(
+        coll, pipeline, 16006, "can't convert from BSON type double to Date");
 
     pipeline = [{
         $project: {
@@ -272,13 +275,13 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
             }
         }
     }];
-    assertErrMsgContains(coll, pipeline, 40485, "unrecognized time zone identifier");
+    assertErrCodeAndErrMsgContains(coll, pipeline, 40485, "unrecognized time zone identifier");
 
     pipeline = [{
         $project:
             {date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: "%"}}}
     }];
-    assertErrMsgContains(coll, pipeline, 18535, "Unmatched '%' at end of format string");
+    assertErrCodeAndErrMsgContains(coll, pipeline, 18535, "Unmatched '%' at end of format string");
 
     // Fails for unknown format specifier.
     pipeline = [{
@@ -286,5 +289,6 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
             date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: "%n"}}
         }
     }];
-    assertErrMsgContains(coll, pipeline, 18536, "Invalid format character '%n' in format string");
+    assertErrCodeAndErrMsgContains(
+        coll, pipeline, 18536, "Invalid format character '%n' in format string");
 })();

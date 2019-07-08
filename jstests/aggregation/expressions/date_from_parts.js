@@ -558,7 +558,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     pipeline =
         [{$project: {date: {"$dateFromParts": {year: 1970, millisecond: "$veryBigDoubleA"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll,
         pipeline,
         ErrorCodes.DurationOverflow,
@@ -566,7 +566,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     pipeline =
         [{$project: {date: {"$dateFromParts": {year: 1970, millisecond: "$veryBigDecimal128A"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll,
         pipeline,
         ErrorCodes.DurationOverflow,
@@ -574,11 +574,13 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     pipeline =
         [{$project: {date: {"$dateFromParts": {year: 1970, millisecond: "$veryBigDoubleB"}}}}];
-    assertErrMsgContains(coll, pipeline, 40515, "'millisecond' must evaluate to an integer");
+    assertErrCodeAndErrMsgContains(
+        coll, pipeline, 40515, "'millisecond' must evaluate to an integer");
 
     pipeline =
         [{$project: {date: {"$dateFromParts": {year: 1970, millisecond: "$veryBigDecimal128B"}}}}];
-    assertErrMsgContains(coll, pipeline, 40515, "'millisecond' must evaluate to an integer");
+    assertErrCodeAndErrMsgContains(
+        coll, pipeline, 40515, "'millisecond' must evaluate to an integer");
 
     /* --------------------------------------------------------------------------------------- */
     /* Testing that year values are only allowed in the range [0, 9999] and that month, day, hour,
@@ -594,92 +596,94 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
     }]));
 
     pipeline = [{$project: {date: {"$dateFromParts": {year: "$bigYear"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 40523, "'year' must evaluate to an integer in the range 0 to 9999");
 
     pipeline = [{$project: {date: {"$dateFromParts": {year: "$smallYear"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 40523, "'year' must evaluate to an integer in the range 0 to 9999");
 
     pipeline = [{$project: {date: {"$dateFromParts": {year: 1970, month: "$prettyBigInt"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 31034, "'month' must evaluate to a value in the range [-32768, 32767]");
 
     pipeline =
         [{$project: {date: {"$dateFromParts": {year: 1970, month: "$prettyBigNegativeInt"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 31034, "'month' must evaluate to a value in the range [-32768, 32767]");
 
     pipeline =
         [{$project: {date: {"$dateFromParts": {year: 1970, month: 1, day: "$prettyBigInt"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 31034, "'day' must evaluate to a value in the range [-32768, 32767]");
 
     pipeline = [{
         $project:
             {date: {"$dateFromParts": {year: 1970, month: 1, day: "$prettyBigNegativeInt"}}}
     }];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 31034, "'day' must evaluate to a value in the range [-32768, 32767]");
 
     pipeline = [{$project: {date: {"$dateFromParts": {year: 1970, hour: "$prettyBigInt"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 31034, "'hour' must evaluate to a value in the range [-32768, 32767]");
 
     pipeline =
         [{$project: {date: {"$dateFromParts": {year: 1970, hour: "$prettyBigNegativeInt"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 31034, "'hour' must evaluate to a value in the range [-32768, 32767]");
 
     pipeline =
         [{$project: {date: {"$dateFromParts": {year: 1970, hour: 0, minute: "$prettyBigInt"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 31034, "'minute' must evaluate to a value in the range [-32768, 32767]");
 
     pipeline = [{
         $project:
             {date: {"$dateFromParts": {year: 1970, hour: 0, minute: "$prettyBigNegativeInt"}}}
     }];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 31034, "'minute' must evaluate to a value in the range [-32768, 32767]");
 
     pipeline = [{$project: {date: {"$dateFromParts": {isoWeekYear: "$bigYear"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 31095, "'isoWeekYear' must evaluate to an integer in the range 0 to 9999");
 
     pipeline = [{$project: {date: {"$dateFromParts": {isoWeekYear: "$smallYear"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 31095, "'isoWeekYear' must evaluate to an integer in the range 0 to 9999");
 
     pipeline =
         [{$project: {date: {"$dateFromParts": {isoWeekYear: 1970, isoWeek: "$prettyBigInt"}}}}];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 31034, "'isoWeek' must evaluate to a value in the range [-32768, 32767]");
 
     pipeline = [{
         $project:
             {date: {"$dateFromParts": {isoWeekYear: 1970, isoWeek: "$prettyBigNegativeInt"}}}
     }];
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll, pipeline, 31034, "'isoWeek' must evaluate to a value in the range [-32768, 32767]");
 
     pipeline = [
         {$project: {date: {"$dateFromParts": {isoWeekYear: 1970, isoDayOfWeek: "$prettyBigInt"}}}}
     ];
-    assertErrMsgContains(coll,
-                         pipeline,
-                         31034,
-                         "'isoDayOfWeek' must evaluate to a value in the range [-32768, 32767]");
+    assertErrCodeAndErrMsgContains(
+        coll,
+        pipeline,
+        31034,
+        "'isoDayOfWeek' must evaluate to a value in the range [-32768, 32767]");
 
     pipeline = [{
         $project: {
             date: {"$dateFromParts": {isoWeekYear: 1970, isoDayOfWeek: "$prettyBigNegativeInt"}}
         }
     }];
-    assertErrMsgContains(coll,
-                         pipeline,
-                         31034,
-                         "'isoDayOfWeek' must evaluate to a value in the range [-32768, 32767]");
+    assertErrCodeAndErrMsgContains(
+        coll,
+        pipeline,
+        31034,
+        "'isoDayOfWeek' must evaluate to a value in the range [-32768, 32767]");
 
     /* --------------------------------------------------------------------------------------- */
     /* Testing wrong arguments */

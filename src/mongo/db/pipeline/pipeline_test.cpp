@@ -3326,12 +3326,12 @@ TEST(PipelineRenameTracking, CanHandleBackAndForthRename) {
 
 TEST(InvolvedNamespacesTest, NoInvolvedNamespacesForMatchSortProject) {
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
-    auto pipeline = unittest::assertGet(
-        Pipeline::create({DocumentSourceMock::createForTest(),
-                          DocumentSourceMatch::create(BSON("x" << 1), expCtx),
-                          DocumentSourceSort::create(expCtx, BSON("y" << -1)),
-                          DocumentSourceProject::create(BSON("x" << 1 << "y" << 1), expCtx)},
-                         expCtx));
+    auto pipeline = unittest::assertGet(Pipeline::create(
+        {DocumentSourceMock::createForTest(),
+         DocumentSourceMatch::create(BSON("x" << 1), expCtx),
+         DocumentSourceSort::create(expCtx, BSON("y" << -1)),
+         DocumentSourceProject::create(BSON("x" << 1 << "y" << 1), expCtx, "$project"_sd)},
+        expCtx));
     auto involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT(involvedNssSet.empty());
 }

@@ -269,13 +269,38 @@ function assertErrorCode(coll, pipe, code, errmsg, options = {}) {
  * Assert that an aggregation fails with a specific code and the error message contains the given
  * string.
  */
-function assertErrMsgContains(coll, pipe, code, expectedMessage) {
+function assertErrCodeAndErrMsgContains(coll, pipe, code, expectedMessage) {
     const response = assert.commandFailedWithCode(
         coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}), code);
     assert.neq(
         -1,
         response.errmsg.indexOf(expectedMessage),
         "Error message did not contain '" + expectedMessage + "', found:\n" + tojson(response));
+}
+
+/**
+ * Assert that an aggregation fails with any code and the error message contains the given
+ * string.
+ */
+function assertErrMsgContains(coll, pipe, expectedMessage) {
+    const response = assert.commandFailed(
+        coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}));
+    assert.neq(
+        -1,
+        response.errmsg.indexOf(expectedMessage),
+        "Error message did not contain '" + expectedMessage + "', found:\n" + tojson(response));
+}
+
+/**
+ * Assert that an aggregation fails with any code and the error message does not contain the given
+ * string.
+ */
+function assertErrMsgDoesNotContain(coll, pipe, expectedMessage) {
+    const response = assert.commandFailed(
+        coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}));
+    assert.eq(-1,
+              response.errmsg.indexOf(expectedMessage),
+              "Error message contained '" + expectedMessage + "'");
 }
 
 /**

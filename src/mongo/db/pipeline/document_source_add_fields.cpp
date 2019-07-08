@@ -50,14 +50,23 @@ REGISTER_DOCUMENT_SOURCE(set,
                          DocumentSourceAddFields::createFromBson);
 
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
-    BSONObj addFieldsSpec, const intrusive_ptr<ExpressionContext>& expCtx, StringData stageName) {
+    BSONObj addFieldsSpec,
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    StringData userSpecifiedName) {
 
     const bool isIndependentOfAnyCollection = false;
     intrusive_ptr<DocumentSourceSingleDocumentTransformation> addFields(
         new DocumentSourceSingleDocumentTransformation(
             expCtx,
-            ParsedAddFields::create(expCtx, addFieldsSpec),
-            stageName.toString(),
+            [&]() {
+                try {
+                    return ParsedAddFields::create(expCtx, addFieldsSpec);
+                } catch (DBException& ex) {
+                    ex.addContext("Invalid " + userSpecifiedName.toString());
+                    throw;
+                }
+            }(),
+            userSpecifiedName.toString(),
             isIndependentOfAnyCollection));
     return addFields;
 }

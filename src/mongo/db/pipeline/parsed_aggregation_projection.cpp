@@ -55,13 +55,8 @@ using expression::isPathPrefixOf;
 // ProjectionSpecValidator
 //
 
-void ProjectionSpecValidator::uassertValid(const BSONObj& spec, StringData stageName) {
-    try {
-        ProjectionSpecValidator(spec).validate();
-    } catch (DBException& ex) {
-        ex.addContext("Invalid " + stageName.toString());
-        throw;
-    }
+void ProjectionSpecValidator::uassertValid(const BSONObj& spec) {
+    ProjectionSpecValidator(spec).validate();
 }
 
 void ProjectionSpecValidator::ensurePathDoesNotConflictOrThrow(const std::string& path) {
@@ -314,11 +309,8 @@ std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& spec,
     ProjectionPolicies policies) {
-    // Check that the specification was valid. Status returned is unspecific because validate()
-    // is used by the $addFields stage as well as $project.
-    // If there was an error, uassert with a $project-specific message.
-    ProjectionSpecValidator::uassertValid(spec, "$project");
-
+    // Checks that the specification was valid, and throws if it is not.
+    ProjectionSpecValidator::uassertValid(spec);
     // Check for any conflicting specifications, and determine the type of the projection.
     auto projectionType = ProjectTypeParser::parse(spec, policies);
     // kComputed is a projection type reserved for $addFields, and should never be detected by the

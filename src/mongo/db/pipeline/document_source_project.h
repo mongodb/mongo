@@ -48,7 +48,9 @@ public:
      * Convenience method to create a $project stage from 'projectSpec'.
      */
     static boost::intrusive_ptr<DocumentSource> create(
-        BSONObj projectSpec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        BSONObj projectSpec,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        StringData specifiedName);
 
     /**
      * Parses a $project stage from the user-supplied BSON.

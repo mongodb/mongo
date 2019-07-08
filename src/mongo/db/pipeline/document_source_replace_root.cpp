@@ -46,15 +46,28 @@ Document ReplaceRootTransformation::applyTransformation(const Document& input) {
     // Extract subdocument in the form of a Value.
     Value newRoot = _newRoot->evaluate(input, &_expCtx->variables);
 
+    // To ensure an accurate user-facing message, any user-facing syntax that uses this stage
+    // internally must provide an message opener that complies with its documentation.
+    StringData msgOpener = [&]() {
+        switch (_specifiedName) {
+            case UserSpecifiedName::kReplaceRoot:
+                return "'newRoot' expression "_sd;
+            case UserSpecifiedName::kReplaceWith:
+                return "'replacement document' "_sd;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }();
+
     // The newRoot expression, if it exists, must evaluate to an object.
     uassert(40228,
-            str::stream()
-                << "'newRoot' expression must evaluate to an object, but resulting value was: "
-                << newRoot.toString()
-                << ". Type of resulting value: '"
-                << typeName(newRoot.getType())
-                << "'. Input document: "
-                << input.toString(),
+            str::stream() << msgOpener.toString()
+                          << "must evaluate to an object, but resulting value was: "
+                          << newRoot.toString()
+                          << ". Type of resulting value: '"
+                          << typeName(newRoot.getType())
+                          << "'. Input document: "
+                          << input.toString(),
             newRoot.getType() == BSONType::Object);
 
     // Turn the value into a document.
@@ -104,7 +117,11 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
     const bool isIndependentOfAnyCollection = false;
     return new DocumentSourceSingleDocumentTransformation(
         expCtx,
-        std::make_unique<ReplaceRootTransformation>(expCtx, newRootExpression),
+        std::make_unique<ReplaceRootTransformation>(
+            expCtx,
+            newRootExpression,
+            (stageName == kStageName) ? ReplaceRootTransformation::UserSpecifiedName::kReplaceRoot
+                                      : ReplaceRootTransformation::UserSpecifiedName::kReplaceWith),
         kStageName.toString(),
         isIndependentOfAnyCollection);
 }

@@ -55,10 +55,11 @@ namespace parsed_aggregation_projection {
 class ProjectionSpecValidator {
 public:
     /**
-     * Throws if the specification is not valid for a projection. The stageName is used to provide a
-     * more helpful error message.
+     * Throws if the specification is not valid for a projection. Because this validator is meant to
+     * be generic, the error thrown is generic.  Callers at the DocumentSource level should modify
+     * the error message if they want to include information specific to the stage name used.
      */
-    static void uassertValid(const BSONObj& spec, StringData stageName);
+    static void uassertValid(const BSONObj& spec);
 
 private:
     ProjectionSpecValidator(const BSONObj& spec) : _rawObj(spec) {}

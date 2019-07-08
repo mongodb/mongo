@@ -62,15 +62,26 @@ BSONObj buildExclusionProjectionSpecification(const std::vector<BSONElement>& un
 }  // namespace
 
 intrusive_ptr<DocumentSource> DocumentSourceProject::create(
-    BSONObj projectSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
+    BSONObj projectSpec, const intrusive_ptr<ExpressionContext>& expCtx, StringData specifiedName) {
     const bool isIndependentOfAnyCollection = false;
     intrusive_ptr<DocumentSource> project(new DocumentSourceSingleDocumentTransformation(
         expCtx,
-        ParsedAggregationProjection::create(
-            expCtx,
-            projectSpec,
-            {ProjectionPolicies::DefaultIdPolicy::kIncludeId,
-             ProjectionPolicies::ArrayRecursionPolicy::kRecurseNestedArrays}),
+        [&]() {
+            // The ParsedAggregationProjection will internally perform a check to see if the
+            // provided specification is valid, and throw an exception if it was not. The exception
+            // is caught here so we can add the name that was actually specified by the user, be it
+            // $project or an alias.
+            try {
+                return ParsedAggregationProjection::create(
+                    expCtx,
+                    projectSpec,
+                    {ProjectionPolicies::DefaultIdPolicy::kIncludeId,
+                     ProjectionPolicies::ArrayRecursionPolicy::kRecurseNestedArrays});
+            } catch (DBException& ex) {
+                ex.addContext("Invalid " + specifiedName.toString());
+                throw;
+            }
+        }(),
         DocumentSourceProject::kStageName.rawData(),
         isIndependentOfAnyCollection));
     return project;
@@ -80,7 +91,7 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     if (elem.fieldNameStringData() == kStageName) {
         uassert(15969, "$project specification must be an object", elem.type() == BSONType::Object);
-        return DocumentSourceProject::create(elem.Obj(), expCtx);
+        return DocumentSourceProject::create(elem.Obj(), expCtx, elem.fieldNameStringData());
     }
 
     invariant(elem.fieldNameStringData() == kAliasNameUnset);
@@ -99,7 +110,8 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
             std::all_of(unsetSpec.cbegin(), unsetSpec.cend(), [](BSONElement elem) {
                 return elem.type() == BSONType::String;
             }));
-    return DocumentSourceProject::create(buildExclusionProjectionSpecification(unsetSpec), expCtx);
+    return DocumentSourceProject::create(
+        buildExclusionProjectionSpecification(unsetSpec), expCtx, elem.fieldNameStringData());
 }
 
 }  // namespace mongo

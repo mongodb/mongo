@@ -215,20 +215,20 @@
                                             {"newField.subField": 1, proofOfUpdate: 1, _id: 0}),
                          {newField: {subField: "hi"}, proofOfUpdate: "PROOF"});
         } else {
-            assertErrMsgContains(sourceColl,
-                                 [{
-                                    $merge: {
-                                        into: {
-                                            db: targetColl.getDB().getName(),
-                                            coll: targetColl.getName(),
-                                        },
-                                        whenMatched: "replace",
-                                        whenNotMatched: "insert",
-                                        on: Object.keys(dottedPathIndexSpec)
-                                    }
-                                 }],
-                                 ErrorCodes.ImmutableField,
-                                 "did you attempt to modify the _id or the shard key?");
+            assertErrCodeAndErrMsgContains(sourceColl,
+                                           [{
+                                              $merge: {
+                                                  into: {
+                                                      db: targetColl.getDB().getName(),
+                                                      coll: targetColl.getName(),
+                                                  },
+                                                  whenMatched: "replace",
+                                                  whenNotMatched: "insert",
+                                                  on: Object.keys(dottedPathIndexSpec)
+                                              }
+                                           }],
+                                           ErrorCodes.ImmutableField,
+                                           "did you attempt to modify the _id or the shard key?");
 
             assert.doesNotThrow(() => sourceColl.aggregate([
                 {$project: {_id: 0}},

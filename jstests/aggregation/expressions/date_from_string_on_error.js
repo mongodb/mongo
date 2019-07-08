@@ -166,7 +166,7 @@
             .toArray());
 
     // Test that 'onError' is ignored when the 'format' is invalid.
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll,
         [{
            $project: {
@@ -178,7 +178,7 @@
         40684,
         "$dateFromString requires that 'format' be a string");
 
-    assertErrMsgContains(
+    assertErrCodeAndErrMsgContains(
         coll,
         [{
            $project: {

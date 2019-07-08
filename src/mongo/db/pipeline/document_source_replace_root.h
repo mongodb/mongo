@@ -40,9 +40,12 @@ namespace mongo {
  */
 class ReplaceRootTransformation final : public TransformerInterface {
 public:
+    enum class UserSpecifiedName { kReplaceRoot, kReplaceWith };
+
     ReplaceRootTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              boost::intrusive_ptr<Expression> newRootExpression)
-        : _expCtx(expCtx), _newRoot(std::move(newRootExpression)) {}
+                              boost::intrusive_ptr<Expression> newRootExpression,
+                              UserSpecifiedName specifiedName)
+        : _expCtx(expCtx), _newRoot(std::move(newRootExpression)), _specifiedName(specifiedName) {}
 
     TransformerType getType() const final {
         return TransformerType::kReplaceRoot;
@@ -79,6 +82,7 @@ public:
 private:
     const boost::intrusive_ptr<ExpressionContext> _expCtx;
     boost::intrusive_ptr<Expression> _newRoot;
+    UserSpecifiedName _specifiedName;
 };
 
 /*

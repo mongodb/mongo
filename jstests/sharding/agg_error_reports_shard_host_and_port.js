@@ -3,7 +3,7 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/utils.js");  // For assertErrMsgContains.
+    load("jstests/aggregation/extras/utils.js");  // For assertErrCodeAndErrMsgContains.
 
     const st = new ShardingTest({shards: 2, config: 1});
 
@@ -28,7 +28,7 @@
     const pipe = [{$project: {a: {$divide: ["$_id", 0]}}}];
     const divideByZeroErrorCode = 16608;
 
-    assertErrMsgContains(coll, pipe, divideByZeroErrorCode, st.rs1.getPrimary().host);
+    assertErrCodeAndErrMsgContains(coll, pipe, divideByZeroErrorCode, st.rs1.getPrimary().host);
 
     st.stop();
 }());
