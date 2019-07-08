@@ -28,6 +28,7 @@ selector:
   - jstests/core/explain_execution_error.js
   - jstests/core/expr.js
   - jstests/core/find9.js
+  - jstests/core/find_and_modify_invalid_query_params.js
   - jstests/core/find_getmore_bsonsize.js
   - jstests/core/find_getmore_cmd.js
   - jstests/core/geo_allowedcomparisons.js

@@ -708,7 +708,7 @@ DBCollection.prototype.updateMany = function(filter, update, options) {
 DBCollection.prototype.findOneAndDelete = function(filter, options) {
     var opts = Object.extend({}, options || {});
     // Set up the command
-    var cmd = {query: filter, remove: true};
+    var cmd = {query: filter || {}, remove: true};
 
     if (opts.sort) {
         cmd.sort = opts.sort;
@@ -771,7 +771,7 @@ DBCollection.prototype.findOneAndReplace = function(filter, replacement, options
     }
 
     // Set up the command
-    var cmd = {query: filter, update: replacement};
+    var cmd = {query: filter || {}, update: replacement};
     if (opts.sort) {
         cmd.sort = opts.sort;
     }
@@ -839,7 +839,7 @@ DBCollection.prototype.findOneAndUpdate = function(filter, update, options) {
     }
 
     // Set up the command
-    var cmd = {query: filter, update: update};
+    var cmd = {query: filter || {}, update: update};
     if (opts.sort) {
         cmd.sort = opts.sort;
     }
