@@ -110,10 +110,38 @@ BSONObj FindAndModifyRequest::toBSON() const {
 
 StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceString fullNs,
                                                                      const BSONObj& cmdObj) {
-    BSONObj query = cmdObj.getObjectField(kQueryField);
-    BSONObj fields = cmdObj.getObjectField(kFieldProjectionField);
+    BSONObj query;
+    BSONObj sort;
+    BSONObj fields;
+    if (auto queryElement = cmdObj[kQueryField]) {
+        if (queryElement.type() != Object) {
+            return {ErrorCodes::Error(31160),
+                    str::stream() << "'" << kQueryField << "' parameter must be an object, found "
+                                  << queryElement.type()};
+        }
+        query = queryElement.embeddedObject();
+    }
+
+    if (auto sortElement = cmdObj[kSortField]) {
+        if (sortElement.type() != Object) {
+            return {ErrorCodes::Error(31174),
+                    str::stream() << "'" << kSortField << "' parameter must be an object, found "
+                                  << sortElement.type()};
+        }
+        sort = sortElement.embeddedObject();
+    }
+
+    if (auto projectionElement = cmdObj[kFieldProjectionField]) {
+        if (projectionElement.type() != Object) {
+            return {ErrorCodes::Error(31175),
+                    str::stream() << "'" << kFieldProjectionField
+                                  << "' parameter must be an object, found "
+                                  << projectionElement.type()};
+        }
+        fields = projectionElement.embeddedObject();
+    }
+
     BSONObj updateObj = cmdObj.getObjectField(kUpdateField);
-    BSONObj sort = cmdObj.getObjectField(kSortField);
 
     BSONObj collation;
     {

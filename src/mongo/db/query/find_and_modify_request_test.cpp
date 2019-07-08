@@ -483,5 +483,37 @@ TEST(FindAndModifyRequest, ParseWithCollationTypeMismatch) {
     ASSERT_EQUALS(parseStatus.getStatus(), ErrorCodes::TypeMismatch);
 }
 
+TEST(FindAndModifyRequest, InvalidQueryParameter) {
+    BSONObj cmdObj(fromjson(R"json({
+            findAndModify: 'user',
+            query: '{ x: 1 }',
+            remove: true
+        })json"));
+
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_EQ(31160, parseStatus.getStatus().code());
+}
+
+TEST(FindAndModifyRequest, InvalidSortParameter) {
+    BSONObj cmdObj(fromjson(R"json({
+            findAndModify: 'user',
+            sort: 1,
+            remove: true
+        })json"));
+
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_EQ(31174, parseStatus.getStatus().code());
+}
+
+TEST(FindAndModifyRequest, InvalidFieldParameter) {
+    BSONObj cmdObj(fromjson(R"json({
+            findAndModify: 'user',
+            fields: null,
+            remove: true
+        })json"));
+
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_EQ(31175, parseStatus.getStatus().code());
+}
 }  // unnamed namespace
 }  // namespace mongo
