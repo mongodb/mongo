@@ -302,6 +302,25 @@ def parse_args():
     return parser.parse_args()
 
 
+def find_suitable_build_id(builds, args):
+    """
+    Find a build_id that fits the given parameters.
+
+    :param builds: List of builds.
+    :param args: The parameters a build must meet, including project, buildVariant, and revision.
+    :return: Build_id that matches the parameters.
+    """
+    prefix = "{}_{}_{}_".format(args.project, args.buildVariant, args.revision)
+    # The "project" and "buildVariant" passed in may contain "-", but the "builds" listed from
+    # Evergreen only contain "_". Replace the hyphens before searching for the build.
+    prefix = prefix.replace("-", "_")
+    build_id_pattern = re.compile(prefix)
+    for build_id in builds:
+        if build_id_pattern.search(build_id):
+            return build_id
+    return None
+
+
 def main():  # pylint: disable=too-many-locals,too-many-statements
     """Execute Main entry.
 
@@ -329,19 +348,8 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
         revision_url = "{}/rest/v1/projects/{}/revisions/{}".format(api_server, args.project,
                                                                     args.revision)
         revisions = requests_get_json(revision_url)
-
-        prefix = "{}_{}_{}_".format(args.project, args.buildVariant, args.revision)
-        # The "project" and "buildVariant" passed in may contain "-", but the "builds" listed from
-        # Evergreen only contain "_". Replace the hyphens before searching for the build.
-        prefix = prefix.replace("-", "_")
-        build_id_pattern = re.compile(prefix)
-        build_id = None
-        for build_id in revisions["builds"]:
-            # Find a suitable build_id
-            match = build_id_pattern.search(build_id)
-            if match:
-                break
-        else:
+        build_id = find_suitable_build_id(revisions["builds"], args)
+        if not build_id:
             print("Could not find build id for revision {} on project {}."
                   " Default compile bypass to false.".format(args.revision, args.project))
             return

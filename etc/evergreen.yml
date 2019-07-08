@@ -1153,6 +1153,18 @@ functions:
         set -o verbose
         set -o errexit
 
+        if [ -n "${burn_in_bypass}" ]; then
+          ${activate_virtualenv}
+          # Evergreen executable is in $HOME, so add that to the path.
+          PATH=$PATH:$HOME $python buildscripts/burn_in_tags_bypass_compile_and_fetch_binaries.py            \
+            --project ${project}                                               \
+            --buildVariant ${burn_in_bypass}                                   \
+            --revision ${revision}                                             \
+            --patchFile patch_files.txt                                        \
+            --outFile bypass_compile_expansions.yml                            \
+            --jsonArtifact artifacts.json
+        fi
+
         # For patch builds determine if we can bypass compile.
         if [[ "${is_patch}" = "true" && "${task_name}" = "compile" ]]; then
           ${activate_virtualenv}
@@ -5714,6 +5726,8 @@ tasks:
       fallback_num_sub_suites: 4
 
 - name: burn_in_tags_gen
+  depends_on:
+    - name: compile
   commands:
   - command: manifest.load
   - func: "git get project"
@@ -5727,7 +5741,6 @@ tasks:
       repeat_tests_secs: 600
       repeat_tests_min: 2
       repeat_tests_max: 1000
-      base_variants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff
 
 - name: auth_audit_gen
   tags: ["auth", "audit"]
@@ -10231,6 +10244,7 @@ buildvariants:
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
     large_distro_name: rhel62-large
+    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff
   display_tasks:
   - *dbtest
   - *unittests

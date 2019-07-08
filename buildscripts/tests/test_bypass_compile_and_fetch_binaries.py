@@ -2,6 +2,7 @@
 
 import unittest
 
+from collections import namedtuple
 from mock import mock_open, patch, MagicMock
 
 import buildscripts.bypass_compile_and_fetch_binaries as under_test
@@ -138,3 +139,28 @@ pytests/test2.py
 
             open_mock.return_value.__enter__.return_value = git_changes.splitlines()
             self.assertFalse(under_test.should_bypass_compile(MagicMock()))
+
+
+def generate_args():
+    project = "project-master"
+    build_variant = "rhel-62-64-bit"
+    revision = "fakesha"
+    Args = namedtuple("Args", ["project", "buildVariant", "revision"])
+    return Args(project=project, buildVariant=build_variant, revision=revision)
+
+
+class TestFindSuitableBuildID(unittest.TestCase):
+    def test_builds(self):
+        expected_build_id = "project_master_rhel_62_64_bit_fakesha_19_07_10_15_48_53"
+        builds = ["build1", "build2", expected_build_id]
+        args = generate_args()
+        build_id = under_test.find_suitable_build_id(builds, args)
+
+        self.assertEqual(build_id, expected_build_id)
+
+    def test_no_builds(self):
+        builds = []
+        args = generate_args()
+        build_id = under_test.find_suitable_build_id(builds, args)
+
+        self.assertEqual(build_id, None)

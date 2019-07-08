@@ -44,11 +44,10 @@ def get_evergreen_config():
 
 
 class TestCreateEvgBuildVariantMap(unittest.TestCase):
-    def test_create_evg_buildvariant_map(self):
-        expansions_file_data = {
-            "base_variants":
-                "enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem"
-        }
+    @mock.patch(ns("evergreen"))
+    def test_create_evg_buildvariant_map(self, evergreen_mock):
+        evergreen_mock.parse_evergreen_file.return_value = get_evergreen_config()
+        expansions_file_data = {"build_variant": "enterprise-rhel-62-64-bit"}
         buildvariant_map = burn_in_tags._create_evg_buildvariant_map(expansions_file_data)
         expected_buildvariant_map = {
             "enterprise-rhel-62-64-bit-majority-read-concern-off":
@@ -58,8 +57,10 @@ class TestCreateEvgBuildVariantMap(unittest.TestCase):
         }
         self.assertEqual(buildvariant_map, expected_buildvariant_map)
 
-    def test_create_evg_buildvariant_map_no_base_variants(self):
-        expansions_file_data = {"base_variants": ""}
+    @mock.patch(ns("evergreen"))
+    def test_create_evg_buildvariant_map_no_base_variants(self, evergreen_mock):
+        evergreen_mock.parse_evergreen_file.return_value = get_evergreen_config()
+        expansions_file_data = {"build_variant": "buildvariant-without-burn-in-tag-buildvariants"}
         buildvariant_map = burn_in_tags._create_evg_buildvariant_map(expansions_file_data)
         self.assertEqual(buildvariant_map, {})
 
@@ -69,17 +70,22 @@ class TestGenerateEvgBuildVariants(unittest.TestCase):
     def test_generate_evg_buildvariant_one_base_variant(self, evergreen_mock):
         evergreen_mock.parse_evergreen_file.return_value = get_evergreen_config()
         base_variant = "enterprise-rhel-62-64-bit-inmem"
-        expected_variant_data = get_evergreen_config().get_variant(base_variant)
-
+        generated_variant = "enterprise-rhel-62-64-bit-inmem-required"
+        burn_in_tags_gen_variant = "enterprise-rhel-62-64-bit"
         shrub_config = Configuration()
-        burn_in_tags._generate_evg_buildvariant(shrub_config, base_variant,
-                                                "enterprise-rhel-62-64-bit-inmem-required")
+        burn_in_tags._generate_evg_buildvariant(shrub_config, base_variant, generated_variant,
+                                                burn_in_tags_gen_variant)
+
+        expected_variant_data = get_evergreen_config().get_variant(base_variant)
         generated_buildvariants = shrub_config.to_map()["buildvariants"]
         self.assertEqual(len(generated_buildvariants), 1)
         generated_build_variant = generated_buildvariants[0]
-        self.assertEqual(generated_build_variant["name"], f"{expected_variant_data}-required")
+        self.assertEqual(generated_build_variant["name"], generated_variant)
         self.assertEqual(generated_build_variant["modules"], expected_variant_data.modules)
-        self.assertEqual(generated_build_variant["expansions"], expected_variant_data.expansions)
+        generated_expansions = generated_build_variant["expansions"]
+        burn_in_bypass_expansion_value = generated_expansions.pop("burn_in_bypass")
+        self.assertEqual(burn_in_bypass_expansion_value, burn_in_tags_gen_variant)
+        self.assertEqual(generated_expansions, expected_variant_data.expansions)
 
 
 class TestGenerateEvgTasks(unittest.TestCase):

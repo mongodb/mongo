@@ -15,14 +15,40 @@ tasks:
   depends_on: []
   commands:
     - func: "fetch source"
+- name: burn_in_tags_gen
+  depends_on: []
+  commands:
+    - func: "fake command"
 
 buildvariants:
+- name: enterprise-rhel-62-64-bit
+  display_name: "! Enterprise RHEL 6.2"
+  expansions:
+    multiversion_platform: rhel62
+    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem
+  tasks:
+  - name: burn_in_tags_gen
+- name: buildvariant-without-burn-in-tag-buildvariants
+  display_name: "Buildvariant without burn in tag buildvariants expansion"
+  expansions:
+    multiversion_platform: rhel62
+  tasks:
+  - name: burn_in_tags_gen
 - name: enterprise-rhel-62-64-bit-majority-read-concern-off
   display_name: "Enterprise RHEL 6.2 (majority read concern off)"
   modules: ["enterprise"]
   run_on:
   - rhel62-small
   expansions: &enterprise-rhel-62-64-bit-majority-read-concern-off-expansions
+    multiversion_edition: enterprise
+  tasks:
+  - name: compile
+- name: enterprise-rhel-62-64-bit-inmem
+  display_name: Enterprise RHEL 6.2 (inMemory)
+  modules: ["enterprise"]
+  run_on:
+  - rhel62-small
+  expansions: &enterprise-rhel-62-64-bit-inmem-expansions
     test_flags: >-
       --majorityReadConcern=off
       --excludeWithAnyTags=requires_majority_read_concern,uses_prepare_transaction,uses_multi_shard_transaction,uses_atclustertime
@@ -32,24 +58,6 @@ buildvariants:
       --release
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
       MONGO_DISTMOD=rhel62
-      multiversion_platform: rhel62
-    multiversion_edition: enterprise
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    tooltags: "ssl sasl gssapi"
-    large_distro_name: rhel62-large
-  tasks:
-  - name: compile
-- name: enterprise-rhel-62-64-bit-inmem
-  display_name: Enterprise RHEL 6.2 (inMemory)
-  modules:
-  - enterprise
-  run_on:
-  - rhel62-small
-  batchtime: 1440 # 1 day
-  expansions: &enterprise-rhel-62-64-bit-inmem-expansions
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
     scons_cache_scope: shared
