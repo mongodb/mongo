@@ -83,7 +83,8 @@
         lsid: session2.getSessionId(),
         txnNumber: session2.getTxnNumber_forTesting(),
         autocommit: false
-    }), ErrorCodes.NoSuchTransaction);
+    }),
+                                 ErrorCodes.NoSuchTransaction);
 
     // Allow the test to complete by aborting the left over prepared transaction.
     jsTestLog("Aborting the prepared transaction on session " + tojson(session1.getSessionId()));
