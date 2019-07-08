@@ -64,6 +64,20 @@ constexpr uint8_t kIntentToEncryptBit = 0x00;
 constexpr uint8_t kDeterministicEncryptionBit = 0x01;
 constexpr uint8_t kRandomEncryptionBit = 0x02;
 
+static constexpr auto kExplain = "explain"_sd;
+
+constexpr std::array<StringData, 11> kEncryptedCommands = {"aggregate"_sd,
+                                                           "count"_sd,
+                                                           "delete"_sd,
+                                                           "distinct"_sd,
+                                                           kExplain,
+                                                           "find"_sd,
+                                                           "findandmodify"_sd,
+                                                           "findAndModify"_sd,
+                                                           "getMore"_sd,
+                                                           "insert"_sd,
+                                                           "update"_sd};
+
 class EncryptedDBClientBase : public DBClientBase, public mozjs::EncryptionCallbacks {
 public:
     EncryptedDBClientBase(std::unique_ptr<DBClientBase> conn,
@@ -126,6 +140,13 @@ public:
     bool isMongos() const final;
 
 protected:
+    std::pair<rpc::UniqueReply, DBClientBase*> processResponse(rpc::UniqueReply result,
+                                                               const StringData databaseName);
+
+    BSONObj encryptDecryptCommand(const BSONObj& object,
+                                  bool encrypt,
+                                  const StringData databaseName);
+
     JS::Value getCollection() const;
 
     BSONObj validateBSONElement(ConstDataRange out, uint8_t bsonType);
@@ -141,6 +162,10 @@ protected:
                                         int32_t algorithm);
 
 private:
+    virtual void encryptMarking(const BSONObj& elem, BSONObjBuilder* builder, StringData elemName);
+
+    void decryptPayload(ConstDataRange data, BSONObjBuilder* builder, StringData elemName);
+
     std::vector<uint8_t> getBinDataArg(mozjs::MozJSImplScope* scope,
                                        JSContext* cx,
                                        JS::CallArgs args,

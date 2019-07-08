@@ -117,11 +117,127 @@ bool EncryptedDBClientBase::lazySupported() const {
     return _conn->lazySupported();
 }
 
-std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::runCommandWithTarget(
-    OpMsgRequest request) {
-    return _conn->runCommandWithTarget(std::move(request));
+BSONObj EncryptedDBClientBase::encryptDecryptCommand(const BSONObj& object,
+                                                     bool encrypt,
+                                                     const StringData databaseName) {
+    std::stack<std::pair<BSONObjIterator, BSONObjBuilder>> frameStack;
+
+    // The encryptDecryptCommand frameStack requires a guard because  if encryptMarking or
+    // decrypt payload throw an exception, the stack's destructor will fire. Because a stack's
+    // variables are not guaranteed to be destroyed in any order, we need to add a guard
+    // to ensure the stack is destroyed in order.
+    const auto frameStackGuard = makeGuard([&] {
+        while (!frameStack.empty()) {
+            frameStack.pop();
+        }
+    });
+
+    frameStack.emplace(BSONObjIterator(object), BSONObjBuilder());
+
+    while (frameStack.size() > 1 || frameStack.top().first.more()) {
+        uassert(31096,
+                "Object too deep to be encrypted. Exceeded stack depth.",
+                frameStack.size() < BSONDepth::kDefaultMaxAllowableDepth);
+        auto & [ iterator, builder ] = frameStack.top();
+        if (iterator.more()) {
+            BSONElement elem = iterator.next();
+            if (elem.type() == BSONType::Object) {
+                frameStack.emplace(BSONObjIterator(elem.Obj()),
+                                   BSONObjBuilder(builder.subobjStart(elem.fieldNameStringData())));
+            } else if (elem.type() == BSONType::Array) {
+                frameStack.emplace(
+                    BSONObjIterator(elem.Obj()),
+                    BSONObjBuilder(builder.subarrayStart(elem.fieldNameStringData())));
+            } else if (elem.isBinData(BinDataType::Encrypt)) {
+                int len;
+                const char* data(elem.binData(len));
+                uassert(31178, "Invalid intentToEncrypt object from Query Analyzer", len >= 1);
+                if ((*data == kRandomEncryptionBit || *data == kDeterministicEncryptionBit) &&
+                    !encrypt) {
+                    ConstDataRange dataCursor(data, len);
+                    decryptPayload(dataCursor, &builder, elem.fieldNameStringData());
+                } else if (*data == kIntentToEncryptBit && encrypt) {
+                    BSONObj obj = BSONObj(data + 1);
+                    encryptMarking(obj, &builder, elem.fieldNameStringData());
+                } else {
+                    builder.append(elem);
+                }
+            } else {
+                builder.append(elem);
+            }
+        } else {
+            frameStack.pop();
+        }
+    }
+    invariant(frameStack.size() == 1);
+    frameStack.top().second.append("$db", databaseName);
+    return frameStack.top().second.obj();
 }
 
+void EncryptedDBClientBase::encryptMarking(const BSONObj& elem,
+                                           BSONObjBuilder* builder,
+                                           StringData elemName) {
+    MONGO_UNREACHABLE;
+}
+
+void EncryptedDBClientBase::decryptPayload(ConstDataRange data,
+                                           BSONObjBuilder* builder,
+                                           StringData elemName) {
+    uassert(ErrorCodes::BadValue, "Invalid decryption blob", data.length() > kAssociatedDataLength);
+    ConstDataRange uuidCdr = ConstDataRange(data.data() + 1, 16);
+    UUID uuid = UUID::fromCDR(uuidCdr);
+
+    auto key = getDataKey(uuid);
+    std::vector<uint8_t> out(data.length() - kAssociatedDataLength);
+    size_t outLen = out.size();
+
+    uassertStatusOK(
+        crypto::aeadDecrypt(*key,
+                            reinterpret_cast<const uint8_t*>(data.data() + kAssociatedDataLength),
+                            data.length() - kAssociatedDataLength,
+                            reinterpret_cast<const uint8_t*>(data.data()),
+                            kAssociatedDataLength,
+                            out.data(),
+                            &outLen));
+
+    // extract type byte
+    const uint8_t bsonType = static_cast<const uint8_t>(*(data.data() + 17));
+    BSONObj decryptedObj = validateBSONElement(ConstDataRange(out.data(), outLen), bsonType);
+    if (bsonType == BSONType::Object) {
+        builder->append(elemName, decryptedObj);
+    } else {
+        builder->appendAs(decryptedObj.firstElement(), elemName);
+    }
+}
+
+std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::processResponse(
+    rpc::UniqueReply result, const StringData databaseName) {
+    auto rawReply = result->getCommandReply();
+    BSONObj decryptedDoc = encryptDecryptCommand(rawReply, false, databaseName);
+
+    rpc::OpMsgReplyBuilder replyBuilder;
+    replyBuilder.setCommandReply(StatusWith<BSONObj>(decryptedDoc));
+    auto msg = replyBuilder.done();
+
+    auto host = _conn->getServerAddress();
+    auto reply = _conn->parseCommandReplyMessage(host, msg);
+
+    return {std::move(reply), this};
+}
+
+std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::runCommandWithTarget(
+    OpMsgRequest request) {
+    std::string commandName = request.getCommandName().toString();
+    std::string databaseName = request.getDatabase().toString();
+
+    if (std::find(kEncryptedCommands.begin(), kEncryptedCommands.end(), StringData(commandName)) ==
+        std::end(kEncryptedCommands)) {
+        return _conn->runCommandWithTarget(std::move(request));
+    }
+
+    auto result = _conn->runCommandWithTarget(std::move(request)).first;
+    return processResponse(std::move(result), databaseName);
+}
 
 /**
  *

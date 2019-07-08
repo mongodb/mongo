@@ -25,15 +25,7 @@ var queryJSON = '{"a":{"$nin":[{"$numberDouble":"Infinity"}]}}';
 if (_isWindows()) {
     queryJSON = '"' + queryJSON.replace(/"/g, '\\"') + '"';
 }
-t.runTool("export",
-          "--out",
-          t.extFile,
-          "-d",
-          t.baseName,
-          "-c",
-          "foo",
-          "-q",
-          queryJSON);
+t.runTool("export", "--out", t.extFile, "-d", t.baseName, "-c", "foo", "-q", queryJSON);
 
 c.drop();
 assert.eq(0, c.count(), "after drop", "-d", t.baseName, "-c", "foo");
@@ -48,15 +40,7 @@ queryJSON = '{"a":{"$numberDouble":"Infinity"}}';
 if (_isWindows()) {
     queryJSON = '"' + queryJSON.replace(/"/g, '\\"') + '"';
 }
-t.runTool("export",
-          "--out",
-          t.extFile,
-          "-d",
-          t.baseName,
-          "-c",
-          "foo",
-          "-q",
-          queryJSON);
+t.runTool("export", "--out", t.extFile, "-d", t.baseName, "-c", "foo", "-q", queryJSON);
 
 c.drop();
 assert.eq(0, c.count(), "after drop", "-d", t.baseName, "-c", "foo");
@@ -72,15 +56,7 @@ queryJSON = '{"a":{"$nin":[{"$numberDouble":"-Infinity"}]}}';
 if (_isWindows()) {
     queryJSON = '"' + queryJSON.replace(/"/g, '\\"') + '"';
 }
-t.runTool("export",
-          "--out",
-          t.extFile,
-          "-d",
-          t.baseName,
-          "-c",
-          "foo",
-          "-q",
-          queryJSON);
+t.runTool("export", "--out", t.extFile, "-d", t.baseName, "-c", "foo", "-q", queryJSON);
 
 c.drop();
 assert.eq(0, c.count(), "after drop", "-d", t.baseName, "-c", "foo");
@@ -96,15 +72,7 @@ queryJSON = '{"a":{"$numberDouble":"-Infinity"}}';
 if (_isWindows()) {
     queryJSON = '"' + queryJSON.replace(/"/g, '\\"') + '"';
 }
-t.runTool("export",
-          "--out",
-          t.extFile,
-          "-d",
-          t.baseName,
-          "-c",
-          "foo",
-          "-q",
-          queryJSON);
+t.runTool("export", "--out", t.extFile, "-d", t.baseName, "-c", "foo", "-q", queryJSON);
 
 c.drop();
 assert.eq(0, c.count(), "after drop", "-d", t.baseName, "-c", "foo");
