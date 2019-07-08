@@ -338,6 +338,7 @@ pipelineeEnv.Library(
         '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+        '$BUILD_DIR/mongo/db/query/sort_pattern',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',

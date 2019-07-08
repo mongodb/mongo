@@ -471,9 +471,8 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
 
     BSONObj sortObj;
     if (sortStage) {
-        sortObj = sortStage
-                      ->serializeSortKeyPattern(
-                          DocumentSourceSort::SortKeySerialization::kForPipelineSerialization)
+        sortObj = sortStage->getSortKeyPattern()
+                      .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
                       .toBson();
     }
 

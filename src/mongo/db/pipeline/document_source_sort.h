@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/sorter/sorter.h"
 
 namespace mongo {
@@ -41,22 +42,6 @@ namespace mongo {
 class DocumentSourceSort final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$sort"_sd;
-    enum class SortKeySerialization {
-        kForExplain,
-        kForPipelineSerialization,
-        kForSortKeyMerging,
-    };
-
-    // Represents one of the components in a compound sort pattern. Each component is either the
-    // field path by which we are sorting, or an Expression which can be used to retrieve the sort
-    // value in the case of a $meta-sort (but not both).
-    struct SortPatternPart {
-        bool isAscending = true;
-        boost::optional<FieldPath> fieldPath;
-        boost::intrusive_ptr<Expression> expression;
-    };
-
-    using SortPattern = std::vector<SortPatternPart>;
 
     GetNextResult getNext() final;
 
@@ -100,11 +85,6 @@ public:
     const SortPattern& getSortKeyPattern() const {
         return _sortPattern;
     }
-
-    /**
-     * Write out a Document whose contents are the sort key pattern.
-     */
-    Document serializeSortKeyPattern(SortKeySerialization) const;
 
     /**
      * Parses a $sort stage from the user-supplied BSON.
@@ -182,7 +162,8 @@ private:
         const DocumentSourceSort& _source;
     };
 
-    explicit DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    explicit DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                                const BSONObj& sortOrder);
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         MONGO_UNREACHABLE;  // Should call serializeToArray instead.
@@ -221,7 +202,8 @@ private:
      * Extracts the sort key component described by 'keyPart' from 'doc' and returns it. Returns
      * ErrorCodes::Internal error if the path for 'keyPart' contains an array in 'doc'.
      */
-    StatusWith<Value> extractKeyPart(const Document& doc, const SortPatternPart& keyPart) const;
+    StatusWith<Value> extractKeyPart(const Document& doc,
+                                     const SortPattern::SortPatternPart& keyPart) const;
 
     /**
      * Returns the sort key for 'doc' based on the SortPattern. Note this is in the BSONObj format -
@@ -255,9 +237,6 @@ private:
     boost::optional<SortKeyGenerator> _sortKeyGen;
 
     SortPattern _sortPattern;
-
-    // The set of paths on which we're sorting.
-    std::set<std::string> _paths;
 
     boost::intrusive_ptr<DocumentSourceLimit> _limitSrc;
 

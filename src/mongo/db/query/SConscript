@@ -199,6 +199,18 @@ env.Library(
     ],
 )
 
+env.Library(
+     target="sort_pattern",
+     source=[
+         "sort_pattern.cpp",
+     ],
+     LIBDEPS=[
+         '$BUILD_DIR/mongo/base',
+         '$BUILD_DIR/mongo/db/pipeline/document_value',
+         '$BUILD_DIR/mongo/db/pipeline/expression',
+     ],
+ )
+
 env.CppUnitTest(
     target="db_query_test",
     source=[

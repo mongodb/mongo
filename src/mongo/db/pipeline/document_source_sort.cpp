@@ -33,7 +33,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -116,8 +115,9 @@ std::string nextFileName() {
 
 constexpr StringData DocumentSourceSort::kStageName;
 
-DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx) {}
+DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext>& pExpCtx,
+                                       const BSONObj& sortOrder)
+    : DocumentSource(pExpCtx), _rawSort(sortOrder), _sortPattern({_rawSort, pExpCtx}) {}
 
 REGISTER_DOCUMENT_SOURCE(sort,
                          LiteParsedDocumentSourceDefault::parse,
@@ -147,11 +147,12 @@ void DocumentSourceSort::serializeToArray(
     if (explain) {  // always one Value for combined $sort + $limit
         array.push_back(Value(DOC(
             kStageName << DOC(
-                "sortKey" << serializeSortKeyPattern(SortKeySerialization::kForExplain) << "limit"
+                "sortKey" << _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain)
+                          << "limit"
                           << (_limitSrc ? Value(_limitSrc->getLimit()) : Value())))));
     } else {  // one Value for $sort and maybe a Value for $limit
         MutableDocument inner(
-            serializeSortKeyPattern(SortKeySerialization::kForPipelineSerialization));
+            _sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization));
         array.push_back(Value(DOC(kStageName << inner.freeze())));
 
         if (_limitSrc) {
@@ -166,36 +167,6 @@ void DocumentSourceSort::doDispose() {
 
 long long DocumentSourceSort::getLimit() const {
     return _limitSrc ? _limitSrc->getLimit() : -1;
-}
-
-Document DocumentSourceSort::serializeSortKeyPattern(SortKeySerialization serializationMode) const {
-    MutableDocument keyObj;
-    const size_t n = _sortPattern.size();
-    for (size_t i = 0; i < n; ++i) {
-        if (_sortPattern[i].fieldPath) {
-            // Append a named integer based on whether the sort is ascending/descending.
-            keyObj.setField(_sortPattern[i].fieldPath->fullPath(),
-                            Value(_sortPattern[i].isAscending ? 1 : -1));
-        } else {
-            // Sorting by an expression, use a made up field name.
-            auto computedFieldName = string(str::stream() << "$computed" << i);
-            switch (serializationMode) {
-                case SortKeySerialization::kForExplain:
-                case SortKeySerialization::kForPipelineSerialization: {
-                    const bool isExplain = (serializationMode == SortKeySerialization::kForExplain);
-                    keyObj[computedFieldName] = _sortPattern[i].expression->serialize(isExplain);
-                    break;
-                }
-                case SortKeySerialization::kForSortKeyMerging: {
-                    // We need to be able to tell which direction the sort is. Expression sorts are
-                    // always descending.
-                    keyObj[computedFieldName] = Value(-1);
-                    break;
-                }
-            }
-        }
-    }
-    return keyObj.freeze();
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
@@ -260,61 +231,18 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     BSONObj sortOrder,
     long long limit,
     boost::optional<uint64_t> maxMemoryUsageBytes) {
-    intrusive_ptr<DocumentSourceSort> pSort(new DocumentSourceSort(pExpCtx));
+    intrusive_ptr<DocumentSourceSort> pSort(new DocumentSourceSort(pExpCtx, sortOrder.getOwned()));
     pSort->_maxMemoryUsageBytes = maxMemoryUsageBytes
         ? *maxMemoryUsageBytes
         : internalDocumentSourceSortMaxBlockingSortBytes.load();
-    pSort->_rawSort = sortOrder.getOwned();
-
-    for (auto&& keyField : sortOrder) {
-        auto fieldName = keyField.fieldNameStringData();
-
-        SortPatternPart patternPart;
-
-        if (keyField.type() == Object) {
-            BSONObj metaDoc = keyField.Obj();
-            // this restriction is due to needing to figure out sort direction
-            uassert(17312,
-                    "$meta is the only expression supported by $sort right now",
-                    metaDoc.firstElement().fieldNameStringData() == "$meta");
-
-            uassert(ErrorCodes::FailedToParse,
-                    "Cannot have additional keys in a $meta sort specification",
-                    metaDoc.nFields() == 1);
-
-            VariablesParseState vps = pExpCtx->variablesParseState;
-            patternPart.expression = ExpressionMeta::parse(pExpCtx, metaDoc.firstElement(), vps);
-
-            // If sorting by textScore, sort highest scores first. If sorting by randVal, order
-            // doesn't matter, so just always use descending.
-            patternPart.isAscending = false;
-
-            pSort->_sortPattern.push_back(std::move(patternPart));
-            continue;
-        }
-
-        uassert(15974,
-                "$sort key ordering must be specified using a number or {$meta: 'textScore'}",
-                keyField.isNumber());
-
-        int sortOrder = keyField.numberInt();
-
-        uassert(15975,
-                "$sort key ordering must be 1 (for ascending) or -1 (for descending)",
-                ((sortOrder == 1) || (sortOrder == -1)));
-
-        patternPart.fieldPath = FieldPath{fieldName};
-        patternPart.isAscending = (sortOrder > 0);
-        pSort->_paths.insert(patternPart.fieldPath->fullPath());
-        pSort->_sortPattern.push_back(std::move(patternPart));
-    }
 
     uassert(15976, "$sort stage must have at least one sort key", !pSort->_sortPattern.empty());
 
     pSort->_sortKeyGen = SortKeyGenerator{
         // The SortKeyGenerator expects the expressions to be serialized in order to detect a sort
         // by a metadata field.
-        pSort->serializeSortKeyPattern(SortKeySerialization::kForPipelineSerialization).toBson(),
+        pSort->_sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
+            .toBson(),
         pExpCtx->getCollator()};
 
     if (limit > 0) {
@@ -410,8 +338,8 @@ Value DocumentSourceSort::getCollationComparisonKey(const Value& val) const {
     return Value(output.obj().firstElement());
 }
 
-StatusWith<Value> DocumentSourceSort::extractKeyPart(const Document& doc,
-                                                     const SortPatternPart& patternPart) const {
+StatusWith<Value> DocumentSourceSort::extractKeyPart(
+    const Document& doc, const SortPattern::SortPatternPart& patternPart) const {
     Value plainKey;
     if (patternPart.fieldPath) {
         invariant(!patternPart.expression);
@@ -459,7 +387,7 @@ BSONObj DocumentSourceSort::extractKeyWithArray(const Document& doc) const {
 
     // Convert the Document to a BSONObj, but only do the conversion for the paths we actually need.
     // Then run the result through the SortKeyGenerator to obtain the final sort key.
-    auto bsonDoc = document_path_support::documentToBsonWithPaths(doc, _paths);
+    auto bsonDoc = _sortPattern.documentToBsonWithSortPaths(doc);
     return uassertStatusOK(_sortKeyGen->getSortKey(std::move(bsonDoc), &metadata));
 }
 
@@ -535,7 +463,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distri
     DistributedPlanLogic split;
     split.shardsStage = this;
     split.inputSortPattern =
-        serializeSortKeyPattern(SortKeySerialization::kForSortKeyMerging).toBson();
+        _sortPattern.serialize(SortPattern::SortKeySerialization::kForSortKeyMerging).toBson();
     if (_limitSrc) {
         split.mergingStage = DocumentSourceLimit::create(pExpCtx, _limitSrc->getLimit());
     }
