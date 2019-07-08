@@ -213,7 +213,7 @@
             command: {find: collName, filter: {x: 1}},
         },
         findAndModify: {
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             sendsShardVersion: true,
             command: {findAndModify: collName, query: {_id: 0}, remove: true}
         },

@@ -71,6 +71,11 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
     const std::set<ErrorCodes::Error>& ignorableErrors = {});
 
 /**
+ * Returns a copy of 'cmdObj' with 'databaseVersion' appended.
+ */
+BSONObj appendDbVersionIfPresent(BSONObj cmdObj, DatabaseVersion dbVersion);
+
+/**
  * Returns a copy of 'cmdObj' with 'version' appended.
  */
 BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version);

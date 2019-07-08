@@ -202,6 +202,7 @@ public:
         _runCommand(opCtx,
                     shard->getId(),
                     (chunkMgr ? chunkMgr->getVersion(shard->getId()) : ChunkVersion::UNSHARDED()),
+                    boost::none,
                     nss,
                     explainCmd,
                     &bob);
@@ -238,6 +239,7 @@ public:
             _runCommand(opCtx,
                         routingInfo.db().primaryId(),
                         ChunkVersion::UNSHARDED(),
+                        routingInfo.db().databaseVersion(),
                         nss,
                         cmdObjForShard,
                         &result);
@@ -254,6 +256,7 @@ public:
         _runCommand(opCtx,
                     chunk.getShardId(),
                     chunkMgr->getVersion(chunk.getShardId()),
+                    boost::none,
                     nss,
                     cmdObjForShard,
                     &result);
@@ -265,16 +268,19 @@ private:
     static void _runCommand(OperationContext* opCtx,
                             const ShardId& shardId,
                             const ChunkVersion& shardVersion,
+                            boost::optional<DatabaseVersion> dbVersion,
                             const NamespaceString& nss,
                             const BSONObj& cmdObj,
                             BSONObjBuilder* result) {
         bool isRetryableWrite = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
         const auto response = [&] {
             std::vector<AsyncRequestsSender::Request> requests;
-            requests.emplace_back(
-                shardId,
-                appendShardVersion(CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-                                   shardVersion));
+            BSONObj filteredCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+            BSONObj cmdObjWithVersions(std::move(filteredCmdObj));
+            if (dbVersion) {
+                cmdObjWithVersions = appendDbVersionIfPresent(cmdObjWithVersions, *dbVersion);
+            }
+            requests.emplace_back(shardId, appendShardVersion(cmdObjWithVersions, shardVersion));
 
             MultiStatementTransactionRequestsSender ars(
                 opCtx,
@@ -294,7 +300,8 @@ private:
 
         const auto responseStatus = getStatusFromCommandResult(response.data);
         if (ErrorCodes::isNeedRetargettingError(responseStatus.code()) ||
-            ErrorCodes::isSnapshotError(responseStatus.code())) {
+            ErrorCodes::isSnapshotError(responseStatus.code()) ||
+            responseStatus.code() == ErrorCodes::StaleDbVersion) {
             // Command code traps this exception and re-runs
             uassertStatusOK(responseStatus.withContext("findAndModify"));
         }
@@ -312,7 +319,7 @@ private:
                     // since it will be run as a transaction it will take the other code path to
                     // updateShardKeyValueOnWouldChangeOwningShardError.
                     documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
-                    _runCommand(opCtx, shardId, shardVersion, nss, cmdObj, result);
+                    _runCommand(opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, result);
                     auto commitResponse =
                         documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
 
