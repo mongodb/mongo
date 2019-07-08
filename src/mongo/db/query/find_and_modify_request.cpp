@@ -168,9 +168,23 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
 
     for (auto&& field : cmdObj.getFieldNames<std::set<std::string>>()) {
         if (field == kQueryField) {
-            query = cmdObj.getObjectField(kQueryField);
+            auto queryElement = cmdObj[kQueryField];
+            if (queryElement.type() != Object) {
+                return {ErrorCodes::Error(31160),
+                        str::stream() << "'" << kQueryField
+                                      << "' parameter must be an object, found "
+                                      << queryElement.type()};
+            }
+            query = queryElement.embeddedObject();
         } else if (field == kSortField) {
-            sort = cmdObj.getObjectField(kSortField);
+            auto sortElement = cmdObj[kSortField];
+            if (sortElement.type() != Object) {
+                return {ErrorCodes::Error(31174),
+                        str::stream() << "'" << kSortField
+                                      << "' parameter must be an object, found "
+                                      << sortElement.type()};
+            }
+            sort = sortElement.embeddedObject();
         } else if (field == kRemoveField) {
             isRemove = cmdObj[kRemoveField].trueValue();
         } else if (field == kUpdateField) {
@@ -178,7 +192,14 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
         } else if (field == kNewField) {
             shouldReturnNew = cmdObj[kNewField].trueValue();
         } else if (field == kFieldProjectionField) {
-            fields = cmdObj.getObjectField(kFieldProjectionField);
+            auto projectionElement = cmdObj[kFieldProjectionField];
+            if (projectionElement.type() != Object) {
+                return {ErrorCodes::Error(31175),
+                        str::stream() << "'" << kFieldProjectionField
+                                      << "' parameter must be an object, found "
+                                      << projectionElement.type()};
+            }
+            fields = projectionElement.embeddedObject();
         } else if (field == kUpsertField) {
             isUpsert = cmdObj[kUpsertField].trueValue();
         } else if (field == kBypassDocumentValidationField) {
