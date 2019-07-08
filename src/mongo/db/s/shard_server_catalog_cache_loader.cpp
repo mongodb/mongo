@@ -446,46 +446,36 @@ std::shared_ptr<Notification<void>> ShardServerCatalogCacheLoader::getChunksSinc
 void ShardServerCatalogCacheLoader::getDatabase(
     StringData dbName,
     std::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
-    long long currentTerm;
     bool isPrimary;
-
-    {
-        // Take the mutex so that we can discern whether we're primary or secondary and schedule a
-        // task with the corresponding _term value.
+    long long term;
+    std::tie(isPrimary, term) = [&] {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        invariant(_role != ReplicaSetRole::None);
+        return std::make_tuple(_role == ReplicaSetRole::Primary, _term);
+    }();
 
-        currentTerm = _term;
-        isPrimary = (_role == ReplicaSetRole::Primary);
-    }
-
-    _threadPool.schedule([ this, name = dbName.toString(), callbackFn, isPrimary, currentTerm ](
+    _threadPool.schedule([ this, name = dbName.toString(), callbackFn, isPrimary, term ](
         auto status) noexcept {
         invariant(status);
 
         auto context = _contexts.makeOperationContext(*Client::getCurrent());
-
-        {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
-
-            // We may have missed an OperationContextGroup interrupt since this operation began
-            // but before the OperationContext was added to the group. So we'll check that
-            // we're still in the same _term.
-            if (_term != currentTerm) {
-                callbackFn(context.opCtx(),
-                           Status{ErrorCodes::InterruptedDueToReplStateChange,
-                                  "Unable to refresh routing table because replica set state "
-                                  "changed or node is shutting down."});
-                return;
-            }
-        }
+        auto const opCtx = context.opCtx();
 
         try {
+            {
+                // We may have missed an OperationContextGroup interrupt since this operation began
+                // but before the OperationContext was added to the group. So we'll check that we're
+                // still in the same _term.
+                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                        "Unable to refresh database because replica set state changed or the node "
+                        "is shutting down.",
+                        _term == term);
+            }
+
             if (isPrimary) {
-                _schedulePrimaryGetDatabase(
-                    context.opCtx(), StringData(name), currentTerm, callbackFn);
+                _schedulePrimaryGetDatabase(opCtx, name, term, callbackFn);
             } else {
-                _runSecondaryGetDatabase(context.opCtx(), StringData(name), callbackFn);
+                _runSecondaryGetDatabase(opCtx, name, callbackFn);
             }
         } catch (const DBException& ex) {
             callbackFn(context.opCtx(), ex.toStatus());
