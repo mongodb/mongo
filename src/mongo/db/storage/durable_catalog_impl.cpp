@@ -942,15 +942,6 @@ void DurableCatalogImpl::updateValidator(OperationContext* opCtx,
     putMetaData(opCtx, ns, md);
 }
 
-void DurableCatalogImpl::updateIndexMetadata(OperationContext* opCtx,
-                                             NamespaceString ns,
-                                             const IndexDescriptor* desc) {
-    // Update any metadata Ident has for this index
-    const string ident = getIndexIdent(opCtx, ns, desc->indexName());
-    auto kvEngine = _engine->getEngine();
-    kvEngine->alterIdentMetadata(opCtx, ident, desc);
-}
-
 Status DurableCatalogImpl::removeIndex(OperationContext* opCtx,
                                        NamespaceString ns,
                                        StringData indexName) {
@@ -1241,19 +1232,6 @@ void DurableCatalogImpl::getReadyIndexes(OperationContext* opCtx,
     for (unsigned i = 0; i < md.indexes.size(); i++) {
         if (md.indexes[i].ready)
             names->push_back(md.indexes[i].spec["name"].String());
-    }
-}
-
-void DurableCatalogImpl::getAllUniqueIndexes(OperationContext* opCtx,
-                                             NamespaceString ns,
-                                             std::vector<std::string>* names) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, ns);
-
-    for (unsigned i = 0; i < md.indexes.size(); i++) {
-        if (md.indexes[i].spec["unique"]) {
-            std::string indexName = md.indexes[i].spec["name"].String();
-            names->push_back(indexName);
-        }
     }
 }
 

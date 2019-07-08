@@ -155,10 +155,6 @@ public:
 
     Status dropIdent(OperationContext* opCtx, StringData ident) override;
 
-    void alterIdentMetadata(OperationContext* opCtx,
-                            StringData ident,
-                            const IndexDescriptor* desc) override;
-
     Status okToRename(OperationContext* opCtx,
                       StringData fromNS,
                       StringData toNS,

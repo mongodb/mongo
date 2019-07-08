@@ -38,15 +38,5 @@
     var ttlAfterRollback = index[1].expireAfterSeconds;
     assert.eq(ttlAfterRollback, ttlBeforeRollback);
 
-    // SERVER-37634 should remove this test post 4.2.
-    // Test transaction rollback after unique index upgrade collMod.
-    assert.commandWorked(adminDB.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-
-    assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
-    assert.writeOK(coll.insert({_id: 0, a: 1}));
-
-    assert.commandFailedWithCode(adminDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}),
-                                 50971);
-
     MongoRunner.stopMongod(conn);
 })();

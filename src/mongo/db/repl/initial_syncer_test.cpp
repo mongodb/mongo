@@ -242,8 +242,6 @@ protected:
         bool droppedUserDBs = false;
         std::vector<std::string> droppedCollections;
         int documentsInsertedCount = 0;
-        bool uniqueIndexUpdated = false;
-        bool upgradeNonReplicatedUniqueIndexesShouldFail = false;
     };
 
     stdx::mutex _storageInterfaceWorkDoneMutex;  // protects _storageInterfaceWorkDone.
@@ -256,8 +254,6 @@ protected:
                                                   const NamespaceString& nss) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.createOplogCalled = true;
-            _storageInterfaceWorkDone.uniqueIndexUpdated = false;
-            _storageInterfaceWorkDone.upgradeNonReplicatedUniqueIndexesShouldFail = false;
             return Status::OK();
         };
         _storageInterface->truncateCollFn = [this](OperationContext* opCtx,
@@ -312,19 +308,6 @@ protected:
 
                 return std::move(localLoader);
             };
-        _storageInterface->upgradeNonReplicatedUniqueIndexesFn = [this](OperationContext* opCtx) {
-            LockGuard lock(_storageInterfaceWorkDoneMutex);
-            if (_storageInterfaceWorkDone.upgradeNonReplicatedUniqueIndexesShouldFail) {
-                // One of the status codes a failed upgradeNonReplicatedUniqueIndexes call
-                // can return is NamespaceNotFound.
-                return Status(ErrorCodes::NamespaceNotFound,
-                              "upgradeNonReplicatedUniqueIndexes failed because the desired "
-                              "ns was not found.");
-            } else {
-                _storageInterfaceWorkDone.uniqueIndexUpdated = true;
-                return Status::OK();
-            }
-        };
 
         _dbWorkThreadPool = std::make_unique<ThreadPool>(ThreadPool::Options());
         _dbWorkThreadPool->startup();
@@ -457,8 +440,8 @@ protected:
 
     void runInitialSyncWithBadFCVResponse(std::vector<BSONObj> docs,
                                           ErrorCodes::Error expectedError);
-    void doSuccessfulInitialSyncWithOneBatch(bool shouldSetFCV);
-    OplogEntry doInitialSyncWithOneBatch(bool shouldSetFCV);
+    void doSuccessfulInitialSyncWithOneBatch();
+    OplogEntry doInitialSyncWithOneBatch();
 
     std::unique_ptr<TaskExecutorMock> _executorProxy;
 
@@ -3775,7 +3758,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchCallbackOnOplog
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 }
 
-OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch(bool shouldSetFCV) {
+OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch() {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
@@ -3828,12 +3811,6 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch(bool shouldSetFCV) {
         assertRemoteCommandNameEquals("getMore", request);
         net->blackHole(noi);
 
-        // Last rollback ID check. Before this check, set fCV to 4.2 if required by the test.
-        if (shouldSetFCV) {
-            serverGlobalParams.featureCompatibility.setVersion(
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
-        }
-
         request = net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
         assertRemoteCommandNameEquals("replSetGetRBID", request);
         net->runReadyNetworkOperations();
@@ -3849,8 +3826,8 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch(bool shouldSetFCV) {
     return lastOp;
 }
 
-void InitialSyncerTest::doSuccessfulInitialSyncWithOneBatch(bool shouldSetFCV) {
-    auto lastOp = doInitialSyncWithOneBatch(shouldSetFCV);
+void InitialSyncerTest::doSuccessfulInitialSyncWithOneBatch() {
+    auto lastOp = doInitialSyncWithOneBatch();
     serverGlobalParams.featureCompatibility.reset();
     ASSERT_OK(_lastApplied.getStatus());
     ASSERT_EQUALS(lastOp.getOpTime(), _lastApplied.getValue().opTime);
@@ -3866,14 +3843,7 @@ TEST_F(InitialSyncerTest,
     // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
 
-    // Tell test to setFCV=4.2 before the last rollback ID check.
-    // _rollbackCheckerCheckForRollbackCallback() calls upgradeNonReplicatedUniqueIndexes
-    // only if fCV is 4.2.
-    doSuccessfulInitialSyncWithOneBatch(true);
-
-    // Ensure that upgradeNonReplicatedUniqueIndexes is called.
-    LockGuard lock(_storageInterfaceWorkDoneMutex);
-    ASSERT_TRUE(_storageInterfaceWorkDone.uniqueIndexUpdated);
+    doSuccessfulInitialSyncWithOneBatch();
 }
 
 TEST_F(InitialSyncerTest,
@@ -4533,32 +4503,6 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
 
     initialSyncer->join();
-}
-
-TEST_F(InitialSyncerTest, InitialSyncerDoesNotCallUpgradeNonReplicatedUniqueIndexesOnFCV40) {
-    // Skip reconstructing prepared transactions at the end of initial sync because
-    // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
-    // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
-    FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
-
-    // In MongoDB 4.2, upgradeNonReplicatedUniqueIndexes will only be called if fCV is 4.2.
-    doSuccessfulInitialSyncWithOneBatch(false);
-
-    LockGuard lock(_storageInterfaceWorkDoneMutex);
-    ASSERT_FALSE(_storageInterfaceWorkDone.uniqueIndexUpdated);
-}
-
-TEST_F(InitialSyncerTest, InitialSyncerUpgradeNonReplicatedUniqueIndexesError) {
-    // Ensure upgradeNonReplicatedUniqueIndexes returns a bad status. This should be passed to the
-    // initial syncer.
-    {
-        LockGuard lock(_storageInterfaceWorkDoneMutex);
-        _storageInterfaceWorkDone.upgradeNonReplicatedUniqueIndexesShouldFail = true;
-    }
-    doInitialSyncWithOneBatch(true);
-
-    // Ensure the upgradeNonReplicatedUniqueIndexes status was captured.
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, _lastApplied);
 }
 
 }  // namespace

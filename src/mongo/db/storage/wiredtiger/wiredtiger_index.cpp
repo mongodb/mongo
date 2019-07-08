@@ -158,10 +158,7 @@ std::string WiredTigerIndex::generateAppMetadataString(const IndexDescriptor& de
 
     int keyStringVersion;
 
-    // The  FCV controls the creation between timestamp safe and timestamp unsafe unique indexes.
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.isVersionUpgradingOrUpgraded() && desc.unique() &&
-        !desc.isIdIndex()) {
+    if (desc.unique() && !desc.isIdIndex()) {
         keyStringVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
             ? kDataFormatV4KeyStringV1UniqueIndexVersionV2
             : kDataFormatV3KeyStringV0UniqueIndexVersionV1;
@@ -276,12 +273,26 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
             str::stream() << versionStatus.reason() << " Index: {name: " << desc->indexName()
                           << ", ns: "
                           << desc->parentNS()
-                          << "} - version too new for this mongod."
-                          << " See http://dochub.mongodb.org/core/4.2-downgrade-index for detailed"
-                          << " instructions on how to handle this error.");
+                          << "} - version either too old or too new for this mongod.");
         fassertFailedWithStatusNoTrace(28579, indexVersionStatus);
     }
     _dataFormatVersion = version.getValue();
+
+    if (!_isIdIndex && desc->unique()) {
+        Status versionStatus = _dataFormatVersion == kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||
+                _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2
+            ? Status::OK()
+            : Status(ErrorCodes::UnsupportedFormat,
+                     str::stream() << "Index: {name: " << desc->indexName() << ", ns: "
+                                   << desc->parentNS()
+                                   << "} has incompatible format version: "
+                                   << _dataFormatVersion
+                                   << ". MongoDB 4.2 onwards, WT secondary unique indexes use "
+                                      "either format version 11 or 12. See "
+                                      "https://dochub.mongodb.org/core/upgrade-4.2-procedures for "
+                                      "detailed instructions on upgrading the index format.");
+        fassertNoTrace(31179, versionStatus);
+    }
 
     // Index data format 6 and 11 correspond to KeyString version V0 and data format 8 and 12
     // correspond to KeyString version V1

@@ -954,10 +954,9 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
           NamespaceString nss;
+          BSONObjBuilder resultWeDontCareAbout;
           std::tie(std::ignore, nss) = parseCollModUUIDAndNss(opCtx, ui, ns, cmd);
-          // The collMod for apply ops could be either a user driven collMod or a collMod triggered
-          // by an upgrade.
-          return collModWithUpgrade(opCtx, nss, cmd);
+          return collMod(opCtx, nss, cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dbCheck", {dbCheckOplogCommand, {}}},

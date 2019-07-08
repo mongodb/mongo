@@ -328,8 +328,6 @@ public:
                 Lock::GlobalLock lk(opCtx, MODE_S);
             }
 
-            updateUniqueIndexesOnUpgrade(opCtx);
-
             upgradeTransactionTable(opCtx);
 
             // Upgrade shards before config finishes its upgrade.

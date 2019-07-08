@@ -138,10 +138,6 @@ public:
                          StringData validationLevel,
                          StringData validationAction);
 
-    void updateIndexMetadata(OperationContext* opCtx,
-                             NamespaceString ns,
-                             const IndexDescriptor* desc);
-
     Status removeIndex(OperationContext* opCtx, NamespaceString ns, StringData indexName);
 
     Status prepareForIndexBuild(OperationContext* opCtx,
@@ -206,9 +202,6 @@ public:
     void getReadyIndexes(OperationContext* opCtx,
                          NamespaceString ns,
                          std::vector<std::string>* names) const;
-    void getAllUniqueIndexes(OperationContext* opCtx,
-                             NamespaceString ns,
-                             std::vector<std::string>* names) const;
 
     bool isIndexPresent(OperationContext* opCtx, NamespaceString ns, StringData indexName) const;
 
