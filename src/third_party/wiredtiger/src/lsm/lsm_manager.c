@@ -339,12 +339,6 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	}
 	WT_STAT_CONN_INCRV(session, lsm_work_units_discarded, removed);
 
-	/* Free resources that are allocated in connection initialize */
-	__wt_spin_destroy(session, &manager->switch_lock);
-	__wt_spin_destroy(session, &manager->app_lock);
-	__wt_spin_destroy(session, &manager->manager_lock);
-	__wt_cond_destroy(session, &manager->work_cond);
-
 	return (ret);
 }
 

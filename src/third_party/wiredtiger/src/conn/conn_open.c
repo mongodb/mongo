@@ -76,16 +76,17 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	wt_conn = &conn->iface;
 	session = conn->default_session;
 
+	/*
+	 * The LSM and async services are not shut down in this path (which is
+	 * called when wiredtiger_open hits an error (as well as during normal
+	 * shutdown). Assert they're not running.
+	 */
+	WT_ASSERT(session,
+	    !F_ISSET(conn, WT_CONN_SERVER_ASYNC | WT_CONN_SERVER_LSM));
+
 	/* Shut down the subsystems, ensuring workers see the state change. */
 	F_SET(conn, WT_CONN_CLOSING);
 	WT_FULL_BARRIER();
-
-	/*
-	 * Clear any pending async operations and shut down the async worker
-	 * threads and system before closing LSM.
-	 */
-	WT_TRET(__wt_async_flush(session));
-	WT_TRET(__wt_async_destroy(session));
 
 	/*
 	 * Shut down server threads other than the eviction server, which is
@@ -93,15 +94,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * btree handles, so take care in ordering shutdown to make sure they
 	 * exit before files are closed.
 	 */
-	WT_TRET(__wt_lsm_manager_destroy(session));
-
-	/*
-	 * Once the async and LSM threads exit, we shouldn't be opening any
-	 * more files.
-	 */
-	F_SET(conn, WT_CONN_CLOSING_NO_MORE_OPENS);
-	WT_FULL_BARRIER();
-
 	WT_TRET(__wt_capacity_server_destroy(session));
 	WT_TRET(__wt_checkpoint_server_destroy(session));
 	WT_TRET(__wt_statlog_destroy(session, true));
@@ -249,9 +241,6 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Start the handle sweep thread. */
 	WT_RET(__wt_sweep_create(session));
-
-	/* Start the optional async threads. */
-	WT_RET(__wt_async_create(session, cfg));
 
 	/* Start the optional capacity thread. */
 	WT_RET(__wt_capacity_server_create(session, cfg));

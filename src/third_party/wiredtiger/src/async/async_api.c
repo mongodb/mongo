@@ -345,7 +345,7 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 		return (ret);
 	}
 	if (!conn->async_cfg && run)			/* Case 2 */
-		return (__async_start(session));
+		return (__wt_async_create(session, cfg));
 	if (!conn->async_cfg)				/* Case 3 */
 		return (0);
 
@@ -578,22 +578,25 @@ __async_runtime_config(WT_ASYNC_OP_IMPL *op, const char *cfg[])
  */
 int
 __wt_async_new_op(WT_SESSION_IMPL *session, const char *uri,
-    const char *config, const char *cfg[], WT_ASYNC_CALLBACK *cb,
-    WT_ASYNC_OP_IMPL **opp)
+    const char *config, WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP_IMPL **opp)
 {
 	WT_ASYNC_OP_IMPL *op;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	const char *cfg[] = { S2C(session)->cfg, NULL, NULL };
 
 	*opp = NULL;
 
 	conn = S2C(session);
+	if (!conn->async_cfg)
+		WT_RET(__wt_async_create(session, cfg));
 	if (!conn->async_cfg)
 		WT_RET_MSG(
 		    session, ENOTSUP, "Asynchronous operations not configured");
 
 	op = NULL;
 	WT_ERR(__async_new_op_alloc(session, uri, config, &op));
+	cfg[1] = config;
 	WT_ERR(__async_runtime_config(op, cfg));
 	op->cb = cb;
 	*opp = op;

@@ -1373,6 +1373,8 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 		}
 	}
 
+	WT_STAT_CONN_INCRV(session,
+	    cache_eviction_pages_queued_post_lru, queue->evict_candidates);
 	queue->evict_current = queue->evict_queue;
 	__wt_spin_unlock(session, &queue->evict_lock);
 

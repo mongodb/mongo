@@ -1327,7 +1327,7 @@ buildvariants:
   display_name: Little-endian (x86)
   run_on:
   - ubuntu1404-test
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
@@ -1344,7 +1344,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1604-zseries-small
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
