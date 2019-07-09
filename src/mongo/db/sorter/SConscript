@@ -16,6 +16,6 @@ sorterEnv.CppUnitTest(
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/s/is_mongos',
-        '$BUILD_DIR/third_party/shim_snappy'
+        '$BUILD_DIR/third_party/shim_snappy',
     ],
 )
