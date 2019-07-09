@@ -119,10 +119,14 @@ public:
      *
      * @param projection The projection that has been passed down to the query system.
      * @param deps The output of DepsTracker::toParsedDeps.
+     * @param inputHasMetadata Indicates whether the input BSON object contains metadata fields.
      */
-    void setProjection(const BSONObj& projection, const boost::optional<ParsedDeps>& deps) {
+    void setProjection(const BSONObj& projection,
+                       const boost::optional<ParsedDeps>& deps,
+                       bool inputHasMetadata) {
         _projection = projection;
         _dependencies = deps;
+        _inputHasMetadata = inputHasMetadata;
     }
 
     /**
@@ -209,6 +213,7 @@ private:
     BSONObj _sort;
     BSONObj _projection;
     bool _shouldProduceEmptyDocs = false;
+    bool _inputHasMetadata = false;
     boost::optional<ParsedDeps> _dependencies;
     boost::intrusive_ptr<DocumentSourceLimit> _limit;
     long long _docsAddedToBatches;  // for _limit enforcement

@@ -75,7 +75,9 @@ DocumentSource::GetNextResult DocumentSourceCursor::getNext() {
 }
 
 Document DocumentSourceCursor::transformBSONObjToDocument(const BSONObj& obj) const {
-    return _dependencies ? _dependencies->extractFields(obj) : Document::fromBsonWithMetaData(obj);
+    return _dependencies
+        ? _dependencies->extractFields(obj)
+        : (_inputHasMetadata ? Document::fromBsonWithMetaData(obj) : Document(obj));
 }
 
 void DocumentSourceCursor::loadBatch() {

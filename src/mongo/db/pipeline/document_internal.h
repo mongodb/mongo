@@ -390,10 +390,11 @@ public:
      * the document. If we know that the BSON does not contain any metadata fields we can set the
      * 'stripMetadata' flag to false that will speed up the field iteration.
      */
-    DocumentStorage(const BSONObj& bson, bool stripMetadata) : DocumentStorage() {
+    DocumentStorage(const BSONObj& bson, bool stripMetadata, bool modified) : DocumentStorage() {
         _bson = bson.getOwned();
         _bsonIt = BSONObjIterator(_bson);
         _stripMetadata = stripMetadata;
+        _modified = modified;
     }
 
     ~DocumentStorage();
@@ -439,10 +440,12 @@ public:
 
     // MutableDocument uses these
     ValueElement& getField(Position pos) {
+        _modified = true;
         verify(pos.found());
         return *(_firstElement->plusBytes(pos.index));
     }
     Value& getField(StringData name, LookupPolicy policy) {
+        _modified = true;
         Position pos = findField(name, policy);
         if (!pos.found())
             return appendField(name, hashKey(name), ValueElement::Kind::kMaybeInserted);
@@ -630,6 +633,13 @@ public:
 
     Position constructInCache(const BSONElement& elem);
 
+    auto isModified() const {
+        return _modified;
+    }
+    auto bsonObj() const {
+        return _bson;
+    }
+
 private:
     /// Returns the position of the named field in the cache or Position()
     Position findFieldInCache(StringData name) const;
@@ -710,6 +720,12 @@ private:
     // have to move the metadata to the MetadataFields object. If we know that the BSON does not
     // have any metadata we can set _stripMetadata to false that will speed up the iteration.
     bool _stripMetadata{false};
+
+    // This flag is set to true anytime the storage returns a mutable field. It is used to optimize
+    // a conversion to BSON; i.e. if there are not any modifications we can directly return _bson.
+    // Note that an empty (default) document is marked 'modified'. The reason for this is that the
+    // empty _bson is not owned but consumers expect toBson() to return owned BSON.
+    bool _modified{true};
 
     // Defined in document.cpp
     static const DocumentStorage kEmptyDoc;

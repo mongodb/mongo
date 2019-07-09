@@ -176,10 +176,12 @@ Position DocumentStorage::findField(StringData requested, LookupPolicy policy) c
 }
 
 Position DocumentStorage::constructInCache(const BSONElement& elem) {
+    auto savedModified = _modified;
     auto pos = getNextPosition();
     const auto fieldName = elem.fieldNameStringData();
     const unsigned hash = hashKey(fieldName);
     appendField(fieldName, hash, ValueElement::Kind::kCached) = Value(elem);
+    _modified = savedModified;
 
     return pos;
 }
@@ -296,7 +298,7 @@ void DocumentStorage::reserveFields(size_t expectedFields) {
 }
 
 intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
-    auto out = make_intrusive<DocumentStorage>(_bson, _stripMetadata);
+    auto out = make_intrusive<DocumentStorage>(_bson, _stripMetadata, _modified);
 
     if (_cache) {
         // Make a copy of the buffer with the fields.
@@ -453,6 +455,10 @@ void Document::toBson(BSONObjBuilder* builder, size_t recursionLevel) const {
 }
 
 BSONObj Document::toBson() const {
+    if (!storage().isModified() && !storage().stripMetadata()) {
+        return storage().bsonObj();
+    }
+
     BSONObjBuilder bb;
     toBson(&bb);
     return bb.obj();

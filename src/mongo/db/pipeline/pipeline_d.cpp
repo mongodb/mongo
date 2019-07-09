@@ -838,7 +838,7 @@ void PipelineD::addCursorSource(Pipeline* pipeline,
     }
 
     if (!projectionObj.isEmpty()) {
-        cursor->setProjection(projectionObj, boost::none);
+        cursor->setProjection(projectionObj, boost::none, deps.getNeedsAnyMetadata());
     } else {
         // There may be fewer dependencies now if the sort was covered.
         if (!sortObj.isEmpty()) {
@@ -847,7 +847,7 @@ void PipelineD::addCursorSource(Pipeline* pipeline,
                                                  : DepsTracker::MetadataAvailable::kNoMetadata);
         }
 
-        cursor->setProjection(deps.toProjection(), deps.toParsedDeps());
+        cursor->setProjection(deps.toProjection(), deps.toParsedDeps(), deps.getNeedsAnyMetadata());
     }
 }
 

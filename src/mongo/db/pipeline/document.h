@@ -623,7 +623,7 @@ public:
      *  complete list is in Document::allMetadataFieldNames).
      */
     DocumentStorage& newStorageWithBson(const BSONObj& bson, bool stripMetadata) {
-        reset(make_intrusive<DocumentStorage>(bson, stripMetadata));
+        reset(make_intrusive<DocumentStorage>(bson, stripMetadata, false));
         return const_cast<DocumentStorage&>(*storagePtr());
     }
 
