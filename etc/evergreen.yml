@@ -1960,7 +1960,7 @@ functions:
 
           ${add_nodejs_to_path}
 
-          npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars}
+          npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars} --branch ${branch_name}
 
     - command: archive.targz_pack
       params:
