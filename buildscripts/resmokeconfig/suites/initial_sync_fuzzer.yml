@@ -15,6 +15,10 @@ executor:
         TestData:
           logComponentVerbosity:
             replication:
+              verbosity: 3
               initialSync: 4
+              heartbeats: 0
+              election: 0
+              rollback: 0
           setParameters:
             numInitialSyncAttempts: 10000000
