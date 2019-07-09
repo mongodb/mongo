@@ -1041,7 +1041,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     _applierState = ApplierState::Stopped;
 
     invariant(_getMemberState_inlock().primary());
-    invariant(!_canAcceptNonLocalWrites);
+    invariant(!_canAcceptNonLocalWrites.loadRelaxed());
 
     {
         lk.unlock();
@@ -1114,7 +1114,7 @@ void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opT
                       opTime.getTimestamp() < myLastAppliedOpTime.getTimestamp());
         }
 
-        if (consistency == DataConsistency::Consistent && _canAcceptNonLocalWrites &&
+        if (consistency == DataConsistency::Consistent && _canAcceptNonLocalWrites.loadRelaxed() &&
             _rsConfig.getWriteMajority() == 1) {
             // Single vote primaries may have a lagged stable timestamp due to paring back the
             // stable timestamp to the all committed timestamp.
@@ -1763,7 +1763,7 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // catch up without allowing new writes in.
     auto action = _updateMemberStateFromTopologyCoordinator_inlock(opCtx);
     invariant(action == PostMemberStateUpdateAction::kActionNone);
-    invariant(!_canAcceptNonLocalWrites);
+    invariant(!_canAcceptNonLocalWrites.loadRelaxed());
 
     // Make sure that we leave _canAcceptNonLocalWrites in the proper state.
     auto updateMemberState = [&] {
@@ -1953,7 +1953,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase_UNSAFE(OperationCont
     //
     // Stand-alone nodes and drained replica set primaries can always accept writes.  Writes are
     // always permitted to the "local" database.
-    if (_canAcceptNonLocalWrites || alwaysAllowNonLocalWrites(*opCtx)) {
+    if (_canAcceptNonLocalWrites.loadRelaxed() || alwaysAllowNonLocalWrites(*opCtx)) {
         return true;
     }
     if (dbName == kLocalDB) {
@@ -1982,7 +1982,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opC
     // If we can accept non local writes (ie we're PRIMARY) then we must not be in ROLLBACK.
     // This check is redundant of the check of _memberState below, but since this can be checked
     // without locking, we do it as an optimization.
-    if (_canAcceptNonLocalWrites || alwaysAllowNonLocalWrites(*opCtx)) {
+    if (_canAcceptNonLocalWrites.loadRelaxed() || alwaysAllowNonLocalWrites(*opCtx)) {
         return true;
     }
 
@@ -2033,7 +2033,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
 
     auto session = OperationContextSession::get(opCtx);
     if (session && session->inActiveOrKilledMultiDocumentTransaction()) {
-        if (!_canAcceptNonLocalWrites && !getTestCommandsEnabled()) {
+        if (!_canAcceptNonLocalWrites.loadRelaxed() && !getTestCommandsEnabled()) {
             return Status(ErrorCodes::NotMaster,
                           "Multi-document transactions are only allowed on replica set primaries.");
         }
@@ -2145,7 +2145,7 @@ void ReplicationCoordinatorImpl::fillIsMasterForReplSet(
                                        _currentCommittedSnapshot->getTimestamp().getSecs());
     }
 
-    if (response->isMaster() && !_canAcceptNonLocalWrites) {
+    if (response->isMaster() && !_canAcceptNonLocalWrites.loadRelaxed()) {
         // Report that we are secondary to ismaster callers until drain completes.
         response->setIsMaster(false);
         response->setIsSecondary(true);
@@ -2615,12 +2615,12 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
         // have just failed a stepdown attempt and thus are staying in PRIMARY state but restoring
         // our ability to accept writes.
         bool canAcceptWrites = _topCoord->canAcceptWrites();
-        if (canAcceptWrites != _canAcceptNonLocalWrites) {
+        if (canAcceptWrites != _canAcceptNonLocalWrites.loadRelaxed()) {
             // We must be holding the global X lock to change _canAcceptNonLocalWrites.
             invariant(opCtx);
             invariant(opCtx->lockState()->isW());
         }
-        _canAcceptNonLocalWrites = canAcceptWrites;
+        _canAcceptNonLocalWrites.store(canAcceptWrites);
     }
 
 
@@ -2646,7 +2646,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
         _opTimeWaiterList.signalAll_inlock();
 
         // _canAcceptNonLocalWrites should already be set above.
-        invariant(!_canAcceptNonLocalWrites);
+        invariant(!_canAcceptNonLocalWrites.loadRelaxed());
 
         serverGlobalParams.validateFeaturesAsMaster.store(false);
         result = kActionCloseAllConnections;
@@ -3233,7 +3233,7 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime_inloc
     }
 
     auto maximumStableTimestamp = commitPoint.getTimestamp();
-    if (_canAcceptNonLocalWrites && _storage->supportsDocLocking(_service)) {
+    if (_canAcceptNonLocalWrites.loadRelaxed() && _storage->supportsDocLocking(_service)) {
         // If the storage engine supports document level locking, then it is possible for oplog
         // writes to commit out of order. In that case, we don't want to set the stable timestamp
         // ahead of the all committed timestamp. This is not a problem for oplog application
