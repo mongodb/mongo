@@ -38,7 +38,7 @@ var $config = extendWorkload($config, function($config, $super) {
                                    $super.states);
 
     $config.transitions = Object.extend(
-        {explain: $config.data.assignEqualProbsToTransitions($config.states)}, $super.transitions);
+        {explain: assignEqualProbsToTransitions(Object.keys($config.states))}, $super.transitions);
 
     return $config;
 });

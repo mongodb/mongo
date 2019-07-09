@@ -13,6 +13,7 @@ var $config = (function() {
     var data = {
         prefix: "create_index_background_unique_",
         numDocsToLoad: 5000,
+        shouldBuild: true,  // used to ensure ordering of buildIndex/dropIndex calls
         iterationCount: 0,
         getCollectionNameForThread: function(threadId) {
             return this.prefix + threadId.toString();
@@ -28,28 +29,52 @@ var $config = (function() {
         },
     };
 
+    let buildIndexHelper = function(db, collName, data) {
+        data.shouldBuild = false;
+        const res = db.runCommand({
+            createIndexes: data.getCollectionNameForThread(data.tid),
+            indexes: [{key: {x: 1}, name: "x_1", unique: true, background: true}]
+        });
+        assertAlways.commandWorked(res);
+    };
+
+    let dropIndexHelper = function(db, collName, data) {
+        data.shouldBuild = true;
+        // In the case that we have an even # of iterations, we skip the final drop so that
+        // validation can be performed on the indexes created.
+        if (data.iterationCount === data.iterations) {
+            return;
+        }
+
+        assertAlways.commandWorked(
+            db.runCommand({dropIndexes: data.getCollectionNameForThread(data.tid), index: "x_1"}));
+    };
+
     var states = (function() {
         function buildIndex(db, collName) {
             this.iterationCount++;
-
-            const res = db.runCommand({
-                createIndexes: this.getCollectionNameForThread(this.tid),
-                indexes: [{key: {x: 1}, name: "x_1", unique: true, background: true}]
-            });
-            assertAlways.commandWorked(res);
+            // Make sure successive calls to buildIndex do not occur without a dropIndex in between.
+            // This is to ensure that workloads extending from this one can add additional states
+            // and still maintain the base workload's guarantee that buildIndex and dropIndex are
+            // called in succession.
+            if (!this.shouldBuild) {
+                dropIndexHelper(db, collName, this);
+                return;
+            }
+            buildIndexHelper(db, collName, this);
         }
 
         function dropIndex(db, collName) {
             this.iterationCount++;
-
-            // In the case that we have an even # of iterations, we skip the final drop so that
-            // validation can be performed on the indexes created.
-            if (this.iterationCount === this.iterations) {
+            // Make sure successive calls to dropIndex do not occur without a buildIndex in between.
+            // This is to ensure that workloads extending from this one can add additional states
+            // and still maintain the base workload's guarantee that buildIndex and dropIndex are
+            // called in succession.
+            if (this.shouldBuild) {
+                buildIndexHelper(db, collName, this);
                 return;
             }
-
-            assertAlways.commandWorked(db.runCommand(
-                {dropIndexes: this.getCollectionNameForThread(this.tid), index: "x_1"}));
+            dropIndexHelper(db, collName, this);
         }
 
         return {

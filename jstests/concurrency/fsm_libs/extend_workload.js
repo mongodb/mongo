@@ -20,7 +20,21 @@ function extendWorkload($config, callback) {
     assert.eq(2,
               callback.length,
               '2nd argument to extendWorkload must take 2 arguments: $config and $super');
-    var parsedSuperConfig = parseConfig($config);
-    var childConfig = Object.extend({}, parsedSuperConfig, true);
+    let parsedSuperConfig = parseConfig($config);
+    let childConfig = Object.extend({}, parsedSuperConfig, true);
     return callback(childConfig, parsedSuperConfig);
+}
+
+/** assignEqualProbsToTransitions example usage:
+ * $config.transitions = Object.extend({<state>:
+ * assignEqualProbsToTransitions(Object.keys($config.states))}, $super.transitions);
+ */
+function assignEqualProbsToTransitions(states) {
+    assertAlways.gt(states.length, 0);
+    let probs = {};
+    let pr = 1.0 / states.length;
+    states.forEach(function(s) {
+        probs[s] = pr;
+    });
+    return probs;
 }

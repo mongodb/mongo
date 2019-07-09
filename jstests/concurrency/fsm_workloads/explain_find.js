@@ -51,7 +51,7 @@ var $config = extendWorkload($config, function($config, $super) {
                                    $super.states);
 
     $config.transitions = Object.extend(
-        {explain: $config.data.assignEqualProbsToTransitions($config.states)}, $super.transitions);
+        {explain: assignEqualProbsToTransitions(Object.keys($config.states))}, $super.transitions);
 
     // doubling number of iterations so there is a higher chance we will
     // transition to each of the 8 new states at least once

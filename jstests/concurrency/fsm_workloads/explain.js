@@ -14,16 +14,6 @@ var $config = (function() {
         collNotExist: 'donotexist__',
         nInserted: 0,
         shardKey: {j: 1},
-        assignEqualProbsToTransitions: function assignEqualProbsToTransitions(statesMap) {
-            var states = Object.keys(statesMap);
-            assertAlways.gt(states.length, 0);
-            var probs = {};
-            var pr = 1.0 / states.length;
-            states.forEach(function(s) {
-                probs[s] = pr;
-            });
-            return probs;
-        }
     };
 
     function setup(db, collName, cluster) {
