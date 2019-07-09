@@ -1382,7 +1382,7 @@ private:
     // Flag that indicates whether writes to databases other than "local" are allowed.  Used to
     // answer canAcceptWritesForDatabase() and canAcceptWritesFor() questions.
     // Always true for standalone nodes and masters in master-slave relationships.
-    bool _canAcceptNonLocalWrites;  // (GX)
+    AtomicWord<bool> _canAcceptNonLocalWrites;  // (GX)
 
     // Flag that indicates whether reads from databases other than "local" are allowed.  Unlike
     // _canAcceptNonLocalWrites, above, this question is about admission control on secondaries,

@@ -979,8 +979,8 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn,
     _drainFinishedCond.notify_all();
 
     invariant(_getMemberState_inlock().primary());
-    invariant(!_canAcceptNonLocalWrites);
-    _canAcceptNonLocalWrites = true;
+    invariant(!_canAcceptNonLocalWrites.loadRelaxed());
+    _canAcceptNonLocalWrites.store(true);
 
     lk.unlock();
     _setFirstOpTimeOfMyTerm(_externalState->onTransitionToPrimary(txn, isV1ElectionProtocol()));
@@ -1936,7 +1936,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(StringData dbName) {
     // accept writes.  Similarly, writes are always permitted to the "local" database.  Finally,
     // in the event that a node is started with --slave and --master, we allow writes unless the
     // master/slave system has set the replAllDead flag.
-    if (_canAcceptNonLocalWrites) {
+    if (_canAcceptNonLocalWrites.loadRelaxed()) {
         return true;
     }
     if (dbName == kLocalDB) {
@@ -2143,7 +2143,7 @@ void ReplicationCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* respon
         response->setLastMajorityWrite(majorityOpTime, majorityOpTime.getTimestamp().getSecs());
     }
     // Report that we are secondary to ismaster callers until drain completes.
-    if (response->isMaster() && !_canAcceptNonLocalWrites) {
+    if (response->isMaster() && !_canAcceptNonLocalWrites.loadRelaxed()) {
         response->setIsMaster(false);
         response->setIsSecondary(true);
     }
@@ -2647,7 +2647,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         _replicationWaiterList.signalAndRemoveAll_inlock();
         // Wake up the optime waiter that is waiting for primary catch-up to finish.
         _opTimeWaiterList.signalAndRemoveAll_inlock();
-        _canAcceptNonLocalWrites = false;
+        _canAcceptNonLocalWrites.store(false);
         _stepDownPending = false;
         serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(false);
         result = kActionCloseAllConnections;
