@@ -1342,13 +1342,19 @@ void WiredTigerKVEngine::alterIdentMetadata(OperationContext* opCtx,
                                             const IndexDescriptor* desc) {
     WiredTigerSession session(_conn);
     std::string uri = _uri(ident);
+    auto sessionHandle = session.getSession();
 
     // Make the alter call to update metadata without taking exclusive lock to avoid conflicts with
     // concurrent operations.
     std::string alterString =
         WiredTigerIndex::generateAppMetadataString(*desc) + "exclusive_refreshed=false,";
-    invariantWTOK(
-        session.getSession()->alter(session.getSession(), uri.c_str(), alterString.c_str()));
+    int ret = sessionHandle->alter(sessionHandle, uri.c_str(), alterString.c_str());
+    if (ret) {
+        severe() << "Failed to alter ident metadata. Uri: " << uri << " Ret: " << ret
+                 << " Ident: " << ident << " alterString: " << redact(alterString)
+                 << " Msg: " << sessionHandle->strerror(sessionHandle, ret);
+        fassertFailed(31013);
+    }
 }
 
 Status WiredTigerKVEngine::dropIdent(OperationContext* opCtx, StringData ident) {
