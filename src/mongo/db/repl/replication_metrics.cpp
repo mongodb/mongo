@@ -262,9 +262,39 @@ int ReplicationMetrics::getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_fo
     return _electionMetrics.getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd();
 }
 
+void ReplicationMetrics::setElectionCandidateMetrics(Date_t lastElectionDate) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _electionCandidateMetrics.setLastElectionDate(lastElectionDate);
+    _nodeIsCandidateOrPrimary = true;
+}
+
+void ReplicationMetrics::setTargetCatchupOpTime(OpTime opTime) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _electionCandidateMetrics.setTargetCatchupOpTime(opTime);
+}
+
+boost::optional<OpTime> ReplicationMetrics::getTargetCatchupOpTime_forTesting() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _electionCandidateMetrics.getTargetCatchupOpTime();
+}
+
 BSONObj ReplicationMetrics::getElectionMetricsBSON() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _electionMetrics.toBSON();
+}
+
+BSONObj ReplicationMetrics::getElectionCandidateMetricsBSON() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_nodeIsCandidateOrPrimary) {
+        return _electionCandidateMetrics.toBSON();
+    }
+    return BSONObj();
+}
+
+void ReplicationMetrics::clearElectionCandidateMetrics() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _electionCandidateMetrics.setTargetCatchupOpTime(boost::none);
+    _nodeIsCandidateOrPrimary = false;
 }
 
 class ReplicationMetrics::ElectionMetricsSSS : public ServerStatusSection {

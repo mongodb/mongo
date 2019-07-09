@@ -48,6 +48,8 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
+#include <boost/optional/optional_io.hpp>
+
 namespace mongo {
 namespace repl {
 namespace {
@@ -344,6 +346,10 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
 
     simulateEnoughHeartbeatsForAllNodesUp();
 
+    // Check that the node's election candidate metrics are unset before it becomes primary.
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
+
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
     log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
@@ -368,6 +374,11 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
                                                                << false << "reason"
                                                                << "don't like him much")));
             voteRequests++;
+            // Check that the node's election candidate metrics are set once it has called an
+            // election.
+            ASSERT_BSONOBJ_NE(
+                BSONObj(),
+                ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
         } else {
             net->blackHole(noi);
         }
@@ -377,6 +388,11 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
     stopCapturingLogMessages();
     ASSERT_EQUALS(
         1, countLogLinesContaining("not running for primary, we received insufficient votes"));
+
+    // Check that the node's election candidate metrics have been cleared, since it lost the dry-run
+    // election and will not become primary.
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
@@ -667,8 +683,16 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
     replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
+    // Check that the node's election candidate metrics are unset before it becomes primary.
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
+
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateSuccessfulDryRun();
+
+    // Check that the node's election candidate metrics are set once it has called an election.
+    ASSERT_BSONOBJ_NE(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
 
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
@@ -694,6 +718,11 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
                   countLogLinesContaining("not becoming primary, we have been superseded already"));
+
+    // Check that the node's election candidate metrics have been cleared, since it lost the actual
+    // election and will not become primary.
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
@@ -2228,6 +2257,10 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
     ASSERT_EQ(0,
               ReplicationMetrics::get(opCtx.get())
                   .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
+
+    // Check that the targetCatchupOpTime metric was not set.
+    ASSERT_EQUALS(boost::none,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 }
 
 // Heartbeats set a future target OpTime and we reached that successfully.
@@ -2237,11 +2270,23 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+
+    // Check that the targetCatchupOpTime metric is unset before the target opTime for catchup is
+    // set.
+    ASSERT_EQUALS(boost::none,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
+
     processHeartbeatRequests([this, time2](const NetworkOpIter noi) {
         auto net = getNet();
         // The old primary accepted one more op and all nodes caught up after voting for me.
         net->scheduleResponse(noi, net->now(), makeHeartbeatResponse(time2));
     });
+
+    // Check that the targetCatchupOpTime metric was set correctly when heartbeats updated the
+    // target opTime for catchup.
+    ASSERT_EQUALS(time2,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
+
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
@@ -2431,6 +2476,10 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
         // Other nodes are ahead of me.
         getNet()->scheduleResponse(noi, getNet()->now(), makeHeartbeatResponse(time2));
     });
+
+    ASSERT_EQUALS(time2,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
+
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     TopologyCoordinator::UpdateTermResult updateTermResult;
     auto evh = getReplCoord()->updateTerm_forTest(2, &updateTermResult);
@@ -2461,6 +2510,10 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
     ASSERT_EQ(0,
               ReplicationMetrics::get(opCtx.get())
                   .getNumCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd_forTesting());
+
+    // Check that the targetCatchupOpTime metric was cleared when the node stepped down.
+    ASSERT_EQUALS(boost::none,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
@@ -2566,6 +2619,8 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countLogLinesContaining("Heartbeats updated catchup target optime"));
+    ASSERT_EQUALS(time3,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 
     // 3) Advancing its applied optime to time 2 isn't enough.
     advanceMyLastAppliedOpTime(time2, Date_t() + Seconds(time2.getSecs()));
@@ -2586,6 +2641,8 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQ(1, countLogLinesContaining("Heartbeats updated catchup target optime"));
+    ASSERT_EQUALS(time4,
+                  ReplicationMetrics::get(getServiceContext()).getTargetCatchupOpTime_forTesting());
 
     // 5) Advancing to time 3 isn't enough now.
     advanceMyLastAppliedOpTime(time3, Date_t() + Seconds(time3.getSecs()));

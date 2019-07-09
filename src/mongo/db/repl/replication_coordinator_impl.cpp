@@ -2102,6 +2102,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     lk.lock();
     _updateAndLogStatsOnStepDown(&arsd);
+
+    // Clear the node's election candidate metrics since it is no longer primary.
+    ReplicationMetrics::get(opCtx).clearElectionCandidateMetrics();
+
     _topCoord->finishUnconditionalStepDown();
 
     onExitGuard.dismiss();
@@ -2365,6 +2369,9 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
         }
     }
 
+    BSONObj electionCandidateMetrics =
+        ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON();
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
     _topCoord->prepareStatusResponse(
@@ -2373,6 +2380,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
             static_cast<unsigned>(time(nullptr) - serverGlobalParams.started),
             _getCurrentCommittedSnapshotOpTimeAndWallTime_inlock(),
             initialSyncProgress,
+            electionCandidateMetrics,
             _storage->getLastStableRecoveryTimestamp(_service),
             _externalState->tooStale()},
         response,
@@ -2678,6 +2686,9 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
 
             lk.lock();
             _updateAndLogStatsOnStepDown(&arsd.get());
+
+            // Clear the node's election candidate metrics since it is no longer primary.
+            ReplicationMetrics::get(opCtx).clearElectionCandidateMetrics();
         } else {
             // Release the rstl lock as the node might have stepped down due to
             // other unconditional step down code paths like learning new term via heartbeat &
@@ -3094,6 +3105,8 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
     if (_waiter && _waiter->opTime == *targetOpTime) {
         return;
     }
+
+    ReplicationMetrics::get(getGlobalServiceContext()).setTargetCatchupOpTime(targetOpTime.get());
 
     log() << "Heartbeats updated catchup target optime to " << *targetOpTime;
     log() << "Latest known optime per replica set member:";

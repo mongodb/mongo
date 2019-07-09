@@ -49,6 +49,7 @@
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
@@ -407,6 +408,10 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 
     lk.lock();
     _updateAndLogStatsOnStepDown(&arsd);
+
+    // Clear the node's election candidate metrics since it is no longer primary.
+    ReplicationMetrics::get(opCtx.get()).clearElectionCandidateMetrics();
+
     _topCoord->finishUnconditionalStepDown();
 
     const auto action = _updateMemberStateFromTopologyCoordinator(lk, opCtx.get());
@@ -629,6 +634,9 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
             lk.lock();
             _updateAndLogStatsOnStepDown(&arsd.get());
+
+            // Clear the node's election candidate metrics since it is no longer primary.
+            ReplicationMetrics::get(opCtx.get()).clearElectionCandidateMetrics();
         } else {
             // Release the rstl lock as the node might have stepped down due to
             // other unconditional step down code paths like learning new term via heartbeat &

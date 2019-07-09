@@ -34,9 +34,11 @@ global:
     cpp_namespace: "mongo::repl"
     cpp_includes:
         - "mongo/db/repl/election_reason_counter_parser.h"
+        - "mongo/db/repl/optime.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/db/repl/replication_types.idl"
 
 types:
     ElectionReasonCounter:
@@ -120,9 +122,14 @@ structs:
                       candidate"
         strict: true
         fields:
-            priorityAtElection:
-                description: "The node's priority at the time of the election"
-                type: double
+            lastElectionDate:
+                description: "Time the node called the dry run election, or the actual election if
+                              it skipped dry run"
+                type: date
+            targetCatchupOpTime:
+                description: "The node's target opTime for catchup"
+                type: optime
+                optional: true
 
     ElectionParticipantMetrics:
         description: "Stores metrics that are specific to the last election in which the node voted"

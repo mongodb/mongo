@@ -301,6 +301,7 @@ public:
         const unsigned selfUptime;
         const OpTimeAndWallTime readConcernMajorityOpTime;
         const BSONObj initialSyncStatus;
+        const BSONObj electionCandidateMetrics;
 
         // boost::none if the storage engine does not support recovery to a timestamp.
         // Timestamp::min() if a stable recovery timestamp is yet to be taken.
