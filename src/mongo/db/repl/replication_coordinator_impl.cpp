@@ -3597,11 +3597,17 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
                                                  stableOpTime->opTime.getTimestamp());
                 }
             } else {
-                // When majority read concern is disabled, the stable optime may be ahead of the
-                // commit point, so we set the committed snapshot to the commit point.
                 const auto lastCommittedOpTime = _topCoord->getLastCommittedOpTimeAndWallTime();
                 if (!lastCommittedOpTime.opTime.isNull()) {
-                    _updateCommittedSnapshot_inlock(lastCommittedOpTime);
+                    // When majority read concern is disabled, we set the stable timestamp to
+                    // be less than or equal to the all committed timestamp. This makes sure that
+                    // the committed snapshot is not past the all committed timestamp to guarantee
+                    // we can always read our own majority committed writes. This problem is
+                    // specific to the case where we have a single node replica set and the
+                    // lastCommittedOpTime is set to be the lastApplied which can be ahead of the
+                    // allCommitted.
+                    auto newCommittedSnapshot = std::min(lastCommittedOpTime, *stableOpTime);
+                    _updateCommittedSnapshot_inlock(newCommittedSnapshot);
                 }
                 // Set the stable timestamp regardless of whether the majority commit point moved
                 // forward.

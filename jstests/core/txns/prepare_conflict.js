@@ -47,7 +47,7 @@
 
     // Insert a document unmodified by the transaction.
     const otherDoc = {_id: 2, y: 2};
-    assert.commandWorked(testColl.insert(otherDoc));
+    assert.commandWorked(testColl.insert(otherDoc, {writeConcern: {w: "majority"}}));
 
     // Create an index on 'y' to avoid conflicts on the field.
     assert.commandWorked(testColl.createIndex({y: 1}));

@@ -17,7 +17,8 @@
 
     // Insert a document that gets deleted as part of the transaction.
     const kDeletedDocumentId = 0;
-    coll.insert({_id: kDeletedDocumentId, a: "I was here before the transaction"});
+    coll.insert({_id: kDeletedDocumentId, a: "I was here before the transaction"},
+                {writeConcern: {w: "majority"}});
 
     let cst = new ChangeStreamTest(db);
     let changeStream = cst.startWatchingChanges({
