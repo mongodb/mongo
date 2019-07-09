@@ -5150,7 +5150,7 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       num_files: 10
-      num_tasks: 5
+      num_tasks: 15
       npm_command: initsync-fuzzer
       resmoke_args: --suites=initial_sync_fuzzer
       name: initial_sync_fuzzer
