@@ -598,7 +598,8 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
         if (cmpData < 0) {
             severe() << "expected the next key" << data.first.toString()
-                     << " to be greater than or equal to the previous key" << previousKey.toString();
+                     << " to be greater than or equal to the previous key"
+                     << previousKey.toString();
             fassertFailedNoTrace(31171);
         }
 
