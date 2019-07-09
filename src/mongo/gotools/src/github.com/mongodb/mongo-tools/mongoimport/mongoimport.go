@@ -375,7 +375,7 @@ func (imp *MongoImport) importDocuments(inputReader InputReader) (numImported ui
 		return 0, 0, err
 	}
 
-	log.Logvf(log.Always, "connected to: %v", imp.ToolOptions.URI.ConnectionString)
+	log.Logvf(log.Always, "connected to: %v", util.SanitizeURI(imp.ToolOptions.URI.ConnectionString))
 
 	log.Logvf(log.Info, "ns: %v.%v",
 		imp.ToolOptions.Namespace.DB,

@@ -53,6 +53,20 @@
   revision = "d9eb7a3d35ec988b8585d4a0068e462c27d28380"
 
 [[projects]]
+  digest = "1:ec7c114271a6226a146c64cb0d95348ac85350fde7dbb2564a1911165aa63ced"
+  name = "github.com/google/go-cmp"
+  packages = [
+    "cmp",
+    "cmp/internal/diff",
+    "cmp/internal/flags",
+    "cmp/internal/function",
+    "cmp/internal/value",
+  ]
+  pruneopts = "T"
+  revision = "6f77996f0c42f7b84e5a2b252227263f93432e9b"
+  version = "v0.3.0"
+
+[[projects]]
   digest = "1:f9c618e8c569f950d5cd339a475eaef92e02e5e63d1434fd7e7881bfa5f02901"
   name = "github.com/google/gopacket"
   packages = [
@@ -66,11 +80,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:c5b612f12dc3ba60fc0a6ff1508890954df5dbd9757bdeb601014018f1f730c2"
+  digest = "1:4cbb75bd3317ea6f590834c19dc22d13fb406c0629905bd17c28ee2c22637bf1"
   name = "github.com/gopherjs/gopherjs"
   packages = ["js"]
   pruneopts = "T"
-  revision = "847fc94819f9d5a4e7154e2203b36f6dbace6f48"
+  revision = "3e4dfb77656c424b6d1196a4d5fed0fcf63677cc"
 
 [[projects]]
   digest = "1:8e9ae4fedb2abb5267f2cd69f8d3010e6c464a9c51d1fa1f9d192c0757ac691a"
@@ -104,7 +118,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:65929a60fecb8d113b86f4a83d447f28f97a72bf0eafc760a6a41c287f08e362"
+  digest = "1:0e4a72583484a5d19fc7897d343c24c3021f246a49125557b5862aa276bcca87"
   name = "github.com/mongodb/mongo-tools-common"
   packages = [
     "archive",
@@ -122,10 +136,11 @@
     "testtype",
     "testutil",
     "text",
+    "txn",
     "util",
   ]
   pruneopts = "T"
-  revision = "947545918a26ddef9a4fa2ab3043b0d85071cb81"
+  revision = "776c33b96e40046d62731a8c549a7cfec7724913"
 
 [[projects]]
   digest = "1:f363c75e8cac5653bc5c0c2b90cbd8a522fdc48c13a5f8d85078750f82d1a009"
@@ -187,7 +202,7 @@
   revision = "73f8eece6fdcd902c185bf651de50f3828bed5ed"
 
 [[projects]]
-  digest = "1:2e7c9ba6722ef3e588363dd0a9fe109773f63551f7838cc909737b7935de77ad"
+  digest = "1:480ce57fc9859f568788c2424c3235bb697c52a9867c2a34fb1ad5c6820ac822"
   name = "go.mongodb.org/mongo-driver"
   packages = [
     "bson",
@@ -207,23 +222,21 @@
     "version",
     "x/bsonx",
     "x/bsonx/bsoncore",
-    "x/mongo/driverlegacy",
-    "x/mongo/driverlegacy/auth",
-    "x/mongo/driverlegacy/auth/internal/gssapi",
-    "x/mongo/driverlegacy/session",
-    "x/mongo/driverlegacy/topology",
-    "x/mongo/driverlegacy/uuid",
-    "x/network/address",
-    "x/network/command",
-    "x/network/compressor",
-    "x/network/connection",
-    "x/network/connstring",
-    "x/network/description",
-    "x/network/result",
-    "x/network/wiremessage",
+    "x/mongo/driver",
+    "x/mongo/driver/address",
+    "x/mongo/driver/auth",
+    "x/mongo/driver/auth/internal/gssapi",
+    "x/mongo/driver/connstring",
+    "x/mongo/driver/description",
+    "x/mongo/driver/dns",
+    "x/mongo/driver/operation",
+    "x/mongo/driver/session",
+    "x/mongo/driver/topology",
+    "x/mongo/driver/uuid",
+    "x/mongo/driver/wiremessage",
   ]
   pruneopts = "T"
-  revision = "bb984ba94a90e2bdf108128bf6bef0c0505a4bc7"
+  revision = "216e392ea5ac0903291d940c2574a11a185663bd"
 
 [[projects]]
   digest = "1:0f2b2cb9f84318c0f71fed3087ff9ac370370f842469b71b00348c3d72a19b44"
@@ -237,14 +250,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7054d0b00df4ca102284022b5014be2a790bf3bc5dda947678e4c1f0d8238287"
+  digest = "1:31eb938007354c1ad51e4a5c08c815cd242dbf32bc3a426013a0ce0578eb2e5c"
   name = "golang.org/x/sync"
   packages = ["semaphore"]
   pruneopts = "T"
-  revision = "e225da77a7e68af35c70ccbf71af2b83e6acac3c"
+  revision = "112230192c580c3556b8cee6403af37a4fc5f28c"
 
 [[projects]]
-  digest = "1:6164911cb5e94e8d8d5131d646613ff82c14f5a8ce869de2f6d80d9889df8c5a"
+  digest = "1:0a6103b1dc59b52f7e64a491b398b854c0fcaacde43c25ce468610a64311b72d"
   name = "golang.org/x/text"
   packages = [
     "internal/gen",
@@ -255,8 +268,8 @@
     "unicode/norm",
   ]
   pruneopts = "T"
-  revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
-  version = "v0.3.0"
+  revision = "342b2e1fbaa52c93f31447ad2c6abc048c63e475"
+  version = "v0.3.2"
 
 [[projects]]
   digest = "1:202d7e19a366151a68e5d96a09caaf02d0e951ece729ac2c760b837af05558a9"
@@ -285,6 +298,7 @@
     "github.com/10gen/llmgo/bson",
     "github.com/10gen/openssl",
     "github.com/3rf/mongo-lint",
+    "github.com/google/go-cmp/cmp",
     "github.com/google/gopacket",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcap",
@@ -306,6 +320,7 @@
     "github.com/mongodb/mongo-tools-common/testtype",
     "github.com/mongodb/mongo-tools-common/testutil",
     "github.com/mongodb/mongo-tools-common/text",
+    "github.com/mongodb/mongo-tools-common/txn",
     "github.com/mongodb/mongo-tools-common/util",
     "github.com/nsf/termbox-go",
     "github.com/patrickmn/go-cache",
@@ -316,6 +331,7 @@
     "go.mongodb.org/mongo-driver/mongo",
     "go.mongodb.org/mongo-driver/mongo/gridfs",
     "go.mongodb.org/mongo-driver/mongo/options",
+    "go.mongodb.org/mongo-driver/mongo/readconcern",
     "go.mongodb.org/mongo-driver/mongo/readpref",
     "go.mongodb.org/mongo-driver/mongo/writeconcern",
     "go.mongodb.org/mongo-driver/x/bsonx",

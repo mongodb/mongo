@@ -203,7 +203,7 @@ func parseDatetimeString(data string) (int64, error) {
 		return 0, fmt.Errorf("invalid $date value string: %s", data)
 	}
 
-	return t.UnixNano() / 1e6, nil
+	return t.Unix()*1e3 + int64(t.Nanosecond())/1e6, nil
 }
 
 func parseDatetimeObject(data *extJSONObject) (d int64, err error) {

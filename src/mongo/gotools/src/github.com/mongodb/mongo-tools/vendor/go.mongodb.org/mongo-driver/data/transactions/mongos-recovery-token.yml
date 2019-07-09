@@ -1,4 +1,8 @@
-topology: [sharded]
+runOn:
+    -
+        minServerVersion: "4.1.8"
+        topology: ["sharded"]
+
 database_name: &database_name "transaction-tests"
 collection_name: &collection_name "test"
 
@@ -265,7 +269,7 @@ tests:
       collection:
         data: []
 
-  - description: abortTransaction does not send recoveryToken
+  - description: abortTransaction sends recoveryToken
     useMultipleMongoses: true
     operations:
       - name: startTransaction
@@ -322,7 +326,7 @@ tests:
             startTransaction:
             autocommit: false
             writeConcern:
-            recoveryToken:
+            recoveryToken: 42
           command_name: abortTransaction
           database_name: admin
       - command_started_event:
@@ -334,7 +338,7 @@ tests:
             startTransaction:
             autocommit: false
             writeConcern:
-            recoveryToken:
+            recoveryToken: 42
           command_name: abortTransaction
           database_name: admin
 

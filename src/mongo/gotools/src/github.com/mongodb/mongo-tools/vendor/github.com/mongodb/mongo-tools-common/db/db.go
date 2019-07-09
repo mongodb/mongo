@@ -9,9 +9,15 @@
 package db
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,7 +29,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	mopt "go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
-	"go.mongodb.org/mongo-driver/x/network/connection"
 )
 
 type (
@@ -157,9 +162,132 @@ func NewSessionProvider(opts options.ToolOptions) (*SessionProvider, error) {
 	return &SessionProvider{client: client}, nil
 }
 
+// addClientCertFromFile adds a client certificate to the configuration given a path to the
+// containing file and returns the certificate's subject name.
+func addClientCertFromFile(cfg *tls.Config, clientFile, keyPasswd string) (string, error) {
+	data, err := ioutil.ReadFile(clientFile)
+	if err != nil {
+		return "", err
+	}
+
+	var currentBlock *pem.Block
+	var certBlock, certDecodedBlock, keyBlock []byte
+
+	remaining := data
+	start := 0
+	for {
+		currentBlock, remaining = pem.Decode(remaining)
+		if currentBlock == nil {
+			break
+		}
+
+		if currentBlock.Type == "CERTIFICATE" {
+			certBlock = data[start : len(data)-len(remaining)]
+			certDecodedBlock = currentBlock.Bytes
+			start += len(certBlock)
+		} else if strings.HasSuffix(currentBlock.Type, "PRIVATE KEY") {
+			if keyPasswd != "" && x509.IsEncryptedPEMBlock(currentBlock) {
+				var encoded bytes.Buffer
+				buf, err := x509.DecryptPEMBlock(currentBlock, []byte(keyPasswd))
+				if err != nil {
+					return "", err
+				}
+
+				pem.Encode(&encoded, &pem.Block{Type: currentBlock.Type, Bytes: buf})
+				keyBlock = encoded.Bytes()
+				start = len(data) - len(remaining)
+			} else {
+				keyBlock = data[start : len(data)-len(remaining)]
+				start += len(keyBlock)
+			}
+		}
+	}
+	if len(certBlock) == 0 {
+		return "", fmt.Errorf("failed to find CERTIFICATE")
+	}
+	if len(keyBlock) == 0 {
+		return "", fmt.Errorf("failed to find PRIVATE KEY")
+	}
+
+	cert, err := tls.X509KeyPair(certBlock, keyBlock)
+	if err != nil {
+		return "", err
+	}
+
+	cfg.Certificates = append(cfg.Certificates, cert)
+
+	// The documentation for the tls.X509KeyPair indicates that the Leaf certificate is not
+	// retained.
+	crt, err := x509.ParseCertificate(certDecodedBlock)
+	if err != nil {
+		return "", err
+	}
+
+	return crt.Subject.String(), nil
+}
+
+// addCACertFromFile adds a root CA certificate to the configuration given a path
+// to the containing file.
+func addCACertFromFile(cfg *tls.Config, file string) error {
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		return err
+	}
+
+	certBytes, err := loadCert(data)
+	if err != nil {
+		return err
+	}
+
+	cert, err := x509.ParseCertificate(certBytes)
+	if err != nil {
+		return err
+	}
+
+	if cfg.RootCAs == nil {
+		cfg.RootCAs = x509.NewCertPool()
+	}
+
+	cfg.RootCAs.AddCert(cert)
+
+	return nil
+}
+
+func loadCert(data []byte) ([]byte, error) {
+	var certBlock *pem.Block
+
+	for certBlock == nil {
+		if data == nil || len(data) == 0 {
+			return nil, errors.New(".pem file must have both a CERTIFICATE and an RSA PRIVATE KEY section")
+		}
+
+		block, rest := pem.Decode(data)
+		if block == nil {
+			return nil, errors.New("invalid .pem file")
+		}
+
+		switch block.Type {
+		case "CERTIFICATE":
+			if certBlock != nil {
+				return nil, errors.New("multiple CERTIFICATE sections in .pem file")
+			}
+
+			certBlock = block
+		}
+
+		data = rest
+	}
+
+	return certBlock.Bytes, nil
+}
+
 // configure the client according to the options set in the uri and in the provided ToolOptions, with ToolOptions having precedence.
 func configureClient(opts options.ToolOptions) (*mongo.Client, error) {
 	clientopt := mopt.Client()
+
+	if opts.RetryWrites != nil {
+		clientopt.SetRetryWrites(*opts.RetryWrites)
+	}
 
 	if opts.URI == nil || opts.URI.ConnectionString == "" {
 		// XXX Normal operations shouldn't ever reach here because a URI should
@@ -223,26 +351,22 @@ func configureClient(opts options.ToolOptions) (*mongo.Client, error) {
 			return nil, fmt.Errorf("CRL files are not supported on this platform")
 		}
 
-		tlsConfig := connection.NewTLSConfig()
+		tlsConfig := &tls.Config{}
 		if opts.SSLAllowInvalidCert || opts.SSLAllowInvalidHost {
-			tlsConfig.SetInsecure(true)
+			tlsConfig.InsecureSkipVerify = true
 		}
 		if opts.SSLPEMKeyFile != "" {
-			if opts.SSLPEMKeyPassword != "" {
-				tlsConfig.SetClientCertDecryptPassword(func() string { return opts.SSLPEMKeyPassword })
-			}
-
-			_, err := tlsConfig.AddClientCertFromFile(opts.SSLPEMKeyFile)
+			_, err := addClientCertFromFile(tlsConfig, opts.SSLPEMKeyFile, opts.SSLPEMKeyPassword)
 			if err != nil {
 				return nil, fmt.Errorf("error configuring client, can't load client certificate: %v", err)
 			}
 		}
 		if opts.SSLCAFile != "" {
-			if err := tlsConfig.AddCACertFromFile(opts.SSLCAFile); err != nil {
+			if err := addCACertFromFile(tlsConfig, opts.SSLCAFile); err != nil {
 				return nil, fmt.Errorf("error configuring client, can't load CA file: %v", err)
 			}
 		}
-		clientopt.SetTLSConfig(tlsConfig.Config)
+		clientopt.SetTLSConfig(tlsConfig)
 	}
 
 	return mongo.NewClient(uriOpts, clientopt)

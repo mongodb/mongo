@@ -9,6 +9,7 @@ package options
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
@@ -122,6 +123,27 @@ func (af *ArrayFilters) ToArray() ([]bson.Raw, error) {
 		filters = append(filters, filter)
 	}
 	return filters, nil
+}
+
+// ToArrayDocument builds a BSON array for the array filters CRUD option. If the registry for af is nil,
+// bson.DefaultRegistry will be used when converting the filter interfaces to BSON.
+func (af *ArrayFilters) ToArrayDocument() (bson.Raw, error) {
+	registry := af.Registry
+	if registry == nil {
+		registry = bson.DefaultRegistry
+	}
+
+	idx, arr := bsoncore.AppendArrayStart(nil)
+	for i, f := range af.Filters {
+		filter, err := bson.MarshalWithRegistry(registry, f)
+		if err != nil {
+			return nil, err
+		}
+
+		arr = bsoncore.AppendDocumentElement(arr, strconv.Itoa(i), filter)
+	}
+	arr, _ = bsoncore.AppendArrayEnd(arr, idx)
+	return arr, nil
 }
 
 // MarshalError is returned when attempting to transform a value into a document

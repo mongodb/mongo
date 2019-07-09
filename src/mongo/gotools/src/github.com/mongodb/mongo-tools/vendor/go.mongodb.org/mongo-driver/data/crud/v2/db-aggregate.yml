@@ -1,0 +1,36 @@
+database_name: &database_name "admin"
+
+minServerVersion: '3.6'
+
+tests:
+  -
+    description: "Aggregate with $listLocalSessions"
+    operations:
+      -
+        name: aggregate
+        object: database
+        arguments:
+          pipeline:
+            - $listLocalSessions: { }
+            - $limit: 1
+            - $addFields: { dummy: "dummy field"}
+            - $project: { _id: 0, dummy: 1}
+        result:
+          -
+            dummy: "dummy field"
+  -
+    description: "Aggregate with $listLocalSessions and allowDiskUse"
+    operations:
+      -
+        name: aggregate
+        object: database
+        arguments:
+          pipeline:
+            - $listLocalSessions: { }
+            - $limit: 1
+            - $addFields: { dummy: "dummy field"}
+            - $project: { _id: 0, dummy: 1 }
+          allowDiskUse: true
+        result:
+          -
+            dummy: "dummy field"

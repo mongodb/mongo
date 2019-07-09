@@ -244,6 +244,7 @@ simpleFormat:
 		p.Status = StatusBadArgNum
 	case p.ArgNum >= len(p.Args): // No argument left over to print for the current verb.
 		p.Status = StatusMissingArg
+		p.ArgNum++
 	case verb == 'v':
 		// Go syntax
 		p.SharpV = p.Sharp

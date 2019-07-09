@@ -23,7 +23,7 @@
   name = "github.com/gopherjs/gopherjs"
   packages = ["js"]
   pruneopts = "UT"
-  revision = "847fc94819f9d5a4e7154e2203b36f6dbace6f48"
+  revision = "3e4dfb77656c424b6d1196a4d5fed0fcf63677cc"
 
 [[projects]]
   digest = "1:8e9ae4fedb2abb5267f2cd69f8d3010e6c464a9c51d1fa1f9d192c0757ac691a"
@@ -48,16 +48,17 @@
   version = "v4.20"
 
 [[projects]]
-  digest = "1:cc1c574c9cb5e99b123888c12b828e2d19224ab6c2244bda34647f230bf33243"
+  digest = "1:237af0cf68bac89e21af72e6cd6b64f388854895e75f82ad08c6c011e1a8286c"
   name = "github.com/smartystreets/assertions"
   packages = [
     ".",
+    "internal/go-diff/diffmatchpatch",
     "internal/go-render/render",
     "internal/oglematchers",
   ]
   pruneopts = "UT"
-  revision = "7678a5452ebea5b7090a6b163f844c133f523da2"
-  version = "1.8.3"
+  revision = "f487f9de1cd36ebab28235b9373028812fb47cbd"
+  version = "1.10.1"
 
 [[projects]]
   digest = "1:0fa3548bbce10c4db040310806841d2a95ab9345a1d9a8ad8359f4f6736b7986"
@@ -87,7 +88,7 @@
   revision = "73f8eece6fdcd902c185bf651de50f3828bed5ed"
 
 [[projects]]
-  digest = "1:305116d943d35382349686adfcef4786746272e77c2e7d2eba6b30caa94e2cf4"
+  digest = "1:265c4a96721e87c67842fe5de3555342d51f800b2e415046e5be2efcacf8158f"
   name = "go.mongodb.org/mongo-driver"
   packages = [
     "bson",
@@ -106,23 +107,21 @@
     "version",
     "x/bsonx",
     "x/bsonx/bsoncore",
-    "x/mongo/driverlegacy",
-    "x/mongo/driverlegacy/auth",
-    "x/mongo/driverlegacy/auth/internal/gssapi",
-    "x/mongo/driverlegacy/session",
-    "x/mongo/driverlegacy/topology",
-    "x/mongo/driverlegacy/uuid",
-    "x/network/address",
-    "x/network/command",
-    "x/network/compressor",
-    "x/network/connection",
-    "x/network/connstring",
-    "x/network/description",
-    "x/network/result",
-    "x/network/wiremessage",
+    "x/mongo/driver",
+    "x/mongo/driver/address",
+    "x/mongo/driver/auth",
+    "x/mongo/driver/auth/internal/gssapi",
+    "x/mongo/driver/connstring",
+    "x/mongo/driver/description",
+    "x/mongo/driver/dns",
+    "x/mongo/driver/operation",
+    "x/mongo/driver/session",
+    "x/mongo/driver/topology",
+    "x/mongo/driver/uuid",
+    "x/mongo/driver/wiremessage",
   ]
   pruneopts = "UT"
-  revision = "bb984ba94a90e2bdf108128bf6bef0c0505a4bc7"
+  revision = "216e392ea5ac0903291d940c2574a11a185663bd"
 
 [[projects]]
   digest = "1:79784b4d6789bbd40f17a9d204051bdd887d889acbbdc24ed8263b3dca28dfbf"
@@ -136,14 +135,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:75515eedc0dc2cb0b40372008b616fa2841d831c63eedd403285ff286c593295"
+  digest = "1:382bb5a7fb4034db3b6a2d19e5a4a6bcf52f4750530603c01ca18a172fa3089b"
   name = "golang.org/x/sync"
   packages = ["semaphore"]
   pruneopts = "UT"
-  revision = "e225da77a7e68af35c70ccbf71af2b83e6acac3c"
+  revision = "112230192c580c3556b8cee6403af37a4fc5f28c"
 
 [[projects]]
-  digest = "1:8029e9743749d4be5bc9f7d42ea1659471767860f0cdc34d37c3111bd308a295"
+  digest = "1:1093f2eb4b344996604f7d8b29a16c5b22ab9e1b25652140d3fede39f640d5cd"
   name = "golang.org/x/text"
   packages = [
     "internal/gen",
@@ -154,8 +153,8 @@
     "unicode/norm",
   ]
   pruneopts = "UT"
-  revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
-  version = "v0.3.0"
+  revision = "342b2e1fbaa52c93f31447ad2c6abc048c63e475"
+  version = "v0.3.2"
 
 [solve-meta]
   analyzer-name = "dep"
@@ -171,8 +170,7 @@
     "go.mongodb.org/mongo-driver/mongo/readpref",
     "go.mongodb.org/mongo-driver/mongo/writeconcern",
     "go.mongodb.org/mongo-driver/tag",
-    "go.mongodb.org/mongo-driver/x/network/connection",
-    "go.mongodb.org/mongo-driver/x/network/connstring",
+    "go.mongodb.org/mongo-driver/x/mongo/driver/connstring",
     "golang.org/x/crypto/ssh/terminal",
   ]
   solver-name = "gps-cdcl"

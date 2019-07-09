@@ -217,7 +217,7 @@ func Trunc(x float64) float64 {
 	if x == posInf || x == negInf || x != x || 1/x == negInf {
 		return x
 	}
-	return float64(int(x))
+	return Copysign(float64(int(x)), x)
 }
 
 var buf struct {

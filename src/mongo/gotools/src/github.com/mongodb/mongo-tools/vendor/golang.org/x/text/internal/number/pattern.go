@@ -10,7 +10,7 @@ import (
 )
 
 // This file contains a parser for the CLDR number patterns as described in
-// http://unicode.org/reports/tr35/tr35-numbers.html#Number_Format_Patterns.
+// https://unicode.org/reports/tr35/tr35-numbers.html#Number_Format_Patterns.
 //
 // The following BNF is derived from this standard.
 //
@@ -201,7 +201,7 @@ var (
 
 // ParsePattern extracts formatting information from a CLDR number pattern.
 //
-// See http://unicode.org/reports/tr35/tr35-numbers.html#Number_Format_Patterns.
+// See https://unicode.org/reports/tr35/tr35-numbers.html#Number_Format_Patterns.
 func ParsePattern(s string) (f *Pattern, err error) {
 	p := parser{Pattern: &Pattern{}}
 

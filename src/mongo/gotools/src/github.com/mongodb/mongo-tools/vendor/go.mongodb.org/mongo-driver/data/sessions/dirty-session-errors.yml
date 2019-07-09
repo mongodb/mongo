@@ -1,0 +1,272 @@
+runOn:
+  - minServerVersion: "4.0"
+    topology: ["replicaset"]
+  - minServerVersion: "4.1.8"
+    topology: ["sharded"]
+
+database_name: &database_name "session-tests"
+collection_name: &collection_name "test"
+
+data:
+  - {_id: 1}
+
+tests:
+  - description: Clean explicit session is not discarded
+
+    operations:
+      - name: assertSessionNotDirty
+        object: testRunner
+        arguments:
+          session: session0
+      - &insert_with_explicit_session
+        name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document: {_id: 2}
+        result:
+          insertedId: 2
+      - name: assertSessionNotDirty
+        object: testRunner
+        arguments:
+          session: session0
+      - name: endSession
+        object: session0
+      - &find_with_implicit_session
+        name: find
+        object: collection
+        arguments:
+          filter: {_id: -1}
+        result: []
+      - name: assertSameLsidOnLastTwoCommands
+        object: testRunner
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - {_id: 2}
+            ordered: true
+            lsid: session0
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            find: *collection_name
+            filter: {_id: -1}
+            lsid: session0
+          command_name: find
+          database_name: *database_name
+
+    outcome:
+      collection:
+        data:
+          - {_id: 1}
+          - {_id: 2}
+
+  - description: Clean implicit session is not discarded
+
+    operations:
+      - &insert_with_implicit_session
+        name: insertOne
+        object: collection
+        arguments:
+          document: {_id: 2}
+        result:
+          insertedId: 2
+      - *find_with_implicit_session
+      - name: assertSameLsidOnLastTwoCommands
+        object: testRunner
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - {_id: 2}
+            ordered: true
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            find: *collection_name
+            filter: {_id: -1}
+          command_name: find
+          database_name: *database_name
+
+    outcome:
+      collection:
+        data:
+          - {_id: 1}
+          - {_id: 2}
+
+  - description: Dirty explicit session is discarded
+
+    clientOptions:
+      retryWrites: true
+
+    failPoint:
+        configureFailPoint: failCommand
+        mode: { times: 1 }
+        data:
+            failCommands: ["insert"]
+            closeConnection: true
+
+    operations:
+      - name: assertSessionNotDirty
+        object: testRunner
+        arguments:
+          session: session0
+      - *insert_with_explicit_session
+      - name: assertSessionDirty
+        object: testRunner
+        arguments:
+          session: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document: {_id: 3}
+        result:
+          insertedId: 3
+      - name: assertSessionDirty
+        object: testRunner
+        arguments:
+          session: session0
+      - name: endSession
+        object: session0
+      - *find_with_implicit_session
+      - name: assertDifferentLsidOnLastTwoCommands
+        object: testRunner
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - {_id: 2}
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - {_id: 2}
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - {_id: 3}
+            ordered: true
+            lsid: session0
+            txnNumber:
+              $numberLong: "2"
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            find: *collection_name
+            filter: {_id: -1}
+          command_name: find
+          database_name: *database_name
+
+    outcome:
+      collection:
+        data:
+          - {_id: 1}
+          - {_id: 2}
+          - {_id: 3}
+
+  - description: Dirty implicit session is discarded (write)
+
+    clientOptions:
+      retryWrites: true
+
+    failPoint:
+        configureFailPoint: failCommand
+        mode: { times: 1 }
+        data:
+            failCommands: ["insert"]
+            closeConnection: true
+
+    operations:
+      - *insert_with_implicit_session
+      - *find_with_implicit_session
+      - name: assertDifferentLsidOnLastTwoCommands
+        object: testRunner
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - {_id: 2}
+            ordered: true
+            txnNumber:
+              $numberLong: "1"
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - {_id: 2}
+            ordered: true
+            txnNumber:
+              $numberLong: "1"
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            find: *collection_name
+            filter: {_id: -1}
+          command_name: find
+          database_name: *database_name
+
+    outcome:
+      collection:
+        data:
+          - {_id: 1}
+          - {_id: 2}
+
+  - description: Dirty implicit session is discarded (read)
+
+    # Enable the failpoint with times:2 so that this test can pass with or
+    # without retryable reads.
+    failPoint:
+        configureFailPoint: failCommand
+        mode: { times: 2 }
+        data:
+            failCommands: ["aggregate"]
+            closeConnection: true
+
+    operations:
+      - name: aggregate
+        object: collection
+        arguments:
+          pipeline:
+            - $project:
+                _id: 1
+        error: true
+      - *find_with_implicit_session
+      - name: assertDifferentLsidOnLastTwoCommands
+        object: testRunner
+
+    # Don't include expectations because a driver may or may not retry the
+    # aggregate depending on if they have implemented the retryable reads spec.
+
+    outcome:
+      collection:
+        data:
+          - {_id: 1}

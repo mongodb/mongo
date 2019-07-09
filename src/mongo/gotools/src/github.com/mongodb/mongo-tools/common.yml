@@ -23,10 +23,8 @@ mongo_tools_variables:
       - name: qa-tests-4.0
       - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: qa-dump-restore-gzip-4.2
-      - name: qa-dump-restore-gzip-3.2
-      - name: qa-dump-restore-archiving-4.2
-      - name: qa-dump-restore-archiving-3.2
+      - name: qa-dump-restore-with-gzip-current
+      - name: qa-dump-restore-with-archiving-current
       - name: unit
       - name: replay-dist
       - name: replay-sanity_check-4.2
@@ -41,7 +39,7 @@ mongo_tools_variables:
       - name: qa-tests-4.0
       - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl-4.2
+      - name: native-cert-ssl-current
       - name: unit
       - name: replay-dist
     rhel_x86_64_task_list: &rhel_x86_64_tasks
@@ -60,10 +58,8 @@ mongo_tools_variables:
       - name: qa-tests-4.0
       - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: qa-dump-restore-gzip-4.2
-      - name: qa-dump-restore-gzip-3.2
-      - name: qa-dump-restore-archiving-4.2
-      - name: qa-dump-restore-archiving-3.2
+      - name: qa-dump-restore-with-gzip-current
+      - name: qa-dump-restore-with-archiving-current
       - name: unit
       - name: vet
       - name: replay-dist
@@ -83,7 +79,7 @@ mongo_tools_variables:
       - name: qa-tests-4.0
       - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl-4.2
+      - name: native-cert-ssl-current
       - name: replay-dist
     rhel_x86_64_enterprise_task_list: &rhel_x86_64_enterprise_tasks
       - name: dist
@@ -96,7 +92,7 @@ mongo_tools_variables:
       - name: qa-tests-4.0
       - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl-4.2
+      - name: native-cert-ssl-current
       - name: replay-dist
       - name: replay-sanity_check-4.2
       - name: replay-go_test-4.2
@@ -120,10 +116,8 @@ mongo_tools_variables:
       - name: qa-tests-4.0
       - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: qa-dump-restore-gzip-4.2
-      - name: qa-dump-restore-gzip-3.2
-      - name: qa-dump-restore-archiving-4.2
-      - name: qa-dump-restore-archiving-3.2
+      - name: qa-dump-restore-with-gzip-current
+      - name: qa-dump-restore-with-archiving-current
       - name: unit
       - name: vet
       - name: replay-dist
@@ -143,7 +137,7 @@ mongo_tools_variables:
       - name: qa-tests-4.0
       - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl-4.2
+      - name: native-cert-ssl-current
       - name: replay-dist
     ubuntu_x86_64_enterprise_task_list: &ubuntu_x86_64_enterprise_tasks
       - name: dist
@@ -155,7 +149,7 @@ mongo_tools_variables:
       - name: qa-tests-4.0
       - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl-4.2
+      - name: native-cert-ssl-current
       - name: replay-dist
       - name: replay-sanity_check-4.2
       - name: replay-go_test-4.2
@@ -204,16 +198,10 @@ mongo_tools_variables:
       - name: qa-tests-4.2
         distros:
         - windows-64-vs2013-test
-      - name: qa-dump-restore-archiving-4.2
+      - name: qa-dump-restore-with-archiving-current
         distros:
         - windows-64-vs2013-test
-      - name: qa-dump-restore-archiving-3.2
-        distros:
-        - windows-64-vs2013-test
-      - name: qa-dump-restore-gzip-4.2
-        distros:
-        - windows-64-vs2013-test
-      - name: qa-dump-restore-gzip-3.2
+      - name: qa-dump-restore-with-gzip-current
         distros:
         - windows-64-vs2013-test
       - name: qa-tests-unstable
@@ -227,7 +215,7 @@ mongo_tools_variables:
       - name: qa-tests-4.0
       - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl-4.2
+      - name: native-cert-ssl-current
       - name: unit
     windows_64_enterprise_task_list: &windows_64_enterprise_tasks
       - name: dist
@@ -257,7 +245,7 @@ mongo_tools_variables:
         distros:
         - windows-64-vs2013-test
       - name: unit
-      - name: native-cert-ssl-4.2
+      - name: native-cert-ssl-current
     rhel71_ppc64le_enterprise_task_list: &rhel71_ppc64le_enterprise_tasks
       - name: dist
       - name: integration-4.0
@@ -265,14 +253,14 @@ mongo_tools_variables:
       - name: integration-4.2
       - name: integration-4.2-auth
       #- name: kerberos
-      - name: qa-dump-restore-archiving-4.2
-      - name: qa-dump-restore-gzip-4.2
+      - name: qa-dump-restore-with-archiving-current
+      - name: qa-dump-restore-with-gzip-current
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
       - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl-4.2
+      - name: native-cert-ssl-current
       - name: replay-dist
       - name: replay-sanity_check-4.2
       - name: replay-go_test-4.2
@@ -289,14 +277,14 @@ mongo_tools_variables:
       - name: integration-4.2-auth
       # Disabled due to TOOLS-2119
       # - name: kerberos
-      - name: qa-dump-restore-archiving-4.2
-      - name: qa-dump-restore-gzip-4.2
+      - name: qa-dump-restore-with-archiving-current
+      - name: qa-dump-restore-with-gzip-current
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
       - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl-4.2
+      - name: native-cert-ssl-current
       - name: replay-dist
       - name: replay-sanity_check-4.2
       - name: replay-go_test-4.2
@@ -317,11 +305,11 @@ mongo_tools_variables:
       - name: dist
       - name: integration-4.2
       - name: integration-4.2-auth
-      - name: qa-dump-restore-archiving-4.2
-      - name: qa-dump-restore-gzip-4.2
+      - name: qa-dump-restore-with-archiving-current
+      - name: qa-dump-restore-with-gzip-current
       - name: qa-tests-4.2
       - name: qa-tests-unstable
-      - name: native-cert-ssl-4.2
+      - name: native-cert-ssl-current
       - name: replay-dist
 
 
@@ -1196,7 +1184,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
-        excludes: "requires_mongo_26,${excludes}"
+        excludes: "${excludes}"
 
 - name: qa-tests-4.2
   depends_on:
@@ -1235,7 +1223,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
-        excludes: "requires_mongo_26,requires_unstable,${excludes}"
+        excludes: "requires_unstable,${excludes}"
 
 - name: qa-tests-4.0
   depends_on:
@@ -1274,7 +1262,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
-        excludes: "requires_mongo_26,requires_unstable,${excludes}"
+        excludes: "requires_min_mongo_42,requires_unstable,${excludes}"
 
 - name: qa-tests-3.6
   depends_on:
@@ -1313,7 +1301,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
-        excludes: "requires_mongo_26,requires_mongo_40,requires_unstable,${excludes}"
+        excludes: "requires_min_mongo_40,requires_min_mongo_42,requires_unstable,${excludes}"
 
 - name: qa-tests-3.4
   depends_on:
@@ -1352,7 +1340,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
-        excludes: "requires_mongo_26,requires_mongo_36,requires_mongo_40,requires_unstable,${excludes}"
+        excludes: "requires_min_mongo_36,requires_min_mongo_40,requires_min_mongo_42,requires_unstable,${excludes}"
 
 - name: qa-tests-3.2
   depends_on:
@@ -1391,9 +1379,9 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
-        excludes: "requires_mongo_26,requires_mongo_34,requires_mongo_36,requires_mongo_40,requires_unstable,,${excludes}"
+        excludes: "requires_min_mongo_34,requires_min_mongo_36,requires_min_mongo_40,requires_min_mongo_42,requires_unstable,${excludes}"
 
-- name: native-cert-ssl-4.2
+- name: native-cert-ssl-current
   depends_on:
   - name: dist
   commands:
@@ -1440,7 +1428,7 @@ tasks:
           chmod 400 jstests/libs/key*
           python buildscripts/resmoke.py --suite=native_cert_ssl  --continueOnFailure --log=buildlogger --reportFile=../../report.json ${resmoke_args} --excludeWithAnyTags="${excludes}"
 
-- name: qa-dump-restore-archiving-4.2
+- name: qa-dump-restore-with-archiving-current
   depends_on:
   - name: dist
   commands:
@@ -1459,30 +1447,9 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "restore_archive"
-        excludes: "requires_mongo_26,requires_unstable,${excludes}"
+        excludes: "requires_unstable,${excludes}"
 
-- name: qa-dump-restore-archiving-3.2
-  depends_on:
-  - name: dist
-  commands:
-    - func: "fetch source"
-    - func: "get buildnumber"
-    - func: "setup credentials"
-    - func: "download mongod"
-      vars:
-        mongo_version: "3.2"
-    - func: "fetch tool"
-      vars:
-        tool: mongodump
-    - func: "fetch tool"
-      vars:
-        tool: mongorestore
-    - func: "run qa-tests"
-      vars:
-        resmoke_suite: "restore_archive"
-        excludes: "requires_mongo_26,requires_mongo_34,requires_mongo_36,requires_mongo_40,requires_unstable,${excludes}"
-
-- name: qa-dump-restore-gzip-4.2
+- name: qa-dump-restore-with-gzip-current
   depends_on:
   - name: dist
   commands:
@@ -1501,28 +1468,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "restore_gzip"
-        excludes: "requires_mongo_26,requires_unstable,${excludes}"
-
-- name: qa-dump-restore-gzip-3.2
-  depends_on:
-  - name: dist
-  commands:
-    - func: "fetch source"
-    - func: "get buildnumber"
-    - func: "setup credentials"
-    - func: "download mongod"
-      vars:
-        mongo_version: "3.2"
-    - func: "fetch tool"
-      vars:
-        tool: mongodump
-    - func: "fetch tool"
-      vars:
-        tool: mongorestore
-    - func: "run qa-tests"
-      vars:
-        resmoke_suite: "restore_gzip"
-        excludes: "requires_mongo_26,requires_mongo_34,requires_mongo_36,requires_mongo_40,requires_unstable,${excludes}"
+        excludes: "requires_unstable,${excludes}"
 
 - name: unit
   commands:

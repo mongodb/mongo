@@ -52,6 +52,16 @@ func NewFreeform(opts ...Option) *Profile {
 	}
 }
 
+// NewRestrictedProfile creates a new PRECIS profile based on an existing
+// profile.
+// If the parent profile already had the Disallow option set, the new rule
+// overrides the parents rule.
+func NewRestrictedProfile(parent *Profile, disallow runes.Set) *Profile {
+	p := *parent
+	Disallow(disallow)(&p.options)
+	return &p
+}
+
 // NewTransformer creates a new transform.Transformer that performs the PRECIS
 // preparation and enforcement steps on the given UTF-8 encoded bytes.
 func (p *Profile) NewTransformer() *Transformer {

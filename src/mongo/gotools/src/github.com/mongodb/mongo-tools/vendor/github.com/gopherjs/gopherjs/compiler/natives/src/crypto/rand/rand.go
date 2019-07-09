@@ -47,3 +47,15 @@ func (r *rngReader) Read(b []byte) (n int, err error) {
 
 	return 0, errors.New("crypto/rand not available in this environment")
 }
+
+func batched(f func([]byte) bool, readMax int) func([]byte) bool {
+	return func(buf []byte) bool {
+		for len(buf) > readMax {
+			if !f(buf[:readMax]) {
+				return false
+			}
+			buf = buf[readMax:]
+		}
+		return len(buf) == 0 || f(buf)
+	}
+}

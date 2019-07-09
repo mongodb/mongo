@@ -133,6 +133,7 @@ type IndexOptions struct {
 	BucketSize              *int32
 	PartialFilterExpression interface{}
 	Collation               *Collation
+	WildcardProjection      interface{}
 }
 
 // Index creates a new *IndexOptions
@@ -261,6 +262,12 @@ func (i *IndexOptions) SetCollation(collation *Collation) *IndexOptions {
 	return i
 }
 
+// SetWildcardProjection specifies a wildcard projection for a wildcard index.
+func (i *IndexOptions) SetWildcardProjection(wildcardProjection interface{}) *IndexOptions {
+	i.WildcardProjection = wildcardProjection
+	return i
+}
+
 // MergeIndexOptions combines the given *IndexOptions into a single *IndexOptions in a last one wins fashion.
 func MergeIndexOptions(opts ...*IndexOptions) *IndexOptions {
 	i := Index()
@@ -319,6 +326,9 @@ func MergeIndexOptions(opts ...*IndexOptions) *IndexOptions {
 		}
 		if opt.Collation != nil {
 			i.Collation = opt.Collation
+		}
+		if opt.WildcardProjection != nil {
+			i.WildcardProjection = opt.WildcardProjection
 		}
 	}
 

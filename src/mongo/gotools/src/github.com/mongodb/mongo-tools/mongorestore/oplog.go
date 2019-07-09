@@ -15,6 +15,7 @@ import (
 	"github.com/mongodb/mongo-tools-common/intents"
 	"github.com/mongodb/mongo-tools-common/log"
 	"github.com/mongodb/mongo-tools-common/progress"
+	"github.com/mongodb/mongo-tools-common/txn"
 	"github.com/mongodb/mongo-tools-common/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -26,6 +27,13 @@ import (
 // of many small operations can overflow the maximum command size.
 // Note that ops > 8MB will still be buffered, just as single elements.
 const oplogMaxCommandSize = 1024 * 1024 * 8
+
+type oplogContext struct {
+	progressor *progress.CountProgressor
+	session    *mongo.Client
+	totalOps   int
+	txnBuffer  *txn.Buffer
+}
 
 // RestoreOplog attempts to restore a MongoDB oplog.
 func (restore *MongoRestore) RestoreOplog() error {
@@ -49,18 +57,21 @@ func (restore *MongoRestore) RestoreOplog() error {
 	bsonSource := db.NewDecodedBSONSource(db.NewBufferlessBSONSource(intent.BSONFile))
 	defer bsonSource.Close()
 
-	var totalOps int64
-	var entrySize int
-
-	oplogProgressor := progress.NewCounter(intent.BSONSize)
-	if restore.ProgressManager != nil {
-		restore.ProgressManager.Attach("oplog", oplogProgressor)
-		defer restore.ProgressManager.Detach("oplog")
-	}
-
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
+	}
+
+	oplogCtx := &oplogContext{
+		progressor: progress.NewCounter(intent.BSONSize),
+		txnBuffer:  txn.NewBuffer(),
+		session:    session,
+	}
+	defer oplogCtx.txnBuffer.Stop()
+
+	if restore.ProgressManager != nil {
+		restore.ProgressManager.Attach("oplog", oplogCtx.progressor)
+		defer restore.ProgressManager.Detach("oplog")
 	}
 
 	for {
@@ -68,7 +79,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 		if rawOplogEntry == nil {
 			break
 		}
-		entrySize = len(rawOplogEntry)
+		oplogCtx.progressor.Inc(int64(len(rawOplogEntry)))
 
 		entryAsOplog := db.Oplog{}
 		err = bson.Unmarshal(rawOplogEntry, &entryAsOplog)
@@ -89,28 +100,94 @@ func (restore *MongoRestore) RestoreOplog() error {
 			break
 		}
 
-		entryAsOplog, err = restore.filterUUIDs(entryAsOplog)
+		meta, err := txn.NewMeta(entryAsOplog)
 		if err != nil {
-			return fmt.Errorf("error filtering UUIDs from oplog: %v", err)
+			return fmt.Errorf("error getting op metadata: %v", err)
 		}
 
-		totalOps++
-		oplogProgressor.Inc(int64(entrySize))
-		err = restore.ApplyOps(session, []interface{}{entryAsOplog})
-		if err != nil {
-			return fmt.Errorf("error applying oplog: %v", err)
+		if meta.IsTxn() {
+			err := restore.HandleTxnOp(oplogCtx, meta, entryAsOplog)
+			if err != nil {
+				return fmt.Errorf("error handling transaction oplog entry: %v", err)
+			}
+		} else {
+			err := restore.HandleNonTxnOp(oplogCtx, entryAsOplog)
+			if err != nil {
+				return fmt.Errorf("error applying oplog: %v", err)
+			}
 		}
+
 	}
 	if fileNeedsIOBuffer, ok := intent.BSONFile.(intents.FileNeedsIOBuffer); ok {
 		fileNeedsIOBuffer.ReleaseIOBuffer()
 	}
 
-	log.Logvf(log.Always, "applied %v oplog entries", totalOps)
+	log.Logvf(log.Always, "applied %v oplog entries", oplogCtx.totalOps)
 	if err := bsonSource.Err(); err != nil {
 		return fmt.Errorf("error reading oplog bson input: %v", err)
 	}
 	return nil
 
+}
+
+func (restore *MongoRestore) HandleNonTxnOp(oplogCtx *oplogContext, op db.Oplog) error {
+	oplogCtx.totalOps++
+
+	op, err := restore.filterUUIDs(op)
+	if err != nil {
+		return fmt.Errorf("error filtering UUIDs from oplog: %v", err)
+	}
+
+	return restore.ApplyOps(oplogCtx.session, []interface{}{op})
+}
+
+func (restore *MongoRestore) HandleTxnOp(oplogCtx *oplogContext, meta txn.Meta, op db.Oplog) error {
+
+	err := oplogCtx.txnBuffer.AddOp(meta, op)
+	if err != nil {
+		return fmt.Errorf("error buffering transaction oplog entry: %v", err)
+	}
+
+	if meta.IsAbort() {
+		err := oplogCtx.txnBuffer.PurgeTxn(meta)
+		if err != nil {
+			return fmt.Errorf("error cleaning up transaction buffer on abort: %v", err)
+		}
+		return nil
+	}
+
+	if !meta.IsCommit() {
+		return nil
+	}
+
+	// From here, we're applying transaction entries
+	ops, errs := oplogCtx.txnBuffer.GetTxnStream(meta)
+
+Loop:
+	for {
+		select {
+		case o, ok := <-ops:
+			if !ok {
+				break Loop
+			}
+			err = restore.HandleNonTxnOp(oplogCtx, o)
+			if err != nil {
+				return fmt.Errorf("error applying transaction op: %v", err)
+			}
+		case err := <-errs:
+			if err != nil {
+				return fmt.Errorf("error replaying transaction: %v", err)
+			}
+			break Loop
+		}
+	}
+
+	err = oplogCtx.txnBuffer.PurgeTxn(meta)
+	if err != nil {
+		return fmt.Errorf("error cleaning up transaction buffer: %v", err)
+	}
+
+	return nil
 }
 
 // ApplyOps is a wrapper for the applyOps database command, we pass in
@@ -171,6 +248,17 @@ func ParseTimestampFlag(ts string) (primitive.Timestamp, error) {
 	return primitive.Timestamp{T: uint32(seconds), I: uint32(increment)}, nil
 }
 
+// Server versions 3.6.0-3.6.8 and 4.0.0-4.0.2 require a 'ui' field
+// in the createIndexes command.
+func (restore *MongoRestore) needsCreateIndexWorkaround() bool {
+	sv := restore.serverVersion
+	if (sv.GTE(db.Version{3, 6, 0}) && sv.LTE(db.Version{3, 6, 8})) ||
+		(sv.GTE(db.Version{4, 0, 0}) && sv.LTE(db.Version{4, 0, 2})) {
+		return true
+	}
+	return false
+}
+
 // filterUUIDs removes 'ui' entries from ops, including nested applyOps ops.
 // It also modifies ops that rely on 'ui'.
 func (restore *MongoRestore) filterUUIDs(op db.Oplog) (db.Oplog, error) {
@@ -178,16 +266,11 @@ func (restore *MongoRestore) filterUUIDs(op db.Oplog) (db.Oplog, error) {
 	if !restore.OutputOptions.PreserveUUID {
 		op.UI = nil
 
-		// TODO TOOLS-2308: the following workaround is no longer allowed since
-		// 4.1.3 and no longer needed since 3.6.9/4.0.3.  We're commenting it
-		// out to get our CI to green, but need a longer-term fix for users on
-		// 3.0.0-3.0.8/4.0.0-4.0.2.
-
-		// new createIndexes oplog command requires 'ui', so if we aren't
-		// preserving UUIDs, we must convert it to an old style index insert
-		// if op.Operation == "c" && op.Object[0].Key == "createIndexes" {
-		// 	return convertCreateIndexToIndexInsert(op)
-		// }
+		// The createIndexes oplog command requires 'ui' for some server versions, so
+		// in that case we fall back to an old-style system.indexes insert.
+		if op.Operation == "c" && op.Object[0].Key == "createIndexes" && restore.needsCreateIndexWorkaround() {
+			return convertCreateIndexToIndexInsert(op)
+		}
 	}
 
 	// Check for and filter nested applyOps ops

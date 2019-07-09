@@ -14,6 +14,7 @@ import (
 	"github.com/mongodb/mongo-tools-common/db"
 	"github.com/mongodb/mongo-tools-common/log"
 	"github.com/mongodb/mongo-tools-common/options"
+	"github.com/mongodb/mongo-tools-common/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/x/bsonx"
 )
@@ -126,7 +127,7 @@ func (mt *MongoTop) Run() error {
 		// if this is the first time and the connection is successful, print
 		// the connection message
 		if !hasData && !mt.OutputOptions.Json {
-			log.Logvf(log.Always, "connected to: %v\n", mt.Options.URI.ConnectionString)
+			log.Logvf(log.Always, "connected to: %v\n", util.SanitizeURI(mt.Options.URI.ConnectionString))
 		}
 
 		hasData = true

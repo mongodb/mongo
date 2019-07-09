@@ -17,7 +17,7 @@
 //    p.Printf("%d ducks in a row", 4331) // Prints 4,331 ducks in a row
 //
 //    p := message.NewPrinter(message.MatchLanguage("nl"))
-//    p.Println("Hoogte: %f meter", 1244.9) // Prints Hoogte: 1.244,9 meter
+//    p.Printf("Hoogte: %.1f meter", 1244.9) // Prints Hoogte: 1,244.9 meter
 //
 //    p := message.NewPrinter(message.MatchLanguage("bn"))
 //    p.Println(123456.78) // Prints ১,২৩,৪৫৬.৭৮
@@ -31,6 +31,7 @@
 //   - flag # always resorts to fmt for printing
 //   - verb 'f', 'e', 'g', 'd' use localized formatting unless the '#' flag is
 //     specified.
+//   - verb 'm' inserts a translation of a string argument.
 //
 // See package fmt for more options.
 //

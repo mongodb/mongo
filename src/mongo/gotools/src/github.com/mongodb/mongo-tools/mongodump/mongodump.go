@@ -366,7 +366,7 @@ func (dump *MongoDump) Dump() (err error) {
 			return fmt.Errorf("error finding oplog: %v", err)
 		}
 		log.Logvf(log.Info, "getting most recent oplog timestamp")
-		dump.oplogStart, err = dump.getCurrentOplogTime()
+		dump.oplogStart, err = dump.getOplogCopyStartTime()
 		if err != nil {
 			return fmt.Errorf("error getting oplog start: %v", err)
 		}

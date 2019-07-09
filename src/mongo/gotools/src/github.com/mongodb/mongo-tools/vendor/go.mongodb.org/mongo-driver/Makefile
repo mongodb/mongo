@@ -26,7 +26,7 @@ doc:
 
 .PHONY: build-examples
 build-examples:
-	go build $(BUILD_TAGS) ./examples/... ./x/network/examples/...
+	go build $(BUILD_TAGS) ./examples/... ./x/mongo/driver/examples/...
 
 .PHONY: build
 build:
@@ -113,7 +113,7 @@ evg-test:
 
 .PHONY: evg-test-auth
 evg-test-auth:
-	go run -tags gssapi ./x/network/examples/count/main.go -uri $(MONGODB_URI)
+	go run -tags gssapi ./x/mongo/driver/examples/count/main.go -uri $(MONGODB_URI)
 
 # benchmark specific targets and support
 perf:driver-test-data.tar.gz

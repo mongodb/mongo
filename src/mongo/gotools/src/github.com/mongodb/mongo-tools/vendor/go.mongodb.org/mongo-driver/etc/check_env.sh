@@ -10,7 +10,7 @@ if [ ! -z $AUTH ] && [[ ! $AUTH =~ ^(noauth|auth)$ ]]; then
     exit 1
 fi
 
-if [ ! -z $SSL ] && [[ ! $SLL =~ ^(nossl|ssl)$ ]]; then
+if [ ! -z $SSL ] && [[ ! $SSL =~ ^(nossl|ssl)$ ]]; then
     >&2 echo "Invalid value of SSL. SSL can optionally be set to one of: nossl, ssl"
     exit 1
 fi

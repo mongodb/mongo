@@ -1,0 +1,67 @@
+runOn:
+    # SERVER-35388 introduced OperationNotSupportedInTransaction in 4.0.2
+    -
+        minServerVersion: "4.0.2"
+        topology: ["replicaset"]
+    -
+        minServerVersion: "4.1.8"
+        topology: ["sharded"]
+
+database_name: &database_name "transaction-tests"
+collection_name: &collection_name "test"
+
+data: &data
+  - {_id: 1}
+  - {_id: 2}
+  - {_id: 3}
+  - {_id: 4}
+
+tests:
+  - description: count
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: count
+        object: collection
+        arguments:
+          session: session0
+          filter:
+            _id: 1
+        result:
+          errorCodeName: OperationNotSupportedInTransaction
+          errorLabelsOmit: ["TransientTransactionError", "UnknownTransactionCommitResult"]
+      - name: abortTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            count: *collection_name
+            query:
+              _id: 1
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: count
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          *data

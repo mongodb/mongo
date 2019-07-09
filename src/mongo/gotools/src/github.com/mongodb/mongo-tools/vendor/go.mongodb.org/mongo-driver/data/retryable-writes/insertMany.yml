@@ -6,8 +6,6 @@ minServerVersion: '3.6'
 tests:
     -
         description: "InsertMany succeeds after one network error"
-        clientOptions:
-            retryWrites: true
         failPoint:
             configureFailPoint: onPrimaryTransactionalWrite
             mode: { times: 1 }
@@ -28,8 +26,6 @@ tests:
                     - { _id: 3, x: 33 }
     -
         description: "InsertMany with unordered execution"
-        clientOptions:
-            retryWrites: true
         failPoint:
             configureFailPoint: onPrimaryTransactionalWrite
             mode: { times: 1 }
@@ -50,8 +46,6 @@ tests:
                     - { _id: 3, x: 33 }
     -
         description: "InsertMany fails after multiple network errors"
-        clientOptions:
-            retryWrites: true
         failPoint:
             # Normally, a mongod will insert the documents as a batch with a
             # single commit. If this fails, mongod may try to insert each

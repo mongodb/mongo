@@ -12,42 +12,28 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/internal/testutil/helpers"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
-	"go.mongodb.org/mongo-driver/x/bsonx"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/session"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/topology"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/uuid"
-	"go.mongodb.org/mongo-driver/x/network/command"
-	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
+	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/description"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/operation"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
 )
 
 // AutoCreateIndexes creates an index in the test cluster.
 func AutoCreateIndexes(t *testing.T, keys []string) {
-	indexes := bsonx.Doc{}
+	var elems [][]byte
 	for _, k := range keys {
-		indexes = append(indexes, bsonx.Elem{k, bsonx.Int32(1)})
+		elems = append(elems, bsoncore.AppendInt32Element(nil, k, 1))
 	}
 	name := strings.Join(keys, "_")
-	indexes = bsonx.Doc{
-		{"key", bsonx.Document(indexes)},
-		{"name", bsonx.String(name)},
-	}
-	cmd := command.CreateIndexes{
-		NS:      command.NewNamespace(DBName(t), ColName(t)),
-		Indexes: bsonx.Arr{bsonx.Document(indexes)},
-	}
-	id, _ := uuid.New()
-	_, err := driverlegacy.CreateIndexes(
-		context.Background(),
-		cmd,
-		Topology(t),
-		description.WriteSelector(),
-		id,
-		&session.Pool{},
+	indexes := bsoncore.BuildDocumentFromElements(nil,
+		bsoncore.AppendDocumentElement(nil, "key", bsoncore.BuildDocumentFromElements(nil,
+			elems...)),
+		bsoncore.AppendStringElement(nil, "name", name),
 	)
+	err := operation.NewCreateIndexes(indexes).Collection(ColName(t)).Database(DBName(t)).
+		Deployment(Topology(t)).ServerSelector(description.WriteSelector()).Execute(context.Background())
 	require.NoError(t, err)
 }
 
@@ -58,100 +44,60 @@ func AutoDropCollection(t *testing.T) {
 
 // DropCollection drops the collection in the test cluster.
 func DropCollection(t *testing.T, dbname, colname string) {
-	cmd := command.Write{DB: dbname, Command: bsonx.Doc{{"drop", bsonx.String(colname)}}}
-	id, _ := uuid.New()
-	_, err := driverlegacy.Write(
-		context.Background(),
-		cmd,
-		Topology(t),
-		description.WriteSelector(),
-		id,
-		&session.Pool{},
-	)
-	if err != nil && !command.IsNotFound(err) {
+	err := operation.NewCommand(bsoncore.BuildDocument(nil, bsoncore.AppendStringElement(nil, "drop", colname))).
+		Database(dbname).ServerSelector(description.WriteSelector()).Deployment(Topology(t)).
+		Execute(context.Background())
+	if de, ok := err.(driver.Error); err != nil && !(ok && de.NamespaceNotFound()) {
 		require.NoError(t, err)
 	}
 }
 
 func autoDropDB(t *testing.T, topo *topology.Topology) {
-	cmd := command.Write{DB: DBName(t), Command: bsonx.Doc{{"dropDatabase", bsonx.Int32(1)}}}
-	id, _ := uuid.New()
-	_, err := driverlegacy.Write(
-		context.Background(),
-		cmd,
-		topo,
-		description.WriteSelector(),
-		id,
-		&session.Pool{},
-	)
+	err := operation.NewCommand(bsoncore.BuildDocument(nil, bsoncore.AppendInt32Element(nil, "dropDatabase", 1))).
+		Database(DBName(t)).ServerSelector(description.WriteSelector()).Deployment(topo).
+		Execute(context.Background())
 	require.NoError(t, err)
 }
 
 // AutoInsertDocs inserts the docs into the test cluster.
-func AutoInsertDocs(t *testing.T, writeConcern *writeconcern.WriteConcern, docs ...bsonx.Doc) {
+func AutoInsertDocs(t *testing.T, writeConcern *writeconcern.WriteConcern, docs ...bsoncore.Document) {
 	InsertDocs(t, DBName(t), ColName(t), writeConcern, docs...)
 }
 
 // InsertDocs inserts the docs into the test cluster.
-func InsertDocs(t *testing.T, dbname, colname string, writeConcern *writeconcern.WriteConcern, docs ...bsonx.Doc) {
-	cmd := command.Insert{NS: command.NewNamespace(dbname, colname), Docs: docs}
-
-	topo := Topology(t)
-	id, _ := uuid.New()
-	_, err := driverlegacy.Insert(
-		context.Background(),
-		cmd,
-		topo,
-		description.WriteSelector(),
-		id,
-		&session.Pool{},
-		false,
-	)
+func InsertDocs(t *testing.T, dbname, colname string, writeConcern *writeconcern.WriteConcern, docs ...bsoncore.Document) {
+	err := operation.NewInsert(docs...).Collection(colname).Database(dbname).
+		Deployment(Topology(t)).ServerSelector(description.WriteSelector()).Execute(context.Background())
 	require.NoError(t, err)
 }
 
 // EnableMaxTimeFailPoint turns on the max time fail point in the test cluster.
 func EnableMaxTimeFailPoint(t *testing.T, s *topology.Server) error {
-	cmd := command.Write{
-		DB: "admin",
-		Command: bsonx.Doc{
-			{"configureFailPoint", bsonx.String("maxTimeAlwaysTimeOut")},
-			{"mode", bsonx.String("alwaysOn")},
-		},
-	}
-	conn, err := s.Connection(context.Background())
-	require.NoError(t, err)
-	defer testhelpers.RequireNoErrorOnClose(t, conn)
-	_, err = cmd.RoundTrip(context.Background(), s.SelectedDescription(), conn)
-	return err
+	cmd := bsoncore.BuildDocumentFromElements(nil,
+		bsoncore.AppendStringElement(nil, "configureFailPoint", "maxTimeAlwaysTimeOut"),
+		bsoncore.AppendStringElement(nil, "mode", "alwaysOn"),
+	)
+	return operation.NewCommand(cmd).
+		Database("admin").Deployment(driver.SingleServerDeployment{Server: s}).
+		Execute(context.Background())
 }
 
 // DisableMaxTimeFailPoint turns off the max time fail point in the test cluster.
 func DisableMaxTimeFailPoint(t *testing.T, s *topology.Server) {
-	cmd := command.Write{
-		DB: "admin",
-		Command: bsonx.Doc{
-			{"configureFailPoint", bsonx.String("maxTimeAlwaysTimeOut")},
-			{"mode", bsonx.String("off")},
-		},
-	}
-	conn, err := s.Connection(context.Background())
-	require.NoError(t, err)
-	defer testhelpers.RequireNoErrorOnClose(t, conn)
-	_, err = cmd.RoundTrip(context.Background(), s.SelectedDescription(), conn)
-	require.NoError(t, err)
+	cmd := bsoncore.BuildDocumentFromElements(nil,
+		bsoncore.AppendStringElement(nil, "configureFailPoint", "maxTimeAlwaysTimeOut"),
+		bsoncore.AppendStringElement(nil, "mode", "off"),
+	)
+	_ = operation.NewCommand(cmd).
+		Database("admin").Deployment(driver.SingleServerDeployment{Server: s}).
+		Execute(context.Background())
 }
 
 // RunCommand runs an arbitrary command on a given database of target server
-func RunCommand(t *testing.T, s *topology.Server, db string, b bsonx.Doc) (bson.Raw, error) {
-	conn, err := s.Connection(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	defer testhelpers.RequireNoErrorOnClose(t, conn)
-	cmd := command.Read{
-		DB:      db,
-		Command: b,
-	}
-	return cmd.RoundTrip(context.Background(), s.SelectedDescription(), conn)
+func RunCommand(t *testing.T, s *topology.Server, db string, cmd bsoncore.Document) (bsoncore.Document, error) {
+	op := operation.NewCommand(cmd).
+		Database(db).Deployment(driver.SingleServerDeployment{Server: s})
+	err := op.Execute(context.Background())
+	res := op.Result()
+	return res, err
 }

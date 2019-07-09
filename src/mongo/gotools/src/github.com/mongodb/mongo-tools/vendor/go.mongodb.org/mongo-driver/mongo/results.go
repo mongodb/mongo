@@ -10,7 +10,7 @@ import (
 	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/x/network/result"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/operation"
 )
 
 // BulkWriteResult holds the result of a bulk write operation.
@@ -50,7 +50,8 @@ type ListDatabasesResult struct {
 	TotalSize int64
 }
 
-func (ldr ListDatabasesResult) fromResult(res result.ListDatabases) ListDatabasesResult {
+func newListDatabasesResultFromOperation(res operation.ListDatabasesResult) ListDatabasesResult {
+	var ldr ListDatabasesResult
 	ldr.Databases = make([]DatabaseSpecification, 0, len(res.Databases))
 	for _, spec := range res.Databases {
 		ldr.Databases = append(

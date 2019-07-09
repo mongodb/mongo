@@ -20,6 +20,9 @@ in this file. Those tests will need to be manually implemented by each driver.
 Server Fail Point
 =================
 
+failCommand
+```````````
+
 Some tests depend on a server fail point, expressed in the ``failPoint`` field.
 For example the ``failCommand`` fail point allows the client to force the
 server to return an error. Keep in mind that the fail point only triggers for
@@ -58,10 +61,11 @@ control the fail point's behavior. ``failCommand`` supports the following
 
 - ``failCommands``: Required, the list of command names to fail.
 - ``closeConnection``: Boolean option, which defaults to ``false``. If
-  ``true``, the connection on which the command is executed will be closed
-  and the client will see a network error.
-- ``errorCode``: Integer option, which is unset by default. If set, the
-  specified command error code will be returned as a command error.
+  ``true``, the command will not be executed, the connection will be closed, and
+  the client will see a network error.
+- ``errorCode``: Integer option, which is unset by default. If set, the command
+  will not be executed and the specified command error code will be returned as
+  a command error.
 - ``writeConcernError``: A document, which is unset by default. If set, the
   server will return this document in the "writeConcernError" field. This
   failure response only applies to commands that support write concern and
@@ -72,9 +76,26 @@ Test Format
 
 Each YAML file has the following keys:
 
-- ``topology``: Optional. An array of server topologies against which to run
-  the test. Valid topologies are "single", "replicaset" and "sharded". The
-  default is all topologies (ie ``[single, replicaset", sharded]``).
+- ``runOn`` (optional): An array of server version and/or topology requirements
+  for which the tests can be run. If the test environment satisfies one or more
+  of these requirements, the tests may be executed; otherwise, this file should
+  be skipped. If this field is omitted, the tests can be assumed to have no
+  particular requirements and should be executed. Each element will have some or
+  all of the following fields:
+
+  - ``minServerVersion`` (optional): The minimum server version (inclusive)
+    required to successfully run the tests. If this field is omitted, it should
+    be assumed that there is no lower bound on the required server version.
+
+  - ``maxServerVersion`` (optional): The maximum server version (inclusive)
+    against which the tests can be run successfully. If this field is omitted,
+    it should be assumed that there is no upper bound on the required server
+    version.
+
+  - ``topology`` (optional): An array of server topologies against which the
+    tests can be run successfully. Valid topologies are "single", "replicaset",
+    and "sharded". If this field is omitted, the default is all topologies (i.e.
+    ``["single", "replicaset", "sharded"]``).
 
 - ``database_name`` and ``collection_name``: The database and collection to use
   for testing.
@@ -90,9 +111,10 @@ Each YAML file has the following keys:
   - ``skipReason``: Optional, string describing why this test should be
     skipped.
 
-  - ``useMultipleMongoses``: Optional, boolean. If true and this test is
-    running against a sharded cluster, intialize the MongoClient for this
-    test with multiple mongos seed addresses.
+  - ``useMultipleMongoses`` (optional): If ``true``, the MongoClient for this
+    test should be initialized with multiple mongos seed addresses. If ``false``
+    or omitted, only a single mongos address should be specified. This field has
+    no effect for non-sharded topologies.
 
   - ``clientOptions``: Optional, parameters to pass to MongoClient().
 
@@ -120,6 +142,9 @@ Each YAML file has the following keys:
       the order keys in the "command" argument when parsing JSON/YAML.
 
     - ``arguments``: Optional, the names and values of arguments.
+
+    - ``error``: Optional. If true, the test should expect an error or
+      exception.
 
     - ``result``: The return value from the operation, if any. This field may
       be a single document or an array of documents in the case of a
@@ -149,7 +174,7 @@ Each YAML file has the following keys:
       - ``data``: The data that should exist in the collection after the
         operations have run.
 
-Use as integration tests
+Use as Integration Tests
 ========================
 
 Run a MongoDB replica set with a primary, a secondary, and an arbiter,
@@ -186,6 +211,9 @@ Then for each element in ``tests``:
    create it explicitly.)
 #. If the YAML file contains a ``data`` array, insert the documents in ``data``
    into the test collection, using writeConcern "majority".
+#. When testing against a sharded cluster run a ``distinct`` command on the
+   newly created collection on all mongoses. For an explanation see,
+   `Why do tests that run distinct sometimes fail with StaleDbVersion?`_
 #. If ``failPoint`` is specified, its value is a configureFailPoint command.
    Run the command on the admin database to enable the fail point.
 #. Create a **new** MongoClient ``client``, with Command Monitoring listeners
@@ -220,6 +248,8 @@ Then for each element in ``tests``:
      method.
    - If the driver throws an exception / returns an error while executing this
      series of operations, store the error message and server error code.
+   - If the operation's ``error`` field is ``true``, verify that the method
+     threw an exception or returned an error.
    - If the result document has an "errorContains" field, verify that the
      method threw an exception or returned an error, and that the value of the
      "errorContains" field matches the error string. "errorContains" is a
@@ -475,9 +505,37 @@ manually.
 
 .. _SERVER-39349: https://jira.mongodb.org/browse/SERVER-39349
 
-**Changelog**
-=============
+Why do tests that run distinct sometimes fail with StaleDbVersion?
+``````````````````````````````````````````````````````````````````
 
+When a shard receives its first command that contains a dbVersion, the shard
+returns a StaleDbVersion error and the Mongos retries the operation. In a
+sharded transaction, Mongos does not retry these operations and instead returns
+the error to the client. For example::
+
+  Command distinct failed: Transaction aa09e296-472a-494f-8334-48d57ab530b6:1 was aborted on statement 0 due to: an error from cluster data placement change :: caused by :: got stale databaseVersion response from shard sh01 at host localhost:27217 :: caused by :: don't know dbVersion.
+
+To workaround this limitation, a driver test runner MUST run a
+non-transactional ``distinct`` command on each Mongos before running any test
+that uses ``distinct``. To ease the implementation drivers can simply run
+``distinct`` before *every* test.
+
+Note that drivers can remove this workaround once `SERVER-39704`_ is resolved
+so that mongos retries this operation transparently. The ``distinct`` command
+is the only command allowed in a sharded transaction that uses the
+``dbVersion`` concept so it is the only command affected.
+
+.. _SERVER-39704: https://jira.mongodb.org/browse/SERVER-39704
+
+Changelog
+=========
+
+:2019-05-15: Add operation level ``error`` field to assert any error.
+:2019-03-25: Add workaround for StaleDbVersion on distinct.
+:2019-03-01: Add top-level ``runOn`` field to denote server version and/or
+             topology requirements requirements for the test file. Removes the
+             ``topology`` top-level field, which is now expressed within
+             ``runOn`` elements.
 :2019-02-28: ``useMultipleMongoses: true`` and non-targeted fail points are
              mutually exclusive.
 :2019-02-13: Modify test format for 4.2 sharded transactions, including

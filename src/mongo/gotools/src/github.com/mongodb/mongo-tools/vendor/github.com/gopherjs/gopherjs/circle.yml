@@ -11,7 +11,7 @@ jobs:
     - checkout
     - run: git clone https://github.com/creationix/nvm $HOME/.nvm && cd $HOME/.nvm && git checkout v0.33.9 && echo 'export NVM_DIR="$HOME/.nvm"' >> $BASH_ENV && echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> $BASH_ENV
     - run: nvm install 10.0.0 && nvm alias default 10.0.0
-    - run: cd /usr/local && sudo rm -rf go && curl https://storage.googleapis.com/golang/go1.11.5.linux-amd64.tar.gz | sudo tar -xz
+    - run: cd /usr/local && sudo rm -rf go && curl https://storage.googleapis.com/golang/go1.12.linux-amd64.tar.gz | sudo tar -xz
     - run: echo 'export PATH="$PATH:/usr/local/go/bin:$HOME/go/bin"' >> $BASH_ENV
     - run: go get -t -d -v ./...
     - run: go install -v
@@ -22,8 +22,8 @@ jobs:
     - run: go generate github.com/gopherjs/gopherjs/compiler/prelude
     - run: diff -u <(echo -n) <(git status --porcelain)
     - run: diff -u <(echo -n) <(gofmt -d .)
-    - run: go tool vet *.go # Go package in root directory.
-    - run: for d in */; do echo $d; done | grep -v tests/ | grep -v third_party/ | xargs go tool vet # All subdirectories except "tests", "third_party".
+    - run: go vet . # Go package in root directory.
+    - run: for d in */; do echo ./$d...; done | grep -v ./doc | grep -v ./tests | grep -v ./node | xargs go vet # All subdirectories except "doc", "tests", "node*".
     - run: diff -u <(echo -n) <(go list ./compiler/natives/src/...) # All those packages should have // +build js.
     - run: gopherjs install -v net/http # Should build successfully (can't run tests, since only client is supported).
     - run: ulimit -s 10000 && gopherjs test --minify -v --short github.com/gopherjs/gopherjs/tests/... $(go list std | grep -v -x -f .std_test_pkg_exclusions)
