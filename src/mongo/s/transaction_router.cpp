@@ -1299,6 +1299,12 @@ void TransactionRouter::Router::_endTransactionTrackingIfNecessary(
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).timingStats.endTime = curTicks;
+
+        // If startTime hasn't been set yet, that probably means it run into an error and is
+        // getting aborted.
+        if (o().timingStats.startTime == 0) {
+            o(lk).timingStats.startTime = curTicks;
+        }
     }
 
     if (shouldLog(logger::LogComponent::kTransaction, logger::LogSeverity::Debug(1)) ||

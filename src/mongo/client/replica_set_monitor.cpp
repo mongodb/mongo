@@ -284,7 +284,7 @@ Future<std::vector<HostAndPort>> ReplicaSetMonitor::_getHostsOrRefresh(
     const ReadPreferenceSetting& criteria, Milliseconds maxWait) {
 
     // If we're in shutdown, don't bother
-    if (globalInShutdownDeprecated()) {
+    if (globalRSMonitorManager.isShutdown()) {
         return Status(ErrorCodes::ShutdownInProgress, "Server is shutting down"_sd);
     }
 
@@ -1268,7 +1268,7 @@ void SetState::notify(bool finishedScan) {
     const auto cachedNow = now();
 
     for (auto it = waiters.begin(); it != waiters.end();) {
-        if (globalInShutdownDeprecated()) {
+        if (globalRSMonitorManager.isShutdown()) {
             it->promise.setError(
                 {ErrorCodes::ShutdownInProgress, str::stream() << "Server is shutting down"});
             waiters.erase(it++);

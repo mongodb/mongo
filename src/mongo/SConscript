@@ -518,6 +518,7 @@ mongos = env.Program(
         'db/server_options',
         'db/server_options_base',
         'db/service_liaison_mongos',
+        'db/session_catalog',
         'db/sessions_collection_sharded',
         'db/startup_warnings_common',
         'db/stats/counters',
