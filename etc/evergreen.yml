@@ -843,7 +843,7 @@ functions:
 
         ${add_nodejs_to_path}
 
-        npm run jstestfuzz -- --jsTestsDir ../jstests ${jstestfuzz_vars}
+        npm run jstestfuzz -- --jsTestsDir ../jstests ${jstestfuzz_vars} --branch ${branch_name}
 
   - command: archive.targz_pack
     params:
