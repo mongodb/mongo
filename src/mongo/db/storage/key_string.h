@@ -437,8 +437,6 @@ public:
      */
     Value getValueCopy() {
         _doneAppending();
-        invariant(_state == BuildState::kEndAdded || _state == BuildState::kAppendedRecordID ||
-                  _state == BuildState::kAppendedTypeBits);
         BufBuilder newBuf(_buffer.len());
         newBuf.appendBuf(_buffer.buf(), _buffer.len());
         return {version, _typeBits, static_cast<size_t>(newBuf.len()), newBuf.release()};
@@ -682,6 +680,10 @@ inline typename std::enable_if<isKeyString<T>::value, std::ostream&>::type opera
     return stream << value.toString();
 }
 
+/**
+ * Given a KeyString which may or may not have a RecordId, returns the length of the section without
+ * the RecordId. More expensive than sizeWithoutRecordIdAtEnd
+ */
 size_t getKeySize(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits);
 
 /**

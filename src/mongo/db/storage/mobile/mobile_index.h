@@ -108,7 +108,7 @@ public:
                     const ValueType& value,
                     bool isTransactional = true);
 
-    bool isUnique() {
+    bool isUnique() const {
         return _isUnique;
     }
 

@@ -320,18 +320,17 @@ public:
         virtual boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
                                                     RequestedInfo parts = kKeyAndLoc) = 0;
 
+        virtual boost::optional<KeyStringEntry> seek(const KeyString::Value& keyString,
+                                                     bool inclusive) = 0;
         /**
          * Seeks to a key with a hint to the implementation that you only want exact matches. If
          * an exact match can't be found, boost::none will be returned and the resulting
          * position of the cursor is unspecified.
          */
         virtual boost::optional<IndexKeyEntry> seekExact(const BSONObj& key,
-                                                         RequestedInfo parts = kKeyAndLoc) {
-            auto kv = seek(key, true, kKeyAndLoc);
-            if (kv && kv->key.woCompare(key, BSONObj(), /*considerFieldNames*/ false) == 0)
-                return kv;
-            return {};
-        }
+                                                         RequestedInfo parts = kKeyAndLoc) = 0;
+
+        virtual boost::optional<KeyStringEntry> seekExact(const KeyString::Value& keyString) = 0;
 
         //
         // Saving and restoring state

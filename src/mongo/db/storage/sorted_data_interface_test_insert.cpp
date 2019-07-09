@@ -489,6 +489,100 @@ TEST(SortedDataInterface, InsertMultipleKeyStrings) {
     }
 }
 
+/*
+ * Insert multiple KeyStrings and seek to the inserted KeyStrings
+ */
+TEST(SortedDataInterface, InsertAndSeekKeyString) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
+
+    KeyString::Builder keyString1(sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
+    KeyString::Builder keyString2(sorted->getKeyStringVersion(), key2, sorted->getOrdering(), loc2);
+
+    KeyString::Builder keyString1WithoutRecordId(
+        sorted->getKeyStringVersion(), key1, sorted->getOrdering());
+    KeyString::Builder keyString2WithoutRecordId(
+        sorted->getKeyStringVersion(), key2, sorted->getOrdering());
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), keyString1.getValueCopy(), loc1, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), keyString2.getValueCopy(), loc2, false));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+
+        auto ksEntry1 = cursor->seek(keyString1WithoutRecordId.getValueCopy(), true);
+        ASSERT_EQUALS(ksEntry1->keyString.compare(keyString1.getValueCopy()), 0);
+        ASSERT_EQUALS(ksEntry1->keyString.compare(keyString2.getValueCopy()), -1);
+
+        auto ksEntry2 = cursor->seek(keyString2WithoutRecordId.getValueCopy(), true);
+        ASSERT_EQUALS(ksEntry2->keyString.compare(keyString2.getValueCopy()), 0);
+        ASSERT_EQUALS(ksEntry2->keyString.compare(keyString1.getValueCopy()), 1);
+    }
+}
+
+/*
+ * Insert multiple KeyStrings and seekExact to the inserted KeyStrings
+ */
+TEST(SortedDataInterface, InsertAndSeekExactKeyString) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
+
+    KeyString::Builder keyString1(sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
+    KeyString::Builder keyString2(sorted->getKeyStringVersion(), key2, sorted->getOrdering(), loc2);
+
+    KeyString::Builder keyString1WithoutRecordId(
+        sorted->getKeyStringVersion(), key1, sorted->getOrdering());
+    KeyString::Builder keyString2WithoutRecordId(
+        sorted->getKeyStringVersion(), key2, sorted->getOrdering());
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(opCtx.get(), keyString1.getValueCopy(), loc1, false));
+            ASSERT_OK(sorted->insert(opCtx.get(), keyString2.getValueCopy(), loc2, false));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+
+        auto ksEntry1 = cursor->seekExact(keyString1WithoutRecordId.getValueCopy());
+        ASSERT_EQUALS(ksEntry1->keyString.compare(keyString1.getValueCopy()), 0);
+        ASSERT_EQUALS(ksEntry1->keyString.compare(keyString2.getValueCopy()), -1);
+
+        auto ksEntry2 = cursor->seekExact(keyString2WithoutRecordId.getValueCopy());
+        ASSERT_EQUALS(ksEntry2->keyString.compare(keyString2.getValueCopy()), 0);
+        ASSERT_EQUALS(ksEntry2->keyString.compare(keyString1.getValueCopy()), 1);
+    }
+}
+
 // Insert multiple compound keys and verify that the number of entries
 // in the index equals the number that were inserted.
 TEST(SortedDataInterface, InsertMultipleCompoundKeys) {
