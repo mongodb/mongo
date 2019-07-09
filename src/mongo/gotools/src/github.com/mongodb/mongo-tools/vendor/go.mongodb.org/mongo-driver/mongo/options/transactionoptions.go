@@ -7,6 +7,8 @@
 package options
 
 import (
+	"time"
+
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
@@ -17,6 +19,7 @@ type TransactionOptions struct {
 	ReadConcern    *readconcern.ReadConcern   // The read concern for the transaction. Defaults to the session's read concern.
 	ReadPreference *readpref.ReadPref         // The read preference for the transaction. Defaults to the session's read preference.
 	WriteConcern   *writeconcern.WriteConcern // The write concern for the transaction. Defaults to the session's write concern.
+	MaxCommitTime  *time.Duration             // The maximum amount of time to allow a single commitTransaction command to run.
 }
 
 // Transaction creates a new *TransactionOptions
@@ -42,6 +45,12 @@ func (t *TransactionOptions) SetWriteConcern(wc *writeconcern.WriteConcern) *Tra
 	return t
 }
 
+// SetMaxCommitTime sets the max commit time for the transaction.
+func (t *TransactionOptions) SetMaxCommitTime(mct *time.Duration) *TransactionOptions {
+	t.MaxCommitTime = mct
+	return t
+}
+
 // MergeTransactionOptions combines the given *TransactionOptions into a single *TransactionOptions in a last one wins
 // fashion.
 func MergeTransactionOptions(opts ...*TransactionOptions) *TransactionOptions {
@@ -58,6 +67,9 @@ func MergeTransactionOptions(opts ...*TransactionOptions) *TransactionOptions {
 		}
 		if opt.WriteConcern != nil {
 			t.WriteConcern = opt.WriteConcern
+		}
+		if opt.MaxCommitTime != nil {
+			t.MaxCommitTime = opt.MaxCommitTime
 		}
 	}
 

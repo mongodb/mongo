@@ -12,10 +12,8 @@ import (
 	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/topology"
-	"go.mongodb.org/mongo-driver/x/network/command"
-	"go.mongodb.org/mongo-driver/x/network/result"
+	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
 )
 
 // ErrUnacknowledgedWrite is returned from functions that have an unacknowledged
@@ -38,14 +36,23 @@ func replaceErrors(err error) error {
 	if err == topology.ErrTopologyClosed {
 		return ErrClientDisconnected
 	}
-	if ce, ok := err.(command.Error); ok {
-		return CommandError{Code: ce.Code, Message: ce.Message, Labels: ce.Labels, Name: ce.Name}
+	if de, ok := err.(driver.Error); ok {
+		return CommandError{Code: de.Code, Message: de.Message, Labels: de.Labels, Name: de.Name}
 	}
-	if conv, ok := err.(driverlegacy.BulkWriteException); ok {
-		return BulkWriteException{
-			WriteConcernError: convertWriteConcernError(conv.WriteConcernError),
-			WriteErrors:       convertBulkWriteErrors(conv.WriteErrors),
+	if qe, ok := err.(driver.QueryFailureError); ok {
+		// qe.Message is "command failure"
+		ce := CommandError{Name: qe.Message}
+
+		dollarErr, err := qe.Response.LookupErr("$err")
+		if err == nil {
+			ce.Message, _ = dollarErr.StringValueOK()
 		}
+		code, err := qe.Response.LookupErr("code")
+		if err == nil {
+			ce.Code, _ = code.Int32OK()
+		}
+
+		return ce
 	}
 
 	return err
@@ -79,6 +86,11 @@ func (e CommandError) HasErrorLabel(label string) bool {
 	return false
 }
 
+// IsMaxTimeMSExpiredError indicates if the error is a MaxTimeMSExpiredError.
+func (e CommandError) IsMaxTimeMSExpiredError() bool {
+	return e.Code == 50 || e.Name == "MaxTimeMSExpired"
+}
+
 // WriteError is a non-write concern failure that occurred as a result of a write
 // operation.
 type WriteError struct {
@@ -106,10 +118,10 @@ func (we WriteErrors) Error() string {
 	return buf.String()
 }
 
-func writeErrorsFromResult(rwes []result.WriteError) WriteErrors {
-	wes := make(WriteErrors, 0, len(rwes))
-	for _, err := range rwes {
-		wes = append(wes, WriteError{Index: err.Index, Code: err.Code, Message: err.ErrMsg})
+func writeErrorsFromDriverWriteErrors(errs driver.WriteErrors) WriteErrors {
+	wes := make(WriteErrors, 0, len(errs))
+	for _, err := range errs {
+		wes = append(wes, WriteError{Index: int(err.Index), Code: int(err.Code), Message: err.Message})
 	}
 	return wes
 }
@@ -117,12 +129,18 @@ func writeErrorsFromResult(rwes []result.WriteError) WriteErrors {
 // WriteConcernError is a write concern failure that occurred as a result of a
 // write operation.
 type WriteConcernError struct {
+	Name    string
 	Code    int
 	Message string
 	Details bson.Raw
 }
 
-func (wce WriteConcernError) Error() string { return wce.Message }
+func (wce WriteConcernError) Error() string {
+	if wce.Name != "" {
+		return fmt.Sprintf("(%v) %v", wce.Name, wce.Message)
+	}
+	return wce.Message
+}
 
 // WriteException is an error for a non-bulk write operation.
 type WriteException struct {
@@ -138,28 +156,12 @@ func (mwe WriteException) Error() string {
 	return buf.String()
 }
 
-func convertBulkWriteErrors(errors []driverlegacy.BulkWriteError) []BulkWriteError {
-	bwErrors := make([]BulkWriteError, 0, len(errors))
-	for _, err := range errors {
-		bwErrors = append(bwErrors, BulkWriteError{
-			WriteError{
-				Index:   err.Index,
-				Code:    err.Code,
-				Message: err.ErrMsg,
-			},
-			dispatchToMongoModel(err.Model),
-		})
-	}
-
-	return bwErrors
-}
-
-func convertWriteConcernError(wce *result.WriteConcernError) *WriteConcernError {
+func convertDriverWriteConcernError(wce *driver.WriteConcernError) *WriteConcernError {
 	if wce == nil {
 		return nil
 	}
 
-	return &WriteConcernError{Code: wce.Code, Message: wce.ErrMsg, Details: wce.ErrInfo}
+	return &WriteConcernError{Code: int(wce.Code), Message: wce.Message, Details: bson.Raw(wce.Details)}
 }
 
 // BulkWriteError is an error for one operation in a bulk write.
@@ -207,16 +209,19 @@ const (
 // This function will wrap the errors from other packages and return them as errors from this package.
 //
 // WriteConcernError will be returned over WriteErrors if both are present.
-func processWriteError(wce *result.WriteConcernError, wes []result.WriteError, err error) (returnResult, error) {
+func processWriteError(err error) (returnResult, error) {
 	switch {
-	case err == command.ErrUnacknowledgedWrite:
+	case err == driver.ErrUnacknowledgedWrite:
 		return rrAll, ErrUnacknowledgedWrite
 	case err != nil:
-		return rrNone, replaceErrors(err)
-	case wce != nil || len(wes) > 0:
-		return rrMany, WriteException{
-			WriteConcernError: convertWriteConcernError(wce),
-			WriteErrors:       writeErrorsFromResult(wes),
+		switch tt := err.(type) {
+		case driver.WriteCommandError:
+			return rrMany, WriteException{
+				WriteConcernError: convertDriverWriteConcernError(tt.WriteConcernError),
+				WriteErrors:       writeErrorsFromDriverWriteErrors(tt.WriteErrors),
+			}
+		default:
+			return rrNone, replaceErrors(err)
 		}
 	default:
 		return rrAll, nil

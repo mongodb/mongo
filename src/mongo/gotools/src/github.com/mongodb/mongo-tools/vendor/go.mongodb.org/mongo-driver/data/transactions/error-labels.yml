@@ -1,4 +1,11 @@
-topology: [replicaset, sharded]
+runOn:
+    -
+        minServerVersion: "4.0"
+        topology: ["replicaset"]
+    -
+        minServerVersion: "4.1.8"
+        topology: ["sharded"]
+
 database_name: &database_name "transaction-tests"
 collection_name: &collection_name "test"
 
@@ -945,6 +952,250 @@ tests:
             autocommit: false
             writeConcern:
               w: majority
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 1
+
+  - description: do not add unknown commit label to MaxTimeMSExpired inside transactions
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 1 }
+      data:
+        failCommands: ["aggregate"]
+        errorCode: 50  # MaxTimeMSExpired
+
+    operations:
+      - name: startTransaction
+        object: session0
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: aggregate
+        object: collection
+        arguments:
+          pipeline:
+            - $project:
+                _id: 1
+          maxTimeMS: 60000
+          session: session0
+        result:
+          errorLabelsOmit: ["UnknownTransactionCommitResult", "TransientTransactionError"]
+      - name: abortTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            aggregate: *collection_name
+            pipeline:
+              - $project:
+                  _id: 1
+            cursor: {}
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            autocommit: false
+            maxTimeMS: 60000
+          command_name: aggregate
+          database_name: *database_name
+      - command_started_event:
+          command:
+            abortTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+          command_name: abortTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data: []
+
+  - description: add unknown commit label to MaxTimeMSExpired
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 1 }
+      data:
+          failCommands: ["commitTransaction"]
+          errorCode: 50  # MaxTimeMSExpired
+
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            writeConcern:
+              w: majority
+            maxCommitTimeMS: 60000
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+        result:
+          errorLabelsContain: ["UnknownTransactionCommitResult"]
+          errorLabelsOmit: ["TransientTransactionError"]
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+              w: majority
+            maxTimeMS: 60000
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            # commitTransaction applies w:majority on retries
+            writeConcern: { w: majority, wtimeout: 10000 }
+            maxTimeMS: 60000
+          command_name: commitTransaction
+          database_name: admin
+
+    outcome:
+      collection:
+        data:
+          - _id: 1
+
+  - description: add unknown commit label to writeConcernError MaxTimeMSExpired
+
+    failPoint:
+      configureFailPoint: failCommand
+      mode: { times: 1 }
+      data:
+          failCommands: ["commitTransaction"]
+          writeConcernError:
+            code: 50  # MaxTimeMSExpired
+            errmsg: operation exceeded time limit
+
+    operations:
+      - name: startTransaction
+        object: session0
+        arguments:
+          options:
+            writeConcern:
+              w: majority
+            maxCommitTimeMS: 60000
+      - name: insertOne
+        object: collection
+        arguments:
+          session: session0
+          document:
+            _id: 1
+        result:
+          insertedId: 1
+      - name: commitTransaction
+        object: session0
+        result:
+          errorLabelsContain: ["UnknownTransactionCommitResult"]
+          errorLabelsOmit: ["TransientTransactionError"]
+      - name: commitTransaction
+        object: session0
+
+    expectations:
+      - command_started_event:
+          command:
+            insert: *collection_name
+            documents:
+              - _id: 1
+            ordered: true
+            readConcern:
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction: true
+            autocommit: false
+            writeConcern:
+          command_name: insert
+          database_name: *database_name
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            writeConcern:
+              w: majority
+            maxTimeMS: 60000
+          command_name: commitTransaction
+          database_name: admin
+      - command_started_event:
+          command:
+            commitTransaction: 1
+            lsid: session0
+            txnNumber:
+              $numberLong: "1"
+            startTransaction:
+            autocommit: false
+            # commitTransaction applies w:majority on retries
+            writeConcern: { w: majority, wtimeout: 10000 }
+            maxTimeMS: 60000
           command_name: commitTransaction
           database_name: admin
 

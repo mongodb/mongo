@@ -1,4 +1,11 @@
-topology: [replicaset, sharded]
+runOn:
+    -
+        minServerVersion: "4.0"
+        topology: ["replicaset"]
+    -
+        minServerVersion: "4.1.8"
+        topology: ["sharded"]
+
 database_name: &database_name "transaction-tests"
 collection_name: &collection_name "test"
 
@@ -260,6 +267,8 @@ tests:
 
   # This test proves that the driver parses the collectionOptions writeConcern.
   - description: collection writeConcern without transaction
+    clientOptions:
+      retryWrites: false
     operations:
       - name: insertOne
         object: collection

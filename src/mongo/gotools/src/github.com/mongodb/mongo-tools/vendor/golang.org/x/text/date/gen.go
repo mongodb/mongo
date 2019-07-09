@@ -28,7 +28,7 @@ var (
 // - Compile format patterns.
 // - Compress the large amount of redundancy in metazones.
 // - Split trees (with shared buckets) with data that is enough for default
-//   formatting of Go Time values and and tables that are needed for larger
+//   formatting of Go Time values and tables that are needed for larger
 //   variants.
 // - zone to metaZone mappings (in supplemental)
 // - Add more enum values and also some key maps for some of the elements.

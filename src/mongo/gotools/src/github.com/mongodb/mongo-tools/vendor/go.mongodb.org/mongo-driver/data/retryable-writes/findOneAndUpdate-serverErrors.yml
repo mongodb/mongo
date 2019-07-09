@@ -8,8 +8,6 @@ minServerVersion: '3.99'
 tests:
     -
         description: "FindOneAndUpdate succeeds after PrimarySteppedDown"
-        clientOptions:
-            retryWrites: true
         failPoint:
             configureFailPoint: failCommand
             mode: { times: 1 }
@@ -30,8 +28,6 @@ tests:
                     - { _id: 2, x: 22 }
     -
         description: "FindOneAndUpdate succeeds after WriteConcernError ShutdownInProgress"
-        clientOptions:
-            retryWrites: true
         failPoint:
             configureFailPoint: failCommand
             mode: { times: 1 }

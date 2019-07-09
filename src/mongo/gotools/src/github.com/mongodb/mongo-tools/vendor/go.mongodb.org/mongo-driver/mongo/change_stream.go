@@ -9,19 +9,22 @@ package mongo
 import (
 	"context"
 	"errors"
+	"fmt"
+	"reflect"
+	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/session"
-	"go.mongodb.org/mongo-driver/x/network/command"
-	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/description"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/operation"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
 )
 
 const errorInterrupted int32 = 11601
@@ -41,384 +44,318 @@ var ErrNilCursor = errors.New("cursor is nil")
 //
 // A typical usage of the ChangeStream type would be:
 type ChangeStream struct {
-	// Current is the BSON bytes of the current change document. This property is only valid until
-	// the next call to Next or Close. If continued access is required to the bson.Raw, you must
-	// make a copy of it.
 	Current bson.Raw
 
-	cmd         bsonx.Doc // aggregate command to run to create stream and rebuild cursor
-	pipeline    bsonx.Arr
-	options     *options.ChangeStreamOptions
-	coll        *Collection
-	db          *Database
-	ns          command.Namespace
-	cursor      *Cursor
-	cursorOpts  bsonx.Doc
-	getMoreOpts bsonx.Doc
-
-	resumeToken bsonx.Doc
-	err         error
-	streamType  StreamType
-	client      *Client
-	sess        Session
-	readPref    *readpref.ReadPref
-	readConcern *readconcern.ReadConcern
-	registry    *bsoncodec.Registry
+	aggregate     *operation.Aggregate
+	pipelineSlice []bsoncore.Document
+	cursor        changeStreamCursor
+	cursorOptions driver.CursorOptions
+	batch         []bsoncore.Document
+	resumeToken   bson.Raw
+	err           error
+	sess          *session.Client
+	client        *Client
+	registry      *bsoncodec.Registry
+	streamType    StreamType
+	options       *options.ChangeStreamOptions
+	selector      description.ServerSelector
+	operationTime *primitive.Timestamp
 }
 
-func (cs *ChangeStream) replaceOptions(desc description.SelectedServer) {
-	// if cs has not received any changes and resumeAfter not specified and max wire version >= 7, run known agg cmd
-	// with startAtOperationTime set to startAtOperationTime provided by user or saved from initial agg
-	// must not send resumeAfter key
-
-	// else: run known agg cmd with resumeAfter set to last known resumeToken
-	// must not set startAtOperationTime (remove if originally in cmd)
-
-	if cs.options.ResumeAfter == nil && desc.WireVersion.Max >= 7 && cs.resumeToken == nil {
-		cs.options.SetStartAtOperationTime(cs.sess.OperationTime())
-	} else {
-		if cs.resumeToken == nil {
-			return // restart stream without the resume token
-		}
-
-		cs.options.SetResumeAfter(cs.resumeToken)
-		// remove startAtOperationTime
-		cs.options.SetStartAtOperationTime(nil)
-	}
+type changeStreamConfig struct {
+	readConcern    *readconcern.ReadConcern
+	readPreference *readpref.ReadPref
+	client         *Client
+	registry       *bsoncodec.Registry
+	streamType     StreamType
+	collectionName string
+	databaseName   string
 }
 
-// Create options docs for the pipeline and cursor
-func createCmdDocs(csType StreamType, opts *options.ChangeStreamOptions, registry *bsoncodec.Registry) (bsonx.Doc,
-	bsonx.Doc, bsonx.Doc, bsonx.Doc, error) {
-
-	pipelineDoc := bsonx.Doc{}
-	cursorDoc := bsonx.Doc{}
-	optsDoc := bsonx.Doc{}
-	getMoreOptsDoc := bsonx.Doc{}
-
-	if csType == ClientStream {
-		pipelineDoc = pipelineDoc.Append("allChangesForCluster", bsonx.Boolean(true))
-	}
-
-	if opts.BatchSize != nil {
-		cursorDoc = cursorDoc.Append("batchSize", bsonx.Int32(*opts.BatchSize))
-	}
-	if opts.Collation != nil {
-		collDoc, err := bsonx.ReadDoc(opts.Collation.ToDocument())
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-		optsDoc = optsDoc.Append("collation", bsonx.Document(collDoc))
-	}
-	if opts.FullDocument != nil {
-		pipelineDoc = pipelineDoc.Append("fullDocument", bsonx.String(string(*opts.FullDocument)))
-	}
-	if opts.MaxAwaitTime != nil {
-		ms := int64(time.Duration(*opts.MaxAwaitTime) / time.Millisecond)
-		getMoreOptsDoc = getMoreOptsDoc.Append("maxTimeMS", bsonx.Int64(ms))
-	}
-	if opts.ResumeAfter != nil {
-		rt, err := transformDocument(registry, opts.ResumeAfter)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-
-		pipelineDoc = pipelineDoc.Append("resumeAfter", bsonx.Document(rt))
-	}
-	if opts.StartAtOperationTime != nil {
-		pipelineDoc = pipelineDoc.Append("startAtOperationTime",
-			bsonx.Timestamp(opts.StartAtOperationTime.T, opts.StartAtOperationTime.I))
-	}
-
-	return pipelineDoc, cursorDoc, optsDoc, getMoreOptsDoc, nil
-}
-
-func getSession(ctx context.Context, client *Client) (Session, error) {
-	sess := sessionFromContext(ctx)
-	if err := client.validSession(sess); err != nil {
-		return nil, err
-	}
-
-	var mongoSess Session
-	if sess != nil {
-		mongoSess = &sessionImpl{
-			Client: sess,
-		}
-	} else {
-		// create implicit session because it will be needed
-		newSess, err := session.NewClientSession(client.topology.SessionPool, client.id, session.Implicit)
-		if err != nil {
-			return nil, err
-		}
-
-		mongoSess = &sessionImpl{
-			Client: newSess,
-		}
-	}
-
-	return mongoSess, nil
-}
-
-func parseOptions(csType StreamType, opts *options.ChangeStreamOptions, registry *bsoncodec.Registry) (bsonx.Doc,
-	bsonx.Doc, bsonx.Doc, bsonx.Doc, error) {
-
-	if opts.FullDocument == nil {
-		opts = opts.SetFullDocument(options.Default)
-	}
-
-	pipelineDoc, cursorDoc, optsDoc, getMoreOptsDoc, err := createCmdDocs(csType, opts, registry)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	return pipelineDoc, cursorDoc, optsDoc, getMoreOptsDoc, nil
-}
-
-func (cs *ChangeStream) runCommand(ctx context.Context, replaceOptions bool) error {
-	ss, err := cs.client.topology.SelectServer(ctx, cs.db.writeSelector)
-	if err != nil {
-		return replaceErrors(err)
-	}
-
-	desc := ss.Description()
-	conn, err := ss.Connection(ctx)
-	if err != nil {
-		return replaceErrors(err)
-	}
-	defer conn.Close()
-
-	if replaceOptions {
-		cs.replaceOptions(desc)
-		optionsDoc, _, _, _, err := createCmdDocs(cs.streamType, cs.options, cs.registry)
-		if err != nil {
-			return err
-		}
-
-		changeStreamDoc := bsonx.Doc{
-			{"$changeStream", bsonx.Document(optionsDoc)},
-		}
-		cs.pipeline[0] = bsonx.Document(changeStreamDoc)
-		cs.cmd.Set("pipeline", bsonx.Array(cs.pipeline))
-	}
-
-	readCmd := command.Read{
-		DB:          cs.db.name,
-		Command:     cs.cmd,
-		Session:     cs.sess.(*sessionImpl).Client,
-		Clock:       cs.client.clock,
-		ReadPref:    cs.readPref,
-		ReadConcern: cs.readConcern,
-	}
-
-	rdr, err := readCmd.RoundTrip(ctx, desc, conn)
-	if err != nil {
-		cs.sess.EndSession(ctx)
-		return replaceErrors(err)
-	}
-
-	batchCursor, err := driverlegacy.NewBatchCursor(bsoncore.Document(rdr), readCmd.Session, readCmd.Clock, ss.Server, cs.getMoreOpts...)
-	if err != nil {
-		cs.sess.EndSession(ctx)
-		return replaceErrors(err)
-	}
-	cursor, err := newCursor(batchCursor, cs.registry)
-	if err != nil {
-		cs.sess.EndSession(ctx)
-		return err
-	}
-	cs.cursor = cursor
-
-	cursorValue, err := rdr.LookupErr("cursor")
-	if err != nil {
-		return err
-	}
-	cursorDoc := cursorValue.Document()
-	cs.ns = command.ParseNamespace(cursorDoc.Lookup("ns").StringValue())
-
-	return nil
-}
-
-func newChangeStream(ctx context.Context, coll *Collection, pipeline interface{},
+func newChangeStream(ctx context.Context, config changeStreamConfig, pipeline interface{},
 	opts ...*options.ChangeStreamOptions) (*ChangeStream, error) {
-
-	pipelineArr, err := transformAggregatePipeline(coll.registry, pipeline)
-	if err != nil {
-		return nil, err
+	if ctx == nil {
+		ctx = context.Background()
 	}
-
-	csOpts := options.MergeChangeStreamOptions(opts...)
-	pipelineDoc, cursorDoc, optsDoc, getMoreDoc, err := parseOptions(CollectionStream, csOpts, coll.registry)
-	if err != nil {
-		return nil, err
-	}
-	sess, err := getSession(ctx, coll.client)
-	if err != nil {
-		return nil, err
-	}
-
-	csDoc := bsonx.Document(bsonx.Doc{
-		{"$changeStream", bsonx.Document(pipelineDoc)},
-	})
-	pipelineArr = append(bsonx.Arr{csDoc}, pipelineArr...)
-
-	cmd := bsonx.Doc{
-		{"aggregate", bsonx.String(coll.name)},
-		{"pipeline", bsonx.Array(pipelineArr)},
-		{"cursor", bsonx.Document(cursorDoc)},
-	}
-	cmd = append(cmd, optsDoc...)
 
 	cs := &ChangeStream{
-		client:      coll.client,
-		sess:        sess,
-		cmd:         cmd,
-		pipeline:    pipelineArr,
-		coll:        coll,
-		db:          coll.db,
-		streamType:  CollectionStream,
-		readPref:    coll.readPreference,
-		readConcern: coll.readConcern,
-		options:     csOpts,
-		registry:    coll.registry,
-		cursorOpts:  cursorDoc,
-		getMoreOpts: getMoreDoc,
+		client:     config.client,
+		registry:   config.registry,
+		streamType: config.streamType,
+		options:    options.MergeChangeStreamOptions(opts...),
+		selector:   description.ReadPrefSelector(config.readPreference),
 	}
 
-	err = cs.runCommand(ctx, false)
-	if err != nil {
-		return nil, err
+	cs.sess = sessionFromContext(ctx)
+	if cs.sess == nil && cs.client.topology.SessionPool != nil {
+		cs.sess, cs.err = session.NewClientSession(cs.client.topology.SessionPool, cs.client.id, session.Implicit)
+		if cs.err != nil {
+			return nil, cs.Err()
+		}
+	}
+	if cs.err = cs.client.validSession(cs.sess); cs.err != nil {
+		closeImplicitSession(cs.sess)
+		return nil, cs.Err()
 	}
 
-	return cs, nil
+	cs.aggregate = operation.NewAggregate(nil).
+		ReadPreference(config.readPreference).ReadConcern(config.readConcern).
+		Deployment(cs.client.topology).ClusterClock(cs.client.clock).
+		CommandMonitor(cs.client.monitor).Session(cs.sess).ServerSelector(cs.selector)
+
+	if cs.options.Collation != nil {
+		cs.aggregate.Collation(bsoncore.Document(cs.options.Collation.ToDocument()))
+	}
+	if cs.options.BatchSize != nil {
+		cs.aggregate.BatchSize(*cs.options.BatchSize)
+		cs.cursorOptions.BatchSize = *cs.options.BatchSize
+	}
+	if cs.options.MaxAwaitTime != nil {
+		cs.cursorOptions.MaxTimeMS = int64(time.Duration(*cs.options.MaxAwaitTime) / time.Millisecond)
+	}
+	cs.cursorOptions.CommandMonitor = cs.client.monitor
+
+	switch cs.streamType {
+	case ClientStream:
+		cs.aggregate.Database("admin")
+	case DatabaseStream:
+		cs.aggregate.Database(config.databaseName)
+	case CollectionStream:
+		cs.aggregate.Collection(config.collectionName).Database(config.databaseName)
+	default:
+		closeImplicitSession(cs.sess)
+		return nil, fmt.Errorf("must supply a valid StreamType in config, instead of %v", cs.streamType)
+	}
+
+	// When starting a change stream, cache startAfter as the first resume token if it is set. If not, cache
+	// resumeAfter. If neither is set, do not cache a resume token.
+	resumeToken := cs.options.StartAfter
+	if resumeToken == nil {
+		resumeToken = cs.options.ResumeAfter
+	}
+	var marshaledToken bson.Raw
+	if resumeToken != nil {
+		if marshaledToken, cs.err = bson.Marshal(resumeToken); cs.err != nil {
+			closeImplicitSession(cs.sess)
+			return nil, cs.Err()
+		}
+	}
+	cs.resumeToken = marshaledToken
+
+	if cs.err = cs.buildPipelineSlice(pipeline); cs.err != nil {
+		closeImplicitSession(cs.sess)
+		return nil, cs.Err()
+	}
+	var pipelineArr bsoncore.Document
+	pipelineArr, cs.err = cs.pipelineToBSON()
+	cs.aggregate.Pipeline(pipelineArr)
+
+	if cs.err = cs.executeOperation(ctx, false); cs.err != nil {
+		closeImplicitSession(cs.sess)
+		return nil, cs.Err()
+	}
+
+	return cs, cs.Err()
 }
 
-func newDbChangeStream(ctx context.Context, db *Database, pipeline interface{},
-	opts ...*options.ChangeStreamOptions) (*ChangeStream, error) {
-
-	pipelineArr, err := transformAggregatePipeline(db.registry, pipeline)
-	if err != nil {
-		return nil, err
+func (cs *ChangeStream) executeOperation(ctx context.Context, resuming bool) error {
+	var server driver.Server
+	var conn driver.Connection
+	if server, cs.err = cs.client.topology.SelectServer(ctx, cs.selector); cs.err != nil {
+		return cs.Err()
 	}
-
-	csOpts := options.MergeChangeStreamOptions(opts...)
-	pipelineDoc, cursorDoc, optsDoc, getMoreDoc, err := parseOptions(DatabaseStream, csOpts, db.registry)
-	if err != nil {
-		return nil, err
+	if conn, cs.err = server.Connection(ctx); cs.err != nil {
+		return cs.Err()
 	}
-	sess, err := getSession(ctx, db.client)
-	if err != nil {
-		return nil, err
-	}
-
-	csDoc := bsonx.Document(bsonx.Doc{
-		{"$changeStream", bsonx.Document(pipelineDoc)},
+	cs.aggregate.Deployment(driver.SingleConnectionDeployment{
+		C: conn,
 	})
-	pipelineArr = append(bsonx.Arr{csDoc}, pipelineArr...)
 
-	cmd := bsonx.Doc{
-		{"aggregate", bsonx.Int32(1)},
-		{"pipeline", bsonx.Array(pipelineArr)},
-		{"cursor", bsonx.Document(cursorDoc)},
-	}
-	cmd = append(cmd, optsDoc...)
+	if resuming {
+		cs.replaceOptions(ctx, conn.Description().WireVersion) // pass wire version
 
-	cs := &ChangeStream{
-		client:      db.client,
-		db:          db,
-		sess:        sess,
-		cmd:         cmd,
-		pipeline:    pipelineArr,
-		streamType:  DatabaseStream,
-		readPref:    db.readPreference,
-		readConcern: db.readConcern,
-		options:     csOpts,
-		registry:    db.registry,
-		cursorOpts:  cursorDoc,
-		getMoreOpts: getMoreDoc,
+		csOptDoc := cs.createPipelineOptionsDoc()
+		pipIdx, pipDoc := bsoncore.AppendDocumentStart(nil)
+		pipDoc = bsoncore.AppendDocumentElement(pipDoc, "$changeStream", csOptDoc)
+		if pipDoc, cs.err = bsoncore.AppendDocumentEnd(pipDoc, pipIdx); cs.err != nil {
+			return cs.Err()
+		}
+		cs.pipelineSlice[0] = pipDoc
+
+		var plArr bsoncore.Document
+		if plArr, cs.err = cs.pipelineToBSON(); cs.err != nil {
+			return cs.Err()
+		}
+		cs.aggregate.Pipeline(plArr)
 	}
 
-	err = cs.runCommand(ctx, false)
-	if err != nil {
-		return nil, err
+	if cs.err = replaceErrors(cs.aggregate.Execute(ctx)); cs.err != nil {
+		return cs.Err()
 	}
 
-	return cs, nil
+	cr := cs.aggregate.ResultCursorResponse()
+	cr.Server = server
+
+	cs.cursor, cs.err = driver.NewBatchCursor(cr, cs.sess, cs.client.clock, cs.cursorOptions)
+	if cs.err = replaceErrors(cs.err); cs.err != nil {
+		return cs.Err()
+	}
+
+	cs.updatePbrtFromCommand()
+	if cs.options.StartAtOperationTime == nil && cs.options.ResumeAfter == nil &&
+		cs.options.StartAfter == nil && conn.Description().WireVersion.Max >= 7 &&
+		cs.emptyBatch() && cs.resumeToken == nil {
+		cs.operationTime = cs.sess.OperationTime
+	}
+
+	return cs.Err()
 }
 
-func newClientChangeStream(ctx context.Context, client *Client, pipeline interface{},
-	opts ...*options.ChangeStreamOptions) (*ChangeStream, error) {
-
-	pipelineArr, err := transformAggregatePipeline(client.registry, pipeline)
-	if err != nil {
-		return nil, err
+// Updates the post batch resume token after a successful aggregate or getMore operation.
+func (cs *ChangeStream) updatePbrtFromCommand() {
+	// Only cache the pbrt if an empty batch was returned and a pbrt was included
+	if pbrt := cs.cursor.PostBatchResumeToken(); cs.emptyBatch() && pbrt != nil {
+		cs.resumeToken = bson.Raw(pbrt)
 	}
-
-	csOpts := options.MergeChangeStreamOptions(opts...)
-	pipelineDoc, cursorDoc, optsDoc, getMoreDoc, err := parseOptions(ClientStream, csOpts, client.registry)
-	if err != nil {
-		return nil, err
-	}
-	sess, err := getSession(ctx, client)
-	if err != nil {
-		return nil, err
-	}
-
-	csDoc := bsonx.Document(bsonx.Doc{
-		{"$changeStream", bsonx.Document(pipelineDoc)},
-	})
-	pipelineArr = append(bsonx.Arr{csDoc}, pipelineArr...)
-
-	cmd := bsonx.Doc{
-		{"aggregate", bsonx.Int32(1)},
-		{"pipeline", bsonx.Array(pipelineArr)},
-		{"cursor", bsonx.Document(cursorDoc)},
-	}
-	cmd = append(cmd, optsDoc...)
-
-	cs := &ChangeStream{
-		client:      client,
-		db:          client.Database("admin"),
-		sess:        sess,
-		cmd:         cmd,
-		pipeline:    pipelineArr,
-		streamType:  ClientStream,
-		readPref:    client.readPreference,
-		readConcern: client.readConcern,
-		options:     csOpts,
-		registry:    client.registry,
-		cursorOpts:  cursorDoc,
-		getMoreOpts: getMoreDoc,
-	}
-
-	err = cs.runCommand(ctx, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return cs, nil
 }
 
 func (cs *ChangeStream) storeResumeToken() error {
-	idVal, err := cs.cursor.Current.LookupErr("_id")
-	if err != nil {
-		_ = cs.Close(context.Background())
-		return ErrMissingResumeToken
+	// If cs.Current is the last document in the batch and a pbrt is included, cache the pbrt
+	// Otherwise, cache the _id of the document
+	var tokenDoc bson.Raw
+	if len(cs.batch) == 0 {
+		if pbrt := cs.cursor.PostBatchResumeToken(); pbrt != nil {
+			tokenDoc = bson.Raw(pbrt)
+		}
 	}
 
-	var idDoc bson.Raw
-	idDoc, ok := idVal.DocumentOK()
-	if !ok {
-		_ = cs.Close(context.Background())
-		return ErrMissingResumeToken
-	}
-	tokenDoc, err := bsonx.ReadDoc(idDoc)
-	if err != nil {
-		_ = cs.Close(context.Background())
-		return ErrMissingResumeToken
+	if tokenDoc == nil {
+		var ok bool
+		tokenDoc, ok = cs.Current.Lookup("_id").DocumentOK()
+		if !ok {
+			_ = cs.Close(context.Background())
+			return ErrMissingResumeToken
+		}
 	}
 
 	cs.resumeToken = tokenDoc
 	return nil
+}
+
+func (cs *ChangeStream) buildPipelineSlice(pipeline interface{}) error {
+	val := reflect.ValueOf(pipeline)
+	if !val.IsValid() || !(val.Kind() == reflect.Slice) {
+		cs.err = errors.New("can only transform slices and arrays into aggregation pipelines, but got invalid")
+		return cs.err
+	}
+
+	cs.pipelineSlice = make([]bsoncore.Document, 0, val.Len()+1)
+
+	csIdx, csDoc := bsoncore.AppendDocumentStart(nil)
+	csDocTemp := cs.createPipelineOptionsDoc()
+	if cs.err != nil {
+		return cs.err
+	}
+	csDoc = bsoncore.AppendDocumentElement(csDoc, "$changeStream", csDocTemp)
+	csDoc, cs.err = bsoncore.AppendDocumentEnd(csDoc, csIdx)
+	if cs.err != nil {
+		return cs.err
+	}
+	cs.pipelineSlice = append(cs.pipelineSlice, csDoc)
+
+	for i := 0; i < val.Len(); i++ {
+		var elem []byte
+		elem, cs.err = transformBsoncoreDocument(cs.registry, val.Index(i).Interface())
+		if cs.err != nil {
+			return cs.err
+		}
+
+		cs.pipelineSlice = append(cs.pipelineSlice, elem)
+	}
+
+	return cs.err
+}
+
+func (cs *ChangeStream) createPipelineOptionsDoc() bsoncore.Document {
+	plDocIdx, plDoc := bsoncore.AppendDocumentStart(nil)
+
+	if cs.streamType == ClientStream {
+		plDoc = bsoncore.AppendBooleanElement(plDoc, "allChangesForCluster", true)
+	}
+
+	if cs.options.FullDocument != nil {
+		plDoc = bsoncore.AppendStringElement(plDoc, "fullDocument", string(*cs.options.FullDocument))
+	}
+
+	if cs.options.ResumeAfter != nil {
+		var raDoc bsoncore.Document
+		raDoc, cs.err = transformBsoncoreDocument(cs.registry, cs.options.ResumeAfter)
+		if cs.err != nil {
+			return nil
+		}
+
+		plDoc = bsoncore.AppendDocumentElement(plDoc, "resumeAfter", raDoc)
+	}
+
+	if cs.options.StartAfter != nil {
+		var saDoc bsoncore.Document
+		saDoc, cs.err = transformBsoncoreDocument(cs.registry, cs.options.StartAfter)
+		if cs.err != nil {
+			return nil
+		}
+
+		plDoc = bsoncore.AppendDocumentElement(plDoc, "startAfter", saDoc)
+	}
+
+	if cs.options.StartAtOperationTime != nil {
+		plDoc = bsoncore.AppendTimestampElement(plDoc, "startAtOperationTime", cs.options.StartAtOperationTime.T, cs.options.StartAtOperationTime.I)
+	}
+
+	if plDoc, cs.err = bsoncore.AppendDocumentEnd(plDoc, plDocIdx); cs.err != nil {
+		return nil
+	}
+
+	return plDoc
+}
+
+func (cs *ChangeStream) pipelineToBSON() (bsoncore.Document, error) {
+	pipelineDocIdx, pipelineArr := bsoncore.AppendArrayStart(nil)
+	for i, doc := range cs.pipelineSlice {
+		pipelineArr = bsoncore.AppendDocumentElement(pipelineArr, strconv.Itoa(i), doc)
+	}
+	if pipelineArr, cs.err = bsoncore.AppendArrayEnd(pipelineArr, pipelineDocIdx); cs.err != nil {
+		return nil, cs.err
+	}
+	return pipelineArr, cs.err
+}
+
+func (cs *ChangeStream) replaceOptions(ctx context.Context, wireVersion *description.VersionRange) {
+	// Cached resume token: use the resume token as the resumeAfter option and set no other resume options
+	if cs.resumeToken != nil {
+		cs.options.SetResumeAfter(cs.resumeToken)
+		cs.options.SetStartAfter(nil)
+		cs.options.SetStartAtOperationTime(nil)
+		return
+	}
+
+	// No cached resume token but cached operation time: use the operation time as the startAtOperationTime option and
+	// set no other resume options
+	if (cs.sess.OperationTime != nil || cs.options.StartAtOperationTime != nil) && wireVersion.Max >= 7 {
+		opTime := cs.options.StartAtOperationTime
+		if cs.operationTime != nil {
+			opTime = cs.sess.OperationTime
+		}
+
+		cs.options.SetStartAtOperationTime(opTime)
+		cs.options.SetResumeAfter(nil)
+		cs.options.SetStartAfter(nil)
+		return
+	}
+
+	// No cached resume token or operation time: set none of the resume options
+	cs.options.SetResumeAfter(nil)
+	cs.options.SetStartAfter(nil)
+	cs.options.SetStartAtOperationTime(nil)
 }
 
 // ID returns the cursor ID for this change stream.
@@ -426,58 +363,16 @@ func (cs *ChangeStream) ID() int64 {
 	if cs.cursor == nil {
 		return 0
 	}
-
 	return cs.cursor.ID()
 }
 
-// Next gets the next result from this change stream. Returns true if there were no errors and the next
-// result is available for decoding.
-func (cs *ChangeStream) Next(ctx context.Context) bool {
-	// execute in a loop to retry resume-able errors and advance the underlying cursor
-	for {
-		if cs.cursor == nil {
-			return false
-		}
-
-		if cs.cursor.Next(ctx) {
-			err := cs.storeResumeToken()
-			if err != nil {
-				cs.err = err
-				return false
-			}
-
-			cs.Current = cs.cursor.Current
-			return true
-		}
-
-		err := cs.cursor.Err()
-		if err == nil {
-			return false
-		}
-
-		switch t := err.(type) {
-		case command.Error:
-			if t.Code == errorInterrupted || t.Code == errorCappedPositionLost || t.Code == errorCursorKilled {
-				return false
-			}
-		}
-
-		_, _ = driverlegacy.KillCursors(ctx, cs.ns, cs.cursor.bc.Server(), cs.ID())
-
-		cs.err = cs.runCommand(ctx, true)
-		if cs.err != nil {
-			return false
-		}
-	}
-}
-
 // Decode will decode the current document into val.
-func (cs *ChangeStream) Decode(out interface{}) error {
+func (cs *ChangeStream) Decode(val interface{}) error {
 	if cs.cursor == nil {
 		return ErrNilCursor
 	}
 
-	return bson.UnmarshalWithRegistry(cs.registry, cs.Current, out)
+	return bson.UnmarshalWithRegistry(cs.registry, cs.Current, val)
 }
 
 // Err returns the current error.
@@ -489,16 +384,98 @@ func (cs *ChangeStream) Err() error {
 		return nil
 	}
 
-	return cs.cursor.Err()
+	return replaceErrors(cs.cursor.Err())
 }
 
 // Close closes this cursor.
 func (cs *ChangeStream) Close(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	closeImplicitSession(cs.sess)
+
 	if cs.cursor == nil {
 		return nil // cursor is already closed
 	}
 
-	return replaceErrors(cs.cursor.Close(ctx))
+	cs.err = replaceErrors(cs.cursor.Close(ctx))
+	cs.cursor = nil
+	return cs.Err()
+}
+
+// ResumeToken returns the last cached resume token for this change stream.
+func (cs *ChangeStream) ResumeToken() bson.Raw {
+	return cs.resumeToken
+}
+
+// Next gets the next result from this change stream. Returns true if there were no errors and the next
+// result is available for decoding.
+func (cs *ChangeStream) Next(ctx context.Context) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if len(cs.batch) == 0 {
+		cs.loopNext(ctx)
+		if cs.err != nil || len(cs.batch) == 0 {
+			cs.err = replaceErrors(cs.err)
+			return false
+		}
+	}
+
+	cs.Current = bson.Raw(cs.batch[0])
+	cs.batch = cs.batch[1:]
+	if cs.err = cs.storeResumeToken(); cs.err != nil {
+		return false
+	}
+	return true
+}
+
+func (cs *ChangeStream) loopNext(ctx context.Context) {
+	for {
+		if cs.cursor == nil {
+			return
+		}
+
+		if cs.cursor.Next(ctx) {
+			// If this is the first batch, the batch cursor will return true, but the batch could be empty.
+			if cs.batch, cs.err = cs.cursor.Batch().Documents(); cs.err != nil || len(cs.batch) > 0 {
+				return
+			}
+
+			// no error but empty batch
+			cs.updatePbrtFromCommand()
+			continue
+		}
+
+		cs.err = replaceErrors(cs.cursor.Err())
+		if cs.err == nil {
+			// If a getMore was done but the batch was empty, the batch cursor will return false with no error
+			if len(cs.batch) == 0 {
+				continue
+			}
+			return
+		}
+
+		switch t := cs.err.(type) {
+		case CommandError:
+			if t.Code == errorInterrupted || t.Code == errorCappedPositionLost || t.Code == errorCursorKilled || t.HasErrorLabel("NonResumableChangeStreamError") {
+				return
+			}
+		}
+
+		// ignore error from cursor close because if the cursor is deleted or errors we tried to close it and will remake and try to get next batch
+		_ = cs.cursor.Close(ctx)
+		if cs.err = cs.executeOperation(ctx, true); cs.err != nil {
+			return
+		}
+	}
+}
+
+// Returns true if the underlying cursor's batch is empty
+func (cs *ChangeStream) emptyBatch() bool {
+	return cs.cursor.Batch().Empty()
 }
 
 // StreamType represents the type of a change stream.

@@ -14,7 +14,7 @@ The MongoDB supported driver for Go.
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Bugs/Feature Reporting](#bugs-feature-reporting)
+- [Bugs / Feature Reporting](#bugs--feature-reporting)
 - [Testing / Development](#testing--development)
 - [Continuous Integration](#continuous-integration)
 - [License](#license)

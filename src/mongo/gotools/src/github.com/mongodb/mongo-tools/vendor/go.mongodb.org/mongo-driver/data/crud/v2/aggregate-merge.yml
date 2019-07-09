@@ -1,0 +1,101 @@
+data:
+  - { _id: 1, x: 11 }
+  - { _id: 2, x: 22 }
+  - { _id: 3, x: 33 }
+
+minServerVersion: '4.2.0'
+
+collection_name: &collection_name 'test_aggregate_merge'
+
+tests:
+  -
+    description: "Aggregate with $merge"
+    operations:
+      -
+        object: collection
+        name: aggregate
+        arguments: &arguments
+          pipeline: &pipeline
+            - $sort: { x : 1 }
+            - $match: { _id: { $gt: 1 } }
+            - $merge: { into: &output_collection "other_test_collection" }
+    expectations:
+      -
+        command_started_event:
+          command:
+            aggregate: *collection_name
+            pipeline: *pipeline
+    outcome: &outcome
+      collection:
+        name: *output_collection
+        data:
+          - { _id: 2, x: 22 }
+          - { _id: 3, x: 33 }
+  -
+    description: "Aggregate with $merge and batch size of 0"
+    operations:
+      -
+        object: collection
+        name: aggregate
+        arguments:
+          <<: *arguments
+          batchSize: 0
+    expectations:
+      -
+        command_started_event:
+          command:
+            aggregate: *collection_name
+            pipeline: *pipeline
+            cursor: {}
+    outcome: *outcome
+  -
+    description: "Aggregate with $merge and majority readConcern"
+    operations:
+      -
+        object: collection
+        name: aggregate
+        collectionOptions:
+          readConcern: { level: "majority" }
+        arguments: *arguments
+    expectations:
+      -
+        command_started_event:
+          command:
+            aggregate: *collection_name
+            pipeline: *pipeline
+            readConcern: { level: "majority" }
+    outcome: *outcome
+  -
+    description: "Aggregate with $merge and local readConcern"
+    operations:
+      -
+        object: collection
+        name: aggregate
+        collectionOptions:
+          readConcern: { level: "local" }
+        arguments: *arguments
+    expectations:
+      -
+        command_started_event:
+          command:
+            aggregate: *collection_name
+            pipeline: *pipeline
+            readConcern: { level: "local" }
+    outcome: *outcome
+  -
+    description: "Aggregate with $merge and available readConcern"
+    operations:
+      -
+        object: collection
+        name: aggregate
+        collectionOptions:
+          readConcern: { level: "available" }
+        arguments: *arguments
+    expectations:
+      -
+        command_started_event:
+          command:
+            aggregate: *collection_name
+            pipeline: *pipeline
+            readConcern: { level: "available" }
+    outcome: *outcome

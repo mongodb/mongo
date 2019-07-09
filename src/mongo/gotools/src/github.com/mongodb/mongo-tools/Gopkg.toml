@@ -33,7 +33,7 @@ required = ["github.com/3rf/mongo-lint"]
 
 [[constraint]]
   name = "go.mongodb.org/mongo-driver"
-  revision = "bb984ba94a90e2bdf108128bf6bef0c0505a4bc7"
+  revision = "216e392ea5ac0903291d940c2574a11a185663bd"
 
 [[constraint]]
   name = "github.com/10gen/escaper"
@@ -124,3 +124,7 @@ required = ["github.com/3rf/mongo-lint"]
 [prune]
   go-tests = true
   # unused-packages = true
+
+[[constraint]]
+  name = "github.com/google/go-cmp"
+  version = "0.3.0"

@@ -14,8 +14,6 @@ phases:
         - "b:27017"
         - ok: 1
           isreplicaset: true
-          setName: "rs"
-          hosts: ["a:27017", "b:27017"]
           minWireVersion: 0
           maxWireVersion: 1
     outcome:
@@ -25,7 +23,7 @@ phases:
           setName: "rs"
         "b:27017":
           type: "RSGhost"
-          setName: "rs"
+          setName:
       topologyType: "ReplicaSetWithPrimary"
       setName: "rs"
       logicalSessionTimeoutMinutes: ~

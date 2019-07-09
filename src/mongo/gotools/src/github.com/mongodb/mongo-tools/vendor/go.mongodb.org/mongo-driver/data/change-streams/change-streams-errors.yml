@@ -1,0 +1,76 @@
+collection_name: &collection_name "test"
+database_name: &database_name "change-stream-tests"
+collection2_name: &collection2_name "test2"
+database2_name: &database2_name "change-stream-tests-2"
+tests:
+  -
+    description: The watch helper must not throw a custom exception when executed against a single server topology, but instead depend on a server error
+    minServerVersion: "3.6.0"
+    target: collection
+    topology:
+      - single
+    changeStreamPipeline: []
+    changeStreamOptions: {}
+    operations: []
+    expectations: []
+    result:
+      error:
+        code: 40573
+  -
+    description: Change Stream should error when an invalid aggregation stage is passed in
+    minServerVersion: "3.6.0"
+    target: collection
+    topology:
+      - replicaset
+    changeStreamPipeline:
+      -
+        $unsupported: foo
+    changeStreamOptions: {}
+    operations:
+      -
+        database: *database_name
+        collection: *collection_name
+        name: insertOne
+        arguments:
+          document:
+            z: 3
+    expectations:
+      -
+        command_started_event:
+          command:
+            aggregate: *collection_name
+            cursor: {}
+            pipeline:
+              - 
+                $changeStream:
+                  fullDocument: default
+              -
+                $unsupported: foo
+          command_name: aggregate
+          database_name: *database_name
+    result:
+      error:
+        code: 40324
+  -
+    description: Change Stream should error when _id is projected out
+    minServerVersion: "4.1.11"
+    target: collection
+    topology:
+      - replicaset
+      - sharded
+    changeStreamPipeline:
+      -
+        $project: { _id: 0 }
+    changeStreamOptions: {}
+    operations:
+      -
+        database: *database_name
+        collection: *collection_name
+        name: insertOne
+        arguments:
+          document:
+            z: 3
+    result:
+      error:
+        code: 280
+        errorLabels: [ "NonResumableChangeStreamError" ]

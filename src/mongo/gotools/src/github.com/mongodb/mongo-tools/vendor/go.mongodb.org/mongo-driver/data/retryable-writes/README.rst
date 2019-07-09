@@ -24,7 +24,7 @@ the cluster.
 Server Fail Point
 =================
 
-The tests depend on a server fail point, ``onPrimaryTransactionalWrite``, which
+Some tests depend on a server fail point, ``onPrimaryTransactionalWrite``, which
 allows us to force a network error before the server would return a write result
 to the client. The fail point also allows control whether the server will
 successfully commit the write via its ``failBeforeCommitExceptionCode`` option.
@@ -140,8 +140,8 @@ Each YAML file has the following keys:
 
   - ``clientOptions``: Parameters to pass to MongoClient().
 
-  - ``failPoint``: The ``configureFailPoint`` command document to run to
-    configure a fail point on the primary server. Drivers must ensure that
+  - ``failPoint`` (optional): The ``configureFailPoint`` command document to run
+    to configure a fail point on the primary server. Drivers must ensure that
     ``configureFailPoint`` is the first field in the command.
 
   - ``operation``: Document describing the operation to be executed. The
@@ -187,9 +187,9 @@ The YAML tests specify bulk write operations that are split by command type
 operations may also be split due to ``maxWriteBatchSize``,
 ``maxBsonObjectSize``, or ``maxMessageSizeBytes``.
 
-For instance, an insertMany operation with five 10 MB documents executed using
+For instance, an insertMany operation with five 10 MiB documents executed using
 OP_MSG payload type 0 (i.e. entire command in one document) would be split into
-five insert commands in order to respect the 16 MB ``maxBsonObjectSize`` limit.
+five insert commands in order to respect the 16 MiB ``maxBsonObjectSize`` limit.
 The same insertMany operation executed using OP_MSG payload type 1 (i.e. command
 arguments pulled out into a separate payload vector) would be split into two
 insert commands in order to respect the 48 MB ``maxMessageSizeBytes`` limit.
@@ -209,59 +209,6 @@ documents in the first command will be processed in the same commit). When
 testing an update or delete that is split into two commands, the ``skip`` should
 be set to the number of statements in the first command to allow the fail point
 to trigger on the second command.
-
-Replica Set Failover Test
-=========================
-
-In addition to network errors, writes should also be retried in the event of a
-primary failover, which results in a "not master" command error (or similar).
-The ``stepdownHangBeforePerformingPostMemberStateUpdateActions`` fail point
-implemented in `d4eb562`_ for `SERVER-31355`_ may be used for this test, as it
-allows a primary to keep its client connections open after a step down. This
-fail point operates by hanging the step down procedure (i.e. ``replSetStepDown``
-command) until the fail point is later deactivated.
-
-.. _d4eb562: https://github.com/mongodb/mongo/commit/d4eb562ac63717904f24de4a22e395070687bc62
-.. _SERVER-31355: https://jira.mongodb.org/browse/SERVER-31355
-
-The following test requires three MongoClient instances and will generally
-require two execution contexts (async drivers may get by with a single thread).
-
-- The client under test will connect to the replica set and be used to execute
-  write operations.
-- The fail point client will connect directly to the initial primary and be used
-  to toggle the fail point.
-- The step down client will connect to the replica set and be used to step down
-  the primary. This client will generally require its own execution context,
-  since the step down will hang.
-
-In order to guarantee that the client under test does not detect the stepped
-down primary's state change via SDAM, it must be configured with a large
-`heartbeatFrequencyMS`_ value (e.g. 60 seconds). Single-threaded drivers may
-also need to set `serverSelectionTryOnce`_ to ``false`` to ensure that server
-selection for the retry attempt waits until a new primary is elected.
-
-.. _heartbeatFrequencyMS: https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#heartbeatfrequencyms
-.. _serverSelectionTryOnce: https://github.com/mongodb/specifications/blob/master/source/server-selection/server-selection.rst#serverselectiontryonce
-
-The test proceeds as follows:
-
-- Using the client under test, insert a document and observe a successful write
-  result. This will ensure that initial discovery takes place.
-- Using the fail point client, activate the fail point by setting ``mode``
-  to ``"alwaysOn"``.
-- Using the step down client, step down the primary by executing the command
-  ``{ replSetStepDown: 60, force: true}``. This operation will hang so long as
-  the fail point is activated. When the fail point is later deactivated, the
-  step down will complete and the primary's client connections will be dropped.
-  At that point, any ensuing network error should be ignored.
-- Using the client under test, insert a document and observe a successful write
-  result. The test MUST assert that the insert command fails once against the
-  stepped down node and is successfully retried on the newly elected primary
-  (after SDAM discovers the topology change). The test MAY use APM or another
-  means to observe both attempts.
-- Using the fail point client, deactivate the fail point by setting ``mode``
-  to ``"off"``.
 
 Command Construction Tests
 ==========================

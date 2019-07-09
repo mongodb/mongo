@@ -1,0 +1,18 @@
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+
+minServerVersion: '3.6'
+
+tests:
+    -
+        description: "DeleteMany ignores retryWrites"
+        operation:
+            name: "deleteMany"
+            arguments:
+                filter: { }
+        outcome:
+            result:
+                deletedCount: 2
+            collection:
+                data: []

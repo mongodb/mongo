@@ -6,6 +6,8 @@
 
 package util
 
+import "regexp"
+
 // Pluralize takes an amount and two strings denoting the singular
 // and plural noun the amount represents. If the amount is singular,
 // the singular form is returned; otherwise plural is returned. E.g.
@@ -15,4 +17,10 @@ func Pluralize(amount int, singular, plural string) string {
 		return singular
 	}
 	return plural
+}
+
+var uriRedactionRE = regexp.MustCompile(`^([^:]+)://[^/?]*@`)
+
+func SanitizeURI(u string) string {
+	return uriRedactionRE.ReplaceAllString(u, "$1://[**REDACTED**]@")
 }

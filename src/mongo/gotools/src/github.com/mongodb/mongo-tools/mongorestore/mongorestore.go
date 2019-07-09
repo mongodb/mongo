@@ -78,6 +78,9 @@ type MongoRestore struct {
 	// Reader to take care of BSON input if not reading from the local filesystem.
 	// This is initialized to os.Stdin if unset.
 	InputReader io.Reader
+
+	// Server version for version-specific behavior
+	serverVersion db.Version
 }
 
 type collectionIndexes map[string][]IndexDocument
@@ -87,6 +90,11 @@ func New(opts Options) (*MongoRestore, error) {
 	provider, err := db.NewSessionProvider(*opts.ToolOptions)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to host: %v", err)
+	}
+
+	serverVersion, err := provider.ServerVersionArray()
+	if err != nil {
+		return nil, fmt.Errorf("error getting server version: %v", err)
 	}
 
 	// start up the progress bar manager
@@ -101,6 +109,7 @@ func New(opts Options) (*MongoRestore, error) {
 		TargetDirectory: opts.TargetDirectory,
 		SessionProvider: provider,
 		ProgressManager: progressManager,
+		serverVersion:   serverVersion,
 	}
 
 	return restore, nil

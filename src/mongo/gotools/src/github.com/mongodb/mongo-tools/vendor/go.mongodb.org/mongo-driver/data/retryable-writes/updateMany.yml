@@ -1,0 +1,23 @@
+data:
+    - { _id: 1, x: 11 }
+    - { _id: 2, x: 22 }
+
+minServerVersion: '3.6'
+
+tests:
+    -
+        description: "UpdateMany ignores retryWrites"
+        operation:
+            name: "updateMany"
+            arguments:
+                filter: { }
+                update: { $inc: { x : 1 }}
+        outcome:
+            result:
+                matchedCount: 2
+                modifiedCount: 2
+                upsertedCount: 0
+            collection:
+                data:
+                  - { _id: 1, x: 12 }
+                  - { _id: 2, x: 23 }

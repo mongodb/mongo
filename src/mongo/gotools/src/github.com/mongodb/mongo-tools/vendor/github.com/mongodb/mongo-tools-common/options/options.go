@@ -23,7 +23,7 @@ import (
 	"github.com/mongodb/mongo-tools-common/util"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
-	"go.mongodb.org/mongo-driver/x/network/connstring"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 )
 
 var (
@@ -84,6 +84,9 @@ type ToolOptions struct {
 
 	// WriteConcern, if specified, sets the client default
 	WriteConcern *writeconcern.WriteConcern
+
+	// RetryWrites, if specified, sets the client default.
+	RetryWrites *bool
 
 	// for caching the parser
 	parser *flags.Parser

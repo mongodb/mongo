@@ -20,8 +20,8 @@ import (
 
 	"reflect"
 
-	"go.mongodb.org/mongo-driver/x/network/connstring"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 )
 
 // Test helpers

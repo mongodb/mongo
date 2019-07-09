@@ -59,7 +59,7 @@ var ErrMissingBOM = errors.New("encoding: missing byte order mark")
 // endianness, use IgnoreBOM. Otherwise, use ExpectBOM and always produce
 // and consume a BOM.
 //
-// In the language of http://www.unicode.org/faq/utf_bom.html#bom10,
+// In the language of https://www.unicode.org/faq/utf_bom.html#bom10,
 // IgnoreBOM corresponds to "Where the precise type of the data stream is
 // known... the BOM should not be used" and ExpectBOM corresponds to "A
 // particular protocol... may require use of the BOM".

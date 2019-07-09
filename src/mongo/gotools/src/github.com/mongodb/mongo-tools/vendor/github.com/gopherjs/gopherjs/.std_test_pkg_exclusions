@@ -1,7 +1,6 @@
 context
 crypto
-crypto/internal/randutil
-crypto/internal/subtle
+crypto/internal/cipherhw
 crypto/tls
 crypto/x509/pkix
 debug/gosym
@@ -16,8 +15,8 @@ go/types
 hash
 image/color/palette
 image/internal/imageutil
-internal/bytealg
 internal/cpu
+internal/goroot
 internal/nettrace
 internal/poll
 internal/race
@@ -29,6 +28,7 @@ internal/syscall/windows/sysdll
 internal/testenv
 internal/testlog
 internal/trace
+internal/x/net/nettest
 log
 log/syslog
 net
@@ -52,6 +52,7 @@ runtime
 runtime/cgo
 runtime/debug
 runtime/internal/atomic
+runtime/internal/math
 runtime/internal/sys
 runtime/pprof
 runtime/pprof/internal/profile
@@ -62,22 +63,3 @@ testing
 testing/internal/testdeps
 testing/iotest
 unsafe
-vendor/golang_org/x/crypto/chacha20poly1305
-vendor/golang_org/x/crypto/cryptobyte
-vendor/golang_org/x/crypto/cryptobyte/asn1
-vendor/golang_org/x/crypto/curve25519
-vendor/golang_org/x/crypto/internal/chacha20
-vendor/golang_org/x/crypto/poly1305
-vendor/golang_org/x/net/dns/dnsmessage
-vendor/golang_org/x/net/http/httpguts
-vendor/golang_org/x/net/http/httpproxy
-vendor/golang_org/x/net/http2/hpack
-vendor/golang_org/x/net/idna
-vendor/golang_org/x/net/internal/nettest
-vendor/golang_org/x/net/nettest
-vendor/golang_org/x/text/secure
-vendor/golang_org/x/text/secure/bidirule
-vendor/golang_org/x/text/transform
-vendor/golang_org/x/text/unicode
-vendor/golang_org/x/text/unicode/bidi
-vendor/golang_org/x/text/unicode/norm

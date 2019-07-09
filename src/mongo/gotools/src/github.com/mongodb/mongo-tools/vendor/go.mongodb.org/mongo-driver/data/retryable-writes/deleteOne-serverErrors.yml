@@ -8,8 +8,6 @@ minServerVersion: '3.99'
 tests:
     -
         description: "DeleteOne succeeds after PrimarySteppedDown"
-        clientOptions:
-            retryWrites: true
         failPoint:
             configureFailPoint: failCommand
             mode: { times: 1 }
@@ -28,8 +26,6 @@ tests:
                     - { _id: 2, x: 22 }
     -
         description: "DeleteOne succeeds after WriteConcernError ShutdownInProgress"
-        clientOptions:
-            retryWrites: true
         failPoint:
             configureFailPoint: failCommand
             mode: { times: 1 }

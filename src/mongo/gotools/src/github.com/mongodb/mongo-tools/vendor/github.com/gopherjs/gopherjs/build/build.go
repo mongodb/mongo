@@ -139,6 +139,9 @@ func importWithSrcDir(bctx build.Context, path string, srcDir string, mode build
 		if installSuffix != "" {
 			bctx.InstallSuffix += "_" + installSuffix
 		}
+	case "syscall/js":
+		// There are no buildable files in this package, but we need to use files in the virtual directory.
+		mode |= build.FindOnly
 	case "math/big":
 		// Use pure Go version of math/big; we don't want non-Go assembly versions.
 		bctx.BuildTags = append(bctx.BuildTags, "math_big_pure_go")

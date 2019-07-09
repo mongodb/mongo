@@ -8,6 +8,8 @@ package mongo
 
 import (
 	"context"
+	"crypto/tls"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,18 +20,19 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/auth"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/session"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/topology"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy/uuid"
-	"go.mongodb.org/mongo-driver/x/network/command"
-	"go.mongodb.org/mongo-driver/x/network/connection"
-	"go.mongodb.org/mongo-driver/x/network/connstring"
-	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
+	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/auth"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/description"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/operation"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
 )
 
 const defaultLocalThreshold = 15 * time.Millisecond
+const batchSize = 10000
 
 // Client performs operations on a given topology.
 type Client struct {
@@ -45,6 +48,7 @@ type Client struct {
 	writeConcern    *writeconcern.WriteConcern
 	registry        *bsoncodec.Registry
 	marshaller      BSONAppender
+	monitor         *event.CommandMonitor
 }
 
 // Connect creates a new Client and then initializes it using the Connect method.
@@ -98,7 +102,7 @@ func NewClient(opts ...*options.ClientOptions) (*Client, error) {
 // Connect initializes the Client by starting background monitoring goroutines.
 // This method must be called before a Client can be used.
 func (c *Client) Connect(ctx context.Context) error {
-	err := c.topology.Connect(ctx)
+	err := c.topology.Connect()
 	if err != nil {
 		return replaceErrors(err)
 	}
@@ -136,8 +140,12 @@ func (c *Client) Ping(ctx context.Context, rp *readpref.ReadPref) error {
 		rp = c.readPreference
 	}
 
-	_, err := c.topology.SelectServer(ctx, description.ReadPrefSelector(rp))
-	return replaceErrors(err)
+	db := c.Database("admin")
+	res := db.RunCommand(ctx, bson.D{
+		{"ping", 1},
+	})
+
+	return replaceErrors(res.Err())
 }
 
 // StartSession starts a new session.
@@ -164,6 +172,9 @@ func (c *Client) StartSession(opts ...*options.SessionOptions) (Session, error) 
 	if sopts.DefaultReadPreference != nil {
 		coreOpts.DefaultReadPreference = sopts.DefaultReadPreference
 	}
+	if sopts.DefaultMaxCommitTime != nil {
+		coreOpts.DefaultMaxCommitTime = sopts.DefaultMaxCommitTime
+	}
 
 	sess, err := session.NewClientSession(c.topology.SessionPool, c.id, session.Explicit, coreOpts)
 	if err != nil {
@@ -173,8 +184,9 @@ func (c *Client) StartSession(opts ...*options.SessionOptions) (Session, error) 
 	sess.RetryWrite = c.retryWrites
 
 	return &sessionImpl{
-		Client: sess,
-		topo:   c.topology,
+		clientSession: sess,
+		client:        c,
+		topo:          c.topology,
 	}, nil
 }
 
@@ -182,12 +194,31 @@ func (c *Client) endSessions(ctx context.Context) {
 	if c.topology.SessionPool == nil {
 		return
 	}
-	cmd := command.EndSessions{
-		Clock:      c.clock,
-		SessionIDs: c.topology.SessionPool.IDSlice(),
+
+	ids := c.topology.SessionPool.IDSlice()
+	idx, idArray := bsoncore.AppendArrayStart(nil)
+	for i, id := range ids {
+		idDoc, _ := id.MarshalBSON()
+		idArray = bsoncore.AppendDocumentElement(idArray, strconv.Itoa(i), idDoc)
+	}
+	idArray, _ = bsoncore.AppendArrayEnd(idArray, idx)
+
+	op := operation.NewEndSessions(idArray).ClusterClock(c.clock).Deployment(c.topology).
+		ServerSelector(description.ReadPrefSelector(readpref.PrimaryPreferred())).CommandMonitor(c.monitor).Database("admin")
+
+	idx, idArray = bsoncore.AppendArrayStart(nil)
+	totalNumIDs := len(ids)
+	for i := 0; i < totalNumIDs; i++ {
+		idDoc, _ := ids[i].MarshalBSON()
+		idArray = bsoncore.AppendDocumentElement(idArray, strconv.Itoa(i), idDoc)
+		if ((i+1)%batchSize) == 0 || i == totalNumIDs-1 {
+			idArray, _ = bsoncore.AppendArrayEnd(idArray, idx)
+			_ = op.SessionIDs(idArray).Execute(ctx)
+			idArray = idArray[:0]
+			idx = 0
+		}
 	}
 
-	_, _ = driverlegacy.EndSessions(ctx, cmd, c.topology, description.ReadPrefSelector(readpref.PrimaryPreferred()))
 }
 
 func (c *Client) configure(opts *options.ClientOptions) error {
@@ -195,7 +226,7 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 		return err
 	}
 
-	var connOpts []connection.Option
+	var connOpts []topology.ConnectionOption
 	var serverOpts []topology.ServerOption
 	var topologyOpts []topology.Option
 
@@ -211,7 +242,7 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 	if len(opts.Compressors) > 0 {
 		comps = opts.Compressors
 
-		connOpts = append(connOpts, connection.WithCompressors(
+		connOpts = append(connOpts, topology.WithCompressors(
 			func(compressors []string) []string {
 				return append(compressors, comps...)
 			},
@@ -219,7 +250,7 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 
 		for _, comp := range comps {
 			if comp == "zlib" {
-				connOpts = append(connOpts, connection.WithZlibLevel(func(level *int) *int {
+				connOpts = append(connOpts, topology.WithZlibLevel(func(level *int) *int {
 					return opts.ZlibLevel
 				}))
 			}
@@ -230,8 +261,8 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 		))
 	}
 	// Handshaker
-	var handshaker = func(connection.Handshaker) connection.Handshaker {
-		return &command.Handshake{Client: command.ClientDoc(appName), Compressors: comps}
+	var handshaker = func(driver.Handshaker) driver.Handshaker {
+		return operation.NewIsMaster().AppName(appName).Compressors(comps)
 	}
 	// Auth & Database & Password & Username
 	if opts.Auth != nil {
@@ -274,24 +305,24 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 			}
 		}
 
-		handshaker = func(connection.Handshaker) connection.Handshaker {
+		handshaker = func(driver.Handshaker) driver.Handshaker {
 			return auth.Handshaker(nil, handshakeOpts)
 		}
 	}
-	connOpts = append(connOpts, connection.WithHandshaker(handshaker))
+	connOpts = append(connOpts, topology.WithHandshaker(handshaker))
 	// ConnectTimeout
 	if opts.ConnectTimeout != nil {
 		serverOpts = append(serverOpts, topology.WithHeartbeatTimeout(
 			func(time.Duration) time.Duration { return *opts.ConnectTimeout },
 		))
-		connOpts = append(connOpts, connection.WithConnectTimeout(
+		connOpts = append(connOpts, topology.WithConnectTimeout(
 			func(time.Duration) time.Duration { return *opts.ConnectTimeout },
 		))
 	}
 	// Dialer
 	if opts.Dialer != nil {
-		connOpts = append(connOpts, connection.WithDialer(
-			func(connection.Dialer) connection.Dialer { return opts.Dialer },
+		connOpts = append(connOpts, topology.WithDialer(
+			func(topology.Dialer) topology.Dialer { return opts.Dialer },
 		))
 	}
 	// Direct
@@ -320,7 +351,7 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 	}
 	// MaxConIdleTime
 	if opts.MaxConnIdleTime != nil {
-		connOpts = append(connOpts, connection.WithIdleTimeout(
+		connOpts = append(connOpts, topology.WithIdleTimeout(
 			func(time.Duration) time.Duration { return *opts.MaxConnIdleTime },
 		))
 	}
@@ -334,7 +365,8 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 	}
 	// Monitor
 	if opts.Monitor != nil {
-		connOpts = append(connOpts, connection.WithMonitor(
+		c.monitor = opts.Monitor
+		connOpts = append(connOpts, topology.WithMonitor(
 			func(*event.CommandMonitor) *event.CommandMonitor { return opts.Monitor },
 		))
 	}
@@ -360,6 +392,7 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 		))
 	}
 	// RetryWrites
+	c.retryWrites = true // retry writes on by default
 	if opts.RetryWrites != nil {
 		c.retryWrites = *opts.RetryWrites
 	}
@@ -373,15 +406,15 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 	if opts.SocketTimeout != nil {
 		connOpts = append(
 			connOpts,
-			connection.WithReadTimeout(func(time.Duration) time.Duration { return *opts.SocketTimeout }),
-			connection.WithWriteTimeout(func(time.Duration) time.Duration { return *opts.SocketTimeout }),
+			topology.WithReadTimeout(func(time.Duration) time.Duration { return *opts.SocketTimeout }),
+			topology.WithWriteTimeout(func(time.Duration) time.Duration { return *opts.SocketTimeout }),
 		)
 	}
 	// TLSConfig
 	if opts.TLSConfig != nil {
-		connOpts = append(connOpts, connection.WithTLSConfig(
-			func(*connection.TLSConfig) *connection.TLSConfig {
-				return &connection.TLSConfig{Config: opts.TLSConfig}
+		connOpts = append(connOpts, topology.WithTLSConfig(
+			func(*tls.Config) *tls.Config {
+				return opts.TLSConfig
 			},
 		))
 	}
@@ -396,7 +429,7 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 	serverOpts = append(
 		serverOpts,
 		topology.WithClock(func(*session.ClusterClock) *session.ClusterClock { return c.clock }),
-		topology.WithConnectionOptions(func(...connection.Option) []connection.Option { return connOpts }),
+		topology.WithConnectionOptions(func(...topology.ConnectionOption) []topology.ConnectionOption { return connOpts }),
 	)
 	c.topologyOptions = append(topologyOpts, topology.WithServerOptions(
 		func(...topology.ServerOption) []topology.ServerOption { return serverOpts },
@@ -427,38 +460,43 @@ func (c *Client) ListDatabases(ctx context.Context, filter interface{}, opts ...
 	sess := sessionFromContext(ctx)
 
 	err := c.validSession(sess)
+	if sess == nil && c.topology.SessionPool != nil {
+		sess, err = session.NewClientSession(c.topology.SessionPool, c.id, session.Implicit)
+		if err != nil {
+			return ListDatabasesResult{}, err
+		}
+		defer sess.EndSession()
+	}
+
+	err = c.validSession(sess)
 	if err != nil {
 		return ListDatabasesResult{}, err
 	}
 
-	f, err := transformDocument(c.registry, filter)
+	filterDoc, err := transformBsoncoreDocument(c.registry, filter)
 	if err != nil {
 		return ListDatabasesResult{}, err
 	}
 
-	cmd := command.ListDatabases{
-		Filter:  f,
-		Session: sess,
-		Clock:   c.clock,
-	}
-
-	readSelector := description.CompositeSelector([]description.ServerSelector{
+	selector := makePinnedSelector(sess, description.CompositeSelector([]description.ServerSelector{
 		description.ReadPrefSelector(readpref.Primary()),
 		description.LatencySelector(c.localThreshold),
-	})
-	res, err := driverlegacy.ListDatabases(
-		ctx, cmd,
-		c.topology,
-		readSelector,
-		c.id,
-		c.topology.SessionPool,
-		opts...,
-	)
+	}))
+
+	ldo := options.MergeListDatabasesOptions(opts...)
+	op := operation.NewListDatabases(filterDoc).
+		Session(sess).ReadPreference(c.readPreference).CommandMonitor(c.monitor).
+		ServerSelector(selector).ClusterClock(c.clock).Database("admin").Deployment(c.topology)
+	if ldo.NameOnly != nil {
+		op = op.NameOnly(*ldo.NameOnly)
+	}
+
+	err = op.Execute(ctx)
 	if err != nil {
 		return ListDatabasesResult{}, replaceErrors(err)
 	}
 
-	return (ListDatabasesResult{}).fromResult(res), nil
+	return newListDatabasesResultFromOperation(op.Result()), nil
 }
 
 // ListDatabaseNames returns a slice containing the names of all of the databases on the server.
@@ -535,5 +573,13 @@ func (c *Client) Watch(ctx context.Context, pipeline interface{},
 		return nil, ErrClientDisconnected
 	}
 
-	return newClientChangeStream(ctx, c, pipeline, opts...)
+	csConfig := changeStreamConfig{
+		readConcern:    c.readConcern,
+		readPreference: c.readPreference,
+		client:         c,
+		registry:       c.registry,
+		streamType:     ClientStream,
+	}
+
+	return newChangeStream(ctx, csConfig, pipeline, opts...)
 }

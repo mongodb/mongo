@@ -24,10 +24,13 @@
 #   go-tests = true
 #   unused-packages = true
 
+[[constraint]]
+  name = "go.mongodb.org/mongo-driver"
+  revision = "216e392ea5ac0903291d940c2574a11a185663bd"
 
 [[constraint]]
-  revision = "44476384cd4721b68705e72f19e95d1a3a504370"
   name = "github.com/howeyc/gopass"
+  revision = "44476384cd4721b68705e72f19e95d1a3a504370"
 
 [[constraint]]
   name = "github.com/jessevdk/go-flags"
@@ -41,15 +44,7 @@
   name = "golang.org/x/crypto"
   revision = "1f22c0103821b9390939b6776727195525381532"
 
-[[constraint]]
-  name = "gopkg.in/mgo.v2"
-  source = "github.com/10gen/mgo"
-  revision = "8c133fd1d0fc316302df84fc12769e17fb473bb1"
-
 [prune]
   go-tests = true
   unused-packages = true
 
-[[constraint]]
-  name = "go.mongodb.org/mongo-driver"
-  revision = "bb984ba94a90e2bdf108128bf6bef0c0505a4bc7"

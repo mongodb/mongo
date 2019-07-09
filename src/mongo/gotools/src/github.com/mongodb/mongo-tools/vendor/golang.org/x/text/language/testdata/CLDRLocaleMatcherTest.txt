@@ -312,8 +312,8 @@ it, en ; 	und ; 	it
 it, en ; 	und, en ; 	en
 
 # examples from
-# http://unicode.org/repos/cldr/tags/latest/common/bcp47/
-# http://unicode.org/repos/cldr/tags/latest/common/validity/variant.xml
+# https://unicode.org/repos/cldr/tags/latest/common/bcp47/
+# https://unicode.org/repos/cldr/tags/latest/common/validity/variant.xml
 
 ##################################################
 # testUnHack

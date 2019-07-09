@@ -431,7 +431,7 @@ func (mf *MongoFiles) Run(displayHost bool) (output string, finalErr error) {
 	}
 
 	if displayHost {
-		log.Logvf(log.Always, "connected to: %v", mf.ToolOptions.URI.ConnectionString)
+		log.Logvf(log.Always, "connected to: %v", util.SanitizeURI(mf.ToolOptions.URI.ConnectionString))
 	}
 
 	// first validate the namespaces we'll be using: <db>.<prefix>.files and <db>.<prefix>.chunks

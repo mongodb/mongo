@@ -62,7 +62,7 @@ func (f Formatter) Format(state format.State, verb rune) {
 }
 
 // Language returns a Formatter that renders the name for lang in the
-// the current language. x may be a language.Base or a language.Tag.
+// current language. x may be a language.Base or a language.Tag.
 // It renders lang in the default language if no translation for the current
 // language is supported.
 func Language(lang interface{}) Formatter {

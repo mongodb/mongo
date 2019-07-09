@@ -792,122 +792,126 @@ func TestCommandOpInsertLiveDB(t *testing.T) {
 	}
 }
 
-func TestCommandOpFindLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
-	if err := teardownDB(); err != nil {
-		t.Error(err)
-	}
-	if isMongosTestServer {
-		t.Skipf("Skipping OpCommand test against mongos")
-	}
+// OP_COMMAND isn't supported on 4.2 so these tests are commented
+// out.  When TOOLS-2327 is done (testing on more server versions),
+// these tests can be restored, protected by a version check.
 
-	insertName := "LiveDB CommandOp Find Test"
-	numInserts := 20
-	numFinds := 4
-	generator := newRecordedOpGenerator()
-	go func() {
-		defer close(generator.opChan)
-		// generate numInsert inserts and feed them to the opChan for tape
-		for i := 0; i < numFinds; i++ {
-			t.Logf("Generating %d inserts\n", numInserts/numFinds)
-			err := generator.generateInsertHelper(fmt.Sprintf("%s: %d", insertName, i), i*(numInserts/numFinds), numInserts/numFinds)
-			if err != nil {
-				t.Error(err)
-			}
-		}
-		// generate numFinds queries and feed them to the opChan for play
-		t.Logf("Generating %d finds\n", numFinds)
-		for j := 0; j < numFinds; j++ {
-			filter := bson.D{{"name", fmt.Sprintf("%s: %d", insertName, j)}}
-			err := generator.generateCommandFind(filter, 0, 0)
-			if err != nil {
-				t.Error(err)
-			}
-		}
-		// generate another query that tests a different field
-		filter := bson.D{{"success", true}}
-		err := generator.generateCommandFind(filter, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
-	}()
+// func TestCommandOpFindLiveDB(t *testing.T) {
+// 	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+// 	if err := teardownDB(); err != nil {
+// 		t.Error(err)
+// 	}
+// 	if isMongosTestServer {
+// 		t.Skipf("Skipping OpCommand test against mongos")
+// 	}
 
-	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
-	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
-	replaySession, err := mgo.Dial(currentTestURL)
-	if err != nil {
-		t.Errorf("Error connecting to test server: %v", err)
-	}
-	context := NewExecutionContext(statCollector, replaySession, &ExecutionOptions{})
+// 	insertName := "LiveDB CommandOp Find Test"
+// 	numInserts := 20
+// 	numFinds := 4
+// 	generator := newRecordedOpGenerator()
+// 	go func() {
+// 		defer close(generator.opChan)
+// 		// generate numInsert inserts and feed them to the opChan for tape
+// 		for i := 0; i < numFinds; i++ {
+// 			t.Logf("Generating %d inserts\n", numInserts/numFinds)
+// 			err := generator.generateInsertHelper(fmt.Sprintf("%s: %d", insertName, i), i*(numInserts/numFinds), numInserts/numFinds)
+// 			if err != nil {
+// 				t.Error(err)
+// 			}
+// 		}
+// 		// generate numFinds queries and feed them to the opChan for play
+// 		t.Logf("Generating %d finds\n", numFinds)
+// 		for j := 0; j < numFinds; j++ {
+// 			filter := bson.D{{"name", fmt.Sprintf("%s: %d", insertName, j)}}
+// 			err := generator.generateCommandFind(filter, 0, 0)
+// 			if err != nil {
+// 				t.Error(err)
+// 			}
+// 		}
+// 		// generate another query that tests a different field
+// 		filter := bson.D{{"success", true}}
+// 		err := generator.generateCommandFind(filter, 0, 0)
+// 		if err != nil {
+// 			t.Error(err)
+// 		}
+// 	}()
 
-	// run mongoreplay's Play loop with the stubbed objects
-	t.Logf("Beginning mongoreplay playback of generated traffic against host: %v\n", currentTestURL)
-	err = Play(context, generator.opChan, testSpeed, 1, 10)
-	if err != nil {
-		t.Errorf("Error Playing traffic: %v\n", err)
-	}
-	t.Log("Completed mongoreplay playback of generated traffic")
+// 	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
+// 	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
+// 	replaySession, err := mgo.Dial(currentTestURL)
+// 	if err != nil {
+// 		t.Errorf("Error connecting to test server: %v", err)
+// 	}
+// 	context := NewExecutionContext(statCollector, replaySession, &ExecutionOptions{})
 
-	t.Log("Examining collected stats to ensure they match expected")
-	opType := "op_command"
-	ns := "mongoreplay"
-	numReturned := 5
-	// loop over the BufferedStatCollector for each of the numFinds queries
-	// created, and ensure that they match what we expected mongoreplay to have
-	// executed
-	for i := 0; i < numFinds; i++ {
-		stat := statRec.Buffer[numInserts+i]
-		t.Logf("Stat result: %#v\n", stat)
-		if stat.OpType != opType ||
-			stat.Ns != ns ||
-			stat.NumReturned != numReturned {
-			t.Errorf("CommandOp Find Not Matched expected OpType: %s, Ns: %s, NumReturned: %d ---- found OpType: %s, Ns: %s, NumReturned: %d\n",
-				opType, ns, numReturned, stat.OpType, stat.Ns, stat.NumReturned)
-		}
-	}
-	stat := statRec.Buffer[numInserts+numFinds]
-	t.Logf("Stat result: %#v\n", stat)
-	// ensure that the last query that was making a query on the 'success' field
-	// executed as expected
-	if stat.OpType != opType ||
-		stat.Ns != ns ||
-		stat.NumReturned != 20 {
-		t.Errorf("CommandOp Find Not Matched expected OpType: %s, Ns: %s, NumReturned: %d ---- found OpType: %s, Ns: %s, NumReturned: %d\n",
-			opType, ns, 20, stat.OpType, stat.Ns, stat.NumReturned)
-	}
-	if err := teardownDB(); err != nil {
-		t.Error(err)
-	}
+// 	// run mongoreplay's Play loop with the stubbed objects
+// 	t.Logf("Beginning mongoreplay playback of generated traffic against host: %v\n", currentTestURL)
+// 	err = Play(context, generator.opChan, testSpeed, 1, 10)
+// 	if err != nil {
+// 		t.Errorf("Error Playing traffic: %v\n", err)
+// 	}
+// 	t.Log("Completed mongoreplay playback of generated traffic")
 
-}
+// 	t.Log("Examining collected stats to ensure they match expected")
+// 	opType := "op_command"
+// 	ns := "mongoreplay"
+// 	numReturned := 5
+// 	// loop over the BufferedStatCollector for each of the numFinds queries
+// 	// created, and ensure that they match what we expected mongoreplay to have
+// 	// executed
+// 	for i := 0; i < numFinds; i++ {
+// 		stat := statRec.Buffer[numInserts+i]
+// 		t.Logf("Stat result: %#v\n", stat)
+// 		if stat.OpType != opType ||
+// 			stat.Ns != ns ||
+// 			stat.NumReturned != numReturned {
+// 			t.Errorf("CommandOp Find Not Matched expected OpType: %s, Ns: %s, NumReturned: %d ---- found OpType: %s, Ns: %s, NumReturned: %d\n",
+// 				opType, ns, numReturned, stat.OpType, stat.Ns, stat.NumReturned)
+// 		}
+// 	}
+// 	stat := statRec.Buffer[numInserts+numFinds]
+// 	t.Logf("Stat result: %#v\n", stat)
+// 	// ensure that the last query that was making a query on the 'success' field
+// 	// executed as expected
+// 	if stat.OpType != opType ||
+// 		stat.Ns != ns ||
+// 		stat.NumReturned != 20 {
+// 		t.Errorf("CommandOp Find Not Matched expected OpType: %s, Ns: %s, NumReturned: %d ---- found OpType: %s, Ns: %s, NumReturned: %d\n",
+// 			opType, ns, 20, stat.OpType, stat.Ns, stat.NumReturned)
+// 	}
+// 	if err := teardownDB(); err != nil {
+// 		t.Error(err)
+// 	}
 
-func TestCommandOpGetMoreLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
-	if isMongosTestServer {
-		t.Skipf("Skipping OpCommand test against mongos")
-	}
-	if err := teardownDB(); err != nil {
-		t.Error(err)
-	}
-	generator := newRecordedOpGenerator()
-	insertName := "LiveDB CommandGetmore Test"
+// }
 
-	gmHelperNames := getmoreHelperNames{
-		findOpType:         "op_command",
-		findCommandName:    "find",
-		getmoreOpType:      "op_command",
-		getmoreCommandName: "getMore",
-		namespace:          "mongoreplay",
-		insertName:         insertName,
-	}
+// func TestCommandOpGetMoreLiveDB(t *testing.T) {
+// 	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+// 	if isMongosTestServer {
+// 		t.Skipf("Skipping OpCommand test against mongos")
+// 	}
+// 	if err := teardownDB(); err != nil {
+// 		t.Error(err)
+// 	}
+// 	generator := newRecordedOpGenerator()
+// 	insertName := "LiveDB CommandGetmore Test"
 
-	getmoreTestHelper(t, gmHelperNames, generator.opChan, generator.generateInsertHelper,
-		generator.generateCommandGetMore, generator.generateCommandReply, generator.generateCommandFind)
+// 	gmHelperNames := getmoreHelperNames{
+// 		findOpType:         "op_command",
+// 		findCommandName:    "find",
+// 		getmoreOpType:      "op_command",
+// 		getmoreCommandName: "getMore",
+// 		namespace:          "mongoreplay",
+// 		insertName:         insertName,
+// 	}
 
-	if err := teardownDB(); err != nil {
-		t.Error(err)
-	}
-}
+// 	getmoreTestHelper(t, gmHelperNames, generator.opChan, generator.generateInsertHelper,
+// 		generator.generateCommandGetMore, generator.generateCommandReply, generator.generateCommandFind)
+
+// 	if err := teardownDB(); err != nil {
+// 		t.Error(err)
+// 	}
+// }
 
 // TestMsgOpInsertLiveDB tests the functionality of mongoreplay replaying inserts
 // against a live database Generates 20 recorded inserts and passes them to the

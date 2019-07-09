@@ -550,20 +550,67 @@ type mapIter struct {
 	m    *js.Object
 	keys *js.Object
 	i    int
+
+	// last is the last object the iterator indicates. If this object exists, the functions that return the
+	// current key or value returns this object, regardless of the current iterator. It is because the current
+	// iterator might be stale due to key deletion in a loop.
+	last *js.Object
 }
 
-func mapiterinit(t *rtype, m unsafe.Pointer) *byte {
-	return (*byte)(unsafe.Pointer(&mapIter{t, js.InternalObject(m), js.Global.Call("$keys", js.InternalObject(m)), 0}))
+func (iter *mapIter) skipUntilValidKey() {
+	for iter.i < iter.keys.Length() {
+		k := iter.keys.Index(iter.i)
+		if iter.m.Get(k.String()) != js.Undefined {
+			break
+		}
+		// The key is already deleted. Move on the next item.
+		iter.i++
+	}
 }
 
-func mapiterkey(it *byte) unsafe.Pointer {
-	iter := (*mapIter)(unsafe.Pointer(it))
-	k := iter.keys.Index(iter.i)
-	return unsafe.Pointer(js.Global.Call("$newDataPointer", iter.m.Get(k.String()).Get("k"), jsType(PtrTo(iter.t.Key()))).Unsafe())
+func mapiterinit(t *rtype, m unsafe.Pointer) unsafe.Pointer {
+	return unsafe.Pointer(&mapIter{t, js.InternalObject(m), js.Global.Call("$keys", js.InternalObject(m)), 0, nil})
 }
 
-func mapiternext(it *byte) {
-	iter := (*mapIter)(unsafe.Pointer(it))
+func mapiterkey(it unsafe.Pointer) unsafe.Pointer {
+	iter := (*mapIter)(it)
+	var kv *js.Object
+	if iter.last != nil {
+		kv = iter.last
+	} else {
+		iter.skipUntilValidKey()
+		if iter.i == iter.keys.Length() {
+			return nil
+		}
+		k := iter.keys.Index(iter.i)
+		kv = iter.m.Get(k.String())
+
+		// Record the key-value pair for later accesses.
+		iter.last = kv
+	}
+	return unsafe.Pointer(js.Global.Call("$newDataPointer", kv.Get("k"), jsType(PtrTo(iter.t.Key()))).Unsafe())
+}
+
+func mapitervalue(it unsafe.Pointer) unsafe.Pointer {
+	iter := (*mapIter)(it)
+	var kv *js.Object
+	if iter.last != nil {
+		kv = iter.last
+	} else {
+		iter.skipUntilValidKey()
+		if iter.i == iter.keys.Length() {
+			return nil
+		}
+		k := iter.keys.Index(iter.i)
+		kv = iter.m.Get(k.String())
+		iter.last = kv
+	}
+	return unsafe.Pointer(js.Global.Call("$newDataPointer", kv.Get("v"), jsType(PtrTo(iter.t.Elem()))).Unsafe())
+}
+
+func mapiternext(it unsafe.Pointer) {
+	iter := (*mapIter)(it)
+	iter.last = nil
 	iter.i++
 }
 
@@ -1030,6 +1077,8 @@ func (v Value) IsNil() bool {
 		return v.object() == js.InternalObject(false)
 	case Interface:
 		return v.object() == js.Global.Get("$ifaceNil")
+	case UnsafePointer:
+		return v.object().Unsafe() == 0
 	default:
 		panic(&ValueError{"reflect.Value.IsNil", k})
 	}

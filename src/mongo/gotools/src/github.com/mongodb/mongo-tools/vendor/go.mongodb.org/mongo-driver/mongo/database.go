@@ -8,15 +8,24 @@ package mongo
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
-	"go.mongodb.org/mongo-driver/x/mongo/driverlegacy"
-	"go.mongodb.org/mongo-driver/x/network/command"
-	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/description"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/operation"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+)
+
+var (
+	defaultRunCmdOpts = []*options.RunCmdOptions{options.RunCmd().SetReadPreference(readpref.Primary())}
 )
 
 // Database performs operations on a given database.
@@ -86,47 +95,64 @@ func (db *Database) Collection(name string, opts ...*options.CollectionOptions) 
 	return newCollection(db, name, opts...)
 }
 
-func (db *Database) processRunCommand(ctx context.Context, cmd interface{}, opts ...*options.RunCmdOptions) (command.Read,
-	description.ServerSelector, error) {
-
-	if ctx == nil {
-		ctx = context.Background()
+// Aggregate runs an aggregation framework pipeline.
+//
+// See https://docs.mongodb.com/manual/aggregation/.
+func (db *Database) Aggregate(ctx context.Context, pipeline interface{},
+	opts ...*options.AggregateOptions) (*Cursor, error) {
+	a := aggregateParams{
+		ctx:            ctx,
+		pipeline:       pipeline,
+		client:         db.client,
+		registry:       db.registry,
+		readConcern:    db.readConcern,
+		writeConcern:   db.writeConcern,
+		db:             db.name,
+		readSelector:   db.readSelector,
+		writeSelector:  db.writeSelector,
+		readPreference: db.readPreference,
+		opts:           opts,
 	}
+	return aggregate(a)
+}
 
+func (db *Database) processRunCommand(ctx context.Context, cmd interface{},
+	opts ...*options.RunCmdOptions) (*operation.Command, *session.Client, error) {
 	sess := sessionFromContext(ctx)
-	runCmd := options.MergeRunCmdOptions(opts...)
-
-	if err := db.client.validSession(sess); err != nil {
-		return command.Read{}, nil, err
-	}
-
-	rp := runCmd.ReadPreference
-	if rp == nil {
-		if sess != nil && sess.TransactionRunning() {
-			rp = sess.CurrentRp // override with transaction read pref if specified
-		}
-		if rp == nil {
-			rp = readpref.Primary() // set to primary if nothing specified in options
+	if sess == nil && db.client.topology.SessionPool != nil {
+		var err error
+		sess, err = session.NewClientSession(db.client.topology.SessionPool, db.client.id, session.Implicit)
+		if err != nil {
+			return nil, sess, err
 		}
 	}
 
-	runCmdDoc, err := transformDocument(db.registry, cmd)
+	err := db.client.validSession(sess)
 	if err != nil {
-		return command.Read{}, nil, err
+		return nil, sess, err
 	}
 
+	ro := options.MergeRunCmdOptions(append(defaultRunCmdOpts, opts...)...)
+	if sess != nil && sess.TransactionRunning() && ro.ReadPreference != nil && ro.ReadPreference.Mode() != readpref.PrimaryMode {
+		return nil, sess, errors.New("read preference in a transaction must be primary")
+	}
+
+	runCmdDoc, err := transformBsoncoreDocument(db.registry, cmd)
+	if err != nil {
+		return nil, sess, err
+	}
 	readSelect := description.CompositeSelector([]description.ServerSelector{
-		description.ReadPrefSelector(rp),
+		description.ReadPrefSelector(ro.ReadPreference),
 		description.LatencySelector(db.client.localThreshold),
 	})
+	if sess != nil && sess.PinnedServer != nil {
+		readSelect = sess.PinnedServer
+	}
 
-	return command.Read{
-		DB:       db.Name(),
-		Command:  runCmdDoc,
-		ReadPref: rp,
-		Session:  sess,
-		Clock:    db.client.clock,
-	}, readSelect, nil
+	return operation.NewCommand(runCmdDoc).
+		Session(sess).CommandMonitor(db.client.monitor).
+		ServerSelector(readSelect).ClusterClock(db.client.clock).
+		Database(db.name).Deployment(db.client.topology).ReadConcern(db.readConcern), sess, nil
 }
 
 // RunCommand runs a command on the database. A user can supply a custom
@@ -136,20 +162,18 @@ func (db *Database) RunCommand(ctx context.Context, runCommand interface{}, opts
 		ctx = context.Background()
 	}
 
-	readCmd, readSelect, err := db.processRunCommand(ctx, runCommand, opts...)
+	op, sess, err := db.processRunCommand(ctx, runCommand, opts...)
+	defer closeImplicitSession(sess)
 	if err != nil {
 		return &SingleResult{err: err}
 	}
 
-	doc, err := driverlegacy.Read(ctx,
-		readCmd,
-		db.client.topology,
-		readSelect,
-		db.client.id,
-		db.client.topology.SessionPool,
-	)
-
-	return &SingleResult{err: replaceErrors(err), rdr: doc, reg: db.registry}
+	err = op.Execute(ctx)
+	return &SingleResult{
+		err: replaceErrors(err),
+		rdr: bson.Raw(op.Result()),
+		reg: db.registry,
+	}
 }
 
 // RunCommandCursor runs a command on the database and returns a cursor over the resulting reader. A user can supply
@@ -159,24 +183,23 @@ func (db *Database) RunCommandCursor(ctx context.Context, runCommand interface{}
 		ctx = context.Background()
 	}
 
-	readCmd, readSelect, err := db.processRunCommand(ctx, runCommand, opts...)
+	op, sess, err := db.processRunCommand(ctx, runCommand, opts...)
 	if err != nil {
-		return nil, err
-	}
-
-	batchCursor, err := driverlegacy.ReadCursor(
-		ctx,
-		readCmd,
-		db.client.topology,
-		readSelect,
-		db.client.id,
-		db.client.topology.SessionPool,
-	)
-	if err != nil {
+		closeImplicitSession(sess)
 		return nil, replaceErrors(err)
 	}
 
-	cursor, err := newCursor(batchCursor, db.registry)
+	if err = op.Execute(ctx); err != nil {
+		closeImplicitSession(sess)
+		return nil, replaceErrors(err)
+	}
+
+	bc, err := op.ResultCursor(driver.CursorOptions{})
+	if err != nil {
+		closeImplicitSession(sess)
+		return nil, replaceErrors(err)
+	}
+	cursor, err := newCursorWithSession(bc, db.registry, sess)
 	return cursor, replaceErrors(err)
 }
 
@@ -187,74 +210,125 @@ func (db *Database) Drop(ctx context.Context) error {
 	}
 
 	sess := sessionFromContext(ctx)
+	if sess == nil && db.client.topology.SessionPool != nil {
+		sess, err := session.NewClientSession(db.client.topology.SessionPool, db.client.id, session.Implicit)
+		if err != nil {
+			return err
+		}
+		defer sess.EndSession()
+	}
 
 	err := db.client.validSession(sess)
 	if err != nil {
 		return err
 	}
 
-	cmd := command.DropDatabase{
-		DB:      db.name,
-		Session: sess,
-		Clock:   db.client.clock,
+	wc := db.writeConcern
+	if sess.TransactionRunning() {
+		wc = nil
 	}
-	_, err = driverlegacy.DropDatabase(
-		ctx, cmd,
-		db.client.topology,
-		db.writeSelector,
-		db.client.id,
-		db.client.topology.SessionPool,
-	)
-	if err != nil && !command.IsNotFound(err) {
+	if !writeconcern.AckWrite(wc) {
+		sess = nil
+	}
+
+	selector := makePinnedSelector(sess, db.writeSelector)
+
+	op := operation.NewDropDatabase().
+		Session(sess).WriteConcern(wc).CommandMonitor(db.client.monitor).
+		ServerSelector(selector).ClusterClock(db.client.clock).
+		Database(db.name).Deployment(db.client.topology)
+
+	err = op.Execute(ctx)
+
+	driverErr, ok := err.(driver.Error)
+	if err != nil && (!ok || !driverErr.NamespaceNotFound()) {
 		return replaceErrors(err)
 	}
 	return nil
 }
 
-// ListCollections list collections from mongodb database.
+// ListCollections returns a cursor over the collections in a database.
 func (db *Database) ListCollections(ctx context.Context, filter interface{}, opts ...*options.ListCollectionsOptions) (*Cursor, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
+	filterDoc, err := transformBsoncoreDocument(db.registry, filter)
+	if err != nil {
+		return nil, err
+	}
+
 	sess := sessionFromContext(ctx)
+	if sess == nil && db.client.topology.SessionPool != nil {
+		sess, err = session.NewClientSession(db.client.topology.SessionPool, db.client.id, session.Implicit)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-	err := db.client.validSession(sess)
+	err = db.client.validSession(sess)
 	if err != nil {
+		closeImplicitSession(sess)
 		return nil, err
 	}
 
-	filterDoc, err := transformDocument(db.registry, filter)
-	if err != nil {
-		return nil, err
+	selector := makePinnedSelector(sess, db.readSelector)
+
+	lco := options.MergeListCollectionsOptions(opts...)
+	op := operation.NewListCollections(filterDoc).
+		Session(sess).ReadPreference(db.readPreference).CommandMonitor(db.client.monitor).
+		ServerSelector(selector).ClusterClock(db.client.clock).
+		Database(db.name).Deployment(db.client.topology)
+	if lco.NameOnly != nil {
+		op = op.NameOnly(*lco.NameOnly)
 	}
 
-	cmd := command.ListCollections{
-		DB:       db.name,
-		Filter:   filterDoc,
-		ReadPref: readpref.Primary(), // list collections must be run on a primary by default
-		Session:  sess,
-		Clock:    db.client.clock,
-	}
-
-	readSelector := description.CompositeSelector([]description.ServerSelector{
-		description.ReadPrefSelector(readpref.Primary()),
-		description.LatencySelector(db.client.localThreshold),
-	})
-	batchCursor, err := driverlegacy.ListCollections(
-		ctx, cmd,
-		db.client.topology,
-		readSelector,
-		db.client.id,
-		db.client.topology.SessionPool,
-		opts...,
-	)
+	err = op.Execute(ctx)
 	if err != nil {
+		closeImplicitSession(sess)
 		return nil, replaceErrors(err)
 	}
 
-	cursor, err := newCursor(batchCursor, db.registry)
+	bc, err := op.Result(driver.CursorOptions{})
+	if err != nil {
+		closeImplicitSession(sess)
+		return nil, replaceErrors(err)
+	}
+	cursor, err := newCursorWithSession(bc, db.registry, sess)
 	return cursor, replaceErrors(err)
+}
+
+// ListCollectionNames returns a slice containing the names of all of the collections on the server.
+func (db *Database) ListCollectionNames(ctx context.Context, filter interface{}, opts ...*options.ListCollectionsOptions) ([]string, error) {
+	opts = append(opts, options.ListCollections().SetNameOnly(true))
+
+	res, err := db.ListCollections(ctx, filter, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0)
+	for res.Next(ctx) {
+		next := &bsonx.Doc{}
+		err = res.Decode(next)
+		if err != nil {
+			return nil, err
+		}
+
+		elem, err := next.LookupErr("name")
+		if err != nil {
+			return nil, err
+		}
+
+		if elem.Type() != bson.TypeString {
+			return nil, fmt.Errorf("incorrect type for 'name'. got %v. want %v", elem.Type(), bson.TypeString)
+		}
+
+		elemName := elem.StringValue()
+		names = append(names, elemName)
+	}
+
+	return names, nil
 }
 
 // ReadConcern returns the read concern of this database.
@@ -278,5 +352,13 @@ func (db *Database) WriteConcern() *writeconcern.WriteConcern {
 func (db *Database) Watch(ctx context.Context, pipeline interface{},
 	opts ...*options.ChangeStreamOptions) (*ChangeStream, error) {
 
-	return newDbChangeStream(ctx, db, pipeline, opts...)
+	csConfig := changeStreamConfig{
+		readConcern:    db.readConcern,
+		readPreference: db.readPreference,
+		client:         db.client,
+		registry:       db.registry,
+		streamType:     DatabaseStream,
+		databaseName:   db.Name(),
+	}
+	return newChangeStream(ctx, csConfig, pipeline, opts...)
 }

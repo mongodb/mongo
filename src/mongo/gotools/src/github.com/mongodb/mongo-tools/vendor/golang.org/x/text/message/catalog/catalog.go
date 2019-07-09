@@ -46,12 +46,12 @@
 // The most common one is plural form, but others exist.
 //
 // Selection messages are provided in packages that provide support for a
-// specific linguistic feature. The following snippet uses plural.Select:
+// specific linguistic feature. The following snippet uses plural.Selectf:
 //
 //   catalog.Set(language.English, "You are %d minute(s) late.",
-//       plural.Select(1,
-//           "one", "You are 1 minute late.",
-//           "other", "You are %d minutes late."))
+//       plural.Selectf(1, "",
+//           plural.One, "You are 1 minute late.",
+//           plural.Other, "You are %d minutes late."))
 //
 // In this example, a message is stored in the Catalog where one of two messages
 // is selected based on the first argument, a number. The first message is
@@ -74,14 +74,14 @@
 //
 //   catalog.Set(language.English, "You are %d minute(s) late.",
 //       catalog.Var("minutes",
-//           plural.Select(1, "one", "minute", "other", "minutes")),
+//           plural.Selectf(1, "", plural.One, "minute", plural.Other, "minutes")),
 //       catalog.String("You are %[1]d ${minutes} late."))
 //
 // Var is defined to return the variable name if the message does not yield a
 // match. This allows us to further simplify this snippet to
 //
 //   catalog.Set(language.English, "You are %d minute(s) late.",
-//       catalog.Var("minutes", plural.Select(1, "one", "minute")),
+//       catalog.Var("minutes", plural.Selectf(1, "", plural.One, "minute")),
 //       catalog.String("You are %d ${minutes} late."))
 //
 // Overall this is still only a minor improvement, but things can get a lot more
@@ -91,20 +91,20 @@
 //   // argument 1: list of hosts, argument 2: list of guests
 //   catalog.Set(language.English, "%[1]v invite(s) %[2]v to their party.",
 //     catalog.Var("their",
-//         plural.Select(1,
-//             "one", gender.Select(1, "female", "her", "other", "his"))),
-//     catalog.Var("invites", plural.Select(1, "one", "invite"))
+//         plural.Selectf(1, ""
+//             plural.One, gender.Select(1, "female", "her", "other", "his"))),
+//     catalog.Var("invites", plural.Selectf(1, "", plural.One, "invite"))
 //     catalog.String("%[1]v ${invites} %[2]v to ${their} party.")),
 //
 // Without variable substitution, this would have to be written as
 //
 //   // argument 1: list of hosts, argument 2: list of guests
 //   catalog.Set(language.English, "%[1]v invite(s) %[2]v to their party.",
-//     plural.Select(1,
-//         "one", gender.Select(1,
+//     plural.Selectf(1, "",
+//         plural.One, gender.Select(1,
 //             "female", "%[1]v invites %[2]v to her party."
 //             "other", "%[1]v invites %[2]v to his party."),
-//         "other", "%[1]v invites %[2]v to their party.")
+//         plural.Other, "%[1]v invites %[2]v to their party.")
 //
 // Not necessarily shorter, but using variables there is less duplication and
 // the messages are more maintenance friendly. Moreover, languages may have up
@@ -119,9 +119,10 @@
 //
 // Where the following macros were defined separately.
 //
-//   catalog.SetMacro(language.English, "invites", plural.Select(1, "one", "invite"))
-//   catalog.SetMacro(language.English, "their", plural.Select(1,
-//      "one", gender.Select(1, "female", "her", "other", "his"))),
+//   catalog.SetMacro(language.English, "invites", plural.Selectf(1, "",
+//      plural.One, "invite"))
+//   catalog.SetMacro(language.English, "their", plural.Selectf(1, "",
+//      plural.One, gender.Select(1, "female", "her", "other", "his"))),
 //
 // Placeholders use parentheses and the arguments to invoke a macro.
 //

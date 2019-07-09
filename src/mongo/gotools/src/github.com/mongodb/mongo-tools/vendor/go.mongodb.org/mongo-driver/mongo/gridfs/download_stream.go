@@ -8,13 +8,10 @@ package gridfs
 
 import (
 	"context"
-
 	"errors"
-
-	"time"
-
 	"io"
 	"math"
+	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -92,13 +89,16 @@ func (ds *DownloadStream) Read(p []byte) (int, error) {
 
 	bytesCopied := 0
 	var err error
-
 	for bytesCopied < len(p) {
 		if ds.bufferStart >= ds.bufferEnd {
 			// Buffer is empty and can load in data from new chunk.
 			err = ds.fillBuffer(ctx)
 			if err != nil {
 				if err == errNoMoreChunks {
+					if bytesCopied == 0 {
+						ds.done = true
+						return 0, io.EOF
+					}
 					return bytesCopied, nil
 				}
 				return bytesCopied, err
@@ -188,7 +188,7 @@ func (ds *DownloadStream) fillBuffer(ctx context.Context) error {
 	bytesLen := int32(len(dataBytes))
 	if ds.expectedChunk == ds.numChunks {
 		// final chunk can be fewer than ds.chunkSize bytes
-		bytesDownloaded := ds.chunkSize * (ds.expectedChunk - 1)
+		bytesDownloaded := int64(ds.chunkSize) * (int64(ds.expectedChunk) - int64(1))
 		bytesRemaining := ds.fileLen - int64(bytesDownloaded)
 
 		if int64(bytesLen) != bytesRemaining {

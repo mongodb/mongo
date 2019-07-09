@@ -109,7 +109,7 @@ func New(opts Options) (*MongoExport, error) {
 		return nil, util.SetupError{Err: err}
 	}
 
-	log.Logvf(log.Always, "connected to: %v", opts.URI.ConnectionString)
+	log.Logvf(log.Always, "connected to: %v", util.SanitizeURI(opts.URI.ConnectionString))
 
 	isMongos, err := provider.IsMongos()
 	if err != nil {

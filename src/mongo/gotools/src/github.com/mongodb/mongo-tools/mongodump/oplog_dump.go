@@ -7,6 +7,7 @@
 package mongodump
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/mongodb/mongo-tools-common/db"
@@ -14,6 +15,9 @@ import (
 	"github.com/mongodb/mongo-tools-common/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	mopt "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
 )
 
 // determineOplogCollectionName uses a command to infer
@@ -49,13 +53,48 @@ func (dump *MongoDump) getCurrentOplogTime() (primitive.Timestamp, error) {
 
 	err := dump.SessionProvider.FindOne("local", dump.oplogCollection, 0, nil, &bson.M{"$natural": -1}, &tempBSON, 0)
 	if err != nil {
-		return primitive.Timestamp{}, err
+		return primitive.Timestamp{}, fmt.Errorf("error getting recent oplog entry: %v", err)
 	}
 	err = bson.Unmarshal(tempBSON, &mostRecentOplogEntry)
 	if err != nil {
 		return primitive.Timestamp{}, err
 	}
 	return mostRecentOplogEntry.Timestamp, nil
+}
+
+// getOplogCopyStartTime returns either the oldest active transaction timestamp or the
+// current oplog time if there are no active transactions.
+func (dump *MongoDump) getOplogCopyStartTime() (primitive.Timestamp, error) {
+	client, err := dump.SessionProvider.GetSession()
+	if err != nil {
+		return primitive.Timestamp{}, fmt.Errorf("error getting client: %v", err)
+	}
+
+	coll := client.Database("config").Collection("transactions", mopt.Collection().SetReadConcern(readconcern.Local()))
+	filter := bson.D{{"state", bson.D{{"$in", bson.A{"prepared", "inProgress"}}}}}
+	opts := mopt.FindOne().SetSort(bson.D{{"startOpTime", 1}})
+
+	var result bson.Raw
+	res := coll.FindOne(context.Background(), filter, opts)
+	err = res.Decode(&result)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return dump.getCurrentOplogTime()
+		}
+		return primitive.Timestamp{}, fmt.Errorf("config.transactions.findOne error: %v", err)
+	}
+
+	rawTS, err := result.LookupErr("startOpTime", "ts")
+	if err != nil {
+		return primitive.Timestamp{}, fmt.Errorf("config.transactions row had no startOpTime.ts field")
+	}
+
+	t, i, ok := rawTS.TimestampOK()
+	if !ok {
+		return primitive.Timestamp{}, fmt.Errorf("config.transactions startOpTime.ts was not a BSON timestamp")
+	}
+
+	return primitive.Timestamp{T: t, I: i}, nil
 }
 
 // checkOplogTimestampExists checks to make sure the oplog hasn't rolled over

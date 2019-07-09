@@ -110,6 +110,26 @@ func (tp Timestamp) Equal(tp2 Timestamp) bool {
 	return tp.T == tp2.T && tp.I == tp2.I
 }
 
+// CompareTimestamp returns an integer comparing two Timestamps, where T is compared first, followed by I.
+// Returns 0 if tp = tp2, 1 if tp > tp2, -1 if tp < tp2.
+func CompareTimestamp(tp, tp2 Timestamp) int {
+	if tp.Equal(tp2) {
+		return 0
+	}
+
+	if tp.T > tp2.T {
+		return 1
+	}
+	if tp.T < tp2.T {
+		return -1
+	}
+	// Compare I values because T values are equal
+	if tp.I > tp2.I {
+		return 1
+	}
+	return -1
+}
+
 // MinKey represents the BSON minkey value.
 type MinKey struct{}
 

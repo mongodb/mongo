@@ -44,7 +44,7 @@ var syscallModule *js.Object
 var alreadyTriedToLoad = false
 var minusOne = -1
 
-func syscall(name string) *js.Object {
+func syscallByName(name string) *js.Object {
 	defer func() {
 		recover()
 		// return nil if recovered
@@ -64,7 +64,7 @@ func syscall(name string) *js.Object {
 }
 
 func Syscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err Errno) {
-	if f := syscall("Syscall"); f != nil {
+	if f := syscallByName("Syscall"); f != nil {
 		r := f.Invoke(trap, a1, a2, a3)
 		return uintptr(r.Index(0).Int()), uintptr(r.Index(1).Int()), Errno(r.Index(2).Int())
 	}
@@ -83,7 +83,7 @@ func Syscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err Errno) {
 }
 
 func Syscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err Errno) {
-	if f := syscall("Syscall6"); f != nil {
+	if f := syscallByName("Syscall6"); f != nil {
 		r := f.Invoke(trap, a1, a2, a3, a4, a5, a6)
 		return uintptr(r.Index(0).Int()), uintptr(r.Index(1).Int()), Errno(r.Index(2).Int())
 	}
@@ -94,7 +94,7 @@ func Syscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err Errno) 
 }
 
 func RawSyscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err Errno) {
-	if f := syscall("Syscall"); f != nil {
+	if f := syscallByName("Syscall"); f != nil {
 		r := f.Invoke(trap, a1, a2, a3)
 		return uintptr(r.Index(0).Int()), uintptr(r.Index(1).Int()), Errno(r.Index(2).Int())
 	}
@@ -103,7 +103,7 @@ func RawSyscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err Errno) {
 }
 
 func rawSyscallNoError(trap, a1, a2, a3 uintptr) (r1, r2 uintptr) {
-	if f := syscall("Syscall"); f != nil {
+	if f := syscallByName("Syscall"); f != nil {
 		r := f.Invoke(trap, a1, a2, a3)
 		return uintptr(r.Index(0).Int()), uintptr(r.Index(1).Int())
 	}
@@ -112,7 +112,7 @@ func rawSyscallNoError(trap, a1, a2, a3 uintptr) (r1, r2 uintptr) {
 }
 
 func RawSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err Errno) {
-	if f := syscall("Syscall6"); f != nil {
+	if f := syscallByName("Syscall6"); f != nil {
 		r := f.Invoke(trap, a1, a2, a3, a4, a5, a6)
 		return uintptr(r.Index(0).Int()), uintptr(r.Index(1).Int()), Errno(r.Index(2).Int())
 	}

@@ -65,7 +65,6 @@ func (dump *MongoDump) dumpMetadata(intent *intents.Intent, buffer resettableOut
 	} else {
 		// get the indexes
 		indexesIter, err := db.GetIndexes(session.Database(intent.DB).Collection(intent.C))
-		defer indexesIter.Close(context.Background())
 		if err != nil {
 			return err
 		}
@@ -73,6 +72,7 @@ func (dump *MongoDump) dumpMetadata(intent *intents.Intent, buffer resettableOut
 			log.Logvf(log.Always, "the collection %v appears to have been dropped after the dump started", intent.Namespace())
 			return nil
 		}
+		defer indexesIter.Close(context.Background())
 
 		ctx := context.Background()
 		for indexesIter.Next(ctx) {

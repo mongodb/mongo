@@ -18,12 +18,36 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+// mongodump writes data into a directory like this:
+//
+// dump
+// ├── db1
+// │   ├── coll1.bson
+// │   └── coll1.metadata.json
+// │   ├── coll2.bson
+// │   └── coll2.metadata.json
+// ├── db2
+// │   ├── coll3.bson
+// │   └── coll3.metadata.json
+// └── oplog.bson
+//
+// (The top level 'dump' name is set by the --out parameter.)
+//
+// This file provides types and methods to build a dump directory in the 'testdata'
+// directory programmatically for use in testing mongorestore.
+
+// testCollData defines data for a single collection.  The 'ns' field must
+// include the database name (e.g. "foo.bar").  The 'metadata' document might
+// contain fields such as: 'options' (a document of collection options),
+// 'indexes' (an array of index data like from getIndexes), and 'uuid' (hex
+// string representing a collection UUID).
 type testCollData struct {
 	ns       string
 	docs     []bson.D
 	metadata bson.D
 }
 
+// SplitNS splits a namespace into database and collection parts.
 func (tcd testCollData) SplitNS() (string, string) {
 	ns := strings.SplitN(tcd.ns, ".", 2)
 	if len(ns) != 2 {
@@ -32,17 +56,16 @@ func (tcd testCollData) SplitNS() (string, string) {
 	return ns[0], util.EscapeCollectionName(ns[1])
 }
 
+// Mkdir ensures the db part of the collection namespace exists as a directory.
+// The basePath represents the top-level "dump" directory path.
 func (tcd testCollData) Mkdir(basePath string) error {
 	db, _ := tcd.SplitNS()
 	dbDir := path.Join(basePath, db)
-	err := os.MkdirAll(dbDir, 0755)
-	if err != nil {
-		return err
-	}
-	return nil
+	return os.MkdirAll(dbDir, 0755)
 }
 
-func (tcd testCollData) WriteData(basePath string) error {
+// WriteDocs writes collection documents to a BSON file under the basePath.
+func (tcd testCollData) WriteDocs(basePath string) error {
 	db, coll := tcd.SplitNS()
 	file, err := os.Create(path.Join(basePath, db, coll+".bson"))
 	if err != nil {
@@ -64,6 +87,7 @@ func (tcd testCollData) WriteData(basePath string) error {
 	return file.Sync()
 }
 
+// WriteMetadata writes collection metadata to a JSON file under the basePath.
 func (tcd testCollData) WriteMetadata(basePath string) error {
 	if tcd.metadata == nil {
 		return nil
@@ -88,12 +112,17 @@ func (tcd testCollData) WriteMetadata(basePath string) error {
 	return file.Sync()
 }
 
+// testDumpDir represents the contents of a database dump.  'dirName' is the
+// top-level "dump" directory path, 'oplog' is a slice of oplog entries, and
+// 'collections' is a slice of collection contents/metadata.
 type testDumpDir struct {
 	dirName     string
 	oplog       []db.Oplog
 	collections []testCollData
 }
 
+// Create removes any existing data in the top-level path and recreates
+// all files for the oplog and collections.
 func (tdd *testDumpDir) Create() error {
 
 	err := tdd.Cleanup()
@@ -111,7 +140,7 @@ func (tdd *testDumpDir) Create() error {
 		if err != nil {
 			return err
 		}
-		err = coll.WriteData(tdd.Path())
+		err = coll.WriteDocs(tdd.Path())
 		if err != nil {
 			return err
 		}
@@ -138,6 +167,7 @@ func (tdd *testDumpDir) Cleanup() error {
 	return os.RemoveAll(tdd.Path())
 }
 
+// WriteOplog writes oplog data to an oplog.bson file.
 func (tdd *testDumpDir) WriteOplog() error {
 	if tdd.oplog == nil {
 		return nil
@@ -162,6 +192,7 @@ func (tdd *testDumpDir) WriteOplog() error {
 	return file.Sync()
 }
 
+// Path returns a path underneath the 'testdata' directory.
 func (tdd *testDumpDir) Path() string {
 	return filepath.Join("testdata", tdd.dirName)
 }

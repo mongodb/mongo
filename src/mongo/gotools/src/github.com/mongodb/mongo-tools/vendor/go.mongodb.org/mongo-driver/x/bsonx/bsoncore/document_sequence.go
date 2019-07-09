@@ -74,6 +74,22 @@ func (ds *DocumentSequence) DocumentCount() int {
 	}
 }
 
+// Empty returns true if the sequence is empty. It always returns true for unknown sequence styles.
+func (ds *DocumentSequence) Empty() bool {
+	if ds == nil {
+		return true
+	}
+
+	switch ds.Style {
+	case SequenceStyle:
+		return len(ds.Data) == 0
+	case ArrayStyle:
+		return len(ds.Data) <= 5
+	default:
+		return true
+	}
+}
+
 //ResetIterator resets the iteration point for the Next method to the beginning of the document
 //sequence.
 func (ds *DocumentSequence) ResetIterator() {

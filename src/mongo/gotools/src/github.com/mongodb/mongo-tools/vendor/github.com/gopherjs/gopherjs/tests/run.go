@@ -87,7 +87,6 @@ var knownFails = map[string]failReason{
 	"fixedbugs/issue15975.go": {desc: "also looks valid but deal with after Go 1.7 support is out?"},
 
 	// These are new tests in Go 1.8.
-	"fixedbugs/issue15528.go": {category: usesUnsupportedPackage, desc: `imports "unsafe" package and gets: Error: reflect: call of reflect.Value.IsNil on unsafe.Pointer Value`}, // See https://github.com/golang/go/commit/dfc56a4cd313c9c5de37f4fadb14912286edc42f for relevant commit.
 	"fixedbugs/issue17381.go": {category: unsureIfGopherJSSupportsThisFeature, desc: "tests runtime.{Callers,FuncForPC} behavior in a deferred func with garbage on stack... does GopherJS even support runtime.{Callers,FuncForPC}?"},
 	"fixedbugs/issue18149.go": {desc: "//line directives with filenames are not correctly parsed, see https://github.com/gopherjs/gopherjs/issues/553."},
 
@@ -115,6 +114,12 @@ var knownFails = map[string]failReason{
 
 	// These are new tests in Go 1.11.5
 	"fixedbugs/issue28688.go": {category: notApplicable, desc: "testing runtime optimisations"},
+
+	// These are new tests in Go 1.12.
+	"fixedbugs/issue23837.go":  {desc: "missing panic on nil pointer-to-empty-struct dereference"},
+	"fixedbugs/issue27201.go":  {desc: "incorrect stack trace for nil dereference in inlined function"},
+	"fixedbugs/issue27518b.go": {desc: "sigpanic can make dead pointer live again"},
+	"fixedbugs/issue29190.go":  {desc: "append does not fail when length overflows"},
 }
 
 type failCategory uint8
