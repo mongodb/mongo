@@ -691,10 +691,13 @@ void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
     int64_t score = uassertStatusOK(WiredTigerUtil::getStatisticsValueAs<int64_t>(
         session->getSession(), "statistics:", "", WT_STAT_CONN_CACHE_LOOKASIDE_SCORE));
 
+    auto totalNumberOfSnapshotTooOldErrors = snapshotWindowParams.snapshotTooOldErrorCount.load();
+
     BSONObjBuilder settings(bob->subobjStart("snapshot-window-settings"));
     settings.append("cache pressure percentage threshold",
                     snapshotWindowParams.cachePressureThreshold.load());
     settings.append("current cache pressure percentage", score);
+    settings.append("total number of SnapshotTooOld errors", totalNumberOfSnapshotTooOldErrors);
     settings.append("max target available snapshots window size in seconds",
                     snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds.load());
     settings.append("target available snapshots window size in seconds",

@@ -162,5 +162,13 @@ TEST_F(SnapshotWindowTest, DecreaseAndIncreaseSnapshotWindow) {
     ASSERT_EQ(snapshotWindowSecondsFive, maxTargetSnapshotWindowSeconds);
 }
 
+TEST_F(SnapshotWindowTest, IncrementSnapshotTooOldErrorCount) {
+    auto beforeCount = snapshotWindowParams.snapshotTooOldErrorCount.load();
+    incrementSnapshotTooOldErrorCount();
+    incrementSnapshotTooOldErrorCount();
+    auto afterCount = snapshotWindowParams.snapshotTooOldErrorCount.load();
+    ASSERT_EQ(beforeCount + 2, afterCount);
+}
+
 }  // namespace
 }  // namespace mongo

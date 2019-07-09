@@ -107,6 +107,8 @@ struct SnapshotWindowParams {
 
     static inline MutableObserverRegistry<decltype(checkCachePressurePeriodSeconds)::WordType>
         observeCheckCachePressurePeriodSeconds;
+
+    AtomicWord<std::int64_t> snapshotTooOldErrorCount{0};
 };
 
 extern SnapshotWindowParams snapshotWindowParams;
