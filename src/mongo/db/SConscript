@@ -1689,6 +1689,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'snapshot_window_options',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/service_context',
     ],
 )

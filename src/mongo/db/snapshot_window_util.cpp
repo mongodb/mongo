@@ -33,6 +33,7 @@
 
 #include "mongo/db/snapshot_window_util.h"
 
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/snapshot_window_options.h"
@@ -109,6 +110,7 @@ void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
     // the window size.
     StorageEngine* engine = opCtx->getServiceContext()->getStorageEngine();
     if (engine && engine->isCacheUnderPressure(opCtx)) {
+        invariant(!engine->isEphemeral() || getTestCommandsEnabled());
         warning() << "Attempted to increase the time window of available snapshots for "
                      "point-in-time operations (readConcern level 'snapshot' or transactions), but "
                      "the storage engine cache pressure, per the cachePressureThreshold setting of "
@@ -152,6 +154,7 @@ void decreaseTargetSnapshotWindowSize(OperationContext* opCtx) {
 
     StorageEngine* engine = opCtx->getServiceContext()->getStorageEngine();
     if (engine && engine->isCacheUnderPressure(opCtx)) {
+        invariant(!engine->isEphemeral() || getTestCommandsEnabled());
         _decreaseTargetSnapshotWindowSize(lock, opCtx);
     }
 }

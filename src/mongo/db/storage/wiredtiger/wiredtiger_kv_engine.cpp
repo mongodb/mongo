@@ -684,6 +684,13 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         _checkpointThread->go();
     }
 
+    if (_ephemeral && !getTestCommandsEnabled()) {
+        // We do not maintain any snapshot history for the ephemeral storage engine in production
+        // because replication and sharded transactions do not currently run on the inMemory engine.
+        // It is live in testing, however.
+        snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.store(0);
+    }
+
     _sizeStorerUri = _uri("sizeStorer");
     WiredTigerSession session(_conn);
     if (!_readOnly && repair && _hasUri(session.getSession(), _sizeStorerUri)) {
@@ -1676,6 +1683,11 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
 Timestamp WiredTigerKVEngine::_calculateHistoryLagFromStableTimestamp(Timestamp stableTimestamp) {
     // The oldest_timestamp should lag behind the stable_timestamp by
     // 'targetSnapshotHistoryWindowInSeconds' seconds.
+
+    if (_ephemeral && !getTestCommandsEnabled()) {
+        // No history should be maintained for the inMemory engine because it is not used yet.
+        invariant(snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load() == 0);
+    }
 
     if (stableTimestamp.getSecs() <
         static_cast<unsigned>(snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load())) {
