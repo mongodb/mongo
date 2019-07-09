@@ -251,6 +251,23 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx) : _opC
     checkOut(opCtx);
 }
 
+OperationContextSession::OperationContextSession(OperationContext* opCtx,
+                                                 SessionCatalog::KillToken killToken)
+    : _opCtx(opCtx) {
+    auto& checkedOutSession = operationSessionDecoration(opCtx);
+
+    invariant(!checkedOutSession);
+    invariant(!opCtx->getLogicalSessionId());  // lsid is specified by killToken argument.
+
+    const auto catalog = SessionCatalog::get(opCtx);
+    auto scopedSessionForKill = catalog->checkOutSessionForKill(opCtx, std::move(killToken));
+
+    // We acquire a Client lock here to guard the construction of this session so that references to
+    // this session are safe to use while the lock is held
+    stdx::lock_guard lk(*opCtx->getClient());
+    checkedOutSession.emplace(std::move(scopedSessionForKill._scos));
+}
+
 OperationContextSession::~OperationContextSession() {
     // Only release the checked out session at the end of the top-level request from the client, not
     // at the end of a nested DBDirectClient call

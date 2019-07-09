@@ -98,11 +98,13 @@ public:
 
     ReplicaSetChangeNotifier& getNotifier();
 
+    bool isShutdown() const;
+
 private:
     using ReplicaSetMonitorsMap = StringMap<std::weak_ptr<ReplicaSetMonitor>>;
 
     // Protects access to the replica set monitors
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
 
     // Executor for monitoring replica sets.
     std::unique_ptr<executor::TaskExecutor> _taskExecutor;

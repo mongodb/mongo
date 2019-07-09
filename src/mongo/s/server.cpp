@@ -90,6 +90,7 @@
 #include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_uptime_reporter.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer_manager.h"
@@ -177,6 +178,64 @@ Status waitForSigningKeys(OperationContext* opCtx) {
     }
 }
 
+
+/**
+ * Abort all active transactions in the catalog that has not yet been committed.
+ *
+ * Outline:
+ * 1. Mark all sessions as killed and collect killTokens from each session.
+ * 2. Create a new Client in order not to pollute the current OperationContext.
+ * 3. Create new OperationContexts for each session to be killed and perform the necessary setup
+ *    to be able to abort transactions properly: like setting TxnNumber and attaching the session
+ *    to the OperationContext.
+ * 4. Send abortTransaction.
+ */
+void implicitlyAbortAllTransactions(OperationContext* opCtx) {
+    struct AbortTransactionDetails {
+    public:
+        AbortTransactionDetails(LogicalSessionId _lsid, SessionCatalog::KillToken _killToken)
+            : lsid(std::move(_lsid)), killToken(std::move(_killToken)) {}
+
+        LogicalSessionId lsid;
+        SessionCatalog::KillToken killToken;
+    };
+
+    const auto catalog = SessionCatalog::get(opCtx);
+
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+
+    const auto abortDeadline =
+        opCtx->getServiceContext()->getFastClockSource()->now() + Seconds(15);
+
+    std::vector<AbortTransactionDetails> toKill;
+    catalog->scanSessions(matcherAllSessions, [&](const ObservableSession& session) {
+        toKill.emplace_back(session.getSessionId(),
+                            session.kill(ErrorCodes::InterruptedAtShutdown));
+    });
+
+    auto newClient = opCtx->getServiceContext()->makeClient("ImplicitlyAbortTxnAtShutdown");
+    AlternativeClientRegion acr(newClient);
+
+    Status shutDownStatus(ErrorCodes::InterruptedAtShutdown,
+                          "aborting transactions due to shutdown");
+
+    for (auto& killDetails : toKill) {
+        auto uniqueNewOpCtx = cc().makeOperationContext();
+        auto newOpCtx = uniqueNewOpCtx.get();
+
+        newOpCtx->setDeadlineByDate(abortDeadline, ErrorCodes::ExceededTimeLimit);
+
+        OperationContextSession sessionCtx(newOpCtx, std::move(killDetails.killToken));
+
+        auto session = OperationContextSession::get(newOpCtx);
+        newOpCtx->setLogicalSessionId(session->getSessionId());
+
+        auto txnRouter = TransactionRouter::get(newOpCtx);
+        txnRouter.implicitlyAbortTransaction(newOpCtx, shutDownStatus);
+    }
+}
+
 /**
  * NOTE: This function may be called at any time after registerShutdownTask is called below. It must
  * not depend on the prior execution of mongo initializers or the existence of threads.
@@ -189,9 +248,11 @@ void cleanupTask(ServiceContext* serviceContext) {
             Client::initThread(getThreadName());
         Client& client = cc();
 
-        // Join the logical session cache before the transport layer
-        if (auto lsc = LogicalSessionCache::get(serviceContext)) {
-            lsc->joinOnShutDown();
+        ServiceContext::UniqueOperationContext uniqueTxn;
+        OperationContext* opCtx = client.getOperationContext();
+        if (!opCtx) {
+            uniqueTxn = client.makeOperationContext();
+            opCtx = uniqueTxn.get();
         }
 
         // Shutdown the TransportLayer so that new connections aren't accepted
@@ -201,12 +262,19 @@ void cleanupTask(ServiceContext* serviceContext) {
             tl->shutdown();
         }
 
-        ServiceContext::UniqueOperationContext uniqueTxn;
-        OperationContext* opCtx = client.getOperationContext();
-        if (!opCtx) {
-            uniqueTxn = client.makeOperationContext();
-            opCtx = uniqueTxn.get();
+        try {
+            // Abort transactions while we can still send remote commands.
+            implicitlyAbortAllTransactions(opCtx);
+        } catch (const DBException& excep) {
+            warning() << "encountered " << excep
+                      << " while trying to abort all active transactions";
         }
+
+        if (auto lsc = LogicalSessionCache::get(serviceContext)) {
+            lsc->joinOnShutDown();
+        }
+
+        ReplicaSetMonitor::shutdown();
 
         opCtx->setIsExecutingShutdown();
 

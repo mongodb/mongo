@@ -232,4 +232,9 @@ ReplicaSetChangeNotifier& ReplicaSetMonitorManager::getNotifier() {
     return _notifier;
 }
 
+bool ReplicaSetMonitorManager::isShutdown() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _isShutdown;
+}
+
 }  // namespace mongo

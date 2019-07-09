@@ -205,6 +205,8 @@ private:
     boost::optional<SessionCatalog::KillToken> _killToken;
 };
 
+class OperationContextSession;
+
 /**
  * RAII type returned by SessionCatalog::checkOutSessionForKill.
  *
@@ -229,6 +231,8 @@ public:
     }
 
 private:
+    friend OperationContextSession;
+
     ScopedCheckedOutSession _scos;
 };
 using SessionToKill = SessionCatalog::SessionToKill;
@@ -339,6 +343,13 @@ public:
      * for the desired session to be checked in by another user.
      */
     OperationContextSession(OperationContext* opCtx);
+
+    /**
+     * Same as constructor above, but takes the session id from the killToken and uses
+     * checkoutSessionForKill instead, placing the checked-out session on the operation context.
+     * Must not be called if the operation context contains a session.
+     */
+    OperationContextSession(OperationContext* opCtx, SessionCatalog::KillToken killToken);
     ~OperationContextSession();
 
     /**
