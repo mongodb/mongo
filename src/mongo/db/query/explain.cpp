@@ -34,7 +34,6 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/cached_plan.h"
-#include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/count_scan.h"
 #include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/idhack.h"
@@ -1016,13 +1015,6 @@ void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsO
             statsOut->replanned = cachedStats->replanned;
         } else if (STAGE_MULTI_PLAN == stages[i]->stageType()) {
             statsOut->fromMultiPlanner = true;
-        } else if (STAGE_COLLSCAN == stages[i]->stageType()) {
-            statsOut->collectionScans++;
-            const auto collScan = static_cast<const CollectionScan*>(stages[i]);
-            const auto collScanStats =
-                static_cast<const CollectionScanStats*>(collScan->getSpecificStats());
-            if (!collScanStats->tailable)
-                statsOut->collectionScansNonTailable++;
         }
     }
 }

@@ -88,9 +88,6 @@ public:
     Status appendRecordCount(OperationContext* opCtx,
                              const NamespaceString& nss,
                              BSONObjBuilder* builder) const final;
-    Status appendQueryExecStats(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                BSONObjBuilder* builder) const final override;
     BSONObj getCollectionOptions(const NamespaceString& nss) final;
     void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                  const BSONObj& renameCommandObj,

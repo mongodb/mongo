@@ -31,7 +31,6 @@
 
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/query/plan_cache.h"
-#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/update_index_data.h"
 
@@ -78,12 +77,6 @@ public:
     virtual CollectionIndexUsageMap getIndexUsageStats() const = 0;
 
     /**
-     * Returns a struct containing information on the number of collection scans that have been
-     * performed.
-     */
-    virtual CollectionIndexUsageTracker::CollectionScanStats getCollectionScanStats() const = 0;
-
-    /**
      * Register a newly-created index with the cache.  Must be called whenever an index is
      * built on the associated collection.
      *
@@ -106,12 +99,10 @@ public:
 
     /**
      * Signal to the cache that a query operation has completed.  'indexesUsed' should list the
-     * set of indexes used by the winning plan, if any. 'summaryStats.collectionScans' and
-     * 'summaryStats.collectionScansNonTailable' should be the number of collections scans and
-     * non-tailable collection scans that occured while executing the winning plan.
+     * set of indexes used by the winning plan, if any.
      */
     virtual void notifyOfQuery(OperationContext* const opCtx,
-                               const PlanSummaryStats& summaryStats) = 0;
+                               const std::set<std::string>& indexesUsed) = 0;
 
     virtual void setNs(NamespaceString ns) = 0;
 };

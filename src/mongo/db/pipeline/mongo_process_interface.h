@@ -195,12 +195,6 @@ public:
     virtual Status appendRecordCount(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      BSONObjBuilder* builder) const = 0;
-    /**
-     * Appends the exec stats for the collection 'nss' to 'builder'.
-     */
-    virtual Status appendQueryExecStats(OperationContext* opCtx,
-                                        const NamespaceString& nss,
-                                        BSONObjBuilder* builder) const = 0;
 
     /**
      * Gets the collection options for the collection given by 'nss'. Throws

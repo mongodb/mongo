@@ -1563,7 +1563,7 @@ bool runMapReduce(OperationContext* opCtx,
             // TODO SERVER-23261: Confirm whether this is the correct place to gather all
             // metrics. There is no harm adding here for the time being.
             curOp->debug().setPlanSummaryMetrics(stats);
-            scopedAutoColl->getCollection()->infoCache()->notifyOfQuery(opCtx, stats);
+            scopedAutoColl->getCollection()->infoCache()->notifyOfQuery(opCtx, stats.indexesUsed);
 
             if (curOp->shouldDBProfile()) {
                 BSONObjBuilder execStatsBob;

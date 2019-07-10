@@ -322,7 +322,7 @@ DocumentSourceCursor::DocumentSourceCursor(
     }
 
     if (collection) {
-        collection->infoCache()->notifyOfQuery(pExpCtx->opCtx, _planSummaryStats);
+        collection->infoCache()->notifyOfQuery(pExpCtx->opCtx, _planSummaryStats.indexesUsed);
     }
 }
 

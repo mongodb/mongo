@@ -50,14 +50,6 @@ struct PlanSummaryStats {
     // The number of milliseconds spent inside the root stage's work() method.
     long long executionTimeMillis = 0;
 
-    // The number of collection scans that occur during execution. Note that more than one
-    // collection scan may happen during execution (e.g. for $lookup execution).
-    long long collectionScans = 0;
-
-    // The number of collection scans that occur during execution which are nontailable. Note that
-    // more than one collection scan may happen during execution (e.g. for $lookup execution).
-    long long collectionScansNonTailable = 0;
-
     // Did this plan use an in-memory sort stage?
     bool hasSortStage = false;
 

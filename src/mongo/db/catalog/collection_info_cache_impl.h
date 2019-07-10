@@ -76,8 +76,6 @@ public:
      */
     CollectionIndexUsageMap getIndexUsageStats() const;
 
-    CollectionIndexUsageTracker::CollectionScanStats getCollectionScanStats() const override;
-
     /**
      * Builds internal cache state based on the current state of the Collection's IndexCatalog
      */
@@ -104,7 +102,11 @@ public:
      */
     void clearQueryCache();
 
-    void notifyOfQuery(OperationContext* opCtx, const PlanSummaryStats& summaryStats);
+    /**
+     * Signal to the cache that a query operation has completed.  'indexesUsed' should list the
+     * set of indexes used by the winning plan, if any.
+     */
+    void notifyOfQuery(OperationContext* opCtx, const std::set<std::string>& indexesUsed);
 
     void setNs(NamespaceString ns) override;
 

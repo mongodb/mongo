@@ -44,9 +44,6 @@ class ClockSource;
  * considered "used" when it appears as part of a winning plan for an operation that uses the
  * query system.
  *
- * It also tracks non-usage of indexes. I.e. it collects information about collection scans that
- * occur on a collection.
- *
  * Indexes must be registered and deregistered on creation/destruction.
  */
 class CollectionIndexUsageTracker {
@@ -54,11 +51,6 @@ class CollectionIndexUsageTracker {
     CollectionIndexUsageTracker& operator=(const CollectionIndexUsageTracker&) = delete;
 
 public:
-    struct CollectionScanStats {
-        unsigned long long collectionScans{0};
-        unsigned long long collectionScansNonTailable{0};
-    };
-
     struct IndexUsageStats {
         IndexUsageStats() = default;
         explicit IndexUsageStats(Date_t now, const BSONObj& key)
@@ -119,15 +111,6 @@ public:
      */
     StringMap<CollectionIndexUsageTracker::IndexUsageStats> getUsageStats() const;
 
-    /**
-     * Get the current state of the usage of collection scans. This struct will only include
-     * information about the collection scans that have occured at the time of calling.
-     */
-    CollectionScanStats getCollectionScanStats() const;
-
-    void recordCollectionScans(unsigned long long collectionScans);
-    void recordCollectionScansNonTailable(unsigned long long collectionScansNonTailable);
-
 private:
     // Map from index name to usage statistics.
     StringMap<CollectionIndexUsageTracker::IndexUsageStats> _indexUsageMap;
@@ -135,10 +118,8 @@ private:
     // Clock source. Used when the 'trackerStartTime' time for an IndexUsageStats object needs to
     // be set.
     ClockSource* _clockSource;
-
-    AtomicWord<unsigned long long> _collectionScans{0};
-    AtomicWord<unsigned long long> _collectionScansNonTailable{0};
 };
 
 typedef StringMap<CollectionIndexUsageTracker::IndexUsageStats> CollectionIndexUsageMap;
+
 }  // namespace mongo
