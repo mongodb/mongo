@@ -34,6 +34,7 @@ SUFFIX_MAP = 'AIB_SUFFIX_MAP'
 ROLE_DEPENDENCIES = 'AIB_ROLE_DEPENDENCIES'
 COMPONENTS = 'AIB_COMPONENTS_EXTRA'
 ROLES = 'AIB_ROLES'
+INSTALL_ACTIONS = 'AIB_INSTALL_ACTIONS'
 
 PRIMARY_COMPONENT = 'AIB_COMPONENT'
 PRIMARY_ROLE = 'AIB_ROLE'
@@ -90,7 +91,7 @@ def get_dependent_actions(
 
     Returns the dependent actions.
     """
-    actions = getattr(node.attributes, "aib_install_actions", None)
+    actions = getattr(node.attributes, INSTALL_ACTIONS, None)
     if not actions:
         return []
 
@@ -265,8 +266,7 @@ def tarball_builder(target, source, env):
 
 def auto_install(env, target, source, **kwargs):
     """Auto install builder."""
-    target = env.Dir(env.subst(target, source=source))
-    source = list(map(env.Entry, env.Flatten([source])))
+    source = [env.Entry(s) for s in env.Flatten([source])]
     roles = {
         kwargs.get(PRIMARY_ROLE),
         # The 'meta' tag is implicitly attached as a role.
@@ -304,16 +304,27 @@ def auto_install(env, target, source, **kwargs):
     roles = {role for role in roles if role}
     components = {component for component in components if component}
 
-    actions = env.Install(
-        target=target,
-        source=source,
-    )
+    actions = []
+
     for s in source:
         s.attributes.keep_targetinfo = 1
-        s.attributes.aib_install_actions = actions
-        s.attributes.aib_components = components
-        s.attributes.aib_roles = roles
+        setattr(s.attributes, COMPONENTS, components)
+        setattr(s.attributes, ROLES, roles)
 
+        target = env.Dir(target)
+        action = env.Install(
+            target=target,
+            source=s,
+        )
+
+        setattr(
+            s.attributes,
+            INSTALL_ACTIONS,
+            action if isinstance(action, (list, set)) else [action]
+        )
+        actions.append(action)
+
+    actions = env.Flatten(actions)
     for component, role in itertools.product(components, roles):
         alias_name = generate_alias(component, role)
         alias = env.Alias(alias_name, actions)
@@ -447,6 +458,22 @@ def exists(_env):
     """Always activate this tool."""
     return True
 
+
+def list_components(env, **kwargs):
+    """List registered components for env."""
+    print("Known AIB components:")
+    for key in env[ALIAS_MAP]:
+        print("\t", key)
+
+
+def list_targets(env, **kwargs):
+    """List AIB generated targets for env."""
+    print("Generated AIB targets:")
+    for _, rolemap in env[ALIAS_MAP].items():
+        for _, info in rolemap.items():
+            print("\t", info.alias[0].name)
+
+
 def generate(env):  # pylint: disable=too-many-statements
     """Generate the auto install builders."""
     bld = SCons.Builder.Builder(action = tarball_builder)
@@ -456,7 +483,8 @@ def generate(env):  # pylint: disable=too-many-statements
     # https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
     env["PREFIX_BINDIR"] = "$DESTDIR/bin"
     env["PREFIX_LIBDIR"] = "$DESTDIR/lib"
-    env["PREFIX_DOCDIR"] = "$DESTDIR/share/doc"
+    env["PREFIX_SHAREDIR"]  = "$DESTDIR/share"
+    env["PREFIX_DOCDIR"] = "$PREFIX_SHAREDIR/doc"
     env["PREFIX_INCLUDEDIR"] = "$DESTDIR/include"
     env["PREFIX_DEBUGDIR"] = _aib_debugdir
     env[SUFFIX_MAP] = {}
@@ -485,6 +513,12 @@ def generate(env):  # pylint: disable=too-many-statements
     env.AddMethod(auto_install, "AutoInstall")
     env.AddMethod(finalize_install_dependencies, "FinalizeInstallDependencies")
     env.Tool("install")
+
+    env.Alias("list-aib-components", [], [ list_components ])
+    env.AlwaysBuild("list-aib-components")
+
+    env.Alias("list-aib-targets", [], [ list_targets ])
+    env.AlwaysBuild("list-aib-targets")
 
     for builder in ["Program", "SharedLibrary", "LoadableModule", "StaticLibrary"]:
         builder = env["BUILDERS"][builder]
