@@ -54,7 +54,8 @@ using TransactionCoordinatorDocument = txn::TransactionCoordinatorDocument;
 const Hours kLongFutureTimeout(8);
 
 const StatusWith<BSONObj> kNoSuchTransaction =
-    BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction);
+    BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction << "errmsg"
+              << "No such transaction exists");
 const StatusWith<BSONObj> kOk = BSON("ok" << 1);
 const Timestamp kDummyPrepareTimestamp = Timestamp(1, 1);
 
@@ -63,6 +64,7 @@ StatusWith<BSONObj> makePrepareOkResponse(const Timestamp& timestamp) {
 }
 
 const StatusWith<BSONObj> kPrepareOk = makePrepareOkResponse(kDummyPrepareTimestamp);
+const StatusWith<BSONObj> kPrepareOkNoTimestamp = BSON("ok" << 1);
 
 class TransactionCoordinatorTestBase : public TransactionCoordinatorTestFixture {
 protected:
@@ -274,12 +276,15 @@ TEST_F(TransactionCoordinatorDriverTest,
         getServiceContext(), aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
 
     assertPrepareSentAndRespondWithRetryableError();
-    aws.shutdown({ErrorCodes::TransactionCoordinatorReachedAbortDecision, "Retry interrupted"});
+    const auto shutdownStatus =
+        Status{ErrorCodes::TransactionCoordinatorReachedAbortDecision, "Retry interrupted"};
+    aws.shutdown(shutdownStatus);
     advanceClockAndExecuteScheduledTasks();
 
     auto response = future.get();
     ASSERT(response.vote == boost::none);
     ASSERT(response.prepareTimestamp == boost::none);
+    ASSERT_EQ(shutdownStatus.code(), response.abortReason->code());
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
@@ -307,6 +312,8 @@ TEST_F(TransactionCoordinatorDriverTest,
     auto response = future.get();
     ASSERT(response.vote == txn::PrepareVote::kAbort);
     ASSERT(response.prepareTimestamp == boost::none);
+    ASSERT(response.abortReason);
+    ASSERT_EQ(ErrorCodes::NoSuchTransaction, response.abortReason->code());
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
@@ -321,6 +328,8 @@ TEST_F(TransactionCoordinatorDriverTest,
     auto response = future.get();
     ASSERT(response.vote == txn::PrepareVote::kAbort);
     ASSERT(response.prepareTimestamp == boost::none);
+    ASSERT(response.abortReason);
+    ASSERT_EQ(ErrorCodes::NoSuchTransaction, response.abortReason->code());
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
@@ -332,7 +341,10 @@ TEST_F(TransactionCoordinatorDriverTest,
                 [&](const executor::RemoteCommandRequest& request) { return kPrepareOk; }});
 
     auto decision = future.get().decision();
+
     ASSERT(decision.getDecision() == txn::CommitDecision::kAbort);
+    ASSERT(decision.getAbortStatus());
+    ASSERT_EQ(ErrorCodes::NoSuchTransaction, decision.getAbortStatus()->code());
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
@@ -345,6 +357,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 
     auto decision = future.get().decision();
     ASSERT(decision.getDecision() == txn::CommitDecision::kAbort);
+    ASSERT(decision.getAbortStatus());
+    ASSERT_EQ(ErrorCodes::NoSuchTransaction, decision.getAbortStatus()->code());
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
@@ -353,10 +367,12 @@ TEST_F(TransactionCoordinatorDriverTest,
     auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; },
-                [&](const executor::RemoteCommandRequest& request) { return kPrepareOk; }});
+                [&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; }});
 
     auto decision = future.get().decision();
     ASSERT(decision.getDecision() == txn::CommitDecision::kAbort);
+    ASSERT(decision.getAbortStatus());
+    ASSERT_EQ(ErrorCodes::NoSuchTransaction, decision.getAbortStatus()->code());
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
@@ -372,6 +388,7 @@ TEST_F(TransactionCoordinatorDriverTest,
 
     auto decision = future.get().decision();
     ASSERT(decision.getDecision() == txn::CommitDecision::kCommit);
+    ASSERT(!decision.getAbortStatus());
     ASSERT_EQ(maxPrepareTimestamp, *decision.getCommitTimestamp());
 }
 
@@ -388,6 +405,7 @@ TEST_F(TransactionCoordinatorDriverTest,
 
     auto decision = future.get().decision();
     ASSERT(decision.getDecision() == txn::CommitDecision::kCommit);
+    ASSERT(!decision.getAbortStatus());
     ASSERT_EQ(maxPrepareTimestamp, *decision.getCommitTimestamp());
 }
 
@@ -404,9 +422,27 @@ TEST_F(TransactionCoordinatorDriverTest,
 
     auto decision = future.get().decision();
     ASSERT(decision.getDecision() == txn::CommitDecision::kCommit);
+    ASSERT(!decision.getAbortStatus());
     ASSERT_EQ(maxPrepareTimestamp, *decision.getCommitTimestamp());
 }
 
+TEST_F(TransactionCoordinatorDriverTest,
+       SendPrepareReturnsAbortDecisionWhenNoPreparedTimestampIsReturned) {
+    const auto timestamp = Timestamp(1, 1);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
+
+    assertPrepareSentAndRespondWithSuccess(timestamp);
+    assertCommandSentAndRespondWith(
+        PrepareTransaction::kCommandName, kPrepareOkNoTimestamp, WriteConcernOptions::Majority);
+
+    auto decision = future.get().decision();
+
+    ASSERT(decision.getDecision() == txn::CommitDecision::kAbort);
+    ASSERT(decision.getAbortStatus());
+    ASSERT_EQ(ErrorCodes::InternalError, decision.getAbortStatus()->code());
+}
 
 class TransactionCoordinatorDriverPersistenceTest : public TransactionCoordinatorDriverTest {
 protected:
@@ -465,7 +501,17 @@ protected:
                                       TxnNumber txnNumber,
                                       const std::vector<ShardId>& participants,
                                       const boost::optional<Timestamp>& commitTimestamp) {
-        txn::persistDecision(*_aws, lsid, txnNumber, participants, commitTimestamp).get();
+        txn::persistDecision(*_aws, lsid, txnNumber, participants, [&] {
+            txn::CoordinatorCommitDecision decision;
+            if (commitTimestamp) {
+                decision.setDecision(txn::CommitDecision::kCommit);
+                decision.setCommitTimestamp(commitTimestamp);
+            } else {
+                decision.setDecision(txn::CommitDecision::kAbort);
+                decision.setAbortStatus(Status(ErrorCodes::NoSuchTransaction, "Test abort status"));
+            }
+            return decision;
+        }()).get();
 
         auto allCoordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
         ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(1));
@@ -573,8 +619,11 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
        PersistCommitDecisionWhenNoDocumentForTransactionExistsCanBeInterruptedAndReturnsError) {
-    Future<void> future = txn::persistDecision(
-        *_aws, _lsid, _txnNumber, _participants, _commitTimestamp /* commit */);
+    Future<void> future = txn::persistDecision(*_aws, _lsid, _txnNumber, _participants, [&] {
+        txn::CoordinatorCommitDecision decision(txn::CommitDecision::kCommit);
+        decision.setCommitTimestamp(_commitTimestamp);
+        return decision;
+    }());
     _aws->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Shutdown for test"});
 
     ASSERT_THROWS_CODE(
@@ -639,7 +688,11 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 
     // Delete the document for the first transaction and check that only the second transaction's
     // document still exists.
-    txn::persistDecision(*_aws, _lsid, txnNumber1, _participants, boost::none /* abort */).get();
+    txn::persistDecision(*_aws, _lsid, txnNumber1, _participants, [&] {
+        txn::CoordinatorCommitDecision decision(txn::CommitDecision::kAbort);
+        decision.setAbortStatus(Status(ErrorCodes::NoSuchTransaction, "Test abort error"));
+        return decision;
+    }()).get();
     txn::deleteCoordinatorDoc(*_aws, _lsid, txnNumber1).get();
 
     allCoordinatorDocs = txn::readAllCoordinatorDocs(operationContext());
@@ -2027,6 +2080,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTerminationCauseFor
     stopCapturingLogMessages();
 
     ASSERT_EQUALS(1, countLogLinesContaining("terminationCause:aborted"));
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining("terminationDetails: NoSuchTransaction: from shard s2"));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesNumParticipants) {

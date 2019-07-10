@@ -36,13 +36,37 @@ namespace mongo {
 namespace txn {
 namespace {
 
-TEST(CoordinatorCommitDecisionTest, SerializeNoCommitTimestamp) {
+TEST(CoordinatorCommitDecisionTest, SerializeCommitHasTimestampAndNoAbortStatus) {
     CoordinatorCommitDecision decision(CommitDecision::kCommit);
+    decision.setCommitTimestamp(Timestamp(100, 200));
+
     auto obj = decision.toBSON();
 
     ASSERT_BSONOBJ_EQ(BSON("decision"
-                           << "commit"),
+                           << "commit"
+                           << "commitTimestamp"
+                           << Timestamp(100, 200)),
                       obj);
+}
+
+TEST(CoordinatorCommitDecisionTest, SerializeAbortHasNoTimestampAndAbortStatus) {
+    CoordinatorCommitDecision decision(CommitDecision::kAbort);
+    decision.setAbortStatus(Status(ErrorCodes::InternalError, "Test error"));
+
+    auto obj = decision.toBSON();
+    auto expectedObj = BSON("decision"
+                            << "abort"
+                            << "abortStatus"
+                            << BSON("code" << 1 << "codeName"
+                                           << "InternalError"
+                                           << "errmsg"
+                                           << "Test error"));
+
+    ASSERT_BSONOBJ_EQ(expectedObj, obj);
+
+    auto deserializedDecision =
+        CoordinatorCommitDecision::parse(IDLParserErrorContext("AbortTest"), expectedObj);
+    ASSERT_BSONOBJ_EQ(obj, deserializedDecision.toBSON());
 }
 
 }  // namespace

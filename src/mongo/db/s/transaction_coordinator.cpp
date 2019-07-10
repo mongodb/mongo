@@ -187,11 +187,7 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
                     return Future<void>::makeReady();
             }
 
-            return txn::persistDecision(*_scheduler,
-                                        _lsid,
-                                        _txnNumber,
-                                        *_participants,
-                                        _decision->getCommitTimestamp())
+            return txn::persistDecision(*_scheduler, _lsid, _txnNumber, *_participants, *_decision)
                 .then([this] {
                     stdx::lock_guard<stdx::mutex> lg(_mutex);
                     _decisionDurable = true;
@@ -264,6 +260,7 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
 }
 
 TransactionCoordinator::~TransactionCoordinator() {
+    invariant(_completionPromisesFired);
     invariant(_completionPromises.empty());
 }
 
@@ -399,7 +396,7 @@ std::string TransactionCoordinator::_twoPhaseCommitInfoForLog(
             break;
         case txn::CommitDecision::kAbort:
             s << ", terminationCause:aborted";
-            // TODO: abortCause, abortSource
+            s << ", terminationDetails: " << *decision.getAbortStatus();
             break;
         default:
             MONGO_UNREACHABLE;

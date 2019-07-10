@@ -75,5 +75,14 @@ logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
     MONGO_UNREACHABLE;
 }
 
+Status readStatusProperty(const BSONElement& statusBSON) {
+    return Status(ErrorCodes::Error(statusBSON["code"].Int()), statusBSON["errmsg"].String());
+}
+
+void writeStatusProperty(const Status& status, StringData fieldName, BSONObjBuilder* builder) {
+    BSONObjBuilder statusBuilder(builder->subobjStart(fieldName));
+    status.serializeErrorToBSON(&statusBuilder);
+}
+
 }  // namespace txn
 }  // namespace mongo

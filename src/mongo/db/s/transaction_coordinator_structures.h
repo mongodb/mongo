@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/s/shard_id.h"
 
@@ -49,13 +50,19 @@ enum class PrepareVote {
 using CommitDecision = PrepareVote;
 
 /**
- * String serializer/deserializer for the commit decision property values.
+ * String serializer/deserializer for the commit decision enum values.
  */
 CommitDecision readCommitDecisionEnumProperty(StringData decision);
 StringData writeCommitDecisionEnumProperty(CommitDecision decision);
 
 logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
                                      const CommitDecision& decision);
+
+/**
+ * Optional serializer/deserializer for the generic server 'Status' type.
+ */
+Status readStatusProperty(const BSONElement& statusBSON);
+void writeStatusProperty(const Status& status, StringData fieldName, BSONObjBuilder* builder);
 
 }  // namespace txn
 }  // namespace mongo

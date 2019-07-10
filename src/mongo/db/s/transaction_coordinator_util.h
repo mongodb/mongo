@@ -79,6 +79,8 @@ private:
     int _numNoVotes{0};
 
     Timestamp _maxPrepareTimestamp;
+
+    boost::optional<Status> _abortStatus;
 };
 
 /**
@@ -130,7 +132,7 @@ Future<void> persistDecision(txn::AsyncWorkScheduler& scheduler,
                              const LogicalSessionId& lsid,
                              TxnNumber txnNumber,
                              const txn::ParticipantsList& participants,
-                             const boost::optional<Timestamp>& commitTimestamp);
+                             const txn::CoordinatorCommitDecision& decision);
 
 /**
  * Sends commit to all shards and returns a future that will be resolved when all participants have
@@ -195,6 +197,9 @@ struct PrepareResponse {
 
     // Will only be set if the vote was kCommit
     boost::optional<Timestamp> prepareTimestamp;
+
+    // Will only be set if the vote was kAbort or no value
+    boost::optional<Status> abortReason;
 };
 Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                                            txn::AsyncWorkScheduler& scheduler,

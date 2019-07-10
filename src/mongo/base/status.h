@@ -194,6 +194,12 @@ public:
     std::string toString() const;
 
     /**
+     * May only be called if the status is *not OK*. Serializes the code, code name and reason in
+     * the canonical code/codeName/errmsg format used in the server command responses.
+     */
+    void serializeErrorToBSON(BSONObjBuilder* builder) const;
+
+    /**
      * Returns true if this Status's code is a member of the given category.
      */
     template <ErrorCategory category>
