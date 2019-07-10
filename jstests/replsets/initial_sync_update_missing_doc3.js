@@ -48,8 +48,7 @@
     const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
 
     // Update and remove document on primary.
-    assert.commandWorked(coll.update({_id: 0}, {x: 2}, {upsert: false}));
-    assert.commandWorked(coll.remove({_id: 0}, {justOne: true}));
+    updateRemove(coll, {_id: 0});
 
     turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
 
