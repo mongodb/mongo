@@ -85,16 +85,16 @@ var turnOffHangBeforeGettingMissingDocFailPoint = function(primary, secondary, n
 
 };
 
-var finishAndValidate = function(replSet, name, firstOplogEnd, numInserted, numCollections) {
+var finishAndValidate = function(replSet, name, firstOplogEnd, numInserted, numDocuments) {
 
     replSet.awaitReplication();
     replSet.awaitSecondaryNodes();
     const dbName = 'test';
     const secondary = replSet.getSecondary();
 
-    assert.eq(numCollections,
+    assert.eq(numDocuments,
               secondary.getDB(dbName).getCollection(name).find().itcount(),
-              'collection successfully synced to secondary');
+              'documents successfully synced to secondary');
 
     const res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
 
@@ -118,4 +118,17 @@ var finishAndValidate = function(replSet, name, firstOplogEnd, numInserted, numC
               secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
               "Oplog buffer was not dropped after initial sync");
 
+};
+
+var updateRemove = function(sessionColl, query) {
+    assert.commandWorked(sessionColl.update(query, {x: 2}, {upsert: false}));
+    assert.commandWorked(sessionColl.remove(query, {justOne: true}));
+};
+
+var insertUpdateRemoveLarge = function(sessionColl, query) {
+    const kSize10MB = 10 * 1024 * 1024;
+    const longString = "a".repeat(kSize10MB);
+    assert.commandWorked(sessionColl.insert({x: longString}));
+    assert.commandWorked(sessionColl.update(query, {x: longString}, {upsert: false}));
+    assert.commandWorked(sessionColl.remove(query, {justOne: true}));
 };

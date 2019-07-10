@@ -18,65 +18,78 @@
     load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
     load("jstests/libs/check_log.js");
 
-    const name = 'initial_sync_update_missing_doc_with_prepare';
-    const replSet = new ReplSetTest({
-        name: name,
-        nodes: 1,
-    });
+    function doTest(doTransactionWork, numDocuments) {
+        const name = 'initial_sync_update_missing_doc_with_prepare';
+        const replSet = new ReplSetTest({
+            name: name,
+            nodes: 1,
+        });
 
-    replSet.startSet();
-    replSet.initiate();
-    const primary = replSet.getPrimary();
-    const dbName = 'test';
+        replSet.startSet();
+        replSet.initiate();
+        const primary = replSet.getPrimary();
+        const dbName = 'test';
 
-    var coll = primary.getDB(dbName).getCollection(name);
-    assert.commandWorked(coll.insert({_id: 0, x: 1}));
-    assert.commandWorked(coll.insert({_id: 1, x: 1}));
+        var coll = primary.getDB(dbName).getCollection(name);
+        assert.commandWorked(coll.insert({_id: 0, x: 1}));
+        assert.commandWorked(coll.insert({_id: 1, x: 1}));
 
-    // Add a secondary node with priority: 0 and votes: 0 so that we prevent elections while
-    // it is syncing from the primary.
-    const secondaryConfig = {rsConfig: {votes: 0, priority: 0}};
-    const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
+        // Add a secondary node with priority: 0 and votes: 0 so that we prevent elections while
+        // it is syncing from the primary.
+        const secondaryConfig = {rsConfig: {votes: 0, priority: 0}};
+        const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
 
-    const session = primary.startSession();
-    const sessionDB = session.getDatabase(dbName);
-    const sessionColl = sessionDB.getCollection(name);
-    // Update and remove document on primary in a prepared transaction. Once we receive the
-    // commit for this transaction, we should apply each operation separately (one update, and
-    // one delete).
-    session.startTransaction();
-    assert.commandWorked(sessionColl.update({_id: 0}, {x: 2}, {upsert: false}));
-    assert.commandWorked(sessionColl.remove({_id: 0}, {justOne: true}));
-    const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
+        const session = primary.startSession();
+        const sessionDB = session.getDatabase(dbName);
+        const sessionColl = sessionDB.getCollection(name);
 
-    // This transaction is eventually aborted, so this document should exist on the secondary
-    // after initial sync.
-    session.startTransaction();
-    assert.commandWorked(sessionColl.update({_id: 1}, {x: 2}, {upsert: false}));
-    assert.commandWorked(sessionColl.remove({_id: 1}, {justOne: true}));
-    PrepareHelpers.prepareTransaction(session);
-    assert.commandWorked(session.abortTransaction_forTesting());
+        session.startTransaction();
+        doTransactionWork(sessionColl, {_id: 0});
+        const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
+        assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
-    turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
+        // This transaction is eventually aborted, so this document should exist on the secondary
+        // after initial sync.
+        session.startTransaction();
+        doTransactionWork(sessionColl, {_id: 1});
+        PrepareHelpers.prepareTransaction(session);
+        assert.commandWorked(session.abortTransaction_forTesting());
 
-    var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-    assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
-    var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
+        turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
 
-    turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 0 /* numInserted */);
+        var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
+        assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
+        var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
 
-    // Since we aborted the second transaction, we expect this collection to still exist after
-    // initial sync.
-    finishAndValidate(replSet, name, firstOplogEnd, 0 /* numInserted */, 1 /* numCollections */);
+        turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 0 /* numInserted */);
 
-    // Make sure the secondary has the correct documents after syncing from the primary. The
-    // second document was deleted in the prepared transaction that was aborted. Therefore, it
-    // should have been properly replication.
-    coll = secondary.getDB(dbName).getCollection(name);
-    assert.docEq(null, coll.findOne({_id: 0}), 'document on secondary matches primary');
-    assert.docEq({_id: 1, x: 1}, coll.findOne({_id: 1}), 'document on secondary matches primary');
+        // Since we aborted the second transaction, we expect this collection to still exist after
+        // initial sync.
+        finishAndValidate(replSet, name, firstOplogEnd, 0 /* numInserted */, numDocuments);
 
-    replSet.stopSet();
+        // Make sure the secondary has the correct documents after syncing from the primary. The
+        // second document was deleted in the prepared transaction that was aborted. Therefore, it
+        // should have been properly replication.
+        coll = secondary.getDB(dbName).getCollection(name);
+        assert.docEq(null, coll.findOne({_id: 0}), 'document on secondary matches primary');
+        assert.docEq(
+            {_id: 1, x: 1}, coll.findOne({_id: 1}), 'document on secondary matches primary');
+
+        replSet.stopSet();
+    }
+
+    jsTestLog("Testing with prepared transaction");
+    // Passing in a function to update and remove document on primary in a prepared transaction
+    // between phrase 1 and 2. Once the secondary receives the commit for the transaction, the
+    // secondary should apply each operation separately (one update, and one delete) during initial
+    // sync.
+    doTest(updateRemove, 1 /* numDocuments after initial sync */);
+
+    jsTestLog("Testing with large prepared transaction");
+    // Passing in a function to insert, update and remove large documents on primary in a large
+    // prepared transaction. Once the secondary receives the commit for the transaction, the
+    // secondary should apply each operation separately (one insert, one update, and one delete)
+    // during initial sync.
+    doTest(insertUpdateRemoveLarge, 2 /* numDocuments after initial sync */);
 
 })();

@@ -3352,6 +3352,83 @@ TEST_F(IdempotencyTestTxns, CommitUnpreparedTransactionWithPartialTxnOps) {
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc2));
 }
 
+TEST_F(IdempotencyTestTxns, CommitTwoUnpreparedTransactionsWithPartialTxnOpsAtOnce) {
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto lsid = makeLogicalSessionId(_opCtx.get());
+    TxnNumber txnNum1(1);
+    TxnNumber txnNum2(2);
+
+    auto partialOp1 = partialTxn(
+        lsid, txnNum1, StmtId(0), OpTime(), BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc)));
+    auto commitOp1 =
+        commitUnprepared(lsid, txnNum1, StmtId(1), BSONArray(), partialOp1.getOpTime());
+
+    // The second transaction (with a different transaction number) in the same session.
+    auto partialOp2 = partialTxn(
+        lsid, txnNum2, StmtId(0), OpTime(), BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc2)));
+    auto commitOp2 =
+        commitUnprepared(lsid, txnNum2, StmtId(1), BSONArray(), partialOp2.getOpTime());
+
+    ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
+                  ->setFollowerMode(MemberState::RS_RECOVERING));
+
+    // This also tests that we clear the partialTxnList for the session after applying the commit of
+    // the first transaction. Otherwise, saving operations from the second transaction to the same
+    // partialTxnList as the first transaction will trigger an invariant because of the mismatching
+    // transaction numbers.
+    testOpsAreIdempotent({partialOp1, commitOp1, partialOp2, commitOp2});
+
+    // The transaction table should only contain the second transaction of the session.
+    repl::checkTxnTable(_opCtx.get(),
+                        lsid,
+                        txnNum2,
+                        commitOp2.getOpTime(),
+                        *commitOp2.getWallClockTime(),
+                        boost::none,
+                        DurableTxnStateEnum::kCommitted);
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc2));
+}
+
+TEST_F(IdempotencyTestTxns, CommitAndAbortTwoTransactionsWithPartialTxnOpsAtOnce) {
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto lsid = makeLogicalSessionId(_opCtx.get());
+    TxnNumber txnNum1(1);
+    TxnNumber txnNum2(2);
+
+    auto partialOp1 = partialTxn(
+        lsid, txnNum1, StmtId(0), OpTime(), BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc)));
+    auto abortOp1 = abortPrepared(lsid, txnNum1, StmtId(1), partialOp1.getOpTime());
+
+    // The second transaction (with a different transaction number) in the same session.
+    auto partialOp2 = partialTxn(
+        lsid, txnNum2, StmtId(0), OpTime(), BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc2)));
+    auto commitOp2 =
+        commitUnprepared(lsid, txnNum2, StmtId(1), BSONArray(), partialOp2.getOpTime());
+
+    ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
+                  ->setFollowerMode(MemberState::RS_RECOVERING));
+
+    // This also tests that we clear the partialTxnList for the session after applying the abort of
+    // the first transaction. Otherwise, saving operations from the second transaction to the same
+    // partialTxnList as the first transaction will trigger an invariant because of the mismatching
+    // transaction numbers.
+    testOpsAreIdempotent({partialOp1, abortOp1, partialOp2, commitOp2});
+
+    // The transaction table should only contain the second transaction of the session.
+    repl::checkTxnTable(_opCtx.get(),
+                        lsid,
+                        txnNum2,
+                        commitOp2.getOpTime(),
+                        *commitOp2.getWallClockTime(),
+                        boost::none,
+                        DurableTxnStateEnum::kCommitted);
+    ASSERT_FALSE(docExists(_opCtx.get(), nss, doc));
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc2));
+}
+
 TEST_F(IdempotencyTestTxns, CommitUnpreparedTransactionWithPartialTxnOpsAndDataPartiallyApplied) {
     createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
@@ -3465,6 +3542,45 @@ TEST_F(IdempotencyTestTxns, CommitPreparedTransactionWithPartialTxnOps) {
                         txnNum,
                         commitOp.getOpTime(),
                         *commitOp.getWallClockTime(),
+                        boost::none,
+                        DurableTxnStateEnum::kCommitted);
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc2));
+}
+
+TEST_F(IdempotencyTestTxns, CommitTwoPreparedTransactionsWithPartialTxnOpsAtOnce) {
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto lsid = makeLogicalSessionId(_opCtx.get());
+    TxnNumber txnNum1(1);
+    TxnNumber txnNum2(2);
+
+    auto partialOp1 = partialTxn(
+        lsid, txnNum1, StmtId(0), OpTime(), BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc)));
+    auto prepareOp1 = prepare(lsid, txnNum1, StmtId(1), BSONArray(), partialOp1.getOpTime());
+    auto commitOp1 = commitPrepared(lsid, txnNum1, StmtId(2), prepareOp1.getOpTime());
+
+    // The second transaction (with a different transaction number) in the same session.
+    auto partialOp2 = partialTxn(
+        lsid, txnNum2, StmtId(0), OpTime(), BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc2)));
+    auto prepareOp2 = prepare(lsid, txnNum2, StmtId(1), BSONArray(), partialOp2.getOpTime());
+    auto commitOp2 = commitPrepared(lsid, txnNum2, StmtId(2), prepareOp2.getOpTime());
+
+    ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
+                  ->setFollowerMode(MemberState::RS_RECOVERING));
+
+    // This also tests that we clear the partialTxnList for the session after applying the commit of
+    // the first prepared transaction. Otherwise, saving operations from the second transaction to
+    // the same partialTxnList as the first transaction will trigger an invariant because of the
+    // mismatching transaction numbers.
+    testOpsAreIdempotent({partialOp1, prepareOp1, commitOp1, partialOp2, prepareOp2, commitOp2});
+
+    // The transaction table should only contain the second transaction of the session.
+    repl::checkTxnTable(_opCtx.get(),
+                        lsid,
+                        txnNum2,
+                        commitOp2.getOpTime(),
+                        *commitOp2.getWallClockTime(),
                         boost::none,
                         DurableTxnStateEnum::kCommitted);
     ASSERT_TRUE(docExists(_opCtx.get(), nss, doc));

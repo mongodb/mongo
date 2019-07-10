@@ -1245,6 +1245,7 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
                 auto commitOplogEntryOpTime = op.getOpTime();
                 derivedOps->emplace_back(readTransactionOperationsFromOplogChain(
                     opCtx, prevOplogEntry, partialTxnList, commitOplogEntryOpTime.getTimestamp()));
+                partialTxnList.clear();
             }
 
             _fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
