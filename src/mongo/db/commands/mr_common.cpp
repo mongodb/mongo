@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/db/commands/mr_common.h"
 
 #include <string>
@@ -38,11 +40,17 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 
 namespace mr {
+
+namespace {
+Rarely nonAtomicDeprecationSampler;  // Used to occasionally log deprecation messages.
+}  // namespace
+
 OutputOptions parseOutputOptions(const std::string& dbname, const BSONObj& cmdObj) {
     OutputOptions outputOptions;
 
@@ -76,14 +84,16 @@ OutputOptions parseOutputOptions(const std::string& dbname, const BSONObj& cmdOb
         if (o.hasElement("db")) {
             outputOptions.outDB = o["db"].String();
         }
-
         if (o.hasElement("nonAtomic")) {
             outputOptions.outNonAtomic = o["nonAtomic"].Bool();
-            if (outputOptions.outNonAtomic)
+            if (outputOptions.outNonAtomic) {
                 uassert(15895,
                         "nonAtomic option cannot be used with this output type",
                         (outputOptions.outType == OutputType::kReduce ||
                          outputOptions.outType == OutputType::kMerge));
+            } else if (nonAtomicDeprecationSampler.tick()) {
+                warning() << "Setting out.nonAtomic to false in MapReduce is deprecated.";
+            }
         }
     } else {
         uasserted(13606, "'out' has to be a string or an object");

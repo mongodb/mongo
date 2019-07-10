@@ -52,6 +52,10 @@ namespace mongo {
 const Milliseconds kNoDistLockTimeout(-1);
 
 AtomicWord<unsigned> jobNumber;
+namespace {
+// Used to rarely log deprecation messages.
+Rarely shardedOutputDeprecationSampler;
+}  // namespace
 
 /**
  * Generates a unique name for the temporary M/R output collection.
@@ -221,6 +225,9 @@ bool runMapReduce(OperationContext* opCtx,
     if (outElmt.type() == Object) {
         // Check if there is a custom output
         BSONObj customOut = outElmt.embeddedObject();
+        if (customOut.hasField("sharded") && shardedOutputDeprecationSampler.tick()) {
+            warning() << "the out.sharded option to mapReduce is deprecated.";
+        }
         shardedOutput = customOut.getBoolField("sharded");
 
         if (customOut.hasField("inline")) {
