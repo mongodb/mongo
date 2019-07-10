@@ -143,4 +143,15 @@ std::string Status::toString() const {
     return sb.str();
 }
 
+void Status::serializeErrorToBSON(BSONObjBuilder* builder) const {
+    invariant(!isOK());
+
+    builder->append("code", code());
+    builder->append("codeName", ErrorCodes::errorString(code()));
+    builder->append("errmsg", reason());
+
+    if (auto ei = extraInfo())
+        ei->serialize(builder);
+}
+
 }  // namespace mongo

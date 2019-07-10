@@ -45,6 +45,13 @@ types:
         serializer: "::mongo::txn::writeCommitDecisionEnumProperty"
         deserializer: "::mongo::txn::readCommitDecisionEnumProperty"
 
+    status:
+        bson_serialization_type: any
+        description: "Serializes/deserializes the general server Status type"
+        cpp_type: "::mongo::Status"
+        serializer: "::mongo::txn::writeStatusProperty"
+        deserializer: "::mongo::txn::readStatusProperty"
+
 structs:
     CoordinatorCommitDecision:
         description: "An object representing the coordinator's commit decision."
@@ -58,6 +65,11 @@ structs:
                 optional: true
                 type: timestamp
                 description: "If the decision is 'commit', contains the chosen commit timestamp,
+                              otherwise it will not be set"
+            abortStatus:
+                optional: true
+                type: status
+                description: "If the decision is 'abort', contains the reason the shard aborted,
                               otherwise it will not be set"
 
     TransactionCoordinatorDocument:

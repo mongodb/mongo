@@ -160,6 +160,7 @@ private:
     // Protects the state below
     mutable stdx::mutex _mutex;
 
+    // Tracks which step of the 2PC coordination is currently (or was most recently) executing
     Step _step{Step::kInactive};
 
     // Promise/future pair which will be signaled when the coordinator has completed
