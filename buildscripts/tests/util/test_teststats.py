@@ -47,7 +47,24 @@ class TestTestStats(unittest.TestCase):
         ]
         test_stats = teststats_utils.TestStats(evg_results)
         expected_runtimes = [
-            teststats_utils.TestRuntime(test_name="dir/test3.js", runtime=42.5),
+            teststats_utils.TestRuntime(test_name="dir/test3.js", runtime=75),
+            teststats_utils.TestRuntime(test_name="dir/test2.js", runtime=30),
+            teststats_utils.TestRuntime(test_name="dir/test1.js", runtime=20),
+        ]
+        self.assertEqual(expected_runtimes, test_stats.get_tests_runtimes())
+
+    def test_hook_first(self):
+        evg_results = [
+            self._make_evg_result("test3:CleanEveryN", 10, 35),
+            self._make_evg_result("dir/test1.js", 1, 10),
+            self._make_evg_result("dir/test2.js", 1, 30),
+            self._make_evg_result("dir/test1.js", 2, 25),
+            self._make_evg_result("dir/test3.js", 5, 10),
+            self._make_evg_result("test3:CheckReplDBHash", 10, 35),
+        ]
+        test_stats = teststats_utils.TestStats(evg_results)
+        expected_runtimes = [
+            teststats_utils.TestRuntime(test_name="dir/test3.js", runtime=80),
             teststats_utils.TestRuntime(test_name="dir/test2.js", runtime=30),
             teststats_utils.TestRuntime(test_name="dir/test1.js", runtime=20),
         ]
