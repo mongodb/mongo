@@ -29,15 +29,15 @@ from collections import defaultdict, namedtuple
 import SCons
 from SCons.Tool import install
 
-ALIAS_MAP = 'AIB_ALIAS_MAP'
-SUFFIX_MAP = 'AIB_SUFFIX_MAP'
-ROLE_DEPENDENCIES = 'AIB_ROLE_DEPENDENCIES'
-COMPONENTS = 'AIB_COMPONENTS_EXTRA'
-ROLES = 'AIB_ROLES'
-INSTALL_ACTIONS = 'AIB_INSTALL_ACTIONS'
+ALIAS_MAP = "AIB_ALIAS_MAP"
+SUFFIX_MAP = "AIB_SUFFIX_MAP"
+PACKAGE_PREFIX = "AIB_PACKAGE_PREFIX"
+ROLE_DEPENDENCIES = "AIB_ROLE_DEPENDENCIES"
+COMPONENTS = "AIB_COMPONENTS_EXTRA"
+ROLES = "AIB_ROLES"
 
-PRIMARY_COMPONENT = 'AIB_COMPONENT'
-PRIMARY_ROLE = 'AIB_ROLE'
+PRIMARY_COMPONENT = "AIB_COMPONENT"
+PRIMARY_ROLE = "AIB_ROLE"
 
 AVAILABLE_ROLES = [
     "base",
@@ -110,12 +110,12 @@ def get_dependent_actions(
         if role != "meta"
     }
     if (
-            # TODO: make the "always transitive" roles configurable
-            "common" not in node_roles
-            # If we are not transferrable
-            and not can_transfer
-            # Checks if we are actually crossing a boundry
-            and node_roles.isdisjoint(roles)
+        # TODO: make the "always transitive" roles configurable
+        "common" not in node_roles
+        # If we are not transferrable
+        and not can_transfer
+        # Checks if we are actually crossing a boundry
+        and node_roles.isdisjoint(roles)
     ):
         return []
 
@@ -129,6 +129,7 @@ def get_dependent_actions(
             actions,
         )
     return actions
+
 
 def scan_for_transitive_install(node, env, path=None, cb=None):
     """Walk the children of node finding all installed dependencies of it."""
@@ -200,9 +201,9 @@ def collect_transitive_files(sources, env, ignore_component_boundries=False):
         # the "special" always transitive roles we should not cross
         # component boundries.
         if (
-                not ignore_component_boundries
-                and "common" not in node_roles
-                and not shares_component
+            not ignore_component_boundries
+            and "common" not in node_roles
+            and not shares_component
         ):
             return []
         return aib_actions
@@ -250,18 +251,24 @@ def tarball_builder(target, source, env):
         common_ancestor = env.Dir("$DESTDIR").get_abspath()
     paths = [file.get_abspath() for file in transitive_files["files"]]
     relative_files = [os.path.relpath(path, common_ancestor) for path in paths]
+    # Target name minus the .gz
+    # TODO: $PKGDIR support
+    tar_name = str(target[0])[0:-3]
     tar_cmd = SCons.Action._subproc(
         env,
         shlex.split(
-            'tar -cvf {tarball} -C {ancestor} {files}'
-            .format(
-                tarball=target[0],
+            "tar -cvf {tarball} -C {ancestor} {files}".format(
+                tarball=tar_name,
                 ancestor=common_ancestor,
                 files=" ".join(relative_files),
             )
         ),
     )
     tar_cmd.wait()
+    gzip_cmd = SCons.Action._subproc(
+        env, shlex.split("gzip -9 {tarball}".format(tarball=tar_name))
+    )
+    gzip_cmd.wait()
 
 
 def auto_install(env, target, source, **kwargs):
@@ -340,7 +347,6 @@ def auto_install(env, target, source, **kwargs):
     return actions
 
 
-
 def finalize_install_dependencies(env):
     """Generates package aliases and wires install dependencies."""
     common_rolemap = env[ALIAS_MAP].get("common")
@@ -366,18 +372,22 @@ def finalize_install_dependencies(env):
             installed_component_files = [
                 file for file in installed_files
                 if (
-                        component in getattr(file.sources[0].attributes, COMPONENTS, [])
-                        and (
-                            role in getattr(file.sources[0].attributes, ROLES, [])
-                            # TODO: make configurable
-                            or "common" in getattr(file.sources[0].attributes, ROLES, [])
-                        )
+                    component in getattr(file.sources[0].attributes, COMPONENTS, [])
+                    and (
+                        role in getattr(file.sources[0].attributes, ROLES, [])
+                        # TODO: make configurable
+                        or "common" in getattr(file.sources[0].attributes, ROLES, [])
+                    )
                 )
             ]
 
             tar_alias = generate_alias(component, role, target="tar")
             tar = env.TarBall(
-                "{}-{}.tar".format(component, role),
+                "{prefix}{component}-{role}.tar.gz".format(
+                    prefix=env.subst(env[PACKAGE_PREFIX]),
+                    component=component,
+                    role=role,
+                ),
                 source=installed_component_files,
                 AIB_COMPONENT=component,
                 AIB_ROLE=role,
@@ -392,7 +402,7 @@ def auto_install_emitter(target, source, env):
     for t in target:
         entry = env.Entry(t)
         suffix = entry.get_suffix()
-        if env.get('AIB_IGNORE', False):
+        if env.get("AIB_IGNORE", False):
             continue
         auto_install_mapping = env[SUFFIX_MAP].get(suffix)
         if auto_install_mapping is not None:
@@ -420,23 +430,26 @@ def add_suffix_mapping(env, source, target=None):
     if isinstance(source, str):
         if target not in AVAILABLE_ROLES:
             raise Exception(
-                "target {} is not a known role. Available roles are {}"
-                .format(target, AVAILABLE_ROLES)
+                "target {} is not a known role. Available roles are {}".format(
+                    target, AVAILABLE_ROLES
+                )
             )
         env[SUFFIX_MAP][env.subst(source)] = target
 
     if not isinstance(source, dict):
-        raise Exception('source must be a dictionary or a string')
+        raise Exception("source must be a dictionary or a string")
 
     for _, mapping in source.items():
         for role in mapping.default_roles:
             if role not in AVAILABLE_ROLES:
                 raise Exception(
-                    "target {} is not a known role. Available roles are {}"
-                    .format(target, AVAILABLE_ROLES)
+                    "target {} is not a known role. Available roles are {}".format(
+                        target, AVAILABLE_ROLES
+                    )
                 )
 
     env[SUFFIX_MAP].update({env.subst(key): value for key, value in source.items()})
+
 
 def suffix_mapping(env, source=False, target=False, **kwargs):
     """Generate a SuffixMap object from source and target."""
@@ -444,6 +457,7 @@ def suffix_mapping(env, source=False, target=False, **kwargs):
         directory=source if source else kwargs.get("directory"),
         default_roles=target if target else kwargs.get("default_roles"),
     )
+
 
 def _aib_debugdir(source, target, env, for_signature):
     for s in source:
@@ -453,6 +467,7 @@ def _aib_debugdir(source, target, env, for_signature):
         oentry = env.Entry(origin)
         osuf = oentry.get_suffix()
         return env[SUFFIX_MAP].get(osuf)[0]
+
 
 def exists(_env):
     """Always activate this tool."""
@@ -476,8 +491,8 @@ def list_targets(env, **kwargs):
 
 def generate(env):  # pylint: disable=too-many-statements
     """Generate the auto install builders."""
-    bld = SCons.Builder.Builder(action = tarball_builder)
-    env.Append(BUILDERS = {'TarBall': bld})
+    bld = SCons.Builder.Builder(action=tarball_builder)
+    env.Append(BUILDERS={"TarBall": bld})
 
     # Matches the autoconf documentation:
     # https://www.gnu.org/prep/standards/html_node/Directory-Variables.html
@@ -487,6 +502,7 @@ def generate(env):  # pylint: disable=too-many-statements
     env["PREFIX_DOCDIR"] = "$PREFIX_SHAREDIR/doc"
     env["PREFIX_INCLUDEDIR"] = "$DESTDIR/include"
     env["PREFIX_DEBUGDIR"] = _aib_debugdir
+    env[PACKAGE_PREFIX] = env.get(PACKAGE_PREFIX, "")
     env[SUFFIX_MAP] = {}
     env[ALIAS_MAP] = defaultdict(dict)
     env[ROLE_DEPENDENCIES] = {
@@ -514,10 +530,10 @@ def generate(env):  # pylint: disable=too-many-statements
     env.AddMethod(finalize_install_dependencies, "FinalizeInstallDependencies")
     env.Tool("install")
 
-    env.Alias("list-aib-components", [], [ list_components ])
+    env.Alias("list-aib-components", [], [list_components])
     env.AlwaysBuild("list-aib-components")
 
-    env.Alias("list-aib-targets", [], [ list_targets ])
+    env.Alias("list-aib-targets", [], [list_targets])
     env.AlwaysBuild("list-aib-targets")
 
     for builder in ["Program", "SharedLibrary", "LoadableModule", "StaticLibrary"]:
