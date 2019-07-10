@@ -472,15 +472,13 @@ Status PlanCache::set(const CanonicalQuery& query,
         return Status(ErrorCodes::BadValue, "number of stats in decision must match solutions");
     }
 
-    if (why->scores.size() != why->candidateOrder.size()) {
-        return Status(ErrorCodes::BadValue,
-                      "number of scores in decision must match viable candidates");
+    if (why->scores.size() != solns.size()) {
+        return Status(ErrorCodes::BadValue, "number of scores in decision must match solutions");
     }
 
-    if (why->candidateOrder.size() + why->failedCandidates.size() != solns.size()) {
+    if (why->candidateOrder.size() != solns.size()) {
         return Status(ErrorCodes::BadValue,
-                      "the number of viable candidates plus the number of failed candidates must "
-                      "match the number of solutions");
+                      "candidate ordering entries in decision must match solutions");
     }
 
     const auto key = computeKey(query);

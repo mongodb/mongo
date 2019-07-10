@@ -52,8 +52,6 @@ PlanStage::StageState PlanStage::work(WorkingSetID* out) {
         ++_commonStats.needTime;
     } else if (StageState::NEED_YIELD == workResult) {
         ++_commonStats.needYield;
-    } else if (StageState::FAILURE == workResult) {
-        _commonStats.failed = true;
     }
 
     return workResult;

@@ -64,7 +64,6 @@ struct CommonStats {
           needTime(0),
           needYield(0),
           executionTimeMillis(0),
-          failed(false),
           isEOF(false) {}
     // String giving the type of the stage. Not owned.
     const char* stageTypeStr;
@@ -94,7 +93,6 @@ struct CommonStats {
 
     // TODO: keep track of the total yield time / fetch time done for a plan.
 
-    bool failed;
     bool isEOF;
 
 private:

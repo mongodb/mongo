@@ -331,8 +331,6 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         bob->appendNumber("needYield", stats.common.needYield);
         bob->appendNumber("saveState", stats.common.yields);
         bob->appendNumber("restoreState", stats.common.unyields);
-        if (stats.common.failed)
-            bob->appendBool("failed", stats.common.failed);
         bob->appendNumber("isEOF", stats.common.isEOF);
     }
 
@@ -741,8 +739,6 @@ void Explain::generateSinglePlanExecutionInfo(const PlanStageStats* stats,
 
     out->appendNumber("totalKeysExamined", totalKeysExamined);
     out->appendNumber("totalDocsExamined", totalDocsExamined);
-    if (stats->common.failed)
-        out->appendBool("failed", stats->common.failed);
 
     // Add the tree of stages, with individual execution stats for each stage.
     BSONObjBuilder stagesBob(out->subobjStart("executionStages"));
@@ -1055,11 +1051,6 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
     for (double score : entry.decision->scores) {
         scoresBuilder.append(score);
     }
-
-    std::for_each(entry.decision->failedCandidates.begin(),
-                  entry.decision->failedCandidates.end(),
-                  [&scoresBuilder](const auto&) { scoresBuilder.append(0.0); });
-
     scoresBuilder.doneFast();
 
     out->append("indexFilterSet", entry.plannerData[0]->indexFilterApplied);
