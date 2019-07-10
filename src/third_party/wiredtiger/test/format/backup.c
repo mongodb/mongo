@@ -104,10 +104,6 @@ backup(void *arg)
 
 	conn = g.wts_conn;
 
-	/* Backups aren't supported for non-standard data sources. */
-	if (DATASOURCE("kvsbdb"))
-		return (WT_THREAD_RET_VALUE);
-
 	/* Open a session. */
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 

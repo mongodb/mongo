@@ -106,14 +106,17 @@ class test_prepare04(wttest.WiredTigerTestCase, suite_subprocess):
         s_other.begin_transaction(self.txn_config + self.ignore_config)
         c_other.set_key(1)
         if self.ignore == False and self.after_ts == True:
-            self.assertRaises(wiredtiger.WiredTigerError, lambda:c_other.search())
+            # Make sure we get the expected prepare conflict message.
+            self.assertRaisesException(wiredtiger.WiredTigerError, lambda:c_other.search(), preparemsg)
         else:
             c_other.search()
             self.assertTrue(c_other.get_value() == 1)
+
         c_other.set_value(3)
-        self.assertRaises(wiredtiger.WiredTigerError, lambda:c_other.update())
+
+        # Make sure we detect the conflict between operations.
+        self.assertRaisesException(wiredtiger.WiredTigerError, lambda:c_other.update(), conflictmsg)
         s_other.commit_transaction()
-        #'''
 
         self.session.timestamp_transaction('commit_timestamp=' + timestamp_str(300))
         self.session.timestamp_transaction('durable_timestamp=' + timestamp_str(300))

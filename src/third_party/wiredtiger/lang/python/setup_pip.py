@@ -195,6 +195,7 @@ def source_filter(sources):
     movers = dict()
     py_dir = os.path.join('lang', 'python')
     pywt_dir = os.path.join(py_dir, 'wiredtiger')
+    pywt_build_dir = os.path.join('build_posix', py_dir, 'wiredtiger')
     pywt_prefix = pywt_dir + os.path.sep
     for f in sources:
         if not re.match(source_regex, f):
@@ -211,7 +212,7 @@ def source_filter(sources):
         result.append(dest)
     # Add SWIG generated files
     result.append('wiredtiger.py')
-    movers['wiredtiger.py'] = os.path.join(pywt_dir, '__init__.py')
+    movers['wiredtiger.py'] = os.path.join(pywt_build_dir, '__init__.py')
     result.append(os.path.join(py_dir, 'wiredtiger_wrap.c'))
     return result, movers
 
@@ -302,6 +303,17 @@ cppflags, cflags, ldflags = get_compile_flags(inc_paths, lib_paths)
 # If we are creating a source distribution, create a staging directory
 # with just the right sources. Put the result in the python dist directory.
 if pip_command == 'sdist':
+
+    # Technically, this script can run under Python2, and will do the
+    # right thing. But if we're running with Python2, chances are we built
+    # WiredTiger using Python2, and a distribution built that way will
+    # only run under Python2, not Python3.  If we do the WiredTiger configure,
+    # build and this script all using Python3, we'll end up with a distribution
+    # that installs and runs under either Python2 or Python3.
+    python2 = (sys.version_info[0] <= 2)
+    if python2:
+        die('Python3 should be used to create a source distribution')
+
     sources, movers = source_filter(get_sources_curdir())
     stage_dir = os.path.join(python_rel_dir, 'stage')
     shutil.rmtree(stage_dir, True)

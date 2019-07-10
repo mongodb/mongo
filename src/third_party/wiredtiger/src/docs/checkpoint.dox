@@ -55,11 +55,13 @@ archiving purposes.
 @section checkpoint_cursors Checkpoint cursors
 
 Cursors are normally opened in the most recent version of a data source.
-However, a checkpoint configuration string may be provided to
-WT_SESSION::open_cursor, opening a read-only, static view of the data
-source.  This provides a limited form of time-travel, as the static view
-is not changed by subsequent checkpoints, and will persist until the
-checkpoint cursor is closed.
+However, a checkpoint configuration string may be provided
+to WT_SESSION::open_cursor, opening a read-only, static view of the
+data source.  This provides a limited form of time-travel, as the static
+view is not changed by subsequent checkpoints and will persist until
+the checkpoint cursor is closed. While it is not an error to set a read
+timestamp in a transaction including a checkpoint cursor, it also has no
+effect on the checkpoint cursor's behavior.
 
 @section checkpoint_naming Checkpoint naming
 

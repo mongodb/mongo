@@ -701,6 +701,20 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test/csuite/test_wt4803_cache_overflow_abort 2>&1
 
+  - name: csuite-wt4891-meta-ckptlist-get-alloc-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt4891_meta_ckptlist_get_alloc 2>&1
+
   - name: csuite-rwlock-test
     depends_on:
       - name: compile
@@ -1313,7 +1327,7 @@ buildvariants:
   display_name: Little-endian (x86)
   run_on:
   - ubuntu1404-test
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
@@ -1330,7 +1344,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1604-zseries-small
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH

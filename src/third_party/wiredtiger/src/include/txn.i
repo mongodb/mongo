@@ -13,13 +13,13 @@
  */
 static inline bool
 __wt_ref_cas_state_int(WT_SESSION_IMPL *session, WT_REF *ref,
-    uint32_t old_state, uint32_t new_state, const char *file, int line)
+    uint32_t old_state, uint32_t new_state, const char *func, int line)
 {
 	bool cas_result;
 
 	/* Parameters that are used in a macro for diagnostic builds */
 	WT_UNUSED(session);
-	WT_UNUSED(file);
+	WT_UNUSED(func);
 	WT_UNUSED(line);
 
 	cas_result = __wt_atomic_casv32(&ref->state, old_state, new_state);
@@ -31,7 +31,7 @@ __wt_ref_cas_state_int(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * updated.
 	 */
 	 if (cas_result)
-		WT_REF_SAVE_STATE(ref, new_state, file, line);
+		WT_REF_SAVE_STATE(ref, new_state, func, line);
 #endif
 	return (cas_result);
 }
@@ -1081,7 +1081,8 @@ __wt_txn_search_check(WT_SESSION_IMPL *session)
 	 * verify this transaction has one.  Same if it should never have
 	 * a read timestamp.
 	 */
-	if (FLD_ISSET(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS) &&
+	if (!F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
+	    FLD_ISSET(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS) &&
 	    !F_ISSET(txn, WT_TXN_PUBLIC_TS_READ))
 		WT_RET_MSG(session, EINVAL, "read_timestamp required and "
 		    "none set on this transaction");

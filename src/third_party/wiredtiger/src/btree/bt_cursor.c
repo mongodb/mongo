@@ -1477,9 +1477,11 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
 	 * the update if the update chain is too long; third, there's a check
 	 * if the updated value is too large to store; fourth, to simplify the
 	 * count of bytes being added/removed; fifth, we can get into serious
-	 * trouble if we attempt to modify a value that doesn't exist. For the
-	 * fifth reason, verify we're not in a read-uncommitted transaction,
-	 * that implies a value that might disappear out from under us.
+	 * trouble if we attempt to modify a value that doesn't exist or read
+	 * a value that might not exist in the future. For the fifth reason,
+	 * fail if in anything other than a snapshot transaction, read-committed
+	 * and read-uncommitted imply values that might disappear out from under
+	 * us or an inability to repeat point-in-time reads.
 	 *
 	 * Also, an application might read a value outside of a transaction and
 	 * then call modify. For that to work, the read must be part of the
@@ -1490,9 +1492,10 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
 	 * because it will work most of the time and the failure is unlikely to
 	 * be detected. Require explicit transactions for modify operations.
 	 */
-	if (session->txn.isolation == WT_ISO_READ_UNCOMMITTED)
+	if (session->txn.isolation != WT_ISO_SNAPSHOT)
 		WT_ERR_MSG(session, ENOTSUP,
-		    "not supported in read-uncommitted transactions");
+		    "not supported in read-committed or read-uncommitted "
+		    "transactions");
 	if (F_ISSET(&session->txn, WT_TXN_AUTOCOMMIT))
 		WT_ERR_MSG(session, ENOTSUP,
 		    "not supported in implicit transactions");

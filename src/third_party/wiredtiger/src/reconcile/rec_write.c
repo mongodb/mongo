@@ -639,8 +639,7 @@ __rec_init(WT_SESSION_IMPL *session,
 	else
 		r->las_skew_newest =
 		    LF_ISSET(WT_REC_LOOKASIDE) && LF_ISSET(WT_REC_VISIBLE_ALL);
-	r->las_skew_newest =
-	    LF_ISSET(WT_REC_LOOKASIDE) && LF_ISSET(WT_REC_VISIBLE_ALL);
+
 	if (r->las_skew_newest &&
 	    !__wt_btree_immediately_durable(session) &&
 	    txn_global->has_stable_timestamp &&

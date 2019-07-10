@@ -69,6 +69,14 @@ static CONFIG c[] = {
 	  "if altering the table is enabled",			/* 10% */
 	  C_BOOL, 10, 0, 0, &g.c_alter, NULL },
 
+	{ "assert_commit_timestamp",
+	  "if assert commit_timestamp",				/* 5% */
+	  C_BOOL, 5, 0, 0, &g.c_assert_commit_timestamp, NULL },
+
+	{ "assert_read_timestamp",
+	  "if assert read_timestamp",				/* 5% */
+	  C_BOOL, 5, 0, 0, &g.c_assert_read_timestamp, NULL },
+
 	{ "auto_throttle",
 	  "if LSM inserts are throttled",			/* 90% */
 	  C_BOOL, 90, 0, 0, &g.c_auto_throttle, NULL },
@@ -138,7 +146,7 @@ static CONFIG c[] = {
 	  C_BOOL, 5, 0, 0, &g.c_data_extend, NULL },
 
 	{ "data_source",
-	  "data source (file | kvsbdb | lsm | table)",
+	  "data source (file | lsm | table)",
 	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_data_source },
 
 	{ "delete_pct",
@@ -378,13 +386,13 @@ static CONFIG c[] = {
 	  "stress splits (#8)",					/* 2% */
 	  C_BOOL, 2, 0, 0, &g.c_timing_stress_split_8, NULL },
 
-	{ "transaction_timestamps",				/* 10% */
+	{ "transaction_timestamps",				/* 70% */
 	  "enable transaction timestamp support",
-	  C_BOOL, 10, 0, 0, &g.c_txn_timestamps, NULL },
+	  C_BOOL, 70, 0, 0, &g.c_txn_timestamps, NULL },
 
 	{ "transaction-frequency",
 	  "percent operations done inside an explicit transaction",
-	  C_IGNORE, 1, 0, 100, &g.c_txn_freq, NULL },
+	  0x0, 1, 100, 100, &g.c_txn_freq, NULL },
 
 	{ "truncate",						/* 100% */
 	  "enable truncation",

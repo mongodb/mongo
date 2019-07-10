@@ -665,8 +665,10 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 		 */
 		if (page != NULL &&
 		    (cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD ||
-		    (newpage && cbt->page_deleted_count > 0)))
+		    (newpage && cbt->page_deleted_count > 0))) {
 			__wt_page_evict_soon(session, cbt->ref);
+			WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
+		}
 		cbt->page_deleted_count = 0;
 
 		if (F_ISSET(cbt, WT_CBT_READ_ONCE))

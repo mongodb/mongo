@@ -65,7 +65,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_rwlock_init(session, &conn->hot_backup_lock));
 	WT_RWLOCK_INIT_TRACKED(session, &conn->table_lock, table);
 
-	/* Setup the spin locks for the LSM manager queues. */
+	/* Setup serialization for the LSM manager queues. */
 	WT_RET(__wt_spin_init(session,
 	    &conn->lsm_manager.app_lock, "LSM application queue lock"));
 	WT_RET(__wt_spin_init(session,
@@ -129,6 +129,12 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->schema_lock);
 	__wt_rwlock_destroy(session, &conn->table_lock);
 	__wt_spin_destroy(session, &conn->turtle_lock);
+
+	/* Free LSM serialization resources. */
+	__wt_spin_destroy(session, &conn->lsm_manager.switch_lock);
+	__wt_spin_destroy(session, &conn->lsm_manager.app_lock);
+	__wt_spin_destroy(session, &conn->lsm_manager.manager_lock);
+	__wt_cond_destroy(session, &conn->lsm_manager.work_cond);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->cfg);

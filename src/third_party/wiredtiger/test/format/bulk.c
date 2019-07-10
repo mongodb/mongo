@@ -28,6 +28,49 @@
 
 #include "format.h"
 
+/*
+ * bulk_begin_transaction --
+ *	Begin a bulk-load transaction.
+ */
+static void
+bulk_begin_transaction(WT_SESSION *session)
+{
+	uint64_t ts;
+	char buf[64];
+
+	wiredtiger_begin_transaction(session, "isolation=snapshot");
+	ts = __wt_atomic_addv64(&g.timestamp, 1);
+	testutil_check(__wt_snprintf(
+	    buf, sizeof(buf), "read_timestamp=%" PRIx64, ts));
+	testutil_check(session->timestamp_transaction(session, buf));
+}
+
+/*
+ * bulk_commit_transaction --
+ *	Commit a bulk-load transaction.
+ */
+static void
+bulk_commit_transaction(WT_SESSION *session)
+{
+	uint64_t ts;
+	char buf[64];
+
+	ts = __wt_atomic_addv64(&g.timestamp, 1);
+	testutil_check(__wt_snprintf(
+	    buf, sizeof(buf), "commit_timestamp=%" PRIx64, ts));
+	testutil_check(session->commit_transaction(session, buf));
+}
+
+/*
+ * bulk_rollback_transaction --
+ *	Rollback a bulk-load transaction.
+ */
+static void
+bulk_rollback_transaction(WT_SESSION *session)
+{
+	testutil_check(session->rollback_transaction(session, NULL));
+}
+
 void
 wts_load(void)
 {
@@ -42,19 +85,13 @@ wts_load(void)
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-	if (g.logging != 0)
-		(void)g.wt_api->msg_printf(g.wt_api, session,
-		    "=============== bulk load start ===============");
+	logop(session, "%s", "=============== bulk load start");
 
 	/*
-	 * No bulk load with data-sources.
-	 *
 	 * No bulk load with custom collators, the order of insertion will not
 	 * match the collation order.
 	 */
 	is_bulk = true;
-	if (DATASOURCE("kvsbdb"))
-		is_bulk = false;
 	if (g.c_reverse)
 		is_bulk = false;
 
@@ -71,6 +108,9 @@ wts_load(void)
 	key_gen_init(&key);
 	val_gen_init(&value);
 
+	if (g.c_txn_timestamps)
+		bulk_begin_transaction(session);
+
 	for (;;) {
 		if (++g.key_cnt > g.c_rows) {
 			g.key_cnt = g.rows = g.c_rows;
@@ -78,8 +118,14 @@ wts_load(void)
 		}
 
 		/* Report on progress every 100 inserts. */
-		if (g.key_cnt % 1000 == 0)
+		if (g.key_cnt % 10000 == 0) {
 			track("bulk load", g.key_cnt, NULL);
+
+			if (g.c_txn_timestamps) {
+				bulk_commit_transaction(session);
+				bulk_begin_transaction(session);
+			}
+		}
 
 		key_gen(&key, g.key_cnt);
 		val_gen(NULL, &value, g.key_cnt);
@@ -89,34 +135,24 @@ wts_load(void)
 			if (!is_bulk)
 				cursor->set_key(cursor, g.key_cnt);
 			cursor->set_value(cursor, *(uint8_t *)value.data);
-			if (g.logging == LOG_OPS)
-				(void)g.wt_api->msg_printf(g.wt_api, session,
-				    "%-10s %" PRIu64 " {0x%02" PRIx8 "}",
-				    "bulk V",
-				    g.key_cnt, ((uint8_t *)value.data)[0]);
+			logop(session, "%-10s %" PRIu64 " {0x%02" PRIx8 "}",
+			    "bulk", g.key_cnt, ((uint8_t *)value.data)[0]);
 			break;
 		case VAR:
 			if (!is_bulk)
 				cursor->set_key(cursor, g.key_cnt);
 			cursor->set_value(cursor, &value);
-			if (g.logging == LOG_OPS)
-				(void)g.wt_api->msg_printf(g.wt_api, session,
-				    "%-10s %" PRIu64 " {%.*s}", "bulk V",
-				    g.key_cnt,
-				    (int)value.size, (char *)value.data);
+			logop(session, "%-10s %" PRIu64 " {%.*s}", "bulk",
+			    g.key_cnt, (int)value.size, (char *)value.data);
 			break;
 		case ROW:
 			cursor->set_key(cursor, &key);
-			if (g.logging == LOG_OPS)
-				(void)g.wt_api->msg_printf(g.wt_api, session,
-				    "%-10s %" PRIu64 " {%.*s}", "bulk K",
-				    g.key_cnt, (int)key.size, (char *)key.data);
 			cursor->set_value(cursor, &value);
-			if (g.logging == LOG_OPS)
-				(void)g.wt_api->msg_printf(g.wt_api, session,
-				    "%-10s %" PRIu64 " {%.*s}", "bulk V",
-				    g.key_cnt,
-				    (int)value.size, (char *)value.data);
+			logop(session,
+			    "%-10s %" PRIu64 " {%.*s}, {%.*s}", "bulk",
+			    g.key_cnt,
+			    (int)key.size, (char *)key.data,
+			    (int)value.size, (char *)value.data);
 			break;
 		}
 
@@ -132,8 +168,14 @@ wts_load(void)
 		 * extra space once the run starts.
 		 */
 		if ((ret = cursor->insert(cursor)) != 0) {
-			if (ret != WT_CACHE_FULL)
-				testutil_die(ret, "cursor.insert");
+			testutil_assert(
+			    ret == WT_CACHE_FULL || ret == WT_ROLLBACK);
+
+			if (g.c_txn_timestamps) {
+				bulk_rollback_transaction(session);
+				bulk_begin_transaction(session);
+			}
+
 			g.rows = --g.key_cnt;
 			g.c_rows = (uint32_t)g.key_cnt;
 
@@ -143,18 +185,14 @@ wts_load(void)
 				g.c_delete_pct += 20;
 			break;
 		}
-
-#ifdef HAVE_BERKELEY_DB
-		if (SINGLETHREADED)
-			bdb_insert(key.data, key.size, value.data, value.size);
-#endif
 	}
+
+	if (g.c_txn_timestamps)
+		bulk_commit_transaction(session);
 
 	testutil_check(cursor->close(cursor));
 
-	if (g.logging != 0)
-		(void)g.wt_api->msg_printf(g.wt_api, session,
-		    "=============== bulk load stop ===============");
+	logop(session, "%s", "=============== bulk load stop");
 
 	testutil_check(session->close(session, NULL));
 

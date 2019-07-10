@@ -1,6 +1,19 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
 </dl><hr>
+@section version_321 Upgrading to Version 3.2.1
+<dl>
+
+<dt>WT_CURSOR::modify transaction requirements</dt>
+<dd>
+In previous releases of WiredTiger, WT_CURSOR::modify operations could be
+performed within <code>read-committed</code> transactions. This implies
+point-in-time reads that cannot be repeated. In the 3.2.1 release,
+WT_CURSOR::modify operations must be performed in an explicit transaction
+at snapshot isolation, and will fail if that's not the case.
+</dd>
+
+</dl><hr>
 @section version_320 Upgrading to Version 3.2.0
 <dl>
 

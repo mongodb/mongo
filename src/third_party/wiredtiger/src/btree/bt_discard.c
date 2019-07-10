@@ -225,16 +225,6 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __free_page_int --
- *	Discard a WT_PAGE_COL_INT or WT_PAGE_ROW_INT page.
- */
-static void
-__free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	__wt_free_ref_index(session, page, WT_INTL_INDEX_GET_SAFE(page), false);
-}
-
-/*
  * __wt_free_ref --
  *	Discard the contents of a WT_REF structure (optionally including the
  * pages it references).
@@ -247,9 +237,6 @@ __wt_free_ref(
 
 	if (ref == NULL)
 		return;
-
-	/* Assert there are no hazard pointers. */
-	WT_ASSERT(session, __wt_hazard_check_assert(session, ref, false));
 
 	/*
 	 * Optionally free the referenced pages.  (The path to free referenced
@@ -289,7 +276,24 @@ __wt_free_ref(
 		__wt_free(session, ref->page_del);
 	}
 
-	__wt_overwrite_and_free(session, ref);
+	__wt_overwrite_and_free_len(session, ref, WT_REF_CLEAR_SIZE);
+}
+
+/*
+ * __free_page_int --
+ *	Discard a WT_PAGE_COL_INT or WT_PAGE_ROW_INT page.
+ */
+static void
+__free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_PAGE_INDEX *pindex;
+	uint32_t i;
+
+	for (pindex =
+	    WT_INTL_INDEX_GET_SAFE(page), i = 0; i < pindex->entries; ++i)
+		__wt_free_ref(session, pindex->index[i], page->type, false);
+
+	__wt_free(session, pindex);
 }
 
 /*
@@ -300,14 +304,24 @@ void
 __wt_free_ref_index(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_PAGE_INDEX *pindex, bool free_pages)
 {
+	WT_REF *ref;
 	uint32_t i;
 
 	if (pindex == NULL)
 		return;
 
-	for (i = 0; i < pindex->entries; ++i)
-		__wt_free_ref(
-		    session, pindex->index[i], page->type, free_pages);
+	for (i = 0; i < pindex->entries; ++i) {
+		ref = pindex->index[i];
+
+		/*
+		 * Used when unrolling splits and other error paths where there
+		 * should never have been a hazard pointer taken.
+		 */
+		WT_ASSERT(session,
+		    __wt_hazard_check_assert(session, ref, false));
+
+		__wt_free_ref(session, ref, page->type, free_pages);
+	}
 	__wt_free(session, pindex);
 }
 

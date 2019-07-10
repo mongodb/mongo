@@ -227,7 +227,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
             self.assertEquals(c.update(), 0)
             c.reset()
 
-            self.session.begin_transaction()
+            self.session.begin_transaction("isolation=snapshot")
             c.set_key(ds.key(row))
             mods = []
             for j in i['mods']:
@@ -264,6 +264,34 @@ class test_cursor12(wttest.WiredTigerTestCase):
             if not single:
                 row = row + 1
         c.close()
+
+    # Smoke-test the modify API, anything other than an explicit transaction
+    # in snapshot isolation fails.
+    def test_modify_txn_api(self):
+        ds = SimpleDataSet(self, self.uri, 100, key_format=self.keyfmt, value_format=self.valuefmt)
+        ds.populate()
+
+        c = self.session.open_cursor(self.uri, None)
+        c.set_key(ds.key(10))
+        msg = '/not supported/'
+
+        self.session.begin_transaction()
+        mods = []
+        mods.append(wiredtiger.Modify('-', 1, 1))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: c.modify(mods), msg)
+        self.session.rollback_transaction()
+
+        self.session.begin_transaction("isolation=read-uncommitted")
+        mods = []
+        mods.append(wiredtiger.Modify('-', 1, 1))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: c.modify(mods), msg)
+        self.session.rollback_transaction()
+
+        self.session.begin_transaction("isolation=read-committed")
+        mods = []
+        mods.append(wiredtiger.Modify('-', 1, 1))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: c.modify(mods), msg)
+        self.session.rollback_transaction()
 
     # Smoke-test the modify API, operating on a group of records.
     def test_modify_smoke(self):
@@ -326,7 +354,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         ds.populate()
 
         c = self.session.open_cursor(self.uri, None)
-        self.session.begin_transaction()
+        self.session.begin_transaction("isolation=snapshot")
         c.set_key(ds.key(10))
         orig = self.make_value('abcdefghijklmnopqrstuvwxyz')
         c.set_value(orig)
@@ -356,7 +384,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         c.set_key(ds.key(10))
         self.assertEquals(c.remove(), 0)
 
-        self.session.begin_transaction()
+        self.session.begin_transaction("isolation=snapshot")
         mods = []
         mod = wiredtiger.Modify('ABCD', 3, 3)
         mods.append(mod)
@@ -374,7 +402,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         ds.populate()
 
         # Start a transaction.
-        self.session.begin_transaction()
+        self.session.begin_transaction("isolation=snapshot")
 
         # Insert a new record.
         c = self.session.open_cursor(self.uri, None)
@@ -393,7 +421,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         # Test that another transaction cannot modify our uncommitted record.
         xs = self.conn.open_session()
         xc = xs.open_cursor(self.uri, None)
-        xs.begin_transaction()
+        xs.begin_transaction("isolation=snapshot")
         xc.set_key(ds.key(30))
         xc.set_value(ds.value(30))
         mods = []
@@ -408,7 +436,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
         # Test that we can't modify our aborted insert.
-        self.session.begin_transaction()
+        self.session.begin_transaction("isolation=snapshot")
         mods = []
         mod = wiredtiger.Modify('ABCD', 3, 3)
         mods.append(mod)
