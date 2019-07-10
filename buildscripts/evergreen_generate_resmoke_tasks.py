@@ -475,8 +475,9 @@ class TestStats(object):
         """Initialize the TestStats with raw results from the Evergreen API."""
         # Mapping from test_file to {"num_run": X, "duration": Y} for tests
         self._runtime_by_test = defaultdict(dict)
-        # Mapping from test_name to {"num_run": X, "duration": Y} for hooks
-        self._hook_runtime_by_test = defaultdict(dict)
+        # Mapping from 'test_name:hook_name' to
+        #       {'test_name': {hook_name': {"num_run": X, "duration": Y}}}
+        self._hook_runtime_by_test = defaultdict(lambda: defaultdict(dict))
 
         for doc in evg_test_stats_results:
             self._add_stats(doc)
@@ -494,16 +495,17 @@ class TestStats(object):
 
     def _add_test_stats(self, test_file, duration, num_run):
         """Add the statistics for a test."""
-        self._add_runtime_info(self._runtime_by_test, test_file, duration, num_run)
+        runtime_info = self._runtime_by_test[test_file]
+        self._add_runtime_info(runtime_info, duration, num_run)
 
     def _add_test_hook_stats(self, test_file, duration, num_run):
         """Add the statistics for a hook."""
-        test_name = testname.split_test_hook_name(test_file)[0]
-        self._add_runtime_info(self._hook_runtime_by_test, test_name, duration, num_run)
+        test_name, hook_name = testname.split_test_hook_name(test_file)
+        runtime_info = self._hook_runtime_by_test[test_name][hook_name]
+        self._add_runtime_info(runtime_info, duration, num_run)
 
     @staticmethod
-    def _add_runtime_info(runtime_dict, test_name, duration, num_run):
-        runtime_info = runtime_dict[test_name]
+    def _add_runtime_info(runtime_info, duration, num_run):
         if not runtime_info:
             runtime_info["duration"] = duration
             runtime_info["num_run"] = num_run
@@ -527,8 +529,7 @@ class TestStats(object):
         for test_file, runtime_info in list(self._runtime_by_test.items()):
             duration = runtime_info["duration"]
             test_name = testname.get_short_name_from_test_file(test_file)
-            hook_runtime_info = self._hook_runtime_by_test[test_name]
-            if hook_runtime_info:
+            for _, hook_runtime_info in self._hook_runtime_by_test[test_name].items():
                 duration += hook_runtime_info["duration"]
             tests.append((normalize_test_name(test_file), duration))
         return sorted(tests, key=lambda x: x[1], reverse=True)

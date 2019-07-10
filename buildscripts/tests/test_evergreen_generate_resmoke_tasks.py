@@ -77,7 +77,7 @@ class TestTestStats(unittest.TestCase):
         ]
         test_stats = grt.TestStats(evg_results)
         expected_runtimes = [
-            ("dir/test3.js", 42.5),
+            ("dir/test3.js", 75),
             ("dir/test2.js", 30),
             ("dir/test1.js", 20),
         ]
