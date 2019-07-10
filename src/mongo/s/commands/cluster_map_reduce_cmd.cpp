@@ -66,6 +66,8 @@ AtomicWord<unsigned> JOB_NUMBER;
 
 const Milliseconds kNoDistLockTimeout(-1);
 
+Rarely shardedOutputDeprecationSampler;  // Used to rarely log deprecation messages.
+
 /**
  * Generates a unique name for the temporary M/R output collection.
  */
@@ -204,6 +206,9 @@ public:
         if (outElmt.type() == Object) {
             // Check if there is a custom output
             BSONObj customOut = outElmt.embeddedObject();
+            if (customOut.hasField("sharded") && shardedOutputDeprecationSampler.tick()) {
+                warning() << "the out.sharded option to mapReduce is deprecated.";
+            }
             shardedOutput = customOut.getBoolField("sharded");
 
             if (customOut.hasField("inline")) {
