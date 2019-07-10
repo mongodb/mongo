@@ -28,6 +28,9 @@
  */
 
 #include <algorithm>
+#include <functional>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -323,6 +326,42 @@ TEST(StringDataFmt, Fmt) {
     using namespace fmt::literals;
     ASSERT_EQUALS(fmt::format("-{}-", "abc"_sd), "-abc-");
     ASSERT_EQUALS("-{}-"_format("abc"_sd), "-abc-");
+}
+
+TEST(Ostream, StringDataMatchesStdString) {
+    const std::string s = "xyz";
+    struct TestCase {
+        int line;
+        std::function<void(std::ostream&)> manip;
+    };
+    const TestCase testCases[] = {
+        {__LINE__, [](std::ostream& os) {}},
+        {__LINE__, [](std::ostream& os) { os << std::setw(5); }},
+        {__LINE__, [](std::ostream& os) { os << std::left << std::setw(5); }},
+        {__LINE__, [](std::ostream& os) { os << std::right << std::setw(5); }},
+        {__LINE__, [](std::ostream& os) { os << std::setfill('.') << std::left << std::setw(5); }},
+        {__LINE__, [](std::ostream& os) { os << std::setfill('.') << std::right << std::setw(5); }},
+    };
+    for (const auto& testCase : testCases) {
+        const std::string location = std::string(" at line:") + std::to_string(testCase.line);
+        struct Experiment {
+            Experiment(std::function<void(std::ostream&)> f) : putter(f) {}
+            std::function<void(std::ostream&)> putter;
+            std::ostringstream os;
+        };
+        Experiment expected{[&](std::ostream& os) { os << s; }};
+        Experiment actual{[&](std::ostream& os) { os << StringData(s); }};
+        for (auto& x : {&expected, &actual}) {
+            x->os << ">>";
+            testCase.manip(x->os);
+            x->putter(x->os);
+        }
+        // ASSERT_EQ(expected.os.str(), actual.os.str()) << location;
+        for (auto& x : {&expected, &actual}) {
+            x->os << "<<";
+        }
+        ASSERT_EQ(expected.os.str(), actual.os.str()) << location;
+    }
 }
 
 }  // namespace mongo

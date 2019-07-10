@@ -31,10 +31,12 @@
 
 #include <ostream>
 
+#include <boost/utility/string_view.hpp>
+
 namespace mongo {
 
 std::ostream& operator<<(std::ostream& stream, StringData value) {
-    return stream.write(value.rawData(), value.size());
+    return stream << boost::string_view(value.rawData(), value.size());
 }
 
 }  // namespace mongo
