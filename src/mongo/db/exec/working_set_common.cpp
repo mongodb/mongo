@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/working_set_common.h"
@@ -39,26 +37,8 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
-
-namespace {
-std::string indexKeyVectorDebugString(const std::vector<IndexKeyDatum>& keyData) {
-    StringBuilder sb;
-    sb << "[";
-    if (keyData.size() > 0) {
-        auto it = keyData.begin();
-        sb << "(key: " << it->keyData << ", index key pattern: " << it->indexKeyPattern << ")";
-        while (++it != keyData.end()) {
-            sb << ", (key: " << it->keyData << ", index key pattern: " << it->indexKeyPattern
-               << ")";
-        }
-    }
-    sb << "]";
-    return sb.str();
-}
-}  // namespace
 
 void WorkingSetCommon::prepareForSnapshotChange(WorkingSet* workingSet) {
     for (auto id : workingSet->getAndClearYieldSensitiveIds()) {
@@ -88,16 +68,6 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
     member->obj.reset();
     auto record = cursor->seekExact(member->recordId);
     if (!record) {
-        // During a query yield, if the member is in the RID_AND_IDX state it should have been
-        // marked as suspicious. If not, then we failed to find the keyed document within the same
-        // storage snapshot, and therefore there may be index corruption.
-        if (member->getState() == WorkingSetMember::RID_AND_IDX && !member->isSuspicious) {
-            error() << "Evidence of index corruption due to extraneous index key(s): "
-                    << indexKeyVectorDebugString(member->keyData) << " on document with record id "
-                    << member->recordId
-                    << ", see http://dochub.mongodb.org/core/data-recovery for recovery steps.";
-            fassertFailed(31138);
-        }
         return false;
     }
 

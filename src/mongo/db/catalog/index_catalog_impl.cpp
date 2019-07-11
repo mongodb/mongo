@@ -75,8 +75,6 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(skipUnindexingDocumentWhenDeleted);
-
 using std::endl;
 using std::string;
 using std::unique_ptr;
@@ -1465,11 +1463,6 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
     entry->accessMethod()->getKeys(
         obj, IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered, &keys, nullptr, nullptr);
 
-    // Tests can enable this failpoint to produce index corruption scenarios where an index has
-    // extra keys.
-    MONGO_FAIL_POINT_BLOCK(skipUnindexingDocumentWhenDeleted, extraData) {
-        return;
-    }
     _unindexKeys(opCtx, entry, {keys.begin(), keys.end()}, obj, loc, logIfError, keysDeletedOut);
 }
 

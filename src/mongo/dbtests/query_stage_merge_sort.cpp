@@ -576,8 +576,6 @@ public:
             ++it;
         }
 
-        WorkingSetCommon::prepareForSnapshotChange(&ws);
-
         // Delete recordIds[11]. The deleted document should be buffered inside the SORT_MERGE
         // stage, and therefore should still be returned.
         ms->saveState();
