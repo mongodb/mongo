@@ -107,11 +107,12 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                             << nsOrUUID.toString());
 
     if (_coll) {
-        // Unlike read concern majority, read concern snapshot cannot yield and wait when there are
-        // pending catalog changes. Instead, we must return an error in such situations. We ignore
-        // this restriction for the oplog, since it never has pending catalog changes.
-        auto readConcernLevel = repl::ReadConcernArgs::get(opCtx).getLevel();
-        if (readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern &&
+        // If we are in a transaction and have a read timestamp, we cannot yield and wait when there
+        // are pending catalog changes. Instead, we must return an error in such situations. We
+        // ignore this restriction for the oplog, since it never has pending catalog changes.
+        if (opCtx->inMultiDocumentTransaction() &&
+            opCtx->recoveryUnit()->getTimestampReadSource() !=
+                RecoveryUnit::ReadSource::kNoTimestamp &&
             _resolvedNss != NamespaceString::kRsOplogNamespace) {
             auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
             if (mySnapshot) {

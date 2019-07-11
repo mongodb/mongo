@@ -91,7 +91,7 @@ void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
         matcher,
         [](const ObservableSession& session) {
             auto participant = TransactionParticipant::get(session);
-            return participant.inMultiDocumentTransaction() && !participant.transactionIsPrepared();
+            return participant.transactionIsOpen() && !participant.transactionIsPrepared();
         },
         [](OperationContext* opCtx, const SessionToKill& session) {
             TransactionParticipant::get(session).abortTransactionIfNotPrepared(opCtx);
@@ -138,7 +138,7 @@ void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
     killSessionsAction(opCtx,
                        matcherAllSessions,
                        [](const ObservableSession& session) {
-                           return TransactionParticipant::get(session).inMultiDocumentTransaction();
+                           return TransactionParticipant::get(session).transactionIsOpen();
                        },
                        [](OperationContext* opCtx, const SessionToKill& session) {
                            TransactionParticipant::get(session).shutdown(opCtx);

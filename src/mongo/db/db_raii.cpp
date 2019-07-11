@@ -378,7 +378,7 @@ LockMode getLockModeForQuery(OperationContext* opCtx, const boost::optional<Name
     invariant(opCtx);
 
     // Use IX locks for multi-statement transactions; otherwise, use IS locks.
-    if (opCtx->getWriteUnitOfWork()) {
+    if (opCtx->inMultiDocumentTransaction()) {
         uassert(51071,
                 "Cannot query system.views within a transaction",
                 !nss || !nss->isSystemDotViews());

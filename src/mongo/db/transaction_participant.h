@@ -114,7 +114,7 @@ class TransactionParticipant {
             StateFlag newState,
             TransitionValidation shouldValidate = TransitionValidation::kValidateTransition);
 
-        bool inMultiDocumentTransaction() const {
+        bool isOpen() const {
             return _state == kInProgress || _state == kPrepared;
         }
 
@@ -288,13 +288,13 @@ public:
         bool expiredAsOf(Date_t when) const;
 
         /**
-         * Returns whether we are in a multi-document transaction, which means we have an active
-         * transaction which has autocommit:false and has not been committed or aborted. It is
-         * possible that the current transaction is stashed onto the stack via a
+         * Returns whether we are in an open multi-document transaction, which means we have an
+         * active transaction which has autocommit:false and has not been committed or aborted. It
+         * is possible that the current transaction is stashed onto the stack via a
          * `SideTransactionBlock`.
          */
-        bool inMultiDocumentTransaction() const {
-            return o().txnState.inMultiDocumentTransaction();
+        bool transactionIsOpen() const {
+            return o().txnState.isOpen();
         };
 
         bool transactionIsCommitted() const {
@@ -309,13 +309,17 @@ public:
             return o().txnState.isPrepared();
         }
 
+        bool transactionIsInProgress() const {
+            return o().txnState.isInProgress();
+        }
+
         /**
          * Returns true if we are in an active multi-document transaction or if the transaction has
          * been aborted. This is used to cover the case where a transaction has been aborted, but
          * the OperationContext state has not been cleared yet.
          */
         bool inActiveOrKilledMultiDocumentTransaction() const {
-            return o().txnState.inMultiDocumentTransaction() || o().txnState.isAborted();
+            return o().txnState.isOpen() || o().txnState.isAborted();
         }
 
         /**
@@ -558,16 +562,16 @@ public:
          * multi-key path info to the set of path infos to be updated at commit time.
          */
         void addUncommittedMultikeyPathInfo(MultikeyPathInfo info) {
-            invariant(inMultiDocumentTransaction());
+            invariant(transactionIsOpen());
             p().multikeyPathInfo.emplace_back(std::move(info));
         }
 
         /**
-         * May only be called while a mutil-document transaction is not committed and returns the
+         * May only be called while a multi-document transaction is not committed and returns the
          * path infos which have been added so far.
          */
         const std::vector<MultikeyPathInfo>& getUncommittedMultikeyPathInfos() const {
-            invariant(inMultiDocumentTransaction());
+            invariant(transactionIsOpen());
             return p().multikeyPathInfo;
         }
 

@@ -237,10 +237,9 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
     ->Status {
     // If we are in a direct client within a transaction, then we may be holding locks, so it is
     // illegal to wait for read concern. This is fine, since the outer operation should have handled
-    // waiting for read concern. We don't want to ignore prepare conflicts because snapshot reads
-    // should block on prepared transactions.
-    if (opCtx->getClient()->isInDirectClient() &&
-        readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+    // waiting for read concern. We don't want to ignore prepare conflicts because reads in
+    // transactions should block on prepared transactions.
+    if (opCtx->getClient()->isInDirectClient() && opCtx->inMultiDocumentTransaction()) {
         return Status::OK();
     }
 

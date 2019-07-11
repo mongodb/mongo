@@ -130,6 +130,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
         uassert(ErrorCodes::InvalidOptions,
                 "Specifying autocommit=true is not allowed.",
                 !osi.getAutocommit().value());
+        opCtx->setInMultiDocumentTransaction();
     } else {
         uassert(ErrorCodes::InvalidOptions,
                 "'startTransaction' field requires 'autocommit' field to also be specified",

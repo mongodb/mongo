@@ -770,6 +770,8 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
 
 TransactionParticipant::SideTransactionBlock::SideTransactionBlock(OperationContext* opCtx)
     : _opCtx(opCtx) {
+    // Do nothing if we are already in a SideTransactionBlock. We can tell we are already in a
+    // SideTransactionBlock because there is no top level write unit of work.
     if (!_opCtx->getWriteUnitOfWork()) {
         return;
     }
@@ -835,7 +837,7 @@ void TransactionParticipant::Participant::stashTransactionResources(OperationCon
     }
     invariant(opCtx->getTxnNumber());
 
-    if (o().txnState.inMultiDocumentTransaction()) {
+    if (o().txnState.isOpen()) {
         _stashActiveTransaction(opCtx);
     }
 }

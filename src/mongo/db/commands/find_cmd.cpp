@@ -272,8 +272,7 @@ public:
             const auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "It is illegal to open a tailable cursor in a transaction",
-                    !txnParticipant ||
-                        !(txnParticipant.inMultiDocumentTransaction() && qr->isTailable()));
+                    !(opCtx->inMultiDocumentTransaction() && qr->isTailable()));
 
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     "The 'readOnce' option is not supported within a transaction.",

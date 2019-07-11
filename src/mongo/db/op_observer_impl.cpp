@@ -339,8 +339,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                std::vector<InsertStatement>::const_iterator last,
                                bool fromMigrate) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    const bool inMultiDocumentTransaction = txnParticipant && opCtx->writesAreReplicated() &&
-        txnParticipant.inMultiDocumentTransaction();
+    const bool inMultiDocumentTransaction =
+        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
 
     Date_t lastWriteDate;
 
@@ -349,11 +349,13 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
     if (inMultiDocumentTransaction) {
         // Do not add writes to the profile collection to the list of transaction operations, since
-        // these are done outside the transaction.
+        // these are done outside the transaction. There is no top-level WriteUnitOfWork when we are
+        // in a SideTransactionBlock.
         if (!opCtx->getWriteUnitOfWork()) {
             invariant(nss.isSystemDotProfile());
             return;
         }
+
         for (auto iter = first; iter != last; iter++) {
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc);
             txnParticipant.addTransactionOperation(opCtx, operation);
@@ -428,8 +430,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     }
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    const bool inMultiDocumentTransaction = txnParticipant && opCtx->writesAreReplicated() &&
-        txnParticipant.inMultiDocumentTransaction();
+    const bool inMultiDocumentTransaction =
+        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
 
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
@@ -489,8 +491,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     invariant(!documentKey.isEmpty());
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    const bool inMultiDocumentTransaction = txnParticipant && opCtx->writesAreReplicated() &&
-        txnParticipant.inMultiDocumentTransaction();
+    const bool inMultiDocumentTransaction =
+        txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
 
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
@@ -951,7 +953,6 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 
     // There should not be a parent WUOW outside of this one. This guarantees the safety of the
     // write conflict retry loop.
-    invariant(!opCtx->getWriteUnitOfWork());
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     // We must not have a maximum lock timeout, since writing the commit or abort oplog entry for a

@@ -358,6 +358,22 @@ public:
 
     bool isIgnoringInterrupts() const;
 
+    /**
+     * Returns whether this operation is part of a multi-document transaction. Specifically, it
+     * indicates whether the user asked for a multi-document transaction.
+     */
+    bool inMultiDocumentTransaction() const {
+        return _inMultiDocumentTransaction;
+    }
+
+    /**
+     * Sets that this operation is part of a multi-document transaction. Once this is set, it cannot
+     * be unset.
+     */
+    void setInMultiDocumentTransaction() {
+        _inMultiDocumentTransaction = true;
+    }
+
 private:
     IgnoreInterruptsState pushIgnoreInterrupts() override {
         IgnoreInterruptsState iis{_ignoreInterrupts,
@@ -482,6 +498,7 @@ private:
 
     bool _writesAreReplicated = true;
     bool _shouldParticipateInFlowControl = true;
+    bool _inMultiDocumentTransaction = false;
 };
 
 namespace repl {

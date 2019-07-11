@@ -414,7 +414,7 @@ TEST_F(TxnParticipantTest, CannotSpecifyStartTransactionOnInProgressTxn) {
     // Must specify startTransaction=true and autocommit=false to start a transaction.
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT_TRUE(txnParticipant.inMultiDocumentTransaction());
+    ASSERT_TRUE(txnParticipant.transactionIsOpen());
 
     // Cannot try to start a transaction that already started.
     ASSERT_THROWS_CODE(
@@ -1115,7 +1115,7 @@ TEST_F(TxnParticipantTest, CannotContinueTransactionIfNotPrimary) {
     // Will start the transaction.
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT_TRUE(txnParticipant.inMultiDocumentTransaction());
+    ASSERT_TRUE(txnParticipant.transactionIsOpen());
 
     ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
         repl::MemberState::RS_SECONDARY));
@@ -1318,7 +1318,7 @@ protected:
         auto sessionCheckout = checkOutSession();
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
 
         ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
                                opCtx(), *opCtx()->getTxnNumber(), autocommit, startTransaction),
@@ -1332,14 +1332,14 @@ protected:
         auto sessionCheckout = checkOutSession();
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
 
         txnParticipant.abortActiveTransaction(opCtx());
         ASSERT(txnParticipant.transactionIsAborted());
 
         txnParticipant.beginOrContinue(
             opCtx(), *opCtx()->getTxnNumber(), autocommit, startTransaction);
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
     }
 
     void cannotSpecifyStartTransactionOnCommittedTxn() {
@@ -1348,7 +1348,7 @@ protected:
         auto sessionCheckout = checkOutSession();
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
 
         txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
         txnParticipant.commitUnpreparedTransaction(opCtx());
@@ -1365,7 +1365,7 @@ protected:
         auto sessionCheckout = checkOutSession();
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
 
         txnParticipant.unstashTransactionResources(opCtx(), "insert");
         auto operation = repl::OplogEntry::makeInsertOperation(kNss, _uuid, BSON("TestValue" << 0));
@@ -1384,7 +1384,7 @@ protected:
         auto sessionCheckout = checkOutSession();
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
 
         txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
         txnParticipant.prepareTransaction(opCtx(), {});
@@ -1405,7 +1405,7 @@ protected:
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), boost::none, boost::none);
-        ASSERT_FALSE(txnParticipant.inMultiDocumentTransaction());
+        ASSERT_FALSE(txnParticipant.transactionIsOpen());
 
         auto autocommit = false;
         auto startTransaction = true;
@@ -1413,7 +1413,7 @@ protected:
         txnParticipant.beginOrContinue(
             opCtx(), *opCtx()->getTxnNumber(), autocommit, startTransaction);
 
-        ASSERT(txnParticipant.inMultiDocumentTransaction());
+        ASSERT(txnParticipant.transactionIsOpen());
     }
 };
 
@@ -3724,7 +3724,7 @@ TEST_F(TxnParticipantTest, AbortTransactionOnSessionCheckoutWithoutRefresh) {
     MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx());
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
-    ASSERT(txnParticipant.inMultiDocumentTransaction());
+    ASSERT(txnParticipant.transactionIsOpen());
     ASSERT_EQ(txnParticipant.getActiveTxnNumber(), txnNumber);
 
     txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");

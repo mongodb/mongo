@@ -70,7 +70,6 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/log.h"
@@ -386,9 +385,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                               uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
                               uuid);
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    expCtx->inMultiDocumentTransaction =
-        txnParticipant && txnParticipant.inMultiDocumentTransaction();
+    expCtx->inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
 
     return expCtx;
 }
@@ -523,10 +520,9 @@ Status runAggregate(OperationContext* opCtx,
             liteParsedPipeline.assertSupportsReadConcern(
                 opCtx, request.getExplain(), serverGlobalParams.enableMajorityReadConcern);
         } catch (const DBException& ex) {
-            auto txnParticipant = TransactionParticipant::get(opCtx);
             // If we are in a multi-document transaction, we intercept the 'readConcern'
             // assertion in order to provide a more descriptive error message and code.
-            if (txnParticipant && txnParticipant.inMultiDocumentTransaction()) {
+            if (opCtx->inMultiDocumentTransaction()) {
                 return {ErrorCodes::OperationNotSupportedInTransaction,
                         ex.toStatus("Operation not permitted in transaction").reason()};
             }

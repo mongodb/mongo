@@ -114,7 +114,7 @@ public:
 
         uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
-                txnParticipant.inMultiDocumentTransaction());
+                txnParticipant.transactionIsOpen());
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeCommitingTxn, opCtx, "hangBeforeCommitingTxn");
@@ -184,7 +184,7 @@ public:
 
         uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
-                txnParticipant.inMultiDocumentTransaction());
+                txnParticipant.transactionIsOpen());
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeAbortingTxn, opCtx, "hangBeforeAbortingTxn");

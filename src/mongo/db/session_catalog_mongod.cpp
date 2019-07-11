@@ -229,7 +229,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
     catalog->scanSessions(matcher, [&](const ObservableSession& session) {
         const auto txnParticipant = TransactionParticipant::get(session);
-        if (!txnParticipant.inMultiDocumentTransaction()) {
+        if (!txnParticipant.transactionIsOpen()) {
             sessionKillTokens.emplace_back(session.kill());
         }
 
@@ -351,7 +351,7 @@ int MongoDSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
         for (const auto& lsid : expiredSessionIds) {
             catalog->scanSession(lsid, [](ObservableSession& session) {
                 const auto participant = TransactionParticipant::get(session);
-                if (!participant.inMultiDocumentTransaction()) {
+                if (!participant.transactionIsOpen()) {
                     session.markForReap();
                 }
             });
@@ -437,8 +437,7 @@ MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWitho
     const auto txnParticipant = TransactionParticipant::get(_opCtx);
     // A session on secondaries should never be checked back in with a TransactionParticipant that
     // isn't prepared, aborted, or committed.
-    invariant(!txnParticipant.inMultiDocumentTransaction() ||
-              txnParticipant.transactionIsPrepared());
+    invariant(!txnParticipant.transactionIsInProgress());
 }
 
 }  // namespace mongo

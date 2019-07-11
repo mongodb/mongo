@@ -105,7 +105,7 @@ public:
 
             uassert(ErrorCodes::NoSuchTransaction,
                     "Transaction isn't in progress",
-                    txnParticipant.inMultiDocumentTransaction());
+                    txnParticipant.transactionIsOpen());
 
             if (txnParticipant.transactionIsPrepared()) {
                 auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
@@ -308,7 +308,7 @@ public:
                                                false /* autocommit */,
                                                boost::none /* startTransaction */);
 
-                invariant(!txnParticipant.inMultiDocumentTransaction(),
+                invariant(!txnParticipant.transactionIsOpen(),
                           "The participant should not be in progress after we waited for the "
                           "participant to complete");
                 uassert(ErrorCodes::NoSuchTransaction,
