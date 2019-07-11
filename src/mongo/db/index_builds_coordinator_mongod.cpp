@@ -216,21 +216,6 @@ Status IndexBuildsCoordinatorMongod::commitIndexBuild(OperationContext* opCtx,
     return Status::OK();
 }
 
-void IndexBuildsCoordinatorMongod::signalChangeToPrimaryMode() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _replMode = ReplState::Primary;
-}
-
-void IndexBuildsCoordinatorMongod::signalChangeToSecondaryMode() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _replMode = ReplState::Secondary;
-}
-
-void IndexBuildsCoordinatorMongod::signalChangeToInitialSyncMode() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _replMode = ReplState::InitialSync;
-}
-
 Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(const UUID& buildUUID,
                                                           const HostAndPort& hostAndPort) {
     // TODO: not yet implemented.

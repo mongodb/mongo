@@ -85,18 +85,6 @@ Status IndexBuildsCoordinatorEmbedded::commitIndexBuild(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-void IndexBuildsCoordinatorEmbedded::signalChangeToPrimaryMode() {
-    MONGO_UNREACHABLE;
-}
-
-void IndexBuildsCoordinatorEmbedded::signalChangeToSecondaryMode() {
-    MONGO_UNREACHABLE;
-}
-
-void IndexBuildsCoordinatorEmbedded::signalChangeToInitialSyncMode() {
-    MONGO_UNREACHABLE;
-}
-
 Status IndexBuildsCoordinatorEmbedded::voteCommitIndexBuild(const UUID& buildUUID,
                                                             const HostAndPort& hostAndPort) {
     MONGO_UNREACHABLE;

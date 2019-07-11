@@ -84,10 +84,6 @@ public:
                             const std::vector<BSONObj>& specs,
                             const UUID& buildUUID) override;
 
-    void signalChangeToPrimaryMode() override;
-    void signalChangeToSecondaryMode() override;
-    void signalChangeToInitialSyncMode() override;
-
     Status voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort) override;
 
     Status setCommitQuorum(OperationContext* opCtx,
@@ -132,12 +128,6 @@ private:
      * TODO: not yet implemented.
      */
     void _refreshReplStateFromPersisted(OperationContext* opCtx, const UUID& buildUUID);
-
-    // Replication hooks will call into the Coordinator to update this on relevant state
-    // transitions. The Coordinator will then use the setting to inform how index builds are run.
-    // Index builds have different inter node communication responsibilities and error checking
-    // requirements depending on the replica set member's state.
-    ReplState _replMode = ReplState::Secondary;
 
     // Thread pool on which index builds are run.
     ThreadPool _threadPool;

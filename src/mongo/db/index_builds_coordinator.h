@@ -204,13 +204,6 @@ public:
     Future<void> abortIndexBuildByBuildUUID(const UUID& buildUUID, const std::string& reason);
 
     /**
-     * Signal replica set member state changes that affect cross replica set index building.
-     */
-    virtual void signalChangeToPrimaryMode() = 0;
-    virtual void signalChangeToSecondaryMode() = 0;
-    virtual void signalChangeToInitialSyncMode() = 0;
-
-    /**
      * TODO: This is not yet implemented.
      */
     virtual Status voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort) = 0;
