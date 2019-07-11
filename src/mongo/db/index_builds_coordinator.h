@@ -199,15 +199,6 @@ public:
     void abortDatabaseIndexBuilds(StringData db, const std::string& reason);
 
     /**
-     * Aborts a given index build by name on the given collection.
-     *
-     * TODO: This is not yet implemented.
-     */
-    Future<void> abortIndexBuildByName(const NamespaceString& nss,
-                                       const std::vector<std::string>& indexNames,
-                                       const std::string& reason);
-
-    /**
      * Aborts a given index build by index build UUID.
      *
      * TODO: This is not yet implemented.
