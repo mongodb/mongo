@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
@@ -48,6 +49,8 @@ namespace mongo {
 using namespace indexbuildentryhelpers;
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangAfterInitializingIndexBuild);
 
 /**
  * Constructs the options for the loader thread pool.
@@ -178,6 +181,8 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
 
             return;
         }
+
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterInitializingIndexBuild);
 
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
