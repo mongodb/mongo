@@ -60,6 +60,11 @@ platforms:
       image_id: ami-60a1e808
     transport:
       username: root
+  - name: rhel80
+    driver:
+      image_id: ami-0c322300a1dd5dc79
+    transport:
+      username: ec2-user
   - name: suse11
     driver:
       image_id: ami-7f2e6015

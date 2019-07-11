@@ -382,6 +382,7 @@ variables:
   - enterprise-rhel-71-ppc64le-inmem
   - enterprise-rhel-72-s390x
   - enterprise-rhel-72-s390x-inmem
+  - enterprise-rhel-80-64-bit
   - enterprise-suse12-64
   - enterprise-suse15-64
   - enterprise-suse12-s390x
@@ -10831,6 +10832,68 @@ buildvariants:
     - ubuntu1604-packer
   - name: .publish
 
+- &enterprise-rhel-80-64-bit-template
+  name: enterprise-rhel-80-64-bit
+  display_name: "Enterprise RHEL 8.0"
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-build
+  expansions:
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-rhel80
+    mh_target: dist-mh
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: rhel80
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    tooltags: "ssl sasl gssapi"
+    build_mongoreplay: true
+  display_tasks:
+  - *dbtest
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel80-build
+  - name: compile_benchmarks
+    distros:
+    - rhel80-build
+  - name: .aggfuzzer
+  - name: audit
+  - name: auth_audit_gen
+  - name: auth_gen
+  - name: .benchmarks
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
+  - name: external_auth
+  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: jsCore_txns_large_txns_format
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: .replica_sets .multi_oplog
+  - name: sasl
+  - name: search_beta
+  - name: search_beta_auth
+  - name: search_beta_ssl
+  - name: sharding_auth_audit_gen
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .stitch
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
+
 # This variant is to intentionally test uncommon features nightly
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-kitchen-sink
@@ -10991,6 +11054,61 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
       - rhel70
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: multiversion
+  - name: replica_sets
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: .sharding .common !.op_query !.csrs
+  - name: .ssl
+  - name: .stitch
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
+
+- name: rhel80
+  display_name: SSL RHEL 8.0
+  run_on:
+  - rhel80-build
+  batchtime: 1440 # 1 day
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-rhel80
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: rhel80
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: rhel80
+    repo_edition: org
+    scons_cache_scope: shared
+    tooltags: "ssl"
+    build_mongoreplay: true
+  display_tasks:
+  - *dbtest
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel80-build
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+    distros:
+      - rhel80-build
+  - name: concurrency_replication_causal_consistency
+    distros:
+      - rhel80-build
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common
