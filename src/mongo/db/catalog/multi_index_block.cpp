@@ -77,7 +77,7 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
     if (_collectionUUID) {
         // init() was previously called with a collection pointer, so ensure that the same
         // collection is being provided for clean up and the interface in not being abused.
-        invariant(_collectionUUID.get() == collection->uuid().get());
+        invariant(_collectionUUID.get() == collection->uuid());
     }
 
     if (!_needToCleanup && !_indexes.empty()) {
@@ -201,18 +201,15 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
                 str::stream() << "Index build aborted: " << _abortReason
                               << ". Cannot initialize index builder: "
                               << collection->ns()
-                              << (collection->uuid()
-                                      ? (" (" + collection->uuid()->toString() + "): ")
-                                      : ": ")
+                              << " ("
+                              << collection->uuid()
+                              << "): "
                               << indexSpecs.size()
                               << " provided. First index spec: "
                               << (indexSpecs.empty() ? BSONObj() : indexSpecs[0])};
     }
 
-    // UUIDs are not guaranteed during startup because the check happens after indexes are rebuilt.
-    if (collection->uuid()) {
-        _collectionUUID = collection->uuid().get();
-    }
+    _collectionUUID = collection->uuid();
 
     _buildIsCleanedUp = false;
 
@@ -366,7 +363,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
 
     // UUIDs are not guaranteed during startup because the check happens after indexes are rebuilt.
     if (_collectionUUID) {
-        invariant(_collectionUUID.get() == collection->uuid().get());
+        invariant(_collectionUUID.get() == collection->uuid());
     }
 
     // Refrain from persisting any multikey updates as a result from building the index. Instead,
@@ -707,7 +704,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
                                OnCommitFn onCommit) {
     // UUIDs are not guaranteed during startup because the check happens after indexes are rebuilt.
     if (_collectionUUID) {
-        invariant(_collectionUUID.get() == collection->uuid().get());
+        invariant(_collectionUUID.get() == collection->uuid());
     }
 
     if (State::kAborted == _getState()) {

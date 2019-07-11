@@ -177,7 +177,7 @@ public:
             nsOrUUID.uuid() == _setCollectionCountStatusUUID) {
             return *_setCollectionCountStatus;
         }
-        _newCounts[nsOrUUID.uuid().get()] = newCount;
+        _newCounts[*nsOrUUID.uuid()] = newCount;
         return Status::OK();
     }
 

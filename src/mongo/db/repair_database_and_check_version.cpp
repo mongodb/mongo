@@ -208,12 +208,6 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                 break;
             }
 
-            // We expect all collections to have UUIDs in MongoDB 4.2
-            if (!coll->uuid()) {
-                error() << "collection " << coll->ns() << " is missing a UUID";
-                return downgradeError;
-            }
-
             // All user-created replicated collections created since MongoDB 4.0 have _id indexes.
             auto requiresIndex = coll->requiresIdIndex() && coll->ns().isReplicated();
             auto collOptions = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, coll->ns());

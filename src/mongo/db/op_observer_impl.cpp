@@ -623,7 +623,6 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
     }
     Collection* coll = db->getCollection(opCtx, nss);
 
-    invariant(coll->uuid());
     invariant(coll->uuid() == uuid);
     invariant(DurableCatalog::get(opCtx)->isEqualToMetadataUUID(opCtx, nss, uuid));
 }

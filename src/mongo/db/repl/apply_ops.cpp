@@ -183,7 +183,7 @@ Status _applyOps(OperationContext* opCtx,
 
             // Append completed op, including UUID if available, to 'opsBuilder'.
             if (opsBuilder) {
-                if (opObj.hasField("ui") || !(collection && collection->uuid())) {
+                if (opObj.hasField("ui") || !collection) {
                     // No changes needed to operation document.
                     opsBuilder->append(opObj);
                 } else {
@@ -191,7 +191,7 @@ Status _applyOps(OperationContext* opCtx,
                     auto uuid = collection->uuid();
                     BSONObjBuilder opBuilder;
                     opBuilder.appendElements(opObj);
-                    uuid->appendToBuilder(&opBuilder, "ui");
+                    uuid.appendToBuilder(&opBuilder, "ui");
                     opsBuilder->append(opBuilder.obj());
                 }
             }

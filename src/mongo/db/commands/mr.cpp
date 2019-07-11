@@ -190,7 +190,7 @@ void dropTempCollections(OperationContext* cleanupOpCtx,
                                     ->canAcceptWritesFor(cleanupOpCtx, tempNamespace));
                         BackgroundOperation::assertNoBgOpInProgForNs(tempNamespace.ns());
                         IndexBuildsCoordinator::get(cleanupOpCtx)
-                            ->assertNoIndexBuildInProgForCollection(collection->uuid().get());
+                            ->assertNoIndexBuildInProgForCollection(collection->uuid());
                         WriteUnitOfWork wunit(cleanupOpCtx);
                         uassertStatusOK(db->dropCollection(cleanupOpCtx, tempNamespace));
                         wunit.commit();
@@ -209,7 +209,7 @@ void dropTempCollections(OperationContext* cleanupOpCtx,
                     if (auto collection = db->getCollection(cleanupOpCtx, incLong)) {
                         BackgroundOperation::assertNoBgOpInProgForNs(incLong.ns());
                         IndexBuildsCoordinator::get(cleanupOpCtx)
-                            ->assertNoIndexBuildInProgForCollection(collection->uuid().get());
+                            ->assertNoIndexBuildInProgForCollection(collection->uuid());
                         WriteUnitOfWork wunit(cleanupOpCtx);
                         uassertStatusOK(db->dropCollection(cleanupOpCtx, incLong));
                         wunit.commit();
@@ -623,7 +623,7 @@ void State::prepTempCollection() {
 
             // Log the createIndex operation.
             _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                _opCtx, _config.tempNamespace, *(tempColl->uuid()), indexToInsert, false);
+                _opCtx, _config.tempNamespace, tempColl->uuid(), indexToInsert, false);
         }
         wuow.commit();
 

@@ -172,7 +172,7 @@ public:
 
         BackgroundOperation::assertNoBgOpInProgForNs(fullNs.ns());
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-            collection->uuid().get());
+            collection->uuid());
 
         collection->cappedTruncateAfter(opCtx, end, inc);
 

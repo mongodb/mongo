@@ -1064,9 +1064,7 @@ int IndexCatalogImpl::numIndexesReady(OperationContext* opCtx) const {
                 log() << "  index: " << i;
             }
 
-            if (_collection->uuid()) {
-                log() << "collection uuid: " << _collection->uuid();
-            }
+            log() << "collection uuid: " << _collection->uuid();
 
             invariant(itIndexes.size() == completedIndexes.size(),
                       "The number of ready indexes reported in the collection metadata catalog did "

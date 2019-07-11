@@ -228,7 +228,7 @@ Status dropIndexes(OperationContext* opCtx,
 
         BackgroundOperation::assertNoBgOpInProgForNs(nss);
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-            collection->uuid().get());
+            collection->uuid());
 
         WriteUnitOfWork wunit(opCtx);
         OldClientContext ctx(opCtx, nss.ns());

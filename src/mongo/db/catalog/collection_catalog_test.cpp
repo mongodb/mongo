@@ -271,7 +271,7 @@ public:
             auto coll = std::make_unique<CollectionMock>(nss);
             auto uuid = coll->uuid();
 
-            catalog.registerCollection(uuid.get(), std::move(coll));
+            catalog.registerCollection(uuid, std::move(coll));
         }
 
         int numEntries = 0;
@@ -289,7 +289,7 @@ public:
     void tearDown() {
         for (auto it = catalog.begin("resourceDb"); it != catalog.end(); ++it) {
             auto coll = *it;
-            auto uuid = coll->uuid().get();
+            auto uuid = coll->uuid();
             if (!coll) {
                 break;
             }
@@ -358,7 +358,7 @@ TEST_F(CollectionCatalogResourceTest, LookupMissingCollectionResource) {
 TEST_F(CollectionCatalogResourceTest, RemoveCollection) {
     const std::string collNs = "resourceDb.coll1";
     auto coll = catalog.lookupCollectionByNamespace(NamespaceString(collNs));
-    catalog.deregisterCollection(coll->uuid().get());
+    catalog.deregisterCollection(coll->uuid());
     auto rid = ResourceId(RESOURCE_COLLECTION, collNs);
     ASSERT(!catalog.lookupResourceName(rid));
 }

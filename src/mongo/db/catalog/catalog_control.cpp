@@ -174,11 +174,9 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
                       str::stream() << "failed to get valid collection pointer for namespace "
                                     << collNss);
 
-            auto uuid = collection->uuid();
-            invariant(uuid);
-
-            if (minVisibleTimestampMap.count(*uuid) > 0) {
-                collection->setMinimumVisibleSnapshot(minVisibleTimestampMap.find(*uuid)->second);
+            if (minVisibleTimestampMap.count(collection->uuid()) > 0) {
+                collection->setMinimumVisibleSnapshot(
+                    minVisibleTimestampMap.find(collection->uuid())->second);
             }
 
             // If this is the oplog collection, re-establish the replication system's cached pointer

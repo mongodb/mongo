@@ -206,7 +206,7 @@ public:
      */
     virtual void setNs(NamespaceString nss) = 0;
 
-    virtual OptionalCollectionUUID uuid() const = 0;
+    virtual UUID uuid() const = 0;
 
     virtual const IndexCatalog* getIndexCatalog() const = 0;
     virtual IndexCatalog* getIndexCatalog() = 0;

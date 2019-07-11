@@ -2767,7 +2767,7 @@ TEST_F(SyncTailTxnTableTest, RetryableWriteThenMultiStatementTxnWriteOnSameSessi
                                            << "ns"
                                            << nss().ns()
                                            << "ui"
-                                           << *uuid
+                                           << uuid
                                            << "o"
                                            << BSON("_id" << 2)))
                         << "partialTxn"
@@ -2826,7 +2826,7 @@ TEST_F(SyncTailTxnTableTest, MultiStatementTxnWriteThenRetryableWriteOnSameSessi
                                            << "ns"
                                            << nss().ns()
                                            << "ui"
-                                           << *uuid
+                                           << uuid
                                            << "o"
                                            << BSON("_id" << 2)))
                         << "partialTxn"

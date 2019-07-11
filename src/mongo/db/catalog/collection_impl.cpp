@@ -196,7 +196,7 @@ using logger::LogComponent;
 
 CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               OptionalCollectionUUID uuid,
+                               UUID uuid,
                                std::unique_ptr<RecordStore> recordStore)
     : _magic(kMagicNumber),
       _ns(nss),
@@ -324,13 +324,15 @@ StatusWithMatchExpression CollectionImpl::parseValidator(
     if (ns().isSystem() && !ns().isDropPendingNamespace()) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Document validators not allowed on system collection " << ns()
-                              << (_uuid ? " with UUID " + _uuid->toString() : "")};
+                              << " with UUID "
+                              << _uuid};
     }
 
     if (ns().isOnInternalDb()) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Document validators are not allowed on collection " << ns().ns()
-                              << (_uuid ? " with UUID " + _uuid->toString() : "")
+                              << " with UUID "
+                              << _uuid
                               << " in the "
                               << ns().db()
                               << " internal database"};
@@ -701,8 +703,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     invariant(sid == opCtx->recoveryUnit()->getSnapshotId());
     args->updatedDoc = newDoc;
 
-    invariant(uuid());
-    OplogUpdateEntryArgs entryArgs(*args, ns(), *uuid());
+    OplogUpdateEntryArgs entryArgs(*args, ns(), _uuid);
     getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, entryArgs);
 
     return {oldLocation};
@@ -732,8 +733,7 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     if (newRecStatus.isOK()) {
         args->updatedDoc = newRecStatus.getValue().toBson();
 
-        invariant(uuid());
-        OplogUpdateEntryArgs entryArgs(*args, ns(), *uuid());
+        OplogUpdateEntryArgs entryArgs(*args, ns(), _uuid);
         getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, entryArgs);
     }
     return newRecStatus;
@@ -1285,7 +1285,7 @@ void _validateCatalogEntry(OperationContext* opCtx,
                            BSONObj validatorDoc,
                            ValidateResults* results) {
     CollectionOptions options = DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, coll->ns());
-    addErrorIfUnequal(options.uuid, coll->uuid(), "UUID", results);
+    addErrorIfUnequal(*options.uuid, coll->uuid(), "UUID", results);
     const CollatorInterface* collation = coll->getDefaultCollator();
     addErrorIfUnequal(options.collation.isEmpty(), !collation, "simple collation", results);
     if (!options.collation.isEmpty() && collation)
@@ -1333,8 +1333,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
             opCtx, &indexConsistency, level, _indexCatalog.get(), &indexNsResultsMap);
 
         // Validate the record store
-        std::string uuidString = str::stream()
-            << " (UUID: " << (uuid() ? uuid()->toString() : "none") << ")";
+        std::string uuidString = str::stream() << " (UUID: " << _uuid << ")";
         log(LogComponent::kIndex) << "validating collection " << ns() << uuidString;
         _validateRecordStore(
             opCtx, _recordStore.get(), level, background, &indexValidator, results, output);

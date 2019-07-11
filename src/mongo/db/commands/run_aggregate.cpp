@@ -571,7 +571,9 @@ Status runAggregate(OperationContext* opCtx,
             // This is a regular aggregation. Lock the collection or view.
             ctx.emplace(opCtx, nss, AutoGetCollection::ViewMode::kViewsPermitted);
             collatorToUse.emplace(resolveCollator(opCtx, request, ctx->getCollection()));
-            uuid = ctx->getCollection() ? ctx->getCollection()->uuid() : boost::none;
+            if (ctx->getCollection()) {
+                uuid = ctx->getCollection()->uuid();
+            }
         }
 
         Collection* collection = ctx ? ctx->getCollection() : nullptr;

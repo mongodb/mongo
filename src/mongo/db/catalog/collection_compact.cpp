@@ -127,7 +127,7 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
 
     // If the storage engine doesn't support compacting in place, make sure no background operations
     // or indexes are running.
-    const UUID collectionUUID = collection->uuid().get();
+    const UUID collectionUUID = collection->uuid();
     BackgroundOperation::assertNoBgOpInProgForNs(collectionNss);
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collectionUUID);
 

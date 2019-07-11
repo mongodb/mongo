@@ -112,7 +112,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
               << ": indexes: " << indexes.size();
     } else {
         log() << "Index build initialized: " << buildUUID << ": " << nss << " ("
-              << *collection->uuid() << " ): indexes: " << indexes.size();
+              << collection->uuid() << " ): indexes: " << indexes.size();
     }
 
     return Status::OK();

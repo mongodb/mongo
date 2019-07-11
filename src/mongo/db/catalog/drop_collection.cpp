@@ -130,7 +130,7 @@ Status _dropCollection(OperationContext* opCtx,
 
     int numIndexes = coll->getIndexCatalog()->numIndexesTotal(opCtx);
     BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
-    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid().get());
+    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
     Status status =
         systemCollectionMode == DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops
         ? db->dropCollection(opCtx, collectionName, dropOpTime)

@@ -189,7 +189,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
 
             BackgroundOperation::assertNoBgOpInProgForNs(nss.ns());
             IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-                db->getCollection(opCtx, nss)->uuid().get());
+                db->getCollection(opCtx, nss)->uuid());
 
             writeConflictRetry(opCtx, "dropDatabase_collection", nss.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);

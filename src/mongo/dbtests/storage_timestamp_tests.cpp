@@ -279,7 +279,7 @@ public:
                                coll,
                                [&](const BSONObj& indexSpec) {
                                    _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                                       _opCtx, coll->ns(), *(coll->uuid()), indexSpec, false);
+                                       _opCtx, coll->ns(), coll->uuid(), indexSpec, false);
                                },
                                MultiIndexBlock::kNoopOnCommitFn));
             // The timestamping repsponsibility is placed on the caller rather than the
@@ -713,7 +713,7 @@ public:
                                    << "ns"
                                    << nss.ns()
                                    << "ui"
-                                   << autoColl.getCollection()->uuid().get()
+                                   << autoColl.getCollection()->uuid()
                                    << "o"
                                    << BSON("_id" << idx))
                          << BSON("ts" << firstInsertTime.addTicks(idx).asTimestamp() << "t" << 1LL
@@ -778,7 +778,7 @@ public:
 
         oplogEntryBuilder << "v" << 2 << "op"
                           << "i"
-                          << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid().get();
+                          << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid();
 
         auto oplogEntry = oplogEntryBuilder.done();
         ASSERT_OK(repl::SyncTail::syncApply(
@@ -834,7 +834,7 @@ public:
                                << "ns"
                                << nss.ns()
                                << "ui"
-                               << autoColl.getCollection()->uuid().get()
+                               << autoColl.getCollection()->uuid()
                                << "o"
                                << BSON("_id" << num))})
                     .getStatus());
@@ -899,7 +899,7 @@ public:
                                << "ns"
                                << nss.ns()
                                << "ui"
-                               << autoColl.getCollection()->uuid().get()
+                               << autoColl.getCollection()->uuid()
                                << "o2"
                                << BSON("_id" << 0)
                                << "o"
@@ -944,7 +944,7 @@ public:
                        << "ns"
                        << nss.ns()
                        << "ui"
-                       << autoColl.getCollection()->uuid().get()
+                       << autoColl.getCollection()->uuid()
                        << "o"
                        << BSON("_id" << 0 << "field" << 0)),
              BSON("ts" << insertTime.addTicks(1).asTimestamp() << "t" << 1LL << "op"
@@ -952,7 +952,7 @@ public:
                        << "ns"
                        << nss.ns()
                        << "ui"
-                       << autoColl.getCollection()->uuid().get()
+                       << autoColl.getCollection()->uuid()
                        << "o"
                        << BSON("_id" << 0))}));
 
@@ -998,7 +998,7 @@ public:
                                                << "ns"
                                                << nss.ns()
                                                << "ui"
-                                               << autoColl.getCollection()->uuid().get()
+                                               << autoColl.getCollection()->uuid()
                                                << "o"
                                                << BSON("_id" << 0)),
                                           BSON("op"
@@ -1006,7 +1006,7 @@ public:
                                                << "ns"
                                                << nss.ns()
                                                << "ui"
-                                               << autoColl.getCollection()->uuid().get()
+                                               << autoColl.getCollection()->uuid()
                                                << "o"
                                                << BSON("_id" << 1))});
         ASSERT_OK(swResult);
@@ -1057,7 +1057,7 @@ public:
                                                << "ns"
                                                << nss.ns()
                                                << "ui"
-                                               << autoColl.getCollection()->uuid().get()
+                                               << autoColl.getCollection()->uuid()
                                                << "o"
                                                << BSON("_id" << 0 << "field" << 0)),
                                           BSON("op"
@@ -1065,7 +1065,7 @@ public:
                                                << "ns"
                                                << nss.ns()
                                                << "ui"
-                                               << autoColl.getCollection()->uuid().get()
+                                               << autoColl.getCollection()->uuid()
                                                << "o"
                                                << BSON("_id" << 0))});
         ASSERT_OK(swResult);
@@ -1212,34 +1212,33 @@ public:
             { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection()); }
 
             BSONObjBuilder resultBuilder;
-            auto swResult =
-                doNonAtomicApplyOps(dbName,
-                                    {
-                                        BSON("ts" << presentTs << "t" << 1LL << "op"
-                                                  << "i"
-                                                  << "ns"
-                                                  << nss1.ns()
-                                                  << "ui"
-                                                  << autoColl.getCollection()->uuid().get()
-                                                  << "o"
-                                                  << doc1),
-                                        BSON("ts" << futureTs << "t" << 1LL << "op"
-                                                  << "c"
-                                                  << "ui"
-                                                  << uuid2
-                                                  << "ns"
-                                                  << nss2.getCommandNS().ns()
-                                                  << "o"
-                                                  << BSON("create" << nss2.coll())),
-                                        BSON("ts" << insert2Ts << "t" << 1LL << "op"
-                                                  << "i"
-                                                  << "ns"
-                                                  << nss2.ns()
-                                                  << "ui"
-                                                  << uuid2
-                                                  << "o"
-                                                  << doc2),
-                                    });
+            auto swResult = doNonAtomicApplyOps(dbName,
+                                                {
+                                                    BSON("ts" << presentTs << "t" << 1LL << "op"
+                                                              << "i"
+                                                              << "ns"
+                                                              << nss1.ns()
+                                                              << "ui"
+                                                              << autoColl.getCollection()->uuid()
+                                                              << "o"
+                                                              << doc1),
+                                                    BSON("ts" << futureTs << "t" << 1LL << "op"
+                                                              << "c"
+                                                              << "ui"
+                                                              << uuid2
+                                                              << "ns"
+                                                              << nss2.getCommandNS().ns()
+                                                              << "o"
+                                                              << BSON("create" << nss2.coll())),
+                                                    BSON("ts" << insert2Ts << "t" << 1LL << "op"
+                                                              << "i"
+                                                              << "ns"
+                                                              << nss2.ns()
+                                                              << "ui"
+                                                              << uuid2
+                                                              << "o"
+                                                              << doc2),
+                                                });
             ASSERT_OK(swResult);
         }
 
@@ -1329,7 +1328,7 @@ public:
         UUID uuid = UUID::gen();
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-            uuid = autoColl.getCollection()->uuid().get();
+            uuid = autoColl.getCollection()->uuid();
         }
         auto indexName = "a_1";
         auto indexSpec =
@@ -1414,7 +1413,7 @@ public:
         UUID uuid = UUID::gen();
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-            uuid = autoColl.getCollection()->uuid().get();
+            uuid = autoColl.getCollection()->uuid();
         }
         auto indexName = "a_1";
         auto indexSpec =
@@ -2019,7 +2018,7 @@ public:
                     if (SimulatePrimary) {
                         // The timestamping responsibility for each index is placed on the caller.
                         _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                            _opCtx, nss, *(autoColl.getCollection()->uuid()), indexSpec, false);
+                            _opCtx, nss, autoColl.getCollection()->uuid(), indexSpec, false);
                     } else {
                         ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(
                             _clock->getClusterTime().asTimestamp()));
@@ -2200,7 +2199,7 @@ public:
                     if (SimulatePrimary) {
                         // The timestamping responsibility for each index is placed on the caller.
                         _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                            _opCtx, nss, *(autoColl.getCollection()->uuid()), indexSpec, false);
+                            _opCtx, nss, autoColl.getCollection()->uuid(), indexSpec, false);
                     } else {
                         ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(
                             _clock->getClusterTime().asTimestamp()));
@@ -2495,7 +2494,7 @@ public:
         UUID uuid = UUID::gen();
         {
             AutoGetCollectionForRead autoColl(_opCtx, ns);
-            uuid = autoColl.getCollection()->uuid().get();
+            uuid = autoColl.getCollection()->uuid();
             ASSERT_EQ(itCount(autoColl.getCollection()), 0);
         }
 
@@ -2609,7 +2608,7 @@ public:
             // Create the collection and insert a document.
             reset(nss);
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-            collUUID = *(autoColl.getCollection()->uuid());
+            collUUID = autoColl.getCollection()->uuid();
             WriteUnitOfWork wuow(_opCtx);
             insertDocument(autoColl.getCollection(),
                            InsertStatement(doc, setupStart.asTimestamp(), presentTerm));
@@ -2807,7 +2806,7 @@ public:
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             auto coll = autoColl.getCollection();
             ASSERT(coll);
-            ui = coll->uuid().get();
+            ui = coll->uuid();
         }
 
         presentTs = _clock->getClusterTime().asTimestamp();
@@ -2977,18 +2976,17 @@ public:
             assertFilteredDocumentAtTimestamp(coll, query2, nullTs, doc2);
 
             // Implicit commit oplog entry should exist at commitEntryTs.
-            const auto commitFilter =
-                BSON("ts" << commitEntryTs << "o"
-                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                                << "i"
-                                                                << "ns"
-                                                                << nss.ns()
-                                                                << "ui"
-                                                                << coll->uuid().get()
-                                                                << "o"
-                                                                << doc2))
-                                             << "count"
-                                             << 2));
+            const auto commitFilter = BSON(
+                "ts" << commitEntryTs << "o" << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                                                   << "i"
+                                                                                   << "ns"
+                                                                                   << nss.ns()
+                                                                                   << "ui"
+                                                                                   << coll->uuid()
+                                                                                   << "o"
+                                                                                   << doc2))
+                                                                << "count"
+                                                                << 2));
             assertOplogDocumentExistsAtTimestamp(commitFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, firstOplogEntryTs, false);
@@ -3011,7 +3009,7 @@ public:
                                                                 << "ns"
                                                                 << nss.ns()
                                                                 << "ui"
-                                                                << coll->uuid().get()
+                                                                << coll->uuid()
                                                                 << "o"
                                                                 << doc))
                                              << "partialTxn"
@@ -3190,7 +3188,7 @@ public:
                                                                 << "ns"
                                                                 << nss.ns()
                                                                 << "ui"
-                                                                << coll->uuid().get()
+                                                                << coll->uuid()
                                                                 << "o"
                                                                 << doc))
                                              << "partialTxn"
@@ -3202,20 +3200,19 @@ public:
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, commitEntryTs, true);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, nullTs, true);
             // The prepare oplog entry should exist at prepareEntryTs and onwards.
-            const auto prepareOplogEntryFilter =
-                BSON("ts" << prepareEntryTs << "o"
-                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                                << "i"
-                                                                << "ns"
-                                                                << nss.ns()
-                                                                << "ui"
-                                                                << coll->uuid().get()
-                                                                << "o"
-                                                                << doc2))
-                                             << "prepare"
-                                             << true
-                                             << "count"
-                                             << 2));
+            const auto prepareOplogEntryFilter = BSON(
+                "ts" << prepareEntryTs << "o" << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                                                    << "i"
+                                                                                    << "ns"
+                                                                                    << nss.ns()
+                                                                                    << "ui"
+                                                                                    << coll->uuid()
+                                                                                    << "o"
+                                                                                    << doc2))
+                                                                 << "prepare"
+                                                                 << true
+                                                                 << "count"
+                                                                 << 2));
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, firstOplogEntryTs, false);
@@ -3324,7 +3321,7 @@ public:
                 AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
                 auto coll = autoColl.getCollection();
                 ASSERT(coll);
-                ui = coll->uuid().get();
+                ui = coll->uuid();
             }
 
             // The prepare oplog entry should exist at firstOplogEntryTs and onwards.

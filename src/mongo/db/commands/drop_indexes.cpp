@@ -145,9 +145,8 @@ public:
         }
 
         BackgroundOperation::assertNoBgOpInProgForNs(toReIndexNss.ns());
-        invariant(collection->uuid());
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-            collection->uuid().get());
+            collection->uuid());
 
         // This is necessary to set up CurOp and update the Top stats.
         OldClientContext ctx(opCtx, toReIndexNss.ns());

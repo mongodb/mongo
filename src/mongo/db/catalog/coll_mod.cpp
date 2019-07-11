@@ -268,8 +268,7 @@ Status _collModInternal(OperationContext* opCtx,
     // progress.
     BackgroundOperation::assertNoBgOpInProgForNs(nss);
     if (coll) {
-        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-            coll->uuid().get());
+        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
     }
 
     // If db/collection/view does not exist, short circuit and return.

@@ -58,7 +58,7 @@ public:
     RequiresCollectionStageBase(const char* stageType, OperationContext* opCtx, CollectionT coll)
         : PlanStage(stageType, opCtx),
           _collection(coll),
-          _collectionUUID(_collection->uuid().get()),
+          _collectionUUID(_collection->uuid()),
           _databaseEpoch(getDatabaseEpoch(_collection)),
           _nss(_collection->ns()) {
         invariant(_collection);

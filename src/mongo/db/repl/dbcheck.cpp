@@ -241,7 +241,7 @@ std::string hashCollectionInfo(const DbCheckCollectionInformation& info) {
 std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(
     OperationContext* opCtx, Collection* collection) {
     const CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
-    const UUID uuid = *collection->uuid();
+    const UUID uuid = collection->uuid();
 
     std::vector<CollectionUUID> collectionUUIDs =
         catalog.getAllCollectionUUIDsFromDb(collection->ns().db());

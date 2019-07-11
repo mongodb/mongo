@@ -268,7 +268,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
         Lock::TempRelease release(opCtx->lockState());
         // TempRelease cannot fail because no recursive locks should be taken.
         invariant(!opCtx->lockState()->isLocked());
-        auto collUUID = *indexCollection->uuid();
+        auto collUUID = indexCollection->uuid();
         auto indexBuildUUID = UUID::gen();
         auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
 

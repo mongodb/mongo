@@ -247,7 +247,7 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
                       str::stream() << "Collection '" << nss << "' was not found.");
     }
 
-    UUID collectionUUID = *collection->uuid();
+    UUID collectionUUID = collection->uuid();
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto collectionIt = _collectionIndexBuilds.find(collectionUUID);

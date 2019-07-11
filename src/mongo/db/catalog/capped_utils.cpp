@@ -91,8 +91,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     }
 
     BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
-    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-        collection->uuid().get());
+    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collection->uuid());
 
     WriteUnitOfWork wuow(opCtx);
 

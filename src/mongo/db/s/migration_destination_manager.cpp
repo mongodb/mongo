@@ -605,7 +605,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
                         << "Cannot create collection "
                         << nss.ns()
                         << " because we already have an identically named collection with UUID "
-                        << (collection->uuid() ? collection->uuid()->toString() : "(none)")
+                        << collection->uuid()
                         << ", which differs from the donor's UUID "
                         << (donorUUID ? donorUUID->toString() : "(none)")
                         << ". Manually drop the collection on this shard if it contains data from "
@@ -674,7 +674,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
                 // before the index is added to the index catalog for correct rollback operation.
                 // See SERVER-35780 and SERVER-35070.
                 serviceContext->getOpObserver()->onCreateIndex(
-                    opCtx, collection->ns(), *(collection->uuid()), spec, true /* fromMigrate */);
+                    opCtx, collection->ns(), collection->uuid(), spec, true /* fromMigrate */);
 
                 // Since the collection is empty, we can add and commit the index catalog entry
                 // within a single WUOW.

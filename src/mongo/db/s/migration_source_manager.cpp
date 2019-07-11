@@ -160,9 +160,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                 autoColl.getCollection());
 
         boost::optional<UUID> collectionUUID;
-        if (autoColl.getCollection()->uuid()) {
-            collectionUUID = autoColl.getCollection()->uuid().value();
-        }
+        collectionUUID = autoColl.getCollection()->uuid();
 
         auto optMetadata =
             CollectionShardingState::get(opCtx, getNss())->getCurrentMetadataIfKnown();

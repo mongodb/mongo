@@ -339,12 +339,6 @@ private:
             return false;
         }
 
-        auto uuid = collection->uuid();
-        // Check if UUID exists.
-        if (!uuid) {
-            return false;
-        }
-
         auto[prev, next] = getPrevAndNextUUIDs(opCtx, collection);
 
         // Find and report collection metadata.
@@ -353,7 +347,7 @@ private:
 
         DbCheckOplogCollection entry;
         entry.setNss(collection->ns());
-        entry.setUuid(*collection->uuid());
+        entry.setUuid(collection->uuid());
         if (prev) {
             entry.setPrev(*prev);
         }
@@ -375,7 +369,7 @@ private:
         collectionInfo.options = entry.getOptions();
 
         auto hle = dbCheckCollectionEntry(
-            collection->ns(), *collection->uuid(), collectionInfo, collectionInfo, optime);
+            collection->ns(), collection->uuid(), collectionInfo, collectionInfo, optime);
 
         HealthLog::get(opCtx).log(*hle);
 

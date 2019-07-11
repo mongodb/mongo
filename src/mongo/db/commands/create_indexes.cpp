@@ -581,7 +581,7 @@ bool runCreateIndexes(OperationContext* opCtx,
                            collection,
                            [opCtx, &ns, collection](const BSONObj& spec) {
                                opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                                   opCtx, ns, *(collection->uuid()), spec, false);
+                                   opCtx, ns, collection->uuid(), spec, false);
                            },
                            MultiIndexBlock::kNoopOnCommitFn));
 

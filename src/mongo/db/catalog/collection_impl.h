@@ -47,7 +47,7 @@ public:
 
     explicit CollectionImpl(OperationContext* opCtx,
                             const NamespaceString& nss,
-                            OptionalCollectionUUID uuid,
+                            UUID uuid,
                             std::unique_ptr<RecordStore> recordStore);
 
     ~CollectionImpl();
@@ -78,7 +78,7 @@ public:
 
     void setNs(NamespaceString nss) final;
 
-    OptionalCollectionUUID uuid() const {
+    UUID uuid() const {
         return _uuid;
     }
 
@@ -389,7 +389,7 @@ private:
     int _magic;
 
     NamespaceString _ns;
-    OptionalCollectionUUID _uuid;
+    UUID _uuid;
 
     // The RecordStore may be null during a repair operation.
     std::unique_ptr<RecordStore> _recordStore;  // owned

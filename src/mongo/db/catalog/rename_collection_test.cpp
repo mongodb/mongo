@@ -1163,9 +1163,9 @@ TEST_F(RenameCollectionTest, CollectionCatalogMappingRemainsIntactThroughRename)
     auto& catalog = CollectionCatalog::get(_opCtx.get());
     Collection* sourceColl = _getCollection_inlock(_opCtx.get(), _sourceNss);
     ASSERT(sourceColl);
-    ASSERT_EQ(sourceColl, catalog.lookupCollectionByUUID(*sourceColl->uuid()));
+    ASSERT_EQ(sourceColl, catalog.lookupCollectionByUUID(sourceColl->uuid()));
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, {}));
-    ASSERT_EQ(sourceColl, catalog.lookupCollectionByUUID(*sourceColl->uuid()));
+    ASSERT_EQ(sourceColl, catalog.lookupCollectionByUUID(sourceColl->uuid()));
 }
 
 TEST_F(RenameCollectionTest, FailRenameCollectionFromReplicatedToUnreplicatedDB) {

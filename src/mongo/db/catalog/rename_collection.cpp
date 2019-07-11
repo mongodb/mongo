@@ -117,8 +117,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
     }
 
     BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
-    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-        sourceColl->uuid().get());
+    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceColl->uuid());
 
     Collection* targetColl = db->getCollection(opCtx, target);
 
@@ -255,7 +254,7 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
 
         BackgroundOperation::assertNoBgOpInProgForNs(targetColl->ns().ns());
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-            targetColl->uuid().get());
+            targetColl->uuid());
 
         auto status = db->dropCollection(opCtx, targetColl->ns(), renameOpTime);
         if (!status.isOK())
@@ -381,7 +380,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
         if (uuidToDrop && uuidToDrop != targetColl->uuid()) {
             // We need to rename the targetColl to a temporary name.
             auto status = renameTargetCollectionToTmp(
-                opCtx, source, sourceColl->uuid().get(), db, target, targetColl->uuid().get());
+                opCtx, source, sourceColl->uuid(), db, target, targetColl->uuid());
             if (!status.isOK())
                 return status;
             targetColl = nullptr;
@@ -462,8 +461,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
                 "Cannot rename collections between a replicated and an unreplicated database"};
 
     BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
-    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-        sourceColl->uuid().get());
+    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceColl->uuid());
 
     auto targetDB = DatabaseHolder::get(opCtx)->getDb(opCtx, target.db());
 
@@ -585,7 +583,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
             for (const auto& indexToCopy : indexesToCopy) {
                 opObserver->onCreateIndex(opCtx,
                                           tmpName,
-                                          *(tmpColl->uuid()),
+                                          tmpColl->uuid(),
                                           indexToCopy,
                                           false  // fromMigrate
                                           );

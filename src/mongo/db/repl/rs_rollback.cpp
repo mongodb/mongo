@@ -784,7 +784,7 @@ void dropCollection(OperationContext* opCtx,
         RemoveSaver removeSaver("rollback", "", nss.ns());
         log() << "Rolling back createCollection on " << nss
               << ": Preparing to write documents to a rollback file for a collection " << nss
-              << " with uuid " << *(collection->uuid()) << " to "
+              << " with uuid " << collection->uuid() << " to "
               << removeSaver.file().generic_string();
 
         // Performs a collection scan and writes all documents in the collection to disk
@@ -860,12 +860,12 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
 
     LOG(2) << "Attempted to rename collection from " << info.renameFrom << " to " << info.renameTo
            << " but " << info.renameTo << " exists already. Temporarily renaming collection "
-           << info.renameTo << " with UUID " << collection->uuid().get() << " out of the way to "
+           << info.renameTo << " with UUID " << collection->uuid() << " out of the way to "
            << tempNss;
 
     // Renaming the collection that was clashing with the attempted rename
     // operation to a different collection name.
-    auto uuid = collection->uuid().get();
+    auto uuid = collection->uuid();
     auto renameStatus = renameCollectionForRollback(opCtx, tempNss, uuid);
 
     if (!renameStatus.isOK()) {

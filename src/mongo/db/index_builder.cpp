@@ -182,7 +182,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
                                      coll,
                                      [opCtx, coll, &ns](const BSONObj& indexSpec) {
                                          opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                                             opCtx, ns, *(coll->uuid()), indexSpec, false);
+                                             opCtx, ns, coll->uuid(), indexSpec, false);
                                      },
                                      MultiIndexBlock::kNoopOnCommitFn);
         if (!status.isOK()) {
