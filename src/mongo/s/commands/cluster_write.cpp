@@ -260,7 +260,8 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
 
     const uint64_t desiredChunkSize = balancerConfig->getMaxChunkSizeBytes();
 
-    if (!chunk->shouldSplit(desiredChunkSize, minIsInf, maxIsInf)) {
+    if (!chunk->shouldSplit(desiredChunkSize, minIsInf, maxIsInf) ||
+        !balancerConfig->getShouldAutoSplit()) {
         return;
     }
 
