@@ -42,6 +42,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/ttl_collection_cache.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -75,6 +76,11 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
         collection, IndexNames::findPluginName(keyPattern), _spec);
 
     _indexName = descriptor->indexName();
+
+    if (_spec.hasField("expireAfterSeconds")) {
+        TTLCollectionCache::get(getGlobalServiceContext())
+            .registerTTLInfo(std::make_pair(collection->uuid(), _indexName));
+    }
 
     bool isBackgroundIndex =
         _method == IndexBuildMethod::kHybrid || _method == IndexBuildMethod::kBackground;

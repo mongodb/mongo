@@ -50,8 +50,6 @@ class CollectionInfoCacheImpl : public CollectionInfoCache {
 public:
     explicit CollectionInfoCacheImpl(Collection* collection, const NamespaceString& ns);
 
-    ~CollectionInfoCacheImpl();
-
     /**
      * Get the PlanCache for this collection.
      */
@@ -135,8 +133,6 @@ private:
 
     // Tracks index usage statistics for this collection.
     CollectionIndexUsageTracker _indexUsageTracker;
-
-    bool _hasTTLIndex = false;
 };
 
 }  // namespace mongo

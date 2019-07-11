@@ -45,20 +45,20 @@ TTLCollectionCache& TTLCollectionCache::get(ServiceContext* ctx) {
     return getTTLCollectionCache(ctx);
 }
 
-void TTLCollectionCache::registerCollection(const NamespaceString& collectionNS) {
-    stdx::lock_guard<stdx::mutex> lock(_ttlCollectionsLock);
-    _ttlCollections.push_back(collectionNS.ns());
+void TTLCollectionCache::registerTTLInfo(std::pair<UUID, std::string>&& ttlInfo) {
+    stdx::lock_guard<stdx::mutex> lock(_ttlInfosLock);
+    _ttlInfos.push_back(std::move(ttlInfo));
 }
 
-void TTLCollectionCache::unregisterCollection(const NamespaceString& collectionNS) {
-    stdx::lock_guard<stdx::mutex> lock(_ttlCollectionsLock);
-    auto collIter = std::find(_ttlCollections.begin(), _ttlCollections.end(), collectionNS.ns());
-    fassert(40220, collIter != _ttlCollections.end());
-    _ttlCollections.erase(collIter);
+void TTLCollectionCache::deregisterTTLInfo(const std::pair<UUID, std::string>& ttlInfo) {
+    stdx::lock_guard<stdx::mutex> lock(_ttlInfosLock);
+    auto collIter = std::find(_ttlInfos.begin(), _ttlInfos.end(), ttlInfo);
+    fassert(40220, collIter != _ttlInfos.end());
+    _ttlInfos.erase(collIter);
 }
 
-std::vector<std::string> TTLCollectionCache::getCollections() {
-    stdx::lock_guard<stdx::mutex> lock(_ttlCollectionsLock);
-    return _ttlCollections;
+std::vector<std::pair<UUID, std::string>> TTLCollectionCache::getTTLInfos() {
+    stdx::lock_guard<stdx::mutex> lock(_ttlInfosLock);
+    return _ttlInfos;
 }
 };  // namespace mongo

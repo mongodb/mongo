@@ -69,6 +69,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
+#include "mongo/db/ttl_collection_cache.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/represent_as.h"
@@ -114,6 +115,11 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
         BSONObj keyPattern = spec.getObjectField("key");
         auto descriptor =
             std::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
+        if (spec.hasField("expireAfterSeconds")) {
+            TTLCollectionCache::get(getGlobalServiceContext())
+                .registerTTLInfo(std::make_pair(_collection->uuid(), indexName));
+        }
+
         const bool initFromDisk = true;
         const bool isReadyIndex = true;
         IndexCatalogEntry* entry =

@@ -47,7 +47,6 @@
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/ttl_collection_cache.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/log.h"
 
@@ -61,14 +60,6 @@ CollectionInfoCacheImpl::CollectionInfoCacheImpl(Collection* collection, const N
       _querySettings(std::make_unique<QuerySettings>()),
       _indexUsageTracker(getGlobalServiceContext()->getPreciseClockSource()) {}
 
-CollectionInfoCacheImpl::~CollectionInfoCacheImpl() {
-    // Necessary because the collection cache will not explicitly get updated upon database drop.
-    if (_hasTTLIndex) {
-        TTLCollectionCache& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
-        ttlCollectionCache.unregisterCollection(_ns);
-    }
-}
-
 const UpdateIndexData& CollectionInfoCacheImpl::getIndexKeys(OperationContext* opCtx) const {
     // This requires "some" lock, and MODE_IS is an expression for that, for now.
     dassert(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_IS));
@@ -78,9 +69,6 @@ const UpdateIndexData& CollectionInfoCacheImpl::getIndexKeys(OperationContext* o
 
 void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
     _indexedPaths.clear();
-
-    bool hadTTLIndex = _hasTTLIndex;
-    _hasTTLIndex = false;
 
     std::unique_ptr<IndexCatalog::IndexIterator> it =
         _collection->getIndexCatalog()->getIndexIterator(opCtx, true);
@@ -127,10 +115,6 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
             }
         } else {
             BSONObj key = descriptor->keyPattern();
-            const BSONObj& infoObj = descriptor->infoObj();
-            if (infoObj.hasField("expireAfterSeconds")) {
-                _hasTTLIndex = true;
-            }
             BSONObjIterator j(key);
             while (j.more()) {
                 BSONElement e = j.next();
@@ -146,16 +130,6 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
             for (auto it = paths.begin(); it != paths.end(); ++it) {
                 _indexedPaths.addPath(FieldRef(*it));
             }
-        }
-    }
-
-    TTLCollectionCache& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
-
-    if (_hasTTLIndex != hadTTLIndex) {
-        if (_hasTTLIndex) {
-            ttlCollectionCache.registerCollection(_collection->ns());
-        } else {
-            ttlCollectionCache.unregisterCollection(_collection->ns());
         }
     }
 
@@ -259,13 +233,6 @@ void CollectionInfoCacheImpl::setNs(NamespaceString ns) {
     _ns = std::move(ns);
 
     _planCache->setNs(_ns);
-
-    // Update the TTL collection cache.
-    if (_hasTTLIndex) {
-        auto& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
-        ttlCollectionCache.unregisterCollection(oldNs);
-        ttlCollectionCache.registerCollection(_ns);
-    }
 }
 
 CollectionIndexUsageTracker::CollectionScanStats CollectionInfoCacheImpl::getCollectionScanStats()

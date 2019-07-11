@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/uuid.h"
 
 /**
  * Caches the set of collections containing a TTL index.
@@ -46,12 +47,12 @@ class TTLCollectionCache {
 public:
     static TTLCollectionCache& get(ServiceContext* ctx);
     // Caller is responsible for ensuring no duplicates are registered.
-    void registerCollection(const NamespaceString& collectionNS);
-    void unregisterCollection(const NamespaceString& collectionNS);
-    std::vector<std::string> getCollections();
+    void registerTTLInfo(std::pair<UUID, std::string>&& ttlInfo);
+    void deregisterTTLInfo(const std::pair<UUID, std::string>& ttlInfo);
+    std::vector<std::pair<UUID, std::string>> getTTLInfos();
 
 private:
-    std::vector<std::string> _ttlCollections;
-    stdx::mutex _ttlCollectionsLock;
+    stdx::mutex _ttlInfosLock;
+    std::vector<std::pair<UUID, std::string>> _ttlInfos;  // <CollectionUUID, IndexName>
 };
 }  // namespace mongo

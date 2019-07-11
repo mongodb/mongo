@@ -132,30 +132,45 @@ private:
             return;
 
         TTLCollectionCache& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
-        std::vector<std::string> ttlCollections = ttlCollectionCache.getCollections();
+        std::vector<std::pair<UUID, std::string>> ttlInfos = ttlCollectionCache.getTTLInfos();
         std::vector<BSONObj> ttlIndexes;
 
         ttlPasses.increment();
 
         // Get all TTL indexes from every collection.
-        for (const std::string& collectionNS : ttlCollections) {
-            NamespaceString collectionNSS(collectionNS);
-            AutoGetCollection autoGetCollection(&opCtx, collectionNSS, MODE_IS);
-            Collection* coll = autoGetCollection.getCollection();
-            if (!coll) {
-                // Skip since collection has been dropped.
+        for (const std::pair<UUID, std::string>& ttlInfo : ttlInfos) {
+            auto uuid = ttlInfo.first;
+            auto indexName = ttlInfo.second;
+
+            auto nss = CollectionCatalog::get(opCtxPtr.get()).lookupNSSByUUID(uuid);
+            if (!nss) {
+                ttlCollectionCache.deregisterTTLInfo(ttlInfo);
                 continue;
             }
 
-            std::vector<std::string> indexNames;
-            DurableCatalog::get(opCtxPtr.get())->getAllIndexes(&opCtx, coll->ns(), &indexNames);
-            for (const std::string& name : indexNames) {
-                BSONObj spec =
-                    DurableCatalog::get(opCtxPtr.get())->getIndexSpec(&opCtx, coll->ns(), name);
-                if (spec.hasField(secondsExpireField)) {
-                    ttlIndexes.push_back(spec.getOwned());
-                }
+            AutoGetCollection autoColl(&opCtx, *nss, MODE_IS);
+            Collection* coll = autoColl.getCollection();
+            // The collection with `uuid` might be renamed before the lock and the wrong
+            // namespace would be locked and looked up so we double check here.
+            if (!coll || coll->uuid() != uuid)
+                continue;
+
+            if (!DurableCatalog::get(opCtxPtr.get())->isIndexPresent(&opCtx, *nss, indexName)) {
+                ttlCollectionCache.deregisterTTLInfo(ttlInfo);
+                continue;
             }
+
+            BSONObj spec =
+                DurableCatalog::get(opCtxPtr.get())->getIndexSpec(&opCtx, *nss, indexName);
+            if (!spec.hasField(secondsExpireField)) {
+                ttlCollectionCache.deregisterTTLInfo(ttlInfo);
+                continue;
+            }
+
+            if (!DurableCatalog::get(opCtxPtr.get())->isIndexReady(&opCtx, *nss, indexName))
+                continue;
+
+            ttlIndexes.push_back(spec.getOwned());
         }
 
         for (const BSONObj& idx : ttlIndexes) {
