@@ -11,8 +11,8 @@ var checkLog;
     }
 
     checkLog = (function() {
-        var getGlobalLog = function(conn) {
-            var cmdRes;
+        let getGlobalLog = function(conn) {
+            let cmdRes;
             try {
                 cmdRes = conn.adminCommand({getLog: 'global'});
             } catch (e) {
@@ -46,7 +46,7 @@ var checkLog;
          * Calls the 'getLog' function at regular intervals on the provided connection 'conn' until
          * the provided 'msg' is found in the logs, or it times out. Throws an exception on timeout.
          */
-        var contains = function(conn, msg, timeout = 5 * 60 * 1000) {
+        let contains = function(conn, msg, timeout = 5 * 60 * 1000) {
             assert.soon(function() {
                 return checkContainsOnce(conn, msg);
             }, 'Could not find log entries containing the following message: ' + msg, timeout, 300);
@@ -54,30 +54,46 @@ var checkLog;
 
         /*
          * Calls the 'getLog' function at regular intervals on the provided connection 'conn' until
-         * the provided 'msg' is found in the logs exactly 'expectedCount' times, or it times out.
-         * Throws an exception on timeout.
+         * the provided 'msg' is found in the logs 'expectedCount' times, or it times out.
+         * Throws an exception on timeout. If 'exact' is true, checks whether the count is exactly
+         * equal to 'expectedCount'. Otherwise, checks whether the count is at least equal to
+         * 'expectedCount'. Early returns when at least 'expectedCount' entries are found.
          */
-        var containsWithCount = function(conn, msg, expectedCount, timeout = 5 * 60 * 1000) {
-            var count = 0;
+        let containsWithCount = function(
+            conn, msg, expectedCount, timeout = 5 * 60 * 1000, exact = true) {
+            let expectedStr = exact ? 'exactly ' : 'at least ';
             assert.soon(
                 function() {
-                    count = 0;
-                    var logMessages = getGlobalLog(conn);
+                    let count = 0;
+                    let logMessages = getGlobalLog(conn);
                     if (logMessages === null) {
                         return false;
                     }
-                    for (var i = 0; i < logMessages.length; i++) {
+                    for (let i = 0; i < logMessages.length; i++) {
                         if (logMessages[i].indexOf(msg) != -1) {
                             count++;
                         }
+                        if (!exact && count >= expectedCount) {
+                            print("checkLog found at least " + expectedCount +
+                                  " log entries containing the following message: " + msg);
+                            return true;
+                        }
                     }
 
-                    return expectedCount === count;
+                    return exact ? expectedCount === count : expectedCount <= count;
                 },
-                'Expected ' + expectedCount + ', but instead saw ' + count +
-                    ' log entries containing the following message: ' + msg,
+                'Did not find ' + expectedStr + expectedCount + ' log entries containing the ' +
+                    'following message: ' + msg,
                 timeout,
                 300);
+        };
+
+        /*
+         * Similar to containsWithCount, but checks whether there are at least 'expectedCount'
+         * instances of 'msg' in the logs.
+         */
+        let containsWithAtLeastCount = function(conn, msg, expectedCount, timeout = 5 * 60 * 1000) {
+            containsWithCount(conn, msg, expectedCount, timeout, /*exact*/ false);
         };
 
         /*
@@ -114,6 +130,7 @@ var checkLog;
             checkContainsOnce: checkContainsOnce,
             contains: contains,
             containsWithCount: containsWithCount,
+            containsWithAtLeastCount: containsWithAtLeastCount,
             formatAsLogLine: formatAsLogLine
         };
     })();
