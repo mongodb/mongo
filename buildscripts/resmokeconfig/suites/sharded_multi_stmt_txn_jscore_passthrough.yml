@@ -303,6 +303,7 @@ selector:
   exclude_with_any_tags:
   # "Cowardly refusing to override read concern of command: ..."
   - assumes_read_concern_unchanged
+  - assumes_unsharded_collection
   # "writeConcern is not allowed within a multi-statement transaction"
   - assumes_write_concern_unchanged
   - assumes_against_mongod_not_mongos
