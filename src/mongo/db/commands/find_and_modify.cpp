@@ -396,7 +396,7 @@ public:
                 PlanSummaryStats summaryStats;
                 Explain::getSummaryStats(*exec, &summaryStats);
                 if (collection) {
-                    collection->infoCache()->notifyOfQuery(opCtx, summaryStats.indexesUsed);
+                    collection->infoCache()->notifyOfQuery(opCtx, summaryStats);
                 }
                 opDebug->setPlanSummaryMetrics(summaryStats);
 
@@ -494,7 +494,7 @@ public:
                 PlanSummaryStats summaryStats;
                 Explain::getSummaryStats(*exec, &summaryStats);
                 if (collection) {
-                    collection->infoCache()->notifyOfQuery(opCtx, summaryStats.indexesUsed);
+                    collection->infoCache()->notifyOfQuery(opCtx, summaryStats);
                 }
                 UpdateStage::recordUpdateStatsInOpDebug(UpdateStage::getUpdateStats(exec.get()),
                                                         opDebug);

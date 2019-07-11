@@ -67,6 +67,7 @@ CollectionScan::CollectionScan(OperationContext* opCtx,
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
     _specificStats.maxTs = params.maxTs;
+    _specificStats.tailable = params.tailable;
     invariant(!_params.shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
 
     if (params.maxTs) {

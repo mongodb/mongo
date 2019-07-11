@@ -198,6 +198,8 @@ struct CollectionScanStats : public SpecificStats {
     // backwards.
     int direction;
 
+    bool tailable{false};
+
     // If present, indicates that the collection scan will stop and return EOF the first time it
     // sees a document that does not pass the filter and has a "ts" Timestamp field greater than
     // 'maxTs'.

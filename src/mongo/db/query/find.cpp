@@ -150,7 +150,7 @@ void endQueryOp(OperationContext* opCtx,
     curOp->debug().setPlanSummaryMetrics(summaryStats);
 
     if (collection) {
-        collection->infoCache()->notifyOfQuery(opCtx, summaryStats.indexesUsed);
+        collection->infoCache()->notifyOfQuery(opCtx, summaryStats);
     }
 
     if (curOp->shouldDBProfile()) {

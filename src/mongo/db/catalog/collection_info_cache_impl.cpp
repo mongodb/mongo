@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/curop_metrics.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
@@ -162,7 +163,11 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
 }
 
 void CollectionInfoCacheImpl::notifyOfQuery(OperationContext* opCtx,
-                                            const std::set<std::string>& indexesUsed) {
+                                            const PlanSummaryStats& summaryStats) {
+    _indexUsageTracker.recordCollectionScans(summaryStats.collectionScans);
+    _indexUsageTracker.recordCollectionScansNonTailable(summaryStats.collectionScansNonTailable);
+
+    const auto& indexesUsed = summaryStats.indexesUsed;
     // Record indexes used to fulfill query.
     for (auto it = indexesUsed.begin(); it != indexesUsed.end(); ++it) {
         // This index should still exist, since the PlanExecutor would have been killed if the
@@ -261,6 +266,11 @@ void CollectionInfoCacheImpl::setNs(NamespaceString ns) {
         ttlCollectionCache.unregisterCollection(oldNs);
         ttlCollectionCache.registerCollection(_ns);
     }
+}
+
+CollectionIndexUsageTracker::CollectionScanStats CollectionInfoCacheImpl::getCollectionScanStats()
+    const {
+    return _indexUsageTracker.getCollectionScanStats();
 }
 
 }  // namespace mongo

@@ -243,7 +243,7 @@ public:
         PlanSummaryStats summaryStats;
         Explain::getSummaryStats(*exec, &summaryStats);
         if (collection) {
-            collection->infoCache()->notifyOfQuery(opCtx, summaryStats.indexesUsed);
+            collection->infoCache()->notifyOfQuery(opCtx, summaryStats);
         }
         curOp->debug().setPlanSummaryMetrics(summaryStats);
 
