@@ -58,10 +58,10 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     static mongo::AuthorizationManagerImpl* authzManager;
 
     static std::unique_ptr<mongo::repl::ReplicationCoordinatorMock> replCoord;
-    const static mongo::LogicalTime kInMemoryLogicalTime =
+    static const mongo::LogicalTime kInMemoryLogicalTime =
         mongo::LogicalTime(mongo::Timestamp(3, 1));
 
-    const static auto ret = [&]() {
+    static const auto ret = [&]() {
         auto ret = mongo::runGlobalInitializers(0, {nullptr}, nullptr);
         invariant(ret.isOK());
 
