@@ -301,12 +301,6 @@ int FlowControl::getNumTickets() {
         }
     }
 
-    // Flow Control is only enabled if FCV is 4.2.
-    const bool isFCV42 =
-        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-         serverGlobalParams.featureCompatibility.getVersion() ==
-             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
-
     // It's important to update the topology on each iteration.
     _updateTopologyData();
     const repl::OpTimeAndWallTime myLastApplied = _replCoord->getMyLastAppliedOpTimeAndWallTime();
@@ -315,8 +309,7 @@ int FlowControl::getNumTickets() {
     const std::int64_t locksUsedLastPeriod = _getLocksUsedLastPeriod();
 
     if (serverGlobalParams.enableMajorityReadConcern == false ||
-        gFlowControlEnabled.load() == false || isFCV42 == false || canAcceptWrites == false ||
-        locksPerOp < 0.0) {
+        gFlowControlEnabled.load() == false || canAcceptWrites == false || locksPerOp < 0.0) {
         _trimSamples(std::min(lastCommitted.opTime.getTimestamp(),
                               getMedianAppliedTimestamp(_prevMemberData)));
         return _kMaxTickets;
