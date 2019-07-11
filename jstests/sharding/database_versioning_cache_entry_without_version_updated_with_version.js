@@ -13,10 +13,6 @@
         st.s.getDB("config").getCollection("databases").findOne({_id: "test"}).version;
     assert.neq(null, versionOnConfig);
 
-    // Before the shard refreshes, it does not have a cache entry for the database.
-    assert.eq(null,
-              st.shard0.getDB("config").getCollection("cache.databases").findOne({_id: "test"}));
-
     // After the shard refreshes, it has a cache entry for the database with version matching the
     // version on the config server.
     assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: "test"}));

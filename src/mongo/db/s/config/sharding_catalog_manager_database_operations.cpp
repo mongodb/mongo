@@ -120,6 +120,17 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
         opCtx, DatabaseType::ConfigNS, db.toBSON(), ShardingCatalogClient::kLocalWriteConcern));
 
+    // Send _flushDatabaseCacheUpdates to the primary shard
+    const auto shard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, db.getPrimary()));
+    auto cmdResponse = uassertStatusOK(
+        shard->runCommandWithFixedRetryAttempts(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                "admin",
+                                                BSON("_flushDatabaseCacheUpdates" << dbName),
+                                                Shard::RetryPolicy::kIdempotent));
+    // TODO SERVER-42112: uassert on the cmdResponse.
+
     return db;
 }
 

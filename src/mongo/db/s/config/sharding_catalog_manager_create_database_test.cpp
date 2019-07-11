@@ -148,6 +148,14 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
         return BSON("ok" << 1 << "totalSize" << 100);
     });
 
+    // Return OK for _flushDatabaseCacheUpdates
+    onCommand([&](const RemoteCommandRequest& request) {
+        std::string cmdName = request.cmdObj.firstElement().fieldName();
+        ASSERT_EQUALS("_flushDatabaseCacheUpdates", cmdName);
+
+        return BSON("ok" << 1);
+    });
+
     future.default_timed_get();
 }
 

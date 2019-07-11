@@ -16,11 +16,14 @@ function checkOnDiskDatabaseVersion(conn, dbName, authoritativeEntry) {
     if (authoritativeEntry === undefined) {
         assert.eq(cacheEntry, undefined);
     } else {
-        // Remove the 'enterCriticalSectionCounter' field, which is the only field the cache
-        // entry should have but the authoritative entry does not.
-        delete cacheEntry["enterCriticalSectionCounter"];
-        assert.docEq(cacheEntry,
-                     authoritativeEntry,
-                     conn + " did not have expected on-disk database version for " + dbName);
+        // Only compare the _id and version fields.
+
+        assert.neq(null, authoritativeEntry._id);
+        assert.neq(null, cacheEntry._id);
+        assert.eq(authoritativeEntry._id, cacheEntry._id);
+
+        assert.neq(null, authoritativeEntry.version);
+        assert.neq(null, cacheEntry.version);
+        assert.docEq(authoritativeEntry.version, cacheEntry.version);
     }
 }
