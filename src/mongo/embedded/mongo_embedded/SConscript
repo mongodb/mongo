@@ -16,7 +16,7 @@ if get_option('install-mode') == 'hygienic':
             '../LICENSE-Embedded.txt',
         ],
         AIB_COMPONENT='embedded',
-        AIB_ROLE='common',
+        AIB_ROLE='base',
     )
 
 mongoEmbeddedEnv = env.Clone()

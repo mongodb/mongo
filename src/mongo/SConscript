@@ -454,6 +454,7 @@ mongod = env.Program(
     ],
     AIB_COMPONENT="servers",
     AIB_COMPONENTS_EXTRA=[
+        "dist",
         "default",
         "core",
     ],
@@ -557,6 +558,7 @@ mongos = env.Program(
     ],
     AIB_COMPONENT="servers",
     AIB_COMPONENTS_EXTRA=[
+        "dist",
         "core",
     ]
 )
@@ -651,6 +653,7 @@ if not has_option('noshell') and usemozjs:
         ],
         AIB_COMPONENT="shell",
         AIB_COMPONENTS_EXTRA=[
+            "dist",
             "core",
         ],
     )
@@ -736,6 +739,7 @@ def installExternalBinary( e, name_str ):
                 name
             ],
             AIB_COMPONENT='tools',
+            AIB_COMPONENTS_EXTRA=['dist'],
             AIB_ROLE='runtime',
         )
         return
@@ -756,6 +760,7 @@ if has_option("use-new-tools"):
             target='$DESTDIR',
             source=env.File('#/src/mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools'),
             AIB_COMPONENT='tools',
+            AIB_COMPONENTS_EXTRA=['dist'],
             AIB_ROLE='base',
         )
     else:
@@ -796,6 +801,7 @@ if hygienic:
             distsrc.File('MPL-2'),
         ],
         AIB_COMPONENT='common',
+        AIB_COMPONENTS_EXTRA=['dist'],
         AIB_ROLE='base',
     )
 else:
@@ -812,6 +818,7 @@ if hygienic:
             if enterprise_license else distsrc.File('LICENSE-Community.txt'),
         ],
         AIB_COMPONENT='common',
+        AIB_COMPONENTS_EXTRA=['dist'],
         AIB_ROLE='base',
     )
 # If no module has introduced a file named LICENSE-Enterprise.txt then this
@@ -873,6 +880,7 @@ else:
             compass_installer,
         ],
         AIB_COMPONENT='tools',
+        AIB_COMPONENTS_EXTRA=['dist'],
         AIB_ROLE='runtime',
     )
 

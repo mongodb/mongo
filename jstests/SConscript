@@ -10,7 +10,7 @@ if not get_option("install-mode") == "hygienic":
 
 for jstest in env.Glob("**/*.js"):
     env.AutoInstall(
-        target="$PREFIX_SHARE_DIR/jstests/" + str(jstest.dir),
+        target="$PREFIX_SHAREDIR/jstests/" + str(jstest.dir),
         source=jstest,
         AIB_COMPONENT="jstests",
         AIB_ROLE="runtime",

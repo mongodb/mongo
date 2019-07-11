@@ -3978,11 +3978,11 @@ tasks:
           --install-mode=hygienic
           --js-engine=none
           --opt=size
-          --dest-dir='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION'
           --separate-debug
           --ssl=off
           --use-system-mongo-c=on
           --wiredtiger=off
+          DESTDIR='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION'
           CPPPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libbson-1.0 $BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libmongoc-1.0'
         task_compile_flags_extra: >-
           --link-model=dynamic-sdk
@@ -4781,13 +4781,13 @@ tasks:
         targets: install-stitch-support
         task_compile_flags: >-
           --install-mode=hygienic
-          --dest-dir='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
           --dbg=off
           --link-model=dynamic-sdk
           --enable-free-mon=off
           --ssl=off
           --enable-http-client=off
           --modules=
+          DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
     - command: shell.exec
       params:
         working_dir: "src/build"
@@ -4814,8 +4814,8 @@ tasks:
         targets: install-stitch-support-test
         task_compile_flags: >-
           --install-mode=hygienic
-          --dest-dir='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
           --dbg=off
+          DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
 
 - name: stitch_support_run_tests
   commands:
