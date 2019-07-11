@@ -1,0 +1,71 @@
+/**
+ * Confirms that background index builds on a primary are aborted when the node steps down between
+ * the initialization and collection scan phases.
+ * @tags: [requires_replication]
+ */
+(function() {
+    "use strict";
+
+    load('jstests/libs/check_log.js');
+    load('jstests/noPassthrough/libs/index_build.js');
+
+    const rst = new ReplSetTest({
+        nodes: [
+            {},
+            {
+              // Disallow elections on secondary.
+              rsConfig: {
+                  priority: 0,
+                  votes: 0,
+              },
+            },
+        ]
+    });
+    const nodes = rst.startSet();
+    rst.initiate();
+
+    const primary = rst.getPrimary();
+    const testDB = primary.getDB('test');
+    const coll = testDB.getCollection('test');
+
+    const enableIndexBuildsCoordinator =
+        assert
+            .commandWorked(primary.adminCommand(
+                {getParameter: 1, enableIndexBuildsCoordinatorForCreateIndexesCommand: 1}))
+            .enableIndexBuildsCoordinatorForCreateIndexesCommand;
+    if (!enableIndexBuildsCoordinator) {
+        jsTestLog(
+            'IndexBuildsCoordinator not enabled for index creation on primary, skipping test.');
+        rst.stopSet();
+        return;
+    }
+
+    assert.writeOK(coll.insert({a: 1}));
+
+    assert.commandWorked(primary.adminCommand(
+        {configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'alwaysOn'}));
+
+    const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
+
+    checkLog.contains(
+        primary,
+        'index build: starting on ' + coll.getFullName() + ' properties: { v: 2, key: { a:');
+
+    try {
+        // Step down the primary.
+        assert.commandWorked(primary.adminCommand({replSetStepDown: 60, force: true}));
+    } finally {
+        assert.commandWorked(primary.adminCommand(
+            {configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'off'}));
+    }
+
+    const exitCode = createIdx({checkExitSuccess: false});
+    assert.neq(
+        0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
+
+    rst.stop(primary, undefined, {allowedExitCode: MongoRunner.EXIT_ABORT});
+    assert(rawMongoProgramOutput().match('Fatal assertion 51101 IndexBuildAborted: Index build: '),
+           'Index build should have aborted on step down.');
+
+    rst.stopSet();
+})();
