@@ -691,7 +691,8 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
 }
 
 void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
-                                            const UUID& buildUUID) noexcept {
+                                            const UUID& buildUUID,
+                                            const IndexBuildOptions& indexBuildOptions) noexcept {
     {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         while (_sleepForTest) {
@@ -710,7 +711,7 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
 
     auto status = [&]() {
         try {
-            _runIndexBuildInner(opCtx, replState);
+            _runIndexBuildInner(opCtx, replState, indexBuildOptions);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }
@@ -732,7 +733,8 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
 }
 
 void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
-                                                 std::shared_ptr<ReplIndexBuildState> replState) {
+                                                 std::shared_ptr<ReplIndexBuildState> replState,
+                                                 const IndexBuildOptions& indexBuildOptions) {
     // 'status' should always be set to something else before this function exits.
     Status status{ErrorCodes::InternalError,
                   "Uninitialized status value in IndexBuildsCoordinator"};

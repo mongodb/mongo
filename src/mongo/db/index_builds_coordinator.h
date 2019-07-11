@@ -74,6 +74,7 @@ public:
      */
     struct IndexBuildOptions {
         boost::optional<CommitQuorumOptions> commitQuorum;
+        bool replSetAndNotPrimary = false;
     };
 
     /**
@@ -346,14 +347,19 @@ protected:
     /**
      * Runs the index build on the caller thread. Handles unregistering the index build and setting
      * the index build's Promise with the outcome of the index build.
+     * 'IndexBuildOptios::replSetAndNotPrimary' is determined at the start of the index build.
      */
-    void _runIndexBuild(OperationContext* opCtx, const UUID& buildUUID) noexcept;
+    void _runIndexBuild(OperationContext* opCtx,
+                        const UUID& buildUUID,
+                        const IndexBuildOptions& indexBuildOptions) noexcept;
 
     /**
      * Acquires locks and runs index build. Throws on error.
+     * 'IndexBuildOptios::replSetAndNotPrimary' is determined at the start of the index build.
      */
     void _runIndexBuildInner(OperationContext* opCtx,
-                             std::shared_ptr<ReplIndexBuildState> replState);
+                             std::shared_ptr<ReplIndexBuildState> replState,
+                             const IndexBuildOptions& indexBuildOptions);
 
     /**
      * Modularizes the _indexBuildsManager calls part of _runIndexBuildInner. Throws on error.

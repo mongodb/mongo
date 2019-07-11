@@ -74,7 +74,8 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
         return it->second;
     }();
 
-    _runIndexBuild(opCtx, buildUUID);
+    invariant(!indexBuildOptions.replSetAndNotPrimary);
+    _runIndexBuild(opCtx, buildUUID, indexBuildOptions);
 
     return replState->sharedPromise.getFuture();
 }

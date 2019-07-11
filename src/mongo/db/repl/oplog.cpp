@@ -188,7 +188,9 @@ Status startIndexBuild(OperationContext* opCtx,
         return statusWithIndexes.getStatus();
     }
 
-    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {/*commitQuorum=*/boost::none};
+    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
+    invariant(!indexBuildOptions.commitQuorum);
+    indexBuildOptions.replSetAndNotPrimary = true;
 
     // We don't pass in a commit quorum here because secondary nodes don't have any knowledge of it.
     return IndexBuildsCoordinator::get(opCtx)
@@ -269,10 +271,13 @@ void createIndexForApplyOps(OperationContext* opCtx,
         auto collUUID = *indexCollection->uuid();
         auto indexBuildUUID = UUID::gen();
         auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
+
         // We don't pass in a commit quorum here because secondary nodes don't have any knowledge of
         // it.
-        IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
-            /*commitQuorum=*/boost::none};
+        IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
+        invariant(!indexBuildOptions.commitQuorum);
+        indexBuildOptions.replSetAndNotPrimary = true;
+
         // This spawns a new thread and returns immediately.
         MONGO_COMPILER_VARIABLE_UNUSED auto fut = uassertStatusOK(
             indexBuildsCoordinator->startIndexBuild(opCtx,

@@ -124,7 +124,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
                  "replication states: "
               << buildUUID;
         // Sets up and runs the index build. Sets result and cleans up index build.
-        _runIndexBuild(opCtx, buildUUID);
+        _runIndexBuild(opCtx, buildUUID, indexBuildOptions);
         return replState->sharedPromise.getFuture();
     }
 
@@ -160,6 +160,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
     _threadPool.schedule([
         this,
         buildUUID,
+        indexBuildOptions,
         deadline,
         timeoutError,
         writesAreReplicated,
@@ -207,7 +208,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         }
 
         // Sets up and runs the index build. Sets result and cleans up index build.
-        _runIndexBuild(opCtx.get(), buildUUID);
+        _runIndexBuild(opCtx.get(), buildUUID, indexBuildOptions);
     });
 
 
