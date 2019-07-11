@@ -84,4 +84,20 @@
 
     // Non-simple: .returnKey() overrides other projections.
     assert.eq({_id: 1}, t.find({_id: 1}, {a: 1}).returnKey().next());
+
+    // Test that equality queries on _id with min() or max() require hint().
+    let err = assert.throws(() => t.find({_id: 2}).min({_id: 1}).itcount());
+    assert.commandFailedWithCode(err, 51173);
+    err = assert.throws(() => t.find({_id: 2}).max({_id: 3}).itcount());
+    assert.commandFailedWithCode(err, 51173);
+
+    // Test that equality queries on _id respect min() and max().
+    assert.eq({_id: 1}, t.find({_id: 1}).hint({_id: 1}).min({_id: 0}).returnKey().next());
+    assert.eq({_id: 1},
+              t.find({_id: 1}).hint({_id: 1}).min({_id: 0}).max({_id: 2}).returnKey().next());
+    assert.eq(0, t.find({_id: 1}).hint({_id: 1}).max({_id: 0}).itcount());
+    assert.eq(0, t.find({_id: 1}).hint({_id: 1}).min({_id: 2}).itcount());
+
+    explain = t.find({_id: 2}).hint({_id: 1}).min({_id: 1}).max({_id: 3}).explain();
+    assert(!isIdhack(db, explain.queryPlanner.winningPlan));
 })();

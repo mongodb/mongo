@@ -165,6 +165,7 @@ void IDHackStage::doReattachToOperationContext() {
 // static
 bool IDHackStage::supportsQuery(Collection* collection, const CanonicalQuery& query) {
     return !query.getQueryRequest().showRecordId() && query.getQueryRequest().getHint().isEmpty() &&
+        query.getQueryRequest().getMin().isEmpty() && query.getQueryRequest().getMax().isEmpty() &&
         !query.getQueryRequest().getSkip() &&
         CanonicalQuery::isSimpleIdQuery(query.getQueryRequest().getFilter()) &&
         !query.getQueryRequest().isTailable() &&
