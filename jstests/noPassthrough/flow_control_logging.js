@@ -42,10 +42,11 @@
     // oplog entry every other second. Once the primary notices the sustainer rate is not moving, it
     // should start logging a warning once per second. This check waits for two log messages to make
     // sure the appropriate state variables are being reset.
-    checkLog.containsWithCount(replSet.getPrimary(),
-                               "Flow control is engaged and the sustainer point is not moving.",
-                               2,
-                               timeoutMilliseconds);
+    checkLog.containsWithAtLeastCount(
+        replSet.getPrimary(),
+        "Flow control is engaged and the sustainer point is not moving.",
+        2,
+        timeoutMilliseconds);
 
     // Restart replication so the replica set will shut down.
     for (let sec of replSet.getSecondaries()) {
