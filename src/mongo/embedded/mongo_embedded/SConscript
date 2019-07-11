@@ -10,7 +10,7 @@ env = env.Clone()
 
 if get_option('install-mode') == 'hygienic':
     env.AutoInstall(
-        '$PREFIX_DOC_DIR/mongo_embedded',
+        '$PREFIX_DOCDIR/mongo_embedded',
         source=[
             '#/LICENSE-Community.txt',
             '../LICENSE-Embedded.txt',
@@ -76,7 +76,7 @@ mongoEmbeddedTargets = mongoEmbeddedEnv.Library(
 
 if get_option('install-mode') == 'hygienic':
     env.AutoInstall(
-        '$INSTALL_DIR/include/mongo_embedded/v1/mongo_embedded',
+        '$PREFIX_INCLUDEDIR/mongo_embedded/v1/mongo_embedded',
         source=['mongo_embedded.h'],
         AIB_COMPONENT='embedded',
         AIB_ROLE='dev',
@@ -122,7 +122,7 @@ if get_option('link-model') != 'dynamic-sdk':
 if get_option('link-model') != 'dynamic-sdk' or get_option('install-mode') != 'hygienic' or not env.TargetOSIs('darwin') or env.TargetOSIs('macOS'):
     Return()
 
-frameworkDir = env.Dir('$INSTALL_DIR/Frameworks/mongo_embedded.framework')
+frameworkDir = env.Dir('$DESTDIR/Frameworks/mongo_embedded.framework')
 env.Alias('install-embedded-dev', frameworkDir)
 
 resourceDir = frameworkDir
@@ -171,7 +171,7 @@ env.AddPostAction(
 
 mongoEmbeddedDSYM = getattr(mongoEmbeddedTargets[0].attributes, "separate_debug_file", None)
 if mongoEmbeddedDSYM:
-    frameworkDSYMDir = '$INSTALL_DIR/Frameworks/mongo_embedded.framework.dSYM'
+    frameworkDSYMDir = '$DESTDIR/Frameworks/mongo_embedded.framework.dSYM'
     env.Alias('install-embedded-dev', frameworkDSYMDir)
 
     env.InstallAs(

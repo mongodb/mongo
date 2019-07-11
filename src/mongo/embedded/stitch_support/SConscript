@@ -51,7 +51,7 @@ stitchSupportTargets = stitchSupportEnv.Library(
 
 if get_option('install-mode') == 'hygienic':
     env.AutoInstall(
-        '$INSTALL_DIR/include/stitch_support/v1/stitch_support',
+        '$PREFIX_INCLUDEDIR/stitch_support/v1/stitch_support',
         source=['stitch_support.h'],
         AIB_COMPONENT='stitch-support',
         AIB_ROLE='dev',

@@ -1049,7 +1049,7 @@ env = Environment(variables=env_vars, **envDict)
 if get_option('dest-dir') is None:
     destDir = env.Dir('$BUILD_ROOT/install')
     prefix = env.Dir(get_option('prefix'))
-    if destDir != prefix:
+    if str(destDir) != str(prefix):
         installDir = destDir.Dir(get_option('prefix')[1:])
     else:
         installDir = destDir
@@ -1061,10 +1061,9 @@ else:
             Exit(1)
     installDir = destDir
 
-env['INSTALL_DIR'] = installDir
-env['DEST_DIR'] = destDir
+env['DESTDIR'] = destDir
 if get_option('legacy-tarball') == 'true':
-    env['INSTALL_DIR'] = env.Dir('$INSTALL_DIR').Dir('$SERVER_DIST_BASENAME')
+    env['DESTDIR'] = env.Dir('$DESTDIR').Dir('$SERVER_DIST_BASENAME')
 
 del envDict
 
@@ -3785,51 +3784,51 @@ if get_option('install-mode') == 'hygienic':
     env.Tool('auto_install_binaries')
     env.AddSuffixMapping({
         "$PROGSUFFIX": env.SuffixMap(
-            directory="$PREFIX_BIN_DIR",
+            directory="$PREFIX_BINDIR",
             default_roles=[
                 "runtime",
             ]
         ),
         
         "$LIBSUFFIX": env.SuffixMap(
-            directory="$PREFIX_LIB_DIR",
+            directory="$PREFIX_LIBDIR",
             default_roles=[
                 "dev",
             ]
         ),
 
         "$SHLIBSUFFIX": env.SuffixMap(
-            directory="$PREFIX_BIN_DIR" \
+            directory="$PREFIX_BINDIR" \
             if mongo_platform.get_running_os_name() == "windows" \
-            else "$PREFIX_LIB_DIR",
+            else "$PREFIX_LIBDIR",
             default_roles=[
                 "runtime",
             ]
         ),
 
         ".debug": env.SuffixMap(
-            directory="$PREFIX_DEBUG_DIR",
+            directory="$PREFIX_DEBUGDIR",
             default_roles=[
                 "debug",
             ]
         ),
         
         ".dSYM": env.SuffixMap(
-            directory="$PREFIX_DEBUG_DIR",
+            directory="$PREFIX_DEBUGDIR",
             default_roles=[
                 "debug"
             ]
         ),
         
         ".lib": env.SuffixMap(
-            directory="$PREFIX_LIB_DIR",
+            directory="$PREFIX_LIBDIR",
             default_roles=[
                 "dev"
             ]
         ),
         
         ".h": env.SuffixMap(
-            directory="$PREFIX_INCLUDE_DIR",
+            directory="$PREFIX_INCLUDEDIR",
             default_roles=[
                 "dev",
             ]
@@ -4189,7 +4188,7 @@ env.NoCache(env.FindInstalledFiles())
 # Substitute environment variables in any build targets so that we can
 # say, for instance:
 #
-# > scons --prefix=/foo/bar '$INSTALL_DIR'
+# > scons --prefix=/foo/bar '$DESTDIR'
 # or
 # > scons \$BUILD_DIR/mongo/base
 #

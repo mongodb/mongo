@@ -461,9 +461,7 @@ mongod = env.Program(
 
 hygienic = get_option('install-mode') == 'hygienic'
 
-if hygienic:
-    env.Default('$INSTALL_DIR/bin/mongod$PROGSUFFIX')
-else:
+if not hygienic:
     env.Default(env.Install('#/', mongod))
 
 # tools
@@ -721,7 +719,7 @@ def installBinary( e, name ):
     else:
         distBinaries.append(name)
 
-    inst = e.Install( "$INSTALL_DIR/bin", name )
+    inst = e.Install( "$DESTDIR/bin", name )
 
     if env.TargetOSIs('posix'):
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
@@ -733,7 +731,7 @@ def installExternalBinary( e, name_str ):
 
     if hygienic:
         env.AutoInstall(
-            target='$PREFIX_BIN_DIR',
+            target='$PREFIX_BINDIR',
             source=[
                 name
             ],
@@ -744,7 +742,7 @@ def installExternalBinary( e, name_str ):
 
     distBinaries.append(name)
 
-    inst = e.Install( "$INSTALL_DIR/bin", name )
+    inst = e.Install( "$DESTDIR/bin", name )
 
     if env.TargetOSIs('posix'):
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
@@ -755,7 +753,7 @@ if has_option("use-new-tools"):
 
     if hygienic:
         env.AutoInstall(
-            target='$INSTALL_DIR',
+            target='$DESTDIR',
             source=env.File('#/src/mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools'),
             AIB_COMPONENT='tools',
             AIB_ROLE='base',
@@ -789,7 +787,7 @@ if not hygienic:
 distsrc = env.Dir('#distsrc')
 if hygienic:
     env.AutoInstall(
-        target='$INSTALL_DIR',
+        target='$DESTDIR',
         source=[
             distsrc.File('README'),
             # TODO: we need figure out what to do when we use a different
@@ -808,7 +806,7 @@ else:
 enterprise_license = [banner for banner in env["MODULE_BANNERS"] if banner.name ==  "LICENSE-Enterprise.txt"]
 if hygienic:
     env.AutoInstall(
-        target='$INSTALL_DIR',
+        target='$DESTDIR',
         source=[
             enterprise_license[0]
             if enterprise_license else distsrc.File('LICENSE-Community.txt'),
@@ -867,10 +865,10 @@ compass_installer = env.Substfile('#/src/mongo/installer/compass/' + compass_scr
 distBinaries.append(compass_installer)
 
 if not hygienic:
-    compass_script_installer = env.Install("$INSTALL_DIR/bin", compass_installer)
+    compass_script_installer = env.Install("$DESTDIR/bin", compass_installer)
 else:
     compass_script_installer = env.AutoInstall(
-        target='$PREFIX_BIN_DIR',
+        target='$PREFIX_BINDIR',
         source=[
             compass_installer,
         ],
@@ -933,4 +931,4 @@ env.NoCache(debug_symbols_dist)
 
 #final alias
 if not hygienic:
-    env.Alias( "install", "$INSTALL_DIR" )
+    env.Alias( "install", "$DESTDIR" )
