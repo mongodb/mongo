@@ -200,8 +200,6 @@ public:
 
     /**
      * Aborts a given index build by index build UUID.
-     *
-     * TODO: This is not yet implemented.
      */
     Future<void> abortIndexBuildByBuildUUID(const UUID& buildUUID, const std::string& reason);
 
