@@ -60,6 +60,10 @@ extern AtomicWord<bool> internalQueryForceIntersectionPlans;
 
 extern AtomicWord<bool> internalQueryPlannerEnableHashIntersection;
 
+extern AtomicWord<int> internalQueryExecMaxBlockingSortBytes;
+
+extern AtomicWord<int> internalQueryPlanEvaluationMaxResults;
+
 }  // namespace mongo
 
 namespace PlanRankingTests {
@@ -176,6 +180,84 @@ private:
     unique_ptr<MultiPlanStage> _mps;
 
     DBDirectClient _client;
+};
+
+/**
+ * Ensures that if a plan fails, but scores higher than a succeeding plan, then the plan which
+ * doesn't fail is chosen.
+ */
+class PlanRankingPreferNonFailed : public PlanRankingTestBase {
+public:
+    PlanRankingPreferNonFailed()
+        : PlanRankingTestBase(),
+          _internalQueryExecMaxBlockingSortBytes(internalQueryExecMaxBlockingSortBytes.load()),
+          // We set the max results to decrease the amount of work that is done during the trial
+          // period. We want it to do less work than there are docs to ensure that no plan reaches
+          // EOF.
+          _internalQueryPlanEvaluationMaxResults(internalQueryPlanEvaluationMaxResults.load()) {
+        internalQueryExecMaxBlockingSortBytes.store(10);
+        internalQueryPlanEvaluationMaxResults.store(100);
+    }
+
+    ~PlanRankingPreferNonFailed() {
+        internalQueryExecMaxBlockingSortBytes.store(_internalQueryExecMaxBlockingSortBytes);
+        internalQueryPlanEvaluationMaxResults.store(_internalQueryPlanEvaluationMaxResults);
+    }
+
+    void run() {
+        // We get the number of works done during the trial period in order to make sure that there
+        // are more documents in the collection than works done in the trial period. This ensures
+        // neither of the plans reach EOF or produce results.
+        size_t numWorks = MultiPlanStage::getTrialPeriodWorks(opCtx(), nullptr);
+        size_t smallNumber = 10;
+        // The following condition must be met in order for the following test to work. Specifically
+        // this condition guarantees that the score of the plan using the index on d will score
+        // higher than the the plan using the index on a.
+        ASSERT(smallNumber < numWorks);
+        for (size_t i = 0; i < numWorks * 2; ++i) {
+            insert(BSON("a" << static_cast<int>(i >= ((numWorks * 2) - smallNumber)) << "d"
+                            << static_cast<int>(i)));
+        }
+
+        // The index {a: 1} is what we expect to be used. The index {d: 1} is just to produce a
+        // competing plan.
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("d" << 1));
+
+        // Query: find({a: 1}).sort({d: 1})
+        auto qr = std::make_unique<QueryRequest>(nss);
+        qr->setFilter(BSON("a" << 1));
+        qr->setSort(BSON("d" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        ASSERT_OK(statusWithCQ.getStatus());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        ASSERT(cq);
+
+        QuerySolution* soln = pickBestPlan(cq.get());
+        ASSERT(
+            QueryPlannerTestLib::solutionMatches("{fetch: {filter: {a:1}, node: "
+                                                 "{ixscan: {filter: null, pattern: {d:1}}}}}",
+                                                 soln->root.get()));
+
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
+        Collection* collection = ctx.getCollection();
+
+        StatusWith<std::unique_ptr<PlanCacheEntry>> planCacheEntryWithStatus =
+            collection->infoCache()->getPlanCache()->getEntry(*(cq.get()));
+        ASSERT_OK(planCacheEntryWithStatus.getStatus());
+
+        // We assert that there was only one plan scored, implying that there was only one
+        // non-failing plan.
+        ASSERT(planCacheEntryWithStatus.getValue()->decision->scores.size() == 1);
+        // We assert that there was one failing plan.
+        ASSERT(planCacheEntryWithStatus.getValue()->decision->failedCandidates.size() == 1);
+    }
+
+private:
+    // Holds the value of global "internalQueryExecMaxBlockingSortBytes" setParameter flag.
+    // Restored at end of test invocation regardless of test result.
+    int _internalQueryExecMaxBlockingSortBytes;
+    int _internalQueryPlanEvaluationMaxResults;
 };
 
 /**
@@ -622,6 +704,7 @@ public:
         add<PlanRankingPreferCoveredEvenIfNoResults>();
         add<PlanRankingPreferImmediateEOF>();
         add<PlanRankingPreferImmediateEOFAgainstHashed>();
+        add<PlanRankingPreferNonFailed>();
         add<PlanRankingNoCollscan>();
         add<PlanRankingCollscan>();
         add<PlanRankingAvoidBlockingSort>();

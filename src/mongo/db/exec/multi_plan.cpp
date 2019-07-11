@@ -219,13 +219,23 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     // After picking best plan, ranking will own plan stats from
     // candidate solutions (winner and losers).
-    std::unique_ptr<PlanRankingDecision> ranking(new PlanRankingDecision);
-    _bestPlanIdx = PlanRanker::pickBestPlan(_candidates, ranking.get());
+    auto statusWithRanking = PlanRanker::pickBestPlan(_candidates);
+    if (!statusWithRanking.isOK()) {
+        return statusWithRanking.getStatus();
+    }
+
+    auto ranking = std::move(statusWithRanking.getValue());
+    // Since the status was ok there should be a ranking containing at least one successfully ranked
+    // plan.
+    invariant(ranking);
+    _bestPlanIdx = ranking->candidateOrder[0];
+
     verify(_bestPlanIdx >= 0 && _bestPlanIdx < static_cast<int>(_candidates.size()));
 
-    // Copy candidate order. We will need this to sort candidate stats for explain
-    // after transferring ownership of 'ranking' to plan cache.
+    // Copy candidate order and failed candidates. We will need this to sort candidate stats for
+    // explain after transferring ownership of 'ranking' to plan cache.
     std::vector<size_t> candidateOrder = ranking->candidateOrder;
+    std::vector<size_t> failedCandidates = ranking->failedCandidates;
 
     CandidatePlan& bestCandidate = _candidates[_bestPlanIdx];
     const auto& alreadyProduced = bestCandidate.results;
@@ -237,7 +247,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     _backupPlanIdx = kNoSuchPlan;
     if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
         LOG(5) << "Winner has blocking stage, looking for backup plan...";
-        for (size_t ix = 0; ix < _candidates.size(); ++ix) {
+        for (auto&& ix : candidateOrder) {
             if (!_candidates[ix].solution->hasBlockingStage) {
                 LOG(5) << "Candidate " << ix << " is backup child";
                 _backupPlanIdx = ix;
@@ -296,9 +306,11 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         std::vector<QuerySolution*> solutions;
 
         // Generate solutions and ranking decisions sorted by score.
-        for (size_t orderingIndex = 0; orderingIndex < candidateOrder.size(); ++orderingIndex) {
-            // index into candidates/ranking
-            size_t ix = candidateOrder[orderingIndex];
+        for (auto&& ix : candidateOrder) {
+            solutions.push_back(_candidates[ix].solution.get());
+        }
+        // Insert the failed plans in the back.
+        for (auto&& ix : failedCandidates) {
             solutions.push_back(_candidates[ix].solution.get());
         }
 
