@@ -39,7 +39,9 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -74,61 +76,103 @@ constexpr auto kLargeString =
 const auto kOneKiBMatchStage = BSON("$match" << BSON("data" << kLargeString));
 const auto kTinyMatchStage = BSON("$match" << BSONObj());
 
-class DurableViewCatalogDummy final : public DurableViewCatalog {
+class ViewCatalogFixture : public CatalogTestFixture {
 public:
-    explicit DurableViewCatalogDummy() : _upsertCount(0), _iterateCount(0) {}
-    static const std::string name;
+    void setUp() override {
+        CatalogTestFixture::setUp();
 
-    using Callback = std::function<Status(const BSONObj& view)>;
-    virtual void iterate(OperationContext* opCtx, Callback callback) {
-        ++_iterateCount;
-    }
-    virtual void iterateIgnoreInvalidEntries(OperationContext* opCtx, Callback callback) {
-        ++_iterateCount;
-    }
-    virtual void upsert(OperationContext* opCtx, const NamespaceString& name, const BSONObj& view) {
-        ++_upsertCount;
-    }
-    virtual void remove(OperationContext* opCtx, const NamespaceString& name) {}
-    virtual const std::string& getName() const {
-        return name;
-    };
+        WriteUnitOfWork wuow(operationContext());
+        AutoGetOrCreateDb autoDb(operationContext(), "db", MODE_X);
+        _db = autoDb.getDb();
+        invariant(_db);
 
-    int getUpsertCount() {
-        return _upsertCount;
+        auto durableViewCatalogUnique = std::make_unique<DurableViewCatalogImpl>(_db);
+        durableViewCatalog = durableViewCatalogUnique.get();
+
+        _viewCatalog = ViewCatalog::get(_db);
+
+        // Create the system views collection for the database.
+        ASSERT(_db->createCollection(
+            operationContext(),
+            NamespaceString("db", NamespaceString::kSystemDotViewsCollectionName)));
+
+        // Create any additional databases used throughout the test.
+        ASSERT(AutoGetOrCreateDb(operationContext(), "db1", MODE_X).getDb());
+        ASSERT(AutoGetOrCreateDb(operationContext(), "db2", MODE_X).getDb());
+        wuow.commit();
     }
 
-    int getIterateCount() {
-        return _iterateCount;
+    void tearDown() {
+        CatalogTestFixture::tearDown();
+    }
+
+    ViewCatalog* getViewCatalog() const {
+        return _viewCatalog;
+    }
+
+    Status createView(OperationContext* opCtx,
+                      const NamespaceString& viewName,
+                      const NamespaceString& viewOn,
+                      const BSONArray& pipeline,
+                      const BSONObj& collation) {
+        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_IX);
+        Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
+        Lock::CollectionLock sysCollLock(
+            operationContext(),
+            NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName),
+            MODE_X);
+
+        WriteUnitOfWork wuow(opCtx);
+        Status s = _viewCatalog->createView(opCtx, viewName, viewOn, pipeline, collation);
+        wuow.commit();
+
+        return s;
+    }
+
+    Status modifyView(OperationContext* opCtx,
+                      const NamespaceString& viewName,
+                      const NamespaceString& viewOn,
+                      const BSONArray& pipeline) {
+        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_X);
+        Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
+        Lock::CollectionLock sysCollLock(
+            operationContext(),
+            NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName),
+            MODE_X);
+
+        WriteUnitOfWork wuow(opCtx);
+        Status s = _viewCatalog->modifyView(opCtx, viewName, viewOn, pipeline);
+        wuow.commit();
+
+        return s;
+    }
+
+    Status dropView(OperationContext* opCtx, const NamespaceString& viewName) {
+        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_IX);
+        Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
+        Lock::CollectionLock sysCollLock(
+            operationContext(),
+            NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName),
+            MODE_X);
+
+        WriteUnitOfWork wuow(opCtx);
+        Status s = _viewCatalog->dropView(opCtx, viewName);
+        wuow.commit();
+
+        return s;
+    }
+
+    std::shared_ptr<ViewDefinition> lookup(OperationContext* opCtx, StringData ns) {
+        Lock::DBLock dbLock(operationContext(), NamespaceString(ns).db(), MODE_IS);
+        return _viewCatalog->lookup(operationContext(), ns);
     }
 
 private:
-    int _upsertCount;
-    int _iterateCount;
-};
-
-const std::string DurableViewCatalogDummy::name = "dummy";
-
-class ViewCatalogFixture : public unittest::Test {
-public:
-    ViewCatalogFixture()
-        : _queryServiceContext(std::make_unique<QueryTestServiceContext>()),
-          opCtx(_queryServiceContext->makeOperationContext()),
-          viewCatalog(std::move(durableViewCatalogUnique)) {}
-
-private:
-    std::unique_ptr<QueryTestServiceContext> _queryServiceContext;
+    Database* _db;
+    ViewCatalog* _viewCatalog;
 
 protected:
-    ServiceContext* getServiceContext() const {
-        return _queryServiceContext->getServiceContext();
-    }
-
-    std::unique_ptr<DurableViewCatalogDummy> durableViewCatalogUnique =
-        std::make_unique<DurableViewCatalogDummy>();
-    DurableViewCatalogDummy* durableViewCatalog = durableViewCatalogUnique.get();
-    ServiceContext::UniqueOperationContext opCtx;
-    ViewCatalog viewCatalog;
+    DurableViewCatalogImpl* durableViewCatalog;
     const BSONArray emptyPipeline;
     const BSONObj emptyCollation;
 };
@@ -137,7 +181,7 @@ protected:
 class ReplViewCatalogFixture : public ViewCatalogFixture {
 public:
     void setUp() override {
-        Test::setUp();
+        ViewCatalogFixture::setUp();
         auto service = getServiceContext();
         repl::ReplSettings settings;
 
@@ -156,47 +200,44 @@ TEST_F(ViewCatalogFixture, CreateExistingView) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
 
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
-    ASSERT_NOT_OK(
-        viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_NOT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
 
 TEST_F(ViewCatalogFixture, CreateViewOnDifferentDatabase) {
     const NamespaceString viewName("db1.view");
     const NamespaceString viewOn("db2.coll");
 
-    ASSERT_NOT_OK(
-        viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_NOT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
 
 TEST_F(ViewCatalogFixture, CanCreateViewWithExprPredicate) {
     const NamespaceString viewOn("db.coll");
-    ASSERT_OK(viewCatalog.createView(opCtx.get(),
-                                     NamespaceString("db.view1"),
-                                     viewOn,
-                                     BSON_ARRAY(BSON("$match" << BSON("$expr" << 1))),
-                                     emptyCollation));
+    ASSERT_OK(createView(operationContext(),
+                         NamespaceString("db.view1"),
+                         viewOn,
+                         BSON_ARRAY(BSON("$match" << BSON("$expr" << 1))),
+                         emptyCollation));
 
-    ASSERT_OK(viewCatalog.createView(
-        opCtx.get(),
-        NamespaceString("db.view2"),
-        viewOn,
-        BSON_ARRAY(
-            BSON("$facet" << BSON("output" << BSON_ARRAY(BSON("$match" << BSON("$expr" << 1)))))),
-        emptyCollation));
+    ASSERT_OK(createView(operationContext(),
+                         NamespaceString("db.view2"),
+                         viewOn,
+                         BSON_ARRAY(BSON("$facet" << BSON("output" << BSON_ARRAY(BSON(
+                                                              "$match" << BSON("$expr" << 1)))))),
+                         emptyCollation));
 }
 
 TEST_F(ViewCatalogFixture, CanCreateViewWithJSONSchemaPredicate) {
     const NamespaceString viewOn("db.coll");
-    ASSERT_OK(viewCatalog.createView(
-        opCtx.get(),
+    ASSERT_OK(createView(
+        operationContext(),
         NamespaceString("db.view1"),
         viewOn,
         BSON_ARRAY(BSON("$match" << BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("x"))))),
         emptyCollation));
 
-    ASSERT_OK(viewCatalog.createView(
-        opCtx.get(),
+    ASSERT_OK(createView(
+        operationContext(),
         NamespaceString("db.view2"),
         viewOn,
         BSON_ARRAY(BSON(
@@ -208,16 +249,16 @@ TEST_F(ViewCatalogFixture, CanCreateViewWithJSONSchemaPredicate) {
 
 TEST_F(ViewCatalogFixture, CanCreateViewWithLookupUsingPipelineSyntax) {
     const NamespaceString viewOn("db.coll");
-    ASSERT_OK(viewCatalog.createView(opCtx.get(),
-                                     NamespaceString("db.view"),
-                                     viewOn,
-                                     BSON_ARRAY(BSON("$lookup" << BSON("from"
-                                                                       << "fcoll"
-                                                                       << "as"
-                                                                       << "as"
-                                                                       << "pipeline"
-                                                                       << BSONArray()))),
-                                     emptyCollation));
+    ASSERT_OK(createView(operationContext(),
+                         NamespaceString("db.view"),
+                         viewOn,
+                         BSON_ARRAY(BSON("$lookup" << BSON("from"
+                                                           << "fcoll"
+                                                           << "as"
+                                                           << "as"
+                                                           << "pipeline"
+                                                           << BSONArray()))),
+                         emptyCollation));
 }
 
 TEST_F(ViewCatalogFixture, CreateViewWithPipelineFailsOnInvalidStageName) {
@@ -225,9 +266,8 @@ TEST_F(ViewCatalogFixture, CreateViewWithPipelineFailsOnInvalidStageName) {
     const NamespaceString viewOn("db.coll");
 
     auto invalidPipeline = BSON_ARRAY(BSON("INVALID_STAGE_NAME" << 1));
-    ASSERT_THROWS(
-        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation),
-        AssertionException);
+    ASSERT_THROWS(createView(operationContext(), viewName, viewOn, invalidPipeline, emptyCollation),
+                  AssertionException);
 }
 
 TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStage) {
@@ -238,7 +278,7 @@ TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStage) {
     auto invalidPipeline = BSON_ARRAY(BSON("$changeStream" << BSONObj()));
 
     ASSERT_THROWS_CODE(
-        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation),
+        createView(operationContext(), viewName, viewOn, invalidPipeline, emptyCollation),
         AssertionException,
         ErrorCodes::OptionNotSupportedOnView);
 }
@@ -252,7 +292,7 @@ TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStagePersi
                                            << "someOtherCollection"));
 
     ASSERT_THROWS_CODE(
-        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation),
+        createView(operationContext(), viewName, viewOn, invalidPipeline, emptyCollation),
         AssertionException,
         ErrorCodes::OptionNotSupportedOnView);
 
@@ -260,7 +300,7 @@ TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStagePersi
                                       << "someOtherCollection"));
 
     ASSERT_THROWS_CODE(
-        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation),
+        createView(operationContext(), viewName, viewOn, invalidPipeline, emptyCollation),
         AssertionException,
         ErrorCodes::OptionNotSupportedOnView);
 }
@@ -269,8 +309,7 @@ TEST_F(ViewCatalogFixture, CreateViewOnInvalidCollectionName) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.$coll");
 
-    ASSERT_NOT_OK(
-        viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_NOT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
 
 TEST_F(ViewCatalogFixture, ExceedMaxViewDepthInOrder) {
@@ -281,15 +320,13 @@ TEST_F(ViewCatalogFixture, ExceedMaxViewDepthInOrder) {
         const NamespaceString viewName(str::stream() << ns << i);
         const NamespaceString viewOn(str::stream() << ns << (i + 1));
 
-        ASSERT_OK(
-            viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+        ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     }
 
     const NamespaceString viewName(str::stream() << ns << i);
     const NamespaceString viewOn(str::stream() << ns << (i + 1));
 
-    ASSERT_NOT_OK(
-        viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_NOT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
 
 TEST_F(ViewCatalogFixture, ExceedMaxViewDepthByJoining) {
@@ -301,23 +338,20 @@ TEST_F(ViewCatalogFixture, ExceedMaxViewDepthByJoining) {
         const NamespaceString viewName(str::stream() << ns << i);
         const NamespaceString viewOn(str::stream() << ns << (i + 1));
 
-        ASSERT_OK(
-            viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+        ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     }
 
     for (i = 1; i < size + 1; i++) {
         const NamespaceString viewName(str::stream() << ns << (size + i));
         const NamespaceString viewOn(str::stream() << ns << (size + i + 1));
 
-        ASSERT_OK(
-            viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+        ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     }
 
     const NamespaceString viewName(str::stream() << ns << size);
     const NamespaceString viewOn(str::stream() << ns << (size + 1));
 
-    ASSERT_NOT_OK(
-        viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_NOT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
 
 TEST_F(ViewCatalogFixture, CreateViewCycles) {
@@ -326,7 +360,7 @@ TEST_F(ViewCatalogFixture, CreateViewCycles) {
         const NamespaceString viewOn("db.view1");
 
         ASSERT_NOT_OK(
-            viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+            createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     }
 
     {
@@ -334,10 +368,9 @@ TEST_F(ViewCatalogFixture, CreateViewCycles) {
         const NamespaceString view2("db.view2");
         const NamespaceString view3("db.view3");
 
-        ASSERT_OK(viewCatalog.createView(opCtx.get(), view1, view2, emptyPipeline, emptyCollation));
-        ASSERT_OK(viewCatalog.createView(opCtx.get(), view2, view3, emptyPipeline, emptyCollation));
-        ASSERT_NOT_OK(
-            viewCatalog.createView(opCtx.get(), view3, view1, emptyPipeline, emptyCollation));
+        ASSERT_OK(createView(operationContext(), view1, view2, emptyPipeline, emptyCollation));
+        ASSERT_OK(createView(operationContext(), view2, view3, emptyPipeline, emptyCollation));
+        ASSERT_NOT_OK(createView(operationContext(), view3, view1, emptyPipeline, emptyCollation));
     }
 }
 
@@ -357,7 +390,7 @@ TEST_F(ViewCatalogFixture, CanSuccessfullyCreateViewWhosePipelineIsExactlyAtMaxS
     const NamespaceString viewOn("db.coll");
     const BSONObj collation;
 
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, builder.arr(), collation));
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, builder.arr(), collation));
 }
 
 TEST_F(ViewCatalogFixture, CannotCreateViewWhosePipelineExceedsMaxSizeInBytes) {
@@ -374,7 +407,7 @@ TEST_F(ViewCatalogFixture, CannotCreateViewWhosePipelineExceedsMaxSizeInBytes) {
     const NamespaceString viewOn("db.coll");
     const BSONObj collation;
 
-    ASSERT_NOT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, builder.arr(), collation));
+    ASSERT_NOT_OK(createView(operationContext(), viewName, viewOn, builder.arr(), collation));
 }
 
 TEST_F(ViewCatalogFixture, CannotCreateViewIfItsFullyResolvedPipelineWouldExceedMaxSizeInBytes) {
@@ -394,34 +427,34 @@ TEST_F(ViewCatalogFixture, CannotCreateViewIfItsFullyResolvedPipelineWouldExceed
     const BSONObj collation1;
     const BSONObj collation2;
 
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), view1, viewOn, builder1.arr(), collation1));
-    ASSERT_NOT_OK(viewCatalog.createView(opCtx.get(), view2, view1, builder2.arr(), collation2));
+    ASSERT_OK(createView(operationContext(), view1, viewOn, builder1.arr(), collation1));
+    ASSERT_NOT_OK(createView(operationContext(), view2, view1, builder2.arr(), collation2));
 }
 
 TEST_F(ViewCatalogFixture, DropMissingView) {
     NamespaceString viewName("db.view");
-    ASSERT_NOT_OK(viewCatalog.dropView(opCtx.get(), viewName));
+    ASSERT_NOT_OK(dropView(operationContext(), viewName));
 }
 
 TEST_F(ViewCatalogFixture, ModifyMissingView) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
 
-    ASSERT_NOT_OK(viewCatalog.modifyView(opCtx.get(), viewName, viewOn, emptyPipeline));
+    ASSERT_NOT_OK(modifyView(operationContext(), viewName, viewOn, emptyPipeline));
 }
 
 TEST_F(ViewCatalogFixture, ModifyViewOnDifferentDatabase) {
     const NamespaceString viewName("db1.view");
     const NamespaceString viewOn("db2.coll");
 
-    ASSERT_NOT_OK(viewCatalog.modifyView(opCtx.get(), viewName, viewOn, emptyPipeline));
+    ASSERT_NOT_OK(modifyView(operationContext(), viewName, viewOn, emptyPipeline));
 }
 
 TEST_F(ViewCatalogFixture, ModifyViewOnInvalidCollectionName) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.$coll");
 
-    ASSERT_NOT_OK(viewCatalog.modifyView(opCtx.get(), viewName, viewOn, emptyPipeline));
+    ASSERT_NOT_OK(modifyView(operationContext(), viewName, viewOn, emptyPipeline));
 }
 
 TEST_F(ReplViewCatalogFixture, ModifyViewWithPipelineFailsOnIneligibleStage) {
@@ -432,35 +465,35 @@ TEST_F(ReplViewCatalogFixture, ModifyViewWithPipelineFailsOnIneligibleStage) {
     auto invalidPipeline = BSON_ARRAY(BSON("$changeStream" << BSONObj()));
 
     // Create the initial, valid view.
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, validPipeline, emptyCollation));
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, validPipeline, emptyCollation));
 
     // Now attempt to replace it with a pipeline containing $changeStream.
-    ASSERT_THROWS_CODE(viewCatalog.modifyView(opCtx.get(), viewName, viewOn, invalidPipeline),
+    ASSERT_THROWS_CODE(modifyView(operationContext(), viewName, viewOn, invalidPipeline),
                        AssertionException,
                        ErrorCodes::OptionNotSupportedOnView);
 }
 
 TEST_F(ViewCatalogFixture, LookupMissingView) {
-    ASSERT(!viewCatalog.lookup(opCtx.get(), "db.view"_sd));
+    ASSERT(!lookup(operationContext(), "db.view"_sd));
 }
 
 TEST_F(ViewCatalogFixture, LookupExistingView) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
 
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 
-    ASSERT(viewCatalog.lookup(opCtx.get(), "db.view"_sd));
+    ASSERT(lookup(operationContext(), "db.view"_sd));
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDExistingView) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
 
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
-    auto& collectionCatalog = CollectionCatalog::get(opCtx.get());
+    auto& collectionCatalog = CollectionCatalog::get(operationContext());
     ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == "db.view");
 }
 
@@ -468,12 +501,19 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
     {
-        WriteUnitOfWork wunit(opCtx.get());
-        ASSERT_OK(
-            viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_X);
+        Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
+        Lock::CollectionLock sysCollLock(
+            operationContext(),
+            NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName),
+            MODE_X);
+
+        WriteUnitOfWork wunit(operationContext());
+        ASSERT_OK(getViewCatalog()->createView(
+            operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     }
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
-    auto& collectionCatalog = CollectionCatalog::get(opCtx.get());
+    auto& collectionCatalog = CollectionCatalog::get(operationContext());
     ASSERT(!collectionCatalog.lookupResourceName(resourceID));
 }
 
@@ -481,11 +521,11 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDrop) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
 
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
-    ASSERT_OK(viewCatalog.dropView(opCtx.get(), viewName));
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_OK(dropView(operationContext(), viewName));
 
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
-    auto& collectionCatalog = CollectionCatalog::get(opCtx.get());
+    auto& collectionCatalog = CollectionCatalog::get(operationContext());
     ASSERT(!collectionCatalog.lookupResourceName(resourceID));
 }
 
@@ -494,18 +534,24 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
     const NamespaceString viewOn("db.coll");
 
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
-    auto& collectionCatalog = CollectionCatalog::get(opCtx.get());
+    auto& collectionCatalog = CollectionCatalog::get(operationContext());
     {
-        WriteUnitOfWork wunit(opCtx.get());
-        ASSERT_OK(
-            viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+        WriteUnitOfWork wunit(operationContext());
+        ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
         ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == viewName.ns());
         wunit.commit();
     }
 
     {
-        WriteUnitOfWork wunit(opCtx.get());
-        ASSERT_OK(viewCatalog.dropView(opCtx.get(), viewName));
+        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_X);
+        Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
+        Lock::CollectionLock sysCollLock(
+            operationContext(),
+            NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName),
+            MODE_X);
+
+        WriteUnitOfWork wunit(operationContext());
+        ASSERT_OK(getViewCatalog()->dropView(operationContext(), viewName));
     }
 
     ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == viewName.ns());
@@ -516,9 +562,9 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModify) {
     const NamespaceString viewOn("db.coll");
 
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
-    auto& collectionCatalog = CollectionCatalog::get(opCtx.get());
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
-    ASSERT_OK(viewCatalog.modifyView(opCtx.get(), viewName, viewOn, emptyPipeline));
+    auto& collectionCatalog = CollectionCatalog::get(operationContext());
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_OK(modifyView(operationContext(), viewName, viewOn, emptyPipeline));
     ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == viewName.ns());
 }
 
@@ -527,17 +573,24 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
     const NamespaceString viewOn("db.coll");
 
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
-    auto& collectionCatalog = CollectionCatalog::get(opCtx.get());
+    auto& collectionCatalog = CollectionCatalog::get(operationContext());
     {
-        WriteUnitOfWork wunit(opCtx.get());
-        ASSERT_OK(
-            viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
+        WriteUnitOfWork wunit(operationContext());
+        ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
         ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == viewName.ns());
         wunit.commit();
     }
     {
-        WriteUnitOfWork wunit(opCtx.get());
-        ASSERT_OK(viewCatalog.modifyView(opCtx.get(), viewName, viewOn, emptyPipeline));
+        Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_X);
+        Lock::CollectionLock collLock(operationContext(), viewName, MODE_IX);
+        Lock::CollectionLock sysCollLock(
+            operationContext(),
+            NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName),
+            MODE_X);
+
+        WriteUnitOfWork wunit(operationContext());
+        ASSERT_OK(
+            getViewCatalog()->modifyView(operationContext(), viewName, viewOn, emptyPipeline));
         ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == viewName.ns());
     }
     ASSERT(collectionCatalog.lookupResourceName(resourceID).get() == viewName.ns());
@@ -547,32 +600,10 @@ TEST_F(ViewCatalogFixture, CreateViewThenDropAndLookup) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
 
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
-    ASSERT_OK(viewCatalog.dropView(opCtx.get(), viewName));
+    ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_OK(dropView(operationContext(), viewName));
 
-    ASSERT(!viewCatalog.lookup(opCtx.get(), "db.view"_sd));
-}
-
-TEST_F(ViewCatalogFixture, ModifyTenTimes) {
-    const char* ns = "db.view";
-    int i;
-
-    for (i = 0; i < 5; i++) {
-        const NamespaceString viewName(str::stream() << ns << i);
-        const NamespaceString viewOn(str::stream() << ns << (i + 1));
-
-        ASSERT_OK(
-            viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
-    }
-
-    for (i = 0; i < 5; i++) {
-        const NamespaceString viewName(str::stream() << ns << i);
-        const NamespaceString viewOn(str::stream() << ns << (i + 1));
-
-        ASSERT_OK(viewCatalog.modifyView(opCtx.get(), viewName, viewOn, emptyPipeline));
-    }
-
-    ASSERT_EQ(10, durableViewCatalog->getUpsertCount());
+    ASSERT(!lookup(operationContext(), "db.view"_sd));
 }
 
 TEST_F(ViewCatalogFixture, Iterate) {
@@ -581,13 +612,14 @@ TEST_F(ViewCatalogFixture, Iterate) {
     const NamespaceString view3("db.view3");
     const NamespaceString viewOn("db.coll");
 
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), view1, viewOn, emptyPipeline, emptyCollation));
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), view2, viewOn, emptyPipeline, emptyCollation));
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), view3, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_OK(createView(operationContext(), view1, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_OK(createView(operationContext(), view2, viewOn, emptyPipeline, emptyCollation));
+    ASSERT_OK(createView(operationContext(), view3, viewOn, emptyPipeline, emptyCollation));
 
     std::set<std::string> viewNames = {"db.view1", "db.view2", "db.view3"};
 
-    viewCatalog.iterate(opCtx.get(), [&viewNames](const ViewDefinition& view) {
+    Lock::DBLock dbLock(operationContext(), "db", MODE_IX);
+    getViewCatalog()->iterate(operationContext(), [&viewNames](const ViewDefinition& view) {
         std::string name = view.name().toString();
         ASSERT(viewNames.end() != viewNames.find(name));
         viewNames.erase(name);
@@ -609,11 +641,12 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectPipeline) {
     pipeline2 << BSON("$match" << BSON("foo" << 2));
     pipeline3 << BSON("$match" << BSON("foo" << 3));
 
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), view1, viewOn, pipeline1.arr(), emptyCollation));
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), view2, view1, pipeline2.arr(), emptyCollation));
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), view3, view2, pipeline3.arr(), emptyCollation));
+    ASSERT_OK(createView(operationContext(), view1, viewOn, pipeline1.arr(), emptyCollation));
+    ASSERT_OK(createView(operationContext(), view2, view1, pipeline2.arr(), emptyCollation));
+    ASSERT_OK(createView(operationContext(), view3, view2, pipeline3.arr(), emptyCollation));
 
-    auto resolvedView = viewCatalog.resolveView(opCtx.get(), view3);
+    Lock::DBLock dbLock(operationContext(), "db", MODE_IX);
+    auto resolvedView = getViewCatalog()->resolveView(operationContext(), view3);
     ASSERT(resolvedView.isOK());
 
     std::vector<BSONObj> expected = {BSON("$match" << BSON("foo" << 1)),
@@ -632,7 +665,9 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectPipeline) {
 TEST_F(ViewCatalogFixture, ResolveViewOnCollectionNamespace) {
     const NamespaceString collectionNamespace("db.coll");
 
-    auto resolvedView = uassertStatusOK(viewCatalog.resolveView(opCtx.get(), collectionNamespace));
+    Lock::DBLock dbLock(operationContext(), "db", MODE_IS);
+    auto resolvedView =
+        uassertStatusOK(getViewCatalog()->resolveView(operationContext(), collectionNamespace));
 
     ASSERT_EQ(resolvedView.getNamespace(), collectionNamespace);
     ASSERT_EQ(resolvedView.getPipeline().size(), 0U);
@@ -649,12 +684,13 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectlyExtractsDefaultCollation) {
     pipeline2 << BSON("$match" << BSON("foo" << 2));
 
     BSONObj collation = BSON("locale"
-                             << "mock_reverse_string");
+                             << "en_US");
 
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), view1, viewOn, pipeline1.arr(), collation));
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), view2, view1, pipeline2.arr(), collation));
+    ASSERT_OK(createView(operationContext(), view1, viewOn, pipeline1.arr(), collation));
+    ASSERT_OK(createView(operationContext(), view2, view1, pipeline2.arr(), collation));
 
-    auto resolvedView = viewCatalog.resolveView(opCtx.get(), view2);
+    Lock::DBLock dbLock(operationContext(), "db", MODE_IS);
+    auto resolvedView = getViewCatalog()->resolveView(operationContext(), view2);
     ASSERT(resolvedView.isOK());
 
     ASSERT_EQ(resolvedView.getValue().getNamespace(), viewOn);
@@ -667,26 +703,12 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectlyExtractsDefaultCollation) {
         ASSERT(SimpleBSONObjComparator::kInstance.evaluate(expected[i] == result[i]));
     }
 
-    auto expectedCollation =
-        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation);
+    auto expectedCollation = CollatorFactoryInterface::get(operationContext()->getServiceContext())
+                                 ->makeFromBSON(collation);
     ASSERT_OK(expectedCollation.getStatus());
     ASSERT_BSONOBJ_EQ(resolvedView.getValue().getDefaultCollation(),
                       expectedCollation.getValue()->getSpec().toBSON());
 }
 
-TEST_F(ViewCatalogFixture, InvalidateThenReload) {
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
-
-    ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
-    ASSERT_EQ(1, durableViewCatalog->getIterateCount());
-
-    ASSERT(viewCatalog.lookup(opCtx.get(), "db.view"_sd));
-    ASSERT_EQ(1, durableViewCatalog->getIterateCount());
-
-    viewCatalog.invalidate();
-    ASSERT_OK(viewCatalog.reloadIfNeeded(opCtx.get()));
-    ASSERT_EQ(2, durableViewCatalog->getIterateCount());
-}
 }  // namespace
 }  // namespace mongo

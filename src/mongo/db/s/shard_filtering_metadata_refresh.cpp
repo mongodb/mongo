@@ -74,7 +74,10 @@ void onShardVersionMismatch(OperationContext* opCtx,
     OperationShardingState::get(opCtx).waitForMigrationCriticalSectionSignal(opCtx);
 
     const auto currentShardVersion = [&] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+        // Avoid using AutoGetCollection() as it returns the InvalidViewDefinition error code
+        // if an invalid view is in the 'system.views' collection.
+        AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
         return CollectionShardingState::get(opCtx, nss)->getCurrentShardVersionIfKnown();
     }();
 
@@ -151,9 +154,10 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     auto cm = routingInfo.cm();
 
     if (!cm) {
-        // No chunk manager, so unsharded.
-
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        // No chunk manager, so unsharded. Avoid using AutoGetCollection() as it returns the
+        // InvalidViewDefinition error code if an invalid view is in the 'system.views' collection.
+        AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         CollectionShardingRuntime::get(opCtx, nss)
             ->setFilteringMetadata(opCtx, CollectionMetadata());
 
@@ -163,7 +167,10 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     // Optimistic check with only IS lock in order to avoid threads piling up on the collection X
     // lock below
     {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+        // Avoid using AutoGetCollection() as it returns the InvalidViewDefinition error code
+        // if an invalid view is in the 'system.views' collection.
+        AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
         auto optMetadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadataIfKnown();
 
         // We already have newer version
@@ -179,8 +186,11 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         }
     }
 
-    // Exclusive collection lock needed since we're now changing the metadata
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    // Exclusive collection lock needed since we're now changing the metadata. Avoid using
+    // AutoGetCollection() as it returns the InvalidViewDefinition error code if an invalid view is
+    // in the 'system.views' collection.
+    AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+    Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
     auto* const css = CollectionShardingRuntime::get(opCtx, nss);
 
     {
