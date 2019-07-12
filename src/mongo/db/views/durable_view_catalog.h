@@ -63,9 +63,15 @@ public:
 
     /**
      * Thread-safe method to mark a catalog name was changed. This will cause the in-memory
-     * view catalog to be marked invalid
+     * view catalog to be reloaded immediately.
      */
     static void onExternalChange(OperationContext* opCtx, const NamespaceString& name);
+
+    /**
+     * Thread-safe method to clear the in-memory state of the view catalog when the 'system.views'
+     * collection is dropped.
+     */
+    static void onSystemViewsCollectionDrop(OperationContext* opCtx, const NamespaceString& name);
 
     using Callback = std::function<Status(const BSONObj& view)>;
     virtual void iterate(OperationContext* opCtx, Callback callback) = 0;

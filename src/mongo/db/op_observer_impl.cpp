@@ -806,7 +806,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
             collectionName != NamespaceString::kServerConfigurationNamespace);
 
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
-        DurableViewCatalog::onExternalChange(opCtx, collectionName);
+        DurableViewCatalog::onSystemViewsCollectionDrop(opCtx, collectionName);
     } else if (collectionName == NamespaceString::kSessionTransactionsTableNamespace) {
         MongoDSessionCatalog::invalidateAllSessions(opCtx);
     }

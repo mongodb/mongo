@@ -56,11 +56,38 @@ namespace mongo {
 
 void DurableViewCatalog::onExternalChange(OperationContext* opCtx, const NamespaceString& name) {
     dassert(opCtx->lockState()->isDbLockedForMode(name.db(), MODE_IX));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(name.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, name.db());
     if (db) {
-        opCtx->recoveryUnit()->onCommit(
-            [db](boost::optional<Timestamp>) { ViewCatalog::get(db)->invalidate(); });
+        // On an external change, an invalid view definition can be detected when the view catalog
+        // is reloaded. This will prevent any further usage of the view catalog until the invalid
+        // view definitions are removed. We use kValidateDurableViews here to catch any invalid view
+        // definitions in the view catalog to make it unusable for subsequent callers.
+        ViewCatalog* viewCatalog = ViewCatalog::get(db);
+        if (viewCatalog->shouldIgnoreExternalChange(opCtx, name)) {
+            return;
+        }
+
+        viewCatalog->reload(opCtx, ViewCatalogLookupBehavior::kValidateDurableViews).ignore();
+    }
+}
+
+void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
+                                                     const NamespaceString& name) {
+    dassert(opCtx->lockState()->isDbLockedForMode(name.db(), MODE_IX));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(name.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+    dassert(name.coll() == NamespaceString::kSystemDotViewsCollectionName);
+
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto db = databaseHolder->getDb(opCtx, name.db());
+    if (db) {
+        // If the 'system.views' collection is dropped, we need to clear the in-memory state of the
+        // view catalog.
+        ViewCatalog* viewCatalog = ViewCatalog::get(db);
+        viewCatalog->clear();
     }
 }
 

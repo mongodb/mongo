@@ -154,13 +154,12 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
     }
 
     // At construction time of the viewCatalog, the CollectionCatalog map wasn't initialized yet,
-    // so no system.views collection would be found. Now we're sufficiently initialized, signal a
-    // version change. Also force a reload, so if there are problems with the catalog contents as
-    // might be caused by incorrect mongod versions or similar, they are found right away.
+    // so no system.views collection would be found. Now that we're sufficiently initialized, reload
+    // the viewCatalog to populate its in-memory state. If there are problems with the catalog
+    // contents as might be caused by incorrect mongod versions or similar, they are found right
+    // away.
     auto views = ViewCatalog::get(this);
-    views->invalidate();
-    Status reloadStatus = views->reloadIfNeeded(opCtx);
-
+    Status reloadStatus = views->reload(opCtx, ViewCatalogLookupBehavior::kValidateDurableViews);
     if (!reloadStatus.isOK()) {
         warning() << "Unable to parse views: " << redact(reloadStatus)
                   << "; remove any invalid views from the " << _viewsName

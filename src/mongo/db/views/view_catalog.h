@@ -71,7 +71,10 @@ public:
     static void set(Database* db, std::unique_ptr<ViewCatalog> catalog);
 
     explicit ViewCatalog(std::unique_ptr<DurableViewCatalog> durable)
-        : _durable(std::move(durable)) {}
+        : _durable(std::move(durable)),
+          _valid(false),
+          _viewGraphNeedsRefresh(true),
+          _ignoreExternalChange(false) {}
 
     /**
      * Iterates through the catalog, applying 'callback' to each view. This callback function
@@ -133,22 +136,25 @@ public:
     StatusWith<ResolvedView> resolveView(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * Reload the views catalog if marked invalid. No-op if already valid. Does only minimal
-     * validation, namely that the view definitions are valid BSON and have no unknown fields.
-     * Reading stops on the first invalid entry. Errors are logged and returned. Performs no
-     * cycle detection etc. This is implicitly called by other methods when the ViewCatalog is
-     * marked invalid, and on first opening a database.
+     * Reloads the in-memory state of the view catalog from the 'system.views' collection catalog.
+     * If the 'lookupBehavior' is 'kValidateDurableViews', then the durable view definitions will be
+     * validated. Reading stops on the first invalid entry with errors logged and returned. Performs
+     * no cycle detection, etc.
+     * This is implicitly called by other methods when write operations are performed on the view
+     * catalog, on external changes to the 'system.views' collection and on the first opening of a
+     * database.
      */
-    Status reloadIfNeeded(OperationContext* opCtx);
+    Status reload(OperationContext* opCtx, ViewCatalogLookupBehavior lookupBehavior);
 
     /**
-     * To be called when direct modifications to the DurableViewCatalog have been committed, so
-     * subsequent lookups will reload the catalog and make the changes visible.
+     * Clears the in-memory state of the view catalog.
      */
-    void invalidate() {
-        _valid.store(false);
-        _viewGraphNeedsRefresh = true;
-    }
+    void clear();
+
+    /**
+     * The view catalog needs to ignore external changes for its own modifications.
+     */
+    bool shouldIgnoreExternalChange(OperationContext* opCtx, const NamespaceString& name) const;
 
 private:
     Status _createOrUpdateView(WithLock,
@@ -183,21 +189,23 @@ private:
                                             OperationContext* opCtx,
                                             StringData ns,
                                             ViewCatalogLookupBehavior lookupBehavior);
-    Status _reloadIfNeeded(WithLock,
-                           OperationContext* opCtx,
-                           ViewCatalogLookupBehavior lookupBehavior);
 
-    void _requireValidCatalog(WithLock lk, OperationContext* opCtx) {
-        uassertStatusOK(
-            _reloadIfNeeded(lk, opCtx, ViewCatalogLookupBehavior::kValidateDurableViews));
-        invariant(_valid.load());
-    }
+    Status _reload(WithLock, OperationContext* opCtx, ViewCatalogLookupBehavior lookupBehavior);
 
-    stdx::mutex _mutex;  // Protects all members, except for _valid.
+    /**
+     * uasserts with the InvalidViewDefinition error if the current in-memory state of the view
+     * catalog is invalid. This ensures that calling into the view catalog while it is invalid
+     * renders it inoperable.
+     */
+    void _requireValidCatalog(WithLock);
+
+    stdx::mutex _mutex;  // Protects all members.
     ViewMap _viewMap;
+    ViewMap _viewMapBackup;
     std::unique_ptr<DurableViewCatalog> _durable;
-    AtomicWord<bool> _valid;
+    bool _valid;
     ViewGraph _viewGraph;
-    bool _viewGraphNeedsRefresh = true;  // Defers initializing the graph until the first insert.
+    bool _viewGraphNeedsRefresh;
+    bool _ignoreExternalChange;
 };
 }  // namespace mongo

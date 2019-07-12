@@ -350,7 +350,10 @@ public:
             opCtx, nss, requestedVersion, forceRefresh /*forceRefreshFromThisThread*/);
 
         {
-            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+            // Avoid using AutoGetCollection() as it returns the InvalidViewDefinition error code
+            // if an invalid view is in the 'system.views' collection.
+            AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
+            Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
 
             const ChunkVersion currVersion = [&] {
                 auto* const css = CollectionShardingState::get(opCtx, nss);
