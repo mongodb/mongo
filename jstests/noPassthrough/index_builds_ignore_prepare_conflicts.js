@@ -90,6 +90,10 @@
             assert.eq(undefined, op.prepareReadConflicts);
         });
 
+        // Because prepare uses w:1, ensure it is majority committed before committing the
+        // transaction.
+        PrepareHelpers.awaitMajorityCommitted(replSetTest, prepareTimestamp);
+
         // Commit the transaction before completing the index build, releasing locks which will
         // allow the index build to complete.
         assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
