@@ -48,6 +48,7 @@
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/unclean_shutdown.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -820,11 +821,18 @@ void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
     auto catalogRs = _catalogRecordStore.get();
     auto cursor = catalogRs->getCursor(opCtx);
     boost::optional<Record> rec = cursor->next();
+    stdx::unordered_set<std::string> nsMap;
     while (rec) {
         // This should only be called by a parent that's done an appropriate `shouldLog` check. Do
         // not duplicate the log level policy.
         LOG_FOR_RECOVERY(kCatalogLogLevel) << "\tId: " << rec->id
                                            << " Value: " << rec->data.toBson();
+        auto valueBson = rec->data.toBson();
+        if (valueBson.hasField("md")) {
+            std::string ns = valueBson.getField("md").Obj().getField("ns").String();
+            invariant(!nsMap.count(ns), str::stream() << "Found duplicate namespace: " << ns);
+            nsMap.insert(ns);
+        }
         rec = cursor->next();
     }
     opCtx->recoveryUnit()->abandonSnapshot();
