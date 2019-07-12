@@ -10628,6 +10628,7 @@ buildvariants:
   - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel62-large
+  - name: sharding_gen
 
 - name: enterprise-rhel-62-64-bit-coverage
   display_name: "~ Enterprise RHEL 6.2 DEBUG Code Coverage"
