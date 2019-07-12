@@ -987,24 +987,28 @@ Status RollbackImpl::_checkAgainstTimeLimit(
     _rollbackStats.lastLocalOptime = topOfOplog.getOpTime();
 
     auto topOfOplogWallOpt = topOfOplog.getWallClockTime();
-    auto commonPointWallOpt = commonPoint.getWallClockTime();
+    // We check the difference between the top of the oplog and the first oplog entry after the
+    // common point when computing the rollback time limit.
+    auto firstOpWallClockTimeAfterCommonPointOpt =
+        commonPoint.getFirstOpWallClockTimeAfterCommonPoint();
 
-    // Only compute the difference if both the top of the oplog and the common point
-    // have wall clock times.
-    if (commonPointWallOpt && topOfOplogWallOpt) {
+
+    // Only compute the difference if both the top of the oplog and the first oplog entry after the
+    // common point have wall clock times.
+    if (firstOpWallClockTimeAfterCommonPointOpt && topOfOplogWallOpt) {
         auto topOfOplogWallTime = topOfOplogWallOpt.get();
-        auto commonPointWallTime = commonPointWallOpt.get();
+        auto firstOpWallClockTimeAfterCommonPoint = firstOpWallClockTimeAfterCommonPointOpt.get();
 
-        if (topOfOplogWallTime >= commonPointWallTime) {
+        if (topOfOplogWallTime >= firstOpWallClockTimeAfterCommonPoint) {
 
-            unsigned long long diff =
-                durationCount<Seconds>(Milliseconds(topOfOplogWallTime - commonPointWallTime));
+            unsigned long long diff = durationCount<Seconds>(
+                Milliseconds(topOfOplogWallTime - firstOpWallClockTimeAfterCommonPoint));
 
             _rollbackStats.lastLocalWallClockTime = topOfOplogWallTime;
-            _rollbackStats.commonPointWallClockTime = commonPointWallTime;
+            _rollbackStats.firstOpWallClockTimeAfterCommonPoint =
+                firstOpWallClockTimeAfterCommonPoint;
 
             auto timeLimit = static_cast<unsigned long long>(gRollbackTimeLimitSecs.loadRelaxed());
-
             if (diff > timeLimit) {
                 return Status(ErrorCodes::UnrecoverableRollbackError,
                               str::stream() << "not willing to roll back more than " << timeLimit
@@ -1014,9 +1018,11 @@ Status RollbackImpl::_checkAgainstTimeLimit(
             }
 
         } else {
-            warning() << "Wall clock times on oplog entries not monotonically increasing. This "
-                         "might indicate a backward clock skew. Time at common point: "
-                      << commonPointWallTime << ". Time at top of oplog: " << topOfOplogWallTime;
+            warning()
+                << "Wall clock times on oplog entries not monotonically increasing. This "
+                   "might indicate a backward clock skew. Time at first oplog after common point: "
+                << firstOpWallClockTimeAfterCommonPoint
+                << ". Time at top of oplog: " << topOfOplogWallTime;
         }
     }
 
@@ -1212,14 +1218,18 @@ void RollbackImpl::_summarizeRollback(OperationContext* opCtx) const {
     if (_rollbackStats.commonPoint) {
         log() << "\tcommon point optime: " << *_rollbackStats.commonPoint;
     }
-    if (_rollbackStats.lastLocalWallClockTime && _rollbackStats.commonPointWallClockTime) {
+    if (_rollbackStats.lastLocalWallClockTime &&
+        _rollbackStats.firstOpWallClockTimeAfterCommonPoint) {
 
         auto lastWall = *_rollbackStats.lastLocalWallClockTime;
-        auto commonWall = *_rollbackStats.commonPointWallClockTime;
-        unsigned long long diff = durationCount<Seconds>(Milliseconds(lastWall - commonWall));
+        auto firstOpWallClockTimeAfterCommonPoint =
+            *_rollbackStats.firstOpWallClockTimeAfterCommonPoint;
+        unsigned long long diff =
+            durationCount<Seconds>(Milliseconds(lastWall - firstOpWallClockTimeAfterCommonPoint));
 
         log() << "\tlast wall clock time on the branch of history rolled back: " << lastWall;
-        log() << "\tcommon point wall clock time: " << commonWall;
+        log() << "\twall clock time of the first operation after the common point: "
+              << firstOpWallClockTimeAfterCommonPoint;
         log() << "\tdifference in wall clock times: " << diff << " second(s)";
     }
     if (_rollbackStats.truncateTimestamp) {

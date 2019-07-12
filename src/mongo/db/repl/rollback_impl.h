@@ -101,9 +101,9 @@ struct RollbackStats {
     boost::optional<Date_t> lastLocalWallClockTime;
 
     /**
-     * The wall clock time at the common point, if known.
+     * The wall clock time of the first operation after the common point, if known.
      */
-    boost::optional<Date_t> commonPointWallClockTime;
+    boost::optional<Date_t> firstOpWallClockTimeAfterCommonPoint;
 };
 
 /**

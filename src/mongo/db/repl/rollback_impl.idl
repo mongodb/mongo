@@ -44,7 +44,7 @@ server_parameters:
         description: >-
             This amount, measured in seconds, represents the maximum allowed rollback period.
             It is calculated by taking the difference of the wall clock times of the oplog entries
-            at the top of the local oplog and at the common point.
+            at the top of the local oplog and the first oplog entry after the common point.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gRollbackTimeLimitSecs

@@ -298,6 +298,8 @@ protected:
 
     UUID kGenericUUID = unittest::assertGet(UUID::parse(kGenericUUIDStr));
 
+    const long kOneDayInMillis = 60 * 60 * 24 * 1000;
+
 private:
     long _counter = 100;
 };
@@ -486,11 +488,31 @@ TEST_F(RollbackImplTest, RollbackReturnsNoMatchingDocumentWhenNoCommonPoint) {
 }
 
 TEST_F(RollbackImplTest, RollbackSucceedsIfRollbackPeriodIsWithinTimeLimit) {
-
-    // The default limit is 1 day, so we make the difference be just under a day.
     auto commonPoint = makeOpAndRecordId(makeOpWithWallClockTime(1, 5 * 1000));
-    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 60 * 60 * 24 * 1000));
+    // We use the difference of wall clock times between the top of the oplog and the first op after
+    // the common point to calculate the rollback time limit.
+    auto firstOpAfterCommonPoint =
+        makeOpAndRecordId(makeOpWithWallClockTime(2, 2 * kOneDayInMillis));
+    // The default limit is 1 day, so we make the difference be just under a day.
+    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(3, kOneDayInMillis));
+    _remoteOplog->setOperations({commonPoint});
+    ASSERT_OK(_insertOplogEntry(commonPoint.first));
+    ASSERT_OK(_insertOplogEntry(firstOpAfterCommonPoint.first));
+    ASSERT_OK(_insertOplogEntry(topOfOplog.first));
 
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    // Run rollback.
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+}
+
+TEST_F(RollbackImplTest, RollbackSucceedsIfTopOfOplogIsFirstOpAfterCommonPoint) {
+
+    auto commonPoint = makeOpAndRecordId(makeOpWithWallClockTime(1, 5 * 1000));
+    // The default limit is 1 day, so we make the difference be 2 days. The rollback should still
+    // succeed since we calculate the difference of wall clock times between the top of the oplog
+    // and the first op after the common point which are both the same operation in this case.
+    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(3, 2 * kOneDayInMillis));
     _remoteOplog->setOperations({commonPoint});
     ASSERT_OK(_insertOplogEntry(commonPoint.first));
     ASSERT_OK(_insertOplogEntry(topOfOplog.first));
@@ -546,12 +568,16 @@ TEST_F(RollbackImplTest, RollbackKillsNecessaryOperations) {
 
 TEST_F(RollbackImplTest, RollbackFailsIfRollbackPeriodIsTooLong) {
 
-    // The default limit is 1 day, so we make the difference be 2 days.
     auto commonPoint = makeOpAndRecordId(makeOpWithWallClockTime(1, 5 * 1000));
-    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 2 * 60 * 60 * 24 * 1000));
+    auto opAfterCommonPoint = makeOpAndRecordId(makeOpWithWallClockTime(2, 5 * 1000));
+    // We calculate the roll back time limit by comparing the difference between the top of the
+    // oplog and the first oplog entry after the commit point. The default limit is 1 day, so we
+    // make the difference be 2 days.
+    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(3, 2 * 60 * 60 * 24 * 1000));
 
     _remoteOplog->setOperations({commonPoint});
     ASSERT_OK(_insertOplogEntry(commonPoint.first));
+    ASSERT_OK(_insertOplogEntry(opAfterCommonPoint.first));
     ASSERT_OK(_insertOplogEntry(topOfOplog.first));
 
     _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
