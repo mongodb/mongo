@@ -409,6 +409,8 @@ public:
      */
     TimeZoneDatabase(std::unique_ptr<_timelib_tzdb, TimeZoneDBDeleter> timeZoneDatabase);
 
+    std::vector<std::string> getTimeZoneStrings() const;
+
 private:
     /**
      * Populates '_timeZones' with parsed time zone rules for each timezone specified by

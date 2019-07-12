@@ -38,3 +38,13 @@ timeZoneEnv.CppUnitTest(
         'date_time_support',
     ]
 )
+
+timeZoneEnv.CppLibfuzzerTest(
+    target='date_time_support_fuzzer',
+    source=[
+        'date_time_support_fuzzer.cpp',
+    ],
+    LIBDEPS=[
+        'date_time_support',
+    ]
+)

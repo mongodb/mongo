@@ -364,6 +364,16 @@ TimeZone TimeZoneDatabase::getTimeZone(StringData timeZoneId) const {
               str::stream() << "unrecognized time zone identifier: \"" << timeZoneId << "\"");
 }
 
+std::vector<std::string> TimeZoneDatabase::getTimeZoneStrings() const {
+    std::vector<std::string> timeZoneStrings = {};
+
+    for (auto const& timezone : _timeZones) {
+        timeZoneStrings.push_back(timezone.first);
+    }
+
+    return timeZoneStrings;
+}
+
 void TimeZone::adjustTimeZone(timelib_time* timelibTime) const {
     if (isTimeZoneIDZone()) {
         timelib_set_timezone(timelibTime, _tzInfo.get());
