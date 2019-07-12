@@ -117,7 +117,8 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	}
 
 	if (0) {
-restart:	/*
+restart:
+		/*
 		 * Discard the currently held page and restart the search from
 		 * the root.
 		 */
@@ -162,7 +163,8 @@ restart:	/*
 			base = indx + 1;
 			--limit;
 		}
-descend:	/*
+descend:
+		/*
 		 * Reference the slot used for next step down the tree.
 		 *
 		 * Base is the smallest index greater than recno and may be the

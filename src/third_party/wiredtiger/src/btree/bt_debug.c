@@ -458,7 +458,8 @@ __wt_debug_disk(
 	case WT_PAGE_OVFL:
 		WT_ERR(ds->f(ds, ", datalen %" PRIu32, dsk->u.datalen));
 		break;
-	WT_ILLEGAL_VALUE_ERR(session, dsk->type);
+	default:
+		WT_ERR(__wt_illegal_value(session, dsk->type));
 	}
 
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED))
@@ -790,7 +791,8 @@ __debug_page(WT_DBG *ds, WT_REF *ref, uint32_t flags)
 		if (LF_ISSET(WT_DEBUG_TREE_LEAF))
 			WT_RET(__debug_page_row_leaf(ds, ref->page));
 		break;
-	WT_ILLEGAL_VALUE(session, ref->page->type);
+	default:
+		return (__wt_illegal_value(session, ref->page->type));
 	}
 
 	return (0);
@@ -840,7 +842,8 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 	case WT_PAGE_ROW_LEAF:
 		entries = page->entries;
 		break;
-	WT_ILLEGAL_VALUE(session, page->type);
+	default:
+		return (__wt_illegal_value(session, page->type));
 	}
 
 	WT_RET(ds->f(ds, ": %s\n", __wt_page_type_string(page->type)));
@@ -880,7 +883,8 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 			break;
 		case 0:
 			break;
-		WT_ILLEGAL_VALUE(session, mod->rec_result);
+		default:
+			return (__wt_illegal_value(session, mod->rec_result));
 		}
 	if (split_gen != 0)
 		WT_RET(ds->f(ds, ", split-gen=%" PRIu64, split_gen));
@@ -965,13 +969,14 @@ __debug_page_col_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 		WT_RET(__debug_ref(ds, ref));
 	} WT_INTL_FOREACH_END;
 
-	if (LF_ISSET(WT_DEBUG_TREE_WALK))
+	if (LF_ISSET(WT_DEBUG_TREE_WALK)) {
 		WT_INTL_FOREACH_BEGIN(session, page, ref) {
 			if (ref->state == WT_REF_MEM) {
 				WT_RET(ds->f(ds, "\n"));
 				WT_RET(__debug_page(ds, ref, flags));
 			}
 		} WT_INTL_FOREACH_END;
+	}
 
 	return (0);
 }
@@ -1039,13 +1044,14 @@ __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 		WT_RET(__debug_ref(ds, ref));
 	} WT_INTL_FOREACH_END;
 
-	if (LF_ISSET(WT_DEBUG_TREE_WALK))
+	if (LF_ISSET(WT_DEBUG_TREE_WALK)) {
 		WT_INTL_FOREACH_BEGIN(session, page, ref) {
 			if (ref->state == WT_REF_MEM) {
 				WT_RET(ds->f(ds, "\n"));
 				WT_RET(__debug_page(ds, ref, flags));
 			}
 		} WT_INTL_FOREACH_END;
+	}
 	return (0);
 }
 
@@ -1442,7 +1448,8 @@ __debug_cell_data(WT_DBG *ds,
 	case WT_CELL_VALUE_SHORT:
 		WT_ERR(__debug_item_value(ds, tag, buf->data, buf->size));
 		break;
-	WT_ILLEGAL_VALUE_ERR(session, unpack->raw);
+	default:
+		WT_ERR(__wt_illegal_value(session, unpack->raw));
 	}
 
 err:	__wt_scr_free(session, &buf);

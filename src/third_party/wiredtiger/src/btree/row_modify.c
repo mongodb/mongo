@@ -216,7 +216,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	}
 
 	if (0) {
-err:		/*
+err:
+		/*
 		 * Remove the update from the current transaction, so we don't
 		 * try to modify it on rollback.
 		 */
@@ -312,10 +313,16 @@ __wt_update_obsolete_check(
 {
 	WT_TXN_GLOBAL *txn_global;
 	WT_UPDATE *first, *next;
-	u_int count;
+	uint64_t oldest, stable;
+	u_int count, upd_seen, upd_unstable;
 
 	txn_global = &S2C(session)->txn_global;
 
+	upd_seen = upd_unstable = 0;
+	oldest = txn_global->has_oldest_timestamp ?
+	    txn_global->oldest_timestamp : WT_TS_NONE;
+	stable = txn_global->has_stable_timestamp ?
+	    txn_global->stable_timestamp : WT_TS_NONE;
 	/*
 	 * This function identifies obsolete updates, and truncates them from
 	 * the rest of the chain; because this routine is called from inside
@@ -330,12 +337,27 @@ __wt_update_obsolete_check(
 	for (first = NULL, count = 0; upd != NULL; upd = upd->next, count++) {
 		if (upd->txnid == WT_TXN_ABORTED)
 			continue;
-		if (!__wt_txn_upd_visible_all(session, upd))
+		/*
+		 * If the update isn't visible, it is not obsolete.
+		 */
+		++upd_seen;
+		if (!__wt_txn_upd_visible_all(session, upd)) {
 			first = NULL;
-		else if (first == NULL && (WT_UPDATE_DATA_VALUE(upd) ||
-		    upd->type == WT_UPDATE_BIRTHMARK))
-			first = upd;
+			/*
+			 * While we're here, also check for the update
+			 * being kept only for timestamp history to
+			 * gauge updates being kept due to history.
+			 */
+			if (upd->start_ts != WT_TS_NONE &&
+			    upd->start_ts >= oldest &&
+			    upd->start_ts < stable)
+				++upd_unstable;
+		} else if (first == NULL && (WT_UPDATE_DATA_VALUE(upd) ||
+			    upd->type == WT_UPDATE_BIRTHMARK))
+				first = upd;
 	}
+
+	__wt_cache_update_lookaside_score(session, upd_seen, upd_unstable);
 
 	/*
 	 * We cannot discard this WT_UPDATE structure, we can only discard

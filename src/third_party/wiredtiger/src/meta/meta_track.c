@@ -320,7 +320,8 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 			    ret = __wt_checkpoint_sync(session, NULL));
 	}
 
-err:	/*
+err:
+	/*
 	 * Undo any tracked operations on failure.
 	 * Apply any tracked operations post-commit.
 	 */

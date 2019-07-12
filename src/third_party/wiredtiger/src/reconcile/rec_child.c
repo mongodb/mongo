@@ -289,7 +289,9 @@ __wt_rec_child_modify(WT_SESSION_IMPL *session,
 			WT_ASSERT(session, WT_REF_SPLIT != WT_REF_SPLIT);
 			return (__wt_set_return(session, EBUSY));
 
-		WT_ILLEGAL_VALUE(session, r->tested_ref_state);
+		default:
+			return (__wt_illegal_value(
+			    session, r->tested_ref_state));
 		}
 		WT_STAT_CONN_INCR(session, child_modify_blocked_page);
 	}

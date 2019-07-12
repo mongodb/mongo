@@ -747,7 +747,8 @@ __curfile_create(WT_SESSION_IMPL *session,
 	WT_STAT_DATA_INCR(session, cursor_create);
 
 	if (0) {
-err:		/*
+err:
+		/*
 		 * Our caller expects to release the data handle if we fail.
 		 * Disconnect it from the cursor before closing.
 		 */
@@ -833,7 +834,8 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 
 	return (0);
 
-err:	/* If the cursor could not be opened, release the handle. */
+err:
+	/* If the cursor could not be opened, release the handle. */
 	WT_TRET(__wt_session_release_dhandle(session));
 	return (ret);
 }

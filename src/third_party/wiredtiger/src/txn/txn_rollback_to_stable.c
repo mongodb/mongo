@@ -327,7 +327,8 @@ __txn_abort_newer_updates(
 	case WT_PAGE_ROW_LEAF:
 		__txn_abort_newer_row_leaf(session, page, rollback_timestamp);
 		break;
-	WT_ILLEGAL_VALUE_ERR(session, page->type);
+	default:
+		WT_ERR(__wt_illegal_value(session, page->type));
 	}
 
 err:	if (local_read)

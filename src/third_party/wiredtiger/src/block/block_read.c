@@ -224,7 +224,6 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 {
 	WT_BLOCK_HEADER *blk, swap;
 	size_t bufsize;
-	uint32_t page_checksum;
 
 	__wt_verbose(session, WT_VERB_READ,
 	    "off %" PRIuMAX ", size %" PRIu32 ", checksum %#" PRIx32,
@@ -248,9 +247,6 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		F_SET(buf, WT_ITEM_ALIGNED);
 		bufsize = WT_MAX(size, buf->memsize + 10);
 	}
-	WT_RET(__wt_buf_init(session, buf, bufsize));
-	WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
-	buf->size = size;
 
 	/*
 	 * Ensure we don't read information that isn't there. It shouldn't ever
@@ -262,6 +258,10 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		"allocation size of %" PRIu32,
 		block->name, size, block->allocsize);
 
+	WT_RET(__wt_buf_init(session, buf, bufsize));
+	WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
+	buf->size = size;
+
 	/*
 	 * We incrementally read through the structure before doing a checksum,
 	 * do little- to big-endian handling early on, and then select from the
@@ -271,10 +271,9 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	__wt_block_header_byteswap_copy(blk, &swap);
 	if (swap.checksum == checksum) {
 		blk->checksum = 0;
-		page_checksum = __wt_checksum(buf->mem,
+		if (__wt_checksum_match(buf->mem,
 		    F_ISSET(&swap, WT_BLOCK_DATA_CKSUM) ?
-		    size : WT_BLOCK_COMPRESS_SKIP);
-		if (page_checksum == checksum) {
+		    size : WT_BLOCK_COMPRESS_SKIP, checksum)) {
 			/*
 			 * Swap the page-header as needed; this doesn't belong
 			 * here, but it's the best place to catch all callers.
@@ -287,10 +286,8 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			__wt_errx(session,
 			    "%s: read checksum error for %" PRIu32 "B block at "
 			    "offset %" PRIuMAX ": calculated block checksum "
-			    "of %#" PRIx32 " doesn't match expected checksum "
-			    "of %#" PRIx32,
-			    block->name,
-			    size, (uintmax_t)offset, page_checksum, checksum);
+			    " doesn't match expected checksum",
+			    block->name, size, (uintmax_t)offset);
 	} else
 		if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
 			__wt_errx(session,

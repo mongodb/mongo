@@ -1481,7 +1481,8 @@ __wt_session_range_truncate(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_schema_range_truncate(session, start, stop));
 
 done:
-err:	/*
+err:
+	/*
 	 * Close any locally-opened start cursor.
 	 *
 	 * Reset application cursors, they've possibly moved and the

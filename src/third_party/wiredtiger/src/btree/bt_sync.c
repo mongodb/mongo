@@ -371,7 +371,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		    WT_CLOCKDIFF_MS(time_stop, time_start));
 	}
 
-err:	/* On error, clear any left-over tree walk. */
+err:
+	/* On error, clear any left-over tree walk. */
 	WT_TRET(__wt_page_release(session, walk, flags));
 	WT_TRET(__wt_page_release(session, prev, flags));
 

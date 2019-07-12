@@ -222,7 +222,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 			WT_ERR(__wt_buf_set(session,
 			    current_key, las_key.data, las_key.size));
 			break;
-		WT_ILLEGAL_VALUE_ERR(session, page->type);
+		default:
+			WT_ERR(__wt_illegal_value(session, page->type));
 		}
 
 		/* Append the latest update to the list. */
@@ -252,7 +253,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 			    current_key, ref, &cbt, first_upd));
 			first_upd = NULL;
 			break;
-		WT_ILLEGAL_VALUE_ERR(session, page->type);
+		default:
+			WT_ERR(__wt_illegal_value(session, page->type));
 		}
 
 	/* Discard the cursor. */
@@ -579,7 +581,8 @@ skip_read:
 	WT_REF_SET_STATE(ref, final_state);
 	return (ret);
 
-err:	/*
+err:
+	/*
 	 * If the function building an in-memory version of the page failed,
 	 * it discarded the page, but not the disk image.  Discard the page
 	 * and separately discard the disk image in all cases.
@@ -611,7 +614,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 	uint64_t sleep_usecs, yield_cnt;
 	uint32_t current_state;
 	int force_attempts;
-	bool busy, cache_work, did_read, stalled, wont_need;
+	bool busy, cache_work, evict_skip, stalled, wont_need;
 
 	btree = S2BT(session);
 
@@ -634,7 +637,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 		WT_STAT_DATA_INCR(session, cache_pages_requested);
 	}
 
-	for (did_read = wont_need = stalled = false,
+	for (evict_skip = stalled = wont_need = false,
 	    force_attempts = 0, sleep_usecs = yield_cnt = 0;;) {
 		switch (current_state = ref->state) {
 		case WT_REF_DELETED:
@@ -664,7 +667,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			if (LF_ISSET(WT_READ_CACHE))
 				return (WT_NOTFOUND);
 
-read:			/*
+read:
+			/*
 			 * The page isn't in memory, read it. If this thread
 			 * respects the cache size, check for space in the
 			 * cache.
@@ -680,7 +684,7 @@ read:			/*
 			 * We just read a page, don't evict it before we have a
 			 * chance to use it.
 			 */
-			did_read = true;
+			evict_skip = true;
 
 			/*
 			 * If configured to not trash the cache, leave the page
@@ -760,7 +764,7 @@ read:			/*
 			/*
 			 * Check if the page requires forced eviction.
 			 */
-			if (did_read || LF_ISSET(WT_READ_NO_SPLIT) ||
+			if (evict_skip || LF_ISSET(WT_READ_NO_SPLIT) ||
 			    btree->evict_disabled > 0 || btree->lsm_primary)
 				goto skip_evict;
 
@@ -780,8 +784,13 @@ read:			/*
 			    __evict_force_check(session, ref)) {
 				++force_attempts;
 				ret = __wt_page_release_evict(session, ref, 0);
-				/* If forced eviction fails, stall. */
-				if (ret == EBUSY) {
+				/*
+				 * If forced eviction succeeded, don't retry.
+				 * If it failed, stall.
+				 */
+				if (ret == 0)
+					evict_skip = true;
+				else if (ret == EBUSY) {
 					WT_NOT_READ(ret, 0);
 					WT_STAT_CONN_INCR(session,
 					    page_forcible_evict_blocked);
@@ -800,7 +809,8 @@ read:			/*
 				continue;
 			}
 
-skip_evict:		/*
+skip_evict:
+			/*
 			 * If we read the page and are configured to not trash
 			 * the cache, and no other thread has already used the
 			 * page, set the read generation so the page is evicted
@@ -837,7 +847,8 @@ skip_evict:		/*
 			return (LF_ISSET(WT_READ_IGNORE_CACHE_SIZE) &&
 			    !F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE) ?
 			    0 : __wt_txn_autocommit_check(session));
-		WT_ILLEGAL_VALUE(session, current_state);
+		default:
+			return (__wt_illegal_value(session, current_state));
 		}
 
 		/*
@@ -856,14 +867,13 @@ skip_evict:		/*
 
 		/*
 		 * If stalling and this thread is allowed to do eviction work,
-		 * check if the cache needs help. If we do work for the cache,
-		 * substitute that for a sleep.
+		 * check if the cache needs help evicting clean pages (don't
+		 * force a read to do dirty eviction).  If we do work for the
+		 * cache, substitute that for a sleep.
 		 */
 		if (!LF_ISSET(WT_READ_IGNORE_CACHE_SIZE)) {
 			WT_RET(__wt_cache_eviction_check(
-			    session, true,
-			    !F_ISSET(&session->txn, WT_TXN_HAS_ID),
-			    &cache_work));
+			    session, true, true, &cache_work));
 			if (cache_work)
 				continue;
 		}

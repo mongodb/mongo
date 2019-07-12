@@ -277,7 +277,8 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	}
 
 	if (0) {
-restart:	/*
+restart:
+		/*
 		 * Discard the currently held page and restart the search from
 		 * the root.
 		 */
@@ -431,7 +432,8 @@ append:			if (__wt_split_descent_race(
 				goto restart;
 		}
 
-descend:	/* Encourage races. */
+descend:
+		/* Encourage races. */
 		WT_DIAGNOSTIC_YIELD;
 
 		/*

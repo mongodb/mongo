@@ -225,7 +225,8 @@ __thread_group_resize(
 		__wt_thread_group_start_one(session, group, true);
 	return (0);
 
-err:	/*
+err:
+	/*
 	 * An error resizing a thread array is currently fatal, it should only
 	 * happen in an out of memory situation. Do real cleanup just in case
 	 * that changes in the future.

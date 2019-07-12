@@ -27,6 +27,9 @@
  */
 
 #include <wiredtiger_config.h>
+#if defined(_M_AMD64)
+#include <intrin.h>
+#endif
 #include <inttypes.h>
 #include <stddef.h>
 

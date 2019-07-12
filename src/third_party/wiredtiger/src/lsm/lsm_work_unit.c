@@ -795,7 +795,8 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		cookie.chunk_array[i] = NULL;
 	}
 
-err:	/* Flush the metadata unless the system is in panic */
+err:
+	/* Flush the metadata unless the system is in panic */
 	if (flush_metadata && ret != WT_PANIC) {
 		__wt_lsm_tree_writelock(session, lsm_tree);
 		WT_TRET(__wt_lsm_meta_write(session, lsm_tree, NULL));

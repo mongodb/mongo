@@ -116,7 +116,8 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	}
 
 	if (0) {
-err:		/* On error, clear any left-over tree walk. */
+err:
+		/* On error, clear any left-over tree walk. */
 		if (next_ref != NULL)
 			WT_TRET(__wt_page_release(
 			    session, next_ref, walk_flags));

@@ -42,21 +42,21 @@ __wt_log_printf(WT_SESSION_IMPL *session, const char *format, ...)
  *	Given a log record, return whether the checksum matches.
  */
 static bool
-__log_checksum_match(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t reclen)
+__log_checksum_match(WT_ITEM *buf, uint32_t reclen)
 {
 	WT_LOG_RECORD *logrec;
-	uint32_t checksum_calculate, checksum_tmp;
+	uint32_t checksum_saved, checksum_tmp;
+	bool checksum_matched;
 
-	WT_UNUSED(session);
-	logrec = (WT_LOG_RECORD *)buf->mem;
-	checksum_tmp = logrec->checksum;
-	logrec->checksum = 0;
-	checksum_calculate = __wt_checksum(logrec, reclen);
+	logrec = buf->mem;
+	checksum_saved = checksum_tmp = logrec->checksum;
 #ifdef WORDS_BIGENDIAN
-	checksum_calculate = __wt_bswap32(checksum_calculate);
+	checksum_tmp = __wt_bswap32(checksum_tmp);
 #endif
-	logrec->checksum = checksum_tmp;
-	return (logrec->checksum == checksum_calculate);
+	logrec->checksum = 0;
+	checksum_matched = __wt_checksum_match(logrec, reclen, checksum_tmp);
+	logrec->checksum = checksum_saved;
+	return (checksum_matched);
 }
 
 /*
@@ -1032,7 +1032,7 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp,
 		goto err;
 	}
 
-	if (!__log_checksum_match(session, buf, allocsize))
+	if (!__log_checksum_match(buf, allocsize))
 		WT_ERR_MSG(session, WT_ERROR,
 		    "%s: System log record checksum mismatch", fh->name);
 	__wt_log_record_byteswap(logrec);
@@ -2479,7 +2479,7 @@ advance:
 		 */
 		buf->size = reclen;
 		logrec = (WT_LOG_RECORD *)buf->mem;
-		if (!__log_checksum_match(session, buf, reclen)) {
+		if (!__log_checksum_match(buf, reclen)) {
 			/*
 			 * A checksum mismatch means we have reached the end of
 			 * the useful part of the log.  This should be found on

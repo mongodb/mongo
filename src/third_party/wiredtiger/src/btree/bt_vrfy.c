@@ -290,7 +290,8 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 done:
-err:	/* Inform the underlying block manager we're done. */
+err:
+	/* Inform the underlying block manager we're done. */
 	if (bm_start)
 		WT_TRET(bm->verify_end(bm, session));
 

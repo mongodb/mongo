@@ -291,3 +291,37 @@ __wt_timing_stress(WT_SESSION_IMPL *session, u_int flag)
 		/* The default maximum delay is 1/10th of a second. */
 		__wt_sleep(0, i * (WT_TIMING_STRESS_MAX_DELAY / 10));
 }
+
+/*
+ * The hardware-accelerated checksum code that originally shipped on Windows
+ * did not correctly handle memory that wasn't 8B aligned and a multiple of 8B.
+ * It's likely that calculations were always 8B aligned, but there's some risk.
+ *
+ * What we do is always write the correct checksum, and if a checksum test
+ * fails, check it against the alternate version have before failing.
+ */
+
+#if defined(_M_AMD64) && !defined(HAVE_NO_CRC32_HARDWARE)
+/*
+ * __wt_checksum_match --
+ *	Return if a checksum matches either the primary or alternate values.
+ */
+static inline bool
+__wt_checksum_match(const void *chunk, size_t len, uint32_t v)
+{
+	return (__wt_checksum(chunk, len) == v ||
+	    __wt_checksum_alt_match(chunk, len, v));
+}
+
+#else
+
+/*
+ * __wt_checksum_match --
+ *	Return if a checksum matches.
+ */
+static inline bool
+__wt_checksum_match(const void *chunk, size_t len, uint32_t v)
+{
+	return (__wt_checksum(chunk, len) == v);
+}
+#endif

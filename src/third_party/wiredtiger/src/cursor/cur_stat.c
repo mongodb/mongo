@@ -711,7 +711,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 
 	/*
 	 * We return the statistics field's offset as the key, and a string
-	 * description, a string value, and a uint64_t value as the value
+	 * description, a string value, and a int64_t value as the value
 	 * columns.
 	 */
 	cursor->key_format = "i";

@@ -95,7 +95,8 @@ wiredtiger_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
 		WT_RET(__pack_write(
 		    session, &pv, &ps->p, (size_t)(ps->end - ps->p)));
 		break;
-	WT_ILLEGAL_VALUE(session, pv.type);
+	default:
+		return (__wt_illegal_value(session, pv.type));
 	}
 
 	return (0);
@@ -128,7 +129,8 @@ wiredtiger_pack_int(WT_PACK_STREAM *ps, int64_t i)
 		WT_RET(__pack_write(
 		    session, &pv, &ps->p, (size_t)(ps->end - ps->p)));
 		break;
-	WT_ILLEGAL_VALUE(session, pv.type);
+	default:
+		return (__wt_illegal_value(session, pv.type));
 	}
 
 	return (0);
@@ -158,7 +160,8 @@ wiredtiger_pack_str(WT_PACK_STREAM *ps, const char *s)
 		WT_RET(__pack_write(
 		    session, &pv, &ps->p, (size_t)(ps->end - ps->p)));
 		break;
-	WT_ILLEGAL_VALUE(session, pv.type);
+	default:
+		return (__wt_illegal_value(session, pv.type));
 	}
 
 	return (0);
@@ -194,7 +197,8 @@ wiredtiger_pack_uint(WT_PACK_STREAM *ps, uint64_t u)
 		WT_RET(__pack_write(
 		    session, &pv, &ps->p, (size_t)(ps->end - ps->p)));
 		break;
-	WT_ILLEGAL_VALUE(session, pv.type);
+	default:
+		return (__wt_illegal_value(session, pv.type));
 	}
 
 	return (0);
@@ -225,7 +229,8 @@ wiredtiger_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
 		item->data = pv.u.item.data;
 		item->size = pv.u.item.size;
 		break;
-	WT_ILLEGAL_VALUE(session, pv.type);
+	default:
+		return (__wt_illegal_value(session, pv.type));
 	}
 
 	return (0);
@@ -258,7 +263,8 @@ wiredtiger_unpack_int(WT_PACK_STREAM *ps, int64_t *ip)
 		    &pv, (const uint8_t **)&ps->p, (size_t)(ps->end - ps->p)));
 		*ip = pv.u.i;
 		break;
-	WT_ILLEGAL_VALUE(session, pv.type);
+	default:
+		return (__wt_illegal_value(session, pv.type));
 	}
 	return (0);
 }
@@ -287,7 +293,8 @@ wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp)
 		    &pv, (const uint8_t **)&ps->p, (size_t)(ps->end - ps->p)));
 		*sp = pv.u.s;
 		break;
-	WT_ILLEGAL_VALUE(session, pv.type);
+	default:
+		return (__wt_illegal_value(session, pv.type));
 	}
 	return (0);
 }
@@ -322,7 +329,8 @@ wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up)
 		    &pv, (const uint8_t **)&ps->p, (size_t)(ps->end - ps->p)));
 		*up = pv.u.u;
 		break;
-	WT_ILLEGAL_VALUE(session, pv.type);
+	default:
+		return (__wt_illegal_value(session, pv.type));
 	}
 	return (0);
 }

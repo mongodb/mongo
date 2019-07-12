@@ -244,8 +244,9 @@ next:	if (pack->cur == pack->end)
 	case 'R':							\
 		(pv).u.u = va_arg(ap, uint64_t);			\
 		break;							\
-	/* User format strings have already been validated. */		\
-	WT_ILLEGAL_VALUE(session, (pv).type);				\
+	default:							\
+		/* User format strings have already been validated. */	\
+		return (__wt_illegal_value(session, (pv).type));	\
 	}								\
 } while (0)
 
@@ -611,8 +612,9 @@ __unpack_read(WT_SESSION_IMPL *session,
 	case 'R':							\
 		*va_arg(ap, uint64_t *) = (pv).u.u;			\
 		break;							\
-	/* User format strings have already been validated. */		\
-	WT_ILLEGAL_VALUE(session, (pv).type);				\
+	default:							\
+		/* User format strings have already been validated. */	\
+		return (__wt_illegal_value(session, (pv).type));	\
 	}								\
 } while (0)
 

@@ -192,7 +192,8 @@ __wt_random_descent(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 	eviction = LF_ISSET(WT_READ_CACHE);
 
 	if (0) {
-restart:	/*
+restart:
+		/*
 		 * Discard the currently held page and restart the search from
 		 * the root.
 		 */
