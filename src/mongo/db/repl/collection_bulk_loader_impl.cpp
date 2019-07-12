@@ -44,6 +44,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/collection_bulk_loader_impl.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -113,58 +114,89 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
         });
 }
 
-Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
-                                                 const std::vector<BSONObj>::const_iterator end) {
-    return _runTaskReleaseResourcesOnFailure([&] {
-        UnreplicatedWritesBlock uwb(_opCtx.get());
+Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
+    const std::vector<BSONObj>::const_iterator begin,
+    const std::vector<BSONObj>::const_iterator end) {
+    auto iter = begin;
+    while (iter != end) {
+        std::vector<RecordId> locs;
+        Status status = writeConflictRetry(
+            _opCtx.get(), "CollectionBulkLoaderImpl/insertDocomuntsUncapped", _nss.ns(), [&] {
+                WriteUnitOfWork wunit(_opCtx.get());
+                auto insertIter = iter;
+                int bytesInBlock = 0;
+                locs.clear();
 
-        for (auto iter = begin; iter != end; ++iter) {
-            boost::optional<RecordId> loc;
-            const auto& doc = *iter;
-            Status status = writeConflictRetry(
-                _opCtx.get(), "CollectionBulkLoaderImpl::insertDocuments", _nss.ns(), [&] {
-                    WriteUnitOfWork wunit(_opCtx.get());
-                    if (_idIndexBlock || _secondaryIndexesBlock) {
-                        auto onRecordInserted = [&](const RecordId& location) {
-                            loc = location;
-                            return Status::OK();
-                        };
-                        // This version of insert will not update any indexes.
-                        const auto status = _autoColl->getCollection()->insertDocumentForBulkLoader(
-                            _opCtx.get(), doc, onRecordInserted);
-                        if (!status.isOK()) {
-                            return status;
-                        }
-                    } else {
-                        // For capped collections, we use regular insertDocument, which will update
-                        // pre-existing indexes.
-                        const auto status = _autoColl->getCollection()->insertDocument(
-                            _opCtx.get(), InsertStatement(doc), nullptr);
-                        if (!status.isOK()) {
-                            return status;
-                        }
-                    }
-
-                    wunit.commit();
-
+                auto onRecordInserted = [&](const RecordId& location) {
+                    locs.emplace_back(location);
                     return Status::OK();
-                });
+                };
 
-            if (!status.isOK()) {
-                return status;
-            }
+                while (insertIter != end && bytesInBlock < collectionBulkLoaderBatchSizeInBytes) {
+                    const auto& doc = *insertIter++;
+                    bytesInBlock += doc.objsize();
+                    // This version of insert will not update any indexes.
+                    const auto status = _autoColl->getCollection()->insertDocumentForBulkLoader(
+                        _opCtx.get(), doc, onRecordInserted);
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                }
 
-            if (loc) {
-                // Inserts index entries into the external sorter. This will not update
-                // pre-existing indexes.
-                status = _addDocumentToIndexBlocks(doc, loc.get());
-            }
+                wunit.commit();
+                return Status::OK();
+            });
 
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // Inserts index entries into the external sorter. This will not update
+        // pre-existing indexes.
+        for (size_t index = 0; index < locs.size(); ++index) {
+            status = _addDocumentToIndexBlocks(*iter++, locs.at(index));
             if (!status.isOK()) {
                 return status;
             }
         }
-        return Status::OK();
+    }
+    return Status::OK();
+}
+
+Status CollectionBulkLoaderImpl::_insertDocumentsForCappedCollection(
+    const std::vector<BSONObj>::const_iterator begin,
+    const std::vector<BSONObj>::const_iterator end) {
+    for (auto iter = begin; iter != end; ++iter) {
+        const auto& doc = *iter;
+        Status status = writeConflictRetry(
+            _opCtx.get(), "CollectionBulkLoaderImpl/insertDocumentsCapped", _nss.ns(), [&] {
+                WriteUnitOfWork wunit(_opCtx.get());
+                // For capped collections, we use regular insertDocument, which
+                // will update pre-existing indexes.
+                const auto status = _autoColl->getCollection()->insertDocument(
+                    _opCtx.get(), InsertStatement(doc), nullptr);
+                if (!status.isOK()) {
+                    return status;
+                }
+                wunit.commit();
+                return Status::OK();
+            });
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
+                                                 const std::vector<BSONObj>::const_iterator end) {
+    return _runTaskReleaseResourcesOnFailure([&] {
+        UnreplicatedWritesBlock uwb(_opCtx.get());
+        if (_idIndexBlock || _secondaryIndexesBlock) {
+            return _insertDocumentsForUncappedCollection(begin, end);
+        } else {
+            return _insertDocumentsForCappedCollection(begin, end);
+        }
     });
 }
 
