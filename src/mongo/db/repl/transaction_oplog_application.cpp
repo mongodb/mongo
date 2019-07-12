@@ -454,7 +454,7 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
             // we query for an incomplete key and an adjacent key is prepared.
             // We ignore prepare conflicts on recovering nodes because they may encounter prepare
             // conflicts that did not occur on the primary.
-            opCtx->recoveryUnit()->setPrepareConflictBehavior(
+            newOpCtx->recoveryUnit()->setPrepareConflictBehavior(
                 PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
             // Checks out the session, applies the operations and prepares the transaction.
