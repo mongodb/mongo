@@ -523,6 +523,12 @@ class MongoDBJavaScriptStack(gdb.Command):
                     print("Ignoring invalid thread %d in javascript_stack" % thread.num)
                     continue
                 thread.switch()
+
+                # Switch frames so gdb actually knows about the mongo::mozjs namespace. It doesn't
+                # actually matter which frame so long as it isn't the top of the stack. This also
+                # enables gdb to know about the mongo::mozjs::kCurrentScope thread-local variable
+                # when using gdb.parse_and_eval().
+                gdb.selected_frame().older().select()
             except gdb.error as err:
                 print("Ignoring GDB error '%s' in javascript_stack" % str(err))
                 continue
