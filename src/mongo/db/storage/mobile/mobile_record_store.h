@@ -93,8 +93,10 @@ public:
         return false;
     }
 
+    /**
+     * Validates the entire database file, not just the table used by this record store.
+     */
     void validate(OperationContext* opCtx,
-                  ValidateCmdLevel level,
                   ValidateResults* results,
                   BSONObjBuilder* output) override;
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/catalog/private/record_store_validate_adaptor.h"
+#include "mongo/db/catalog/record_store_validate_adaptor.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -195,7 +195,6 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
 }
 
 void RecordStoreValidateAdaptor::traverseRecordStore(RecordStore* recordStore,
-                                                     ValidateCmdLevel level,
                                                      ValidateResults* results,
                                                      BSONObjBuilder* output) {
     long long nrecords = 0;

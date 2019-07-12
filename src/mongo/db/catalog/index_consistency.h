@@ -39,14 +39,6 @@
 namespace mongo {
 
 /**
- * The IndexConsistency class is used to keep track of the index consistency.
- * It does this by using the index keys from index entries and index keys generated from the
- * document to ensure there is a one-to-one mapping for each key.
- * In addition, an IndexObserver class can be hooked into the IndexAccessMethod to inform
- * this class about changes to the indexes during a validation and compensate for them.
- */
-
-/**
  * Contains all the index information and stats throughout the validation.
  */
 struct IndexInfo {
@@ -67,12 +59,18 @@ struct IndexInfo {
     std::set<uint32_t> hashedMultikeyMetadataPaths;
 };
 
+/**
+ * The IndexConsistency class is used to keep track of the index consistency.
+ * It does this by using the index keys from index entries and index keys generated from the
+ * document to ensure there is a one-to-one mapping for each key.
+ * In addition, an IndexObserver class can be hooked into the IndexAccessMethod to inform
+ * this class about changes to the indexes during a validation and compensate for them.
+ */
 class IndexConsistency final {
+    using IndexInfoMap = std::map<std::string, IndexInfo>;
     using ValidateResultsMap = std::map<std::string, ValidateResults>;
 
 public:
-    using IndexInfoMap = std::map<std::string, IndexInfo>;
-
     IndexConsistency(OperationContext* opCtx,
                      Collection* collection,
                      NamespaceString nss,

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -43,7 +43,8 @@ class IndexConsistency;
 namespace {
 
 using ValidateResultsMap = std::map<std::string, ValidateResults>;
-}
+
+}  // namespace
 
 /**
  * The record store validate adaptor is used to keep track of the index consistency during
@@ -83,7 +84,6 @@ public:
      * set to keep track of the index consistency during a validation.
      */
     void traverseRecordStore(RecordStore* recordStore,
-                             ValidateCmdLevel level,
                              ValidateResults* results,
                              BSONObjBuilder* output);
 

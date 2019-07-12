@@ -185,7 +185,6 @@ public:
     }
 
     virtual void validate(OperationContext* opCtx,
-                          ValidateCmdLevel level,
                           ValidateResults* results,
                           BSONObjBuilder* output);
 

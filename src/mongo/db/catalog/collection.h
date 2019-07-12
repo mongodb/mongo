@@ -338,9 +338,11 @@ public:
     virtual Status truncate(OperationContext* const opCtx) = 0;
 
     /**
+     * Expects the caller to hold at least a collection IS lock.
+     *
      * @return OK if the validate run successfully
      *         OK will be returned even if corruption is found
-     *         deatils will be in result.
+     *         details will be in 'results'.
      */
     virtual Status validate(OperationContext* const opCtx,
                             const ValidateCmdLevel level,

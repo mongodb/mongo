@@ -479,7 +479,6 @@ public:
      * structures. If corruption is found, details of the errors will be in the results parameter.
      */
     virtual void validate(OperationContext* opCtx,
-                          ValidateCmdLevel level,
                           ValidateResults* results,
                           BSONObjBuilder* output) {}
 

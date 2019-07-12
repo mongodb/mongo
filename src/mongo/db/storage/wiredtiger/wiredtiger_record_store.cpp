@@ -1490,13 +1490,11 @@ Status WiredTigerRecordStore::compact(OperationContext* opCtx) {
 }
 
 void WiredTigerRecordStore::validate(OperationContext* opCtx,
-                                     ValidateCmdLevel level,
                                      ValidateResults* results,
                                      BSONObjBuilder* output) {
     dassert(opCtx->lockState()->isReadLocked());
 
-    // Only full validate should verify table.
-    if (_isEphemeral || level != kValidateFull) {
+    if (_isEphemeral) {
         return;
     }
 

@@ -226,11 +226,6 @@ public:
      */
     Status truncate(OperationContext* opCtx) final;
 
-    /**
-     * @return OK if the validate run successfully
-     *         OK will be returned even if corruption is found
-     *         deatils will be in result
-     */
     Status validate(OperationContext* opCtx,
                     ValidateCmdLevel level,
                     bool background,

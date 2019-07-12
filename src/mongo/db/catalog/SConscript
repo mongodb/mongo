@@ -299,7 +299,7 @@ env.Library(
         "index_catalog_entry_impl.cpp",
         "index_catalog_impl.cpp",
         "index_consistency.cpp",
-        "private/record_store_validate_adaptor.cpp",
+        "record_store_validate_adaptor.cpp",
     ],
     LIBDEPS=[
         'collection',

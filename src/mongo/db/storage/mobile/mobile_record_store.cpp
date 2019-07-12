@@ -384,17 +384,10 @@ Status MobileRecordStore::truncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
-/**
- * Note: on full validation, this validates the entire database file, not just the table used by
- * this record store.
- */
 void MobileRecordStore::validate(OperationContext* opCtx,
-                                 ValidateCmdLevel level,
                                  ValidateResults* results,
                                  BSONObjBuilder* output) {
-    if (level == kValidateFull) {
-        embedded::doValidate(opCtx, results);
-    }
+    embedded::doValidate(opCtx, results);
 }
 
 Status MobileRecordStore::touch(OperationContext* opCtx, BSONObjBuilder* output) const {

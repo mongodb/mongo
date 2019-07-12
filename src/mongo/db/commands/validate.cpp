@@ -50,20 +50,33 @@ using std::endl;
 using std::string;
 using std::stringstream;
 
+// Sets the 'valid' result field to false and returns immediately.
 MONGO_FAIL_POINT_DEFINE(validateCmdCollectionNotValid);
 
 namespace {
 
-// Protects `_validationQueue`
+// Protects the state below.
 stdx::mutex _validationMutex;
 
-// Wakes up `_validationQueue`
+// Holds the set of full `databaseName.collectionName` namespace strings in progress. Validation
+// commands register themselves in this data structure so that subsequent commands on the same
+// namespace will wait rather than run in parallel.
+std::set<std::string> _validationsInProgress;
+
+// This is waited upon if there is found to already be a validation command running on the targeted
+// namespace, as _validationsInProgress would indicate. This is signaled when a validation command
+// finishes on any namespace.
 stdx::condition_variable _validationNotifier;
 
-// Holds the set of full `database.collections` namespace strings in progress.
-std::set<std::string> _validationsInProgress;
 }  // namespace
 
+/**
+ * Example validate command:
+ *   {
+ *       validate: "collectionNameWithoutTheDBPart",
+ *       full: <bool>  // If true, a more thorough (and slower) collection validation is performed.
+ *   }
+ */
 class ValidateCmd : public BasicCommand {
 public:
     ValidateCmd() : BasicCommand("validate") {}
@@ -97,7 +110,6 @@ public:
         actions.addAction(ActionType::validate);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
-    //{ validate: "collectionnamewithoutthedbpart" [, full: <bool> } */
 
     bool run(OperationContext* opCtx,
              const string& dbname,
@@ -113,26 +125,21 @@ public:
         const bool full = cmdObj["full"].trueValue();
 
         ValidateCmdLevel level = kValidateNormal;
-
         if (full) {
             level = kValidateFull;
-        }
-
-        if (cmdObj["scandata"]) {
-            const char* deprecationWarning =
-                "the scandata option is deprecated and will be removed in a future release";
-            result.append("note", deprecationWarning);
         }
 
         if (!serverGlobalParams.quiet.load()) {
             LOG(0) << "CMD: validate " << nss.ns();
         }
 
-        AutoGetDb ctx(opCtx, nss.db(), MODE_IX);
-        Lock::CollectionLock collLk(opCtx, nss, MODE_X);
-        Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(opCtx, nss) : nullptr;
+        AutoGetDb autoDB(opCtx, nss.db(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+
+        Collection* collection =
+            autoDB.getDb() ? autoDB.getDb()->getCollection(opCtx, nss) : nullptr;
         if (!collection) {
-            if (ctx.getDb() && ViewCatalog::get(ctx.getDb())->lookup(opCtx, nss.ns())) {
+            if (autoDB.getDb() && ViewCatalog::get(autoDB.getDb())->lookup(opCtx, nss.ns())) {
                 uasserted(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");
             }
 
@@ -141,7 +148,7 @@ public:
 
         result.append("ns", nss.ns());
 
-        // Only one validation per collection can be in progress, the rest wait in order.
+        // Only one validation per collection can be in progress, the rest wait.
         {
             stdx::unique_lock<stdx::mutex> lock(_validationMutex);
             try {
@@ -152,7 +159,7 @@ public:
                 CommandHelpers::appendCommandStatusNoThrow(
                     result,
                     {ErrorCodes::CommandFailed,
-                     str::stream() << "Exception during validation: " << e.toString()});
+                     str::stream() << "Exception thrown during validation: " << e.toString()});
                 return false;
             }
 
@@ -165,7 +172,7 @@ public:
             _validationNotifier.notify_all();
         });
 
-        // TODO SERVER-30357: Add support for background validation.
+        // TODO (SERVER-30357): Add support for background validation.
         const bool background = false;
 
         ValidateResults results;
@@ -179,8 +186,7 @@ public:
 
         // All collections must have a UUID.
         if (!opts.uuid) {
-            results.errors.push_back(str::stream() << "UUID missing on collection " << nss.ns()
-                                                   << " but SchemaVersion=3.6");
+            results.errors.push_back(str::stream() << "UUID missing on collection " << nss.ns());
             results.valid = false;
         }
 
