@@ -68,20 +68,24 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         dbpath_prefix = fixture.get_dbpath_prefix()
 
         if use_stepdown_permitted_file:
-            stepdown_files = StepdownFiles._make(
+            self.__stepdown_files = StepdownFiles._make(
                 [os.path.join(dbpath_prefix, field) for field in StepdownFiles._fields])
-            self.__lifecycle = FileBasedStepdownLifecycle(stepdown_files)
         else:
-            self.__lifecycle = FlagBasedStepdownLifecycle()
+            self.__stepdown_files = None
 
     def before_suite(self, test_report):
         """Before suite."""
         if not self._rs_fixtures:
             self._add_fixture(self._fixture)
 
+        if self.__stepdown_files is not None:
+            lifecycle = FileBasedStepdownLifecycle(self.__stepdown_files)
+        else:
+            lifecycle = FlagBasedStepdownLifecycle()
+
         self._stepdown_thread = _StepdownThread(
             self.logger, self._mongos_fixtures, self._rs_fixtures, self._stepdown_interval_secs,
-            self._terminate, self._kill, self.__lifecycle, self._wait_for_mongos_retarget,
+            self._terminate, self._kill, lifecycle, self._wait_for_mongos_retarget,
             self._stepdown_via_heartbeats)
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
