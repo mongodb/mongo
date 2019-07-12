@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/container_size_helper.h"
 
 namespace mongo {
 
@@ -87,8 +88,8 @@ public:
     explicit FieldRef(StringData path);
 
     /**
-     * Field parts accessed through getPart() calls no longer would be valid, after the
-     * destructor ran.
+     * Field parts accessed through getPart() calls no longer would be valid, after the destructor
+     * ran.
      */
     ~FieldRef() {}
 
@@ -98,8 +99,8 @@ public:
     void parse(StringData dottedField);
 
     /**
-     * Sets the 'i-th' field part to point to 'part'. Assumes i < size(). Behavior is
-     * undefined otherwise.
+     * Sets the 'i-th' field part to point to 'part'. Assumes i < size(). Behavior is undefined
+     * otherwise.
      */
     void setPart(size_t i, StringData part);
 
@@ -109,8 +110,8 @@ public:
     void appendPart(StringData part);
 
     /**
-     * Removes the last part from the path, decreasing its size by 1. Has no effect on a
-     * FieldRef with size 0.
+     * Removes the last part from the path, decreasing its size by 1. Has no effect on a FieldRef
+     * with size 0.
      */
     void removeLastPart();
 
@@ -159,14 +160,14 @@ public:
     std::set<size_t> getNumericPathComponents(size_t startPart = 0) const;
 
     /**
-     * Returns a StringData of the full dotted field in its current state (i.e., some parts may
-     * have been replaced since the parse() call).
+     * Returns a StringData of the full dotted field in its current state (i.e., some parts may have
+     * been replaced since the parse() call).
      */
     StringData dottedField(size_t offsetFromStart = 0) const;
 
     /**
-     * Returns a StringData of parts of the dotted field from startPart to endPart in its
-     * current state (i.e., some parts may have been replaced since the parse() call).
+     * Returns a StringData of parts of the dotted field from startPart to endPart in its current
+     * state (i.e., some parts may have been replaced since the parse() call).
      */
     StringData dottedSubstring(size_t startPart, size_t endPart) const;
 
@@ -176,8 +177,8 @@ public:
     bool equalsDottedField(StringData other) const;
 
     /**
-     * Return 0 if 'this' is equal to 'other' lexicographically, -1 if is it less than or
-     * +1 if it is greater than.
+     * Return 0 if 'this' is equal to 'other' lexicographically, -1 if is it less than or +1 if it
+     * is greater than.
      */
     int compare(const FieldRef& other) const;
 
@@ -203,6 +204,18 @@ public:
 
     StringData operator[](int index) const {
         return getPart(index);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const {
+        return  // Add size of each element in '_replacements' vector.
+            container_size_helper::estimateObjectSizeInBytes(
+                _replacements, [](const std::string& s) { return s.capacity(); }, true) +
+            // Add size of each element in '_variable' vector.
+            container_size_helper::estimateObjectSizeInBytes(_variable) +
+            // Add runtime size of '_dotted' string.
+            _dotted.capacity() +
+            // Add size of the object.
+            sizeof(*this);
     }
 
 private:

@@ -37,6 +37,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/container_size_helper.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -109,6 +110,9 @@ struct CoreIndexInfo {
             return "(" + catalogName + ", " + disambiguator + ")";
         }
 
+        uint64_t estimateObjectSizeInBytes() const {
+            return catalogName.capacity() + disambiguator.capacity() + sizeof(*this);
+        }
         // The name of the index in the catalog.
         std::string catalogName;
 
@@ -194,6 +198,32 @@ struct IndexEntry : CoreIndexInfo {
     }
 
     std::string toString() const;
+
+    uint64_t estimateObjectSizeInBytes() const {
+
+        return  // For each element in 'multikeyPaths' add the 'length of the vector * size of the
+                // vector element'.
+            container_size_helper::estimateObjectSizeInBytes(
+                multikeyPaths,
+                [](const auto& keyPath) {
+                    // Calculate the size of each std::set in 'multiKeyPaths'.
+                    return container_size_helper::estimateObjectSizeInBytes(keyPath);
+                },
+                true) +
+            container_size_helper::estimateObjectSizeInBytes(
+                multikeyPathSet,
+                [](const auto& fieldRef) { return fieldRef.estimateObjectSizeInBytes(); },
+                false) +
+            // Subtract static size of 'identifier' since it is already included in
+            // 'sizeof(*this)'.
+            (identifier.estimateObjectSizeInBytes() - sizeof(identifier)) +
+            // Add the runtime BSONObj size of 'keyPattern'.
+            keyPattern.objsize() +
+            // The BSON size of the 'infoObj' is purposefully excluded since its ownership is shared
+            // with the index catalog.
+            // Add size of the object.
+            sizeof(*this);
+    }
 
     bool multikey;
 
