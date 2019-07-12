@@ -869,7 +869,7 @@ void TransactionParticipant::Participant::resetRetryableWriteState(OperationCont
 }
 
 void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
-    OperationContext* opCtx, MaxLockTimeout maxLockTimeout) {
+    OperationContext* opCtx, MaxLockTimeout maxLockTimeout, AcquireTicket acquireTicket) {
     // Transaction resources already exist for this transaction.  Transfer them from the
     // stash to the operation context.
     //
@@ -910,8 +910,14 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
         }
     }
 
+    if (acquireTicket == AcquireTicket::kSkip) {
+        stashLocker->skipAcquireTicket();
+    }
+
     tempTxnResourceStash->release(opCtx);
     releaseOnError.dismiss();
+
+    invariant(opCtx->lockState()->shouldAcquireTicket() || o().txnState.isPrepared());
 }
 
 void TransactionParticipant::Participant::unstashTransactionResources(OperationContext* opCtx,
@@ -928,13 +934,26 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
     _checkIsCommandValidWithTxnState(*opCtx->getTxnNumber(), cmdName);
     if (o().txnResourceStash) {
         MaxLockTimeout maxLockTimeout;
-        // Max lock timeout must not be set on secondaries, since secondary oplog application cannot
-        // fail. And, primaries should respect the transaction lock timeout, since it can prevent
-        // the transaction from making progress.
-        maxLockTimeout =
-            opCtx->writesAreReplicated() ? MaxLockTimeout::kAllowed : MaxLockTimeout::kNotAllowed;
+        // Default is we should acquire ticket.
+        AcquireTicket acquireTicket{AcquireTicket::kNoSkip};
 
-        _releaseTransactionResourcesToOpCtx(opCtx, maxLockTimeout);
+        if (opCtx->writesAreReplicated()) {
+            // Primaries should respect the transaction lock timeout, since it can prevent
+            // the transaction from making progress.
+            maxLockTimeout = MaxLockTimeout::kAllowed;
+            // Prepared transactions should not acquire ticket. Else, it can deadlock with other
+            // non-transactional operations that have exhausted the write tickets and are blocked on
+            // them due to prepare or lock conflict.
+            if (o().txnState.isPrepared()) {
+                acquireTicket = AcquireTicket::kSkip;
+            }
+        } else {
+            // Max lock timeout must not be set on secondaries, since secondary oplog application
+            // cannot fail.
+            maxLockTimeout = MaxLockTimeout::kNotAllowed;
+        }
+
+        _releaseTransactionResourcesToOpCtx(opCtx, maxLockTimeout, acquireTicket);
         stdx::lock_guard<Client> lg(*opCtx->getClient());
         o(lg).transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
                                                    opCtx->getServiceContext()->getTickSource());
@@ -1013,7 +1032,7 @@ void TransactionParticipant::Participant::refreshLocksForPreparedTransaction(
 
     // Lock and Ticket reacquisition of a prepared transaction should not fail for
     // state transitions (step up/step down).
-    _releaseTransactionResourcesToOpCtx(opCtx, MaxLockTimeout::kNotAllowed);
+    _releaseTransactionResourcesToOpCtx(opCtx, MaxLockTimeout::kNotAllowed, AcquireTicket::kNoSkip);
 
     // Snapshot transactions don't conflict with PBWM lock on both primary and secondary.
     invariant(!opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
