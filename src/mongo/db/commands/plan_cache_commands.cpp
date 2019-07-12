@@ -396,9 +396,8 @@ Status listPlansOriginalFormat(std::unique_ptr<CanonicalQuery> cq,
 
         // Create the plan details field. Currently, this is a simple string representation of
         // SolutionCacheData.
-        SolutionCacheData* scd = entry->plannerData[i];
         BSONObjBuilder detailsBob(planBob.subobjStart("details"));
-        detailsBob.append("solution", scd->toString());
+        detailsBob.append("solution", entry->plannerData[i]->toString());
         detailsBob.doneFast();
 
         // reason is comprised of score and initial stats provided by
@@ -426,7 +425,7 @@ Status listPlansOriginalFormat(std::unique_ptr<CanonicalQuery> cq,
         }
         feedbackBob.doneFast();
 
-        planBob.append("filterSet", scd->indexFilterApplied);
+        planBob.append("filterSet", entry->plannerData[i]->indexFilterApplied);
     }
 
     plansBuilder.doneFast();

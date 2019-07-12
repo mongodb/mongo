@@ -38,6 +38,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/util/container_size_helper.h"
 
 namespace mongo {
 
@@ -103,6 +104,18 @@ struct PlanRankingDecision {
         decision->scores = scores;
         decision->candidateOrder = candidateOrder;
         return decision;
+    }
+
+    uint64_t estimateObjectSizeInBytes() const {
+        return  // Add size of each element in 'stats' vector.
+            container_size_helper::estimateObjectSizeInBytes(
+                stats, [](const auto& stat) { return stat->estimateObjectSizeInBytes(); }, true) +
+            // Add size of each element in 'candidateOrder' vector.
+            container_size_helper::estimateObjectSizeInBytes(candidateOrder) +
+            // Add size of each element in 'scores' vector.
+            container_size_helper::estimateObjectSizeInBytes(scores) +
+            // Add size of the object.
+            sizeof(*this);
     }
 
     // Stats of all plans sorted in descending order by score.
