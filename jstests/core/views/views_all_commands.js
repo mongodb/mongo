@@ -87,6 +87,7 @@
         _configsvrMoveChunk: {skip: isAnInternalCommand},
         _configsvrMovePrimary: {skip: isAnInternalCommand},
         _configsvrRefineCollectionShardKey: {skip: isAnInternalCommand},
+        _configsvrRenameCollection: {skip: isAnInternalCommand},
         _configsvrRemoveShard: {skip: isAnInternalCommand},
         _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
         _configsvrShardCollection: {skip: isAnInternalCommand},
