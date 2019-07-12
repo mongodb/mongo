@@ -5197,6 +5197,21 @@ tasks:
       name: aggregation_expression_multiversion_fuzzer
       task_path_suffix: "/data/multiversion"
 
+## Standalone generational fuzzer for checking optimized and unoptimized expression equivalence
+- <<: *jstestfuzz_template
+  name: aggregation_expression_optimization_fuzzer_gen
+  tags: ["aggfuzzer"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 5
+      num_tasks: 10
+      jstestfuzz_vars: --diffTestingMode optimization
+      resmoke_args: --suites=generational_fuzzer
+      npm_command: agg-expr-fuzzer
+      name: aggregation_expression_optimization_fuzzer
+
 ## Standalone fuzzer for checking wildcard index correctness ##
 - <<: *jstestfuzz_template
   name: aggregation_wildcard_fuzzer_gen
@@ -9310,6 +9325,7 @@ buildvariants:
     - windows-64-vs2017-compile
   - name: .aggregation !.auth !.encrypt
   - name: aggregation_expression_multiversion_fuzzer_gen
+  - name: aggregation_expression_optimization_fuzzer_gen
   - name: auth_gen
   - name: bulk_gle_passthrough
   - name: .causally_consistent !.sharding
