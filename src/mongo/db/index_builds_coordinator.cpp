@@ -761,9 +761,10 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
               str::stream() << "Collection " << *nss
                             << " should exist because an index build is in progress.");
 
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    auto replSetAndNotPrimary = replCoord->getSettings().usingReplSets() &&
-        !replCoord->canAcceptWritesForDatabase(opCtx, replState->dbName);
+    // TODO(SERVER-39484): Since 'replSetAndNotPrimary' is derived from the replication state at the
+    // start of the index build, this value is not resilient to member state changes like
+    // stepup/stepdown.
+    auto replSetAndNotPrimary = indexBuildOptions.replSetAndNotPrimary;
 
     try {
         if (replSetAndNotPrimary) {

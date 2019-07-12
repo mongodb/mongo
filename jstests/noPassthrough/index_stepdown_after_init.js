@@ -59,13 +59,18 @@
             {configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'off'}));
     }
 
+    // Wait for the index build to stop.
+    IndexBuildTest.waitForIndexBuildToStop(testDB);
+
     const exitCode = createIdx({checkExitSuccess: false});
     assert.neq(
         0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
 
-    rst.stop(primary, undefined, {allowedExitCode: MongoRunner.EXIT_ABORT});
-    assert(rawMongoProgramOutput().match('Fatal assertion 51101 IndexBuildAborted: Index build: '),
-           'Index build should have aborted on step down.');
+    checkLog.contains(primary, 'IndexBuildAborted: Index build aborted: ');
+
+    // Check that no new index has been created.  This verifies that the index build was aborted
+    // rather than successfully completed.
+    IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
 
     rst.stopSet();
 })();
