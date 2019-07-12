@@ -48,8 +48,10 @@ namespace mongo {
 
 using std::string;
 
+namespace KeyString {
+
+
 namespace {
-typedef KeyString::TypeBits TypeBits;
 
 namespace CType {
 // canonical types namespace. (would be enum class CType: uint8_t in C++11)
@@ -323,13 +325,13 @@ string readInvertedCStringWithNuls(BufReader* reader) {
 }
 }  // namespace
 
-void KeyString::resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId) {
+void Builder::resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId) {
     resetToEmpty();
     _appendAllElementsForIndexing(obj, ord, kInclusive);
     appendRecordId(recordId);
 }
 
-void KeyString::resetToKey(const BSONObj& obj, Ordering ord, Discriminator discriminator) {
+void Builder::resetToKey(const BSONObj& obj, Ordering ord, Discriminator discriminator) {
     resetToEmpty();
     _appendAllElementsForIndexing(obj, ord, discriminator);
 }
@@ -338,9 +340,9 @@ void KeyString::resetToKey(const BSONObj& obj, Ordering ord, Discriminator discr
 // -----------   APPEND CODE  -------------------------------------------
 // ----------------------------------------------------------------------
 
-void KeyString::_appendAllElementsForIndexing(const BSONObj& obj,
-                                              Ordering ord,
-                                              Discriminator discriminator) {
+void Builder::_appendAllElementsForIndexing(const BSONObj& obj,
+                                            Ordering ord,
+                                            Discriminator discriminator) {
     int elemCount = 0;
     BSONObjIterator it(obj);
     while (auto elem = it.next()) {
@@ -383,7 +385,7 @@ void KeyString::_appendAllElementsForIndexing(const BSONObj& obj,
     _append(kEnd, false);
 }
 
-void KeyString::appendRecordId(RecordId loc) {
+void Builder::appendRecordId(RecordId loc) {
     // The RecordId encoding must be able to determine the full length starting from the last
     // byte, without knowing where the first byte is since it is stored at the end of a
     // KeyString, and we need to be able to read the RecordId without decoding the whole thing.
@@ -429,7 +431,7 @@ void KeyString::appendRecordId(RecordId loc) {
     _append(lastByte, false);
 }
 
-void KeyString::appendTypeBits(const TypeBits& typeBits) {
+void Builder::appendTypeBits(const TypeBits& typeBits) {
     // As an optimization, encode AllZeros as a single 0 byte.
     if (typeBits.isAllZeros()) {
         _append(uint8_t(0), false);
@@ -439,11 +441,11 @@ void KeyString::appendTypeBits(const TypeBits& typeBits) {
     _appendBytes(typeBits.getBuffer(), typeBits.getSize(), false);
 }
 
-void KeyString::_appendBool(bool val, bool invert) {
+void Builder::_appendBool(bool val, bool invert) {
     _append(val ? CType::kBoolTrue : CType::kBoolFalse, invert);
 }
 
-void KeyString::_appendDate(Date_t val, bool invert) {
+void Builder::_appendDate(Date_t val, bool invert) {
     _append(CType::kDate, invert);
     // see: http://en.wikipedia.org/wiki/Offset_binary
     uint64_t encoded = static_cast<uint64_t>(val.asInt64());
@@ -451,40 +453,40 @@ void KeyString::_appendDate(Date_t val, bool invert) {
     _append(endian::nativeToBig(encoded), invert);
 }
 
-void KeyString::_appendTimestamp(Timestamp val, bool invert) {
+void Builder::_appendTimestamp(Timestamp val, bool invert) {
     _append(CType::kTimestamp, invert);
     _append(endian::nativeToBig(val.asLL()), invert);
 }
 
-void KeyString::_appendOID(OID val, bool invert) {
+void Builder::_appendOID(OID val, bool invert) {
     _append(CType::kOID, invert);
     _appendBytes(val.view().view(), OID::kOIDSize, invert);
 }
 
-void KeyString::_appendString(StringData val, bool invert) {
+void Builder::_appendString(StringData val, bool invert) {
     _typeBits.appendString();
     _append(CType::kStringLike, invert);
     _appendStringLike(val, invert);
 }
 
-void KeyString::_appendSymbol(StringData val, bool invert) {
+void Builder::_appendSymbol(StringData val, bool invert) {
     _typeBits.appendSymbol();
     _append(CType::kStringLike, invert);  // Symbols and Strings compare equally
     _appendStringLike(val, invert);
 }
 
-void KeyString::_appendCode(StringData val, bool invert) {
+void Builder::_appendCode(StringData val, bool invert) {
     _append(CType::kCode, invert);
     _appendStringLike(val, invert);
 }
 
-void KeyString::_appendCodeWString(const BSONCodeWScope& val, bool invert) {
+void Builder::_appendCodeWString(const BSONCodeWScope& val, bool invert) {
     _append(CType::kCodeWithScope, invert);
     _appendStringLike(val.code, invert);
     _appendBson(val.scope, invert);
 }
 
-void KeyString::_appendBinData(const BSONBinData& val, bool invert) {
+void Builder::_appendBinData(const BSONBinData& val, bool invert) {
     _append(CType::kBinData, invert);
     if (val.length < 0xff) {
         // size fits in one byte so use one byte to encode.
@@ -498,7 +500,7 @@ void KeyString::_appendBinData(const BSONBinData& val, bool invert) {
     _appendBytes(val.data, val.length, invert);
 }
 
-void KeyString::_appendRegex(const BSONRegEx& val, bool invert) {
+void Builder::_appendRegex(const BSONRegEx& val, bool invert) {
     _append(CType::kRegEx, invert);
     // note: NULL is not allowed in pattern or flags
     _appendBytes(val.pattern.rawData(), val.pattern.size(), invert);
@@ -507,14 +509,14 @@ void KeyString::_appendRegex(const BSONRegEx& val, bool invert) {
     _append(int8_t(0), invert);
 }
 
-void KeyString::_appendDBRef(const BSONDBRef& val, bool invert) {
+void Builder::_appendDBRef(const BSONDBRef& val, bool invert) {
     _append(CType::kDBRef, invert);
     _append(endian::nativeToBig(int32_t(val.ns.size())), invert);
     _appendBytes(val.ns.rawData(), val.ns.size(), invert);
     _appendBytes(val.oid.view().view(), OID::kOIDSize, invert);
 }
 
-void KeyString::_appendArray(const BSONArray& val, bool invert) {
+void Builder::_appendArray(const BSONArray& val, bool invert) {
     _append(CType::kArray, invert);
     BSONForEach(elem, val) {
         // No generic ctype byte needed here since no name is encoded.
@@ -523,12 +525,12 @@ void KeyString::_appendArray(const BSONArray& val, bool invert) {
     _append(int8_t(0), invert);
 }
 
-void KeyString::_appendObject(const BSONObj& val, bool invert) {
+void Builder::_appendObject(const BSONObj& val, bool invert) {
     _append(CType::kObject, invert);
     _appendBson(val, invert);
 }
 
-void KeyString::_appendNumberDouble(const double num, bool invert) {
+void Builder::_appendNumberDouble(const double num, bool invert) {
     if (num == 0.0 && std::signbit(num))
         _typeBits.appendZero(TypeBits::kNegativeDoubleZero);
     else
@@ -537,9 +539,9 @@ void KeyString::_appendNumberDouble(const double num, bool invert) {
     _appendDoubleWithoutTypeBits(num, kDCMEqualToDouble, invert);
 }
 
-void KeyString::_appendDoubleWithoutTypeBits(const double num,
-                                             DecimalContinuationMarker dcm,
-                                             bool invert) {
+void Builder::_appendDoubleWithoutTypeBits(const double num,
+                                           DecimalContinuationMarker dcm,
+                                           bool invert) {
     const bool isNegative = num < 0.0;
     const double magnitude = isNegative ? -num : num;
 
@@ -610,17 +612,17 @@ void KeyString::_appendDoubleWithoutTypeBits(const double num,
     }
 }
 
-void KeyString::_appendNumberLong(const long long num, bool invert) {
+void Builder::_appendNumberLong(const long long num, bool invert) {
     _typeBits.appendNumberLong();
     _appendInteger(num, invert);
 }
 
-void KeyString::_appendNumberInt(const int num, bool invert) {
+void Builder::_appendNumberInt(const int num, bool invert) {
     _typeBits.appendNumberInt();
     _appendInteger(num, invert);
 }
 
-void KeyString::_appendNumberDecimal(const Decimal128 dec, bool invert) {
+void Builder::_appendNumberDecimal(const Decimal128 dec, bool invert) {
     bool isNegative = dec.isNegative();
     if (dec.isZero()) {
         uint32_t zeroExp = dec.getBiasedExponent();
@@ -774,7 +776,7 @@ void KeyString::_appendNumberDecimal(const Decimal128 dec, bool invert) {
     _append(decimalContinuation, isNegative ? !invert : invert);
 }
 
-void KeyString::_appendBsonValue(const BSONElement& elem, bool invert, const StringData* name) {
+void Builder::_appendBsonValue(const BSONElement& elem, bool invert, const StringData* name) {
     if (name) {
         _appendBytes(name->rawData(), name->size() + 1, invert);  // + 1 for NUL
     }
@@ -857,7 +859,7 @@ void KeyString::_appendBsonValue(const BSONElement& elem, bool invert, const Str
 
 /// -- lowest level
 
-void KeyString::_appendStringLike(StringData str, bool invert) {
+void Builder::_appendStringLike(StringData str, bool invert) {
     while (true) {
         size_t firstNul = strnlen(str.rawData(), str.size());
         // No NULs in string.
@@ -873,7 +875,7 @@ void KeyString::_appendStringLike(StringData str, bool invert) {
     }
 }
 
-void KeyString::_appendBson(const BSONObj& obj, bool invert) {
+void Builder::_appendBson(const BSONObj& obj, bool invert) {
     BSONForEach(elem, obj) {
         // Force the order to be based on (ctype, name, value).
         _append(bsonTypeToGenericKeyStringType(elem.type()), invert);
@@ -883,7 +885,7 @@ void KeyString::_appendBson(const BSONObj& obj, bool invert) {
     _append(int8_t(0), invert);
 }
 
-void KeyString::_appendSmallDouble(double value, DecimalContinuationMarker dcm, bool invert) {
+void Builder::_appendSmallDouble(double value, DecimalContinuationMarker dcm, bool invert) {
     bool isNegative = value < 0;
     double magnitude = isNegative ? -value : value;
     dassert(!std::isnan(value) && value != 0 && magnitude < 1);
@@ -894,7 +896,7 @@ void KeyString::_appendSmallDouble(double value, DecimalContinuationMarker dcm, 
 
     uint64_t encoded;
 
-    if (version == KeyString::Version::V0) {
+    if (version == Version::V0) {
         // Not using magnitude to preserve sign bit in V0
         memcpy(&encoded, &value, sizeof(encoded));
     } else if (magnitude >= kTiniestDoubleWith2BitDCM) {
@@ -921,7 +923,7 @@ void KeyString::_appendSmallDouble(double value, DecimalContinuationMarker dcm, 
     _append(endian::nativeToBig(encoded), isNegative ? !invert : invert);
 }
 
-void KeyString::_appendLargeDouble(double value, DecimalContinuationMarker dcm, bool invert) {
+void Builder::_appendLargeDouble(double value, DecimalContinuationMarker dcm, bool invert) {
     dassert(!std::isnan(value));
     dassert(value != 0.0);
     invariant(dcm != kDCMEqualToDoubleRoundedUpTo15Digits);  // only single DCM bit here
@@ -946,9 +948,9 @@ void KeyString::_appendLargeDouble(double value, DecimalContinuationMarker dcm, 
     _append(encoded, value > 0 ? invert : !invert);
 }
 
-void KeyString::_appendTinyDecimalWithoutTypeBits(const Decimal128 dec,
-                                                  const double bin,
-                                                  bool invert) {
+void Builder::_appendTinyDecimalWithoutTypeBits(const Decimal128 dec,
+                                                const double bin,
+                                                bool invert) {
     // This function is only for 'dec' that doesn't exactly equal a double, but rounds to 'bin'
     dassert(bin == dec.toDouble(Decimal128::kRoundTowardZero));
     dassert(std::abs(bin) < DBL_MIN);
@@ -1003,7 +1005,7 @@ void KeyString::_appendTinyDecimalWithoutTypeBits(const Decimal128 dec,
 }
 
 
-void KeyString::_appendHugeDecimalWithoutTypeBits(const Decimal128 dec, bool invert) {
+void Builder::_appendHugeDecimalWithoutTypeBits(const Decimal128 dec, bool invert) {
     // To allow us to use CType::kNumericNegativeLargeMagnitude we need to fit between the highest
     // finite double and the representation of +/-Inf. We do this by forcing the high bit to 1
     // (large doubles always have 0) and never encoding ~0 here.
@@ -1022,7 +1024,7 @@ void KeyString::_appendHugeDecimalWithoutTypeBits(const Decimal128 dec, bool inv
 }
 
 // Handles NumberLong and NumberInt which are encoded identically except for the TypeBits.
-void KeyString::_appendInteger(const long long num, bool invert) {
+void Builder::_appendInteger(const long long num, bool invert) {
     if (num == std::numeric_limits<long long>::min()) {
         // -2**63 is exactly representable as a double and not as a positive int64.
         // Therefore we encode it as a double.
@@ -1041,7 +1043,7 @@ void KeyString::_appendInteger(const long long num, bool invert) {
     _appendPreshiftedIntegerPortion(magnitude << 1, isNegative, invert);
 }
 
-void KeyString::_appendPreshiftedIntegerPortion(uint64_t value, bool isNegative, bool invert) {
+void Builder::_appendPreshiftedIntegerPortion(uint64_t value, bool isNegative, bool invert) {
     dassert(value != 0ULL);
     dassert(value != 1ULL);
 
@@ -1061,11 +1063,11 @@ void KeyString::_appendPreshiftedIntegerPortion(uint64_t value, bool isNegative,
 }
 
 template <typename T>
-void KeyString::_append(const T& thing, bool invert) {
+void Builder::_append(const T& thing, bool invert) {
     _appendBytes(&thing, sizeof(thing), invert);
 }
 
-void KeyString::_appendBytes(const void* source, size_t bytes, bool invert) {
+void Builder::_appendBytes(const void* source, size_t bytes, bool invert) {
     char* const base = _buffer.skip(bytes);
 
     if (invert) {
@@ -1085,13 +1087,13 @@ void toBsonValue(uint8_t ctype,
                  BufReader* reader,
                  TypeBits::Reader* typeBits,
                  bool inverted,
-                 KeyString::Version version,
+                 Version version,
                  BSONObjBuilderValueStream* stream);
 
 void toBson(BufReader* reader,
             TypeBits::Reader* typeBits,
             bool inverted,
-            KeyString::Version version,
+            Version version,
             BSONObjBuilder* builder) {
     while (readType<uint8_t>(reader, inverted) != 0) {
         if (inverted) {
@@ -1136,7 +1138,7 @@ void toBsonValue(uint8_t ctype,
                  BufReader* reader,
                  TypeBits::Reader* typeBits,
                  bool inverted,
-                 KeyString::Version version,
+                 Version version,
                  BSONObjBuilderValueStream* stream) {
     // This is only used by the kNumeric.*ByteInt types, but needs to be declared up here
     // since it is used across a fallthrough.
@@ -1311,7 +1313,7 @@ void toBsonValue(uint8_t ctype,
             } else {
                 uassert(50819,
                         "Invalid type bits for numeric NaN",
-                        type == TypeBits::kDecimal && version == KeyString::Version::V1);
+                        type == TypeBits::kDecimal && version == Version::V1);
                 *stream << Decimal128::kPositiveNaN;
             }
             break;
@@ -1353,14 +1355,14 @@ void toBsonValue(uint8_t ctype,
         // fallthrough (format is the same as positive, but inverted)
         case CType::kNumericPositiveLargeMagnitude: {
             const uint8_t originalType = typeBits->readNumeric();
-            invariant(version > KeyString::Version::V0 || originalType != TypeBits::kDecimal);
+            invariant(version > Version::V0 || originalType != TypeBits::kDecimal);
             uint64_t encoded = readType<uint64_t>(reader, inverted);
             encoded = endian::bigToNative(encoded);
             bool hasDecimalContinuation = false;
             double bin;
 
             // Backward compatibility
-            if (version == KeyString::Version::V0) {
+            if (version == Version::V0) {
                 memcpy(&bin, &encoded, sizeof(bin));
             } else if (!(encoded & (1ULL << 63))) {  // In range of (finite) doubles
                 hasDecimalContinuation = encoded & 1;
@@ -1399,7 +1401,7 @@ void toBsonValue(uint8_t ctype,
             } else {
                 uassert(50826,
                         "Unexpected type of large number.",
-                        originalType == TypeBits::kDecimal && version != KeyString::Version::V0);
+                        originalType == TypeBits::kDecimal && version != Version::V0);
                 const auto roundAwayFromZero = isNegative ? Decimal128::kRoundTowardNegative
                                                           : Decimal128::kRoundTowardPositive;
                 Decimal128 dec(bin, Decimal128::kRoundTo34Digits, roundAwayFromZero);
@@ -1422,7 +1424,7 @@ void toBsonValue(uint8_t ctype,
             uint64_t encoded = readType<uint64_t>(reader, inverted);
             encoded = endian::bigToNative(encoded);
 
-            if (version == KeyString::Version::V0) {
+            if (version == Version::V0) {
                 // for these, the raw double was stored intact, including sign bit.
                 uassert(50812,
                         "Invalid type bits for small number.",
@@ -1491,14 +1493,14 @@ void toBsonValue(uint8_t ctype,
                 }
                 case 0x3: {
                     // Small double, 2**(-255) or more in magnitude. Common case.
-                    auto dcm = static_cast<KeyString::DecimalContinuationMarker>(encoded & 3);
+                    auto dcm = static_cast<Builder::DecimalContinuationMarker>(encoded & 3);
                     encoded >>= 2;
                     double bin;
                     memcpy(&bin, &encoded, sizeof(bin));
                     if (originalType == TypeBits::kDouble) {
                         uassert(50824,
                                 "Decimal contuation mismatch.",
-                                dcm == KeyString::kDCMEqualToDouble);
+                                dcm == Builder::kDCMEqualToDouble);
                         *stream << (isNegative ? -bin : bin);
                         break;
                     }
@@ -1509,18 +1511,18 @@ void toBsonValue(uint8_t ctype,
                             originalType == TypeBits::kDecimal);
                     Decimal128 dec;
                     switch (dcm) {
-                        case KeyString::kDCMEqualToDoubleRoundedUpTo15Digits:
+                        case Builder::kDCMEqualToDoubleRoundedUpTo15Digits:
                             dec = Decimal128(bin,
                                              Decimal128::kRoundTo15Digits,
                                              Decimal128::kRoundTowardPositive);
                             break;
-                        case KeyString::kDCMEqualToDouble:
+                        case Builder::kDCMEqualToDouble:
                             dec = Decimal128(bin,
                                              Decimal128::kRoundTo34Digits,
                                              Decimal128::kRoundTowardPositive);
                             break;
-                        case KeyString::kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits:
-                        case KeyString::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits:
+                        case Builder::kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits:
+                        case Builder::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits:
                             // Deal with decimal continuation
                             dec = Decimal128(bin,
                                              Decimal128::kRoundTo34Digits,
@@ -1594,7 +1596,7 @@ void toBsonValue(uint8_t ctype,
             }
 
             // KeyString V0: anything fractional is a double
-            if (version == KeyString::Version::V0) {
+            if (version == Version::V0) {
                 uassert(50832,
                         "Expected type double for fractional part.",
                         originalType == TypeBits::kDouble);
@@ -1637,19 +1639,19 @@ void toBsonValue(uint8_t ctype,
             }
 
             // The two lsb's are the DCM, except for the 8-byte case, where it's already known
-            KeyString::DecimalContinuationMarker dcm = fracBytes
-                ? static_cast<KeyString::DecimalContinuationMarker>(encodedFraction & 3)
-                : KeyString::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits;
+            Builder::DecimalContinuationMarker dcm = fracBytes
+                ? static_cast<Builder::DecimalContinuationMarker>(encodedFraction & 3)
+                : Builder::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits;
 
             // Deal with decimal cases
             uassert(50810, "Expected type Decimal.", originalType == TypeBits::kDecimal);
             Decimal128 dec;
             switch (dcm) {
-                case KeyString::kDCMEqualToDoubleRoundedUpTo15Digits:
+                case Builder::kDCMEqualToDoubleRoundedUpTo15Digits:
                     dec = Decimal128(
                         bin, Decimal128::kRoundTo15Digits, Decimal128::kRoundTowardPositive);
                     break;
-                case KeyString::kDCMEqualToDouble:
+                case Builder::kDCMEqualToDouble:
                     dec = Decimal128(
                         bin, Decimal128::kRoundTo34Digits, Decimal128::kRoundTowardPositive);
                     break;
@@ -1669,12 +1671,9 @@ void toBsonValue(uint8_t ctype,
     }
 }
 
-void filterKeyFromKeyString(uint8_t ctype,
-                            BufReader* reader,
-                            bool inverted,
-                            KeyString::Version version);
+void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Version version);
 
-void readBson(BufReader* reader, bool inverted, KeyString::Version version) {
+void readBson(BufReader* reader, bool inverted, Version version) {
     while (readType<uint8_t>(reader, inverted) != 0) {
         if (inverted) {
             std::string name = readInvertedCString(reader);
@@ -1686,10 +1685,7 @@ void readBson(BufReader* reader, bool inverted, KeyString::Version version) {
     }
 }
 
-void filterKeyFromKeyString(uint8_t ctype,
-                            BufReader* reader,
-                            bool inverted,
-                            KeyString::Version version) {
+void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Version version) {
     // This is only used by the kNumeric.*ByteInt types, but needs to be declared up here
     // since it is used across a fallthrough.
     bool isNegative = false;
@@ -1804,7 +1800,7 @@ void filterKeyFromKeyString(uint8_t ctype,
             bool hasDecimalContinuation = false;
 
             // Backward compatibility or infinity
-            if (version == KeyString::Version::V0 || encoded == ~0ULL) {
+            if (version == Version::V0 || encoded == ~0ULL) {
                 break;
             } else if (!(encoded & (1ULL << 63))) {  // In range of (finite) doubles
                 hasDecimalContinuation = encoded & 1;
@@ -1829,7 +1825,7 @@ void filterKeyFromKeyString(uint8_t ctype,
             uint64_t encoded = readType<uint64_t>(reader, inverted);
             encoded = endian::bigToNative(encoded);
 
-            if (version == KeyString::Version::V0) {
+            if (version == Version::V0) {
                 break;
             }
 
@@ -1855,15 +1851,15 @@ void filterKeyFromKeyString(uint8_t ctype,
                 }
                 case 0x3: {
                     // Small double, 2**(-255) or more in magnitude. Common case.
-                    auto dcm = static_cast<KeyString::DecimalContinuationMarker>(encoded & 3);
+                    auto dcm = static_cast<Builder::DecimalContinuationMarker>(encoded & 3);
 
                     // Deal with decimal cases
                     switch (dcm) {
-                        case KeyString::kDCMEqualToDoubleRoundedUpTo15Digits:
-                        case KeyString::kDCMEqualToDouble:
+                        case Builder::kDCMEqualToDoubleRoundedUpTo15Digits:
+                        case Builder::kDCMEqualToDouble:
                             break;
-                        case KeyString::kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits:
-                        case KeyString::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits:
+                        case Builder::kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits:
+                        case Builder::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits:
                             // Deal with decimal continuation
                             reader->skip(sizeof(std::uint64_t));
                     }
@@ -1912,7 +1908,7 @@ void filterKeyFromKeyString(uint8_t ctype,
             }
 
             // KeyString V0: anything fractional is a double
-            if (version == KeyString::Version::V0) {
+            if (version == Version::V0) {
                 const uint64_t exponent = (64 - countLeadingZeros64(integerPart)) - 1;
                 const size_t fractionalBits = (52 - exponent);
                 const size_t fractionalBytes = (fractionalBits + 7) / 8;
@@ -1933,14 +1929,14 @@ void filterKeyFromKeyString(uint8_t ctype,
                 encodedFraction = (encodedFraction << 8) | readType<uint8_t>(reader, inverted);
 
             // The two lsb's are the DCM, except for the 8-byte case, where it's already known
-            KeyString::DecimalContinuationMarker dcm = fracBytes
-                ? static_cast<KeyString::DecimalContinuationMarker>(encodedFraction & 3)
-                : KeyString::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits;
+            Builder::DecimalContinuationMarker dcm = fracBytes
+                ? static_cast<Builder::DecimalContinuationMarker>(encodedFraction & 3)
+                : Builder::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits;
 
             // Deal with decimal cases
             switch (dcm) {
-                case KeyString::kDCMEqualToDoubleRoundedUpTo15Digits:
-                case KeyString::kDCMEqualToDouble:
+                case Builder::kDCMEqualToDoubleRoundedUpTo15Digits:
+                case Builder::kDCMEqualToDouble:
                     break;
                 default:
                     // Deal with decimal continuation
@@ -1968,11 +1964,11 @@ Decimal128 adjustDecimalExponent(TypeBits::Reader* typeBits, Decimal128 num) {
     const uint32_t origExp = num.getBiasedExponent();
     const uint8_t storedBits = typeBits->readDecimalExponent();
 
-    uint32_t highExp = (origExp & ~KeyString::TypeBits::kStoredDecimalExponentMask) | storedBits;
+    uint32_t highExp = (origExp & ~TypeBits::kStoredDecimalExponentMask) | storedBits;
 
     // Start by determining an exponent that's not less than num's and matches the stored bits.
     if (highExp < origExp)
-        highExp += (1U << KeyString::TypeBits::kStoredDecimalExponentBits);
+        highExp += (1U << TypeBits::kStoredDecimalExponentBits);
 
     // This must be the right exponent, as no scaling is required.
     if (highExp == origExp)
@@ -1995,7 +1991,7 @@ Decimal128 adjustDecimalExponent(TypeBits::Reader* typeBits, Decimal128 num) {
         num = quantized;
     } else {
         // Decrease exponent and increase (left shift) coefficient.
-        uint32_t lowExp = highExp - (1U << KeyString::TypeBits::kStoredDecimalExponentBits);
+        uint32_t lowExp = highExp - (1U << TypeBits::kStoredDecimalExponentBits);
         uassert(50814,
                 "Unexpected exponent values after adjusting Decimal.",
                 lowExp >= origExp - kMaxExpAdjust && Decimal128::isValid(0, lowExp, 0, 0));
@@ -2003,115 +1999,22 @@ Decimal128 adjustDecimalExponent(TypeBits::Reader* typeBits, Decimal128 num) {
     }
     uassert(50830,
             "Unexpected biased exponent in decimal.",
-            (num.getBiasedExponent() & KeyString::TypeBits::kStoredDecimalExponentMask) ==
-                (highExp & KeyString::TypeBits::kStoredDecimalExponentMask));
+            (num.getBiasedExponent() & TypeBits::kStoredDecimalExponentMask) ==
+                (highExp & TypeBits::kStoredDecimalExponentMask));
     return num;
 }
 
 }  // namespace
 
-size_t KeyString::getKeySize(const char* buffer,
-                             size_t len,
-                             Ordering ord,
-                             const TypeBits& typeBits) {
-    invariant(len > 0);
-    BufReader reader(buffer, len);
-    unsigned remainingBytes;
-    for (int i = 0; (remainingBytes = reader.remaining()); i++) {
-        const bool invert = (ord.get(i) == -1);
-        uint8_t ctype = readType<uint8_t>(&reader, invert);
-        // We have already read the Key.
-        if (ctype == kEnd)
-            break;
-
-        // Read the Key that comes after the first byte in KeyString.
-        filterKeyFromKeyString(ctype, &reader, invert, typeBits.version);
-    }
-
-    invariant(len > remainingBytes);
-    // Key size = buffer len - number of bytes comprising the RecordId
-    return (len - (remainingBytes - 1));
-}
-
-BSONObj KeyString::toBsonSafe(const char* buffer,
-                              size_t len,
-                              Ordering ord,
-                              const TypeBits& typeBits) {
-    BSONObjBuilder builder;
-    BufReader reader(buffer, len);
-    TypeBits::Reader typeBitsReader(typeBits);
-    for (int i = 0; reader.remaining(); i++) {
-        const bool invert = (ord.get(i) == -1);
-        uint8_t ctype = readType<uint8_t>(&reader, invert);
-        if (ctype == kLess || ctype == kGreater) {
-            // This was just a discriminator which is logically part of the previous field. This
-            // will only be encountered on queries, not in the keys stored in an index.
-            // Note: this should probably affect the BSON key name of the last field, but it
-            // must be read *after* the value so it isn't possible.
-            ctype = readType<uint8_t>(&reader, invert);
-        }
-
-        if (ctype == kEnd)
-            break;
-        toBsonValue(ctype, &reader, &typeBitsReader, invert, typeBits.version, &(builder << ""));
-    }
-    return builder.obj();
-}
-
-BSONObj KeyString::toBson(const char* buffer,
-                          size_t len,
-                          Ordering ord,
-                          const TypeBits& typeBits) noexcept {
-    return toBsonSafe(buffer, len, ord, typeBits);
-}
-
-BSONObj KeyString::toBson(StringData data, Ordering ord, const TypeBits& typeBits) {
-    return toBson(data.rawData(), data.size(), ord, typeBits);
-}
-
-RecordId KeyString::decodeRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {
-    invariant(bufSize >= 2);  // smallest possible encoding of a RecordId.
-    const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
-    const unsigned char lastByte = *(buffer + bufSize - 1);
-    const size_t ridSize = 2 + (lastByte & 0x7);  // stored in low 3 bits.
-    invariant(bufSize >= ridSize);
-    const unsigned char* firstBytePtr = buffer + bufSize - ridSize;
-    BufReader reader(firstBytePtr, ridSize);
-    return decodeRecordId(&reader);
-}
-
-size_t KeyString::sizeWithoutRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {
-    invariant(bufSize >= 2);  // smallest possible encoding of a RecordId.
-    const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
-    const unsigned char lastByte = *(buffer + bufSize - 1);
-    const size_t ridSize = 2 + (lastByte & 0x7);  // stored in low 3 bits.
-    invariant(bufSize >= ridSize);
-    return bufSize - ridSize;
-}
-
-RecordId KeyString::decodeRecordId(BufReader* reader) {
-    const uint8_t firstByte = readType<uint8_t>(reader, false);
-    const uint8_t numExtraBytes = firstByte >> 5;  // high 3 bits in firstByte
-    uint64_t repr = firstByte & 0x1f;              // low 5 bits in firstByte
-    for (int i = 0; i < numExtraBytes; i++) {
-        repr = (repr << 8) | readType<uint8_t>(reader, false);
-    }
-
-    const uint8_t lastByte = readType<uint8_t>(reader, false);
-    invariant((lastByte & 0x7) == numExtraBytes);
-    repr = (repr << 5) | (lastByte >> 3);  // fold in high 5 bits of last byte
-    return RecordId(repr);
-}
-
 // ----------------------------------------------------------------------
 //  --------- MISC class utils --------
 // ----------------------------------------------------------------------
 
-std::string KeyString::toString() const {
+std::string Builder::toString() const {
     return toHex(getBuffer(), getSize());
 }
 
-int KeyString::compare(const KeyString& other) const {
+int Builder::compare(const Builder& other) const {
     int a = getSize();
     int b = other.getSize();
 
@@ -2133,7 +2036,7 @@ int KeyString::compare(const KeyString& other) const {
     return a < b ? -1 : 1;
 }
 
-int KeyString::Value::compare(const KeyString::Value& other) const {
+int Value::compare(const Value& other) const {
     int a = getSize();
     int b = other.getSize();
 
@@ -2155,7 +2058,7 @@ int KeyString::Value::compare(const KeyString::Value& other) const {
     return a < b ? -1 : 1;
 }
 
-uint32_t KeyString::TypeBits::readSizeFromBuffer(BufReader* reader) {
+uint32_t TypeBits::readSizeFromBuffer(BufReader* reader) {
     const uint8_t firstByte = reader->peek<uint8_t>();
 
     // Case 2: all bits in one byte; no size byte.
@@ -2184,7 +2087,7 @@ uint32_t KeyString::TypeBits::readSizeFromBuffer(BufReader* reader) {
     return 0;
 }
 
-void KeyString::TypeBits::setRawSize(uint32_t size) {
+void TypeBits::setRawSize(uint32_t size) {
     // Grow the data buffer if needed.
     if (size > getDataBufferLen()) {
         _buf.grow(size - getDataBufferLen());
@@ -2199,7 +2102,7 @@ void KeyString::TypeBits::setRawSize(uint32_t size) {
     }
 }
 
-void KeyString::TypeBits::resetFromBuffer(BufReader* reader) {
+void TypeBits::resetFromBuffer(BufReader* reader) {
     reset();
 
     if (!reader->remaining())
@@ -2213,7 +2116,7 @@ void KeyString::TypeBits::resetFromBuffer(BufReader* reader) {
     memcpy(getDataBuffer(), reader->skip(size), size);
 }
 
-void KeyString::TypeBits::appendBit(uint8_t oneOrZero) {
+void TypeBits::appendBit(uint8_t oneOrZero) {
     dassert(oneOrZero == 0 || oneOrZero == 1);
 
     if (oneOrZero == 1)
@@ -2231,7 +2134,7 @@ void KeyString::TypeBits::appendBit(uint8_t oneOrZero) {
     _curBit++;
 }
 
-void KeyString::TypeBits::appendZero(uint8_t zeroType) {
+void TypeBits::appendZero(uint8_t zeroType) {
     switch (zeroType) {
         // 2-bit encodings
         case kInt:
@@ -2264,20 +2167,20 @@ void KeyString::TypeBits::appendZero(uint8_t zeroType) {
     }
 }
 
-void KeyString::TypeBits::appendDecimalZero(uint32_t whichZero) {
+void TypeBits::appendDecimalZero(uint32_t whichZero) {
     invariant((whichZero >> 12) <= kDecimalZero5xxx - kDecimalZero0xxx);
     appendZero((whichZero >> 12) + kDecimalZero0xxx);
     for (int bitPos = 11; bitPos >= 0; bitPos--)
         appendBit((whichZero >> bitPos) & 1);
 }
 
-void KeyString::TypeBits::appendDecimalExponent(uint8_t storedExponentBits) {
+void TypeBits::appendDecimalExponent(uint8_t storedExponentBits) {
     invariant(storedExponentBits < (1U << kStoredDecimalExponentBits));
     for (int bitPos = kStoredDecimalExponentBits - 1; bitPos >= 0; bitPos--)
         appendBit((storedExponentBits >> bitPos) & 1);
 }
 
-uint8_t KeyString::TypeBits::Reader::readBit() {
+uint8_t TypeBits::Reader::readBit() {
     if (_typeBits._isAllZeros)
         return 0;
 
@@ -2290,7 +2193,7 @@ uint8_t KeyString::TypeBits::Reader::readBit() {
     return (_typeBits.getDataBuffer()[byte] & (1 << offsetInByte)) ? 1 : 0;
 }
 
-uint8_t KeyString::TypeBits::Reader::readZero() {
+uint8_t TypeBits::Reader::readZero() {
     uint8_t res = readNumeric();
 
     // For keyString v1, negative and decimal zeros require at least 3 more bits.
@@ -2304,7 +2207,7 @@ uint8_t KeyString::TypeBits::Reader::readZero() {
     return res;
 }
 
-uint32_t KeyString::TypeBits::Reader::readDecimalZero(uint8_t zeroType) {
+uint32_t TypeBits::Reader::readDecimalZero(uint8_t zeroType) {
     uint32_t whichZero = zeroType - TypeBits::kDecimalZero0xxx;
     for (int bitPos = 11; bitPos >= 0; bitPos--)
         whichZero = (whichZero << 1) | readBit();
@@ -2312,10 +2215,97 @@ uint32_t KeyString::TypeBits::Reader::readDecimalZero(uint8_t zeroType) {
     return whichZero;
 }
 
-uint8_t KeyString::TypeBits::Reader::readDecimalExponent() {
+uint8_t TypeBits::Reader::readDecimalExponent() {
     uint8_t exponentBits = 0;
     for (int bitPos = kStoredDecimalExponentBits - 1; bitPos >= 0; bitPos--)
         exponentBits = (exponentBits << 1) | readBit();
     return exponentBits;
 }
+
+size_t getKeySize(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits) {
+    invariant(len > 0);
+    BufReader reader(buffer, len);
+    unsigned remainingBytes;
+    for (int i = 0; (remainingBytes = reader.remaining()); i++) {
+        const bool invert = (ord.get(i) == -1);
+        uint8_t ctype = readType<uint8_t>(&reader, invert);
+        // We have already read the Key.
+        if (ctype == kEnd)
+            break;
+
+        // Read the Key that comes after the first byte in KeyString.
+        filterKeyFromKeyString(ctype, &reader, invert, typeBits.version);
+    }
+
+    invariant(len > remainingBytes);
+    // Key size = buffer len - number of bytes comprising the RecordId
+    return (len - (remainingBytes - 1));
+}
+
+BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits) {
+    BSONObjBuilder builder;
+    BufReader reader(buffer, len);
+    TypeBits::Reader typeBitsReader(typeBits);
+    for (int i = 0; reader.remaining(); i++) {
+        const bool invert = (ord.get(i) == -1);
+        uint8_t ctype = readType<uint8_t>(&reader, invert);
+        if (ctype == kLess || ctype == kGreater) {
+            // This was just a discriminator which is logically part of the previous field. This
+            // will only be encountered on queries, not in the keys stored in an index.
+            // Note: this should probably affect the BSON key name of the last field, but it
+            // must be read *after* the value so it isn't possible.
+            ctype = readType<uint8_t>(&reader, invert);
+        }
+
+        if (ctype == kEnd)
+            break;
+        toBsonValue(ctype, &reader, &typeBitsReader, invert, typeBits.version, &(builder << ""));
+    }
+    return builder.obj();
+}
+
+BSONObj toBson(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits) noexcept {
+    return toBsonSafe(buffer, len, ord, typeBits);
+}
+
+BSONObj toBson(StringData data, Ordering ord, const TypeBits& typeBits) {
+    return toBson(data.rawData(), data.size(), ord, typeBits);
+}
+
+RecordId decodeRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {
+    invariant(bufSize >= 2);  // smallest possible encoding of a RecordId.
+    const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
+    const unsigned char lastByte = *(buffer + bufSize - 1);
+    const size_t ridSize = 2 + (lastByte & 0x7);  // stored in low 3 bits.
+    invariant(bufSize >= ridSize);
+    const unsigned char* firstBytePtr = buffer + bufSize - ridSize;
+    BufReader reader(firstBytePtr, ridSize);
+    return decodeRecordId(&reader);
+}
+
+size_t sizeWithoutRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {
+    invariant(bufSize >= 2);  // smallest possible encoding of a RecordId.
+    const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
+    const unsigned char lastByte = *(buffer + bufSize - 1);
+    const size_t ridSize = 2 + (lastByte & 0x7);  // stored in low 3 bits.
+    invariant(bufSize >= ridSize);
+    return bufSize - ridSize;
+}
+
+RecordId decodeRecordId(BufReader* reader) {
+    const uint8_t firstByte = readType<uint8_t>(reader, false);
+    const uint8_t numExtraBytes = firstByte >> 5;  // high 3 bits in firstByte
+    uint64_t repr = firstByte & 0x1f;              // low 5 bits in firstByte
+    for (int i = 0; i < numExtraBytes; i++) {
+        repr = (repr << 8) | readType<uint8_t>(reader, false);
+    }
+
+    const uint8_t lastByte = readType<uint8_t>(reader, false);
+    invariant((lastByte & 0x7) == numExtraBytes);
+    repr = (repr << 5) | (lastByte >> 3);  // fold in high 5 bits of last byte
+    return RecordId(repr);
+}
+
+}  // namespace KeyString
+
 }  // namespace mongo

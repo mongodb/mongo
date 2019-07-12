@@ -252,7 +252,7 @@ private:
     /**
      * If this returns true, the cursor will be positioned on the first matching the input 'key'.
      */
-    bool _keyExists(OperationContext* opCtx, WT_CURSOR* c, const KeyString& key);
+    bool _keyExists(OperationContext* opCtx, WT_CURSOR* c, const KeyString::Builder& key);
 
     bool _partial;
 };

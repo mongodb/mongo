@@ -59,12 +59,12 @@ BSONObj const sample = BSON(""
                             << (int64_t)0);
 
 std::string createKey(StringData ident, int64_t recordId) {
-    KeyString ks(version, BSON("" << ident << "" << recordId), allAscending);
+    KeyString::Builder ks(version, BSON("" << ident << "" << recordId), allAscending);
     return std::string(ks.getBuffer(), ks.getSize());
 }
 
 RecordId extractRecordId(const std::string& keyStr) {
-    KeyString ks(version, sample, allAscending);
+    KeyString::Builder ks(version, sample, allAscending);
     ks.resetFromBuffer(keyStr.c_str(), keyStr.size());
     BSONObj obj = KeyString::toBson(keyStr.c_str(), keyStr.size(), allAscending, ks.getTypeBits());
     auto it = BSONObjIterator(obj);

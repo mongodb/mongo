@@ -74,10 +74,11 @@ BSONObj stripFieldNames(const BSONObj& obj) {
     return bob.obj();
 }
 
-// This function converts a key and an ordering to a KeyString.
-std::unique_ptr<KeyString> keyToKeyString(const BSONObj& key, Ordering order) {
+// This function converts a key and an ordering to a KeyString::Builder.
+std::unique_ptr<KeyString::Builder> keyToKeyStringBuilder(const BSONObj& key, Ordering order) {
     KeyString::Version version = KeyString::Version::V1;
-    std::unique_ptr<KeyString> retKs = std::make_unique<KeyString>(version, key, order);
+    std::unique_ptr<KeyString::Builder> retKs =
+        std::make_unique<KeyString::Builder>(version, key, order);
     return retKs;
 }
 
@@ -87,7 +88,7 @@ std::string createKeyString(const BSONObj& key,
                             Ordering order,
                             bool isUnique) {
     KeyString::Version version = KeyString::Version::V1;
-    KeyString ks(version, key, order);
+    KeyString::Builder ks(version, key, order);
 
     BSONObjBuilder b;
     b.append("", prefixToUse);                                // prefix
@@ -112,10 +113,10 @@ bool keysAreIdentical(std::string ks1, std::string ks2, bool isUnique) {
 }
 
 /**
- * This function converts a KeyString into an IndexKeyEntry. We don't need to store the typebits
- * for the outer key string (the one consisting of the prefix, the key, and the recordId) since
- * those will not be used. However, we do need to store the typebits for the internal keystring
- * (made from the key itself), as those typebits are potentially important.
+ * This function converts a KeyString::Builder into an IndexKeyEntry. We don't need to store the
+ * typebits for the outer key string (the one consisting of the prefix, the key, and the recordId)
+ * since those will not be used. However, we do need to store the typebits for the internal
+ * keystring (made from the key itself), as those typebits are potentially important.
  *
  * The data which is serialized as a byte array, has the following structure:
  *     [RecordId][TypeBits of internal keystring]
@@ -143,7 +144,7 @@ IndexKeyEntry keyStringToIndexKeyEntry(const std::string keyString,
     SharedBuffer sb;
     auto it = BSONObjIterator(bsonObj);
     ++it;  // We want the second part
-    KeyString ks(version);
+    KeyString::Builder ks(version);
     ks.resetFromBuffer((*it).valuestr(), (*it).valuestrsize());
 
     BSONObj originalKey = KeyString::toBsonSafe(ks.getBuffer(), ks.getSize(), order, tbInternal);
@@ -190,7 +191,7 @@ Status SortedDataBuilderInterface::addKey(const BSONObj& key, const RecordId& lo
     invariant(loc.isNormal() || loc.isReserved());
     invariant(!hasFieldNames(key));
 
-    std::unique_ptr<KeyString> newKS = keyToKeyString(key, _order);
+    std::unique_ptr<KeyString::Builder> newKS = keyToKeyStringBuilder(key, _order);
     std::string newKSToString = std::string(newKS->getBuffer(), newKS->getSize());
 
     int twoKeyCmp = 1;
@@ -290,7 +291,7 @@ Status SortedDataInterface::insert(OperationContext* opCtx,
                                    const RecordId& loc,
                                    bool dupsAllowed) {
     // The KeyString representation of the key.
-    std::unique_ptr<KeyString> workingCopyInternalKs = keyToKeyString(key, _order);
+    std::unique_ptr<KeyString::Builder> workingCopyInternalKs = keyToKeyStringBuilder(key, _order);
 
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     std::string insertKeyString = createKeyString(key, loc, _prefix, _order, _isUnique);

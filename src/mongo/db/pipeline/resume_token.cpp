@@ -117,7 +117,7 @@ ResumeToken::ResumeToken(const ResumeTokenData& data) {
     }
     data.documentKey.addToBsonObj(&builder, "");
     auto keyObj = builder.obj();
-    KeyString encodedToken(KeyString::Version::V1, keyObj, Ordering::make(BSONObj()));
+    KeyString::Builder encodedToken(KeyString::Version::V1, keyObj, Ordering::make(BSONObj()));
     _hexKeyString = toHex(encodedToken.getBuffer(), encodedToken.getSize());
     const auto& typeBits = encodedToken.getTypeBits();
     if (!typeBits.isAllZeros())

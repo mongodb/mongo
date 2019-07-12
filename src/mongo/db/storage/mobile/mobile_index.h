@@ -92,7 +92,7 @@ public:
      */
     template <typename ValueType>
     Status doInsert(OperationContext* opCtx,
-                    const KeyString& key,
+                    const KeyString::Builder& key,
                     const ValueType& value,
                     bool isTransactional = true);
 
@@ -118,7 +118,9 @@ protected:
     /**
      * Performs the deletion from the table matching the given key.
      */
-    void _doDelete(OperationContext* opCtx, const KeyString& key, KeyString* value = nullptr);
+    void _doDelete(OperationContext* opCtx,
+                   const KeyString::Builder& key,
+                   KeyString::Builder* value = nullptr);
 
     virtual Status _insert(OperationContext* opCtx,
                            const BSONObj& key,

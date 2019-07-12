@@ -64,7 +64,7 @@ std::string extractKeyStringInternal(const BSONObj& shardKeyValue, Ordering orde
         strippedKeyValue.appendAs(elem, ""_sd);
     }
 
-    KeyString ks(KeyString::Version::V1, strippedKeyValue.done(), ordering);
+    KeyString::Builder ks(KeyString::Version::V1, strippedKeyValue.done(), ordering);
     return {ks.getBuffer(), ks.getSize()};
 }
 

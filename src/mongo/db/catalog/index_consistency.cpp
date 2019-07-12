@@ -62,7 +62,7 @@ IndexInfo::IndexInfo(const IndexDescriptor* descriptor)
     : descriptor(descriptor),
       indexNameHash(hash(descriptor->indexName())),
       ord(Ordering::make(descriptor->keyPattern())),
-      ks(std::make_unique<KeyString>(KeyString::Version::kLatestVersion)) {}
+      ks(std::make_unique<KeyString::Builder>(KeyString::Version::kLatestVersion)) {}
 
 IndexConsistency::IndexConsistency(OperationContext* opCtx,
                                    Collection* collection,
@@ -90,11 +90,12 @@ IndexConsistency::IndexConsistency(OperationContext* opCtx,
     }
 }
 
-void IndexConsistency::addMultikeyMetadataPath(const KeyString& ks, IndexInfo* indexInfo) {
+void IndexConsistency::addMultikeyMetadataPath(const KeyString::Builder& ks, IndexInfo* indexInfo) {
     indexInfo->hashedMultikeyMetadataPaths.emplace(_hashKeyString(ks, indexInfo->indexNameHash));
 }
 
-void IndexConsistency::removeMultikeyMetadataPath(const KeyString& ks, IndexInfo* indexInfo) {
+void IndexConsistency::removeMultikeyMetadataPath(const KeyString::Builder& ks,
+                                                  IndexInfo* indexInfo) {
     indexInfo->hashedMultikeyMetadataPaths.erase(_hashKeyString(ks, indexInfo->indexNameHash));
 }
 
@@ -207,7 +208,7 @@ void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap
     results->valid = false;
 }
 
-void IndexConsistency::addDocKey(const KeyString& ks,
+void IndexConsistency::addDocKey(const KeyString::Builder& ks,
                                  IndexInfo* indexInfo,
                                  RecordId recordId,
                                  const BSONObj& indexKey) {
@@ -241,7 +242,7 @@ void IndexConsistency::addDocKey(const KeyString& ks,
     }
 }
 
-void IndexConsistency::addIndexKey(const KeyString& ks,
+void IndexConsistency::addIndexKey(const KeyString::Builder& ks,
                                    IndexInfo* indexInfo,
                                    RecordId recordId,
                                    const BSONObj& indexKey) {
@@ -310,7 +311,8 @@ BSONObj IndexConsistency::_generateInfo(const IndexInfo& indexInfo,
     }
 }
 
-uint32_t IndexConsistency::_hashKeyString(const KeyString& ks, uint32_t indexNameHash) const {
+uint32_t IndexConsistency::_hashKeyString(const KeyString::Builder& ks,
+                                          uint32_t indexNameHash) const {
     MurmurHash3_x86_32(
         ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize(), indexNameHash, &indexNameHash);
     MurmurHash3_x86_32(ks.getBuffer(), ks.getSize(), indexNameHash, &indexNameHash);

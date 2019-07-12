@@ -49,7 +49,7 @@
 namespace mongo {
 
 namespace {
-KeyString makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey) {
+KeyString::Builder makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey) {
     const auto multikeyMetadataOrd = Ordering::make(BSON("" << 1 << "" << 1));
     const RecordId multikeyMetadataRecordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
     return {KeyString::Version::kLatestVersion,
@@ -143,15 +143,17 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
     std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(_opCtx, true);
     // We want to use the latest version of KeyString here.
     const KeyString::Version version = KeyString::Version::kLatestVersion;
-    std::unique_ptr<KeyString> indexKeyString = std::make_unique<KeyString>(version);
-    std::unique_ptr<KeyString> prevIndexKeyString = std::make_unique<KeyString>(version);
+    std::unique_ptr<KeyString::Builder> indexKeyStringBuilder =
+        std::make_unique<KeyString::Builder>(version);
+    std::unique_ptr<KeyString::Builder> prevIndexKeyStringBuilder =
+        std::make_unique<KeyString::Builder>(version);
 
     // Seeking to BSONObj() is equivalent to seeking to the first entry of an index.
     for (auto indexEntry = cursor->seek(BSONObj(), true); indexEntry; indexEntry = cursor->next()) {
-        indexKeyString->resetToKey(indexEntry->key, ord, indexEntry->loc);
+        indexKeyStringBuilder->resetToKey(indexEntry->key, ord, indexEntry->loc);
 
         // Ensure that the index entries are in increasing or decreasing order.
-        if (!isFirstEntry && *indexKeyString < *prevIndexKeyString) {
+        if (!isFirstEntry && *indexKeyStringBuilder < *prevIndexKeyStringBuilder) {
             if (results && results->valid) {
                 results->errors.push_back(
                     "one or more indexes are not in strictly ascending or descending order");
@@ -173,11 +175,11 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
         }
 
         _indexConsistency->addIndexKey(
-            *indexKeyString, indexInfo, indexEntry->loc, indexEntry->key);
+            *indexKeyStringBuilder, indexInfo, indexEntry->loc, indexEntry->key);
 
         numKeys++;
         isFirstEntry = false;
-        prevIndexKeyString.swap(indexKeyString);
+        prevIndexKeyStringBuilder.swap(indexKeyStringBuilder);
     }
 
     if (results && _indexConsistency->getMultikeyMetadataPathCount(indexInfo) > 0) {

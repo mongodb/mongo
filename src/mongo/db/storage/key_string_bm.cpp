@@ -104,7 +104,7 @@ static BsonsAndKeyStrings generateBsonsAndKeyStrings(BsonValueType bsonValueType
     result.keystringSize = 0;
     for (int i = 0; i < kSampleSize; i++) {
         BSONObj bson = generateBson(bsonValueType);
-        KeyString ks(version, bson, ALL_ASCENDING);
+        KeyString::Builder ks(version, bson, ALL_ASCENDING);
         result.bsonSize += bson.objsize();
         result.keystringSize += ks.getSize();
         result.bsons[i] = bson;
@@ -127,7 +127,7 @@ void BM_BSONToKeyString(benchmark::State& state,
     for (auto _ : state) {
         benchmark::ClobberMemory();
         for (auto bson : bsonsAndKeyStrings.bsons) {
-            benchmark::DoNotOptimize(KeyString(version, bson, ALL_ASCENDING));
+            benchmark::DoNotOptimize(KeyString::Builder(version, bson, ALL_ASCENDING));
         }
     }
     state.SetBytesProcessed(state.iterations() * bsonsAndKeyStrings.bsonSize);
