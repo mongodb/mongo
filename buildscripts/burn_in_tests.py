@@ -44,6 +44,7 @@ AVG_TEST_TIME_MULTIPLIER = 3
 CONFIG_FILE = "../src/.evergreen.yml"
 REPEAT_SUITES = 2
 EVERGREEN_FILE = "etc/evergreen.yml"
+MAX_TASKS_TO_CREATE = 1000
 MIN_AVG_TEST_OVERFLOW_SEC = 60
 MIN_AVG_TEST_TIME_SEC = 5 * 60
 # The executor_file and suite_files defaults are required to make the suite resolver work
@@ -640,7 +641,12 @@ def create_generate_tasks_file(evg_api, options, tests_by_task):
     evg_config = Configuration()
     evg_config = create_generate_tasks_config(evg_api, evg_config, options, tests_by_task,
                                               include_gen_task=True)
-    _write_json_file(evg_config.to_map(), options.generate_tasks_file)
+    json_config = evg_config.to_map()
+    tasks_to_create = len(json_config.get('tasks', []))
+    if tasks_to_create > MAX_TASKS_TO_CREATE:
+        LOGGER.warning("Attempting to create more tasks than max(%d), aborting", tasks_to_create)
+        sys.exit(1)
+    _write_json_file(json_config, options.generate_tasks_file)
 
 
 def run_tests(no_exec, tests_by_task, resmoke_cmd, report_file):

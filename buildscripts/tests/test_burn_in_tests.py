@@ -782,6 +782,30 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
             self.assertEqual(len(execution_tasks), 1)
             self.assertEqual(execution_tasks[0], burn_in.BURN_IN_TESTS_GEN_TASK)
 
+    @patch("buildscripts.burn_in_tests._write_json_file")
+    @patch("buildscripts.burn_in_tests.sys.exit")
+    @patch("buildscripts.burn_in_tests.create_generate_tasks_config")
+    def test_cap_on_task_generate(self, gen_tasks_config_mock, exit_mock, write_mock):
+        evg_api = MagicMock()
+        options = MagicMock()
+        tests_by_task = MagicMock()
+
+        task_list = [f"task_{i}" for i in range(1005)]
+
+        evg_config = MagicMock()
+        evg_config.to_map.return_value = {
+            "tasks": task_list,
+        }
+
+        gen_tasks_config_mock.return_value = evg_config
+
+        exit_mock.side_effect = ValueError('exiting')
+        with self.assertRaises(ValueError):
+            burn_in.create_generate_tasks_file(evg_api, options, tests_by_task)
+
+        exit_mock.assert_called_once()
+        write_mock.assert_not_called()
+
 
 class UpdateReportDataTests(unittest.TestCase):
     def test_update_report_data_nofile(self):
