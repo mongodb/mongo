@@ -4,10 +4,10 @@
 import collections
 import copy
 import json
+import logging
 import optparse
 import os.path
 import subprocess
-import re
 import shlex
 import sys
 import urllib.parse
@@ -32,10 +32,13 @@ from buildscripts.ciconfig import evergreen
 from buildscripts.client import evergreen as evergreen_client
 # pylint: enable=wrong-import-position
 
+LOGGER = logging.getLogger(__name__)
+
 API_REST_PREFIX = "/rest/v1/"
 API_SERVER_DEFAULT = "https://evergreen.mongodb.com"
 REPEAT_SUITES = 2
 EVERGREEN_FILE = "etc/evergreen.yml"
+MAX_TASKS_TO_CREATE = 1000
 # The executor_file and suite_files defaults are required to make the suite resolver work
 # correctly.
 SELECTOR_FILE = "etc/burn_in_tests.yml"
@@ -464,6 +467,8 @@ def _get_run_buildvariant(options):
 def create_generate_tasks_file(options, tests_by_task):
     """Create the Evergreen generate.tasks file."""
 
+    # pylint: disable=too-many-locals
+
     evg_config = Configuration()
     task_specs = []
     task_names = [BURN_IN_TESTS_GEN_TASK]
@@ -494,7 +499,12 @@ def create_generate_tasks_file(options, tests_by_task):
     display_task = DisplayTaskDefinition(BURN_IN_TESTS_TASK).execution_tasks(task_names)
     evg_config.variant(_get_run_buildvariant(options)).tasks(task_specs).display_task(display_task)
 
-    _write_json_file(evg_config.to_map(), options.generate_tasks_file)
+    json_config = evg_config.to_map()
+    tasks_to_create = len(json_config.get('tasks', []))
+    if tasks_to_create > MAX_TASKS_TO_CREATE:
+        LOGGER.warning("Attempting to create more tasks than max(%d), aborting", tasks_to_create)
+        sys.exit(1)
+    _write_json_file(json_config, options.generate_tasks_file)
 
 
 def run_tests(no_exec, tests_by_task, resmoke_cmd, report_file):
@@ -526,6 +536,12 @@ def run_tests(no_exec, tests_by_task, resmoke_cmd, report_file):
 
 def main():
     """Execute Main program."""
+
+    logging.basicConfig(
+        format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
+        level=logging.DEBUG,
+        stream=sys.stdout,
+    )
 
     options, args = parse_command_line()
 
