@@ -335,8 +335,8 @@ public:
                                                        const WriteConcernOptions& writeConcern) = 0;
 
     /**
-     * Updates a single document in the specified namespace on the config server. The document must
-     * have an _id index. Must only be used for updates to the 'config' database.
+     * Updates a single document in the specified namespace on the config server. Must only be used
+     * for updates to the 'config' database.
      *
      * This method retries the operation on NotMaster or network errors, so it should only be used
      * with modifications which are idempotent.
@@ -354,6 +354,19 @@ public:
                                                   const BSONObj& update,
                                                   bool upsert,
                                                   const WriteConcernOptions& writeConcern) = 0;
+
+    /**
+     * Updates multiple documents in the specified namespace on the config server. Must only be used
+     * for updates to the 'config' database.
+     *
+     * Read the comment for 'updateConfigDocument' for additional information.
+     */
+    virtual StatusWith<bool> updateConfigDocuments(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const BSONObj& query,
+                                                   const BSONObj& update,
+                                                   bool upsert,
+                                                   const WriteConcernOptions& writeConcern) = 0;
 
     /**
      * Removes documents matching a particular query predicate from the specified namespace on the

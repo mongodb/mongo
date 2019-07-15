@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
@@ -140,6 +141,9 @@ public:
                                                                  boost::none,
                                                                  collType.getUnique(),
                                                                  false);  // createIndexIfPossible
+
+            ShardingCatalogManager::get(opCtx)->refineCollectionShardKey(
+                opCtx, nss, newShardKeyPattern);
         }
 
     private:

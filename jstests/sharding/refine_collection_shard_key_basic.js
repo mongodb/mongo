@@ -1,20 +1,31 @@
 //
 // Basic tests for refineCollectionShardKey.
 //
+// Tag this test as 'requires_find_command' to prevent it from running in the legacy passthroughs.
+// @tags: [requires_find_command]
+//
 
 (function() {
     'use strict';
     load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
-    const st = new ShardingTest({mongos: 2, shards: 1});
+    const st = new ShardingTest({mongos: 2, shards: 2, rs: {nodes: 3}});
     const mongos = st.s0;
     const staleMongos = st.s1;
+    const primaryShard = st.shard0.shardName;
+    const secondaryShard = st.shard1.shardName;
     const kDbName = 'db';
     const kCollName = 'foo';
     const kNsName = kDbName + '.' + kCollName;
+    const kConfigCollections = 'config.collections';
+    const kConfigChunks = 'config.chunks';
+    const kConfigTags = 'config.tags';
+    const kUnrelatedName = kDbName + '.bar';
+    let oldEpoch = null;
 
     function enableShardingAndShardColl(keyDoc) {
         assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+        st.ensurePrimaryShard(kDbName, primaryShard);
         assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: keyDoc}));
     }
 
@@ -34,7 +45,188 @@
             mongos.adminCommand({shardCollection: kNsName, key: keyDoc, unique: true}));
     }
 
-    // ********** SIMPLE TESTS **********
+    function validateConfigCollections(keyDoc, oldEpoch) {
+        const collArr = mongos.getCollection(kConfigCollections).find({_id: kNsName}).toArray();
+        assert.eq(1, collArr.length);
+        assert.eq(keyDoc, collArr[0].key);
+        assert.neq(oldEpoch, collArr[0].lastmodEpoch);
+    }
+
+    // 1. Assume oldKeyDoc = {a: 1, b: 1} when validating operations before
+    //    'refineCollectionShardKey'.
+    // 2. Assume newKeyDoc = {a: 1, b: 1, c: 1, d: 1} when validating operations after
+    //    'refineCollectionShardKey'.
+
+    function setupCRUDBeforeRefine() {
+        const session = mongos.startSession({retryWrites: true});
+        const sessionDB = session.getDatabase(kDbName);
+
+        // The documents below will be read after refineCollectionShardKey to verify data integrity.
+        assert.writeOK(sessionDB.getCollection(kCollName).insert({a: 5, b: 5, c: 5, d: 5}));
+        assert.writeOK(sessionDB.getCollection(kCollName).insert({a: 10, b: 10, c: 10, d: 10}));
+    }
+
+    function validateCRUDAfterRefine() {
+        // Force a refresh on each shard to simulate the asynchronous 'setShardVersion' completing.
+        flushRoutersAndRefreshShardMetadata(st, {ns: kNsName});
+
+        const session = mongos.startSession({retryWrites: true});
+        const sessionDB = session.getDatabase(kDbName);
+
+        // Verify that documents inserted before refineCollectionShardKey have not been corrupted.
+        assert.eq([{a: 5, b: 5, c: 5, d: 5}],
+                  sessionDB.getCollection(kCollName).find({a: 5}, {_id: 0}).toArray());
+        assert.eq([{a: 10, b: 10, c: 10, d: 10}],
+                  sessionDB.getCollection(kCollName).find({a: 10}, {_id: 0}).toArray());
+
+        // The full shard key is required when inserting documents.
+        assert.writeErrorWithCode(sessionDB.getCollection(kCollName).insert({a: 1, b: 1}),
+                                  ErrorCodes.ShardKeyNotFound);
+        assert.writeErrorWithCode(sessionDB.getCollection(kCollName).insert({a: -1, b: -1}),
+                                  ErrorCodes.ShardKeyNotFound);
+        assert.writeOK(sessionDB.getCollection(kCollName).insert({a: 1, b: 1, c: 1, d: 1}));
+        assert.writeOK(sessionDB.getCollection(kCollName).insert({a: -1, b: -1, c: -1, d: -1}));
+
+        // The full shard key is required when updating documents.
+        assert.writeErrorWithCode(
+            sessionDB.getCollection(kCollName).update({a: 1, b: 1}, {$set: {b: 2}}), 31025);
+        assert.writeErrorWithCode(
+            sessionDB.getCollection(kCollName).update({a: -1, b: -1}, {$set: {b: 2}}), 31025);
+        assert.writeOK(
+            sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1, d: 1}, {$set: {b: 2}}));
+        assert.writeOK(sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1, d: -1},
+                                                                 {$set: {b: 4}}));
+
+        assert.eq(2, sessionDB.getCollection(kCollName).findOne({a: 1}).b);
+        assert.eq(4, sessionDB.getCollection(kCollName).findOne({a: -1}).b);
+
+        // Versioned reads against secondaries should work as expected.
+        mongos.setReadPref("secondary");
+        assert.eq(2, sessionDB.getCollection(kCollName).findOne({a: 1}).b);
+        assert.eq(4, sessionDB.getCollection(kCollName).findOne({a: -1}).b);
+        mongos.setReadPref(null);
+
+        // The full shard key is required when removing documents.
+        assert.writeErrorWithCode(sessionDB.getCollection(kCollName).remove({a: 1, b: 1}, true),
+                                  ErrorCodes.ShardKeyNotFound);
+        assert.writeErrorWithCode(sessionDB.getCollection(kCollName).remove({a: -1, b: -1}, true),
+                                  ErrorCodes.ShardKeyNotFound);
+        assert.writeOK(sessionDB.getCollection(kCollName).remove({a: 1, b: 2, c: 1, d: 1}, true));
+        assert.writeOK(
+            sessionDB.getCollection(kCollName).remove({a: -1, b: 4, c: -1, d: -1}, true));
+        assert.writeOK(sessionDB.getCollection(kCollName).remove({a: 5, b: 5, c: 5, d: 5}, true));
+        assert.writeOK(
+            sessionDB.getCollection(kCollName).remove({a: 10, b: 10, c: 10, d: 10}, true));
+        assert.eq(null, sessionDB.getCollection(kCollName).findOne());
+    }
+
+    function validateSplitAfterRefine() {
+        // The full shard key is required when manually specifying bounds.
+        assert.commandFailed(mongos.adminCommand({split: kNsName, middle: {a: 0, b: 0}}));
+        assert.commandWorked(
+            mongos.adminCommand({split: kNsName, middle: {a: 0, b: 0, c: 0, d: 0}}));
+    }
+
+    function validateMoveAfterRefine() {
+        // The full shard key is required when manually specifying bounds.
+        assert.commandFailed(
+            mongos.adminCommand({moveChunk: kNsName, find: {a: 5, b: 5}, to: secondaryShard}));
+        assert.commandWorked(mongos.adminCommand(
+            {moveChunk: kNsName, find: {a: 5, b: 5, c: 5, d: 5}, to: secondaryShard}));
+    }
+
+    function validateMergeAfterRefine() {
+        assert.commandWorked(
+            mongos.adminCommand({split: kNsName, middle: {a: 0, b: 0, c: 0, d: 0}}));
+        assert.commandWorked(
+            mongos.adminCommand({split: kNsName, middle: {a: 10, b: 10, c: 10, d: 10}}));
+
+        // The full shard key is required when manually specifying bounds.
+        assert.commandFailed(mongos.adminCommand(
+            {mergeChunks: kNsName, bounds: [{a: MinKey, b: MinKey}, {a: MaxKey, b: MaxKey}]}));
+        assert.commandWorked(mongos.adminCommand({
+            mergeChunks: kNsName,
+            bounds: [
+                {a: MinKey, b: MinKey, c: MinKey, d: MinKey},
+                {a: MaxKey, b: MaxKey, c: MaxKey, d: MaxKey}
+            ]
+        }));
+    }
+
+    function setupConfigChunksBeforeRefine() {
+        // Ensure there exist 2 chunks that are not the global max chunk to properly verify the
+        // correctness of the multi-update in refineCollectionShardKey.
+        assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 0, b: 0}}));
+        assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 5, b: 5}}));
+
+        return mongos.getCollection(kConfigChunks).findOne({ns: kNsName}).lastmodEpoch;
+    }
+
+    function validateConfigChunksAfterRefine(oldEpoch) {
+        const chunkArr =
+            mongos.getCollection(kConfigChunks).find({ns: kNsName}).sort({min: 1}).toArray();
+        assert.eq(3, chunkArr.length);
+        assert.eq({a: MinKey, b: MinKey, c: MinKey, d: MinKey}, chunkArr[0].min);
+        assert.eq({a: 0, b: 0, c: MinKey, d: MinKey}, chunkArr[0].max);
+        assert.eq({a: 0, b: 0, c: MinKey, d: MinKey}, chunkArr[1].min);
+        assert.eq({a: 5, b: 5, c: MinKey, d: MinKey}, chunkArr[1].max);
+        assert.eq({a: 5, b: 5, c: MinKey, d: MinKey}, chunkArr[2].min);
+        assert.eq({a: MaxKey, b: MaxKey, c: MaxKey, d: MaxKey}, chunkArr[2].max);
+        assert.eq(chunkArr[0].lastmodEpoch, chunkArr[1].lastmodEpoch);
+        assert.eq(chunkArr[1].lastmodEpoch, chunkArr[2].lastmodEpoch);
+        assert.neq(oldEpoch, chunkArr[0].lastmodEpoch);
+    }
+
+    function setupConfigTagsBeforeRefine() {
+        // Ensure there exist 2 tags that are not the global max tag to properly verify the
+        // correctness of the multi-update in refineCollectionShardKey.
+        assert.commandWorked(mongos.adminCommand({addShardToZone: primaryShard, zone: 'zone_1'}));
+        assert.commandWorked(mongos.adminCommand({addShardToZone: primaryShard, zone: 'zone_2'}));
+        assert.commandWorked(mongos.adminCommand({addShardToZone: primaryShard, zone: 'zone_3'}));
+        assert.commandWorked(mongos.adminCommand({
+            updateZoneKeyRange: kNsName,
+            min: {a: MinKey, b: MinKey},
+            max: {a: 0, b: 0},
+            zone: 'zone_1'
+        }));
+        assert.commandWorked(mongos.adminCommand(
+            {updateZoneKeyRange: kNsName, min: {a: 0, b: 0}, max: {a: 5, b: 5}, zone: 'zone_2'}));
+        assert.commandWorked(mongos.adminCommand({
+            updateZoneKeyRange: kNsName,
+            min: {a: 5, b: 5},
+            max: {a: MaxKey, b: MaxKey},
+            zone: 'zone_3'
+        }));
+    }
+
+    function validateConfigTagsAfterRefine() {
+        const tagsArr =
+            mongos.getCollection(kConfigTags).find({ns: kNsName}).sort({min: 1}).toArray();
+        assert.eq(3, tagsArr.length);
+        assert.eq({a: MinKey, b: MinKey, c: MinKey, d: MinKey}, tagsArr[0].min);
+        assert.eq({a: 0, b: 0, c: MinKey, d: MinKey}, tagsArr[0].max);
+        assert.eq({a: 0, b: 0, c: MinKey, d: MinKey}, tagsArr[1].min);
+        assert.eq({a: 5, b: 5, c: MinKey, d: MinKey}, tagsArr[1].max);
+        assert.eq({a: 5, b: 5, c: MinKey, d: MinKey}, tagsArr[2].min);
+        assert.eq({a: MaxKey, b: MaxKey, c: MaxKey, d: MaxKey}, tagsArr[2].max);
+    }
+
+    function validateUnrelatedCollAfterRefine(oldCollArr, oldChunkArr, oldTagsArr) {
+        const collArr =
+            mongos.getCollection(kConfigCollections).find({_id: kUnrelatedName}).toArray();
+        assert.eq(1, collArr.length);
+        assert.sameMembers(oldCollArr, collArr);
+
+        const chunkArr = mongos.getCollection(kConfigChunks).find({ns: kUnrelatedName}).toArray();
+        assert.eq(3, chunkArr.length);
+        assert.sameMembers(oldChunkArr, chunkArr);
+
+        const tagsArr = mongos.getCollection(kConfigTags).find({ns: kUnrelatedName}).toArray();
+        assert.eq(3, tagsArr.length);
+        assert.sameMembers(oldTagsArr, tagsArr);
+    }
+
+    jsTestLog('********** SIMPLE TESTS **********');
 
     // Should fail because arguments 'refineCollectionShardKey' and 'key' are invalid types.
     assert.commandFailedWithCode(
@@ -94,7 +286,7 @@
 
     assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
-    // ********** NAMESPACE VALIDATION TESTS **********
+    jsTestLog('********** NAMESPACE VALIDATION TESTS **********');
 
     enableShardingAndShardColl({_id: 1});
 
@@ -141,7 +333,7 @@
 
     assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
-    // ********** SHARD KEY VALIDATION TESTS **********
+    jsTestLog('********** SHARD KEY VALIDATION TESTS **********');
 
     enableShardingAndShardColl({_id: 1});
 
@@ -196,9 +388,11 @@
     // 1}, and an index exists on {_id: 1, aKey: 1, bKey: 1}.
     dropAndReshardColl({_id: 1});
     assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1, bKey: 1}));
+    oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).lastmodEpoch;
 
     assert.commandWorked(
         mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}));
+    validateConfigCollections({_id: 1, aKey: 1}, oldEpoch);
 
     // Should fail because only an index with missing or incomplete shard key entries exists for new
     // shard key {_id: 1, aKey: 1}.
@@ -249,11 +443,116 @@
     // Should work because a 'useful' index exists for new shard key {_id: 1, aKey: 1}.
     dropAndReshardColl({_id: 1});
     assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1}));
+    oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).lastmodEpoch;
 
     assert.commandWorked(
         mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}));
+    validateConfigCollections({_id: 1, aKey: 1}, oldEpoch);
+
+    // Should work because a 'useful' index exists for new shard key {a: 1, b.c: 1}. NOTE: We are
+    // explicitly verifying that refineCollectionShardKey works with a dotted field.
+    dropAndReshardColl({a: 1});
+    assert.commandWorked(mongos.getCollection(kNsName).createIndex({a: 1, 'b.c': 1}));
+    oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).lastmodEpoch;
+
+    assert.commandWorked(
+        mongos.adminCommand({refineCollectionShardKey: kNsName, key: {a: 1, 'b.c': 1}}));
+    validateConfigCollections({a: 1, 'b.c': 1}, oldEpoch);
 
     assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
+
+    jsTestLog('********** INTEGRATION TESTS **********');
+
+    const oldKeyDoc = {a: 1, b: 1};
+    const newKeyDoc = {a: 1, b: 1, c: 1, d: 1};
+
+    enableShardingAndShardColl(oldKeyDoc);
+    assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));
+
+    // CRUD operations before and after refineCollectionShardKey should work as expected.
+    setupCRUDBeforeRefine();
+    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
+    validateCRUDAfterRefine();
+
+    // Split chunk operations before and after refineCollectionShardKey should work as expected.
+    dropAndReshardColl(oldKeyDoc);
+    assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));
+
+    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
+    validateSplitAfterRefine();
+
+    // Move chunk operations before and after refineCollectionShardKey should work as expected.
+    dropAndReshardColl(oldKeyDoc);
+    assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));
+    assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 0, b: 0}}));
+    assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 10, b: 10}}));
+
+    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
+    validateMoveAfterRefine();
+
+    // Merge chunk operations before and after refineCollectionShardKey should work as expected.
+    dropAndReshardColl(oldKeyDoc);
+    assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));
+
+    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
+    validateMergeAfterRefine();
+
+    // The config.chunks collection before and after refineCollectionShardKey should be as expected.
+    dropAndReshardColl(oldKeyDoc);
+    assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));
+
+    oldEpoch = setupConfigChunksBeforeRefine();
+    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
+    validateConfigChunksAfterRefine(oldEpoch);
+
+    // The config.tags collection before and after refineCollectionShardKey should be as expected.
+    dropAndReshardColl(oldKeyDoc);
+    assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));
+
+    setupConfigTagsBeforeRefine();
+    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
+    validateConfigTagsAfterRefine();
+
+    // Create an unrelated namespace 'db.bar' with 3 chunks and 3 tags to verify that it isn't
+    // corrupted after refineCollectionShardKey.
+    dropAndReshardColl(oldKeyDoc);
+    assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));
+
+    assert.commandWorked(mongos.adminCommand({shardCollection: kUnrelatedName, key: oldKeyDoc}));
+    assert.commandWorked(mongos.adminCommand({split: kUnrelatedName, middle: {a: 0, b: 0}}));
+    assert.commandWorked(mongos.adminCommand({split: kUnrelatedName, middle: {a: 5, b: 5}}));
+    assert.commandWorked(mongos.adminCommand({addShardToZone: primaryShard, zone: 'unrelated_1'}));
+    assert.commandWorked(mongos.adminCommand({addShardToZone: primaryShard, zone: 'unrelated_2'}));
+    assert.commandWorked(mongos.adminCommand({addShardToZone: primaryShard, zone: 'unrelated_3'}));
+    assert.commandWorked(mongos.adminCommand({
+        updateZoneKeyRange: kUnrelatedName,
+        min: {a: MinKey, b: MinKey},
+        max: {a: 0, b: 0},
+        zone: 'unrelated_1'
+    }));
+    assert.commandWorked(mongos.adminCommand({
+        updateZoneKeyRange: kUnrelatedName,
+        min: {a: 0, b: 0},
+        max: {a: 5, b: 5},
+        zone: 'unrelated_2'
+    }));
+    assert.commandWorked(mongos.adminCommand({
+        updateZoneKeyRange: kUnrelatedName,
+        min: {a: 5, b: 5},
+        max: {a: MaxKey, b: MaxKey},
+        zone: 'unrelated_3'
+    }));
+
+    const oldCollArr =
+        mongos.getCollection(kConfigCollections).find({_id: kUnrelatedName}).toArray();
+    const oldChunkArr = mongos.getCollection(kConfigChunks).find({ns: kUnrelatedName}).toArray();
+    const oldTagsArr = mongos.getCollection(kConfigTags).find({ns: kUnrelatedName}).toArray();
+    assert.eq(1, oldCollArr.length);
+    assert.eq(3, oldChunkArr.length);
+    assert.eq(3, oldTagsArr.length);
+
+    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
+    validateUnrelatedCollAfterRefine(oldCollArr, oldChunkArr, oldTagsArr);
 
     st.stop();
 })();

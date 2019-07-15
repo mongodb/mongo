@@ -304,6 +304,16 @@ public:
                           const CollectionOptions& options);
 
     /**
+     * Refines the shard key of an existing collection with namespace 'nss'. Here, 'shardKey'
+     * denotes the new shard key, which must contain the old shard key as a prefix.
+     *
+     * Throws exception on errors.
+     */
+    void refineCollectionShardKey(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const ShardKeyPattern& newShardKey);
+
+    /**
      * Creates a ScopedLock on the collection name in _namespaceSerializer. This is to prevent
      * timeouts waiting on the dist lock if multiple threads attempt to create or drop the same
      * collection.

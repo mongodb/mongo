@@ -574,4 +574,99 @@ void ShardingCatalogManager::createCollection(OperationContext* opCtx,
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 }
 
+void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const ShardKeyPattern& newShardKeyPattern) {
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+    // migrations. Take _kZoneOpLock in exclusive mode to prevent concurrent zone operations.
+    // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
+    // move chunks on different collections to proceed in parallel.
+    Lock::ExclusiveLock chunkLk(opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock zoneLk(opCtx->lockState(), _kZoneOpLock);
+
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    const auto newEpoch = OID::gen();
+
+    auto collType = uassertStatusOK(catalogClient->getCollection(opCtx, nss)).value;
+    const auto oldShardKeyPattern = ShardKeyPattern(collType.getKeyPattern());
+    collType.setEpoch(newEpoch);
+    collType.setKeyPattern(newShardKeyPattern.getKeyPattern());
+
+    uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
+        opCtx, nss, collType, false /* upsert */));
+
+    const auto oldFields = oldShardKeyPattern.toBSON();
+    const auto newFields =
+        newShardKeyPattern.toBSON().filterFieldsUndotted(oldFields, false /* inFilter */);
+
+    // Construct query objects for calls to 'updateConfigDocument(s)' below.
+    BSONObjBuilder notGlobalMaxBuilder, isGlobalMaxBuilder;
+    notGlobalMaxBuilder.append(ChunkType::ns.name(), nss.ns());
+    isGlobalMaxBuilder.append(ChunkType::ns.name(), nss.ns());
+    for (const auto& fieldElem : oldFields) {
+        notGlobalMaxBuilder.append("max." + fieldElem.fieldNameStringData(), BSON("$ne" << MAXKEY));
+        isGlobalMaxBuilder.append("max." + fieldElem.fieldNameStringData(), BSON("$eq" << MAXKEY));
+    }
+    const auto notGlobalMaxQuery = notGlobalMaxBuilder.obj();
+    const auto isGlobalMaxQuery = isGlobalMaxBuilder.obj();
+
+    // The defaultBounds object sets the bounds of each new field in the refined key to MinKey. The
+    // globalMaxBounds object corrects the max bounds of the global max chunk/tag to MaxKey.
+    //
+    // Example: oldKeyDoc = {a: 1}
+    //          newKeyDoc = {a: 1, b: 1, c: 1}
+    //          defaultBounds = {min.b: MinKey, min.c: MinKey, max.b: MinKey, max.c: MinKey}
+    //          globalMaxBounds = {min.b: MinKey, min.c: MinKey, max.b: MaxKey, max.c: MaxKey}
+    BSONObjBuilder defaultBoundsBuilder, globalMaxBoundsBuilder;
+    for (const auto& fieldElem : newFields) {
+        defaultBoundsBuilder.appendMinKey("min." + fieldElem.fieldNameStringData());
+        defaultBoundsBuilder.appendMinKey("max." + fieldElem.fieldNameStringData());
+
+        globalMaxBoundsBuilder.appendMinKey("min." + fieldElem.fieldNameStringData());
+        globalMaxBoundsBuilder.appendMaxKey("max." + fieldElem.fieldNameStringData());
+    }
+    const auto defaultBounds = defaultBoundsBuilder.obj();
+    const auto globalMaxBounds = globalMaxBoundsBuilder.obj();
+
+    // Update all config.chunks entries for the given namespace by setting (i) their epoch to the
+    // newly-generated objectid, (ii) their bounds for each new field in the refined key to MinKey
+    // (except for the global max chunk where the max bounds are set to MaxKey), and unsetting (iii)
+    // their jumbo field.
+    uassertStatusOK(catalogClient->updateConfigDocuments(
+        opCtx,
+        ChunkType::ConfigNS,
+        notGlobalMaxQuery,
+        BSON("$set" << BSON(ChunkType::epoch(newEpoch)) << "$max" << defaultBounds << "$unset"
+                    << BSON(ChunkType::jumbo(true))),
+        false,  // upsert
+        ShardingCatalogClient::kLocalWriteConcern));
+
+    uassertStatusOK(catalogClient->updateConfigDocument(
+        opCtx,
+        ChunkType::ConfigNS,
+        isGlobalMaxQuery,
+        BSON("$set" << BSON(ChunkType::epoch(newEpoch)) << "$max" << globalMaxBounds << "$unset"
+                    << BSON(ChunkType::jumbo(true))),
+        false,  // upsert
+        ShardingCatalogClient::kLocalWriteConcern));
+
+    // Update all config.tags entries for the given namespace by setting their bounds for each new
+    // field in the refined key to MinKey (except for the global max tag where the max bounds are
+    // set to MaxKey).
+    uassertStatusOK(
+        catalogClient->updateConfigDocuments(opCtx,
+                                             TagsType::ConfigNS,
+                                             notGlobalMaxQuery,
+                                             BSON("$max" << defaultBounds),
+                                             false,  // upsert
+                                             ShardingCatalogClient::kLocalWriteConcern));
+
+    uassertStatusOK(catalogClient->updateConfigDocument(opCtx,
+                                                        TagsType::ConfigNS,
+                                                        isGlobalMaxQuery,
+                                                        BSON("$max" << globalMaxBounds),
+                                                        false,  // upsert
+                                                        ShardingCatalogClient::kLocalWriteConcern));
+}
+
 }  // namespace mongo

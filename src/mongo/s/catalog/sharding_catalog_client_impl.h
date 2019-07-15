@@ -155,6 +155,13 @@ public:
                                           bool upsert,
                                           const WriteConcernOptions& writeConcern) override;
 
+    StatusWith<bool> updateConfigDocuments(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const BSONObj& query,
+                                           const BSONObj& update,
+                                           bool upsert,
+                                           const WriteConcernOptions& writeConcern) override;
+
     Status removeConfigDocuments(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const BSONObj& query,
@@ -170,8 +177,9 @@ public:
 
 private:
     /**
-     * Updates a single document in the specified namespace on the config server. The document must
-     * have an _id index. Must only be used for updates to the 'config' database.
+     * Updates a single document (if useMultiUpdate is false) or multiple documents (if
+     * useMultiUpdate is true) in the specified namespace on the config server. Must only be used
+     * for updates to the 'config' database.
      *
      * This method retries the operation on NotMaster or network errors, so it should only be used
      * with modifications which are idempotent.
@@ -186,7 +194,8 @@ private:
                                                   const BSONObj& query,
                                                   const BSONObj& update,
                                                   bool upsert,
-                                                  const WriteConcernOptions& writeConcern);
+                                                  const WriteConcernOptions& writeConcern,
+                                                  bool useMultiUpdate);
 
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
