@@ -1,0 +1,123 @@
+'\" t
+.\" Manual page created with latex2man on Thu Aug 16 09:44:45 MDT 2007
+.\" NOTE: This file is generated, DO NOT EDIT.
+.de Vb
+.ft CW
+.nf
+..
+.de Ve
+.ft R
+
+.fi
+..
+.TH "UNW\\_GET\\_PROC\\_NAME" "3" "16 August 2007" "Programming Library " "Programming Library "
+.SH NAME
+unw_get_proc_name
+\-\- get name of current procedure 
+.PP
+.SH SYNOPSIS
+
+.PP
+#include <libunwind.h>
+.br
+.PP
+int
+unw_get_proc_name(unw_cursor_t *cp,
+char *bufp,
+size_t
+len,
+unw_word_t *offp);
+.br
+.PP
+.SH DESCRIPTION
+
+.PP
+The unw_get_proc_name()
+routine returns the name of the 
+procedure that created the stack frame identified by argument 
+cp\&.
+The bufp
+argument is a pointer to a character buffer 
+that is at least len
+bytes long. This buffer is used to return 
+the name of the procedure. The offp
+argument is a pointer to a 
+word that is used to return the byte\-offset of the instruction\-pointer 
+saved in the stack frame identified by cp,
+relative to the start 
+of the procedure. For example, if procedure foo()
+starts at 
+address 0x40003000, then invoking unw_get_proc_name()
+on a 
+stack frame with an instruction\-pointer value of 0x40003080 would 
+return a value of 0x80 in the word pointed to by offp
+(assuming 
+the procedure is at least 0x80 bytes long). 
+.PP
+Note that on some platforms there is no reliable way to distinguish 
+between procedure names and ordinary labels. Furthermore, if symbol 
+information has been stripped from a program, procedure names may be 
+completely unavailable or may be limited to those exported via a 
+dynamic symbol table. In such cases, unw_get_proc_name()
+may return the name of a label or a preceeding (nearby) procedure. 
+However, the offset returned through offp
+is always relative to 
+the returned name, which ensures that the value (address) of the 
+returned name plus the returned offset will always be equal to the 
+instruction\-pointer of the stack frame identified by cp\&.
+.PP
+.SH RETURN VALUE
+
+.PP
+On successful completion, unw_get_proc_name()
+returns 0. 
+Otherwise the negative value of one of the error\-codes below is 
+returned. 
+.PP
+.SH THREAD AND SIGNAL SAFETY
+
+.PP
+unw_get_proc_name()
+is thread\-safe. If cursor cp
+is 
+in the local address\-space, this routine is also safe to use from a 
+signal handler. 
+.PP
+.SH ERRORS
+
+.PP
+.TP
+UNW_EUNSPEC
+ An unspecified error occurred. 
+.TP
+UNW_ENOINFO
+ Libunwind
+was unable to determine 
+the name of the procedure. 
+.TP
+UNW_ENOMEM
+ The procedure name is too long to fit 
+in the buffer provided. A truncated version of the name has been 
+returned. 
+.PP
+In addition, unw_get_proc_name()
+may return any error 
+returned by the access_mem()
+call\-back (see 
+unw_create_addr_space(3)).
+.PP
+.SH SEE ALSO
+
+.PP
+libunwind(3),
+unw_get_proc_info(3)
+.PP
+.SH AUTHOR
+
+.PP
+David Mosberger\-Tang
+.br
+Email: \fBdmosberger@gmail.com\fP
+.br
+WWW: \fBhttp://www.nongnu.org/libunwind/\fP\&.
+.\" NOTE: This file is generated, DO NOT EDIT.

@@ -105,3 +105,19 @@ env.CppUnitTest(
         'system_error',
     ],
 )
+
+# To be enabled by a '--enable-libunwind' option coming soon.
+if False:
+    unwindTestEnv = env.Clone()
+    unwindTestEnv.InjectThirdParty(libraries=['unwind'])
+    unwindTestEnv.CppUnitTest(
+        target=[
+            'unwind_test',
+        ],
+        source=[
+            'unwind_test.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/third_party/shim_unwind',
+        ]
+    )

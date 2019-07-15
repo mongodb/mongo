@@ -1,0 +1,401 @@
+\documentclass{article}
+\usepackage[fancyhdr,pdf]{latex2man}
+
+\input{common.tex}
+
+\begin{document}
+
+\begin{Name}{3}{libunwind-dynamic}{David Mosberger-Tang}{Programming Library}{Introduction to dynamic unwind-info}libunwind-dynamic -- libunwind-support for runtime-generated code
+\end{Name}
+
+\section{Introduction}
+
+For \Prog{libunwind} to do its job, it needs to be able to reconstruct
+the \emph{frame state} of each frame in a call-chain.  The frame state
+describes the subset of the machine-state that consists of the
+\emph{frame registers} (typically the instruction-pointer and the
+stack-pointer) and all callee-saved registers (preserved registers).
+The frame state describes each register either by providing its
+current value (for frame registers) or by providing the location at
+which the current value is stored (callee-saved registers).
+
+For statically generated code, the compiler normally takes care of
+emitting \emph{unwind-info} which provides the minimum amount of
+information needed to reconstruct the frame-state for each instruction
+in a procedure.  For dynamically generated code, the runtime code
+generator must use the dynamic unwind-info interface provided by
+\Prog{libunwind} to supply the equivalent information.  This manual
+page describes the format of this information in detail.
+
+For the purpose of this discussion, a \emph{procedure} is defined to
+be an arbitrary piece of \emph{contiguous} code.  Normally, each
+procedure directly corresponds to a function in the source-language
+but this is not strictly required.  For example, a runtime
+code-generator could translate a given function into two separate
+(discontiguous) procedures: one for frequently-executed (hot) code and
+one for rarely-executed (cold) code.  Similarly, simple
+source-language functions (usually leaf functions) may get translated
+into code for which the default unwind-conventions apply and for such
+code, it is not strictly necessary to register dynamic unwind-info.
+
+A procedure logically consists of a sequence of \emph{regions}.
+Regions are nested in the sense that the frame state at the end of one
+region is, by default, assumed to be the frame state for the next
+region.  Each region is thought of as being divided into a
+\emph{prologue}, a \emph{body}, and an \emph{epilogue}.  Each of them
+can be empty.  If non-empty, the prologue sets up the frame state for
+the body.  For example, the prologue may need to allocate some space
+on the stack and save certain callee-saved registers.  The body
+performs the actual work of the procedure but does not change the
+frame state in any way.  If non-empty, the epilogue restores the
+previous frame state and as such it undoes or cancels the effect of
+the prologue.  In fact, a single epilogue may undo the effect of the
+prologues of several (nested) regions.
+
+We should point out that even though the prologue, body, and epilogue
+are logically separate entities, optimizing code-generators will
+generally interleave instructions from all three entities.  For this
+reason, the dynamic unwind-info interface of \Prog{libunwind} makes no
+distinction whatsoever between prologue and body.  Similarly, the
+exact set of instructions that make up an epilogue is also irrelevant.
+The only point in the epilogue that needs to be described explicitly
+by the dynamic unwind-info is the point at which the stack-pointer
+gets restored.  The reason this point needs to be described is that
+once the stack-pointer is restored, all values saved in the
+deallocated portion of the stack frame become invalid and hence
+\Prog{libunwind} needs to know about it.  The portion of the frame
+state not saved on the stack is assume to remain valid through the end
+of the region.  For this reason, there is usually no need to describe
+instructions which restore the contents of callee-saved registers.
+
+Within a region, each instruction that affects the frame state in some
+fashion needs to be described with an operation descriptor.  For this
+purpose, each instruction in the region is assigned a unique index.
+Exactly how this index is derived depends on the architecture.  For
+example, on RISC and EPIC-style architecture, instructions have a
+fixed size so it's possible to simply number the instructions.  In
+contrast, most CISC use variable-length instruction encodings, so it
+is usually necessary to use a byte-offset as the index.  Given the
+instruction index, the operation descriptor specifies the effect of
+the instruction in an abstract manner.  For example, it might express
+that the instruction stores calle-saved register \Var{r1} at offset 16
+in the stack frame.
+
+\section{Procedures}
+
+A runtime code-generator registers the dynamic unwind-info of a
+procedure by setting up a structure of type \Type{unw\_dyn\_info\_t}
+and calling \Func{\_U\_dyn\_register}(), passing the address of the
+structure as the sole argument.  The members of the
+\Type{unw\_dyn\_info\_t} structure are described below:
+\begin{itemize}
+\item[\Type{void~*}next] Private to \Prog{libunwind}.  Must not be used
+  by the application.
+\item[\Type{void~*}prev] Private to \Prog{libunwind}.  Must not be used
+  by the application.
+\item[\Type{unw\_word\_t} \Var{start\_ip}] The start-address of the
+  instructions of the procedure (remember: procedure are defined to be
+  contiguous pieces of code, so a single code-range is sufficient).
+\item[\Type{unw\_word\_t} \Var{end\_ip}] The end-address of the
+  instructions of the procedure (non-inclusive, that is,
+  \Var{end\_ip}-\Var{start\_ip} is the size of the procedure in
+  bytes).
+\item[\Type{unw\_word\_t} \Var{gp}] The global-pointer value in use
+  for this procedure.  The exact meaing of the global-pointer is
+  architecture-specific and on some architecture, it is not used at
+  all.
+\item[\Type{int32\_t} \Var{format}] The format of the unwind-info.
+  This member can be one of \Const{UNW\_INFO\_FORMAT\_DYNAMIC},
+  \Const{UNW\_INFO\_FORMAT\_TABLE}, or
+  \Const{UNW\_INFO\_FORMAT\_REMOTE\_TABLE}.
+\item[\Type{union} \Var{u}] This union contains one sub-member
+  structure for every possible unwind-info format:
+  \begin{description}
+  \item[\Type{unw\_dyn\_proc\_info\_t} \Var{pi}] This member is used
+    for format \Const{UNW\_INFO\_FORMAT\_DYNAMIC}.
+  \item[\Type{unw\_dyn\_table\_info\_t} \Var{ti}] This member is used
+    for format \Const{UNW\_INFO\_FORMAT\_TABLE}.
+  \item[\Type{unw\_dyn\_remote\_table\_info\_t} \Var{rti}] This member
+    is used for format \Const{UNW\_INFO\_FORMAT\_REMOTE\_TABLE}.
+  \end{description}\
+  The format of these sub-members is described in detail below.
+\end{itemize}
+
+\subsection{Proc-info format}
+
+This is the preferred dynamic unwind-info format and it is generally
+the one used by full-blown runtime code-generators.  In this format,
+the details of a procedure are described by a structure of type
+\Type{unw\_dyn\_proc\_info\_t}.  This structure contains the following
+members:
+\begin{description}
+
+\item[\Type{unw\_word\_t} \Var{name\_ptr}] The address of a
+  (human-readable) name of the procedure or 0 if no such name is
+  available.  If non-zero, The string stored at this address must be
+  ASCII NUL terminated.  For source languages that use name-mangling
+  (such as C++ or Java) the string stored at this address should be
+  the \emph{demangled} version of the name.
+
+\item[\Type{unw\_word\_t} \Var{handler}] The address of the
+  personality-routine for this procedure.  Personality-routines are
+  used in conjunction with exception handling.  See the C++ ABI draft
+  (http://www.codesourcery.com/cxx-abi/) for an overview and a
+  description of the personality routine.  If the procedure has no
+  personality routine, \Var{handler} must be set to 0.
+
+\item[\Type{uint32\_t} \Var{flags}] A bitmask of flags.  At the
+  moment, no flags have been defined and this member must be
+  set to 0.
+
+\item[\Type{unw\_dyn\_region\_info\_t~*}\Var{regions}] A NULL-terminated
+  linked list of region-descriptors.  See section ``Region
+  descriptors'' below for more details.
+
+\end{description}
+
+\subsection{Table-info format}
+
+This format is generally used when the dynamically generated code was
+derived from static code and the unwind-info for the dynamic and the
+static versions is identical.  For example, this format can be useful
+when loading statically-generated code into an address-space in a
+non-standard fashion (i.e., through some means other than
+\Func{dlopen}()).  In this format, the details of a group of procedures
+is described by a structure of type \Type{unw\_dyn\_table\_info}.
+This structure contains the following members:
+\begin{description}
+
+\item[\Type{unw\_word\_t} \Var{name\_ptr}] The address of a
+  (human-readable) name of the procedure or 0 if no such name is
+  available.  If non-zero, The string stored at this address must be
+  ASCII NUL terminated.  For source languages that use name-mangling
+  (such as C++ or Java) the string stored at this address should be
+  the \emph{demangled} version of the name.
+
+\item[\Type{unw\_word\_t} \Var{segbase}] The segment-base value
+  that needs to be added to the segment-relative values stored in the
+  unwind-info.  The exact meaning of this value is
+  architecture-specific.
+
+\item[\Type{unw\_word\_t} \Var{table\_len}] The length of the
+  unwind-info (\Var{table\_data}) counted in units of words
+  (\Type{unw\_word\_t}).
+
+\item[\Type{unw\_word\_t} \Var{table\_data}] A pointer to the actual
+  data encoding the unwind-info.  The exact format is
+  architecture-specific (see architecture-specific sections below).
+
+\end{description}
+
+\subsection{Remote table-info format}
+
+The remote table-info format has the same basic purpose as the regular
+table-info format.  The only difference is that when \Prog{libunwind}
+uses the unwind-info, it will keep the table data in the target
+address-space (which may be remote).  Consequently, the type of the
+\Var{table\_data} member is \Type{unw\_word\_t} rather than a pointer.
+This implies that \Prog{libunwind} will have to access the table-data
+via the address-space's \Func{access\_mem}() call-back, rather than
+through a direct memory reference.
+
+From the point of view of a runtime-code generator, the remote
+table-info format offers no advantage and it is expected that such
+generators will describe their procedures either with the proc-info
+format or the normal table-info format.  The main reason that the
+remote table-info format exists is to enable the
+address-space-specific \Func{find\_proc\_info}() callback (see
+\SeeAlso{unw\_create\_addr\_space}(3)) to return unwind tables whose
+data remains in remote memory.  This can speed up unwinding (e.g., for
+a debugger) because it reduces the amount of data that needs to be
+loaded from remote memory.
+
+\section{Regions descriptors}
+
+A region descriptor is a variable length structure that describes how
+each instruction in the region affects the frame state.  Of course,
+most instructions in a region usualy do not change the frame state and
+for those, nothing needs to be recorded in the region descriptor.  A
+region descriptor is a structure of type
+\Type{unw\_dyn\_region\_info\_t} and has the following members:
+\begin{description}
+\item[\Type{unw\_dyn\_region\_info\_t~*}\Var{next}] A pointer to the
+  next region.  If this is the last region, \Var{next} is \Const{NULL}.
+\item[\Type{int32\_t} \Var{insn\_count}] The length of the region in
+  instructions.  Each instruction is assumed to have a fixed size (see
+  architecture-specific sections for details).  The value of
+  \Var{insn\_count} may be negative in the last region of a procedure
+  (i.e., it may be negative only if \Var{next} is \Const{NULL}).  A
+  negative value indicates that the region covers the last \emph{N}
+  instructions of the procedure, where \emph{N} is the absolute value
+  of \Var{insn\_count}.
+\item[\Type{uint32\_t} \Var{op\_count}] The (allocated) length of
+  the \Var{op\_count} array.
+\item[\Type{unw\_dyn\_op\_t} \Var{op}] An array of dynamic unwind
+  directives.  See Section ``Dynamic unwind directives'' for a
+  description of the directives.
+\end{description}
+A region descriptor with an \Var{insn\_count} of zero is an
+\emph{empty region} and such regions are perfectly legal.  In fact,
+empty regions can be useful to establish a particular frame state
+before the start of another region.
+
+A single region list can be shared across multiple procedures provided
+those procedures share a common prologue and epilogue (their bodies
+may differ, of course).  Normally, such procedures consist of a canned
+prologue, the body, and a canned epilogue.  This could be described by
+two regions: one covering the prologue and one covering the epilogue.
+Since the body length is variable, the latter region would need to
+specify a negative value in \Var{insn\_count} such that
+\Prog{libunwind} knows that the region covers the end of the procedure
+(up to the address specified by \Var{end\_ip}).
+
+The region descriptor is a variable length structure to make it
+possible to allocate all the necessary memory with a single
+memory-allocation request.  To facilitate the allocation of a region
+descriptors \Prog{libunwind} provides a helper routine with the
+following synopsis:
+
+\noindent
+\Type{size\_t} \Func{\_U\_dyn\_region\_size}(\Type{int} \Var{op\_count});
+
+This routine returns the number of bytes needed to hold a region
+descriptor with space for \Var{op\_count} unwind directives.  Note
+that the length of the \Var{op} array does not have to match exactly
+with the number of directives in a region.  Instead, it is sufficient
+if the \Var{op} array contains at least as many entries as there are
+directives, since the end of the directives can always be indicated
+with the \Const{UNW\_DYN\_STOP} directive.
+
+\section{Dynamic unwind directives}
+
+A dynamic unwind directive describes how the frame state changes
+at a particular point within a region.  The description is in
+the form of a structure of type \Type{unw\_dyn\_op\_t}.  This
+structure has the following members:
+\begin{description}
+\item[\Type{int8\_t} \Var{tag}] The operation tag.  Must be one
+  of the \Type{unw\_dyn\_operation\_t} values described below.
+\item[\Type{int8\_t} \Var{qp}] The qualifying predicate that controls
+  whether or not this directive is active.  This is useful for
+  predicated architecturs such as IA-64 or ARM, where the contents of
+  another (callee-saved) register determines whether or not an
+  instruction is executed (takes effect).  If the directive is always
+  active, this member should be set to the manifest constant
+  \Const{\_U\_QP\_TRUE} (this constant is defined for all
+  architectures, predicated or not).
+\item[\Type{int16\_t} \Var{reg}] The number of the register affected
+  by the instruction.
+\item[\Type{int32\_t} \Var{when}] The region-relative number of
+  the instruction to which this directive applies.  For example,
+  a value of 0 means that the effect described by this directive
+  has taken place once the first instruction in the region has
+  executed.
+\item[\Type{unw\_word\_t} \Var{val}] The value to be applied by the
+  operation tag.  The exact meaning of this value varies by tag.  See
+  Section ``Operation tags'' below.
+\end{description}
+It is perfectly legitimate to specify multiple dynamic unwind
+directives with the same \Var{when} value, if a particular instruction
+has a complex effect on the frame state.
+
+Empty regions by definition contain no actual instructions and as such
+the directives are not tied to a particular instruction.  By
+convention, the \Var{when} member should be set to 0, however.
+
+There is no need for the dynamic unwind directives to appear
+in order of increasing \Var{when} values.  If the directives happen to
+be sorted in that order, it may result in slightly faster execution,
+but a runtime code-generator should not go to extra lengths just to
+ensure that the directives are sorted.
+
+IMPLEMENTATION NOTE: should \Prog{libunwind} implementations for
+certain architectures prefer the list of unwind directives to be
+sorted, it is recommended that such implementations first check
+whether the list happens to be sorted already and, if not, sort the
+directives explicitly before the first use.  With this approach, the
+overhead of explicit sorting is only paid when there is a real benefit
+and if the runtime code-generator happens to generated sorted lists
+naturally, the performance penalty is limited to a simple O(N) check.
+
+\subsection{Operations tags}
+
+The possible operation tags are defined by enumeration type
+\Type{unw\_dyn\_operation\_t} which defines the following
+values:
+\begin{description}
+
+\item[\Const{UNW\_DYN\_STOP}] Marks the end of the dynamic unwind
+  directive list.  All remaining entries in the \Var{op} array of the
+  region-descriptor are ignored.  This tag is guaranteed to have a
+  value of 0.
+
+\item[\Const{UNW\_DYN\_SAVE\_REG}] Marks an instruction which saves
+  register \Var{reg} to register \Var{val}.
+
+\item[\Const{UNW\_DYN\_SPILL\_FP\_REL}] Marks an instruction which
+  spills register \Var{reg} to a frame-pointer-relative location.  The
+  frame-pointer-relative offset is given by the value stored in member
+  \Var{val}.  See the architecture-specific sections for a description
+  of the stack frame layout.
+
+\item[\Const{UNW\_DYN\_SPILL\_SP\_REL}] Marks an instruction which
+  spills register \Var{reg} to a stack-pointer-relative location.  The
+  stack-pointer-relative offset is given by the value stored in member
+  \Var{val}.  See the architecture-specific sections for a description
+  of the stack frame layout.
+
+\item[\Const{UNW\_DYN\_ADD}] Marks an instruction which adds
+  the constant value \Var{val} to register \Var{reg}.  To add subtract
+  a constant value, store the two's-complement of the value in
+  \Var{val}.  The set of registers that can be specified for this tag
+  is described in the architecture-specific sections below.
+
+\item[\Const{UNW\_DYN\_POP\_FRAMES}]
+
+\item[\Const{UNW\_DYN\_LABEL\_STATE}]
+
+\item[\Const{UNW\_DYN\_COPY\_STATE}]
+
+\item[\Const{UNW\_DYN\_ALIAS}]
+
+\end{description}
+
+unw\_dyn\_op\_t
+
+\_U\_dyn\_op\_save\_reg();
+\_U\_dyn\_op\_spill\_fp\_rel();
+\_U\_dyn\_op\_spill\_sp\_rel();
+\_U\_dyn\_op\_add();
+\_U\_dyn\_op\_pop\_frames();
+\_U\_dyn\_op\_label\_state();
+\_U\_dyn\_op\_copy\_state();
+\_U\_dyn\_op\_alias();
+\_U\_dyn\_op\_stop();
+
+\section{IA-64 specifics}
+
+- meaning of segbase member in table-info/table-remote-info format
+- format of table\_data in table-info/table-remote-info format
+- instruction size: each bundle is counted as 3 instructions, regardless
+  of template (MLX)
+- describe stack-frame layout, especially with regards to sp-relative
+  and fp-relative addressing
+- UNW\_DYN\_ADD can only add to ``sp'' (always a negative value); use
+  POP\_FRAMES otherwise
+
+\section{See Also}
+
+\SeeAlso{libunwind(3)},
+\SeeAlso{\_U\_dyn\_register(3)},
+\SeeAlso{\_U\_dyn\_cancel(3)}
+
+\section{Author}
+
+\noindent
+David Mosberger-Tang\\
+Email: \Email{dmosberger@gmail.com}\\
+WWW: \URL{http://www.nongnu.org/libunwind/}.
+\LatexManEnd
+
+\end{document}

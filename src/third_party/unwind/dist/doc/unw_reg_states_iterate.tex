@@ -1,0 +1,83 @@
+\documentclass{article}
+\usepackage[fancyhdr,pdf]{latex2man}
+
+\input{common.tex}
+
+\begin{document}
+
+\begin{Name}{3}{unw\_reg\_states\_iterate}{David Mosberger-Tang}{Programming Library}{unw\_reg\_states\_iterate}unw\_reg\_states\_iterate -- get register state info on current procedure
+\end{Name}
+
+\section{Synopsis}
+
+\File{\#include $<$libunwind.h$>$}\\
+
+\Type{int} \Func{unw\_reg\_states\_iterate}(\Type{unw\_cursor\_t~*}\Var{cp}, \Type{unw\_reg\_states\_callback}\Var{cb}, \Type{void~*}\Var{token});\\
+
+\section{Description}
+
+The \Func{unw\_reg\_states\_iterate}() routine provides
+information about the procedure that created the stack frame
+identified by argument \Var{cp}.  The \Var{cb} argument is a pointer
+to a function of type \Type{unw\_reg\_states\_callback} which is used to
+return the information.  The function \Type{unw\_reg\_states\_callback} has the
+following definition:
+
+\Type{int} (~*\Var{unw\_reg\_states\_callback})(\Type{void~*}\Var{token},
+			\Type{void~*}\Var{reg\_states\_data},
+			\Type{size\_t} \Var{reg\_states\_data\_size},
+			\Type{unw\_word\_t} \Var{start\_ip}, \Type{unw\_word\_t} \Var{end\_ip});
+
+The callback function may be invoked several times for each call of \Func{unw\_reg\_states\_iterate}. Each call is associcated with a instruction address range and a set of instructions on how to update register values when returning from the procedure in that address range.  For each invocation, the arguments to the callback function are:
+\begin{description}
+\item[\Type{void~*} \Var{token}] The token value passed to \Var{unw\_reg\_states\_callback}. \\
+\item[\Type{void~*} \Var{reg\_states\_data}] A pointer to data about
+  updating register values. This data, or a copy of it, can be passed
+  to \Var{unw\_apply\_reg\_state}.\\
+\item[\Type{int} \Var{reg\_states\_data\_size}] The size of the register update data. \\
+\item[\Type{unw\_word\_t} \Var{start\_ip}] The address of the first
+  instruction of the address range.  \\
+\item[\Type{unw\_word\_t} \Var{end\_ip}] The address of the first
+  instruction \emph{beyond} the end of the address range.  \\
+\end{description}
+
+\section{Return Value}
+
+On successful completion, \Func{unw\_reg\_states\_iterate}() returns
+0.  If the callback function returns a nonzero value, that indicates
+failure and the function returns immediately.  Otherwise the negative
+value of one of the error-codes below is returned.
+
+\section{Thread and Signal Safety}
+
+\Func{unw\_reg\_states\_iterate}() is thread-safe.  If cursor \Var{cp} is
+in the local address-space, this routine is also safe to use from a
+signal handler.
+
+\section{Errors}
+
+\begin{Description}
+\item[\Const{UNW\_EUNSPEC}] An unspecified error occurred.
+\item[\Const{UNW\_ENOINFO}] \Prog{Libunwind} was unable to locate
+  unwind-info for the procedure.
+\item[\Const{UNW\_EBADVERSION}] The unwind-info for the procedure has
+  version or format that is not understood by \Prog{libunwind}.
+\end{Description}
+In addition, \Func{unw\_reg\_states\_iterate}() may return any error
+returned by the \Func{access\_mem}() call-back (see
+\Func{unw\_create\_addr\_space}(3)).
+
+\section{See Also}
+
+\SeeAlso{libunwind(3)},
+\SeeAlso{unw\_apply\_reg\_state(3)}
+
+\section{Author}
+
+\noindent
+David Mosberger-Tang\\
+Email: \Email{dmosberger@gmail.com}\\
+WWW: \URL{http://www.nongnu.org/libunwind/}.
+\LatexManEnd
+
+\end{document}

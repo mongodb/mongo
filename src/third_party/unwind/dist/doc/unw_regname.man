@@ -1,0 +1,68 @@
+'\" t
+.\" Manual page created with latex2man on Thu Aug 16 09:44:45 MDT 2007
+.\" NOTE: This file is generated, DO NOT EDIT.
+.de Vb
+.ft CW
+.nf
+..
+.de Ve
+.ft R
+
+.fi
+..
+.TH "UNW\\_REGNAME" "3" "16 August 2007" "Programming Library " "Programming Library "
+.SH NAME
+unw_regname
+\-\- get register name 
+.PP
+.SH SYNOPSIS
+
+.PP
+#include <libunwind.h>
+.br
+.PP
+const char *unw_regname(unw_regnum_t
+regnum);
+.br
+.PP
+.SH DESCRIPTION
+
+.PP
+The unw_regname()
+routine returns a printable name for 
+register regnum\&.
+If regnum
+is an invalid or otherwise 
+unrecognized register number, a string consisting of three question 
+marks is returned. The returned string is statically allocated and 
+therefore guaranteed to remain valid until the application terminates. 
+.PP
+.SH RETURN VALUE
+
+.PP
+The unw_regname()
+routine cannot fail and always returns a 
+valid (non\-NULL)
+string. 
+.PP
+.SH THREAD AND SIGNAL SAFETY
+
+.PP
+The unw_regname()
+routine is thread\-safe as well as safe to 
+use from a signal handler. 
+.PP
+.SH SEE ALSO
+
+.PP
+libunwind(3)
+.PP
+.SH AUTHOR
+
+.PP
+David Mosberger\-Tang
+.br
+Email: \fBdmosberger@gmail.com\fP
+.br
+WWW: \fBhttp://www.nongnu.org/libunwind/\fP\&.
+.\" NOTE: This file is generated, DO NOT EDIT.

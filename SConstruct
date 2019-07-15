@@ -325,92 +325,38 @@ add_option('use-sasl-client',
     nargs=0,
 )
 
-add_option('use-system-tcmalloc',
-    help='use system version of tcmalloc library',
-    nargs=0,
-)
-
-add_option('use-system-fmt',
-    help='use system version of fmt library',
-    nargs=0,
-)
-
-add_option('use-system-pcre',
-    help='use system version of pcre library',
-    nargs=0,
-)
-
-add_option('use-system-wiredtiger',
-    help='use system version of wiredtiger library',
-    nargs=0,
-)
+# Most of the "use-system-*" options follow a simple form.
+for pack in [
+    ('abseil-cpp',),
+    ('asio', 'ASIO',),
+    ('boost',),
+    ('fmt',),
+    ('google-benchmark', 'Google benchmark'),
+    ('icu', 'ICU'),
+    ('intel_decimal128', 'intel decimal128'),
+    ('kms-message',),
+    ('pcre',),
+    ('snappy',),
+    ('sqlite',),
+    ('stemmer',),
+    ('tcmalloc',),
+    ('unwind',),
+    ('valgrind',),
+    ('wiredtiger',),
+    ('yaml',),
+    ('zlib',),
+    ('zstd', 'Zstandard'),
+    ]:
+    name = pack[0]
+    pretty = name
+    if len(pack) == 2:
+        pretty = pack[1]
+    add_option(f'use-system-{name}',
+               help=f'use system version of {pretty} library',
+               nargs=0)
 
 add_option('system-boost-lib-search-suffixes',
     help='Comma delimited sequence of boost library suffixes to search',
-)
-
-add_option('use-system-abseil-cpp',
-    help='use system version of abseil-cpp libraries',
-    nargs=0,
-)
-
-add_option('use-system-boost',
-    help='use system version of boost libraries',
-    nargs=0,
-)
-
-add_option('use-system-snappy',
-    help='use system version of snappy library',
-    nargs=0,
-)
-
-add_option('use-system-valgrind',
-    help='use system version of valgrind library',
-    nargs=0,
-)
-
-add_option('use-system-google-benchmark',
-    help='use system version of Google benchmark library',
-    nargs=0,
-)
-
-add_option('use-system-zlib',
-    help='use system version of zlib library',
-    nargs=0,
-)
-
-add_option('use-system-zstd',
-    help="use system version of Zstandard library",
-    nargs=0,
-)
-
-add_option('use-system-sqlite',
-    help='use system version of sqlite library',
-    nargs=0,
-)
-
-add_option('use-system-stemmer',
-    help='use system version of stemmer',
-    nargs=0)
-
-add_option('use-system-yaml',
-    help='use system version of yaml',
-    nargs=0,
-)
-
-add_option('use-system-asio',
-    help="use system version of ASIO",
-    nargs=0,
-)
-
-add_option('use-system-icu',
-    help="use system version of ICU",
-    nargs=0,
-)
-
-add_option('use-system-intel_decimal128',
-    help='use system version of intel decimal128',
-    nargs=0,
 )
 
 add_option('use-system-mongo-c',
@@ -420,11 +366,6 @@ add_option('use-system-mongo-c',
     help="use system version of the mongo-c-driver (auto will use it if it's found)",
     nargs='?',
     type='choice',
-)
-
-add_option('use-system-kms-message',
-    help='use system version of kms-message library',
-    nargs=0,
 )
 
 add_option('use-system-all',
@@ -3298,6 +3239,9 @@ def doConfigure(myenv):
 
     if use_system_version_of_library("fmt"):
         conf.FindSysLibDep("fmt", ["fmt"])
+
+    if use_system_version_of_library("unwind"):
+        conf.FindSysLibDep("unwind", ["unwind"])
 
     if use_system_version_of_library("intel_decimal128"):
         conf.FindSysLibDep("intel_decimal128", ["bid"])

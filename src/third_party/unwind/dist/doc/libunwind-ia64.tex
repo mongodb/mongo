@@ -1,0 +1,216 @@
+\documentclass{article}
+\usepackage[fancyhdr,pdf]{latex2man}
+
+\input{common.tex}
+
+\begin{document}
+
+\begin{Name}{3}{libunwind-ia64}{David Mosberger-Tang}{Programming Library}{IA-64-specific support in libunwind}libunwind-ia64 -- IA-64-specific support in libunwind
+\end{Name}
+
+
+\section{Introduction}
+
+The IA-64 version of \Prog{libunwind} uses a platform-string of
+\texttt{ia64} and, at least in theory, should be able to support all
+operating systems adhering to the processor-specific ABI defined for
+the Itanium Processor Family.  This includes both little-endian Linux
+and big-endian HP-UX.  Furthermore, to make it possible for a single
+library to unwind both 32- and 64-bit targets, the type
+\Type{unw\_word\_t} is always defined to be 64 bits wide (independent
+of the natural word-size of the host).  Having said that, the current
+implementation has been tested only with IA-64 Linux.
+
+When targeting IA-64, the \Prog{libunwind} header file defines the
+macro \Const{UNW\_TARGET\_IA64} as 1 and the macro \Const{UNW\_TARGET}
+as ``ia64'' (without the quotation marks).  The former makes it
+possible for platform-dependent unwind code to use
+conditional-compilation to select an appropriate implementation.  The
+latter is useful for stringification purposes and to construct
+target-platform-specific symbols.
+
+One special feature of IA-64 is the use of NaT bits to support
+speculative execution.  Often, NaT bits are thought of as the ``65-th
+bit'' of a general register.  However, to make everything fit into
+64-bit wide \Type{unw\_word\_t} values, \Prog{libunwind} treats the
+NaT-bits like separate boolean registers, whose 64-bit value is either
+TRUE (non-zero) or FALSE (zero).
+
+
+\section{Machine-State}
+
+The machine-state (set of registers) that is accessible through
+\Prog{libunwind} depends on the type of stack frame that a cursor
+points to.  For normal frames, all ``preserved'' (callee-saved)
+registers are accessible.  For signal-trampoline frames, all registers
+(including ``scratch'' (caller-saved) registers) are accessible.  Most
+applications do not have to worry a-priori about which registers are
+accessible when.  In case of doubt, it is always safe to \emph{try} to
+access a register (via \Func{unw\_get\_reg}() or
+\Func{unw\_get\_fpreg}()) and if the register isn't accessible, the
+call will fail with a return-value of \texttt{-}\Const{UNW\_EBADREG}.
+
+As a special exception to the above general rule, scratch registers
+\texttt{r15}-\texttt{r18} are always accessible, even in normal
+frames.  This makes it possible to pass arguments, e.g., to exception
+handlers.
+
+For a detailed description of the IA-64 register usage convention,
+please see the ``Itanium Software Conventions and Runtime Architecture
+Guide'', available at:
+\begin{center}
+  \URL{http://www.intel.com/design/itanium/downloads/245358.htm}
+\end{center}
+
+
+\section{Register Names}
+
+The IA-64-version of \Prog{libunwind} defines three kinds of register
+name macros: frame-register macros, normal register macros, and
+convenience macros.  Below, we describe each kind in turn:
+
+
+\subsection{Frame-register Macros}
+
+Frame-registers are special (pseudo) registers because they always
+have a valid value, even though sometimes they do not get saved
+explicitly (e.g., if a memory stack frame is 16 bytes in size, the
+previous stack-pointer value can be calculated simply as
+\texttt{sp+16}, so there is no need to save the stack-pointer
+explicitly).  Moreover, the set of frame register values uniquely
+identifies a stack frame.  The IA-64 architecture defines two stacks
+(a memory and a register stack). Including the instruction-pointer
+(IP), this means there are three frame registers:
+\begin{Description}
+\item[\Const{UNW\_IA64\_IP}:] Contains the instruction pointer (IP, or
+  ``program counter'') of the current stack frame.  Given this value,
+  the remaining machine-state corresponds to the register-values that
+  were present in the CPU when it was just about to execute the
+  instruction pointed to by \Const{UNW\_IA64\_IP}.  Bits 0 and 1 of
+  this frame-register encode the slot number of the instruction.
+  \textbf{Note:} Due to the way the call instruction works on IA-64,
+  the slot number is usually zero, but can be non-zero, e.g., in the
+  stack-frame of a signal-handler trampoline.
+\item[\Const{UNW\_IA64\_SP}:] Contains the (memory) stack-pointer
+  value (SP).
+\item[\Const{UNW\_IA64\_BSP}:] Contains the register backing-store
+  pointer (BSP).  \textbf{Note:} the value in this register is equal
+  to the contents of register \texttt{ar.bsp} at the time the
+  instruction at \Const{UNW\_IA64\_IP} was about to begin execution.
+\end{Description}
+
+
+\subsection{Normal Register Macros}
+
+The following normal register name macros are available:
+\begin{Description}
+\item[\Const{UNW\_IA64\_GR}:] The base-index for general (integer)
+  registers.  Add an index in the range from 0..127 to get a
+  particular general register.  For example, to access \texttt{r4},
+  the index \Const{UNW\_IA64\_GR}\texttt{+4} should be used.
+  Registers \texttt{r0} and \texttt{r1} (\texttt{gp}) are read-only,
+  and any attempt to write them will result in an error
+  (\texttt{-}\Const{UNW\_EREADONLYREG}).  Even though \texttt{r1} is
+  read-only, \Prog{libunwind} will automatically adjust its value if
+  the instruction-pointer (\Const{UNW\_IA64\_IP}) is modified.  For
+  example, if \Const{UNW\_IA64\_IP} is set to a value inside a
+  function \Func{func}(), then reading
+  \Const{UNW\_IA64\_GR}\texttt{+1} will return the global-pointer
+  value for this function.
+\item[\Const{UNW\_IA64\_NAT}:] The base-index for the NaT bits of the
+  general (integer) registers.  A non-zero value in these registers
+  corresponds to a set NaT-bit.  Add an index in the range from 0..127
+  to get a particular NaT-bit register.  For example, to access the
+  NaT bit of \texttt{r4}, the index \Const{UNW\_IA64\_NAT}\texttt{+4}
+  should be used.
+\item[\Const{UNW\_IA64\_FR}:] The base-index for floating-point
+  registers.  Add an index in the range from 0..127 to get a
+  particular floating-point register.  For example, to access
+  \texttt{f2}, the index \Const{UNW\_IA64\_FR}\texttt{+2} should be
+  used.  Registers \texttt{f0} and \texttt{f1} are read-only, and any
+  attempt to write to indices \Const{UNW\_IA64\_FR}\texttt{+0} or
+  \Const{UNW\_IA64\_FR}\texttt{+1} will result in an error
+  (\texttt{-}\Const{UNW\_EREADONLYREG}).
+\item[\Const{UNW\_IA64\_AR}:] The base-index for application
+  registers.  Add an index in the range from 0..127 to get a
+  particular application register.  For example, to access
+  \texttt{ar40}, the index \Const{UNW\_IA64\_AR}\texttt{+40} should be
+  used.  The IA-64 architecture defines several application registers
+  as ``reserved for future use''.  Attempting to access such registers
+  results in an error (\texttt{-}\Const{UNW\_EBADREG}).
+\item[\Const{UNW\_IA64\_BR}:] The base-index for branch registers.
+  Add an index in the range from 0..7 to get a particular branch
+  register.  For example, to access \texttt{b6}, the index
+  \Const{UNW\_IA64\_BR}\texttt{+6} should be used.
+\item[\Const{UNW\_IA64\_PR}:] Contains the set of predicate registers.
+  This 64-bit wide register contains registers \texttt{p0} through
+  \texttt{p63} in the ``broad-side'' format.  Just like with the
+  ``move predicates'' instruction, the registers are mapped as if
+  \texttt{CFM.rrb.pr} were set to 0.  Thus, in general the value of
+  predicate register \texttt{p}$N$ with $N$>=16 can be found
+  in bit \texttt{16 + (($N$-16)+CFM.rrb.pr) \% 48}.
+\item[\Const{UNW\_IA64\_CFM}:] Contains the current-frame-mask
+  register.
+\end{Description}
+
+
+\subsection{Convenience Macros}
+
+Convenience macros are simply aliases for certain frequently used
+registers:
+\begin{Description}
+\item[\Const{UNW\_IA64\_GP}:] Alias for \Const{UNW\_IA64\_GR}\texttt{+1},
+  the global-pointer register.
+\item[\Const{UNW\_IA64\_TP}:] Alias for \Const{UNW\_IA64\_GR}\texttt{+13},
+  the thread-pointer register.
+\item[\Const{UNW\_IA64\_AR\_RSC}:] Alias for \Const{UNW\_IA64\_GR}\texttt{+16},
+  the register-stack configuration register.
+\item[\Const{UNW\_IA64\_AR\_BSP}:] Alias for
+  \Const{UNW\_IA64\_GR}\texttt{+17}.  This register index accesses the
+  value of register \texttt{ar.bsp} as of the time it was last saved
+  explicitly.  This is rarely what you want.  Normally, you'll want to
+  use \Const{UNW\_IA64\_BSP} instead.
+\item[\Const{UNW\_IA64\_AR\_BSPSTORE}:] Alias for \Const{UNW\_IA64\_GR}\texttt{+18},
+  the register-backing store write pointer.
+\item[\Const{UNW\_IA64\_AR\_RNAT}:] Alias for \Const{UNW\_IA64\_GR}\texttt{+19},
+  the register-backing store NaT-collection register.
+\item[\Const{UNW\_IA64\_AR\_CCV}:] Alias for \Const{UNW\_IA64\_GR}\texttt{+32},
+  the compare-and-swap value register.
+\item[\Const{UNW\_IA64\_AR\_CSD}:] Alias for \Const{UNW\_IA64\_GR}\texttt{+25},
+  the compare-and-swap-data register (used by 16-byte atomic operations).
+\item[\Const{UNW\_IA64\_AR\_UNAT}:] Alias for \Const{UNW\_IA64\_GR}\texttt{+36},
+  the user NaT-collection register.
+\item[\Const{UNW\_IA64\_AR\_FPSR}:] Alias for \Const{UNW\_IA64\_GR}\texttt{+40},
+  the floating-point status (and control) register.
+\item[\Const{UNW\_IA64\_AR\_PFS}:] Alias for \Const{UNW\_IA64\_GR}\texttt{+64},
+  the previous frame-state register.
+\item[\Const{UNW\_IA64\_AR\_LC}:] Alias for \Const{UNW\_IA64\_GR}\texttt{+65}
+  the loop-count register.
+\item[\Const{UNW\_IA64\_AR\_EC}:] Alias for \Const{UNW\_IA64\_GR}\texttt{+66},
+  the epilogue-count register.
+\end{Description}
+
+
+\section{The Unwind-Context Type}
+
+On IA-64, \Type{unw\_context\_t} is simply an alias for
+\Type{ucontext\_t} (as defined by the Single UNIX Spec).  This implies
+that it is possible to initialize a value of this type not just with
+\Func{unw\_getcontext}(), but also with \Func{getcontext}(), for
+example.  However, since this is an IA-64-specific extension to
+\Prog{libunwind}, portable code should not rely on this equivalence.
+
+
+\section{See Also}
+
+\SeeAlso{libunwind(3)}
+
+\section{Author}
+
+\noindent
+David Mosberger-Tang\\
+Email: \Email{dmosberger@gmail.com}\\
+WWW: \URL{http://www.nongnu.org/libunwind/}.
+\LatexManEnd
+
+\end{document}
