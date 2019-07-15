@@ -3,6 +3,7 @@
 Import("env")
 Import("has_option")
 Import("debugBuild")
+Import("consumerMods")
 
 env = env.Clone()
 
@@ -95,14 +96,11 @@ if not debugBuild:
 if (not debugBuild) or (not env['TARGET_ARCH'] in ['x86_64', 'i386']):
     env.Append(CPPDEFINES=["NO_TCMALLOC_SAMPLES"])
 
-gperftools_root = env.Dir("#/src/third_party/gperftools-2.7")
-gperftools_platform = gperftools_root.Dir("platform/${TARGET_OS}_${TARGET_ARCH}")
+env.Append(CPPPATH=["platform/${TARGET_OS}_${TARGET_ARCH}/internal/src",
+                    "dist/src"])
 
-env.Append(CPPPATH=[gperftools_platform.Dir("internal/src"),
-                    gperftools_root.Dir("dist/src")])
-
-# propagates to consumers that Inject (depend on) gperftools.
-env.RegisterConsumerModifications(CPPPATH=[gperftools_platform.Dir("include")])
+# 'consumerMods' propagates to consumers that Inject (depend on) gperftools.
+consumerMods['CPPPATH'] = "#/src/third_party/gperftools-2.7/platform/${TARGET_OS}_${TARGET_ARCH}/include"
 
 def removeIfPresent(lst, item):
     try:
