@@ -58,17 +58,11 @@ public:
     void shutdown(OperationContext*) override {
         shutdownCalled = true;
     }
-    void pushEvenIfFull(OperationContext* opCtx, const Value& value) override {
-        push(opCtx, value);
-    }
-    void push(OperationContext*, const Value& value) override {
-        values.push_back(value);
-    }
     void pushAllNonBlocking(OperationContext* opCtx,
                             Batch::const_iterator begin,
                             Batch::const_iterator end) override {
         for (auto i = begin; i != end; ++i) {
-            push(opCtx, *i);
+            values.push_back(*i);
         }
     }
     void waitForSpace(OperationContext*, std::size_t) override {
@@ -171,11 +165,11 @@ TEST_F(OplogBufferProxyTest, Startup) {
 }
 
 TEST_F(OplogBufferProxyTest, ShutdownResetsCachedValues) {
-    auto pushValue = BSON("x" << 1);
-    _proxy->push(_opCtx, pushValue);
+    OplogBuffer::Batch values = {BSON("x" << 1)};
+    _proxy->pushAllNonBlocking(_opCtx, values.cbegin(), values.cend());
     OplogBuffer::Value peekValue;
     ASSERT_TRUE(_proxy->peek(_opCtx, &peekValue));
-    ASSERT_BSONOBJ_EQ(pushValue, peekValue);
+    ASSERT_BSONOBJ_EQ(values[0], peekValue);
 
     ASSERT_NOT_EQUALS(boost::none, _proxy->lastObjectPushed(_opCtx));
     ASSERT_NOT_EQUALS(boost::none, _proxy->getLastPeeked_forTest());
@@ -247,22 +241,6 @@ void _testPushFunctionUpdatesCachedLastObjectPushed(
     ASSERT_FALSE(mock->lastObjectPushedCalled);
 }
 
-TEST_F(OplogBufferProxyTest, PushEvenIfFullUpdatesCachedLastObjectPushed) {
-    auto pushFn = [](OperationContext* opCtx, OplogBuffer* proxy, const OplogBuffer::Value& value) {
-        proxy->pushEvenIfFull(opCtx, value);
-        return 1U;
-    };
-    _testPushFunctionUpdatesCachedLastObjectPushed(_opCtx, _proxy.get(), _mock, pushFn);
-}
-
-TEST_F(OplogBufferProxyTest, PushUpdatesCachedLastObjectPushed) {
-    auto pushFn = [](OperationContext* opCtx, OplogBuffer* proxy, const OplogBuffer::Value& value) {
-        proxy->push(opCtx, value);
-        return 1U;
-    };
-    _testPushFunctionUpdatesCachedLastObjectPushed(_opCtx, _proxy.get(), _mock, pushFn);
-}
-
 TEST_F(OplogBufferProxyTest, PushAllNonBlockingUpdatesCachedLastObjectPushed) {
     auto pushFn = [](OperationContext* opCtx, OplogBuffer* proxy, const OplogBuffer::Value& value) {
         OplogBuffer::Batch values = {BSON("x" << 2), value};
@@ -282,7 +260,8 @@ TEST_F(OplogBufferProxyTest, PushAllNonBlockingDoesNotUpdateCachedLastObjectPush
 }
 
 TEST_F(OplogBufferProxyTest, WaitForDataReturnsTrueImmediatelyIfLastObjectPushedIsCached) {
-    _proxy->pushEvenIfFull(_opCtx, BSON("x" << 1));
+    OplogBuffer::Batch values = {BSON("x" << 1)};
+    _proxy->pushAllNonBlocking(_opCtx, values.cbegin(), values.cend());
     ASSERT_TRUE(_proxy->waitForData(Seconds(10)));
     ASSERT_FALSE(_mock->waitForDataCalled);
 }
@@ -294,7 +273,8 @@ TEST_F(OplogBufferProxyTest, WaitForDataForwardsCallToTargetIfLastObjectPushedIs
 
 TEST_F(OplogBufferProxyTest, TryPopResetsLastPushedObjectIfBufferIsEmpty) {
     auto pushValue = BSON("x" << 1);
-    _proxy->push(_opCtx, BSON("x" << 1));
+    OplogBuffer::Batch values = {pushValue};
+    _proxy->pushAllNonBlocking(_opCtx, values.cbegin(), values.cend());
     auto lastPushed = _proxy->lastObjectPushed(_opCtx);
     ASSERT_NOT_EQUALS(boost::none, _proxy->lastObjectPushed(_opCtx));
     ASSERT_BSONOBJ_EQ(pushValue, *lastPushed);

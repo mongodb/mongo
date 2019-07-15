@@ -149,20 +149,6 @@ ServiceContext::UniqueOperationContext makeOpCtx() {
     return cc().makeOperationContext();
 }
 
-StatusWith<Timestamp> parseTimestampStatus(const QueryResponseStatus& fetchResult) {
-    if (!fetchResult.isOK()) {
-        return fetchResult.getStatus();
-    } else {
-        const auto docs = fetchResult.getValue().documents;
-        const auto hasDoc = docs.begin() != docs.end();
-        if (!hasDoc || !docs.begin()->hasField("ts")) {
-            return {ErrorCodes::FailedToParse, "Could not find an oplog entry with 'ts' field."};
-        } else {
-            return {docs.begin()->getField("ts").timestamp()};
-        }
-    }
-}
-
 StatusWith<OpTimeAndWallTime> parseOpTimeAndWallTime(const QueryResponseStatus& fetchResult) {
     if (!fetchResult.isOK()) {
         return fetchResult.getStatus();

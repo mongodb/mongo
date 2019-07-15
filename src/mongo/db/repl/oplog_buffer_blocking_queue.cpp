@@ -61,20 +61,6 @@ void OplogBufferBlockingQueue::shutdown(OperationContext* opCtx) {
     clear(opCtx);
 }
 
-void OplogBufferBlockingQueue::pushEvenIfFull(OperationContext*, const Value& value) {
-    _queue.pushEvenIfFull(value);
-    if (_counters) {
-        _counters->increment(value);
-    }
-}
-
-void OplogBufferBlockingQueue::push(OperationContext*, const Value& value) {
-    _queue.push(value);
-    if (_counters) {
-        _counters->increment(value);
-    }
-}
-
 void OplogBufferBlockingQueue::pushAllNonBlocking(OperationContext*,
                                                   Batch::const_iterator begin,
                                                   Batch::const_iterator end) {

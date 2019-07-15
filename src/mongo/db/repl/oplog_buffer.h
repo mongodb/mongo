@@ -89,21 +89,6 @@ public:
     virtual void shutdown(OperationContext* opCtx) = 0;
 
     /**
-     * Pushes operation into oplog buffer, ignoring any size constraints. Does not block.
-     * If the oplog buffer is already full, this will cause the size of the oplog buffer to exceed
-     * the limit returned by getMaxSize() but should not otherwise adversely affect normal
-     * functionality such as pushing and popping operations from the oplog buffer.
-     */
-    virtual void pushEvenIfFull(OperationContext* opCtx, const Value& value) = 0;
-
-    /**
-     * Pushes operation into oplog buffer.
-     * If there are size constraints on the oplog buffer, this may block until sufficient space
-     * is made available (by popping) to complete this operation.
-     */
-    virtual void push(OperationContext* opCtx, const Value& value) = 0;
-
-    /**
      * Pushes operations in the iterator range [begin, end) into the oplog buffer without blocking.
      */
     virtual void pushAllNonBlocking(OperationContext* opCtx,

@@ -58,8 +58,6 @@ public:
 
     void startup(OperationContext* opCtx) override;
     void shutdown(OperationContext* opCtx) override;
-    void pushEvenIfFull(OperationContext* opCtx, const Value& value) override;
-    void push(OperationContext* opCtx, const Value& value) override;
     void pushAllNonBlocking(OperationContext* opCtx,
                             Batch::const_iterator begin,
                             Batch::const_iterator end) override;

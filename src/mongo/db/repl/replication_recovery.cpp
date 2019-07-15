@@ -155,12 +155,6 @@ public:
         return _peekOrPop(value, Mode::kPeek);
     }
 
-    void pushEvenIfFull(OperationContext*, const Value&) final {
-        MONGO_UNREACHABLE;
-    }
-    void push(OperationContext*, const Value&) final {
-        MONGO_UNREACHABLE;
-    }
     void pushAllNonBlocking(OperationContext*, Batch::const_iterator, Batch::const_iterator) final {
         MONGO_UNREACHABLE;
     }

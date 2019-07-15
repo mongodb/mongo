@@ -160,15 +160,6 @@ void OplogBufferCollection::shutdown(OperationContext* opCtx) {
     }
 }
 
-void OplogBufferCollection::pushEvenIfFull(OperationContext* opCtx, const Value& value) {
-    Batch valueBatch = {value};
-    pushAllNonBlocking(opCtx, valueBatch.begin(), valueBatch.end());
-}
-
-void OplogBufferCollection::push(OperationContext* opCtx, const Value& value) {
-    pushEvenIfFull(opCtx, value);
-}
-
 void OplogBufferCollection::pushAllNonBlocking(OperationContext* opCtx,
                                                Batch::const_iterator begin,
                                                Batch::const_iterator end) {
