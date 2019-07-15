@@ -353,7 +353,8 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	/* If no page is active, begin a walk from the start/end of the tree. */
 	if ((ref = ref_orig) == NULL) {
 		if (0) {
-restart:		/*
+restart:
+			/*
 			 * Yield before retrying, and if we've yielded enough
 			 * times, start sleeping so we don't burn CPU to no
 			 * purpose.
@@ -467,7 +468,8 @@ restart:		/*
 			++*walkcntp;
 
 		for (;;) {
-descend:		/*
+descend:
+			/*
 			 * Get a reference, setting the reference hint if it's
 			 * wrong (used when we continue the walk). We don't
 			 * always update the hints when splitting, it's expected

@@ -557,7 +557,8 @@ __config_process_value(WT_CONFIG_ITEM *value)
 	}
 
 	if (0) {
-nonum:		/*
+nonum:
+		/*
 		 * We didn't get a well-formed number.  That might be okay, the
 		 * required type will be checked by __wt_config_check.
 		 */

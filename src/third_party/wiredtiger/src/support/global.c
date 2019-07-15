@@ -119,6 +119,10 @@ __global_once(void)
 
 	TAILQ_INIT(&__wt_process.connqh);
 
+	/*
+	 * Set up the checksum functions. If there's only one, set it as the
+	 * alternate, that way code doesn't have to check if it's set or not.
+	 */
 	__wt_process.checksum = wiredtiger_crc32c_func();
 
 	__global_calibrate_ticks();

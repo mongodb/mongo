@@ -13,7 +13,7 @@
 static inline WT_INSERT *
 __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
 {
-	WT_INSERT *ins, **insp;
+	WT_INSERT *ins, **insp, *ret_ins;
 	int i;
 
 	/* If there's no insert chain to search, we're done. */
@@ -28,28 +28,37 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
 	 */
-	ins = NULL;
-	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;)
-		if (*insp != NULL && recno >= WT_INSERT_RECNO(*insp)) {
-			ins = *insp;	/* GTE: keep going at this level */
-			insp = &(*insp)->next[i];
+	ret_ins = NULL;
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
+		/*
+		 * Use a local variable to access the insert because the skip
+		 * list can change across references.
+		 */
+		WT_ORDERED_READ(ins, *insp);
+		if (ins != NULL && recno >= WT_INSERT_RECNO(ins)) {
+					/* GTE: keep going at this level */
+			insp = &ins->next[i];
+			ret_ins = ins;
 		} else {
 			--i;		/* LT: drop down a level */
 			--insp;
 		}
+	}
 
 	/*
-	 * If we didn't find any records smaller than the target, we never set
-	 * the return value, set it to the first record in the list. Otherwise,
-	 * it references a record less-than-or-equal to the target, move to a
-	 * later record, that is, a subsequent record greater than the target.
-	 * Because inserts happen concurrently, additional records might be
-	 * inserted after the searched-for record that are still smaller than
-	 * the target, continue to move forward until reaching a record larger
-	 * than the target. There isn't any safety testing because we confirmed
-	 * such a record exists before searching.
+	 * If we didn't find any records greater than or equal to the target,
+	 * we never set the return value, set it to the first record in the
+	 * list.
+	 *
+	 * Otherwise, it references a record less-than-or-equal to the target,
+	 * move to a later record, that is, a subsequent record greater than
+	 * the target.  Because inserts happen concurrently, additional records
+	 * might be inserted after the searched-for record that are still
+	 * smaller than the target, continue to move forward until reaching a
+	 * record larger than the target. There isn't any safety testing
+	 * because we confirmed such a record exists before searching.
 	 */
-	if (ins == NULL)
+	if ((ins = ret_ins) == NULL)
 		ins = WT_SKIP_FIRST(ins_head);
 	while (recno >= WT_INSERT_RECNO(ins))
 		ins = WT_SKIP_NEXT(ins);
@@ -63,7 +72,7 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
 static inline WT_INSERT *
 __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
 {
-	WT_INSERT *ins, **insp;
+	WT_INSERT *ins, **insp, *ret_ins;
 	int i;
 
 	/* If there's no insert chain to search, we're done. */
@@ -78,16 +87,24 @@ __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
 	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;)
-		if (*insp != NULL && recno > WT_INSERT_RECNO(*insp)) {
-			ins = *insp;	/* GT: keep going at this level */
-			insp = &(*insp)->next[i];
+	ret_ins = NULL;
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
+		/*
+		 * Use a local variable to access the insert because the skip
+		 * list can change across references.
+		 */
+		WT_ORDERED_READ(ins, *insp);
+		if (ins != NULL && recno > WT_INSERT_RECNO(ins)) {
+					/* GT: keep going at this level */
+			insp = &ins->next[i];
+			ret_ins = ins;
 		} else  {
 			--i;		/* LTE: drop down a level */
 			--insp;
 		}
+	}
 
-	return (ins);
+	return (ret_ins);
 }
 
 /*
@@ -97,38 +114,43 @@ __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
 static inline WT_INSERT *
 __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
 {
-	WT_INSERT **insp, *ret_ins;
+	WT_INSERT *ins, **insp;
 	uint64_t ins_recno;
 	int cmp, i;
 
 	/* If there's no insert chain to search, we're done. */
-	if ((ret_ins = WT_SKIP_LAST(ins_head)) == NULL)
+	if ((ins = WT_SKIP_LAST(ins_head)) == NULL)
 		return (NULL);
 
 	/* Fast path the check for values at the end of the skiplist. */
-	if (recno > WT_INSERT_RECNO(ret_ins))
+	if (recno > WT_INSERT_RECNO(ins))
 		return (NULL);
-	if (recno == WT_INSERT_RECNO(ret_ins))
-		return (ret_ins);
+	if (recno == WT_INSERT_RECNO(ins))
+		return (ins);
 
 	/*
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0; ) {
-		if (*insp == NULL) {
+		/*
+		 * Use a local variable to access the insert because the skip
+		 * list can change across references.
+		 */
+		WT_ORDERED_READ(ins, *insp);
+		if (ins == NULL) {
 			--i;
 			--insp;
 			continue;
 		}
 
-		ins_recno = WT_INSERT_RECNO(*insp);
+		ins_recno = WT_INSERT_RECNO(ins);
 		cmp = (recno == ins_recno) ? 0 : (recno < ins_recno) ? -1 : 1;
 
 		if (cmp == 0)			/* Exact match: return */
-			return (*insp);
+			return (ins);
 		if (cmp > 0)			/* Keep going at this level */
-			insp = &(*insp)->next[i];
+			insp = &ins->next[i];
 		else {				/* Drop down a level */
 			--i;
 			--insp;

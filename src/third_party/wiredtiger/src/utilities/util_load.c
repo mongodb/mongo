@@ -147,7 +147,8 @@ load_dump(WT_SESSION *session)
 	} else
 		ret = insert(cursor, uri);
 
-err:	/*
+err:
+	/*
 	 * Technically, we don't have to close the cursor because the session
 	 * handle will do it for us, but I'd like to see the flush to disk and
 	 * the close succeed, it's better to fail early when loading files.

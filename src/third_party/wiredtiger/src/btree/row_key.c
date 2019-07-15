@@ -166,7 +166,8 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 	direction = BACKWARD;
 	for (slot_offset = 0;;) {
 		if (0) {
-switch_and_jump:	/* Switching to a forward roll. */
+switch_and_jump:
+			/* Switching to a forward roll. */
 			WT_ASSERT(session, direction == BACKWARD);
 			direction = FORWARD;
 

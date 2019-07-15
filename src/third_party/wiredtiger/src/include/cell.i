@@ -1046,7 +1046,8 @@ __cell_data_ref(WT_SESSION_IMPL *session,
 			return (0);
 		huffman = btree->huffman_value;
 		break;
-	WT_ILLEGAL_VALUE(session, unpack->type);
+	default:
+		return (__wt_illegal_value(session, unpack->type));
 	}
 
 	return (huffman == NULL || store->size == 0 ? 0 :

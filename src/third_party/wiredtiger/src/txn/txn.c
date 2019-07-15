@@ -1078,7 +1078,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		    __wt_cache_eviction_check(session, false, false, NULL));
 	return (0);
 
-err:	/*
+err:
+	/*
 	 * If anything went wrong, roll back.
 	 *
 	 * !!!
@@ -1612,7 +1613,7 @@ int
 __wt_verbose_dump_txn_one(WT_SESSION_IMPL *session, WT_TXN *txn)
 {
 	const char *iso_tag;
-	char ts_string[4][WT_TS_INT_STRING_SIZE];
+	char ts_string[5][WT_TS_INT_STRING_SIZE];
 
 	WT_NOT_READ(iso_tag, "INVALID");
 	switch (txn->isolation) {
@@ -1627,22 +1628,34 @@ __wt_verbose_dump_txn_one(WT_SESSION_IMPL *session, WT_TXN *txn)
 		break;
 	}
 	WT_RET(__wt_msg(session,
-	    "mod count: %u"
+	    "transaction id: %" PRIu64
+	    ", mod count: %u"
 	    ", snap min: %" PRIu64
 	    ", snap max: %" PRIu64
+	    ", snapshot count: %u"
 	    ", commit_timestamp: %s"
 	    ", durable_timestamp: %s"
 	    ", first_commit_timestamp: %s"
+	    ", prepare_timestamp: %s"
 	    ", read_timestamp: %s"
+	    ", checkpoint LSN: [%" PRIu32 "][%" PRIu32 "]"
+	    ", full checkpoint: %s"
+	    ", rollback reason: %s"
 	    ", flags: 0x%08" PRIx32
 	    ", isolation: %s",
+	    txn->id,
 	    txn->mod_count,
 	    txn->snap_min,
 	    txn->snap_max,
+	    txn->snapshot_count,
 	    __wt_timestamp_to_string(txn->commit_timestamp, ts_string[0]),
 	    __wt_timestamp_to_string(txn->durable_timestamp, ts_string[1]),
 	    __wt_timestamp_to_string(txn->first_commit_timestamp, ts_string[2]),
-	    __wt_timestamp_to_string(txn->read_timestamp, ts_string[3]),
+	    __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[3]),
+	    __wt_timestamp_to_string(txn->read_timestamp, ts_string[4]),
+	    txn->ckpt_lsn.l.file, txn->ckpt_lsn.l.offset,
+	    txn->full_ckpt ? "true" : "false",
+	    txn->rollback_reason == NULL ? "" : txn->rollback_reason,
 	    txn->flags,
 	    iso_tag));
 	return (0);

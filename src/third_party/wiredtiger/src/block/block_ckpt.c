@@ -129,7 +129,8 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_ERR(__wt_block_truncate(session, block, ci->file_size));
 
 	if (0) {
-err:		/*
+err:
+		/*
 		 * Don't call checkpoint-unload: unload does real work including
 		 * file truncation.  If we fail early enough that the checkpoint
 		 * information isn't correct, bad things would happen.  The only
@@ -357,11 +358,6 @@ __ckpt_verify(WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
 				break;
 			/* FALLTHROUGH */
 		default:
-			/*
-			 * Don't convert to WT_ILLEGAL_VALUE, it won't compile
-			 * on some gcc compilers because they don't understand
-			 * FALLTHROUGH as part of a macro.
-			 */
 			return (__wt_illegal_value(session, ckpt->flags));
 		}
 	return (0);

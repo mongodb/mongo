@@ -356,7 +356,8 @@ __backup_start(WT_SESSION_IMPL *session,
 		WT_ERR(__backup_list_append(session, cb, WT_WIREDTIGER));
 	}
 
-err:	/* Close the hot backup file. */
+err:
+	/* Close the hot backup file. */
 	if (srcfs != NULL)
 		WT_TRET(__wt_fclose(session, &srcfs));
 	/*

@@ -1830,7 +1830,8 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 			    "option configured");
 	}
 
-err:	/*
+err:
+	/*
 	 * We ignore the connection's lock file handle on error, it will be
 	 * closed when the connection structure is destroyed.
 	 */
@@ -2868,7 +2869,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*connectionp = &conn->iface;
 
-err:	/* Discard the scratch buffers. */
+err:
+	/* Discard the scratch buffers. */
 	__wt_scr_free(session, &encbuf);
 	__wt_scr_free(session, &i1);
 	__wt_scr_free(session, &i2);

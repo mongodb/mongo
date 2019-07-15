@@ -55,6 +55,7 @@ src/checksum/power8/crc32.sx		POWERPC_HOST
 src/checksum/power8/crc32_wrapper.c	POWERPC_HOST
 src/checksum/software/checksum.c
 src/checksum/x86/crc32-x86.c		X86_HOST
+src/checksum/x86/crc32-x86-alt.c	X86_HOST
 src/checksum/zseries/crc32-s390x.c	ZSERIES_HOST
 src/checksum/zseries/crc32le-vx.sx	ZSERIES_HOST
 src/config/config.c

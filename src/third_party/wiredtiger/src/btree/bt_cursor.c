@@ -1093,7 +1093,8 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt, bool positioned)
 		goto err;
 	}
 
-retry:	/*
+retry:
+	/*
 	 * Note these steps must be repeatable, we'll continue to take this path
 	 * as long as we encounter WT_RESTART.
 	 *
@@ -1215,7 +1216,8 @@ search_notfound:	ret = WT_NOTFOUND;
 		__cursor_state_restore(cursor, &state);
 	}
 
-done:	/*
+done:
+	/*
 	 * Upper level cursor removes don't expect the cursor value to be set
 	 * after a successful remove (and check in diagnostic mode). Error
 	 * handling may have converted failure to a success, do a final check.
@@ -1376,7 +1378,8 @@ done:		switch (modify_type) {
 			break;
 		case WT_UPDATE_BIRTHMARK:
 		case WT_UPDATE_TOMBSTONE:
-		WT_ILLEGAL_VALUE(session, modify_type);
+		default:
+			return (__wt_illegal_value(session, modify_type));
 		}
 	}
 

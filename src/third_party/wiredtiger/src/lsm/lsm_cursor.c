@@ -959,7 +959,8 @@ __clsm_next(WT_CURSOR *cursor)
 		if (clsm->current != NULL)
 			goto retry;
 	} else {
-retry:		/*
+retry:
+		/*
 		 * If there are multiple cursors on that key, move them
 		 * forward.
 		 */
@@ -1122,7 +1123,8 @@ __clsm_prev(WT_CURSOR *cursor)
 		if (clsm->current != NULL)
 			goto retry;
 	} else {
-retry:		/*
+retry:
+		/*
 		 * If there are multiple cursors on that key, move them
 		 * backwards.
 		 */

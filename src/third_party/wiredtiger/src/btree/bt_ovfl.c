@@ -241,7 +241,8 @@ __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell)
 		__wt_cell_type_reset(session,
 		    unpack->cell, WT_CELL_VALUE_OVFL, WT_CELL_VALUE_OVFL_RM);
 		break;
-	WT_ILLEGAL_VALUE(session, unpack->raw);
+	default:
+		return (__wt_illegal_value(session, unpack->raw));
 	}
 
 	__wt_writeunlock(session, &btree->ovfl_lock);

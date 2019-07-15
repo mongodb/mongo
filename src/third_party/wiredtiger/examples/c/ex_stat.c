@@ -30,7 +30,7 @@
  */
 #include <test_util.h>
 
-void get_stat(WT_CURSOR *cursor, int stat_field, uint64_t *valuep);
+void get_stat(WT_CURSOR *cursor, int stat_field, int64_t *valuep);
 void print_cursor(WT_CURSOR *);
 void print_database_stats(WT_SESSION *);
 void print_derived_stats(WT_SESSION *);
@@ -46,7 +46,7 @@ void
 print_cursor(WT_CURSOR *cursor)
 {
 	const char *desc, *pvalue;
-	uint64_t value;
+	int64_t value;
 	int ret;
 
 	while ((ret = cursor->next(cursor)) == 0) {
@@ -134,7 +134,7 @@ print_overflow_pages(WT_SESSION *session)
 	/*! [statistics retrieve by key] */
 	WT_CURSOR *cursor;
 	const char *desc, *pvalue;
-	uint64_t value;
+	int64_t value;
 
 	error_check(session->open_cursor(session,
 	    "statistics:table:access", NULL, NULL, &cursor));
@@ -150,7 +150,7 @@ print_overflow_pages(WT_SESSION *session)
 
 /*! [statistics calculation helper function] */
 void
-get_stat(WT_CURSOR *cursor, int stat_field, uint64_t *valuep)
+get_stat(WT_CURSOR *cursor, int stat_field, int64_t *valuep)
 {
 	const char *desc, *pvalue;
 
@@ -172,20 +172,20 @@ print_derived_stats(WT_SESSION *session)
 
 	{
 	/*! [statistics calculate table fragmentation] */
-	uint64_t ckpt_size, file_size, percent;
+	int64_t ckpt_size, file_size, percent;
 	get_stat(cursor, WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE, &ckpt_size);
 	get_stat(cursor, WT_STAT_DSRC_BLOCK_SIZE, &file_size);
 
 	percent = 0;
 	if (file_size != 0)
 		percent = 100 * ((file_size - ckpt_size) / file_size);
-	printf("Table is %" PRIu64 "%% fragmented\n", percent);
+	printf("Table is %" PRId64 "%% fragmented\n", percent);
 	/*! [statistics calculate table fragmentation] */
 	}
 
 	{
 	/*! [statistics calculate write amplification] */
-	uint64_t app_insert, app_remove, app_update, fs_writes;
+	int64_t app_insert, app_remove, app_update, fs_writes;
 
 	get_stat(cursor, WT_STAT_DSRC_CURSOR_INSERT_BYTES, &app_insert);
 	get_stat(cursor, WT_STAT_DSRC_CURSOR_REMOVE_BYTES, &app_remove);

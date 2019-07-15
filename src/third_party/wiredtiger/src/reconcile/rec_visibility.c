@@ -182,11 +182,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
 			if (upd->prepare_state == WT_PREPARE_LOCKED ||
 			    upd->prepare_state == WT_PREPARE_INPROGRESS)
 				prepared = true;
-			else if ((F_ISSET(r, WT_REC_VISIBLE_ALL) ?
+			else if (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 			    WT_TXNID_LE(r->last_running, txnid) :
-			    !__txn_visible_id(session, txnid)) ||
-			    (upd->start_ts != WT_TS_NONE &&
-			    !__wt_txn_upd_durable(session, upd)))
+			    !__txn_visible_id(session, txnid))
 				uncommitted = r->update_uncommitted = true;
 
 			if (prepared || uncommitted)
@@ -198,12 +196,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
 			first_ts_upd = upd;
 
 		/*
-		 * Find the first update we can use.
-		 *
-		 * Update/restore eviction can handle any update (including
-		 * uncommitted updates).  Lookaside eviction can save any
-		 * committed update.  Regular eviction checks that the maximum
-		 * transaction ID and timestamp seen are stable.
+		 * Select the update to write to the disk image.
 		 *
 		 * Lookaside and update/restore eviction try to choose the same
 		 * version as a subsequent checkpoint, so that checkpoint can
@@ -218,9 +211,8 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
 		if (upd_select->upd == NULL && r->las_skew_newest)
 			upd_select->upd = upd;
 
-		if ((F_ISSET(r, WT_REC_VISIBLE_ALL) ?
+		if (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 		    !__wt_txn_upd_visible_all(session, upd) :
-		    !__wt_txn_upd_visible(session, upd)) ||
 		    !__wt_txn_upd_durable(session, upd)) {
 			if (F_ISSET(r, WT_REC_EVICT))
 				++r->updates_unstable;

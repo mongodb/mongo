@@ -243,7 +243,8 @@ err:		if (!closing)
 		WT_STAT_DATA_INCR(session, cache_eviction_fail);
 	}
 
-done:	/* Leave any local eviction generation. */
+done:
+	/* Leave any local eviction generation. */
 	if (local_gen)
 		__wt_session_gen_leave(session, WT_GEN_EVICT);
 
@@ -456,7 +457,8 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref,
 		}
 
 		break;
-	WT_ILLEGAL_VALUE(session, mod->rec_result);
+	default:
+		return (__wt_illegal_value(session, mod->rec_result));
 	}
 
 	return (0);

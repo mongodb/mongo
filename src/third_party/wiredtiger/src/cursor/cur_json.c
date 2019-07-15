@@ -52,8 +52,9 @@ static int __json_pack_size(WT_SESSION_IMPL *, const char *, WT_CONFIG_ITEM *,
 		WT_RET(json_string_arg(session, &(jstr), &(pv).u.item));\
 		(pv).type = 'K';					\
 		break;							\
-	/* User format strings have already been validated. */		\
-	WT_ILLEGAL_VALUE(session, (pv).type);				\
+	default:							\
+		/* User format strings have already been validated. */	\
+		return (__wt_illegal_value(session, (pv).type));	\
 	}								\
 } while (0)
 
@@ -934,7 +935,8 @@ __wt_json_strncpy(WT_SESSION *wt_session,
 			case '\\':
 				*dst++ = ch;
 				break;
-			WT_ILLEGAL_VALUE(session, ch);
+			default:
+				return (__wt_illegal_value(session, ch));
 			}
 		else
 			*dst++ = ch;

@@ -130,7 +130,8 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **stats)
 	case WT_PAGE_ROW_LEAF:
 		__stat_page_row_leaf(session, page, stats);
 		break;
-	WT_ILLEGAL_VALUE(session, page->type);
+	default:
+		return (__wt_illegal_value(session, page->type));
 	}
 	return (0);
 }
@@ -245,11 +246,12 @@ __stat_page_row_int(
 	 * the in-memory representation of the page doesn't necessarily contain
 	 * a reference to the original cell.
 	 */
-	if (page->dsk != NULL)
+	if (page->dsk != NULL) {
 		WT_CELL_FOREACH_BEGIN(session, btree, page->dsk, unpack) {
 			if (__wt_cell_type(unpack.cell) == WT_CELL_KEY_OVFL)
 				++ovfl_cnt;
 		} WT_CELL_FOREACH_END;
+	}
 
 	WT_STAT_INCRV(session, stats, btree_overflow, ovfl_cnt);
 }

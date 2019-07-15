@@ -38,6 +38,7 @@ __cursor_skip_prev(WT_CURSOR_BTREE *cbt)
 	WT_INSERT *current, *ins;
 	WT_ITEM key;
 	WT_SESSION_IMPL *session;
+	uint64_t recno;
 	int i;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -47,6 +48,7 @@ restart:
 	 * If the search stack does not point at the current item, fill it in
 	 * with a search.
 	 */
+	recno = WT_INSERT_RECNO(cbt->ins);
 	while ((current = cbt->ins) != PREV_INS(cbt, 0)) {
 		if (cbt->btree->type == BTREE_ROW) {
 			key.data = WT_INSERT_KEY(current);
@@ -55,8 +57,7 @@ restart:
 			    session, cbt, cbt->ins_head, &key));
 		} else
 			cbt->ins = __col_insert_search(cbt->ins_head,
-			    cbt->ins_stack, cbt->next_stack,
-			    WT_INSERT_RECNO(current));
+			    cbt->ins_stack, cbt->next_stack, recno);
 	}
 
 	/*
@@ -360,7 +361,8 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
 new_page:	if (cbt->recno < cbt->ref->ref_recno)
 			return (WT_NOTFOUND);
 
-restart_read:	/* Find the matching WT_COL slot. */
+restart_read:
+		/* Find the matching WT_COL slot. */
 		if ((cip =
 		    __col_var_search(cbt->ref, cbt->recno, &rle_start)) == NULL)
 			return (WT_NOTFOUND);
@@ -629,7 +631,8 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 				ret = __cursor_var_append_prev(
 				    cbt, newpage, restart);
 				break;
-			WT_ILLEGAL_VALUE_ERR(session, page->type);
+			default:
+				WT_ERR(__wt_illegal_value(session, page->type));
 			}
 			if (ret == 0 || ret == WT_PREPARE_CONFLICT)
 				break;
@@ -649,7 +652,8 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 			case WT_PAGE_ROW_LEAF:
 				ret = __cursor_row_prev(cbt, newpage, restart);
 				break;
-			WT_ILLEGAL_VALUE_ERR(session, page->type);
+			default:
+				WT_ERR(__wt_illegal_value(session, page->type));
 			}
 			if (ret != WT_NOTFOUND)
 				break;

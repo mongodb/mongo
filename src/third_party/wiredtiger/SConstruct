@@ -526,6 +526,14 @@ t = env.Program("wtperf", [
     LIBS=[wtlib, shim, testutil] + wtlibs)
 Default(t)
 
+t = env.Program('wt2695_checksum', ['test/csuite/wt2695_checksum/main.c'],
+    LIBS=[wtlib, shim, testutil] + wtlibs)
+Default(t)
+
+t = env.Program('wt4117_checksum', ['test/csuite/wt4117_checksum/main.c'],
+    LIBS=[wtlib, shim, testutil] + wtlibs)
+Default(t)
+
 #Build the Examples
 for ex in examples:
     exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim, testutil] + wtlibs)

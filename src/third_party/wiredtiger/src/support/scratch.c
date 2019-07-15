@@ -179,7 +179,8 @@ __wt_buf_set_printable_format(WT_SESSION_IMPL *session,
 			    session, buf, "%s%" PRIu64, sep, pv.u.u));
 			sep = ",";
 			break;
-		WT_ILLEGAL_VALUE_ERR(session, pv.type);
+		default:
+			WT_ERR(__wt_illegal_value(session, pv.type));
 		}
 	}
 	WT_ERR_NOTFOUND_OK(ret);

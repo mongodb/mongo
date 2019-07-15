@@ -195,7 +195,8 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session, const char *tag,
 	case WT_PAGE_BLOCK_MANAGER:
 	case WT_PAGE_OVFL:
 		return (__verify_dsk_chunk(session, tag, dsk, dsk->u.datalen));
-	WT_ILLEGAL_VALUE(session, dsk->type);
+	default:
+		return (__wt_illegal_value(session, dsk->type));
 	}
 	/* NOTREACHED */
 }
@@ -634,7 +635,8 @@ __verify_dsk_row(WT_SESSION_IMPL *session,
 			current->size = prefix + unpack->size;
 		}
 
-key_compare:	/*
+key_compare:
+		/*
 		 * Compare the current key against the last key.
 		 *
 		 * Be careful about the 0th key on internal pages: we only store

@@ -120,7 +120,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			fail_msg = "block decompression failed";
 			goto corrupt;
 		}
-	} else
+	} else {
 		/*
 		 * If we uncompressed above, the page is in the correct buffer.
 		 * If we get here the data may be in the wrong buffer and the
@@ -130,6 +130,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		if (ip != NULL)
 			WT_ERR(__wt_buf_set(
 			    session, buf, ip->data, dsk->mem_size));
+	}
 
 	/* If the handle is a verify handle, verify the physical page. */
 	if (F_ISSET(btree, WT_BTREE_VERIFY)) {

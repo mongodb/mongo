@@ -560,12 +560,13 @@ class WiredTigerTestCase(unittest.TestCase):
 
     def raisesBusy(self, expr):
         """
-        Execute the expression, returning true if a 'Resource busy'
-        exception is raised, returning false if no exception is raised.
+        Execute the expression, returning true if a 'Resource busy' exception
+        is raised, returning false if no exception is raised. Some systems
+        report 'Device or resource busy', allow either.
         Any other exception raises a test suite failure.
         """
         return self.assertRaisesException(wiredtiger.WiredTigerError, \
-            expr, exceptionString='Resource busy', optional=True)
+            expr, exceptionString='/[Rr]esource busy/', optional=True)
 
     def assertTimestampsEqual(self, ts1, ts2):
         """
