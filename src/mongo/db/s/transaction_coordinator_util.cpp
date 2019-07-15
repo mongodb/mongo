@@ -548,7 +548,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                         auto prepareTimestampField = response.data["prepareTimestamp"];
                         if (prepareTimestampField.eoo() ||
                             prepareTimestampField.timestamp().isNull()) {
-                            Status abortStatus(ErrorCodes::InternalError,
+                            Status abortStatus(ErrorCodes::Error(50993),
                                                str::stream()
                                                    << "Coordinator shard received an OK response "
                                                       "to prepareTransaction without a "

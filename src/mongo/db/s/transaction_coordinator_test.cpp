@@ -466,8 +466,28 @@ TEST_F(TransactionCoordinatorDriverTest,
 
     ASSERT(decision.getDecision() == txn::CommitDecision::kAbort);
     ASSERT(decision.getAbortStatus());
-    ASSERT_EQ(ErrorCodes::InternalError, decision.getAbortStatus()->code());
+    ASSERT_EQ(50993, int(decision.getAbortStatus()->code()));
 }
+
+TEST_F(TransactionCoordinatorDriverTest,
+       SendPrepareReturnsErrorWhenOneShardReturnsReadConcernMajorityNotEnabled) {
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
+
+    assertPrepareSentAndRespondWithSuccess(Timestamp(100, 1));
+    assertCommandSentAndRespondWith(
+        PrepareTransaction::kCommandName,
+        BSON("ok" << 0 << "code" << ErrorCodes::ReadConcernMajorityNotEnabled << "errmsg"
+                  << "Read concern majority not enabled"),
+        WriteConcernOptions::Majority);
+
+    auto decision = future.get().decision();
+
+    ASSERT(decision.getDecision() == txn::CommitDecision::kAbort);
+    ASSERT(decision.getAbortStatus());
+    ASSERT_EQ(ErrorCodes::ReadConcernMajorityNotEnabled, decision.getAbortStatus()->code());
+}
+
 
 class TransactionCoordinatorDriverPersistenceTest : public TransactionCoordinatorDriverTest {
 protected:
@@ -900,6 +920,35 @@ TEST_F(TransactionCoordinatorTest,
 
     coordinator.onCompletion().get();
 }
+
+TEST_F(TransactionCoordinatorTest,
+       RunCommitProducesReadConcernMajorityNotEnabledIfEitherShardReturnsIt) {
+    TransactionCoordinator coordinator(
+        getServiceContext(),
+        _lsid,
+        _txnNumber,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max());
+    coordinator.runCommit(kTwoShardIdList);
+    auto commitDecisionFuture = coordinator.getDecision();
+
+    // One participant votes commit and other encounters retryable error
+    onCommands({[&](const executor::RemoteCommandRequest& request) { return kPrepareOk; },
+                [&](const executor::RemoteCommandRequest& request) {
+                    return BSON("ok" << 0 << "code" << ErrorCodes::ReadConcernMajorityNotEnabled
+                                     << "errmsg"
+                                     << "Read concern majority not enabled");
+                }});
+
+    assertAbortSentAndRespondWithSuccess();
+    assertAbortSentAndRespondWithSuccess();
+
+    ASSERT_THROWS_CODE(
+        commitDecisionFuture.get(), AssertionException, ErrorCodes::ReadConcernMajorityNotEnabled);
+
+    coordinator.onCompletion().get();
+}
+
 
 class TransactionCoordinatorMetricsTest : public TransactionCoordinatorTestBase {
 public:

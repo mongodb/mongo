@@ -99,6 +99,7 @@ selector:
   - jstests/sharding/shard_collection_existing_zones.js
   - jstests/sharding/single_shard_transaction_with_arbiter.js
   - jstests/sharding/single_shard_transaction_without_majority_reads_lagged.js
+  - jstests/sharding/multi_shard_transaction_without_majority_reads.js
   - jstests/sharding/snapshot_cursor_commands_mongos.js
   - jstests/sharding/transactions_causal_consistency.js
   - jstests/sharding/transactions_distinct_not_allowed_on_sharded_collections.js

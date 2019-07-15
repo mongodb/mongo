@@ -73,20 +73,23 @@ public:
                 uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             }
 
-            // We automatically fail 'prepareTransaction' against a primary that has
-            // 'enableMajorityReadConcern' set to 'false'.
-            uassert(50993,
+            // If a node has majority read concern disabled, replication must use the legacy
+            // 'rollbackViaRefetch' algortithm, which does not support prepareTransaction oplog
+            // entries
+            uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
                     "'prepareTransaction' is not supported with 'enableMajorityReadConcern=false'",
                     serverGlobalParams.enableMajorityReadConcern);
 
-            // We do not allow preparing a transaction if the replica set has any arbiters.
+            // Replica sets with arbiters are able to continually accept majority writes without
+            // actually being able to commit them (e.g. PSA with a downed secondary), which in turn
+            // will impact the liveness of 2PC transactions
             const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            uassert(50995,
+            uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
                     "'prepareTransaction' is not supported for replica sets with arbiters",
                     !replCoord->setContainsArbiter());
 
-            // We do not allow the prepareTransaction command to run on a standalone.
-            uassert(51239,
+            // Standalone nodes do not support transactions at all
+            uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
                     "'prepareTransaction' is not supported on standalone nodes.",
                     replCoord->isReplEnabled());
 
@@ -256,8 +259,10 @@ public:
 
             if (coordinatorDecisionFuture) {
                 auto swCommitDecision = coordinatorDecisionFuture->getNoThrow(opCtx);
-                // The coordinator can only return NoSuchTransaction if cancelIfCommitNotYetStarted
-                // was called, which can happen in one of 3 cases:
+                // The coordinator can only throw NoSuchTransaction (as opposed to propagating an
+                // Abort decision due to NoSuchTransaction reported by a shard) if
+                // cancelIfCommitNotYetStarted was called, which can happen in one of 3 cases:
+                //
                 //  1) The deadline to receive coordinateCommit passed
                 //  2) Transaction with a newer txnNumber started on the session before
                 //     coordinateCommit was received
