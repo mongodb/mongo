@@ -331,10 +331,17 @@ void DocumentSourceShardCheckResumability::_assertOplogHasEnoughHistory(
     auto pipeline = pExpCtx->mongoProcessInterface->makePipeline({matchSpec}, firstEntryExpCtx);
     if (auto first = pipeline->getNext()) {
         auto firstOplogEntry = Value(*first);
+        // If the first entry in the oplog is the replset initialization, then it doesn't matter
+        // if its timestamp is later than the resume token. No events earlier than the token can
+        // have fallen off this oplog, and it is therefore safe to resume. Otherwise, verify that
+        // the timestamp of the first oplog entry is earlier than that of the resume token.
+        const bool isNewRS =
+            Value::compare(firstOplogEntry["o"]["msg"], Value("initiating set"_sd), nullptr) == 0 &&
+            Value::compare(firstOplogEntry["op"], Value("n"_sd), nullptr) == 0;
         uassert(40576,
-                "Resume of change stream was not possible, as the resume point may no longer "
-                "be in the oplog. ",
-                firstOplogEntry["ts"].getTimestamp() < _tokenFromClient.clusterTime);
+                "Resume of change stream was not possible, as the resume point may no longer be in "
+                "the oplog. ",
+                isNewRS || firstOplogEntry["ts"].getTimestamp() < _tokenFromClient.clusterTime);
     } else {
         // Very unusual case: the oplog is empty.  We can always resume. However, it should never be
         // possible to have obtained a document that matched the filter if the oplog is empty.
