@@ -359,6 +359,6 @@ error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "MaxTimeMSExpired", 
 
 error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable", "StaleChunkHistory", "MigrationConflict"])
 
-error_class("VoteAbortError", ["NoSuchTransaction", "TransactionTooOld"])
+error_class("VoteAbortError", ["NoSuchTransaction", "ReadConcernMajorityNotEnabled", "TransactionTooOld"])
 
 error_class("NonResumableChangeStreamError", ["ChangeStreamFatalError", "ChangeStreamHistoryLost"])

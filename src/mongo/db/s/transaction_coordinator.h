@@ -98,7 +98,7 @@ public:
      *
      * TODO (SERVER-37364): Remove this when it is no longer needed by the coordinator service.
      */
-    SharedSemiFuture<txn::CommitDecision> getDecision();
+    SharedSemiFuture<txn::CommitDecision> getDecision() const;
 
     /**
      * Returns a future which can be listened on for when all the asynchronous activity spawned by

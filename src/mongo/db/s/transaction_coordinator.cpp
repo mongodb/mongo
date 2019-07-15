@@ -249,19 +249,28 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
                     _serviceContext->getPreciseClockSource()->now());
             }
 
-            _decisionPromise.emplaceValue(_decision->getDecision());
-
             switch (_decision->getDecision()) {
-                case CommitDecision::kCommit:
+                case CommitDecision::kCommit: {
+                    _decisionPromise.emplaceValue(CommitDecision::kCommit);
+
                     return txn::sendCommit(_serviceContext,
                                            *_scheduler,
                                            _lsid,
                                            _txnNumber,
                                            *_participants,
                                            *_decision->getCommitTimestamp());
-                case CommitDecision::kAbort:
+                }
+                case CommitDecision::kAbort: {
+                    const auto& abortStatus = *_decision->getAbortStatus();
+
+                    if (abortStatus == ErrorCodes::ReadConcernMajorityNotEnabled)
+                        _decisionPromise.setError(abortStatus);
+                    else
+                        _decisionPromise.emplaceValue(CommitDecision::kAbort);
+
                     return txn::sendAbort(
                         _serviceContext, *_scheduler, _lsid, _txnNumber, *_participants);
+                }
                 default:
                     MONGO_UNREACHABLE;
             };
@@ -324,7 +333,7 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
     _kickOffCommitPromise.emplaceValue();
 }
 
-SharedSemiFuture<CommitDecision> TransactionCoordinator::getDecision() {
+SharedSemiFuture<CommitDecision> TransactionCoordinator::getDecision() const {
     return _decisionPromise.getFuture();
 }
 

@@ -27,7 +27,7 @@
         shards: 1,
         rs: {
             nodes: [
-                {/* primary */ enableMajorityReadConcern: false},
+                {/* primary */ enableMajorityReadConcern: 'false'},
                 {/* secondary */ rsConfig: {priority: 0}}
             ]
         }
