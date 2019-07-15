@@ -196,7 +196,7 @@ buildvariants:
 - name: amazonlinux64-enterprise
   display_name: Amazon Linux 64 Enterprise
   run_on:
-  - linux-64-amzn-test
+  - amazon1-2018-test
   expansions:
     build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
@@ -248,7 +248,7 @@ buildvariants:
 - name: rhel62-enterprise
   display_name: RHEL 6.2 Enterprise
   run_on:
-  - rhel62-test
+  - rhel62-small
   expansions:
     build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
@@ -256,7 +256,7 @@ buildvariants:
 - name: rhel70-enterprise
   display_name: RHEL 7.0 Enterprise
   run_on:
-  - rhel70
+  - rhel70-small
   expansions:
     build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
@@ -293,6 +293,14 @@ buildvariants:
     build_tags: "sasl gssapi ssl"
   tasks: *atlas_live_tasks
 
+- name: ubuntu1804-enterprise
+  display_name: Ubuntu 18.04 Enterprise
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    build_tags: "sasl gssapi ssl"
+  tasks: *atlas_live_tasks
+
 #######################################
 #        Windows Buildvariants        #
 #######################################
@@ -300,7 +308,7 @@ buildvariants:
 - name: windows-64-ssl
   display_name: Windows 64-bit SSL
   run_on:
-  - windows-64-vs2013-compile
+  - windows-64-vs2017-test
   expansions:
     build_tags: "ssl"
   tasks: *atlas_live_tasks
@@ -313,6 +321,16 @@ buildvariants:
   display_name: ZAP ARM64 Ubuntu 16.04 SSL
   run_on:
   - ubuntu1604-arm64-small
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    build_tags: "ssl"
+  tasks: *atlas_live_tasks
+
+- name: ubuntu1804-arm64-ssl
+  display_name: ZAP ARM64 Ubuntu 18.04 SSL
+  run_on:
+  - ubuntu1804-arm64-small
   stepback: false
   batchtime: 10080 # weekly
   expansions:
@@ -343,6 +361,16 @@ buildvariants:
     build_tags: 'ssl sasl gssapi'
   tasks: *atlas_live_tasks
 
+- name: ubuntu1804-ppc64le-enterprise
+  display_name: ZAP PPC64LE Ubuntu 18.04 Enterprise
+  run_on:
+  - ubuntu1804-power8-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    build_tags: 'ssl sasl gssapi'
+  tasks: *atlas_live_tasks
+
 #######################################
 #     Z (s390x) Buildvariants         #
 #######################################
@@ -351,6 +379,16 @@ buildvariants:
   display_name: ZAP s390x RHEL 6.7 Enterprise
   run_on:
   - rhel67-zseries-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    build_tags: "sasl gssapi ssl"
+  tasks: *atlas_live_tasks
+
+- name: rhel72-s390x-enterprise
+  display_name: ZAP s390x RHEL 7.2 Enterprise
+  run_on:
+  - rhel72-zseries-test
   stepback: false
   batchtime: 10080 # weekly
   expansions:

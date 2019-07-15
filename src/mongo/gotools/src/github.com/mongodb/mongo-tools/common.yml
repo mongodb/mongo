@@ -182,28 +182,28 @@ mongo_tools_variables:
       - name: integration-4.2
       - name: integration-4.2-auth
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-tests-3.2
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-tests-3.4
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-tests-3.6
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-tests-4.0
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-tests-4.2
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-dump-restore-with-archiving-current
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-dump-restore-with-gzip-current
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-tests-unstable
       - name: unit
     windows_64_ssl_task_list: &windows_64_ssl_tasks
@@ -225,25 +225,25 @@ mongo_tools_variables:
       - name: integration-4.2-auth
       - name: kerberos
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-tests-3.2
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-tests-3.4
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-tests-3.6
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-tests-4.0
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-tests-4.2
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: qa-tests-unstable
         distros:
-        - windows-64-vs2013-test
+        - windows-64-vs2017-test
       - name: unit
       - name: native-cert-ssl-current
     rhel71_ppc64le_enterprise_task_list: &rhel71_ppc64le_enterprise_tasks
@@ -1836,7 +1836,7 @@ buildvariants:
 - name: rhel62
   display_name: RHEL 6.2
   run_on:
-  - rhel62-test
+  - rhel62-small
   expansions:
     <<: *mongod_default_startup_args
     <<: *mongo_default_startup_args
@@ -1851,7 +1851,7 @@ buildvariants:
 - name: rhel62-ssl
   display_name: RHEL 6.2 SSL
   run_on:
-  - rhel62-test
+  - rhel62-small
   expansions:
     <<: *mongod_ssl_startup_args
     <<: *mongo_ssl_startup_args
@@ -1871,7 +1871,7 @@ buildvariants:
 - name: rhel62-enterprise
   display_name: RHEL 6.2 Enterprise
   run_on:
-  - rhel62-test
+  - rhel62-small
   expansions:
     <<: *mongod_default_startup_args
     <<: *mongo_default_startup_args
@@ -1890,7 +1890,7 @@ buildvariants:
 - name: rhel70
   display_name: RHEL 7.0
   run_on:
-  - rhel70
+  - rhel70-small
   expansions:
     build_tags: ""
   tasks:
@@ -1900,7 +1900,7 @@ buildvariants:
 - name: rhel70-enterprise
   display_name: RHEL 7.0 Enterprise
   run_on:
-  - rhel70
+  - rhel70-small
   expansions:
     build_tags: "sasl gssapi ssl"
   tasks:
@@ -2035,7 +2035,7 @@ buildvariants:
 - name: windows-64
   display_name: Windows 64-bit
   run_on:
-  - windows-64-vs2013-test
+  - windows-64-vs2017-test
   expansions:
     <<: *mongod_default_startup_args
     <<: *mongo_default_startup_args
@@ -2052,7 +2052,7 @@ buildvariants:
 - name: windows-64-ssl
   display_name: Windows 64-bit SSL
   run_on:
-  - windows-64-vs2013-compile
+  - windows-64-vs2017-compile
   expansions:
     <<: *mongod_ssl_startup_args
     <<: *mongo_ssl_startup_args
@@ -2074,7 +2074,7 @@ buildvariants:
 - name: windows-64-enterprise
   display_name: Windows 64-bit Enterprise
   run_on:
-  - windows-64-vs2013-compile
+  - windows-64-vs2017-compile
   expansions:
     <<: *mongod_default_startup_args
     <<: *mongo_default_startup_args
@@ -2220,6 +2220,18 @@ buildvariants:
     run_kinit: true
     integration_test_args: integration
   tasks: *rhel67_s390x_enterprise_tasks
+
+- name: rhel72-s390x-enterprise
+  display_name: ZAP s390x RHEL 7.2 Enterprise
+  run_on:
+  - rhel72-zseries-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    build_tags: "sasl gssapi ssl"
+  tasks:
+  - name: dist
+  - name: replay-dist
 
 - name: ubuntu1604-s390x-enterprise
   display_name: ZAP s390x Ubuntu 16.04 Enterprise

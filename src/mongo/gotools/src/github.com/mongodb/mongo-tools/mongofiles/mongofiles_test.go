@@ -198,7 +198,7 @@ func fileContentsCompare(file1, file2 *os.File, t *testing.T) (bool, error) {
 
 // get an id of an existing file, for _id access
 func idOfFile(filename string) string {
-	return fmt.Sprintf("ObjectId('%v')", testFiles[filename].Hex())
+	return fmt.Sprintf(`{"$oid":"%s"}`, testFiles[filename].Hex())
 }
 
 // test output needs some cleaning
@@ -540,7 +540,7 @@ func TestMongoFilesCommands(t *testing.T) {
 		})
 
 		Convey("Testing the 'put_id' command by putting some lorem ipsum file with 287613 bytes with different ids should succeed", func() {
-			for _, idToTest := range []string{"'test_id'", "'{a:\"b\"}'", "'{$numberlong:9999999999999999999999}'", "'{a:{b:{c:{}}}}'"} {
+			for _, idToTest := range []string{`test_id`, `{"a":"b"}`, `{"$numberLong":"999999999999999"}`, `{"a":{"b":{"c":{}}}}`} {
 				runPutIDTestCase(idToTest, t)
 			}
 		})

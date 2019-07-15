@@ -19,9 +19,11 @@ install_test_data = function() {
 
 // attempt to export fields without NaN
 install_test_data();
-
-t.runTool(
-    "export", "--out", t.extFile, "-d", t.baseName, "-c", "foo", "-q", "{a:{\"$nin\":[NaN]}}");
+var queryJSON = '{"a":{"$nin":[{"$numberDouble":"NaN"}]}}';
+if (_isWindows()) {
+    queryJSON = '"' + queryJSON.replace(/"/g, '\\"') + '"';
+}
+t.runTool("export", "--out", t.extFile, "-d", t.baseName, "-c", "foo", "-q", queryJSON);
 
 c.drop();
 assert.eq(0, c.count(), "after drop", "-d", t.baseName, "-c", "foo");
@@ -33,7 +35,11 @@ assert.eq(2, c.count(), "after restore 1");
 // attempt to export fields with NaN
 install_test_data();
 
-t.runTool("export", "--out", t.extFile, "-d", t.baseName, "-c", "foo", "-q", "{a:NaN}");
+queryJSON = '{"a":{"$numberDouble":"NaN"}}';
+if (_isWindows()) {
+    queryJSON = '"' + queryJSON.replace(/"/g, '\\"') + '"';
+}
+t.runTool("export", "--out", t.extFile, "-d", t.baseName, "-c", "foo", "-q", queryJSON);
 
 c.drop();
 assert.eq(0, c.count(), "after drop", "-d", t.baseName, "-c", "foo");
