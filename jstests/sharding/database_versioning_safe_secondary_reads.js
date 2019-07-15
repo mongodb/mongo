@@ -29,12 +29,13 @@
     checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, undefined);
     checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
 
-    // Use 'enableSharding' to create the database only in the sharding catalog (the database will
-    // not exist on any shards). Manually update the 'primary' field in the new dbEntry in
-    // config.databases so that we know which shard is the primary.
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(st.s.getDB("config").getCollection("databases").update({_id: dbName}, {
-        $set: {primary: st.rs1.name}
+    // Manually insert an entry for 'dbName' into config.databases so that we can choose shard1 as
+    // the primary shard.
+    assert.commandWorked(st.s.getDB("config").getCollection("databases").insert({
+        _id: dbName,
+        primary: st.rs1.name,
+        partitioned: false,
+        version: {uuid: new UUID(), lastMod: NumberInt(1)},
     }));
 
     // Check that a command that attaches databaseVersion returns empty results, even though the
@@ -190,15 +191,15 @@
     checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, undefined);
     checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
 
-    // Use 'enableSharding' to create the database only in the sharding catalog (the database will
-    // not exist on any shards).
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-
-    // Simulate that the database was created on 'shard0' by directly modifying the database entry
-    // (we cannot use movePrimary, since movePrimary creates the database on the shards).
-    assert.writeOK(st.s.getDB("config").getCollection("databases").update({_id: dbName}, {
-        $set: {primary: st.shard0.shardName}
+    // Manually insert an entry for 'dbName' into config.databases so that we can choose shard0 as
+    // the primary shard.
+    assert.commandWorked(st.s.getDB("config").getCollection("databases").insert({
+        _id: dbName,
+        primary: st.rs0.name,
+        partitioned: false,
+        version: {uuid: new UUID(), lastMod: NumberInt(1)},
     }));
+
     const dbEntry = st.s.getDB("config").getCollection("databases").findOne({_id: dbName});
 
     assert.commandWorked(st.s.getDB(dbName).runCommand({listCollections: 1}));

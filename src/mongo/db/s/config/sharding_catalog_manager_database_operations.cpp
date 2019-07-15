@@ -117,8 +117,10 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
 
     log() << "Registering new database " << db << " in sharding catalog";
 
+    // Do this write with majority writeConcern to guarantee that the shard sees the write when it
+    // receives the _flushDatabaseCacheUpdates.
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
-        opCtx, DatabaseType::ConfigNS, db.toBSON(), ShardingCatalogClient::kLocalWriteConcern));
+        opCtx, DatabaseType::ConfigNS, db.toBSON(), ShardingCatalogClient::kMajorityWriteConcern));
 
     // Send _flushDatabaseCacheUpdates to the primary shard
     const auto shard =
