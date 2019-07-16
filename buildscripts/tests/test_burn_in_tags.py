@@ -102,8 +102,9 @@ class TestGenerateEvgTasks(unittest.TestCase):
         }  # yapf: disable
         shrub_config = Configuration()
         evergreen_api = Mock()
+        repo = Mock()
         burn_in_tags._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
-                                         buildvariant_map)
+                                         buildvariant_map, repo)
 
         self.assertEqual(shrub_config.to_map(), {})
 
@@ -127,11 +128,12 @@ class TestGenerateEvgTasks(unittest.TestCase):
         }  # yapf: disable
         shrub_config = Configuration()
         evergreen_api = Mock()
+        repo = Mock()
         evergreen_api.test_stats_by_project.return_value = [
             Mock(test_file="dir/test2.js", avg_duration_pass=10)
         ]
         burn_in_tags._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
-                                         buildvariant_map)
+                                         buildvariant_map, repo)
 
         generated_config = shrub_config.to_map()
         self.assertEqual(len(generated_config["buildvariants"]), 2)

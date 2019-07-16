@@ -51,6 +51,13 @@ RUN_TESTS_MULTIVERSION_COMMAND = {
     "vars": {"resmoke_args": "--shellWriteMode=commands", "task_path_suffix": MULTIVERSION_PATH}
 }
 
+NS = "buildscripts.burn_in_tests"
+
+
+def ns(relative_name):  # pylint: disable=invalid-name
+    """Return a full name from a name relative to the test module"s name space."""
+    return NS + "." + relative_name
+
 
 def tasks_mock(  #pylint: disable=too-many-arguments
         tasks, generate_resmoke_tasks_command=None, get_vars_task_name=None, run_tests_command=None,
@@ -440,8 +447,8 @@ class TestGenerateTimeouts(unittest.TestCase):
 
         self.assertEqual(len(shrub_commands), 1)
         command_definition = shrub_commands[0]
-        self.assertEqual(command_definition.to_map()['params']['exec_timeout_secs'], 1531)
-        self.assertEqual(command_definition.to_map()['params']['timeout_secs'], 1366)
+        self.assertEqual(command_definition.to_map()["params"]["exec_timeout_secs"], 1531)
+        self.assertEqual(command_definition.to_map()["params"]["timeout_secs"], 1366)
 
     def test__generate_timeouts_no_results(self):
         shrub_commands = []
@@ -799,7 +806,7 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
 
         gen_tasks_config_mock.return_value = evg_config
 
-        exit_mock.side_effect = ValueError('exiting')
+        exit_mock.side_effect = ValueError("exiting")
         with self.assertRaises(ValueError):
             burn_in.create_generate_tasks_file(evg_api, options, tests_by_task)
 
@@ -891,50 +898,6 @@ class RunTests(unittest.TestCase):
             mock_exit.side_effect = self.SysExit(error_code)
             with self.assertRaises(self.SysExit):
                 burn_in.run_tests(no_exec, TESTS_BY_TASK, resmoke_cmd, None)
-
-
-class FindLastActivated(unittest.TestCase):
-    def test_find_last_activated_task_first_rev(self):
-        rev_list = ["rev1", "rev2", "rev3"]
-        variant = "build_variant_0"
-        branch = "master"
-        evg_api = MagicMock()
-
-        revision = burn_in.find_last_activated_task(rev_list, variant, branch, evg_api)
-        self.assertEqual(revision, rev_list[0])
-
-    def test_find_last_activated_task_last_rev(self):
-        rev_list = ["rev1", "rev2", "rev3"]
-        variant = "build_variant_0"
-        branch = "master"
-        evg_api = MagicMock()
-        evg_api.version_by_id.return_value.build_by_variant.side_effect = [
-            MagicMock(activated=False),
-            MagicMock(activated=False),
-            MagicMock(activated=True),
-        ]
-
-        revision = burn_in.find_last_activated_task(rev_list, variant, branch, evg_api)
-        self.assertEqual(revision, rev_list[2])
-
-    def test_find_last_activated_task_no_rev(self):
-        rev_list = ["rev1", "rev2", "rev3"]
-        variant = "build_variant_0"
-        branch = "master"
-        evg_api = MagicMock()
-        evg_api.version_by_id.return_value.build_by_variant.return_value.activated = False
-
-        revision = burn_in.find_last_activated_task(rev_list, variant, branch, evg_api)
-        self.assertIsNone(revision)
-
-    def test_find_last_activated_norevisions(self):
-        rev_list = []
-        variant = "build_variant_0"
-        branch = "master"
-        evg_api = MagicMock()
-
-        revision = burn_in.find_last_activated_task(rev_list, variant, branch, evg_api)
-        self.assertIsNone(revision)
 
 
 MEMBERS_MAP = {
@@ -1104,228 +1067,63 @@ class CreateTaskList(unittest.TestCase):
                 burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, [])
 
 
-class FindChangedTests(unittest.TestCase):
+class TestFindChangedTests(unittest.TestCase):
+    @patch(ns("find_changed_files"))
+    def test_nothing_found(self, changed_files_mock):
+        repo_mock = MagicMock()
+        changed_files_mock.return_value = set()
 
-    NUM_COMMITS = 10
-    MOD_FILES = [os.path.normpath("jstests/test1.js"), os.path.normpath("jstests/test2.js")]
-    REV_DIFF = dict(zip([str(x) for x in range(NUM_COMMITS)],
-                        [MOD_FILES] * NUM_COMMITS))  #type: ignore
-    NO_REV_DIFF = dict(
-        zip([str(x) for x in range(NUM_COMMITS)], [None for _ in range(NUM_COMMITS)]))
+        self.assertEqual(0, len(burn_in.find_changed_tests(repo_mock)))
 
-    UNTRACKED_FILES = [
-        os.path.normpath("jstests/untracked1.js"),
-        os.path.normpath("jstests/untracked2.js")
-    ]
+    @patch(ns("find_changed_files"))
+    @patch(ns("os.path.isfile"))
+    def test_non_js_files_filtered(self, is_file_mock, changed_files_mock):
+        repo_mock = MagicMock()
+        file_list = [
+            os.path.join("jstests", "test1.js"),
+            os.path.join("jstests", "test1.cpp"),
+            os.path.join("jstests", "test2.js"),
+        ]
+        changed_files_mock.return_value = set(file_list)
+        is_file_mock.return_value = True
 
-    @staticmethod
-    def _copy_rev_diff(rev_diff):
-        """Use this method instead of copy.deepcopy().
+        found_tests = burn_in.find_changed_tests(repo_mock)
 
-        Note - it was discovered during testing that after using copy.deepcopy() that
-        updating one key would update all of them, i.e.,
-            rev_diff = {"1": ["abc"], 2": ["abc"]}
-            copy_rev_diff = copy.deepcopy(rev_diff)
-            copy_rev_diff["2"] += "xyz"
-            print(rev_diff)
-                Result: {"1": ["abc"], 2": ["abc"]}
-            print(copy_rev_diff)
-                Result: {"1": ["abc", "xyz"], 2": ["abc", "xyz"]}
-        At this point no identifiable issue could be found related to this problem.
-        """
-        copy_rev_diff = {}
-        for key in rev_diff:
-            copy_rev_diff[key] = []
-            for file_name in rev_diff[key]:
-                copy_rev_diff[key].append(file_name)
-        return copy_rev_diff
+        self.assertIn(file_list[0], found_tests)
+        self.assertIn(file_list[2], found_tests)
+        self.assertNotIn(file_list[1], found_tests)
 
-    @staticmethod
-    def _get_rev_list(range1, range2):
-        return [str(num) for num in range(range1, range2 + 1)]
+    @patch(ns("find_changed_files"))
+    @patch(ns("os.path.isfile"))
+    def test_missing_files_filtered(self, is_file_mock, changed_files_mock):
+        repo_mock = MagicMock()
+        file_list = [
+            os.path.join("jstests", "test1.js"),
+            os.path.join("jstests", "test2.js"),
+            os.path.join("jstests", "test3.js"),
+        ]
+        changed_files_mock.return_value = set(file_list)
+        is_file_mock.return_value = False
 
-    def _mock_git_repository(self, directory):
-        return MockGitRepository(directory, FindChangedTests._get_rev_list(self.rev1, self.rev2),
-                                 self.rev_diff, self.untracked_files)
+        found_tests = burn_in.find_changed_tests(repo_mock)
 
-    def _test_find_changed_tests(  #pylint: disable=too-many-arguments
-            self, commit, max_revisions, variant, check_evg, rev1, rev2, rev_diff, untracked_files,
-            last_activated_task=None):
-        branch = "master"
-        project = "project"
-        # pylint: disable=attribute-defined-outside-init
-        self.rev1 = rev1
-        self.rev2 = rev2
-        self.rev_diff = rev_diff
-        self.untracked_files = untracked_files
-        self.expected_changed_tests = []
-        if commit is None and rev_diff:
-            self.expected_changed_tests += rev_diff[str(self.NUM_COMMITS - 1)]
-        elif rev_diff.get(commit, []):
-            self.expected_changed_tests += rev_diff.get(commit, [])
-        self.expected_changed_tests += untracked_files
-        # pylint: enable=attribute-defined-outside-init
-        evg_api = MagicMock()
-        with patch(GIT + ".Repository", self._mock_git_repository),\
-             patch("os.path.isfile", return_value=True),\
-             patch(BURN_IN + ".find_last_activated_task", return_value=last_activated_task):
-            return burn_in.find_changed_tests(branch, commit, max_revisions, variant, project,
-                                              check_evg, evg_api)
+        self.assertEqual(0, len(found_tests))
 
-    def test_find_changed_tests(self):
-        commit = "3"
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", False, 0, 3,
-                                                      self.REV_DIFF, self.UNTRACKED_FILES)
-        self.assertEqual(changed_tests, self.expected_changed_tests)
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", True, 0, 3,
-                                                      self.REV_DIFF, self.UNTRACKED_FILES)
-        self.assertEqual(changed_tests, self.expected_changed_tests)
+    @patch(ns("find_changed_files"))
+    @patch(ns("os.path.isfile"))
+    def test_non_jstests_files_filtered(self, is_file_mock, changed_files_mock):
+        repo_mock = MagicMock()
+        file_list = [
+            os.path.join("jstests", "test1.js"),
+            os.path.join("other", "test2.js"),
+            os.path.join("jstests", "test3.js"),
+        ]
+        changed_files_mock.return_value = set(file_list)
+        is_file_mock.return_value = True
 
-    def test_find_changed_tests_no_changes(self):
-        commit = "3"
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", False, 0, 3,
-                                                      self.NO_REV_DIFF, [])
-        self.assertEqual(changed_tests, [])
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", True, 0, 3,
-                                                      self.NO_REV_DIFF, [], "1")
-        self.assertEqual(changed_tests, [])
+        found_tests = burn_in.find_changed_tests(repo_mock)
 
-    def test_find_changed_tests_check_evergreen(self):
-        commit = "1"
-        rev_diff = self._copy_rev_diff(self.REV_DIFF)
-        rev_diff["2"] += [os.path.normpath("jstests/test.js")]
-        expected_changed_tests = self.REV_DIFF[commit] + self.UNTRACKED_FILES
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", False, 0, 3, rev_diff,
-                                                      self.UNTRACKED_FILES)
-        self.assertEqual(changed_tests, expected_changed_tests)
-        rev_diff = self._copy_rev_diff(self.REV_DIFF)
-        rev_diff["3"] += [os.path.normpath("jstests/test.js")]
-        expected_changed_tests = rev_diff["3"] + self.UNTRACKED_FILES
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", True, 0, 3, rev_diff,
-                                                      self.UNTRACKED_FILES, "1")
-        self.assertEqual(changed_tests, expected_changed_tests)
-
-    def test_find_changed_tests_no_diff(self):
-        commit = "3"
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", False, 0, 3,
-                                                      self.NO_REV_DIFF, self.UNTRACKED_FILES)
-        self.assertEqual(changed_tests, self.UNTRACKED_FILES)
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", True, 0, 3,
-                                                      self.NO_REV_DIFF, self.UNTRACKED_FILES)
-        self.assertEqual(changed_tests, self.UNTRACKED_FILES)
-
-    def test_find_changed_tests_no_untracked(self):
-        commit = "3"
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", False, 0, 3,
-                                                      self.REV_DIFF, [])
-        self.assertEqual(changed_tests, self.REV_DIFF[commit])
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", True, 0, 3,
-                                                      self.REV_DIFF, [])
-        self.assertEqual(changed_tests, self.REV_DIFF[commit])
-
-    def test_find_changed_tests_no_base_commit(self):
-        changed_tests = self._test_find_changed_tests(None, 5, "myvariant", False, 0, 3,
-                                                      self.REV_DIFF, self.UNTRACKED_FILES)
-        self.assertEqual(changed_tests, self.expected_changed_tests)
-        changed_tests = self._test_find_changed_tests(None, 5, "myvariant", True, 0, 3,
-                                                      self.REV_DIFF, self.UNTRACKED_FILES)
-        self.assertEqual(changed_tests, self.expected_changed_tests)
-
-    def test_find_changed_tests_non_js(self):
-        commit = "3"
-        rev_diff = self._copy_rev_diff(self.REV_DIFF)
-        rev_diff[commit] += [os.path.normpath("jstests/test.yml")]
-        untracked_files = self.UNTRACKED_FILES + [os.path.normpath("jstests/untracked.yml")]
-        expected_changed_tests = self.REV_DIFF[commit] + self.UNTRACKED_FILES
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", False, 0, 3, rev_diff,
-                                                      untracked_files)
-        self.assertEqual(changed_tests, expected_changed_tests)
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", True, 0, 3, rev_diff,
-                                                      untracked_files)
-        self.assertEqual(changed_tests, expected_changed_tests)
-
-    def test_find_changed_tests_not_in_jstests(self):
-        commit = "3"
-        rev_diff = self._copy_rev_diff(self.REV_DIFF)
-        rev_diff[commit] += [os.path.normpath("other/test.js")]
-        untracked_files = self.UNTRACKED_FILES + [os.path.normpath("other/untracked.js")]
-        expected_changed_tests = self.REV_DIFF[commit] + self.UNTRACKED_FILES
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", False, 0, 3, rev_diff,
-                                                      untracked_files)
-        self.assertEqual(changed_tests, expected_changed_tests)
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", True, 0, 3, rev_diff,
-                                                      untracked_files)
-        self.assertEqual(changed_tests, expected_changed_tests)
-
-    def test_find_changed_tests_no_revisions(self):
-        commit = "3"
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", False, 0, 0,
-                                                      self.REV_DIFF, self.UNTRACKED_FILES)
-        self.assertEqual(changed_tests, self.expected_changed_tests)
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", True, 0, 0,
-                                                      self.REV_DIFF, self.UNTRACKED_FILES)
-        self.assertEqual(changed_tests, self.expected_changed_tests)
-
-    def test_find_changed_tests_too_many_revisions(self):
-        commit = "3"
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", False, 0, 9,
-                                                      self.REV_DIFF, self.UNTRACKED_FILES)
-        self.assertEqual(changed_tests, [])
-        changed_tests = self._test_find_changed_tests(commit, 5, "myvariant", True, 0, 9,
-                                                      self.REV_DIFF, self.UNTRACKED_FILES)
-        self.assertEqual(changed_tests, [])
-
-
-class MockGitRepository(object):
-    def __init__(self, _, rev_list, rev_diff, untracked_files):
-        self.rev_list = rev_list
-        self.rev_diff = rev_diff
-        self.untracked_files = untracked_files
-
-    def _get_revs(self, rev_range):
-        revs = rev_range.split("...")
-        if not revs:
-            return revs
-        elif len(revs) == 1:
-            revs.append("HEAD")
-        if revs[1] == "HEAD" and self.rev_list:
-            revs[1] = self.rev_list[-1]
-        return revs
-
-    def __get_rev_range(self, rev_range):
-        commits = []
-        if len(self.rev_list) < 2:
-            return commits
-        revs = self._get_revs(rev_range)
-        latest_commit_found = False
-        for commit in self.rev_list:
-            latest_commit_found = latest_commit_found or revs[0] == commit
-            if revs[1] == commit:
-                break
-            if latest_commit_found:
-                commits.append(commit)
-        return commits
-
-    def get_merge_base(self, _):
-        return self.rev_list[-1]
-
-    def git_rev_list(self, args):
-        return "\n".join(self.__get_rev_range(args[0])[::-1])
-
-    def git_diff(self, args):
-        revs = self._get_revs(args[1])
-        if revs:
-            diff_list = self.rev_diff.get(revs[-1], [])
-            if diff_list:
-                return "\n".join(diff_list)
-        return ""
-
-    def git_status(self, args):
-        revs = self._get_revs(args[0])
-        modified_files = [""]
-        if revs:
-            diff_list = self.rev_diff.get(revs[-1], [])
-            if diff_list:
-                modified_files = [" M {}".format(untracked) for untracked in diff_list]
-        untracked_files = ["?? {}".format(untracked) for untracked in self.untracked_files]
-        return "\n".join(modified_files + untracked_files)
+        self.assertIn(file_list[0], found_tests)
+        self.assertIn(file_list[2], found_tests)
+        self.assertNotIn(file_list[1], found_tests)
+        self.assertEqual(2, len(found_tests))

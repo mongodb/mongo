@@ -14,8 +14,11 @@ import logging
 
 from math import ceil
 
-import yaml
+from git import Repo
 import requests
+import structlog
+from structlog.stdlib import LoggerFactory
+import yaml
 
 from shrub.config import Configuration
 from shrub.command import CommandDefinition
@@ -31,17 +34,23 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # pylint: disable=wrong-import-position
-from buildscripts import git
+from buildscripts.patch_builds.change_data import find_changed_files
 from buildscripts import resmokelib
 from buildscripts.ciconfig import evergreen
 from buildscripts.util import teststats
 # pylint: enable=wrong-import-position
 
-LOGGER = logging.getLogger(__name__)
+structlog.configure(logger_factory=LoggerFactory())
+LOGGER = structlog.getLogger(__name__)
+EXTERNAL_LOGGERS = {
+    "evergreen",
+    "git",
+    "urllib3",
+}
 
 AVG_TEST_RUNTIME_ANALYSIS_DAYS = 14
 AVG_TEST_TIME_MULTIPLIER = 3
-CONFIG_FILE = "../src/.evergreen.yml"
+CONFIG_FILE = ".evergreen.yml"
 REPEAT_SUITES = 2
 EVERGREEN_FILE = "etc/evergreen.yml"
 MAX_TASKS_TO_CREATE = 1000
@@ -181,31 +190,24 @@ def validate_options(parser, options):
         check_variant(options.run_buildvariant, parser)
 
 
-def find_last_activated_task(revisions, variant, project, evg_api):
+def _is_file_a_test_file(file_path):
     """
-    Search the given list of revisions for the first build that was activated in evergreen.
+    Check if the given path points to a test file.
 
-    :param revisions: List of revisions to search.
-    :param variant: Build variant to query for.
-    :param project: Project being run against.
-    :param evg_api: Evergreen api.
-    :return: First revision from list that has been activated.
+    :param file_path: path to file.
+    :return: True if path points to test.
     """
-    prefix = project.replace("-", "_")
+    # Check that the file exists because it may have been moved or deleted in the patch.
+    if os.path.splitext(file_path)[1] != ".js" or not os.path.isfile(file_path):
+        return False
 
-    for githash in revisions:
-        version_id = f"{prefix}_{githash}"
-        version = evg_api.version_by_id(version_id)
+    if "jstests" not in file_path:
+        return False
 
-        build = version.build_by_variant(variant)
-        if build.activated:
-            return githash
-
-    return None
+    return True
 
 
-def find_changed_tests(  # pylint: disable=too-many-locals,too-many-arguments
-        branch_name, base_commit, max_revisions, buildvariant, project, check_evergreen, evg_api):
+def find_changed_tests(repo: Repo):
     """
     Find the changed tests.
 
@@ -213,66 +215,12 @@ def find_changed_tests(  # pylint: disable=too-many-locals,too-many-arguments
     TODO: This should be expanded to search for enterprise modules.
     The returned file paths are in normalized form (see os.path.normpath(path)).
 
-    :param branch_name: Branch being run against.
-    :param base_commit: Commit changes are made on top of.
-    :param max_revisions: Max number of revisions to search through.
-    :param buildvariant: Build variant burn is being run on.
-    :param project: Project that is being run on.
-    :param check_evergreen: Should evergreen be checked for an activated build.
-    :param evg_api: Evergreen api.
-    :returns: List of changed tests.
+    :returns: Set of changed tests.
     """
-
-    changed_tests = []
-
-    repo = git.Repository(".")
-
-    if base_commit is None:
-        base_commit = repo.get_merge_base([branch_name + "@{upstream}", "HEAD"])
-
-    if check_evergreen:
-        # We're going to check up to 200 commits in Evergreen for the last scheduled one.
-        # The current commit will be activated in Evergreen; we use --skip to start at the
-        # previous commit when trying to find the most recent preceding commit that has been
-        # activated.
-        revs_to_check = repo.git_rev_list([base_commit, "--max-count=200", "--skip=1"]).splitlines()
-        last_activated = find_last_activated_task(revs_to_check, buildvariant, project, evg_api)
-        if last_activated is None:
-            # When the current commit is the first time 'buildvariant' has run, there won't be a
-            # commit among 'revs_to_check' that's been activated in Evergreen. We handle this by
-            # only considering tests changed in the current commit.
-            last_activated = "HEAD"
-        print("Comparing current branch against", last_activated)
-        revisions = repo.git_rev_list([base_commit + "..." + last_activated]).splitlines()
-        base_commit = last_activated
-    else:
-        revisions = repo.git_rev_list([base_commit + "...HEAD"]).splitlines()
-
-    revision_count = len(revisions)
-    if revision_count > max_revisions:
-        print(("There are too many revisions included ({}). This is likely because your base"
-               " branch is not {}. You can allow us to review more than {} revisions by using"
-               " the --maxRevisions option.".format(revision_count, branch_name, max_revisions)))
-        return changed_tests
-
-    changed_files = repo.git_diff(["--name-only", base_commit]).splitlines()
-    # New files ("untracked" in git terminology) won't show up in the git diff results.
-    untracked_files = repo.git_status(["--porcelain"]).splitlines()
-
-    # The lines with untracked files start with '?? '.
-    for line in untracked_files:
-        if line.startswith("?"):
-            (_, line) = line.split(" ", 1)
-            changed_files.append(line)
-
-    for line in changed_files:
-        line = line.rstrip()
-        # Check that the file exists because it may have been moved or deleted in the patch.
-        if os.path.splitext(line)[1] != ".js" or not os.path.isfile(line):
-            continue
-        if "jstests" in line:
-            path = os.path.normpath(line)
-            changed_tests.append(path)
+    changed_files = find_changed_files(repo)
+    LOGGER.debug("Found changed files", files=changed_files)
+    changed_tests = {os.path.normpath(path) for path in changed_files if _is_file_a_test_file(path)}
+    LOGGER.debug("Found changed tests", files=changed_tests)
     return changed_tests
 
 
@@ -526,7 +474,7 @@ def _generate_timeouts(options, commands, test, task_avg_test_runtime_stats):
         avg_test_runtime = _parse_avg_test_runtime(test, task_avg_test_runtime_stats)
         if avg_test_runtime:
             cmd_timeout = CmdTimeoutUpdate()
-            LOGGER.debug("Avg test runtime for test %s is: %s", test, avg_test_runtime)
+            LOGGER.debug("Avg test runtime", test=test, runtime=avg_test_runtime)
 
             timeout = _calculate_timeout(avg_test_runtime)
             cmd_timeout.timeout(timeout)
@@ -555,7 +503,7 @@ def _get_task_runtime_history(evg_api, project, task, variant):
                                              tasks=[task], variants=[variant], group_by="test",
                                              group_num_days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
         test_runtimes = teststats.TestStats(data).get_tests_runtimes()
-        LOGGER.debug("Test_runtime data parsed from Evergreen history: %s", test_runtimes)
+        LOGGER.debug("Test_runtime data parsed from Evergreen history", runtimes=test_runtimes)
         return test_runtimes
     except requests.HTTPError as err:
         if err.response.status_code == requests.codes.SERVICE_UNAVAILABLE:
@@ -605,20 +553,18 @@ def create_generate_tasks_config(evg_api, evg_config, options, tests_by_task, in
     return evg_config
 
 
-def create_tests_by_task(options, evg_api):
+def create_tests_by_task(options, repo):
     """
     Create a list of tests by task.
 
     :param options: Options.
-    :param evg_api: Evergreen api.
+    :param repo: Git repo being tracked.
     :return: Tests by task
     """
     # Parse the Evergreen project configuration file.
     evergreen_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
 
-    changed_tests = find_changed_tests(options.branch, options.base_commit, options.max_revisions,
-                                       options.buildvariant, options.project,
-                                       options.check_evergreen, evg_api)
+    changed_tests = find_changed_tests(repo)
     exclude_suites, exclude_tasks, exclude_tests = find_excludes(SELECTOR_FILE)
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
@@ -644,7 +590,8 @@ def create_generate_tasks_file(evg_api, options, tests_by_task):
     json_config = evg_config.to_map()
     tasks_to_create = len(json_config.get('tasks', []))
     if tasks_to_create > MAX_TASKS_TO_CREATE:
-        LOGGER.warning("Attempting to create more tasks than max(%d), aborting", tasks_to_create)
+        LOGGER.warning("Attempting to create more tasks than max, aborting", tasks=tasks_to_create,
+                       max=MAX_TASKS_TO_CREATE)
         sys.exit(1)
     _write_json_file(json_config, options.generate_tasks_file)
 
@@ -676,17 +623,22 @@ def run_tests(no_exec, tests_by_task, resmoke_cmd, report_file):
     _write_json_file(test_results, report_file)
 
 
-def main(evg_api):
-    """Execute Main program."""
-
+def configure_logging():
+    """Configure logging for the application."""
     logging.basicConfig(
         format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
         level=logging.DEBUG,
         stream=sys.stdout,
     )
+    for log_name in EXTERNAL_LOGGERS:
+        logging.getLogger(log_name).setLevel(logging.WARNING)
 
+
+def main(evg_api):
+    """Execute Main program."""
+
+    configure_logging()
     options, args = parse_command_line()
-
     resmoke_cmd = _set_resmoke_cmd(options, args)
 
     # Load the dict of tests to run.
@@ -700,7 +652,8 @@ def main(evg_api):
 
     # Run the executor finder.
     else:
-        tests_by_task = create_tests_by_task(options, evg_api)
+        repo = Repo(".")
+        tests_by_task = create_tests_by_task(options, repo)
 
         if options.test_list_outfile:
             _write_json_file(tests_by_task, options.test_list_outfile)

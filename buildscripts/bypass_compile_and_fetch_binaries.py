@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import logging
 import os
 import re
 import sys
@@ -19,7 +20,10 @@ except ImportError:
     from urllib.parse import urlparse  # type: ignore
 # pylint: enable=ungrouped-imports
 
+from git.repo import Repo
 import requests
+import structlog
+from structlog.stdlib import LoggerFactory
 import yaml
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
@@ -28,8 +32,10 @@ if __name__ == "__main__" and __package__ is None:
 
 # pylint: disable=wrong-import-position
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
-from buildscripts.git import Repository
 # pylint: enable=wrong-import-position
+
+structlog.configure(logger_factory=LoggerFactory())
+LOGGER = structlog.get_logger(__name__)
 
 _IS_WINDOWS = (sys.platform == "win32" or sys.platform == "cygwin")
 
@@ -104,7 +110,7 @@ def requests_get_json(url):
     try:
         return response.json()
     except ValueError:
-        print("Invalid JSON object returned with response: {}".format(response.text))
+        LOGGER.warning("Invalid JSON object returned with response", response=response.text)
         raise
 
 
@@ -124,15 +130,16 @@ def read_evg_config():
 def write_out_bypass_compile_expansions(patch_file, **expansions):
     """Write out the macro expansions to given file."""
     with open(patch_file, "w") as out_file:
-        print("Saving compile bypass expansions to {0}: ({1})".format(patch_file, expansions))
+        LOGGER.info("Saving compile bypass expansions", patch_file=patch_file,
+                    expansions=expansions)
         yaml.safe_dump(expansions, out_file, default_flow_style=False)
 
 
 def write_out_artifacts(json_file, artifacts):
     """Write out the JSON file with URLs of artifacts to given file."""
     with open(json_file, "w") as out_file:
-        print("Generating artifacts.json from pre-existing artifacts {0}".format(
-            json.dumps(artifacts, indent=4)))
+        LOGGER.info("Generating artifacts.json from pre-existing artifacts", json=json.dumps(
+            artifacts, indent=4))
         json.dump(artifacts, out_file)
 
 
@@ -182,8 +189,8 @@ def _get_original_etc_evergreen(path):
     :param path: path to etc/evergreen.
     :return: An EvergreenProjectConfig for the previous etc/evergreen file.
     """
-    repo = Repository(".")
-    previous_contents = repo.git_show([f"HEAD:{path}"])
+    repo = Repo(".")
+    previous_contents = repo.git.show([f"HEAD:{path}"])
     with TemporaryDirectory() as tmpdir:
         file_path = os.path.join(tmpdir, "evergreen.yml")
         with open(file_path, "w") as fp:
@@ -260,20 +267,18 @@ def should_bypass_compile(args):
             if os.path.isdir(filename):
                 continue
 
+            log = LOGGER.bind(filename=filename)
             if _file_in_group(filename, BYPASS_BLACKLIST):
-                print("Compile bypass disabled after detecting {} as being modified because"
-                      " it is a file known to affect compilation.".format(filename))
+                log.warning("Compile bypass disabled due to blacklisted file")
                 return False
 
             if not _file_in_group(filename, BYPASS_WHITELIST):
-                print("Compile bypass disabled after detecting {} as being modified because"
-                      " it isn't a file known to not affect compilation.".format(filename))
+                log.warning("Compile bypass disabled due to non-whitelisted file")
                 return False
 
             if filename in BYPASS_EXTRA_CHECKS_REQUIRED:
                 if not _check_file_for_bypass(filename, args.buildVariant):
-                    print("Compile bypass disabled after detecting {} as being modified because"
-                          " the changes could affect compilation.".format(filename))
+                    log.warning("Compile bypass disabled due to extra checks for file.")
                     return False
 
     return True
@@ -335,12 +340,18 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
     determine to bypass compile do we write out the macro expansions.
     """
     args = parse_args()
+    logging.basicConfig(
+        format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
+        level=logging.DEBUG,
+        stream=sys.stdout,
+    )
 
     # Determine if we should bypass compile based on modified patch files.
     if should_bypass_compile(args):
         evg_config = read_evg_config()
         if evg_config is None:
-            print("Could not find ~/.evergreen.yml config file. Default compile bypass to false.")
+            LOGGER.warning(
+                "Could not find ~/.evergreen.yml config file. Default compile bypass to false.")
             return
 
         api_server = "{url.scheme}://{url.netloc}".format(
@@ -350,8 +361,8 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
         revisions = requests_get_json(revision_url)
         build_id = find_suitable_build_id(revisions["builds"], args)
         if not build_id:
-            print("Could not find build id for revision {} on project {}."
-                  " Default compile bypass to false.".format(args.revision, args.project))
+            LOGGER.warning("Could not find build id. Default compile bypass to false.",
+                           revision=args.revision, project=args.project)
             return
 
         # Generate the compile task id.
@@ -361,23 +372,25 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
         # Get info on compile task of base commit.
         task = requests_get_json(task_url)
         if task is None or task["status"] != "success":
-            print("Could not retrieve artifacts because the compile task {} for base commit"
-                  " was not available. Default compile bypass to false.".format(compile_task_id))
+            LOGGER.warning(
+                "Could not retrieve artifacts because the compile task for base commit"
+                " was not available. Default compile bypass to false.", task_id=compile_task_id)
             return
 
         # Get the compile task artifacts from REST API
-        print("Fetching pre-existing artifacts from compile task {}".format(compile_task_id))
+        LOGGER.info("Fetching pre-existing artifacts from compile task", task_id=compile_task_id)
         artifacts = []
         for artifact in task["files"]:
             filename = os.path.basename(artifact["url"])
             if filename.startswith(build_id):
-                print("Retrieving archive {}".format(filename))
+                LOGGER.info("Retrieving archive", filename=filename)
                 # This is the artifacts.tgz as referenced in evergreen.yml.
                 try:
                     urllib.request.urlretrieve(artifact["url"], filename)
                 except urllib.error.ContentTooShortError:
-                    print("The artifact {} could not be completely downloaded. Default"
-                          " compile bypass to false.".format(filename))
+                    LOGGER.warning(
+                        "The artifact could not be completely downloaded. Default"
+                        " compile bypass to false.", filename=filename)
                     return
 
                 # Need to extract certain files from the pre-existing artifacts.tgz.
@@ -395,24 +408,25 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
                         tarinfo for tarinfo in tar.getmembers()
                         if tarinfo.name.startswith("repo/") or tarinfo.name in extract_files
                     ]
-                    print("Extracting the following files from {0}...\n{1}".format(
-                        filename, "\n".join(tarinfo.name for tarinfo in subdir)))
+                    LOGGER.info("Extracting the files...", filename=filename,
+                                files="\n".join(tarinfo.name for tarinfo in subdir))
                     tar.extractall(members=subdir)
             elif filename.startswith("mongo-src"):
-                print("Retrieving mongo source {}".format(filename))
+                LOGGER.info("Retrieving mongo source", filename=filename)
                 # This is the distsrc.[tgz|zip] as referenced in evergreen.yml.
                 try:
                     urllib.request.urlretrieve(artifact["url"], filename)
                 except urllib.error.ContentTooShortError:
-                    print("The artifact {} could not be completely downloaded. Default"
-                          " compile bypass to false.".format(filename))
+                    LOGGER.warn(
+                        "The artifact could not be completely downloaded. Default"
+                        " compile bypass to false.", filename=filename)
                     return
                 extension = os.path.splitext(filename)[1]
                 distsrc_filename = "distsrc{}".format(extension)
-                print("Renaming {} to {}".format(filename, distsrc_filename))
+                LOGGER.info("Renaming", filename=filename, rename=distsrc_filename)
                 os.rename(filename, distsrc_filename)
             else:
-                print("Linking base artifact {} to this patch build".format(filename))
+                LOGGER.info("Linking base artifact to this patch build", filename=filename)
                 # For other artifacts we just add their URLs to the JSON file to upload.
                 files = {
                     "name": artifact["name"],
