@@ -48,26 +48,39 @@ class Resmoke(object):
         self._resmoke_logger = self._exec_logger.new_resmoke_logger()
 
     def _exit_logging(self):
-        if not self._interrupted:
-            logging.flush.stop_thread()
+        if self._interrupted:
+            # We want to exit as quickly as possible when interrupted by a user and therefore don't
+            # bother waiting for all log output to be flushed to logkeeper.
+            return
+
+        if logging.buildlogger.is_log_output_incomplete():
+            # If we already failed to write log output to logkeeper, then we don't bother waiting
+            # for any remaining log output to be flushed as it'll likely fail too. Exiting without
+            # joining the flush thread here also means that resmoke.py won't hang due a logger from
+            # a fixture or a background hook not being closed.
+            self._exit_on_incomplete_logging()
+            return
+
+        logging.flush.stop_thread()
+
+        if logging.buildlogger.is_log_output_incomplete():
             self._exit_on_incomplete_logging()
 
     def _exit_on_incomplete_logging(self):
-        if logging.buildlogger.is_log_output_incomplete():
-            if self._exit_code == 0:
-                # We don't anticipate users to look at passing Evergreen tasks very often that even
-                # if the log output is incomplete, we'd still rather not show anything in the
-                # Evergreen UI or cause a JIRA ticket to be created.
-                self._resmoke_logger.info(
-                    "We failed to flush all log output to logkeeper but all tests passed, so"
-                    " ignoring.")
-                return
-
-            exit_code = errors.LoggerRuntimeConfigError.EXIT_CODE
+        if self._exit_code == 0:
+            # We don't anticipate users to look at passing Evergreen tasks very often that even if
+            # the log output is incomplete, we'd still rather not show anything in the Evergreen UI
+            # or cause a JIRA ticket to be created.
             self._resmoke_logger.info(
-                "Exiting with code %d rather than requested code %d because we failed to flush all"
-                " log output to logkeeper.", exit_code, self._exit_code)
-            self.exit(exit_code)
+                "We failed to flush all log output to logkeeper but all tests passed, so"
+                " ignoring.")
+            return
+
+        exit_code = errors.LoggerRuntimeConfigError.EXIT_CODE
+        self._resmoke_logger.info(
+            "Exiting with code %d rather than requested code %d because we failed to flush all"
+            " log output to logkeeper.", exit_code, self._exit_code)
+        self.exit(exit_code)
 
     def run(self):
         """Run resmoke."""
