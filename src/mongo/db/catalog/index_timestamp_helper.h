@@ -51,8 +51,10 @@ void setGhostCommitTimestampForWrite(OperationContext* opCtx, const NamespaceStr
  * is when the operation is not committed with an oplog entry, which may be necessary for
  * certain index catalog operations not associated with a unique optime. This implementation
  * uses the LogicalClock to timestamp operations.
+ * Returns true if a ghost timestamp was set, false if no timestamp was required to be set.  Can
+ * also throw WriteConflictException.
  */
-void setGhostCommitTimestampForCatalogWrite(OperationContext* opCtx, const NamespaceString& nss);
+bool setGhostCommitTimestampForCatalogWrite(OperationContext* opCtx, const NamespaceString& nss);
 };
 
 }  // mongo

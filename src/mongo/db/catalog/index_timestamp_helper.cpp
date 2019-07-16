@@ -146,11 +146,11 @@ bool requiresGhostCommitTimestampForCatalogWrite(OperationContext* opCtx, Namesp
 }
 }  // namespace
 
-void IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(OperationContext* opCtx,
+bool IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(OperationContext* opCtx,
                                                                   const NamespaceString& nss) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
     if (!requiresGhostCommitTimestampForCatalogWrite(opCtx, nss)) {
-        return;
+        return false;
     }
     auto status = opCtx->recoveryUnit()->setTimestamp(
         LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
@@ -160,5 +160,6 @@ void IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(OperationConte
         throw WriteConflictException();
     }
     fassert(50701, status);
+    return true;
 }
 }  // namespace mongo
