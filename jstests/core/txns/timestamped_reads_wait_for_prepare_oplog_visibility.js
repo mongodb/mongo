@@ -61,7 +61,7 @@
         // Insert a document for the transaction.
         assert.commandWorked(testColl.insert(TestData.txnDoc));
         // Insert a document untouched by the transaction.
-        assert.commandWorked(testColl.insert(TestData.otherDoc));
+        assert.commandWorked(testColl.insert(TestData.otherDoc, {writeconcern: {w: "majority"}}));
 
         // Start a transaction with a single update on the 'txnDoc'.
         const session = db.getMongo().startSession({causalConsistency: false});
