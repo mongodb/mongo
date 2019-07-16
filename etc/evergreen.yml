@@ -7391,7 +7391,7 @@ tasks:
 
 - <<: *task_template
   name: client_encrypt
-  tags: ["ssl"]
+  tags: ["ssl", "encrypt"]
   commands:
   - func: "do setup"
   - func: "run tests"
