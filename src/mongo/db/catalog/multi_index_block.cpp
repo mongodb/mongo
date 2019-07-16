@@ -38,6 +38,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/catalog/multi_index_block_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -89,9 +90,12 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
     // Lock the collection if it's not already locked.
     boost::optional<Lock::DBLock> dbLock;
     boost::optional<Lock::CollectionLock> collLock;
-    if (!opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X)) {
-        dbLock.emplace(opCtx, collection->ns().db(), MODE_IX);
-        collLock.emplace(opCtx, collection->ns(), MODE_X);
+
+    auto nss = collection->ns();
+
+    if (!opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X)) {
+        dbLock.emplace(opCtx, nss.db(), MODE_IX);
+        collLock.emplace(opCtx, nss, MODE_X);
     }
 
     if (!_needToCleanup || _indexes.empty()) {
@@ -118,18 +122,28 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             // Nodes building an index on behalf of a user (e.g: `createIndexes`, `applyOps`) may
             // fail, removing the existence of the index from the catalog. This update must be
-            // timestamped. A failure from `createIndexes` should not have a commit timestamp and
-            // instead write a noop entry. A foreground `applyOps` index build may have a commit
-            // timestamp already set.
-            if (opCtx->recoveryUnit()->getCommitTimestamp().isNull() &&
+            // timestamped (unless the build is on an unreplicated collection). A failure from
+            // `createIndexes` should not have a commit timestamp and instead write a noop entry. A
+            // foreground `applyOps` index build may have a commit timestamp already set.
+            if (opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+                // We must choose a timestamp to write with, as we don't have one handy in the
+                // recovery unit already.
+
                 // We need to avoid checking replication state if we do not hold the RSTL.  If we do
                 // not hold the RSTL, we must be a build started on a secondary via replication.
-                opCtx->lockState()->isRSTLLocked() &&
-                replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
-                opCtx->getServiceContext()->getOpObserver()->onOpMessage(
-                    opCtx,
-                    BSON("msg" << std::string(str::stream() << "Failing index builds. Coll: "
-                                                            << collection->ns())));
+                if (opCtx->lockState()->isRSTLLocked() &&
+                    replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
+                    opCtx->getServiceContext()->getOpObserver()->onOpMessage(
+                        opCtx,
+                        BSON("msg" << std::string(str::stream() << "Failing index builds. Coll: "
+                                                                << nss)));
+                } else {
+                    // Simply get a timestamp to write with here; we can't write to the oplog.
+                    repl::UnreplicatedWritesBlock uwb(opCtx);
+                    if (!IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(opCtx, nss)) {
+                        log() << "Did not timestamp index abort write.";
+                    }
+                }
             }
             wunit.commit();
             _buildIsCleanedUp = true;
