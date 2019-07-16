@@ -254,8 +254,8 @@ variables:
   # The python virtual environment is installed in ${workdir}, which is created in
   # "set up virtualenv".
   - func: "set up virtualenv"
+  - func: "configure evergreen api credentials"
   # NOTE: To disable the compile bypass feature, comment out the next line.
-  #
   - func: "bypass compile and fetch binaries"
   - func: "update bypass expansions"
   - func: "get buildnumber"
@@ -1239,7 +1239,6 @@ functions:
         script: |
           # exit immediately if virtualenv is not found
           set -o errexit
-          set -o verbose
 
           virtualenv_loc=$(which ${virtualenv|virtualenv})
 
@@ -1481,7 +1480,6 @@ functions:
         working_dir: src
         script: |
           set -o errexit
-          set -o verbose
 
           ${activate_virtualenv}
           $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file expansions.yml --verbose
@@ -4716,75 +4714,19 @@ tasks:
         ${activate_virtualenv}
         find buildscripts etc jstests -name '*.y*ml' -exec yamllint -c etc/yamllint_config.yml {} +
 
-### This task is deprecated, but left in here in case of need to run burn_in_tests
-### instead of the generated task:
-###  - Rename burn_in_tests_gen task to burn_in_tests_gen_UNUSED
-###  - Rename burn_in_tests_gen to burn_in_tests on the build variants
-- <<: *task_template
-  name: burn_in_tests
-  depends_on:
-  - name: compile
-  commands:
-  - command: manifest.load
-  - func: "git get project"
-    # The repository is cloned in a directory distinct from src for the modified test detection
-    # because the extraction of the artifacts performed in the 'do setup' causes
-    # 'git diff --name-only' to see all tests as modified on Windows (git 1.9.5). See SERVER-30634.
-    vars:
-      git_project_directory: burn_in_tests_clonedir
-  - func: "do setup"
-  - command: shell.exec
-    params:
-      working_dir: burn_in_tests_clonedir
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-        # If this is a scheduled build, we check for changes against the last scheduled commit.
-        if [ "${is_patch}" != "true" ]; then
-          burn_in_args="--checkEvergreen"
-        fi
-        pushd ../src
-        ${activate_virtualenv}
-        popd
-        # Capture a list of new and modified tests.
-        build_variant=${build_variant}
-        if [ -n "${burn_in_tests_build_variant|}" ]; then
-          build_variant=${burn_in_tests_build_variant|}
-        fi
-        # Evergreen executable is in $HOME.
-        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=$build_variant --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
-        # Copy the results to the src dir.
-        cp jstests/new_tests.json ../src/jstests/new_tests.json
-  - func: "do multiversion setup"
-  - func: "run tests"
-    vars:
-      task_path_suffix: /data/multiversion:$HOME
-      resmoke_wrapper: $python buildscripts/burn_in_tests.py --testListFile=jstests/new_tests.json
-      resmoke_args: --repeatSuites=2
-###
-
 - name: burn_in_tests_gen
   commands:
   - command: manifest.load
   - func: "git get project"
-    # The repository is cloned in a directory distinct from src for the modified test detection
-    # because the extraction of the artifacts performed in the 'do setup' causes
-    # 'git diff --name-only' to see all tests as modified on Windows (git 1.9.5). See SERVER-30634.
-    vars:
-      git_project_directory: burn_in_tests_clonedir
   - func: "set task expansion macros"
   - func: "set up virtualenv"
-    vars:
-      pip_dir: ${workdir}/burn_in_tests_clonedir/etc/pip
   - command: shell.exec
     params:
-      working_dir: burn_in_tests_clonedir
+      working_dir: src
       shell: bash
       script: |
         set -o errexit
         set -o verbose
-        mkdir ../src
         ${activate_virtualenv}
         # If this is a scheduled build, we check for changes against the last scheduled commit.
         if [ "${is_patch}" != "true" ]; then
@@ -4800,7 +4742,7 @@ tasks:
         # Increase the burn_in repetition from 2 to 1000 executions or 10 minutes
         burn_in_args="$burn_in_args --repeatTestsMin=2 --repeatTestsMax=1000 --repeatTestsSecs=600"
         # Evergreen executable is in $HOME.
-        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --branch=${branch_name} $build_variant_opts --distro=${distro_id} --generateTasksFile=../src/burn_in_tests_gen.json --noExec $burn_in_args
+        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --branch=${branch_name} $build_variant_opts --distro=${distro_id} --generateTasksFile=burn_in_tests_gen.json --noExec $burn_in_args
   - command: archive.targz_pack
     params:
       target: src/burn_in_tests_gen.tgz

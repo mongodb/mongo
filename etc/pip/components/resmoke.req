@@ -1,5 +1,5 @@
 PyKMIP == 0.4.0 # It's now 0.8.0. We're far enough back to have API conflicts.
-evergreen.py == 0.3.2
+evergreen.py == 0.3.9
 jinja2
 mock
 shrub.py == 0.2.0

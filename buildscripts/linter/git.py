@@ -5,7 +5,7 @@ import os
 import re
 from typing import Any, Callable, List, Tuple
 
-from buildscripts import git as _git
+from buildscripts.linter import git_base as _git
 from buildscripts import moduleconfig
 from buildscripts.resmokelib.utils import globstar
 

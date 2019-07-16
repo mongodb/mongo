@@ -12,7 +12,9 @@ import shlex
 import sys
 import urllib.parse
 
-import requests
+from git import Repo
+import structlog
+from structlog.stdlib import LoggerFactory
 import yaml
 
 from shrub.config import Configuration
@@ -26,16 +28,22 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # pylint: disable=wrong-import-position
-from buildscripts import git
+from buildscripts.patch_builds.change_data import find_changed_files
 from buildscripts import resmokelib
 from buildscripts.ciconfig import evergreen
-from buildscripts.client import evergreen as evergreen_client
 # pylint: enable=wrong-import-position
 
-LOGGER = logging.getLogger(__name__)
+structlog.configure(logger_factory=LoggerFactory())
+LOGGER = structlog.getLogger(__name__)
+EXTERNAL_LOGGERS = {
+    "evergreen",
+    "git",
+    "urllib3",
+}
 
-API_REST_PREFIX = "/rest/v1/"
-API_SERVER_DEFAULT = "https://evergreen.mongodb.com"
+AVG_TEST_RUNTIME_ANALYSIS_DAYS = 14
+AVG_TEST_TIME_MULTIPLIER = 3
+CONFIG_FILE = ".evergreen.yml"
 REPEAT_SUITES = 2
 EVERGREEN_FILE = "etc/evergreen.yml"
 MAX_TASKS_TO_CREATE = 1000
@@ -170,100 +178,37 @@ def validate_options(parser, options):
         check_variant(options.run_buildvariant, parser)
 
 
-def find_last_activated_task(revisions, variant, branch_name):
-    """Get the git hash of the most recently activated build before this one."""
+def _is_file_a_test_file(file_path):
+    """
+    Check if the given path points to a test file.
 
-    project = "mongodb-mongo-" + branch_name
-    build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace("-", "_")
+    :param file_path: path to file.
+    :return: True if path points to test.
+    """
+    # Check that the file exists because it may have been moved or deleted in the patch.
+    if os.path.splitext(file_path)[1] != ".js" or not os.path.isfile(file_path):
+        return False
 
-    evg_cfg = evergreen_client.read_evg_config()
-    if evg_cfg is not None and "api_server_host" in evg_cfg:
-        api_server = "{url.scheme}://{url.netloc}".format(
-            url=urllib.parse.urlparse(evg_cfg["api_server_host"]))
-    else:
-        api_server = API_SERVER_DEFAULT
+    if "jstests" not in file_path:
+        return False
 
-    api_prefix = api_server + API_REST_PREFIX
-
-    for githash in revisions:
-        url = "{}projects/{}/revisions/{}".format(api_prefix, project, githash)
-        response = requests.get(url)
-        revision_data = response.json()
-
-        try:
-            for build in revision_data["builds"]:
-                if build.startswith(build_prefix):
-                    url = "{}builds/{}".format(api_prefix, build)
-                    build_resp = requests.get(url)
-                    build_data = build_resp.json()
-                    if build_data["activated"]:
-                        return build_data["revision"]
-        except:  # pylint: disable=bare-except
-            # Sometimes build data is incomplete, as was the related build.
-            pass
-
-    return None
+    return True
 
 
-def find_changed_tests(  # pylint: disable=too-many-locals
-        branch_name, base_commit, max_revisions, buildvariant, check_evergreen):
-    """Find the changed tests.
+def find_changed_tests(repo: Repo):
+    """
+    Find the changed tests.
 
     Use git to find which files have changed in this patch.
     TODO: This should be expanded to search for enterprise modules.
     The returned file paths are in normalized form (see os.path.normpath(path)).
+
+    :returns: Set of changed tests.
     """
-
-    changed_tests = []
-
-    repo = git.Repository(".")
-
-    if base_commit is None:
-        base_commit = repo.get_merge_base([branch_name + "@{upstream}", "HEAD"])
-
-    if check_evergreen:
-        # We're going to check up to 200 commits in Evergreen for the last scheduled one.
-        # The current commit will be activated in Evergreen; we use --skip to start at the
-        # previous commit when trying to find the most recent preceding commit that has been
-        # activated.
-        revs_to_check = repo.git_rev_list([base_commit, "--max-count=200", "--skip=1"]).splitlines()
-        last_activated = find_last_activated_task(revs_to_check, buildvariant, branch_name)
-        if last_activated is None:
-            # When the current commit is the first time 'buildvariant' has run, there won't be a
-            # commit among 'revs_to_check' that's been activated in Evergreen. We handle this by
-            # only considering tests changed in the current commit.
-            last_activated = "HEAD"
-        print("Comparing current branch against", last_activated)
-        revisions = repo.git_rev_list([base_commit + "..." + last_activated]).splitlines()
-        base_commit = last_activated
-    else:
-        revisions = repo.git_rev_list([base_commit + "...HEAD"]).splitlines()
-
-    revision_count = len(revisions)
-    if revision_count > max_revisions:
-        print(("There are too many revisions included ({}). This is likely because your base"
-               " branch is not {}. You can allow us to review more than {} revisions by using"
-               " the --maxRevisions option.".format(revision_count, branch_name, max_revisions)))
-        return changed_tests
-
-    changed_files = repo.git_diff(["--name-only", base_commit]).splitlines()
-    # New files ("untracked" in git terminology) won't show up in the git diff results.
-    untracked_files = repo.git_status(["--porcelain"]).splitlines()
-
-    # The lines with untracked files start with '?? '.
-    for line in untracked_files:
-        if line.startswith("?"):
-            (_, line) = line.split(" ", 1)
-            changed_files.append(line)
-
-    for line in changed_files:
-        line = line.rstrip()
-        # Check that the file exists because it may have been moved or deleted in the patch.
-        if os.path.splitext(line)[1] != ".js" or not os.path.isfile(line):
-            continue
-        if "jstests" in line:
-            path = os.path.normpath(line)
-            changed_tests.append(path)
+    changed_files = find_changed_files(repo)
+    LOGGER.debug("Found changed files", files=changed_files)
+    changed_tests = {os.path.normpath(path) for path in changed_files if _is_file_a_test_file(path)}
+    LOGGER.debug("Found changed tests", files=changed_tests)
     return changed_tests
 
 
@@ -502,7 +447,7 @@ def create_generate_tasks_file(options, tests_by_task):
     json_config = evg_config.to_map()
     tasks_to_create = len(json_config.get('tasks', []))
     if tasks_to_create > MAX_TASKS_TO_CREATE:
-        LOGGER.warning("Attempting to create more tasks than max(%d), aborting", tasks_to_create)
+        LOGGER.warning("Attempting to create more tasks than max, aborting", tasks=tasks_to_create)
         sys.exit(1)
     _write_json_file(json_config, options.generate_tasks_file)
 
@@ -534,17 +479,23 @@ def run_tests(no_exec, tests_by_task, resmoke_cmd, report_file):
     _write_json_file(test_results, report_file)
 
 
-def main():
-    """Execute Main program."""
+def configure_logging():
+    """Configure logging for the application."""
 
     logging.basicConfig(
         format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
         level=logging.DEBUG,
         stream=sys.stdout,
     )
+    for log_name in EXTERNAL_LOGGERS:
+        logging.getLogger(log_name).setLevel(logging.WARNING)
 
+
+def main():
+    """Execute Main program."""
+
+    configure_logging()
     options, args = parse_command_line()
-
     resmoke_cmd = _set_resmoke_cmd(options, args)
 
     # Load the dict of tests to run.
@@ -561,9 +512,8 @@ def main():
         # Parse the Evergreen project configuration file.
         evergreen_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
 
-        changed_tests = find_changed_tests(options.branch, options.base_commit,
-                                           options.max_revisions, options.buildvariant,
-                                           options.check_evergreen)
+        repo = Repo(".")
+        changed_tests = find_changed_tests(repo)
         exclude_suites, exclude_tasks, exclude_tests = find_excludes(SELECTOR_FILE)
         changed_tests = filter_tests(changed_tests, exclude_tests)
 

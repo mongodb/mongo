@@ -1,1 +1,4 @@
+click ~= 7.0
+GitPython ~= 2.1.11
 psutil
+structlog ~= 19.1.0

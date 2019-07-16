@@ -1,8 +1,6 @@
 """Module to run git commands on a repository."""
 
 import logging
-import os
-import sys
 import subprocess
 
 LOGGER = logging.getLogger(__name__)
