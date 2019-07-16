@@ -51,6 +51,8 @@ static StringData keyStringVersionToString(Version version) {
     return version == Version::V0 ? "V0" : "V1";
 }
 
+static const Ordering ALL_ASCENDING = Ordering::make(BSONObj());
+
 /**
  * Encodes info needed to restore the original BSONTypes from a KeyString. They cannot be
  * stored in place since we don't want them to affect the ordering (1 and 1.0 compare as
@@ -73,9 +75,10 @@ public:
         _buf.reset();
         _buf.appendBuf(tb._buf.buf(), tb._buf.len());
     }
+
     TypeBits& operator=(const TypeBits& tb) = delete;
     TypeBits(TypeBits&&) = default;
-    TypeBits& operator=(TypeBits&&) = delete;
+    TypeBits& operator=(TypeBits&&) = default;
 
     /**
      * If there are no bytes remaining, assumes AllZeros. Otherwise, reads bytes out of the
@@ -248,7 +251,7 @@ public:
         const TypeBits& _typeBits;
     };
 
-    const Version version;
+    Version version;
 
 private:
     static uint32_t readSizeFromBuffer(BufReader* reader);
@@ -277,7 +280,7 @@ private:
      * the TypeBits size is in long encoding range(>127), all the bytes are used for the long
      * encoding format (first byte + 4 size bytes + data bytes).
      */
-    StackBufBuilder _buf;
+    BufBuilder _buf;
 };
 
 
@@ -343,6 +346,15 @@ public:
         kExclusiveAfter,
     };
 
+    enum BuildState {
+        kEmpty,                  // Buffer is empty.
+        kAppendingBSONElements,  // In the process of appending BSON Elements
+        kEndAdded,               // Finished appedning BSON Elements.
+        kAppendedRecordID,       // Finished appending a RecordID.
+        kAppendedTypeBits,       // Finished appending a TypeBits.
+        kReleased                // Released the buffer and so the buffer is no longer valid.
+    };
+
     /**
      * Encodes the kind of NumberDecimal that is stored.
      */
@@ -353,10 +365,18 @@ public:
         kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits = 0x3
     };
 
-    explicit Builder(Version version) : version(version), _typeBits(version) {}
+    Builder(Version version, Ordering ord, Discriminator discriminator)
+        : version(version),
+          _typeBits(version),
+          _state(kEmpty),
+          _elemCount(0),
+          _ordering(ord),
+          _discriminator(discriminator) {}
+    Builder(Version version, Ordering ord) : Builder(version, ord, kInclusive) {}
+    explicit Builder(Version version) : Builder(version, ALL_ASCENDING, kInclusive) {}
 
     Builder(Version version, const BSONObj& obj, Ordering ord, RecordId recordId)
-        : Builder(version) {
+        : Builder(version, ord) {
         resetToKey(obj, ord, recordId);
     }
 
@@ -364,19 +384,34 @@ public:
             const BSONObj& obj,
             Ordering ord,
             Discriminator discriminator = kInclusive)
-        : Builder(version) {
+        : Builder(version, ord) {
         resetToKey(obj, ord, discriminator);
     }
 
-    Builder(Version version, RecordId rid) : version(version), _typeBits(version) {
+    Builder(Version version, RecordId rid) : Builder(version) {
         appendRecordId(rid);
+    }
+
+    /**
+     * Releases the data held in this buffer into a Value type, releasing and transfering ownership
+     * of the buffer _buffer and TypeBits _typeBits to the returned Value object from the current
+     * Builder.
+     */
+    Value release() {
+        _prepareForRelease();
+        _transition(kReleased);
+        return {
+            version, std::move(_typeBits), static_cast<size_t>(_buffer.len()), _buffer.release()};
     }
 
     /**
      * Copies the data held in this buffer into a Value type that holds and owns a copy of the
      * buffer.
      */
-    Value getValue() {
+    Value getValueCopy() {
+        _prepareForRelease();
+        invariant(_state == kEndAdded || _state == kAppendedRecordID ||
+                  _state == kAppendedTypeBits);
         BufBuilder newBuf;
         newBuf.appendBuf(_buffer.buf(), _buffer.len());
         return {version, TypeBits(_typeBits), static_cast<size_t>(newBuf.len()), newBuf.release()};
@@ -384,14 +419,25 @@ public:
 
     void appendRecordId(RecordId loc);
     void appendTypeBits(const TypeBits& bits);
+    void appendBSONElement(const BSONElement& elem);
 
     /**
      * Resets to an empty state.
-     * Equivalent to but faster than *this = Builder()
+     * Equivalent to but faster than *this = Builder(ord, discriminator)
      */
-    void resetToEmpty() {
-        _buffer.reset();
-        _typeBits.reset();
+    void resetToEmpty(Ordering ord = ALL_ASCENDING,
+                      Discriminator discriminator = kInclusive) {
+        if (_state == kReleased) {
+            _buffer = BufBuilder();
+            _typeBits = TypeBits(version);
+        } else {
+            _buffer.reset();
+            _typeBits.reset();
+        }
+        _elemCount = 0;
+        _ordering = ord;
+        _discriminator = discriminator;
+        _transition(kEmpty);
     }
 
     void resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId);
@@ -402,18 +448,22 @@ public:
     }
 
     const char* getBuffer() const {
+        invariant(_state != kReleased);
         return _buffer.buf();
     }
 
     size_t getSize() const {
+        invariant(_state != kReleased);
         return _buffer.len();
     }
 
     bool isEmpty() const {
+        invariant(_state != kReleased);
         return _buffer.len() == 0;
     }
 
     const TypeBits& getTypeBits() const {
+        invariant(_state != kReleased);
         return _typeBits;
     }
 
@@ -432,9 +482,7 @@ public:
     const Version version;
 
 private:
-    void _appendAllElementsForIndexing(const BSONObj& obj,
-                                       Ordering ord,
-                                       Discriminator discriminator);
+    void _appendAllElementsForIndexing(const BSONObj& obj, Discriminator discriminator);
 
     void _appendBool(bool val, bool invert);
     void _appendDate(Date_t val, bool invert);
@@ -471,13 +519,64 @@ private:
     void _appendDoubleWithoutTypeBits(const double num, DecimalContinuationMarker dcm, bool invert);
     void _appendHugeDecimalWithoutTypeBits(const Decimal128 dec, bool invert);
     void _appendTinyDecimalWithoutTypeBits(const Decimal128 dec, const double bin, bool invert);
+    void _appendDiscriminator(const Discriminator discriminator);
+    void _appendEnd();
 
     template <typename T>
     void _append(const T& thing, bool invert);
     void _appendBytes(const void* source, size_t bytes, bool invert);
 
+    void _prepareForRelease() {
+        if (_state == kAppendingBSONElements) {
+            _appendDiscriminator(_discriminator);
+        }
+    }
+
+    void _transition(BuildState to) {
+        // We can empty at any point since it just means that we are clearing the buffer.
+        if (to == kEmpty) {
+            _state = to;
+            return;
+        }
+
+        switch (_state) {
+            case kEmpty:
+                invariant(to == kAppendingBSONElements || to == kAppendedRecordID);
+                break;
+            case kAppendingBSONElements:
+                invariant(to == kEndAdded);
+                break;
+            case kEndAdded:
+                invariant(to == kAppendedRecordID || to == kReleased);
+                break;
+            case kAppendedRecordID:
+                // This first case is the special case in
+                // WiredTigerIndexUnique::_insertTimestampUnsafe.
+                // The third case is the case when we are appending a list of RecordIDs as in the
+                // KeyString test RecordIDs.
+                invariant(to == kAppendedTypeBits || to == kReleased || to == kAppendedRecordID);
+                break;
+            case kAppendedTypeBits:
+                // This first case is the special case in
+                // WiredTigerIndexUnique::_insertTimestampUnsafe.
+                invariant(to == kAppendedRecordID || to == kReleased);
+                break;
+            case kReleased:
+                invariant(to == kEmpty);
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+        _state = to;
+    }
+
+
     TypeBits _typeBits;
-    StackBufBuilder _buffer;
+    BufBuilder _buffer;
+    enum BuildState _state;
+    int _elemCount;
+    Ordering _ordering;
+    Discriminator _discriminator;
 };
 
 inline bool operator<(const Builder& lhs, const Builder& rhs) {

@@ -71,6 +71,15 @@ BSONObj toBsonAndCheckKeySize(const KeyString::Builder& ks, Ordering ord) {
     return KeyString::toBson(ks.getBuffer(), KeyStringBuilderSize, ord, ks.getTypeBits());
 }
 
+BSONObj toBsonAndCheckKeySize(const KeyString::Value& ks, Ordering ord) {
+    auto KeyStringSize = ks.getSize();
+
+    // Validate size of the key in KeyString::Builder.
+    ASSERT_EQUALS(KeyStringSize,
+                  KeyString::getKeySize(ks.getBuffer(), KeyStringSize, ord, ks.getTypeBits()));
+    return KeyString::toBson(ks.getBuffer(), KeyStringSize, ord, ks.getTypeBits());
+}
+
 Ordering ALL_ASCENDING = Ordering::make(BSONObj());
 Ordering ONE_ASCENDING = Ordering::make(BSON("a" << 1));
 Ordering ONE_DESCENDING = Ordering::make(BSON("a" << -1));
@@ -462,10 +471,10 @@ TEST_F(KeyStringBuilderTest, KeyStringValue) {
     // Test that KeyStringBuilder is releasable into a Value type that is comparable. Once
     // released, it is reusable once reset.
     KeyString::Builder ks1(KeyString::Version::V1, BSON("" << 1), ALL_ASCENDING);
-    KeyString::Value data1 = ks1.getValue();
+    KeyString::Value data1 = ks1.release();
 
     KeyString::Builder ks2(KeyString::Version::V1, BSON("" << 2), ALL_ASCENDING);
-    KeyString::Value data2 = ks2.getValue();
+    KeyString::Value data2 = ks2.release();
 
     ASSERT(data2.compare(data1) > 0);
     ASSERT(data1.compare(data2) < 0);
@@ -478,6 +487,115 @@ TEST_F(KeyStringBuilderTest, KeyStringValue) {
     // Test that Value is copyable.
     KeyString::Value dataCopy = data2;
     ASSERT(data2.compare(dataCopy) == 0);
+}
+
+#define COMPARE_KS_BSON(ks, bson, order)                             \
+    do {                                                             \
+        const BSONObj _converted = toBsonAndCheckKeySize(ks, order); \
+        ASSERT_BSONOBJ_EQ(_converted, bson);                         \
+        ASSERT(_converted.binaryEqual(bson));                        \
+    } while (0)
+
+TEST_F(KeyStringBuilderTest, KeyStringValueReleaseReusableTest) {
+    // Test that KeyStringBuilder is reusable once reset.
+    BSONObj doc1 = BSON("fieldA" << 1 << "fieldB" << 2);
+    BSONObj doc2 = BSON("fieldA" << 2 << "fieldB" << 3);
+    BSONObj bson1 = BSON("" << 1 << "" << 2);
+    BSONObj bson2 = BSON("" << 2 << "" << 3);
+    KeyString::Builder ks1(KeyString::Version::V1);
+    ks1.appendBSONElement(doc1["fieldA"]);
+    ks1.appendBSONElement(doc1["fieldB"]);
+    KeyString::Value data1 = ks1.release();
+
+    ks1.resetToEmpty();
+    ks1.appendBSONElement(doc2["fieldA"]);
+    ks1.appendBSONElement(doc2["fieldB"]);
+    KeyString::Value data2 = ks1.release();
+    COMPARE_KS_BSON(data1, bson1, ALL_ASCENDING);
+    COMPARE_KS_BSON(data2, bson2, ALL_ASCENDING);
+}
+
+TEST_F(KeyStringBuilderTest, KeyStringGetValueCopyTest) {
+    // Test that KeyStringGetValueCopyTest creates a copy.
+    BSONObj doc = BSON("fieldA" << 1);
+    KeyString::Builder ks(KeyString::Version::V1, ALL_ASCENDING);
+    ks.appendBSONElement(doc["fieldA"]);
+    KeyString::Value data1 = ks.getValueCopy();
+    KeyString::Value data2 = ks.release();
+
+    // Assert that a copy was actually made and they don't share a buffer.
+    ASSERT_NOT_EQUALS(data1.getBuffer(), data2.getBuffer());
+
+    COMPARE_KS_BSON(data1, BSON("" << 1), ALL_ASCENDING);
+    COMPARE_KS_BSON(data2, BSON("" << 1), ALL_ASCENDING);
+}
+
+TEST_F(KeyStringBuilderTest, KeyStringBuilderAppendBsonElement) {
+    // Test that appendBsonElement works.
+    {
+        BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
+        KeyString::Builder ks(KeyString::Version::V1, ALL_ASCENDING);
+        ks.appendBSONElement(doc["fieldA"]);
+        ks.appendBSONElement(doc["fieldB"]);
+        KeyString::Value data = ks.release();
+        COMPARE_KS_BSON(data, BSON("" << 1 << "" << 2), ALL_ASCENDING);
+    }
+
+    {
+        BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
+        KeyString::Builder ks(KeyString::Version::V1, ONE_DESCENDING);
+        ks.appendBSONElement(doc["fieldA"]);
+        ks.appendBSONElement(doc["fieldB"]);
+        KeyString::Value data = ks.release();
+        COMPARE_KS_BSON(data, BSON("" << 1 << "" << 2), ONE_DESCENDING);
+    }
+
+    {
+        BSONObj doc = BSON("fieldA"
+                           << "value1"
+                           << "fieldB"
+                           << "value2");
+        KeyString::Builder ks(KeyString::Version::V1, ONE_DESCENDING);
+        ks.appendBSONElement(doc["fieldA"]);
+        ks.appendBSONElement(doc["fieldB"]);
+        KeyString::Value data = ks.release();
+        COMPARE_KS_BSON(data,
+                        BSON(""
+                             << "value1"
+                             << ""
+                             << "value2"),
+                        ONE_DESCENDING);
+    }
+}
+
+TEST_F(KeyStringBuilderTest, KeyStringBuilderOrdering) {
+    // Test that ordering works.
+    BSONObj doc = BSON("fieldA" << 1);
+    KeyString::Builder ks1(KeyString::Version::V1, ALL_ASCENDING);
+    ks1.appendBSONElement(doc["fieldA"]);
+    KeyString::Builder ks2(KeyString::Version::V1, ONE_DESCENDING);
+    ks2.appendBSONElement(doc["fieldA"]);
+    KeyString::Value data1 = ks1.release();
+    KeyString::Value data2 = ks2.release();
+
+    ASSERT_EQUALS(data1.getSize(), data2.getSize());
+    // Confirm that the buffers are different, indicating that the data is stored inverted in the
+    // second.
+    ASSERT_NE(0, memcmp(data1.getBuffer(), data2.getBuffer(), data1.getSize()));
+}
+
+TEST_F(KeyStringBuilderTest, KeyStringBuilderDiscriminator) {
+    // test that when passed in a Discriminator it gets added.
+    BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
+    KeyString::Builder ks(
+        KeyString::Version::V1, ALL_ASCENDING, KeyString::Builder::kExclusiveBefore);
+    ks.appendBSONElement(doc["fieldA"]);
+    ks.appendBSONElement(doc["fieldB"]);
+    KeyString::Value data = ks.release();
+    uint8_t appendedDescriminator = (uint8_t)(*(data.getBuffer() + (data.getSize() - 2)));
+    uint8_t end = (uint8_t)(*(data.getBuffer() + (data.getSize() - 1)));
+    ASSERT_EQ((uint8_t)'\001', appendedDescriminator);
+    ASSERT_EQ((uint8_t)'\004', end);
 }
 
 TEST_F(KeyStringBuilderTest, LotsOfNumbers1) {

@@ -326,45 +326,27 @@ string readInvertedCStringWithNuls(BufReader* reader) {
 }  // namespace
 
 void Builder::resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId) {
-    resetToEmpty();
-    _appendAllElementsForIndexing(obj, ord, kInclusive);
+    resetToEmpty(ord);
+    _appendAllElementsForIndexing(obj, kInclusive);
     appendRecordId(recordId);
 }
 
 void Builder::resetToKey(const BSONObj& obj, Ordering ord, Discriminator discriminator) {
-    resetToEmpty();
-    _appendAllElementsForIndexing(obj, ord, discriminator);
+    resetToEmpty(ord, discriminator);
+    _appendAllElementsForIndexing(obj, discriminator);
 }
 
-// ----------------------------------------------------------------------
-// -----------   APPEND CODE  -------------------------------------------
-// ----------------------------------------------------------------------
+void Builder::appendBSONElement(const BSONElement& elem) {
+    const int elemIdx = _elemCount++;
+    const bool invert = (_ordering.get(elemIdx) == -1);
 
-void Builder::_appendAllElementsForIndexing(const BSONObj& obj,
-                                            Ordering ord,
-                                            Discriminator discriminator) {
-    int elemCount = 0;
-    BSONObjIterator it(obj);
-    while (auto elem = it.next()) {
-        const int elemIdx = elemCount++;
-        const bool invert = (ord.get(elemIdx) == -1);
-
-        _appendBsonValue(elem, invert, nullptr);
-
-        dassert(elem.fieldNameSize() < 3);  // fieldNameSize includes the NUL
-
-        // IndexEntryComparison::makeQueryObject() encodes a discriminator in the first byte of
-        // the field name. This discriminator overrides the passed in one. Normal elements only
-        // have the NUL byte terminator. Entries stored in an index are not allowed to have a
-        // discriminator.
-        if (char ch = *elem.fieldName()) {
-            // l for less / g for greater.
-            invariant(ch == 'l' || ch == 'g');
-            discriminator = ch == 'l' ? kExclusiveBefore : kExclusiveAfter;
-            invariant(!it.more());
-        }
+    if (_state == kEmpty) {
+        _transition(kAppendingBSONElements);
     }
+    _appendBsonValue(elem, invert, nullptr);
+}
 
+void Builder::_appendDiscriminator(const Discriminator discriminator) {
     // The discriminator forces this KeyString to compare Less/Greater than any KeyString with
     // the same prefix of keys. As an example, this can be used to land on the first key in the
     // index with the value "a" regardless of the RecordId. In compound indexes it can use a
@@ -382,10 +364,40 @@ void Builder::_appendAllElementsForIndexing(const BSONObj& obj,
 
     // TODO consider omitting kEnd when using a discriminator byte. It is not a storage format
     // change since keystrings with discriminators are not allowed to be stored.
+    _appendEnd();
+}
+// ----------------------------------------------------------------------
+// -----------   APPEND CODE  -------------------------------------------
+// ----------------------------------------------------------------------
+
+void Builder::_appendEnd() {
+    _transition(kEndAdded);
     _append(kEnd, false);
 }
 
+void Builder::_appendAllElementsForIndexing(const BSONObj& obj, Discriminator discriminator) {
+    _transition(kAppendingBSONElements);
+    BSONObjIterator it(obj);
+    while (auto elem = it.next()) {
+        appendBSONElement(elem);
+        dassert(elem.fieldNameSize() < 3);  // fieldNameSize includes the NUL
+
+        // IndexEntryComparison::makeQueryObject() encodes a discriminator in the first byte of
+        // the field name. This discriminator overrides the passed in one. Normal elements only
+        // have the NUL byte terminator. Entries stored in an index are not allowed to have a
+        // discriminator.
+        if (char ch = *elem.fieldName()) {
+            // l for less / g for greater.
+            invariant(ch == 'l' || ch == 'g');
+            discriminator = ch == 'l' ? kExclusiveBefore : kExclusiveAfter;
+            invariant(!it.more());
+        }
+    }
+    _appendDiscriminator(discriminator);
+}
+
 void Builder::appendRecordId(RecordId loc) {
+    _transition(kAppendedRecordID);
     // The RecordId encoding must be able to determine the full length starting from the last
     // byte, without knowing where the first byte is since it is stored at the end of a
     // KeyString, and we need to be able to read the RecordId without decoding the whole thing.
@@ -432,6 +444,7 @@ void Builder::appendRecordId(RecordId loc) {
 }
 
 void Builder::appendTypeBits(const TypeBits& typeBits) {
+    _transition(kAppendedTypeBits);
     // As an optimization, encode AllZeros as a single 0 byte.
     if (typeBits.isAllZeros()) {
         _append(uint8_t(0), false);
