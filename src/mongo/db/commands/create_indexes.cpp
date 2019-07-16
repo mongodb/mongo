@@ -400,13 +400,35 @@ Collection* getOrCreateCollection(OperationContext* opCtx,
     });
 }
 
+/**
+ * Locks a collection in the database 'dbName' with UUID 'uuid' in the mode 'collectionLockMode',
+ * instantiating the lock in the 'collLock' reference.
+ */
+void lockCollectionByUUID(OperationContext* opCtx,
+                          const std::string& dbName,
+                          const UUID& uuid,
+                          LockMode collectionLockMode,
+                          boost::optional<Lock::CollectionLock>& collLock) {
+    NamespaceString prevResolvedNss;
+    NamespaceString resolvedNss;
+    NamespaceStringOrUUID nssOrUUID(dbName, uuid);
+    do {
+        prevResolvedNss = AutoGetCollection::resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
+        collLock.emplace(opCtx, prevResolvedNss, collectionLockMode);
+
+        // We looked up UUID without a collection lock so it's possible that the
+        // collection name changed now. Look it up again.
+        resolvedNss = AutoGetCollection::resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
+    } while (resolvedNss != prevResolvedNss);
+}
+
 bool runCreateIndexes(OperationContext* opCtx,
                       const std::string& dbname,
                       const BSONObj& cmdObj,
                       std::string& errmsg,
                       BSONObjBuilder& result,
                       bool runTwoPhaseBuild) {
-    const NamespaceString ns(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
+    NamespaceString ns(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
     uassertStatusOK(userAllowedWriteNS(ns));
 
     // Disallow users from creating new indexes on config.transactions since the sessions code
@@ -446,7 +468,12 @@ bool runCreateIndexes(OperationContext* opCtx,
     opCtx->recoveryUnit()->setPrepareConflictBehavior(
         PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
-    auto collection = getOrCreateCollection(opCtx, db, ns, cmdObj, &errmsg, &result);
+    Collection* collection = getOrCreateCollection(opCtx, db, ns, cmdObj, &errmsg, &result);
+    // Save the db name and collection uuid so we can correctly relock even across a
+    // concurrent rename collection operation. We allow rename collection while an
+    // index is in progress iff the rename is within the same database.
+    const std::string dbName = ns.db().toString();
+    const UUID collectionUUID = collection->uuid();
 
     // Use AutoStatsTracker to update Top.
     boost::optional<AutoStatsTracker> statsTracker;
@@ -517,7 +544,17 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Collection scan and insert into index, followed by a drain of writes received in the
     // background.
     {
-        Lock::CollectionLock colLock(opCtx, ns, MODE_IS);
+        boost::optional<Lock::CollectionLock> colLock;
+        lockCollectionByUUID(opCtx, dbName, collectionUUID, MODE_IS, colLock);
+
+        // Reaquire the collection pointer because we momentarily released the collection lock.
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+        invariant(collection);
+
+        // Reaquire the 'ns' string in case the collection was renamed while we momentarily released
+        // the collection lock.
+        ns = collection->ns();
+
         uassertStatusOK(indexer.insertAllDocumentsInCollection(opCtx, collection));
     }
 
@@ -529,7 +566,16 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Perform the first drain while holding an intent lock.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
-        Lock::CollectionLock colLock(opCtx, ns, MODE_IS);
+        boost::optional<Lock::CollectionLock> colLock;
+        lockCollectionByUUID(opCtx, dbName, collectionUUID, MODE_IS, colLock);
+
+        // Reaquire the collection pointer because we momentarily released the collection lock.
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+        invariant(collection);
+
+        // Reaquire the 'ns' string in case the collection was renamed while we momentarily released
+        // the collection lock.
+        ns = collection->ns();
 
         uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
     }
@@ -542,7 +588,16 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Perform the second drain while stopping writes on the collection.
     {
         opCtx->recoveryUnit()->abandonSnapshot();
-        Lock::CollectionLock colLock(opCtx, ns, MODE_S);
+        boost::optional<Lock::CollectionLock> colLock;
+        lockCollectionByUUID(opCtx, dbName, collectionUUID, MODE_S, colLock);
+
+        // Reaquire the collection pointer because we momentarily released the collection lock.
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+        invariant(collection);
+
+        // Reaquire the 'ns' string in case the collection was renamed while we momentarily released
+        // the collection lock.
+        ns = collection->ns();
 
         uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
     }
@@ -555,7 +610,15 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Need to get exclusive collection lock back to complete the index build.
     if (indexer.isBackgroundBuilding()) {
         opCtx->recoveryUnit()->abandonSnapshot();
-        exclusiveCollectionLock.emplace(opCtx, ns, MODE_X);
+        lockCollectionByUUID(opCtx, dbName, collectionUUID, MODE_X, exclusiveCollectionLock);
+
+        // Reaquire the collection pointer because we momentarily released the collection lock.
+        collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(collectionUUID);
+        invariant(collection);
+
+        // Reaquire the 'ns' string in case the collection was renamed while we momentarily released
+        // the collection lock.
+        ns = collection->ns();
     }
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
