@@ -305,16 +305,16 @@ func (exp *MongoExport) getCursor() (*mongo.Cursor, error) {
 		findOpts.SetSort(sortD)
 	}
 
-	query := map[string]interface{}{}
+	query := bson.D{}
 	if exp.InputOpts != nil && exp.InputOpts.HasQuery() {
 		var err error
 		content, err := exp.InputOpts.GetQuery()
 		if err != nil {
 			return nil, err
 		}
-		query, err = getObjectFromByteArg(content)
+		err = bson.UnmarshalExtJSON(content, false, &query)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error parsing query as Extended JSON: %v", err)
 		}
 	}
 
@@ -329,8 +329,11 @@ func (exp *MongoExport) getCursor() (*mongo.Cursor, error) {
 	if !exp.InputOpts.ForceTableScan && len(query) == 0 && exp.InputOpts != nil && exp.InputOpts.Sort == "" &&
 		!exp.collInfo.IsView() && !exp.collInfo.IsSystemCollection() {
 
-		// Use a hint on the _id index instead of the deprecated snapshot option
-		findOpts.SetHint(bson.D{{"_id", 1}})
+		// Don't hint autoIndexId:false collections
+		autoIndexId, found := exp.collInfo.Options["autoIndexId"]
+		if !found || autoIndexId == true {
+			findOpts.SetHint(bson.D{{"_id", 1}})
+		}
 	}
 
 	if exp.InputOpts != nil {

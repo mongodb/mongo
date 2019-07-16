@@ -56,8 +56,11 @@
 
     var data = MongoRunner.dataDir + "/dumprestore7-dump1/";
     var query = {ts: {$gt: time}};
-    print("mongodump query: " + tojson(query));
-
+    var queryJSON = '{"ts":{"$gt":{"$timestamp":{"t":' + time.t + ',"i":' + time.i + '}}}}';
+    print("mongodump query: " + queryJSON);
+    if (_isWindows()) {
+        queryJSON = '"' + queryJSON.replace(/"/g, '\\"') + '"';
+    }
     var testQueryCount =
         replTest.getPrimary().getDB("local").getCollection("oplog.rs").find(query).itcount();
     assert.eq(testQueryCount, 20, "the query should match 20 documents");
@@ -66,7 +69,7 @@
         host: "127.0.0.1:" + replTest.ports[0],
         db: "local",
         collection: "oplog.rs",
-        query: tojson(query),
+        query: queryJSON,
         out: data,
     });
     assert.eq(0, exitCode, "monogdump failed to dump the oplog");

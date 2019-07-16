@@ -13,10 +13,9 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
 
-	"github.com/mongodb/mongo-tools-common/bsonutil"
 	"github.com/mongodb/mongo-tools-common/db"
-	"github.com/mongodb/mongo-tools-common/json"
 	"github.com/mongodb/mongo-tools-common/log"
 	"github.com/mongodb/mongo-tools-common/options"
 	"github.com/mongodb/mongo-tools-common/util"
@@ -287,22 +286,27 @@ func (mf *MongoFiles) handleDeleteID() error {
 
 // parse and convert input extended JSON _id. Generates a new ObjectID if no _id provided.
 func (mf *MongoFiles) parseOrCreateID() (interface{}, error) {
-	if mf.Id == "" {
+	trimmed := strings.Trim(mf.Id, " ")
+
+	if trimmed == "" {
 		return primitive.NewObjectID(), nil
 	}
 
-	var asJSON interface{}
-	if err := json.Unmarshal([]byte(mf.Id), &asJSON); err != nil {
-		return nil, fmt.Errorf("error parsing provided extJSON: %v", err)
+	// Wrap JSON bytes into a document for unmarshaling, then pick out the value after.
+	var wrapped string
+	switch trimmed[0] {
+	case '{':
+		wrapped = fmt.Sprintf(`{"_id":%s}`, trimmed)
+	default:
+		wrapped = fmt.Sprintf(`{"_id":"%s"}`, trimmed)
 	}
-
-	// legacy extJSON parser
-	id, err := bsonutil.ConvertLegacyExtJSONValueToBSON(asJSON)
+	var idDoc bson.D
+	err := bson.UnmarshalExtJSON([]byte(wrapped), false, &idDoc)
 	if err != nil {
-		return nil, fmt.Errorf("error converting extJSON vlaue to bson: %v", err)
+		return nil, fmt.Errorf("error parsing id as Extended JSON: %v", err)
 	}
 
-	return id, nil
+	return idDoc[0].Value, nil
 }
 
 // writeGFSFileToLocal writes a file from gridFS to stdout or the filesystem.
