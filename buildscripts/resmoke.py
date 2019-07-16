@@ -228,7 +228,14 @@ class Main(object):
             exit_code = max(suite.return_code for suite in suites)
             sys.exit(exit_code)
         finally:
-            if not interrupted:
+            # We want to exit as quickly as possible when interrupted by a user and therefore don't
+            # bother waiting for all log output to be flushed to logkeeper.
+            #
+            # If we already failed to write log output to logkeeper, then we don't bother waiting
+            # for any remaining log output to be flushed as it'll likely fail too. Exiting without
+            # joining the flush thread here also means that resmoke.py won't hang due a logger from
+            # a fixture or a background hook not being closed.
+            if not interrupted and not resmokelib.logging.buildlogger.is_log_output_incomplete():
                 resmokelib.logging.flush.stop_thread()
 
             resmokelib.reportfile.write(suites)
