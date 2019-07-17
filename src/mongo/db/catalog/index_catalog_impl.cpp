@@ -552,13 +552,12 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
     if (nss.isOplog())
         return Status(ErrorCodes::CannotCreateIndex, "cannot have an index on the oplog");
 
-    // If we stop generating the 'ns' field for index specs during testing, then we shouldn't
-    // validate that the 'ns' field is missing.
-    if (!disableIndexSpecNamespaceGeneration.load()) {
+    // If the index spec has the 'ns' field and if we don't stop generating the 'ns' field during
+    // testing, validate that it is correct.
+    if (spec.hasField("ns") && !disableIndexSpecNamespaceGeneration.load()) {
         const BSONElement specNamespace = spec["ns"];
         if (specNamespace.type() != String)
-            return Status(ErrorCodes::CannotCreateIndex,
-                          "the index spec is missing a \"ns\" string field");
+            return Status(ErrorCodes::CannotCreateIndex, "the \"ns\" field is not a string");
 
         if (nss.ns() != specNamespace.valueStringData())
             return Status(ErrorCodes::CannotCreateIndex,
@@ -1719,6 +1718,12 @@ StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
         name = "_id_";
     }
     b.append("name", name);
+
+    // The 'ns' field was removed from index specs in v4.4 and could be missing when running with
+    // mixed version nodes.
+    if (!spec.hasField("ns") && !disableIndexSpecNamespaceGeneration.load()) {
+        b.append("ns", collection->ns().ns());
+    }
 
     {
         BSONObjIterator i(o);
