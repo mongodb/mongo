@@ -63,6 +63,7 @@ using std::vector;
 const std::set<std::string> kSetShellParameterWhitelist = {
     "disabledSecureAllocatorDomains",
     "newLineAfterPasswordPromptForTest",
+    "skipShellCursorFinalize",
 };
 
 std::string getMongoShellHelp(StringData name, const moe::OptionSection& options) {

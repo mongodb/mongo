@@ -43,3 +43,11 @@ structs:
     strict: true
     fields:
       endSessions: array<object>
+
+server_parameters:
+  skipShellCursorFinalize:
+    description: 'Skip finalizing cursors during garbage collection in shell'
+    set_at: startup
+    cpp_vartype: bool
+    cpp_varname: 'skipShellCursorFinalize'
+    default: false

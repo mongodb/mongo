@@ -34,9 +34,9 @@
 #include "mongo/scripting/mozjs/session.h"
 
 #include "mongo/scripting/mozjs/bson.h"
-#include "mongo/scripting/mozjs/end_sessions_gen.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/mongo.h"
+#include "mongo/scripting/mozjs/scripting_util_gen.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/util/log.h"
