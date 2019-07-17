@@ -299,7 +299,6 @@ env.Library(
         "index_catalog_entry_impl.cpp",
         "index_catalog_impl.cpp",
         "index_consistency.cpp",
-        "record_store_validate_adaptor.cpp",
     ],
     LIBDEPS=[
         'collection',
@@ -341,6 +340,17 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         '$BUILD_DIR/mongo/db/transaction',
     ],
+)
+
+env.Library(
+    target='collection_validation',
+    source=[
+	"collection_validation.cpp",
+	"record_store_validate_adaptor.cpp",
+    ],
+    LIBDEPS=[
+	'catalog_impl',
+    ]
 )
 
 env.Library(
@@ -423,6 +433,7 @@ env.CppUnitTest(
         'collection_catalog',
         'collection_catalog_helper',
         'collection_options',
+        'collection_validation',
         'commit_quorum_options',
         'database_holder',
         'index_build_block',

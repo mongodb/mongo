@@ -37,6 +37,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -614,7 +615,8 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
 
     Lock::DBLock lk(_opCtx.get(), nss.db(), MODE_IX);
     auto lock = std::make_unique<Lock::CollectionLock>(_opCtx.get(), nss, MODE_X);
-    ASSERT_OK(collection->validate(_opCtx.get(), kValidateFull, false, &validateResults, &bob));
+    ASSERT_OK(CollectionValidation::validate(
+        _opCtx.get(), collection, kValidateFull, false, &validateResults, &bob));
     ASSERT_TRUE(validateResults.valid);
 
     std::string dataHash = computeDataHash(collection);

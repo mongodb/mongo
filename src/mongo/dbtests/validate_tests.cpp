@@ -32,6 +32,7 @@
 #include <cstdint>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
@@ -90,12 +91,12 @@ protected:
         invariant(_opCtx.lockState()->isCollectionLockedForMode(_nss, MODE_X));
 
         Database* db = _autoDb.get()->getDb();
-        ASSERT_OK(db->getCollection(&_opCtx, _nss)
-                      ->validate(&_opCtx,
-                                 _full ? kValidateFull : kValidateNormal,
-                                 _background,
-                                 &results,
-                                 &output));
+        ASSERT_OK(CollectionValidation::validate(&_opCtx,
+                                                 db->getCollection(&_opCtx, _nss),
+                                                 _full ? kValidateFull : kValidateNormal,
+                                                 _background,
+                                                 &results,
+                                                 &output));
 
         //  Check if errors are reported if and only if valid is set to false.
         ASSERT_EQ(results.valid, results.errors.empty());
@@ -1225,8 +1226,12 @@ public:
                 std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
 
             Database* db = _autoDb.get()->getDb();
-            ASSERT_OK(db->getCollection(&_opCtx, _nss)
-                          ->validate(&_opCtx, kValidateFull, _background, &results, &output));
+            ASSERT_OK(CollectionValidation::validate(&_opCtx,
+                                                     db->getCollection(&_opCtx, _nss),
+                                                     kValidateFull,
+                                                     _background,
+                                                     &results,
+                                                     &output));
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
@@ -1329,8 +1334,12 @@ public:
                 std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
 
             Database* db = _autoDb.get()->getDb();
-            ASSERT_OK(db->getCollection(&_opCtx, _nss)
-                          ->validate(&_opCtx, kValidateFull, _background, &results, &output));
+            ASSERT_OK(CollectionValidation::validate(&_opCtx,
+                                                     db->getCollection(&_opCtx, _nss),
+                                                     kValidateFull,
+                                                     _background,
+                                                     &results,
+                                                     &output));
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
@@ -1413,8 +1422,12 @@ public:
                 std::make_unique<Lock::CollectionLock>(&_opCtx, _nss, MODE_X);
 
             Database* db = _autoDb.get()->getDb();
-            ASSERT_OK(db->getCollection(&_opCtx, _nss)
-                          ->validate(&_opCtx, kValidateFull, _background, &results, &output));
+            ASSERT_OK(CollectionValidation::validate(&_opCtx,
+                                                     db->getCollection(&_opCtx, _nss),
+                                                     kValidateFull,
+                                                     _background,
+                                                     &results,
+                                                     &output));
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(2), results.errors.size());

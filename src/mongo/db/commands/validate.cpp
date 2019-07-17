@@ -32,7 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
-
+#include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
@@ -176,7 +176,8 @@ public:
         const bool background = false;
 
         ValidateResults results;
-        Status status = collection->validate(opCtx, level, background, &results, &result);
+        Status status =
+            CollectionValidation::validate(opCtx, collection, level, background, &results, &result);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }

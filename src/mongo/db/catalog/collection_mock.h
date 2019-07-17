@@ -80,6 +80,10 @@ public:
         std::abort();
     }
 
+    const BSONObj getValidatorDoc() const {
+        std::abort();
+    }
+
     bool requiresIdIndex() const {
         std::abort();
     }
@@ -157,14 +161,6 @@ public:
     }
 
     Status truncate(OperationContext* opCtx) {
-        std::abort();
-    }
-
-    Status validate(OperationContext* opCtx,
-                    ValidateCmdLevel level,
-                    bool background,
-                    ValidateResults* results,
-                    BSONObjBuilder* output) {
         std::abort();
     }
 

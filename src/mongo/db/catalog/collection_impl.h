@@ -98,6 +98,10 @@ public:
         return _recordStore.get();
     }
 
+    const BSONObj getValidatorDoc() const final {
+        return _validatorDoc.getOwned();
+    }
+
     bool requiresIdIndex() const final;
 
     Snapshotted<BSONObj> docFor(OperationContext* opCtx, RecordId loc) const final {
@@ -225,12 +229,6 @@ public:
      * on the collection.
      */
     Status truncate(OperationContext* opCtx) final;
-
-    Status validate(OperationContext* opCtx,
-                    ValidateCmdLevel level,
-                    bool background,
-                    ValidateResults* results,
-                    BSONObjBuilder* output) final;
 
     /**
      * forces data into cache

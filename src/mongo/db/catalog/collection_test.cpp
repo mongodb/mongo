@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/stdx/thread.h"
@@ -74,7 +75,7 @@ void CollectionTest::checkValidate(
     for (auto level : levels) {
         ValidateResults results;
         BSONObjBuilder output;
-        auto status = coll->validate(opCtx, level, false, &results, &output);
+        auto status = CollectionValidation::validate(opCtx, coll, level, false, &results, &output);
         ASSERT_OK(status);
         ASSERT_EQ(results.valid, valid);
         ASSERT_EQ(results.errors.size(), (long unsigned int)errors);

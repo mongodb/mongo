@@ -40,6 +40,8 @@ namespace mongo {
 
 class IndexConsistency;
 
+enum ValidateCmdLevel : int { kValidateNormal = 0x01, kValidateFull = 0x02 };
+
 namespace {
 
 using ValidateResultsMap = std::map<std::string, ValidateResults>;

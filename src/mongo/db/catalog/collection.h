@@ -214,6 +214,8 @@ public:
     virtual const RecordStore* getRecordStore() const = 0;
     virtual RecordStore* getRecordStore() = 0;
 
+    virtual const BSONObj getValidatorDoc() const = 0;
+
     virtual bool requiresIdIndex() const = 0;
 
     virtual Snapshotted<BSONObj> docFor(OperationContext* const opCtx, RecordId loc) const = 0;
@@ -336,19 +338,6 @@ public:
      * on the collection.
      */
     virtual Status truncate(OperationContext* const opCtx) = 0;
-
-    /**
-     * Expects the caller to hold at least a collection IS lock.
-     *
-     * @return OK if the validate run successfully
-     *         OK will be returned even if corruption is found
-     *         details will be in 'results'.
-     */
-    virtual Status validate(OperationContext* const opCtx,
-                            const ValidateCmdLevel level,
-                            bool background,
-                            ValidateResults* const results,
-                            BSONObjBuilder* const output) = 0;
 
     /**
      * forces data into cache.

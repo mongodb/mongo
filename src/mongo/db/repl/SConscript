@@ -545,6 +545,7 @@ env.Library(
     LIBDEPS=[
         'sync_tail_test_fixture',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/catalog/collection_validation',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
     ],
 )

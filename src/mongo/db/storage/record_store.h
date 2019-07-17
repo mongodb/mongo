@@ -69,9 +69,6 @@ struct Record {
     RecordData data;
 };
 
-enum ValidateCmdLevel : int { kValidateNormal = 0x01, kValidateFull = 0x02 };
-
-
 /**
  * Retrieves Records from a RecordStore.
  *
