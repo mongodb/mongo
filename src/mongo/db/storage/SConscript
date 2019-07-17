@@ -190,6 +190,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/unittest/unittest',
         'index_entry_comparison',
+        'key_string',
         'test_harness_helper',
     ],
 

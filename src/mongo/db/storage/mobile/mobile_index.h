@@ -57,8 +57,18 @@ public:
                   const RecordId& recId,
                   bool dupsAllowed) override;
 
+    Status insert(OperationContext* opCtx,
+                  const KeyString::Builder& keyString,
+                  const RecordId& recId,
+                  bool dupsAllowed) override;
+
     void unindex(OperationContext* opCtx,
                  const BSONObj& key,
+                 const RecordId& recId,
+                 bool dupsAllowed) override;
+
+    void unindex(OperationContext* opCtx,
+                 const KeyString::Builder& keyString,
                  const RecordId& recId,
                  bool dupsAllowed) override;
 
@@ -92,17 +102,11 @@ public:
      */
     template <typename ValueType>
     Status doInsert(OperationContext* opCtx,
-                    const KeyString::Builder& key,
+                    const char* keyBuffer,
+                    size_t keySize,
+                    const KeyString::TypeBits& typeBits,
                     const ValueType& value,
                     bool isTransactional = true);
-
-    Ordering getOrdering() const {
-        return _ordering;
-    }
-
-    KeyString::Version getKeyStringVersion() const {
-        return _keyStringVersion;
-    }
 
     bool isUnique() {
         return _isUnique;
@@ -119,16 +123,17 @@ protected:
      * Performs the deletion from the table matching the given key.
      */
     void _doDelete(OperationContext* opCtx,
-                   const KeyString::Builder& key,
+                   const char* keyBuffer,
+                   size_t keySize,
                    KeyString::Builder* value = nullptr);
 
     virtual Status _insert(OperationContext* opCtx,
-                           const BSONObj& key,
+                           const KeyString::Builder& keyString,
                            const RecordId& recId,
                            bool dupsAllowed) = 0;
 
     virtual void _unindex(OperationContext* opCtx,
-                          const BSONObj& key,
+                          const KeyString::Builder& keyString,
                           const RecordId& recId,
                           bool dupsAllowed) = 0;
 
@@ -138,7 +143,6 @@ protected:
 
     const bool _isUnique;
     const Ordering _ordering;
-    const KeyString::Version _keyStringVersion = KeyString::Version::kLatestVersion;
     const std::string _ident;
     const NamespaceString _collectionNamespace;
     const std::string _indexName;
@@ -158,12 +162,12 @@ public:
 
 protected:
     Status _insert(OperationContext* opCtx,
-                   const BSONObj& key,
+                   const KeyString::Builder& keyString,
                    const RecordId& recId,
                    bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
-                  const BSONObj& key,
+                  const KeyString::Builder& keyString,
                   const RecordId& recId,
                   bool dupsAllowed) override;
 };
@@ -181,12 +185,12 @@ public:
 
 protected:
     Status _insert(OperationContext* opCtx,
-                   const BSONObj& key,
+                   const KeyString::Builder& keyString,
                    const RecordId& recId,
                    bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
-                  const BSONObj& key,
+                  const KeyString::Builder& keyString,
                   const RecordId& recId,
                   bool dupsAllowed) override;
 

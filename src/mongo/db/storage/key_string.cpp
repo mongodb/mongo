@@ -2036,6 +2036,28 @@ int Builder::compare(const Builder& other) const {
     return a < b ? -1 : 1;
 }
 
+int Builder::compareWithoutRecordId(const Builder& other) const {
+    int a = !isEmpty() ? sizeWithoutRecordIdAtEnd(getBuffer(), getSize()) : 0;
+    int b = !other.isEmpty() ? sizeWithoutRecordIdAtEnd(other.getBuffer(), other.getSize()) : 0;
+
+    int min = std::min(a, b);
+
+    int cmp = memcmp(getBuffer(), other.getBuffer(), min);
+
+    if (cmp) {
+        if (cmp < 0)
+            return -1;
+        return 1;
+    }
+
+    // keys match
+
+    if (a == b)
+        return 0;
+
+    return a < b ? -1 : 1;
+}
+
 int Value::compare(const Value& other) const {
     int a = getSize();
     int b = other.getSize();

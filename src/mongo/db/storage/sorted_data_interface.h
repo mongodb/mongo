@@ -35,6 +35,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_string.h"
 
 #pragma once
 
@@ -52,6 +53,9 @@ struct ValidateResults;
  */
 class SortedDataInterface {
 public:
+    SortedDataInterface(KeyString::Version keyStringVersion, Ordering ordering)
+        : _keyStringVersion(keyStringVersion), _ordering(ordering) {}
+
     virtual ~SortedDataInterface() {}
 
     //
@@ -91,6 +95,23 @@ public:
                           bool dupsAllowed) = 0;
 
     /**
+     * Insert an entry into the index with the specified KeyString and RecordId.
+     *
+     * @param opCtx the transaction under which the insert takes place
+     * @param dupsAllowed true if duplicate keys are allowed, and false
+     *        otherwise
+     *
+     * @return Status::OK() if the insert succeeded,
+     *
+     *         ErrorCodes::DuplicateKey if 'keyString' already exists in 'this' index
+     *         at a RecordId other than 'loc' and duplicates were not allowed
+     */
+    virtual Status insert(OperationContext* opCtx,
+                          const KeyString::Builder& keyString,
+                          const RecordId& loc,
+                          bool dupsAllowed) = 0;
+
+    /**
      * Remove the entry from the index with the specified key and RecordId.
      *
      * @param opCtx the transaction under which the remove takes place
@@ -99,6 +120,18 @@ public:
      */
     virtual void unindex(OperationContext* opCtx,
                          const BSONObj& key,
+                         const RecordId& loc,
+                         bool dupsAllowed) = 0;
+
+    /**
+     * Remove the entry from the index with the specified KeyString and RecordId.
+     *
+     * @param opCtx the transaction under which the remove takes place
+     * @param dupsAllowed true if duplicate keys are allowed, and false
+     *        otherwise
+     */
+    virtual void unindex(OperationContext* opCtx,
+                         const KeyString::Builder& keyString,
                          const RecordId& loc,
                          bool dupsAllowed) = 0;
 
@@ -172,6 +205,20 @@ public:
         long long x = -1;
         fullValidate(opCtx, &x, nullptr);
         return x;
+    }
+
+    /*
+     * Return the KeyString version for 'this' index.
+     */
+    KeyString::Version getKeyStringVersion() const {
+        return _keyStringVersion;
+    }
+
+    /*
+     * Return the ordering for 'this' index.
+     */
+    Ordering getOrdering() const {
+        return _ordering;
     }
 
     /**
@@ -354,6 +401,10 @@ public:
     //
 
     virtual Status initAsEmpty(OperationContext* opCtx) = 0;
+
+protected:
+    const KeyString::Version _keyStringVersion;
+    const Ordering _ordering;
 };
 
 /**
@@ -364,12 +415,13 @@ public:
     virtual ~SortedDataBuilderInterface() {}
 
     /**
-     * Adds 'key' to intermediate storage.
+     * Adds 'key' or 'keyString' to intermediate storage.
      *
      * 'key' must be > or >= the last key passed to this function (depends on _dupsAllowed).  If
      * this is violated an error Status (ErrorCodes::InternalError) will be returned.
      */
     virtual Status addKey(const BSONObj& key, const RecordId& loc) = 0;
+    virtual Status addKey(const KeyString::Builder& keyString, const RecordId& loc) = 0;
 
     /**
      * Do any necessary work to finish building the tree.

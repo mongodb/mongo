@@ -73,7 +73,8 @@ BSONObj stripFieldNames(const BSONObj& query) {
 MobileIndex::MobileIndex(OperationContext* opCtx,
                          const IndexDescriptor* desc,
                          const std::string& ident)
-    : _isUnique(desc->unique()),
+    : SortedDataInterface(KeyString::Version::kLatestVersion, Ordering::make(desc->keyPattern())),
+      _isUnique(desc->unique()),
       _ordering(Ordering::make(desc->keyPattern())),
       _ident(ident),
       _collectionNamespace(desc->parentNS()),
@@ -87,12 +88,23 @@ Status MobileIndex::insert(OperationContext* opCtx,
     invariant(recId.isValid());
     invariant(!hasFieldNames(key));
 
-    return _insert(opCtx, key, recId, dupsAllowed);
+    KeyString::Builder keyString(_keyStringVersion, key, _ordering, recId);
+
+    return insert(opCtx, keyString, recId, dupsAllowed);
+}
+
+Status MobileIndex::insert(OperationContext* opCtx,
+                           const KeyString::Builder& keyString,
+                           const RecordId& recId,
+                           bool dupsAllowed) {
+    return _insert(opCtx, keyString, recId, dupsAllowed);
 }
 
 template <typename ValueType>
 Status MobileIndex::doInsert(OperationContext* opCtx,
-                             const KeyString::Builder& key,
+                             const char* keyBuffer,
+                             size_t keySize,
+                             const KeyString::TypeBits& typeBits,
                              const ValueType& value,
                              bool isTransactional) {
     MobileSession* session;
@@ -105,7 +117,7 @@ Status MobileIndex::doInsert(OperationContext* opCtx,
     SqliteStatement insertStmt(
         *session, "INSERT INTO \"", _ident, "\" (key, value) VALUES (?, ?);");
 
-    insertStmt.bindBlob(0, key.getBuffer(), key.getSize());
+    insertStmt.bindBlob(0, keyBuffer, keySize);
     insertStmt.bindBlob(1, value.getBuffer(), value.getSize());
 
     int status = insertStmt.step();
@@ -113,8 +125,7 @@ Status MobileIndex::doInsert(OperationContext* opCtx,
         insertStmt.setExceptionStatus(status);
         if (isUnique()) {
             // Return error if duplicate key inserted in a unique index.
-            BSONObj bson =
-                KeyString::toBson(key.getBuffer(), key.getSize(), _ordering, key.getTypeBits());
+            BSONObj bson = KeyString::toBson(keyBuffer, keySize, _ordering, typeBits);
             return buildDupKeyErrorStatus(bson, _collectionNamespace, _indexName, _keyPattern);
         } else {
             // A record with same key could already be present in a standard index, that is OK. This
@@ -135,18 +146,28 @@ void MobileIndex::unindex(OperationContext* opCtx,
     invariant(recId.isValid());
     invariant(!hasFieldNames(key));
 
-    return _unindex(opCtx, key, recId, dupsAllowed);
+    KeyString::Builder keyString(_keyStringVersion, key, _ordering, recId);
+
+    return unindex(opCtx, keyString, recId, dupsAllowed);
+}
+
+void MobileIndex::unindex(OperationContext* opCtx,
+                          const KeyString::Builder& keyString,
+                          const RecordId& recId,
+                          bool dupsAllowed) {
+    return _unindex(opCtx, keyString, recId, dupsAllowed);
 }
 
 void MobileIndex::_doDelete(OperationContext* opCtx,
-                            const KeyString::Builder& key,
+                            const char* keyBuffer,
+                            size_t keySize,
                             KeyString::Builder* value) {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
 
     SqliteStatement deleteStmt(
         *session, "DELETE FROM \"", _ident, "\" WHERE key = ?", value ? " AND value = ?" : "", ";");
 
-    deleteStmt.bindBlob(0, key.getBuffer(), key.getSize());
+    deleteStmt.bindBlob(0, keyBuffer, keySize);
     if (value) {
         deleteStmt.bindBlob(1, value->getBuffer(), value->getSize());
     }
@@ -264,6 +285,7 @@ public:
                     const BSONObj& keyPattern)
         : _index(index),
           _opCtx(opCtx),
+          _lastKeyString(index->getKeyStringVersion()),
           _dupsAllowed(dupsAllowed),
           _collectionNamespace(collectionNamespace),
           _indexName(indexName),
@@ -275,14 +297,20 @@ public:
         invariant(recId.isValid());
         invariant(!hasFieldNames(key));
 
-        Status status = _checkNextKey(key);
+        KeyString::Builder keyString(
+            _index->getKeyStringVersion(), key, _index->getOrdering(), recId);
+        return addKey(keyString, recId);
+    }
+
+    Status addKey(const KeyString::Builder& keyString, const RecordId& recId) override {
+        Status status = _checkNextKey(keyString);
         if (!status.isOK()) {
             return status;
         }
 
-        _lastKey = key.getOwned();
+        _lastKeyString.resetFromBuffer(keyString.getBuffer(), keyString.getSize());
 
-        return _addKey(key, recId);
+        return _addKey(keyString, recId);
     }
 
     void commit(bool mayInterrupt) override {}
@@ -292,9 +320,13 @@ protected:
      * Checks whether the new key to be inserted is > or >= the previous one depending
      * on _dupsAllowed.
      */
-    Status _checkNextKey(const BSONObj& key) {
-        const int cmp = key.woCompare(_lastKey, _index->getOrdering());
+    Status _checkNextKey(const KeyString::Builder& keyString) {
+        const int cmp = keyString.compare(_lastKeyString);
         if (!_dupsAllowed && cmp == 0) {
+            auto key = KeyString::toBson(keyString.getBuffer(),
+                                         keyString.getSize(),
+                                         _index->getOrdering(),
+                                         keyString.getTypeBits());
             return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
         } else if (cmp < 0) {
             return Status(ErrorCodes::InternalError, "expected higher RecordId in bulk builder");
@@ -302,11 +334,11 @@ protected:
         return Status::OK();
     }
 
-    virtual Status _addKey(const BSONObj& key, const RecordId& recId) = 0;
+    virtual Status _addKey(const KeyString::Builder& keyString, const RecordId& recId) = 0;
 
     MobileIndex* _index;
     OperationContext* const _opCtx;
-    BSONObj _lastKey;
+    KeyString::Builder _lastKeyString;
     const bool _dupsAllowed;
     const NamespaceString _collectionNamespace;
     const std::string _indexName;
@@ -327,10 +359,10 @@ public:
         : BulkBuilderBase(index, opCtx, dupsAllowed, collectionNamespace, indexName, keyPattern) {}
 
 protected:
-    Status _addKey(const BSONObj& key, const RecordId& recId) override {
-        KeyString::Builder keyStr(_index->getKeyStringVersion(), key, _index->getOrdering(), recId);
-        KeyString::TypeBits value = keyStr.getTypeBits();
-        return _index->doInsert(_opCtx, keyStr, value, false);
+    Status _addKey(const KeyString::Builder& keyString, const RecordId&) override {
+        KeyString::TypeBits typeBits = keyString.getTypeBits();
+        return _index->doInsert(
+            _opCtx, keyString.getBuffer(), keyString.getSize(), typeBits, typeBits, false);
     }
 };
 
@@ -351,16 +383,24 @@ public:
     }
 
 protected:
-    Status _addKey(const BSONObj& key, const RecordId& recId) override {
-        const KeyString::Builder keyStr(_index->getKeyStringVersion(), key, _index->getOrdering());
+    Status _addKey(const KeyString::Builder& keyString, const RecordId& recId) override {
+        dassert(recId ==
+                KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
 
         KeyString::Builder value(_index->getKeyStringVersion(), recId);
-        KeyString::TypeBits typeBits = keyStr.getTypeBits();
+        KeyString::TypeBits typeBits = keyString.getTypeBits();
         if (!typeBits.isAllZeros()) {
             value.appendTypeBits(typeBits);
         }
+        auto sizeWithoutRecordId =
+            KeyString::sizeWithoutRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
 
-        return _index->doInsert(_opCtx, keyStr, value, false);
+        return _index->doInsert(_opCtx,
+                                keyString.getBuffer(),
+                                sizeWithoutRecordId,
+                                keyString.getTypeBits(),
+                                value,
+                                false);
     }
 };
 
@@ -659,24 +699,23 @@ std::unique_ptr<SortedDataInterface::Cursor> MobileIndexStandard::newCursor(Oper
 }
 
 Status MobileIndexStandard::_insert(OperationContext* opCtx,
-                                    const BSONObj& key,
+                                    const KeyString::Builder& keyString,
                                     const RecordId& recId,
                                     bool dupsAllowed) {
     invariant(dupsAllowed);
+    dassert(recId == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
 
-    const KeyString::Builder keyStr(_keyStringVersion, key, _ordering, recId);
-    const KeyString::TypeBits value = keyStr.getTypeBits();
-    return doInsert(opCtx, keyStr, value);
+    const KeyString::TypeBits typeBits = keyString.getTypeBits();
+    return doInsert(opCtx, keyString.getBuffer(), keyString.getSize(), typeBits, typeBits);
 }
 
 void MobileIndexStandard::_unindex(OperationContext* opCtx,
-                                   const BSONObj& key,
-                                   const RecordId& recId,
+                                   const KeyString::Builder& keyString,
+                                   const RecordId&,
                                    bool dupsAllowed) {
     invariant(dupsAllowed);
 
-    const KeyString::Builder keyStr(_keyStringVersion, key, _ordering, recId);
-    _doDelete(opCtx, keyStr);
+    _doDelete(opCtx, keyString.getBuffer(), keyString.getSize());
 }
 
 MobileIndexUnique::MobileIndexUnique(OperationContext* opCtx,
@@ -698,42 +737,52 @@ std::unique_ptr<SortedDataInterface::Cursor> MobileIndexUnique::newCursor(Operat
 }
 
 Status MobileIndexUnique::_insert(OperationContext* opCtx,
-                                  const BSONObj& key,
+                                  const KeyString::Builder& keyString,
                                   const RecordId& recId,
                                   bool dupsAllowed) {
     // Replication is not supported so dups are not allowed.
     invariant(!dupsAllowed);
-    const KeyString::Builder keyStr(_keyStringVersion, key, _ordering);
+
+    invariant(recId.isValid());
+    dassert(recId == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
 
     KeyString::Builder value(_keyStringVersion, recId);
-    KeyString::TypeBits typeBits = keyStr.getTypeBits();
+    KeyString::TypeBits typeBits = keyString.getTypeBits();
     if (!typeBits.isAllZeros()) {
         value.appendTypeBits(typeBits);
     }
+    auto sizeWithoutRecordId =
+        KeyString::sizeWithoutRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
 
-    return doInsert(opCtx, keyStr, value);
+    return doInsert(
+        opCtx, keyString.getBuffer(), sizeWithoutRecordId, keyString.getTypeBits(), value);
 }
 
 void MobileIndexUnique::_unindex(OperationContext* opCtx,
-                                 const BSONObj& key,
+                                 const KeyString::Builder& keyString,
                                  const RecordId& recId,
                                  bool dupsAllowed) {
     // Replication is not supported so dups are not allowed.
     invariant(!dupsAllowed);
-    const KeyString::Builder keyStr(_keyStringVersion, key, _ordering);
 
     // A partial index may attempt to delete a non-existent record id. If it is a partial index, it
     // must delete a row that matches both key and value.
+    auto sizeWithoutRecordId =
+        KeyString::sizeWithoutRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
     if (_isPartial) {
+        invariant(recId.isValid());
+        dassert(recId ==
+                KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+
         KeyString::Builder value(_keyStringVersion, recId);
-        KeyString::TypeBits typeBits = keyStr.getTypeBits();
+        KeyString::TypeBits typeBits = keyString.getTypeBits();
         if (!typeBits.isAllZeros()) {
             value.appendTypeBits(typeBits);
         }
 
-        _doDelete(opCtx, keyStr, &value);
+        _doDelete(opCtx, keyString.getBuffer(), sizeWithoutRecordId, &value);
     } else {
-        _doDelete(opCtx, keyStr);
+        _doDelete(opCtx, keyString.getBuffer(), sizeWithoutRecordId);
     }
 }
 

@@ -418,6 +418,7 @@ public:
     }
 
     int compare(const Builder& other) const;
+    int compareWithoutRecordId(const Builder& other) const;
 
     /**
      * @return a hex encoding of this key

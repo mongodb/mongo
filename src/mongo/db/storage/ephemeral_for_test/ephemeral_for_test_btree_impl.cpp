@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -90,12 +91,14 @@ class EphemeralForTestBtreeBuilderImpl : public SortedDataBuilderInterface {
 public:
     EphemeralForTestBtreeBuilderImpl(IndexSet* data,
                                      long long* currentKeySize,
+                                     const Ordering& ordering,
                                      bool dupsAllowed,
                                      const NamespaceString& collectionNamespace,
                                      const std::string& indexName,
                                      const BSONObj& keyPattern)
         : _data(data),
           _currentKeySize(currentKeySize),
+          _ordering(ordering),
           _dupsAllowed(dupsAllowed),
           _comparator(_data->key_comp()),
           _collectionNamespace(collectionNamespace),
@@ -128,9 +131,19 @@ public:
         return Status::OK();
     }
 
+    Status addKey(const KeyString::Builder& keyString, const RecordId& loc) {
+        dassert(loc == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+
+        auto key = KeyString::toBson(
+            keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
+
+        return addKey(key, loc);
+    }
+
 private:
     IndexSet* const _data;
     long long* _currentKeySize;
+    const Ordering& _ordering;
     const bool _dupsAllowed;
 
     IndexEntryComparison _comparator;  // used by the bulk builder to detect duplicate keys
@@ -144,11 +157,13 @@ private:
 class EphemeralForTestBtreeImpl : public SortedDataInterface {
 public:
     EphemeralForTestBtreeImpl(IndexSet* data,
+                              const Ordering& ordering,
                               bool isUnique,
                               const NamespaceString& collectionNamespace,
                               const std::string& indexName,
                               const BSONObj& keyPattern)
-        : _data(data),
+        : SortedDataInterface(KeyString::Version::kLatestVersion, ordering),
+          _data(data),
           _isUnique(isUnique),
           _collectionNamespace(collectionNamespace),
           _indexName(indexName),
@@ -157,8 +172,13 @@ public:
     }
 
     virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) {
-        return new EphemeralForTestBtreeBuilderImpl(
-            _data, &_currentKeySize, dupsAllowed, _collectionNamespace, _indexName, _keyPattern);
+        return new EphemeralForTestBtreeBuilderImpl(_data,
+                                                    &_currentKeySize,
+                                                    _ordering,
+                                                    dupsAllowed,
+                                                    _collectionNamespace,
+                                                    _indexName,
+                                                    _keyPattern);
     }
 
     virtual Status insert(OperationContext* opCtx,
@@ -181,6 +201,18 @@ public:
         return Status::OK();
     }
 
+    virtual Status insert(OperationContext* opCtx,
+                          const KeyString::Builder& keyString,
+                          const RecordId& loc,
+                          bool dupsAllowed) {
+        dassert(loc == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+
+        auto key = KeyString::toBson(
+            keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
+
+        return insert(opCtx, key, loc, dupsAllowed);
+    }
+
     virtual void unindex(OperationContext* opCtx,
                          const BSONObj& key,
                          const RecordId& loc,
@@ -195,6 +227,18 @@ public:
             _currentKeySize -= key.objsize();
             opCtx->recoveryUnit()->registerChange(new IndexChange(_data, entry, false));
         }
+    }
+
+    virtual void unindex(OperationContext* opCtx,
+                         const KeyString::Builder& keyString,
+                         const RecordId& loc,
+                         bool dupsAllowed) {
+        dassert(loc == KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+
+        auto key = KeyString::toBson(
+            keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
+
+        return unindex(opCtx, key, loc, dupsAllowed);
     }
 
     virtual void fullValidate(OperationContext* opCtx,
@@ -533,6 +577,7 @@ std::unique_ptr<SortedDataInterface> getEphemeralForTestBtreeImpl(
         *dataInOut = std::make_shared<IndexSet>(IndexEntryComparison(ordering));
     }
     return std::make_unique<EphemeralForTestBtreeImpl>(static_cast<IndexSet*>(dataInOut->get()),
+                                                       ordering,
                                                        isUnique,
                                                        collectionNamespace,
                                                        indexName,
