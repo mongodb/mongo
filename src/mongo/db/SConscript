@@ -1874,3 +1874,10 @@ env.CppLibfuzzerTest(
         '$BUILD_DIR/mongo/unittest/unittest/',
     ],
 )
+
+env.Benchmark(
+    target='commands_bm',
+    source=[
+        'commands_bm.cpp',
+    ],
+)
