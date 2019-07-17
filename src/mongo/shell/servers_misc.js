@@ -115,7 +115,7 @@ allocatePorts = function(numPorts) {
     return ports;
 };
 
-function startParallelShell(jsCode, port, noConnect) {
+function startParallelShell(jsCode, port, noConnect, ...optionArgs) {
     var shellPath = MongoRunner.mongoShellPath;
     var args = [shellPath];
 
@@ -161,6 +161,7 @@ function startParallelShell(jsCode, port, noConnect) {
         jsCode = "TestData = " + tojson(TestData) + ";" + jsCode;
     }
 
+    args.push(...optionArgs);
     args.push("--eval", jsCode);
 
     var pid = startMongoProgramNoConnect.apply(null, args);

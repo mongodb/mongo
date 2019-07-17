@@ -121,7 +121,7 @@ if usemozjs:
             'mozjs/valuereader.cpp',
             'mozjs/valuewriter.cpp',
             env.Idlc('mozjs/engine.idl')[0],
-            env.Idlc('mozjs/end_sessions.idl')[0],
+            env.Idlc('mozjs/scripting_util.idl')[0],
         ],
         LIBDEPS=[
             'bson_template_evaluator',
