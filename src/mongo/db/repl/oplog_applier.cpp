@@ -136,7 +136,7 @@ void OplogApplier::enqueue(OperationContext* opCtx,
     if (sampler.tick()) {
         LOG(2) << "oplog buffer has " << _oplogBuffer->getSize() << " bytes";
     }
-    _oplogBuffer->pushAllNonBlocking(opCtx, begin, end);
+    _oplogBuffer->push(opCtx, begin, end);
 }
 
 namespace {

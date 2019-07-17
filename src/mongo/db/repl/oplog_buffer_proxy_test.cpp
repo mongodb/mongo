@@ -58,9 +58,9 @@ public:
     void shutdown(OperationContext*) override {
         shutdownCalled = true;
     }
-    void pushAllNonBlocking(OperationContext* opCtx,
-                            Batch::const_iterator begin,
-                            Batch::const_iterator end) override {
+    void push(OperationContext* opCtx,
+              Batch::const_iterator begin,
+              Batch::const_iterator end) override {
         for (auto i = begin; i != end; ++i) {
             values.push_back(*i);
         }
@@ -166,7 +166,7 @@ TEST_F(OplogBufferProxyTest, Startup) {
 
 TEST_F(OplogBufferProxyTest, ShutdownResetsCachedValues) {
     OplogBuffer::Batch values = {BSON("x" << 1)};
-    _proxy->pushAllNonBlocking(_opCtx, values.cbegin(), values.cend());
+    _proxy->push(_opCtx, values.cbegin(), values.cend());
     OplogBuffer::Value peekValue;
     ASSERT_TRUE(_proxy->peek(_opCtx, &peekValue));
     ASSERT_BSONOBJ_EQ(values[0], peekValue);
@@ -194,7 +194,7 @@ TEST_F(OplogBufferProxyTest, MaxSize) {
 TEST_F(OplogBufferProxyTest, EmptySizeAndCount) {
     ASSERT_TRUE(_proxy->isEmpty());
     OplogBuffer::Batch values = {BSON("x" << 1), BSON("x" << 2)};
-    _proxy->pushAllNonBlocking(_opCtx, values.cbegin(), values.cend());
+    _proxy->push(_opCtx, values.cbegin(), values.cend());
     ASSERT_FALSE(_proxy->isEmpty());
     ASSERT_EQUALS(values.size(), _mock->getCount());
     ASSERT_EQUALS(_mock->getCount(), _proxy->getCount());
@@ -204,7 +204,7 @@ TEST_F(OplogBufferProxyTest, EmptySizeAndCount) {
 
 TEST_F(OplogBufferProxyTest, ClearResetsCachedValues) {
     OplogBuffer::Batch values = {BSON("x" << 1), BSON("x" << 2)};
-    _proxy->pushAllNonBlocking(_opCtx, values.cbegin(), values.cend());
+    _proxy->push(_opCtx, values.cbegin(), values.cend());
     ASSERT_FALSE(_mock->isEmpty());
     auto lastObjPushed = _proxy->lastObjectPushed(_opCtx);
     ASSERT_NOT_EQUALS(boost::none, lastObjPushed);
@@ -244,7 +244,7 @@ void _testPushFunctionUpdatesCachedLastObjectPushed(
 TEST_F(OplogBufferProxyTest, PushAllNonBlockingUpdatesCachedLastObjectPushed) {
     auto pushFn = [](OperationContext* opCtx, OplogBuffer* proxy, const OplogBuffer::Value& value) {
         OplogBuffer::Batch values = {BSON("x" << 2), value};
-        proxy->pushAllNonBlocking(opCtx, values.cbegin(), values.cend());
+        proxy->push(opCtx, values.cbegin(), values.cend());
         return values.size();
     };
     _testPushFunctionUpdatesCachedLastObjectPushed(_opCtx, _proxy.get(), _mock, pushFn);
@@ -252,7 +252,7 @@ TEST_F(OplogBufferProxyTest, PushAllNonBlockingUpdatesCachedLastObjectPushed) {
 
 TEST_F(OplogBufferProxyTest, PushAllNonBlockingDoesNotUpdateCachedLastObjectPushedOnEmptyBatch) {
     OplogBuffer::Batch values;
-    _proxy->pushAllNonBlocking(_opCtx, values.cbegin(), values.cend());
+    _proxy->push(_opCtx, values.cbegin(), values.cend());
     ASSERT_EQUALS(values.size(), _mock->values.size());
 
     ASSERT_EQUALS(boost::none, _proxy->lastObjectPushed(_opCtx));
@@ -261,7 +261,7 @@ TEST_F(OplogBufferProxyTest, PushAllNonBlockingDoesNotUpdateCachedLastObjectPush
 
 TEST_F(OplogBufferProxyTest, WaitForDataReturnsTrueImmediatelyIfLastObjectPushedIsCached) {
     OplogBuffer::Batch values = {BSON("x" << 1)};
-    _proxy->pushAllNonBlocking(_opCtx, values.cbegin(), values.cend());
+    _proxy->push(_opCtx, values.cbegin(), values.cend());
     ASSERT_TRUE(_proxy->waitForData(Seconds(10)));
     ASSERT_FALSE(_mock->waitForDataCalled);
 }
@@ -274,7 +274,7 @@ TEST_F(OplogBufferProxyTest, WaitForDataForwardsCallToTargetIfLastObjectPushedIs
 TEST_F(OplogBufferProxyTest, TryPopResetsLastPushedObjectIfBufferIsEmpty) {
     auto pushValue = BSON("x" << 1);
     OplogBuffer::Batch values = {pushValue};
-    _proxy->pushAllNonBlocking(_opCtx, values.cbegin(), values.cend());
+    _proxy->push(_opCtx, values.cbegin(), values.cend());
     auto lastPushed = _proxy->lastObjectPushed(_opCtx);
     ASSERT_NOT_EQUALS(boost::none, _proxy->lastObjectPushed(_opCtx));
     ASSERT_BSONOBJ_EQ(pushValue, *lastPushed);
@@ -298,7 +298,7 @@ TEST_F(OplogBufferProxyTest, PeekCachesFrontOfBuffer) {
     _mock->peekCalled = false;
 
     OplogBuffer::Batch values = {BSON("x" << 1), BSON("x" << 2)};
-    _proxy->pushAllNonBlocking(_opCtx, values.cbegin(), values.cend());
+    _proxy->push(_opCtx, values.cbegin(), values.cend());
     ASSERT_EQUALS(values.size(), _mock->values.size());
 
     ASSERT_TRUE(_proxy->peek(_opCtx, &peekValue));
@@ -314,7 +314,7 @@ TEST_F(OplogBufferProxyTest, PeekCachesFrontOfBuffer) {
 
 TEST_F(OplogBufferProxyTest, TryPopClearsCachedFrontValue) {
     OplogBuffer::Batch values = {BSON("x" << 1), BSON("x" << 2)};
-    _proxy->pushAllNonBlocking(_opCtx, values.cbegin(), values.cend());
+    _proxy->push(_opCtx, values.cbegin(), values.cend());
     ASSERT_EQUALS(values.size(), _mock->values.size());
 
     // Peek and pop first value {x: 1}.

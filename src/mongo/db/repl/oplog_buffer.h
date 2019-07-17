@@ -91,9 +91,9 @@ public:
     /**
      * Pushes operations in the iterator range [begin, end) into the oplog buffer without blocking.
      */
-    virtual void pushAllNonBlocking(OperationContext* opCtx,
-                                    Batch::const_iterator begin,
-                                    Batch::const_iterator end) = 0;
+    virtual void push(OperationContext* opCtx,
+                      Batch::const_iterator begin,
+                      Batch::const_iterator end) = 0;
 
     /**
      * Returns when enough space is available.

@@ -61,9 +61,9 @@ void OplogBufferBlockingQueue::shutdown(OperationContext* opCtx) {
     clear(opCtx);
 }
 
-void OplogBufferBlockingQueue::pushAllNonBlocking(OperationContext*,
-                                                  Batch::const_iterator begin,
-                                                  Batch::const_iterator end) {
+void OplogBufferBlockingQueue::push(OperationContext*,
+                                    Batch::const_iterator begin,
+                                    Batch::const_iterator end) {
     _queue.pushAllNonBlocking(begin, end);
     if (_counters) {
         for (auto i = begin; i != end; ++i) {
