@@ -48,4 +48,10 @@ assert.commandWorked(testDB.runCommand({
     out: {replace: "foo", db: "test"}
 }));
 
+// Test invalid namespace.
+assert.commandFailedWithCode(
+    testDB.runCommand(
+        {mapReduce: /bar/, map: mapFunc, reduce: reduceFunc, out: {replace: "foo", db: "test"}}),
+    ErrorCodes.InvalidNamespace);
+
 st.stop();

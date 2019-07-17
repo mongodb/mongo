@@ -62,3 +62,7 @@ db.mr_nonexistent.drop();
 assert.commandFailedWithCode(
     db.runCommand({mapReduce: "mr_nonexistent", map: m_good, reduce: r, out: "out_nonexistent"}),
     ErrorCodes.NamespaceNotFound);
+
+// Test invalid namespace.
+assert.commandFailed(
+    db.runCommand({mapReduce: /test/, map: m_good, reduce: r, out: "out_nonexistent"}));

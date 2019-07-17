@@ -210,7 +210,7 @@ bool runMapReduce(OperationContext* opCtx,
                   BSONObjBuilder& result) {
     Timer t;
 
-    const NamespaceString nss(CommandHelpers::parseNsFromCommand(dbname, cmdObj));
+    const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
     const std::string shardResultCollection = getTmpName(nss.coll());
 
     bool shardedOutput = false;
