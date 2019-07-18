@@ -52,3 +52,30 @@ commands:
                 description: "Whether or not mongod will drop the target of
                     renameCollection prior to renaming the collection"
                 default: false
+            stayTemp:
+                type: bool
+                description: "Whether or not we want the source collection
+                    to be a temporary collection after the rename"
+                default: false
+    _shardsvrRenameCollection:
+        cpp_name: ShardsvrRenameCollection
+        description: "The request format of the internal renameCollection
+            command on a shard server."
+        namespace: ignored
+        fields:
+            renameCollection:
+                type: namespacestring
+                description: "The namespace of the collection to be renamed."
+            to:
+                type: namespacestring
+                description: "The new namespace of the collection."
+            dropTarget:
+                type: bool
+                description: "Whether or not mongod will drop the target of
+                    renameCollection prior to renaming the collection"
+                default: false
+            stayTemp:
+                type: bool
+                description: "Whether or not we want the source collection
+                    to be a temporary collection after the rename"
+                default: false

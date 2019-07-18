@@ -284,6 +284,7 @@ env.Library(
         'set_shard_version_command.cpp',
         'sharding_server_status.cpp',
         'sharding_state_command.cpp',
+        'shardsvr_rename_collection.cpp',
         'shardsvr_shard_collection.cpp',
         'split_chunk_command.cpp',
         'split_vector_command.cpp',
@@ -293,6 +294,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/cloner',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/commands/server_status',

@@ -682,6 +682,53 @@ Status renameBetweenDBs(OperationContext* opCtx,
 }
 
 }  // namespace
+void validateAndRunRenameCollection(OperationContext* opCtx,
+                                    const NamespaceString& source,
+                                    const NamespaceString& target,
+                                    bool dropTarget,
+                                    bool stayTemp) {
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid source namespace: " << source.ns(),
+            source.isValid());
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid target namespace: " << target.ns(),
+            target.isValid());
+
+    if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
+         repl::ReplicationCoordinator::modeNone)) {
+        uassert(ErrorCodes::IllegalOperation,
+                "can't rename live oplog while replicating",
+                !source.isOplog());
+        uassert(ErrorCodes::IllegalOperation,
+                "can't rename to live oplog while replicating",
+                !target.isOplog());
+    }
+
+    uassert(ErrorCodes::IllegalOperation,
+            "If either the source or target of a rename is an oplog name, both must be",
+            source.isOplog() == target.isOplog());
+
+    Status sourceStatus = userAllowedWriteNS(source);
+    uassert(ErrorCodes::IllegalOperation,
+            "error with source namespace: " + sourceStatus.reason(),
+            sourceStatus.isOK());
+    Status targetStatus = userAllowedWriteNS(target);
+    uassert(ErrorCodes::IllegalOperation,
+            "error with target namespace: " + targetStatus.reason(),
+            targetStatus.isOK());
+
+    if (source.isServerConfigurationCollection()) {
+        uasserted(ErrorCodes::IllegalOperation,
+                  "renaming the server configuration "
+                  "collection (admin.system.version) is not "
+                  "allowed");
+    }
+
+    RenameCollectionOptions options;
+    options.dropTarget = dropTarget;
+    options.stayTemp = stayTemp;
+    uassertStatusOK(renameCollection(opCtx, source, target, options));
+}
 
 Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,

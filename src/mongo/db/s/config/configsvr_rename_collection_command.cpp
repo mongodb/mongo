@@ -89,6 +89,29 @@ public:
                 opCtx, nssSource.ns(), "renameCollection", DistLockManager::kDefaultLockTimeout));
             auto collDistLockTarget = uassertStatusOK(catalogClient->getDistLockManager()->lock(
                 opCtx, nssTarget.ns(), "renameCollection", DistLockManager::kDefaultLockTimeout));
+
+            ShardsvrRenameCollection shardsvrRenameCollectionRequest;
+            shardsvrRenameCollectionRequest.setRenameCollection(nssSource);
+            shardsvrRenameCollectionRequest.setTo(nssTarget);
+            shardsvrRenameCollectionRequest.setDropTarget(request().getDropTarget());
+            shardsvrRenameCollectionRequest.setStayTemp(request().getStayTemp());
+
+            const auto dbType = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDatabase(
+                                                    opCtx,
+                                                    nssSource.db().toString(),
+                                                    repl::ReadConcernArgs::get(opCtx).getLevel()))
+                                    .value;
+            const auto primaryShardId = dbType.getPrimary();
+            const auto primaryShard =
+                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
+            BSONObj unusedPassthroughObj;
+            auto cmdResponse = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                "admin",
+                shardsvrRenameCollectionRequest.toBSON(unusedPassthroughObj),
+                Shard::RetryPolicy::kIdempotent));
+            uassertStatusOK(cmdResponse.commandStatus);
         }
 
     private:

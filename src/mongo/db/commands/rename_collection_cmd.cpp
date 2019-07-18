@@ -96,54 +96,9 @@ public:
 
         const NamespaceString source(sourceNsElt.valueStringData());
         const NamespaceString target(targetNsElt.valueStringData());
-
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid source namespace: " << source.ns(),
-                source.isValid());
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid target namespace: " << target.ns(),
-                target.isValid());
-
-        if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-             repl::ReplicationCoordinator::modeNone)) {
-            if (source.isOplog()) {
-                errmsg = "can't rename live oplog while replicating";
-                return false;
-            }
-            if (target.isOplog()) {
-                errmsg = "can't rename to live oplog while replicating";
-                return false;
-            }
-        }
-
-        if (source.isOplog() != target.isOplog()) {
-            errmsg = "If either the source or target of a rename is an oplog name, both must be";
-            return false;
-        }
-
-        Status sourceStatus = userAllowedWriteNS(source);
-        if (!sourceStatus.isOK()) {
-            errmsg = "error with source namespace: " + sourceStatus.reason();
-            return false;
-        }
-
-        Status targetStatus = userAllowedWriteNS(target);
-        if (!targetStatus.isOK()) {
-            errmsg = "error with target namespace: " + targetStatus.reason();
-            return false;
-        }
-
-        if (source.isServerConfigurationCollection()) {
-            uasserted(ErrorCodes::IllegalOperation,
-                      "renaming the server configuration "
-                      "collection (admin.system.version) is not "
-                      "allowed");
-        }
-
-        RenameCollectionOptions options;
-        options.dropTarget = cmdObj["dropTarget"].trueValue();
-        options.stayTemp = cmdObj["stayTemp"].trueValue();
-        uassertStatusOK(renameCollection(opCtx, source, target, options));
+        bool dropTarget = cmdObj["dropTarget"].trueValue();
+        bool stayTemp = cmdObj["stayTemp"].trueValue();
+        validateAndRunRenameCollection(opCtx, source, target, dropTarget, stayTemp);
         return true;
     }
 
