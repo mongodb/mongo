@@ -328,18 +328,6 @@ public:
         }
     }
 
-    template <typename CallableT>
-    void runOnExecutor(CallableT&& cb) {
-        ExecutorFuture(ExecutorPtr(_parent->_factory->getExecutor()))  //
-            .getAsync([ this, anchor = shared_from_this(), cb = std::forward<CallableT>(cb) ](
-                Status && status) mutable {
-                invariant(status);
-
-                stdx::lock_guard lk(_parent->_mutex);
-                cb();
-            });
-    }
-
 private:
     using OwnedConnection = std::shared_ptr<ConnectionInterface>;
     using OwnershipPool = stdx::unordered_map<ConnectionInterface*, OwnedConnection>;
@@ -410,8 +398,11 @@ private:
     // it will be discarded on return/refresh.
     size_t _generation = 0;
 
-    bool _inFulfillRequests = false;
-    bool _inControlLoop = false;
+    // When the pool needs to potentially die or spawn connections, updateController() is scheduled
+    // onto the executor and this flag is set. When updateController() finishes running, this flag
+    // is unset. This allows the pool to amortize the expensive spawning and hopefully do work once
+    // it is closer to steady state.
+    bool _updateScheduled = false;
 
     size_t _created = 0;
 
@@ -660,12 +651,10 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
 
 auto ConnectionPool::SpecificPool::makeHandle(ConnectionInterface* connection) -> ConnectionHandle {
     auto deleter = [ this, anchor = shared_from_this() ](ConnectionInterface * connection) {
-        runOnExecutor([this, connection]() {
-            returnConnection(connection);
-
-            _lastActiveTime = _parent->_factory->now();
-            updateState();
-        });
+        stdx::lock_guard lk(_parent->_mutex);
+        returnConnection(connection);
+        _lastActiveTime = _parent->_factory->now();
+        updateState();
     };
     return ConnectionHandle(connection, std::move(deleter));
 }
@@ -893,13 +882,6 @@ void ConnectionPool::SpecificPool::processFailure(const Status& status) {
 
 // fulfills as many outstanding requests as possible
 void ConnectionPool::SpecificPool::fulfillRequests() {
-    // If some other thread (possibly this thread) is fulfilling requests,
-    // don't keep padding the callstack.
-    if (_inFulfillRequests)
-        return;
-
-    _inFulfillRequests = true;
-    auto guard = makeGuard([&] { _inFulfillRequests = false; });
     while (_requests.size()) {
         // Marking this as our newest active time
         _lastActiveTime = _parent->_factory->now();
@@ -1069,10 +1051,9 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
 }
 
 void ConnectionPool::SpecificPool::updateController() {
-    if (std::exchange(_inControlLoop, true)) {
+    if (_health.isShutdown) {
         return;
     }
-    const auto guard = makeGuard([&] { _inControlLoop = false; });
 
     auto& controller = *_parent->_controller;
 
@@ -1120,7 +1101,7 @@ void ConnectionPool::SpecificPool::updateController() {
         }
     }
 
-    runOnExecutor([this]() { spawnConnections(); });
+    spawnConnections();
 }
 
 // Updates our state and manages the request timer
@@ -1133,7 +1114,19 @@ void ConnectionPool::SpecificPool::updateState() {
 
     updateEventTimer();
     updateHealth();
-    updateController();
+
+    if (std::exchange(_updateScheduled, true)) {
+        return;
+    }
+
+    ExecutorFuture(ExecutorPtr(_parent->_factory->getExecutor()))  //
+        .getAsync([ this, anchor = shared_from_this() ](Status && status) mutable {
+            invariant(status);
+
+            stdx::lock_guard lk(_parent->_mutex);
+            _updateScheduled = false;
+            updateController();
+        });
 }
 
 }  // namespace executor

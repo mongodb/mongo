@@ -84,25 +84,30 @@ protected:
             .semi();
     }
 
+    void doneWith(ConnectionPool::ConnectionHandle& conn) {
+        dynamic_cast<ConnectionImpl*>(conn.get())->indicateSuccess();
+
+        ExecutorFuture(_executor).getAsync([conn = std::move(conn)](auto){});
+    }
+
+    using StatusWithConn = StatusWith<ConnectionPool::ConnectionHandle>;
+
+    auto getId(const ConnectionPool::ConnectionHandle& conn) {
+        return dynamic_cast<ConnectionImpl*>(conn.get())->id();
+    }
+    auto verifyAndGetId(StatusWithConn& swConn) {
+        ASSERT(swConn.isOK());
+        auto& conn = swConn.getValue();
+        return getId(conn);
+    }
+
+    template <typename Ptr>
+    void dropConnectionsTest(std::shared_ptr<ConnectionPool> const& pool, Ptr t);
+
 private:
     std::shared_ptr<OutOfLineExecutor> _executor = std::make_shared<InlineOutOfLineExecutor>();
     std::shared_ptr<ConnectionPool> _pool;
 };
-
-void doneWith(const ConnectionPool::ConnectionHandle& conn) {
-    dynamic_cast<ConnectionImpl*>(conn.get())->indicateSuccess();
-}
-
-using StatusWithConn = StatusWith<ConnectionPool::ConnectionHandle>;
-
-auto getId(const ConnectionPool::ConnectionHandle& conn) {
-    return dynamic_cast<ConnectionImpl*>(conn.get())->id();
-}
-auto verifyAndGetId(StatusWithConn& swConn) {
-    ASSERT(swConn.isOK());
-    auto& conn = swConn.getValue();
-    return getId(conn);
-}
 
 /**
  * Verify that we get the same connection if we grab one, return it and grab
@@ -157,7 +162,7 @@ TEST_F(ConnectionPoolTest, ConnectionsAreAcquiredInMRUOrder) {
             try {
                 ConnectionPool::ConnectionHandle conn = std::move(connections.back());
                 connections.pop_back();
-                conn->indicateSuccess();
+                doneWith(conn);
             } catch (...) {
             }
         }
@@ -185,7 +190,7 @@ TEST_F(ConnectionPoolTest, ConnectionsAreAcquiredInMRUOrder) {
         ConnectionPool::ConnectionHandle conn = std::move(connections.back());
         connections.pop_back();
         ids.push(static_cast<ConnectionImpl*>(conn.get())->id());
-        conn->indicateSuccess();
+        doneWith(conn);
     }
     ASSERT_EQ(ids.size(), kSize);
 
@@ -233,7 +238,7 @@ TEST_F(ConnectionPoolTest, ConnectionsNotUsedRecentlyArePurged) {
             try {
                 ConnectionPool::ConnectionHandle conn = std::move(connections.back());
                 connections.pop_back();
-                conn->indicateSuccess();
+                doneWith(conn);
             } catch (...) {
             }
         }
@@ -267,7 +272,7 @@ TEST_F(ConnectionPoolTest, ConnectionsNotUsedRecentlyArePurged) {
     while (!connections.empty()) {
         ConnectionPool::ConnectionHandle conn = std::move(connections.back());
         connections.pop_back();
-        conn->indicateSuccess();
+        doneWith(conn);
     }
 
     // Advance the time, but not enough to age out connections. We should still have them all.
@@ -296,7 +301,7 @@ TEST_F(ConnectionPoolTest, ConnectionsNotUsedRecentlyArePurged) {
     while (!connections.empty()) {
         ConnectionPool::ConnectionHandle conn = std::move(connections.back());
         connections.pop_back();
-        conn->indicateSuccess();
+        doneWith(conn);
     }
 
     // We should still have all of them in the pool
@@ -592,7 +597,6 @@ TEST_F(ConnectionPoolTest, requestsServedByUrgency) {
     ASSERT(!reachedA);
 
     doneWith(conn);
-    conn.reset();
 
     // Now that we've returned the connection, we see the second has been
     // called
@@ -648,7 +652,6 @@ TEST_F(ConnectionPoolTest, maxPoolRespected) {
     // Return 1
     ConnectionPool::ConnectionInterface* conn1Ptr = conn1.get();
     doneWith(conn1);
-    conn1.reset();
 
     // Verify that it's the one that pops out for request 3
     ASSERT_EQ(conn1Ptr, conn3.get());
@@ -943,15 +946,12 @@ TEST_F(ConnectionPoolTest, minPoolRespected) {
     // Return each connection over 1, 2 and 3 ms
     PoolImpl::setNow(now + Milliseconds(1));
     doneWith(conn1);
-    conn1.reset();
 
     PoolImpl::setNow(now + Milliseconds(2));
     doneWith(conn2);
-    conn2.reset();
 
     PoolImpl::setNow(now + Milliseconds(3));
     doneWith(conn3);
-    conn3.reset();
 
     // Jump 5 seconds and verify that refreshes only two refreshes occurred
     PoolImpl::setNow(now + Milliseconds(5000));
@@ -1145,7 +1145,6 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensCheckoutDelays) {
 
     // return conn 1
     doneWith(conn1);
-    conn1.reset();
 
     // expire the pool
     PoolImpl::setNow(now + Milliseconds(2000));
@@ -1221,7 +1220,6 @@ TEST_F(ConnectionPoolTest, dropConnections) {
 
     // return the connection
     doneWith(handle);
-    handle.reset();
 
     // Make sure that a new connection request properly disposed of the gen1
     // connection
@@ -1354,7 +1352,7 @@ TEST_F(ConnectionPoolTest, RefreshTimeoutsDontTimeoutRequests) {
 }
 
 template <typename Ptr>
-void dropConnectionsTest(std::shared_ptr<ConnectionPool> const& pool, Ptr t) {
+void ConnectionPoolTest::dropConnectionsTest(std::shared_ptr<ConnectionPool> const& pool, Ptr t) {
     auto now = Date_t::now();
     PoolImpl::setNow(now);
 
@@ -1495,7 +1493,6 @@ TEST_F(ConnectionPoolTest, AsyncGet) {
 
         connId1 = getId(conn1);
         doneWith(conn1);
-        conn1.reset();
         ASSERT(connId1);
 
         // Since the third future has a smaller timeout than the second,
@@ -1511,7 +1508,6 @@ TEST_F(ConnectionPoolTest, AsyncGet) {
 
         connId3 = getId(conn3);
         doneWith(conn3);
-        conn3.reset();
 
         // The second future is now finally ready
         ASSERT_TRUE(connFuture2.isReady());
