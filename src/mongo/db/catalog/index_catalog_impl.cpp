@@ -472,7 +472,7 @@ Status IndexCatalogImpl::IndexBuildBlock::init() {
     if (auto replCoord = repl::ReplicationCoordinator::get(_opCtx)) {
         isBackgroundSecondaryBuild =
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet &&
-            replCoord->getMemberState().secondary() && isBackgroundIndex;
+            !replCoord->getMemberState().primary() && isBackgroundIndex;
     }
 
     // Setup on-disk structures.
