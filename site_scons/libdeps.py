@@ -7,11 +7,12 @@ and to add them to the link command executed when building programs.
 
 For example, consider a program 'try' that depends on a lib 'tc', which in
 turn uses a symbol from a lib 'tb' which in turn uses a library from 'ta'.
+
 Without this package, the Program declaration for "try" looks like this:
 
 Program('try', ['try.c', 'path/to/${LIBPREFIX}tc${LIBSUFFIX}',
-                'path/to/${LIBPREFIX}tc${LIBSUFFIX}',
-                'path/to/${LIBPREFIX}tc${LIBSUFFIX}',])
+                'path/to/${LIBPREFIX}tb${LIBSUFFIX}',
+                'path/to/${LIBPREFIX}ta${LIBSUFFIX}',])
 
 With this library, we can instead write the following
 

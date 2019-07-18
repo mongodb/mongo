@@ -95,6 +95,24 @@ SetOption('random', 1)
 #   using the nargs='const' mechanism.
 #
 
+add_option('ninja',
+    choices=['true', 'false'],
+    default='false',
+    nargs='?',
+    const='true',
+    type='choice',
+    help='Enable the build.ninja generator tool',
+)
+
+add_option('ccache',
+    choices=['true', 'false'],
+    default='false',
+    nargs='?',
+    const='true',
+    type='choice',
+    help='Enable ccache support',
+)
+
 add_option('prefix',
     default='$BUILD_ROOT/install',
     help='installation prefix',
@@ -659,6 +677,9 @@ env_vars.Add('ARFLAGS',
     help='Sets flags for the archiver',
     converter=variable_shlex_converter)
 
+env_vars.Add('CCACHE',
+    help='Path to ccache used for the --ccache option. Defaults to first ccache in PATH.')
+
 env_vars.Add(
     'CACHE_SIZE',
     help='Maximum size of the cache (in gigabytes)',
@@ -800,6 +821,20 @@ env_vars.Add('MSVC_USE_SCRIPT',
 
 env_vars.Add('MSVC_VERSION',
     help='Sets the version of Visual Studio to use (e.g.  12.0, 11.0, 10.0)')
+
+env_vars.Add('NINJA_SUFFIX',
+    help="""A suffix to add to the end of generated build.ninja
+files. Useful for when compiling multiple build ninja files for
+different configurations, for instance:
+
+    scons --sanitize=asan --ninja NINJA_SUFFIX=asan ninja-install-all-meta
+    scons --sanitize=tsan --ninja NINJA_SUFFIX=tsan ninja-install-all-meta
+          
+Will generate the files (respectively):
+
+    install-all-meta.build.ninja.asan
+    install-all-meta.build.ninja.tsan
+""")
 
 env_vars.Add('OBJCOPY',
     help='Sets the path to objcopy',
@@ -1477,12 +1512,18 @@ if link_model.startswith("dynamic"):
 if optBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
 
-# Enable the fast decider if exlicltly requested or if in 'auto' mode and not in conflict with other
-# options.
-if get_option('build-fast-and-loose') == 'on' or \
-   (get_option('build-fast-and-loose') == 'auto' and \
-    not has_option('release') and \
-    not has_option('cache')):
+# Enable the fast decider if explicitly requested or if in 'auto' mode
+# and not in conflict with other options like the ninja option which
+# sets it's own decider
+if (
+        not get_option('ninja') == 'true' and
+        get_option('build-fast-and-loose') == 'on' or
+        (
+            get_option('build-fast-and-loose') == 'auto' and
+            not has_option('release') and
+            not has_option('cache')
+         )
+):
     # See http://www.scons.org/wiki/GoFastButton for details
     env.Decider('MD5-timestamp')
     env.SetOption('max_drift', 1)
@@ -1541,12 +1582,9 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
             fake_lib.write(str(uuid.uuid4()))
             fake_lib.write('\n')
 
-    def noop_action(env, target, source):
-        pass
-
     env['ARCOM'] = write_uuid_to_file
     env['ARCOMSTR'] = 'Generating placeholder library $TARGET'
-    env['RANLIBCOM'] = noop_action
+    env['RANLIBCOM'] = ''
     env['RANLIBCOMSTR'] = 'Skipping ranlib for $TARGET'
 
 libdeps.setup_environment(env, emitting_shared=(link_model.startswith("dynamic")))
@@ -3673,6 +3711,70 @@ def doConfigure(myenv):
 
 
 env = doConfigure( env )
+env["NINJA_SYNTAX"] = "#site_scons/third_party/ninja_syntax.py"
+
+# Now that we are done with configure checks, enable icecream, if available.
+env.Tool('icecream')
+
+if get_option('ninja') == 'true':
+    env.Tool("ninja")
+    def test_txt_writer(alias_name):
+        """Find all the tests registered to alias_name and write them to a file via ninja."""
+        rule_written = False
+
+        def wrapper(env, ninja, node, dependencies):
+            """Make a Ninja-able version of the test files."""
+            rule = alias_name.upper() + "_GENERATOR"
+            if not rule_written:
+                ninja.rule(
+                    rule,
+                    description="Generate test list text file",
+                    command="echo $in > $out",
+                )
+                rule_written = True
+
+            alias = env.Alias(alias_name)
+            paths = []
+            children = alias.children()
+            for child in children:
+                paths.append('\t' + str(child))
+
+            ninja.build(
+                str(node),
+                rule,
+                inputs='\n'.join(paths),
+                implicit=dependencies,
+            )
+
+        return wrapper
+    env.NinjaRegisterFunctionHandler("unit_test_list_builder_action", test_txt_writer('$UNITTEST_ALIAS'))
+    env.NinjaRegisterFunctionHandler("integration_test_list_builder_action", test_txt_writer('$INTEGRATION_TEST_ALIAS'))
+    env.NinjaRegisterFunctionHandler("benchmark_list_builder_action", test_txt_writer('$BENCHMARK_ALIAS'))
+
+    def fakelib_in_ninja():
+        """Generates empty .a files"""
+        rule_written = False
+
+        def wrapper(env, ninja, node, dependencies):
+            if not rule_written:
+                cmd = "touch $out"
+                if not env.TargetOSIs("posix"):
+                    cmd = "cmd /c copy NUL $out"
+                ninja.rule(
+                    "FAKELIB",
+                    command=cmd,
+                )
+                rule_written = True
+
+            ninja.build(node.get_path(), rule='FAKELIB', implicit=dependencies)
+
+        return wrapper
+
+    env.NinjaRegisterFunctionHandler("write_uuid_to_file", fakelib_in_ninja())
+
+    # Load ccache after icecream since order matters when we're both changing CCCOM
+    if get_option('ccache') == 'true':
+        env.Tool('ccache')
 
 # TODO: Later, this should live somewhere more graceful.
 if get_option('install-mode') == 'hygienic':
@@ -3767,8 +3869,6 @@ if get_option('install-mode') == 'hygienic':
 elif get_option('separate-debug') == "on":
     env.FatalError('Cannot use --separate-debug without --install-mode=hygienic')
 
-# Now that we are done with configure checks, enable icecream, if available.
-env.Tool('icecream')
 
 # If the flags in the environment are configured for -gsplit-dwarf,
 # inject the necessary emitter.

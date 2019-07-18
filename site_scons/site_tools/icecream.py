@@ -66,8 +66,9 @@ def generate(env):
         # Make an isolated environment so that our setting of ICECC_VERSION in the environment
         # doesn't appear when executing icecc_create_env
         toolchain_env = env.Clone()
+        toolchain_env.Decider("timestamp-newer")
         if toolchain_env.ToolchainIs('clang'):
-            toolchain = env.Command(
+            toolchain = toolchain_env.Command(
                 target=icecc_version,
                 source=[
                     '$ICECC_CREATE_ENV',
@@ -153,10 +154,11 @@ def generate(env):
     env['ICECC_VERSION_ARCH_GEN'] = icecc_version_arch_gen
 
     # Make compile jobs flow through icecc
-    env['CCCOM'] = '$( ICECC_VERSION=${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN} $ICECC $) ' + env['CCCOM']
-    env['CXXCOM'] = '$( ICECC_VERSION=${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN} $ICECC $) ' + env['CXXCOM']
-    env['SHCCCOM'] = '$( ICECC_VERSION=${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN} $ICECC $) ' + env['SHCCCOM']
-    env['SHCXXCOM'] = '$( ICECC_VERSION=${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN} $ICECC $) ' + env['SHCXXCOM']
+    env['ENV']['ICECC_VERSION'] = env.subst('${ICECC_VERSION_ARCH_GEN}${ICECC_VERSION_GEN}')
+    env['CCCOM'] = '$( $ICECC $) ' + env['CCCOM']
+    env['CXXCOM'] = '$( $ICECC $) ' + env['CXXCOM']
+    env['SHCCCOM'] = '$( $ICECC $) ' + env['SHCCCOM']
+    env['SHCXXCOM'] = '$( $ICECC $) ' + env['SHCXXCOM']
 
     # Make link like jobs flow through icerun so we don't kill the
     # local machine.

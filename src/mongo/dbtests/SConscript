@@ -176,4 +176,4 @@ if not has_option('noshell') and usemozjs:
     )
     hygienic = get_option('install-mode') == 'hygienic'
     if not hygienic:
-        env.Alias("dbtest", env.Install('#/', dbtest))
+        env.Install('#/', dbtest)

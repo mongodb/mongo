@@ -81,11 +81,8 @@ def generate(env):
     env['ARFLAGS'] = SCons.Util.CLVar(
         [arflag if arflag != "rc" else "rcsTD" for arflag in env['ARFLAGS']])
 
-    def noop_action(env, target, source):
-        pass
-
     # Disable running ranlib, since we added 's' above
-    env['RANLIBCOM'] = noop_action
+    env['RANLIBCOM'] = ''
     env['RANLIBCOMSTR'] = 'Skipping ranlib for thin archive $TARGET'
 
     for builder in ['StaticLibrary', 'SharedArchive']:

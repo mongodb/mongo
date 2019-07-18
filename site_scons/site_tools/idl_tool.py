@@ -47,7 +47,7 @@ def idl_scanner(node, env, path):
     try:
         deps_str = subprocess.check_output(cmd).decode('utf-8')
     except subprocess.CalledProcessError as e:
-        print(("IDLC ERROR: %s" % (e.output) ))
+        print("IDLC ERROR: %s" % e.output)
         raise
 
     deps_list = deps_str.splitlines()
