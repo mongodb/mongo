@@ -317,14 +317,22 @@ Status MongoInterfaceStandalone::appendQueryExecStats(OperationContext* opCtx,
 }
 
 BSONObj MongoInterfaceStandalone::getCollectionOptions(const NamespaceString& nss) {
-    const auto infos = _client.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
-    if (infos.empty()) {
-        return BSONObj();
+    std::list<BSONObj> infos;
+
+    try {
+        infos = _client.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
+        if (infos.empty()) {
+            return BSONObj();
+        }
+    } catch (const DBException& e) {
+        uasserted(ErrorCodes::CommandFailed, e.reason());
     }
+
     const auto& infoObj = infos.front();
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << nss.toString() << " is a view, not a collection",
             infoObj["type"].valueStringData() != "view"_sd);
+
     return infoObj.getObjectField("options").getOwned();
 }
 

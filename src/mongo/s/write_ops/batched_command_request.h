@@ -35,6 +35,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version_helpers.h"
 
 namespace mongo {
 
@@ -115,6 +116,19 @@ public:
         return *_shardVersion;
     }
 
+    void setDbVersion(DatabaseVersion dbVersion) {
+        _dbVersion = std::move(dbVersion);
+    }
+
+    bool hasDbVersion() const {
+        return _dbVersion.is_initialized();
+    }
+
+    const DatabaseVersion& getDbVersion() const {
+        invariant(_dbVersion);
+        return *_dbVersion;
+    }
+
     void setRuntimeConstants(RuntimeConstants runtimeConstants) {
         invariant(_updateReq);
         _updateReq->setRuntimeConstants(std::move(runtimeConstants));
@@ -179,6 +193,7 @@ private:
     std::unique_ptr<write_ops::Delete> _deleteReq;
 
     boost::optional<ChunkVersion> _shardVersion;
+    boost::optional<DatabaseVersion> _dbVersion;
 
     boost::optional<BSONObj> _writeConcern;
     bool _allowImplicitCollectionCreation = true;

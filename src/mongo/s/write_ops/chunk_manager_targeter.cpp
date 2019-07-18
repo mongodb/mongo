@@ -40,6 +40,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
@@ -210,7 +211,7 @@ bool isExactIdQuery(OperationContext* opCtx,
     return cq.isOK() && isExactIdQuery(opCtx, *cq.getValue(), manager);
 }
 //
-// Utilities to compare shard versions
+// Utilities to compare shard and db versions
 //
 
 /**
@@ -297,22 +298,37 @@ CompareResult compareAllShardVersions(const CachedCollectionRoutingInfo& routing
     return finalResult;
 }
 
+CompareResult compareDbVersions(const CachedCollectionRoutingInfo& routingInfo,
+                                const boost::optional<DatabaseVersion>& remoteDbVersion) {
+    DatabaseVersion cachedDbVersion = routingInfo.db().databaseVersion();
+
+    // Db may have been dropped
+    if (!remoteDbVersion || (cachedDbVersion.getUuid() != remoteDbVersion->getUuid())) {
+        return CompareResult_Unknown;
+    }
+
+    if (cachedDbVersion.getLastMod() < remoteDbVersion->getLastMod()) {
+        return CompareResult_LT;
+    }
+
+    return CompareResult_GTE;
+}
+
 /**
  * Whether or not the manager/primary pair is different from the other manager/primary pair.
  */
 bool isMetadataDifferent(const std::shared_ptr<ChunkManager>& managerA,
-                         const std::shared_ptr<Shard>& primaryA,
+                         const DatabaseVersion dbVersionA,
                          const std::shared_ptr<ChunkManager>& managerB,
-                         const std::shared_ptr<Shard>& primaryB) {
-    if ((managerA && !managerB) || (!managerA && managerB) || (primaryA && !primaryB) ||
-        (!primaryA && primaryB))
+                         const DatabaseVersion dbVersionB) {
+    if ((managerA && !managerB) || (!managerA && managerB))
         return true;
 
     if (managerA) {
         return managerA->getVersion() != managerB->getVersion();
     }
 
-    return primaryA->getId() != primaryB->getId();
+    return databaseVersion::equal(dbVersionA, dbVersionB);
 }
 
 /**
@@ -320,10 +336,10 @@ bool isMetadataDifferent(const std::shared_ptr<ChunkManager>& managerA,
  * of the metadata.
  */
 bool wasMetadataRefreshed(const std::shared_ptr<ChunkManager>& managerA,
-                          const std::shared_ptr<Shard>& primaryA,
+                          const DatabaseVersion dbVersionA,
                           const std::shared_ptr<ChunkManager>& managerB,
-                          const std::shared_ptr<Shard>& primaryB) {
-    if (isMetadataDifferent(managerA, primaryA, managerB, primaryB))
+                          const DatabaseVersion dbVersionB) {
+    if (isMetadataDifferent(managerA, dbVersionA, managerB, dbVersionB))
         return true;
 
     if (managerA) {
@@ -401,7 +417,9 @@ StatusWith<ShardEndpoint> ChunkManagerTargeter::targetInsert(OperationContext* o
                                         << "; no metadata found");
         }
 
-        return ShardEndpoint(_routingInfo->db().primary()->getId(), ChunkVersion::UNSHARDED());
+        return ShardEndpoint(_routingInfo->db().primary()->getId(),
+                             ChunkVersion::UNSHARDED(),
+                             _routingInfo->db().databaseVersion());
     }
 
     return Status::OK();
@@ -430,8 +448,9 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
                     str::stream() << "could not target update on " << getNS().ns()
                                   << "; no metadata found"};
         }
-        return std::vector<ShardEndpoint>{
-            {_routingInfo->db().primaryId(), ChunkVersion::UNSHARDED()}};
+        return std::vector<ShardEndpoint>{{_routingInfo->db().primaryId(),
+                                           ChunkVersion::UNSHARDED(),
+                                           _routingInfo->db().databaseVersion()}};
     }
 
     const auto& shardKeyPattern = _routingInfo->cm()->getShardKeyPattern();
@@ -590,22 +609,22 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
                               << "; no metadata found"};
     }
 
+    if (!_routingInfo->cm()) {
+        return std::vector<ShardEndpoint>{{_routingInfo->db().primaryId(),
+                                           ChunkVersion::UNSHARDED(),
+                                           _routingInfo->db().databaseVersion()}};
+    }
+
     std::set<ShardId> shardIds;
-    if (_routingInfo->cm()) {
-        try {
-            _routingInfo->cm()->getShardIdsForQuery(opCtx, query, collation, &shardIds);
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-    } else {
-        shardIds.insert(_routingInfo->db().primary()->getId());
+    try {
+        _routingInfo->cm()->getShardIdsForQuery(opCtx, query, collation, &shardIds);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
-        const auto version = _routingInfo->cm() ? _routingInfo->cm()->getVersion(shardId)
-                                                : ChunkVersion::UNSHARDED();
-        endpoints.emplace_back(std::move(shardId), version);
+        endpoints.emplace_back(std::move(shardId), _routingInfo->cm()->getVersion(shardId));
     }
 
     return endpoints;
@@ -630,19 +649,20 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetCollection() 
                               << "; metadata not found"};
     }
 
-    std::set<ShardId> shardIds;
-    if (_routingInfo->cm()) {
-        _routingInfo->cm()->getAllShardIds(&shardIds);
-    } else {
-        shardIds.insert(_routingInfo->db().primary()->getId());
+    if (!_routingInfo->cm()) {
+        return std::vector<ShardEndpoint>{{_routingInfo->db().primaryId(),
+                                           ChunkVersion::UNSHARDED(),
+                                           _routingInfo->db().databaseVersion()}};
     }
+
+    std::set<ShardId> shardIds;
+    _routingInfo->cm()->getAllShardIds(&shardIds);
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
-        const auto version = _routingInfo->cm() ? _routingInfo->cm()->getVersion(shardId)
-                                                : ChunkVersion::UNSHARDED();
-        endpoints.emplace_back(std::move(shardId), version);
+        endpoints.emplace_back(std::move(shardId), _routingInfo->cm()->getVersion(shardId));
     }
+
     return endpoints;
 }
 
@@ -657,11 +677,13 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetAllShards(
     std::vector<ShardId> shardIds;
     Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
 
+    // This function is only called if doing a multi write that targets more than one shard. This
+    // implies the collection is sharded, so we should always have a chunk manager.
+    invariant(_routingInfo->cm());
+
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
-        const auto version = _routingInfo->cm() ? _routingInfo->cm()->getVersion(shardId)
-                                                : ChunkVersion::UNSHARDED();
-        endpoints.emplace_back(std::move(shardId), version);
+        endpoints.emplace_back(std::move(shardId), _routingInfo->cm()->getVersion(shardId));
     }
 
     return endpoints;
@@ -669,12 +691,14 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetAllShards(
 
 void ChunkManagerTargeter::noteCouldNotTarget() {
     dassert(_remoteShardVersions.empty());
+    dassert(!_remoteDbVersion);
     _needsTargetingRefresh = true;
 }
 
-void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
-                                             const StaleConfigInfo& staleInfo) {
+void ChunkManagerTargeter::noteStaleShardResponse(const ShardEndpoint& endpoint,
+                                                  const StaleConfigInfo& staleInfo) {
     dassert(!_needsTargetingRefresh);
+    dassert(!_remoteDbVersion);
 
     ChunkVersion remoteShardVersion;
     if (!staleInfo.getVersionWanted()) {
@@ -703,6 +727,28 @@ void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
     }
 }
 
+void ChunkManagerTargeter::noteStaleDbResponse(const ShardEndpoint& endpoint,
+                                               const StaleDbRoutingVersion& staleInfo) {
+    dassert(!_needsTargetingRefresh);
+    dassert(_remoteShardVersions.empty());
+
+    DatabaseVersion remoteDbVersion;
+    if (!staleInfo.getVersionWanted()) {
+        // If we don't have a vWanted sent, assume the version is higher than our current version.
+        remoteDbVersion = _routingInfo->db().databaseVersion();
+        remoteDbVersion = databaseVersion::makeIncremented(remoteDbVersion);
+    } else {
+        remoteDbVersion = *staleInfo.getVersionWanted();
+    }
+
+    if (!_remoteDbVersion ||
+        (_remoteDbVersion->getUuid() == remoteDbVersion.getUuid() &&
+         _remoteDbVersion->getLastMod() < remoteDbVersion.getLastMod()) ||
+        (_remoteDbVersion->getUuid() != remoteDbVersion.getUuid())) {
+        _remoteDbVersion = remoteDbVersion;
+    }
+}
+
 Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) {
     bool dummy;
     if (!wasChanged) {
@@ -713,13 +759,14 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
 
     LOG(4) << "ChunkManagerTargeter checking if refresh is needed, needsTargetingRefresh("
            << _needsTargetingRefresh << ") remoteShardVersions empty ("
-           << _remoteShardVersions.empty() << ")";
+           << _remoteShardVersions.empty() << ")"
+           << ") remoteDbVersion empty (" << !_remoteDbVersion << ")";
 
     //
     // Did we have any stale config or targeting errors at all?
     //
 
-    if (!_needsTargetingRefresh && _remoteShardVersions.empty()) {
+    if (!_needsTargetingRefresh && _remoteShardVersions.empty() && !_remoteDbVersion) {
         return Status::OK();
     }
 
@@ -728,7 +775,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
     //
 
     auto lastManager = _routingInfo->cm();
-    auto lastPrimary = _routingInfo->db().primary();
+    auto lastDbVersion = _routingInfo->db().databaseVersion();
 
     auto initStatus = init(opCtx);
     if (!initStatus.isOK()) {
@@ -747,20 +794,19 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
         _needsTargetingRefresh = false;
 
         // If we couldn't target, we might need to refresh if we haven't remotely refreshed
-        // the
-        // metadata since we last got it from the cache.
+        // the metadata since we last got it from the cache.
 
         bool alreadyRefreshed = wasMetadataRefreshed(
-            lastManager, lastPrimary, _routingInfo->cm(), _routingInfo->db().primary());
+            lastManager, lastDbVersion, _routingInfo->cm(), _routingInfo->db().databaseVersion());
 
         // If didn't already refresh the targeting information, refresh it
         if (!alreadyRefreshed) {
             // To match previous behavior, we just need an incremental refresh here
-            return _refreshNow(opCtx);
+            return _refreshShardVersionNow(opCtx);
         }
 
         *wasChanged = isMetadataDifferent(
-            lastManager, lastPrimary, _routingInfo->cm(), _routingInfo->db().primary());
+            lastManager, lastDbVersion, _routingInfo->cm(), _routingInfo->db().databaseVersion());
         return Status::OK();
     } else if (!_remoteShardVersions.empty()) {
         // If we got stale shard versions from remote shards, we may need to refresh
@@ -775,19 +821,46 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
 
         if (result == CompareResult_Unknown || result == CompareResult_LT) {
             // Our current shard versions aren't all comparable to the old versions, maybe drop
-            return _refreshNow(opCtx);
+            return _refreshShardVersionNow(opCtx);
         }
 
         *wasChanged = isMetadataDifferent(
-            lastManager, lastPrimary, _routingInfo->cm(), _routingInfo->db().primary());
+            lastManager, lastDbVersion, _routingInfo->cm(), _routingInfo->db().databaseVersion());
+        return Status::OK();
+    } else if (_remoteDbVersion) {
+        // If we got stale dbversions from remote shards, we may need to refresh
+        // NOTE: Not sure yet if this can happen simultaneously with targeting issues
+
+        CompareResult result = compareDbVersions(*_routingInfo, _remoteDbVersion);
+
+        LOG(4) << "ChunkManagerTargeter database versions comparison result: " << (int)result;
+
+        // Reset the version
+        _remoteDbVersion = boost::none;
+
+        if (result == CompareResult_Unknown || result == CompareResult_LT) {
+            // Our current db version isn't always comparable to the old version, it may have been
+            // dropped
+            return _refreshDbVersionNow(opCtx);
+        }
+
+        *wasChanged = isMetadataDifferent(
+            lastManager, lastDbVersion, _routingInfo->cm(), _routingInfo->db().databaseVersion());
         return Status::OK();
     }
 
     MONGO_UNREACHABLE;
 }
 
-Status ChunkManagerTargeter::_refreshNow(OperationContext* opCtx) {
+Status ChunkManagerTargeter::_refreshShardVersionNow(OperationContext* opCtx) {
     Grid::get(opCtx)->catalogCache()->onStaleShardVersion(std::move(*_routingInfo));
+
+    return init(opCtx);
+}
+
+Status ChunkManagerTargeter::_refreshDbVersionNow(OperationContext* opCtx) {
+    Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(
+        _nss.db(), std::move(_routingInfo->db().databaseVersion()));
 
     return init(opCtx);
 }

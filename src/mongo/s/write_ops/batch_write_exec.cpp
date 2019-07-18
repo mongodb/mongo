@@ -68,15 +68,25 @@ WriteErrorDetail errorFromStatus(const Status& status) {
     return error;
 }
 
-// Helper to note several stale errors from a response
-void noteStaleResponses(const std::vector<ShardError>& staleErrors, NSTargeter* targeter) {
+// Helper to note several stale shard errors from a response
+void noteStaleShardResponses(const std::vector<ShardError>& staleErrors, NSTargeter* targeter) {
     for (const auto& error : staleErrors) {
         LOG(4) << "Noting stale config response " << error.error.getErrInfo() << " from shard "
                << error.endpoint.shardName;
-        targeter->noteStaleResponse(
+        targeter->noteStaleShardResponse(
             error.endpoint,
             StaleConfigInfo::parseFromCommandError(
                 error.error.isErrInfoSet() ? error.error.getErrInfo() : BSONObj()));
+    }
+}
+
+// Helper to note several stale db errors from a response
+void noteStaleDbResponses(const std::vector<ShardError>& staleErrors, NSTargeter* targeter) {
+    for (const auto& error : staleErrors) {
+        LOG(4) << "Noting stale database response " << error.error.toBSON() << " from shard "
+               << error.endpoint.shardName;
+        targeter->noteStaleDbResponse(
+            error.endpoint, StaleDbRoutingVersion::parseFromCommandError(error.error.toBSON()));
     }
 }
 
@@ -297,6 +307,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 if (responseStatus.isOK()) {
                     TrackedErrors trackedErrors;
                     trackedErrors.startTracking(ErrorCodes::StaleShardVersion);
+                    trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
                     trackedErrors.startTracking(ErrorCodes::CannotImplicitlyCreateCollection);
 
                     LOG(4) << "Write results received from " << shardHost.toString() << ": "
@@ -329,11 +340,20 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     }
 
                     // Note if anything was stale
-                    const auto& staleErrors =
+                    const auto& staleShardErrors =
                         trackedErrors.getErrors(ErrorCodes::StaleShardVersion);
-                    if (!staleErrors.empty()) {
-                        noteStaleResponses(staleErrors, &targeter);
-                        ++stats->numStaleBatches;
+                    const auto& staleDbErrors = trackedErrors.getErrors(ErrorCodes::StaleDbVersion);
+
+                    if (!staleShardErrors.empty()) {
+                        invariant(staleDbErrors.empty());
+                        noteStaleShardResponses(staleShardErrors, &targeter);
+                        ++stats->numStaleShardBatches;
+                    }
+
+                    if (!staleDbErrors.empty()) {
+                        invariant(staleShardErrors.empty());
+                        noteStaleDbResponses(staleDbErrors, &targeter);
+                        ++stats->numStaleDbBatches;
                     }
 
                     const auto& cannotImplicitlyCreateErrors =

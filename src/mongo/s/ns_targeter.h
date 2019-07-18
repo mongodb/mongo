@@ -43,17 +43,22 @@ namespace mongo {
 class OperationContext;
 
 /**
- * Combines a shard and the version which that shard should be using
+ * Combines a shard, the shard version, and database version that the shard should be using
  */
 struct ShardEndpoint {
-    ShardEndpoint(const ShardId& shardName, const ChunkVersion& shardVersion)
-        : shardName(shardName), shardVersion(shardVersion) {}
+    ShardEndpoint(const ShardId& shardName,
+                  const ChunkVersion& shardVersion,
+                  const boost::optional<DatabaseVersion> dbVersion = boost::none)
+        : shardName(shardName), shardVersion(shardVersion), databaseVersion(dbVersion) {}
 
     ShardEndpoint(const ShardEndpoint& other)
-        : shardName(other.shardName), shardVersion(other.shardVersion) {}
+        : shardName(other.shardName), shardVersion(other.shardVersion) {
+        databaseVersion = other.databaseVersion;
+    }
 
     ShardId shardName;
     ChunkVersion shardVersion;
+    boost::optional<DatabaseVersion> databaseVersion;
 };
 
 /**
@@ -143,8 +148,19 @@ public:
      *
      * If stale responses are is noted, we must not have noted that we cannot target.
      */
-    virtual void noteStaleResponse(const ShardEndpoint& endpoint,
-                                   const StaleConfigInfo& staleInfo) = 0;
+    virtual void noteStaleShardResponse(const ShardEndpoint& endpoint,
+                                        const StaleConfigInfo& staleInfo) = 0;
+
+    /**
+     * Informs the targeter of stale db routing version responses for this db from an endpoint,
+     * with further information available in the returned staleInfo.
+     *
+     * Any stale responses noted here will be taken into account on the next refresh.
+     *
+     * If stale responses are is noted, we must not have noted that we cannot target.
+     */
+    virtual void noteStaleDbResponse(const ShardEndpoint& endpoint,
+                                     const StaleDbRoutingVersion& staleInfo) = 0;
 
     /**
      * Refreshes the targeting metadata for the namespace if needed, based on previously-noted

@@ -78,6 +78,14 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
         if (!handleMismatchStatus.isOK())
             log() << "Failed to handle stale version exception"
                   << causedBy(redact(handleMismatchStatus));
+    } else if (auto staleInfo = status->extraInfo<StaleDbRoutingVersion>()) {
+        auto handleMismatchStatus = onDbVersionMismatchNoExcept(_opCtx,
+                                                                staleInfo->getDb(),
+                                                                staleInfo->getVersionReceived(),
+                                                                staleInfo->getVersionWanted());
+        if (!handleMismatchStatus.isOK())
+            log() << "Failed to handle database version exception"
+                  << causedBy(redact(handleMismatchStatus));
     } else if (auto cannotImplicitCreateCollInfo =
                    status->extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
         if (ShardingState::get(_opCtx)->enabled()) {

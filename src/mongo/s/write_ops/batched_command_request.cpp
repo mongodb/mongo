@@ -46,6 +46,11 @@ BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request
     auto chunkVersion = ChunkVersion::parseFromCommand(request.body);
     if (chunkVersion != ErrorCodes::NoSuchKey) {
         batchRequest.setShardVersion(uassertStatusOK(std::move(chunkVersion)));
+        if (chunkVersion == ChunkVersion::UNSHARDED()) {
+            auto dbVersion = DatabaseVersion::parse(IDLParserErrorContext("BatchedCommandRequest"),
+                                                    request.body);
+            batchRequest.setDbVersion(std::move(dbVersion));
+        }
     }
 
     auto writeConcernField = request.body[kWriteConcern];
@@ -119,6 +124,10 @@ void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
     _visit([&](auto&& op) { op.serialize({}, builder); });
     if (_shardVersion) {
         _shardVersion->appendToCommand(builder);
+    }
+
+    if (_dbVersion) {
+        builder->append("databaseVersion", _dbVersion->toBSON());
     }
 
     if (_writeConcern) {

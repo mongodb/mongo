@@ -120,8 +120,13 @@ public:
         // No-op
     }
 
-    void noteStaleResponse(const ShardEndpoint& endpoint,
-                           const StaleConfigInfo& staleInfo) override {
+    void noteStaleShardResponse(const ShardEndpoint& endpoint,
+                                const StaleConfigInfo& staleInfo) override {
+        // No-op
+    }
+
+    void noteStaleDbResponse(const ShardEndpoint& endpoint,
+                             const StaleDbRoutingVersion& staleInfo) override {
         // No-op
     }
 

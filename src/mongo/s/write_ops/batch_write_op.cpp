@@ -37,6 +37,9 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
@@ -521,7 +524,15 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
         return wcb;
     }());
 
-    request.setShardVersion(targetedBatch.getEndpoint().shardVersion);
+
+    auto shardVersion = targetedBatch.getEndpoint().shardVersion;
+    request.setShardVersion(shardVersion);
+
+    auto dbVersion = targetedBatch.getEndpoint().databaseVersion;
+    invariant((shardVersion == ChunkVersion::UNSHARDED() && dbVersion) ||
+              (shardVersion != ChunkVersion::UNSHARDED() && !dbVersion));
+    if (dbVersion)
+        request.setDbVersion(dbVersion.get());
 
     if (_clientRequest.hasWriteConcern()) {
         if (_clientRequest.isVerboseWC()) {
@@ -878,7 +889,21 @@ bool EndpointComp::operator()(const ShardEndpoint* endpointA,
         return shardVersionDiff < 0;
     }
 
-    return endpointA->shardVersion.epoch().compare(endpointB->shardVersion.epoch()) < 0;
+    const long epochDiff = endpointA->shardVersion.epoch().compare(endpointB->shardVersion.epoch());
+    if (epochDiff) {
+        return epochDiff < 0;
+    }
+
+    if (endpointA->databaseVersion && endpointB->databaseVersion) {
+        if (endpointA->databaseVersion->getUuid() < endpointB->databaseVersion->getUuid())
+            return true;
+
+        return (endpointA->databaseVersion->getLastMod() -
+                    endpointB->databaseVersion->getLastMod() <
+                0);
+    }
+
+    return false;
 }
 
 void TrackedErrors::startTracking(int errCode) {

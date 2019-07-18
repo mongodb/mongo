@@ -94,8 +94,11 @@ public:
 
     void noteCouldNotTarget() override;
 
-    void noteStaleResponse(const ShardEndpoint& endpoint,
-                           const StaleConfigInfo& staleInfo) override;
+    void noteStaleShardResponse(const ShardEndpoint& endpoint,
+                                const StaleConfigInfo& staleInfo) override;
+
+    void noteStaleDbResponse(const ShardEndpoint& endpoint,
+                             const StaleDbRoutingVersion& staleInfo) override;
 
     /**
      * Replaces the targeting information with the latest information from the cache.  If this
@@ -114,7 +117,12 @@ private:
     /**
      * Performs an actual refresh from the config server.
      */
-    Status _refreshNow(OperationContext* opCtx);
+    Status _refreshShardVersionNow(OperationContext* opCtx);
+
+    /**
+     * Performs an actual refresh from the config server.
+     */
+    Status _refreshDbVersionNow(OperationContext* opCtx);
 
     /**
      * Returns a vector of ShardEndpoints where a document might need to be placed.
@@ -165,6 +173,9 @@ private:
 
     // Map of shard->remote shard version reported from stale errors
     ShardVersionMap _remoteShardVersions;
+
+    // remote db version reported from stale errors
+    boost::optional<DatabaseVersion> _remoteDbVersion;
 };
 
 }  // namespace mongo

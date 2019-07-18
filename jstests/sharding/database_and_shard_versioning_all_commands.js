@@ -156,7 +156,7 @@ let testCases = {
     },
     delete: {
         skipProfilerCheck: true,
-        sendsDbVersion: false,
+        sendsDbVersion: true,
         // The profiler extracts the individual deletes from the 'deletes' array, and so loses
         // the overall delete command's attached shardVersion, though one is sent.
         sendsShardVersion: true,
@@ -231,7 +231,7 @@ let testCases = {
     grantRolesToUser: {skip: "always targets the config server"},
     hostInfo: {skip: "executes locally on mongos (not sent to any remote node)"},
     insert: {
-        sendsDbVersion: false,
+        sendsDbVersion: true,
         sendsShardVersion: true,
         command: {insert: collName, documents: [{_id: 1}]},
         cleanUp: function(mongosConn) {
@@ -411,7 +411,7 @@ let testCases = {
     stopRecordingTraffic: {skip: "executes locally on mongos (not sent to any remote node)"},
     update: {
         skipProfilerCheck: true,
-        sendsDbVersion: false,
+        sendsDbVersion: true,
         // The profiler extracts the individual updates from the 'updates' array, and so loses
         // the overall update command's attached shardVersion, though one is sent.
         sendsShardVersion: true,

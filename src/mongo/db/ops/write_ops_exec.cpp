@@ -256,7 +256,7 @@ bool handleError(OperationContext* opCtx,
         return false;
     }
 
-    if (ex.extraInfo<StaleConfigInfo>()) {
+    if (ex.extraInfo<StaleConfigInfo>() || ex.extraInfo<StaleDbRoutingVersion>()) {
         if (!opCtx->getClient()->isInDirectClient()) {
             auto& oss = OperationShardingState::get(opCtx);
             oss.setShardingOperationFailedStatus(ex.toStatus());

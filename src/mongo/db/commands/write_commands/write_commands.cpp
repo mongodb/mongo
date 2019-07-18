@@ -93,7 +93,8 @@ void serializeReply(OperationContext* opCtx,
     if (continueOnError && !result.results.empty()) {
         const auto& lastResult = result.results.back();
         if (lastResult == ErrorCodes::StaleConfig ||
-            lastResult == ErrorCodes::CannotImplicitlyCreateCollection) {
+            lastResult == ErrorCodes::CannotImplicitlyCreateCollection ||
+            lastResult == ErrorCodes::StaleDbVersion) {
             // For ordered:false commands we need to duplicate these error results for all ops
             // after we stopped. See handleError() in write_ops_exec.cpp for more info.
             auto err = result.results.back();

@@ -32,8 +32,6 @@ selector:
   - jstests/sharding/migration_critical_section_concurrency.js        # SERVER-21713
   # Runs with auth enabled.
   - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
-  # Aggregation with $merge will fail until SERVER-41949 is finished.
-  - jstests/sharding/merge_with_move_primary.js
 
 executor:
   config:
