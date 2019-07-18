@@ -630,9 +630,9 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _isCapped(params.isCapped),
       _isEphemeral(params.isEphemeral),
       _isLogged(WiredTigerUtil::useTableLogging(
-                    NamespaceString(ns()),
-                    getGlobalReplSettings().usingReplSets() ||
-                        repl::ReplSettings::shouldRecoverFromOplogAsStandalone())),
+          NamespaceString(ns()),
+          getGlobalReplSettings().usingReplSets() ||
+              repl::ReplSettings::shouldRecoverFromOplogAsStandalone())),
       _isOplog(NamespaceString::oplog(params.ns)),
       _cappedMaxSize(params.cappedMaxSize),
       _cappedMaxSizeSlack(std::min(params.cappedMaxSize / 10, int64_t(16 * 1024 * 1024))),
