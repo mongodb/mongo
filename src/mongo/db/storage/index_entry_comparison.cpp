@@ -194,8 +194,9 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
         builder.appendAs(keyValueElem, keyNameElem.fieldName());
     }
 
-    sb << builder.obj();
-    return Status(DuplicateKeyErrorInfo(keyPattern, key), sb.str());
+    auto keyValueWithName = builder.obj();
+    sb << keyValueWithName;
+    return Status(DuplicateKeyErrorInfo(keyPattern, keyValueWithName), sb.str());
 }
 
 }  // namespace mongo

@@ -383,6 +383,7 @@ env.CppUnitTest(
     target='db_storage_test',
     source=[
         'flow_control_test.cpp',
+        'index_entry_comparison_test.cpp',
         'key_string_test.cpp',
         'storage_engine_lock_file_test.cpp',
         'storage_engine_metadata_test.cpp',
