@@ -104,7 +104,7 @@ public:
      */
     template <ErrorCategory category>
     bool isA() const {
-        return ErrorCodes::isA<category>(code());
+        return ErrorCodes::isA<category>(*this);
     }
 
     /**

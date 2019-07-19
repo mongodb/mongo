@@ -75,7 +75,8 @@ std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code) {
 }
 
 //#for $cat in $categories
-bool ErrorCodes::is${cat.name}(Error err) {
+template <>
+bool ErrorCodes::isA<ErrorCategory::$cat.name>(Error err) {
     switch (err) {
         //#for $code in $cat.codes
         case $code:
@@ -85,8 +86,8 @@ bool ErrorCodes::is${cat.name}(Error err) {
             return false;
     }
 }
-//#end for
 
+//#end for
 bool ErrorCodes::shouldHaveExtraInfo(Error code) {
     switch (code) {
         //#for $ec in $codes_with_extra

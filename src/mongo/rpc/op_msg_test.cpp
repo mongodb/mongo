@@ -550,7 +550,7 @@ TEST_F(OpMsgParser, FailsIfTooManyDocumentSequences) {
 
     ASSERT_THROWS_WITH_CHECK(
         msg.parse(), ExceptionFor<ErrorCodes::TooManyDocumentSequences>, [](const DBException& ex) {
-            ASSERT(ex.isA<ErrorCategory::ConnectionFatalMessageParseError>());
+            ASSERT(ErrorCodes::isConnectionFatalMessageParseError(ex));
         });
 }
 

@@ -149,7 +149,7 @@ Future<void> authenticateClient(const BSONObj& params,
                                 const std::string& clientName,
                                 RunCommandHook runCommand) {
     auto errorHandler = [](Status status) {
-        if (serverGlobalParams.transitionToAuth && !status.isA<ErrorCategory::NetworkError>()) {
+        if (serverGlobalParams.transitionToAuth && !ErrorCodes::isNetworkError(status)) {
             // If auth failed in transitionToAuth, just pretend it succeeded.
             log() << "Failed to authenticate in transitionToAuth, falling back to no "
                      "authentication.";

@@ -1083,7 +1083,7 @@ public:
 
         return std::move(*this).onError([func =
                                              std::forward<Func>(func)](Status && status) mutable {
-            if (!ErrorCodes::isA<category>(status.code()))
+            if (!ErrorCodes::isA<category>(status))
                 uassertStatusOK(status);
             return throwingCall(func, std::move(status));
         });
