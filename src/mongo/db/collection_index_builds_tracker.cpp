@@ -48,11 +48,9 @@ void CollectionIndexBuildsTracker::addIndexBuild(
 
     invariant(replIndexBuildState->indexNames.size());
     for (auto& indexName : replIndexBuildState->indexNames) {
-        // Ensure that a new entry is added.
-        invariant(_buildStateByIndexName.emplace(indexName, replIndexBuildState).second,
-                  str::stream() << "index build state for " << indexName
-                                << " already exists. Collection: "
-                                << replIndexBuildState->collectionUUID);
+        // Duplicate index names within the same index build are ignored here because these will
+        // be caught during validation by the IndexCatalog.
+        _buildStateByIndexName.emplace(indexName, replIndexBuildState);
     }
 }
 
@@ -63,7 +61,6 @@ void CollectionIndexBuildsTracker::removeIndexBuild(
     _buildStateByBuildUUID.erase(replIndexBuildState->buildUUID);
 
     for (const auto& indexName : replIndexBuildState->indexNames) {
-        invariant(_buildStateByIndexName.find(indexName) != _buildStateByIndexName.end());
         _buildStateByIndexName.erase(indexName);
     }
 

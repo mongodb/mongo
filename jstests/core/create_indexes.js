@@ -170,6 +170,15 @@
     res = t.runCommand('createIndexes', {indexes: [{key: {f: ""}, name: 'f_1'}]});
     assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
 
+    // Test that index creation fails with duplicate index names in the index specs.
+    res = t.runCommand('createIndexes', {
+        indexes: [
+            {key: {g: 1}, name: 'myidx'},
+            {key: {h: 1}, name: 'myidx'},
+        ],
+    });
+    assert.commandFailedWithCode(res, ErrorCodes.IndexKeySpecsConflict);
+
     // Test that user is not allowed to create indexes in config.transactions.
     var configDB = db.getSiblingDB('config');
     res = configDB.runCommand(
