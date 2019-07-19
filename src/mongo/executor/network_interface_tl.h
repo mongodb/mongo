@@ -40,6 +40,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/strong_weak_finish_line.h"
 
 namespace mongo {
 namespace executor {
@@ -106,6 +107,7 @@ private:
         Date_t deadline = RemoteCommandRequest::kNoExpirationDate;
         Date_t start;
 
+        StrongWeakFinishLine finishLine;
         ConnectionPool::ConnectionHandle conn;
         std::unique_ptr<transport::ReactorTimer> timer;
 
