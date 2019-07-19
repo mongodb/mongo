@@ -83,7 +83,7 @@ class Process(_process.Process):
                 self.wait()
         return self._return_code
 
-    def wait(self):
+    def wait(self, timeout=None):
         """Wait until process has terminated and all output has been consumed by the logger pipes."""
         if self._return_code is None:
             wait = self._stub.Wait(self._id)

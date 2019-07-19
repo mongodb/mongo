@@ -2672,6 +2672,9 @@ def doConfigure(myenv):
             # to fail
             sanitizer_list.remove('fuzzer')
             sanitizer_list.append('fuzzer-no-link')
+            # These flags are needed to generate a coverage report
+            myenv.Append(LINKFLAGS=['-fprofile-instr-generate','-fcoverage-mapping'])
+            myenv.Append(CCFLAGS=['-fprofile-instr-generate','-fcoverage-mapping'])
 
         sanitizer_option = '-fsanitize=' + ','.join(sanitizer_list)
 
