@@ -661,7 +661,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
     try {
         auto buildIndexFuture = uassertStatusOK(indexBuildsCoord->startIndexBuild(
-            opCtx, *collectionUUID, specs, buildUUID, protocol, indexBuildOptions));
+            opCtx, dbname, *collectionUUID, specs, buildUUID, protocol, indexBuildOptions));
 
         auto deadline = opCtx->getDeadline();
         // Date_t::max() means no deadline.

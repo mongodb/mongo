@@ -111,6 +111,7 @@ public:
      */
     virtual StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> startIndexBuild(
         OperationContext* opCtx,
+        StringData dbName,
         CollectionUUID collectionUUID,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,
@@ -338,6 +339,7 @@ protected:
      */
     StatusWith<boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>>
     _registerAndSetUpIndexBuild(OperationContext* opCtx,
+                                StringData dbName,
                                 CollectionUUID collectionUUID,
                                 const std::vector<BSONObj>& specs,
                                 const UUID& buildUUID,

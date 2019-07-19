@@ -538,6 +538,7 @@ void IndexBuildsCoordinator::_unregisterIndexBuild(
 StatusWith<boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>>
 IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
     OperationContext* opCtx,
+    StringData dbName,
     CollectionUUID collectionUUID,
     const std::vector<BSONObj>& specs,
     const UUID& buildUUID,
@@ -598,7 +599,7 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
     }
 
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collectionUUID, nss->db().toString(), filteredSpecs, protocol, commitQuorum);
+        buildUUID, collectionUUID, dbName.toString(), filteredSpecs, protocol, commitQuorum);
     replIndexBuildState->stats.numIndexesBefore = _getNumIndexesTotal(opCtx, collection);
 
     Status status = _registerIndexBuild(lk, replIndexBuildState);

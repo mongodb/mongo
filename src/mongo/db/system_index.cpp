@@ -126,6 +126,7 @@ SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats> generateSystemIndexForE
         IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {CommitQuorumOptions(1)};
         auto indexBuildFuture =
             uassertStatusOK(indexBuildsCoord->startIndexBuild(opCtx,
+                                                              ns.db(),
                                                               collectionUUID,
                                                               {indexSpec},
                                                               buildUUID,

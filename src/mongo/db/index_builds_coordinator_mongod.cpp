@@ -89,13 +89,14 @@ void IndexBuildsCoordinatorMongod::shutdown() {
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
+                                              StringData dbName,
                                               CollectionUUID collectionUUID,
                                               const std::vector<BSONObj>& specs,
                                               const UUID& buildUUID,
                                               IndexBuildProtocol protocol,
                                               IndexBuildOptions indexBuildOptions) {
     auto statusWithOptionalResult = _registerAndSetUpIndexBuild(
-        opCtx, collectionUUID, specs, buildUUID, protocol, indexBuildOptions.commitQuorum);
+        opCtx, dbName, collectionUUID, specs, buildUUID, protocol, indexBuildOptions.commitQuorum);
     if (!statusWithOptionalResult.isOK()) {
         return statusWithOptionalResult.getStatus();
     }
