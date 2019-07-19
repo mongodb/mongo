@@ -8,7 +8,6 @@ from . import interface
 from ... import core
 from ... import utils
 
-
 class CPPLibfuzzerTestCase(interface.ProcessTestCase):
     """A C++ libfuzzer test to execute."""
 
@@ -27,15 +26,13 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
         os.makedirs(self.corpus_directory, exist_ok=True)
 
     def _make_process(self):
-        default_args = [
-            self.program_executable, self.corpus_directory, "-max_len=100000", "-rss_limit_mb=5000"
-        ]
-        return core.programs.make_process(self.logger, default_args, **self.program_options)
+        default_args = [self.program_executable, self.corpus_directory, "-max_len=100000", "-rss_limit_mb=5000"]
+        return core.programs.make_process(self.logger, default_args,
+                                          **self.program_options)
 
     def _execute(self, process):
         """Run the specified process."""
-        self.logger.info("Starting Libfuzzer Test %s...\n%s", self.short_description(),
-                         process.as_command())
+        self.logger.info("Starting Libfuzzer Test %s...\n%s", self.short_description(), process.as_command())
         process.start()
         self.logger.info("%s started with pid %s.", self.short_description(), process.pid)
         try:
