@@ -308,11 +308,12 @@ __wt_update_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value,
  *	Check for obsolete updates.
  */
 WT_UPDATE *
-__wt_update_obsolete_check(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd)
+__wt_update_obsolete_check(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_UPDATE *upd, bool update_accounting)
 {
 	WT_TXN_GLOBAL *txn_global;
-	WT_UPDATE *first, *next;
+	WT_UPDATE *first, *next, *prev;
+	size_t size;
 	uint64_t oldest, stable;
 	u_int count, upd_seen, upd_unstable;
 
@@ -333,28 +334,34 @@ __wt_update_obsolete_check(
 	 *
 	 * Only updates with globally visible, self-contained data can terminate
 	 * update chains.
+	 *
+	 * Birthmarks are a special case: once a birthmark becomes obsolete, it
+	 * can be discarded and subsequent reads will see the on-page value (as
+	 * expected).  Inserting updates into the lookaside table relies on
+	 * this behavior to avoid creating update chains with multiple
+	 * birthmarks.
 	 */
-	for (first = NULL, count = 0; upd != NULL; upd = upd->next, count++) {
+	for (first = prev = NULL, count = 0;
+	    upd != NULL;
+	    prev = upd, upd = upd->next, count++) {
 		if (upd->txnid == WT_TXN_ABORTED)
 			continue;
-		/*
-		 * If the update isn't visible, it is not obsolete.
-		 */
 		++upd_seen;
 		if (!__wt_txn_upd_visible_all(session, upd)) {
 			first = NULL;
 			/*
-			 * While we're here, also check for the update
-			 * being kept only for timestamp history to
-			 * gauge updates being kept due to history.
+			 * While we're here, also check for the update being
+			 * kept only for timestamp history to gauge updates
+			 * being kept due to history.
 			 */
 			if (upd->start_ts != WT_TS_NONE &&
 			    upd->start_ts >= oldest &&
 			    upd->start_ts < stable)
 				++upd_unstable;
-		} else if (first == NULL && (WT_UPDATE_DATA_VALUE(upd) ||
-			    upd->type == WT_UPDATE_BIRTHMARK))
-				first = upd;
+		} else if (first == NULL && upd->type == WT_UPDATE_BIRTHMARK)
+			first = prev;
+		else if (first == NULL && WT_UPDATE_DATA_VALUE(upd))
+			first = upd;
 	}
 
 	__wt_cache_update_lookaside_score(session, upd_seen, upd_unstable);
@@ -367,8 +374,19 @@ __wt_update_obsolete_check(
 	 */
 	if (first != NULL &&
 	    (next = first->next) != NULL &&
-	    __wt_atomic_cas_ptr(&first->next, next, NULL))
+	    __wt_atomic_cas_ptr(&first->next, next, NULL)) {
+		/*
+		 * Decrement the dirty byte count while holding the page lock,
+		 * else we can race with checkpoints cleaning a page.
+		 */
+		if (update_accounting) {
+			for (size = 0, upd = next; upd != NULL; upd = upd->next)
+				size += WT_UPDATE_MEMSIZE(upd);
+			if (size != 0)
+				__wt_cache_page_inmem_decr(session, page, size);
+		}
 		return (next);
+	}
 
 	/*
 	 * If the list is long, don't retry checks on this page until the

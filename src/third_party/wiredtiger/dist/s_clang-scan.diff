@@ -1,0 +1,33 @@
+In file included from src/block/block_write.c:9:
+In file included from ./src/include/wt_internal.h:412:
+./src/include/intpack.i:194:4: warning: Assigned value is garbage or undefined
+        p = *pp;
+          ^ ~~~
+1 warning generated.
+src/conn/conn_capacity.c:310:2: warning: Value stored to 'capacity' is never read
+        capacity = steal_capacity = 0;
+        ^          ~~~~~~~~~~~~~~~~~~
+1 warning generated.
+src/reconcile/rec_col.c:700:2: warning: Value stored to 'start_ts' is never read
+        start_ts = WT_TS_MAX;
+        ^          ~~~~~~~~~
+src/reconcile/rec_col.c:701:2: warning: Value stored to 'start_txn' is never read
+        start_txn = WT_TXN_MAX;
+        ^           ~~~~~~~~~~
+src/reconcile/rec_col.c:702:2: warning: Value stored to 'stop_ts' is never read
+        stop_ts = WT_TS_NONE;
+        ^         ~~~~~~~~~~
+src/reconcile/rec_col.c:703:2: warning: Value stored to 'stop_txn' is never read
+        stop_txn = WT_TS_NONE;
+        ^          ~~~~~~~~~~
+src/reconcile/rec_col.c:1199:9: warning: Null pointer passed as an argument to a 'nonnull' parameter
+                                    memcmp(
+                                    ^~~~~~~
+5 warnings generated.
+In file included from src/reconcile/rec_write.c:9:
+In file included from ./src/include/wt_internal.h:417:
+./src/include/mutex.i:187:13: warning: Null pointer passed as an argument to a 'nonnull' parameter
+        if ((ret = pthread_mutex_unlock(&t->lock)) != 0)
+                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+ar: `u' modifier ignored since `D' is the default (see `U')

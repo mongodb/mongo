@@ -155,8 +155,8 @@ struct __wt_named_extractor {
  *	backup.
  */
 #define	WT_CONN_HOTBACKUP_START(conn) do {				\
-	conn->hot_backup = true;					\
-	conn->hot_backup_list = NULL;					\
+	(conn)->hot_backup = true;					\
+	(conn)->hot_backup_list = NULL;					\
 } while (0)
 
 /*

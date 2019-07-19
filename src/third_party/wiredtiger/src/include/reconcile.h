@@ -51,8 +51,8 @@ struct __wt_reconcile {
 	u_int updates_seen;		/* Count of updates seen. */
 	u_int updates_unstable;		/* Count of updates not visible_all. */
 
-	bool update_uncommitted;	/* An update was uncommitted */
-	bool update_used;		/* An update could be used */
+	bool update_uncommitted;	/* An update was uncommitted. */
+	bool update_used;		/* An update could be used. */
 
 	/* All the updates are with prepare in-progress state. */
 	bool all_upd_prepare_in_prog;

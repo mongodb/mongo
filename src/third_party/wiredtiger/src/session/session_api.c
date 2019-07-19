@@ -8,8 +8,6 @@
 
 #include "wt_internal.h"
 
-static int __session_checkpoint(WT_SESSION *, const char *);
-static int __session_snapshot(WT_SESSION *, const char *);
 static int __session_rollback_transaction(WT_SESSION *, const char *);
 
 /*

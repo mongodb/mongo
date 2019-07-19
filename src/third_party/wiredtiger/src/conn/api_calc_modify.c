@@ -72,9 +72,6 @@ __cm_extend(WT_CM_STATE *cms,
 	ptrdiff_t n;
 	const uint8_t *p1, *p2;
 
-	p1 = m1;
-	p2 = m2;
-
 	/*
 	 * Keep skipping half of the remaining bytes while they compare equal.
 	 * This is significantly faster than our byte-at-a-time loop below.

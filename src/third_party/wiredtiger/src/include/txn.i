@@ -683,7 +683,7 @@ __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
  */
 static inline bool
 __wt_txn_visible_all(
-    WT_SESSION_IMPL *session, uint64_t id, const wt_timestamp_t timestamp)
+    WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp)
 {
 	wt_timestamp_t pinned_ts;
 
@@ -783,7 +783,7 @@ __txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
  */
 static inline bool
 __wt_txn_visible(
-    WT_SESSION_IMPL *session, uint64_t id, const wt_timestamp_t timestamp)
+    WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp)
 {
 	WT_TXN *txn;
 

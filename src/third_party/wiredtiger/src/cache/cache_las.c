@@ -744,8 +744,26 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 			slot = page->type == WT_PAGE_ROW_LEAF ?
 			    WT_ROW_SLOT(page, list->ripcip) :
 			    WT_COL_SLOT(page, list->ripcip);
-		first_upd = upd = list->ins == NULL ?
+		first_upd = list->ins == NULL ?
 		    page->modify->mod_row_update[slot] : list->ins->upd;
+
+		/*
+		 * Trim any updates before writing to lookaside. This saves
+		 * wasted work, but is also necessary because the
+		 * reconciliation only resolves existing birthmarks if they
+		 * aren't obsolete.
+		 */
+		WT_WITH_BTREE(session, btree, upd =
+		    __wt_update_obsolete_check(session, page, first_upd, true));
+		if (upd != NULL)
+			__wt_free_update_list(session, upd);
+		upd = first_upd;
+
+		/*
+		 * It's not OK for the update list to contain a birthmark on
+		 * entry - we will generate one below if necessary.
+		 */
+		WT_ASSERT(session, __wt_count_birthmarks(first_upd) == 0);
 
 		/*
 		 * Walk the list of updates, storing each key/value pair into
@@ -762,14 +780,14 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 				las_value.data = upd->data;
 				las_value.size = upd->size;
 				break;
-			case WT_UPDATE_BIRTHMARK:
-				WT_ASSERT(session, upd != first_upd ||
-				    multi->page_las.skew_newest);
-				/* FALLTHROUGH */
 			case WT_UPDATE_TOMBSTONE:
 				las_value.size = 0;
 				break;
 			default:
+				/*
+				 * It is never OK to see a birthmark here - it
+				 * would be referring to the wrong page image.
+				 */
 				WT_ERR(__wt_illegal_value(session, upd->type));
 			}
 

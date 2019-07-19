@@ -3,32 +3,28 @@
 t=__wt.$$
 trap 'rm -rf $t' 0 1 2 3 13 15
 
-# Installation of the clang development package isn't standard, list a
-# couple of the places we're using.
-export PATH=$PATH:/usr/local/clang50/bin:/usr/local/llvm-devel/bin
-
-# Remove old reports.
-rm -rf /tmp/scan-build-*
-
 # Find the top-level WiredTiger directory and move to there.
-p="$PWD"
-while test "$p" != "/" ; do
-	if test -d "$p/build_posix"; then
-		break;
-	fi
-	p=`dirname $p`
-done
-test "$p" != "/" || {
-	echo "$0: cannot find the WiredTiger top-level directory"
+top=`git rev-parse --show-toplevel` && cd $top || exit 1
+echo "$0: running clang-tidy in $PWD"
+
+# Clang isn't installed in any standard place, find a binary we can use.
+# If the caller gives us $CLANGTIDY, use it.
+tidy="$CLANGTIDY"
+
+if test -z "$tidy" &&
+    test -x /usr/lib/llvm-3.9/bin/clang-tidy; then
+	tidy="/usr/lib/llvm-3.9/bin/clang-tidy"
+fi
+
+if test -z "$tidy"; then
+	echo "$0: no clang-tidy programs found"
+	echo "$0: set \$CLANGTIDY=/path/clang-tidy to continue"
 	exit 1
-}
+fi
+echo "$0: clang-tidy: $tidy"
 
-cd $p || exit 1
-echo "$0: running clang-tidy in $p..."
-
-sh autogen.sh > /dev/null || exit 1
-
-./configure --enable-diagnostic --enable-strict > /dev/null
+(sh autogen.sh &&
+    ./configure --enable-diagnostic --enable-strict) > /dev/null || exit 1
 
 # We need a custom wiredtiger_config.h, clang-tidy doesn't know where to
 # find the x86intrin.h include file.
@@ -37,8 +33,7 @@ sed '/HAVE_X86INTRIN_H/d' < $t > wiredtiger_config.h
 
 # We need a custom verify_build.h, clang-tidy doesn't like the magic.
 f=src/include/verify_build.h
-rm -f $f.save
-cp $f $f.save
+cat $f > $f.save
 echo '#define WT_STATIC_ASSERT(a)' > $f
 
 def="-D_GNU_SOURCE"
@@ -48,6 +43,7 @@ args="-checks=*"
 args="$args,-android-cloexec-fopen"
 args="$args,-clang-analyzer-core.NullDereference"
 args="$args,-clang-analyzer-optin.performance.Padding"
+args="$args,-clang-analyzer-valist.Uninitialized"
 args="$args,-cppcoreguidelines-avoid-magic-numbers"
 args="$args,-google-readability-braces-around-statements"
 args="$args,-hicpp-braces-around-statements"
@@ -65,27 +61,21 @@ args="$args,-readability-named-parameter"
 args="$args,-readability-non-const-parameter"
 args="$args,-readability-uppercase-literal-suffix"
 
-# clang-tidy gets unhappy if we toss the whole tree at it, so run
-# through a file at a time.
 # Only specify -header once.
-(
-clang-tidy src/btree/bt_compact.c \
-    "-header-filter=.*" "$args" -- $def $inc 2>&1
-for i in src/[a-np-z]*/*.c src/os_posix/*.c; do
-	clang-tidy $i "$args" -- $def $inc 2>&1
-done
-) > $t
+f=src/btree/bt_compact.c
+$tidy --quiet $f "-header-filter=.*,$args" -- $def $inc > $t
+
+f=`echo src/[a-np-z]*/*.c src/os_posix/*.c`
+$tidy --quiet $f "$args" -- $def $inc >> $t
+
+# Restore verify_build.h.
+f=src/include/verify_build.h
+cat $f.save > $f
+rm -f $f.save
 
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 echo 'clang-tidy output'
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-sed -e '/ warnings generated/d' \
-    -e '/Suppressed.*warnings/d' \
-    -e '/Use -header-filter/d' < $t
-
-# Restore verify_build.h.
-f=src/include/verify_build.h
-rm -f $f
-mv $f.save $f
+cat $t
 
 exit 0

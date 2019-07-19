@@ -1,3 +1,6 @@
+abort=0
 cache_minimum=20
+logging=1
+logging_archive=0
 rows=1000000
 timer=4

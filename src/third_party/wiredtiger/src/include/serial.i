@@ -266,7 +266,6 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_DECL_RET;
 	WT_UPDATE *obsolete, *upd;
 	wt_timestamp_t obsolete_timestamp;
-	size_t size;
 	uint64_t txn;
 
 	/* Clear references to memory we now own and must free on error. */
@@ -331,16 +330,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	if (WT_PAGE_TRYLOCK(session, page) != 0)
 		return (0);
 
-	obsolete = __wt_update_obsolete_check(session, page, upd->next);
-
-	/*
-	 * Decrement the dirty byte count while holding the page lock, else we
-	 * can race with checkpoints cleaning a page.
-	 */
-	for (size = 0, upd = obsolete; upd != NULL; upd = upd->next)
-		size += WT_UPDATE_MEMSIZE(upd);
-	if (size != 0)
-		__wt_cache_page_inmem_decr(session, page, size);
+	obsolete = __wt_update_obsolete_check(session, page, upd->next, true);
 
 	WT_PAGE_UNLOCK(session, page);
 

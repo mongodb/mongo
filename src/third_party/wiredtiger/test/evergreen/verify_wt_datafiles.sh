@@ -43,13 +43,7 @@ if [ ! -x "${wt_binary}" ]; then
 	exit 6
 fi
 
-# Check the existence of test/format 't' binary
-if [ ! -x "t" ]; then
-	echo "test/format 't' binary does not exist, exiting ..."
-	exit 6
-fi
-
-export LD_LIBRARY_PATH=$(dirname "${wt_binary}")
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-""}:$(dirname "${wt_binary}")
 num_tables_verified=0
 
 # Work out the list of directories that include wt data files
@@ -62,10 +56,14 @@ for d in ${dirs_include_datafile}
 do
 	echo "${d}"
 
-	tables=$(${wt_binary} -h "${d}" list)
-	rc=$?
+	${wt_binary} -h ${d} printlog > /dev/null
+	if [ "$?" -ne "0" ]; then 
+		echo "Failed to dump '${d}' log files, exiting ..."
+		exit 1
+	fi
 
-	if [ "$rc" -ne "0" ]; then 
+	tables=$(${wt_binary} -h "${d}" list)
+	if [ "$?" -ne "0" ]; then 
 		echo "Failed to list '${d}' directory, exiting ..."
 		exit 1
 	fi

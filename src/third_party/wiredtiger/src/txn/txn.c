@@ -624,7 +624,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 		txn->id = WT_TXN_NONE;
 	}
 
-	__wt_txn_clear_commit_timestamp(session);
+	__wt_txn_clear_durable_timestamp(session);
 
 	/* Free the scratch buffer allocated for logging. */
 	__wt_logrec_free(session, &txn->logrec);
@@ -641,10 +641,15 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 
 	txn->rollback_reason = NULL;
 
-	/* Ensure the transaction flags are cleared on exit */
+	/*
+	 * Ensure the transaction flags are cleared on exit
+	 *
+	 * Purposely do NOT clear the commit and durable timestamps on release.
+	 * Other readers may still find these transactions in the durable queue
+	 * and will need to see those timestamps.
+	 */
 	txn->flags = 0;
 	txn->prepare_timestamp = WT_TS_NONE;
-	txn->durable_timestamp = WT_TS_NONE;
 }
 
 /*
@@ -800,16 +805,15 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_OP *op;
 	WT_UPDATE *upd;
-	wt_timestamp_t prev_commit_timestamp;
+	wt_timestamp_t candidate_durable_timestamp, prev_durable_timestamp;
 	int64_t resolved_update_count, visited_update_count;
 	uint32_t fileid;
 	u_int i;
-	bool locked, prepare, readonly, skip_update_assert, update_timestamp;
+	bool locked, prepare, readonly, skip_update_assert, update_durable_ts;
 
 	txn = &session->txn;
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
-	prev_commit_timestamp = 0;	/* -Wconditional-uninitialized */
 	locked = skip_update_assert = false;
 	resolved_update_count = visited_update_count = 0;
 
@@ -1028,13 +1032,15 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->mod_count = 0;
 
 	/*
-	 * Track the largest commit timestamp we have seen.
-	 *
-	 * We don't actually clear the local commit timestamp, just the flag.
-	 * That said, we can't update the global commit timestamp until this
-	 * transaction is visible, which happens when we release it.
+	 * If durable is set, we'll try to update the global durable timestamp
+	 * with that value. If durable isn't set, durable is implied to be the
+	 * the same as commit so we'll use that instead.
 	 */
-	update_timestamp = F_ISSET(txn, WT_TXN_HAS_TS_COMMIT);
+	candidate_durable_timestamp = WT_TS_NONE;
+	if (F_ISSET(txn, WT_TXN_HAS_TS_DURABLE))
+		candidate_durable_timestamp = txn->durable_timestamp;
+	else if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
+		candidate_durable_timestamp = txn->commit_timestamp;
 
 	__wt_txn_release(session);
 	if (locked)
@@ -1047,25 +1053,28 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	if (!readonly)
 		WT_IGNORE_RET(__wt_gen_next(session, WT_GEN_COMMIT));
 
-	/* First check if we've already committed something in the future. */
-	if (update_timestamp) {
-		prev_commit_timestamp = txn_global->commit_timestamp;
-		update_timestamp =
-		    txn->commit_timestamp > prev_commit_timestamp;
+	/* First check if we've made something durable in the future. */
+	update_durable_ts = false;
+	prev_durable_timestamp = WT_TS_NONE;
+	if (candidate_durable_timestamp != WT_TS_NONE) {
+		prev_durable_timestamp = txn_global->durable_timestamp;
+		update_durable_ts =
+		    candidate_durable_timestamp > prev_durable_timestamp;
 	}
 
 	/*
-	 * If it looks like we need to move the global commit timestamp,
-	 * write lock and re-check.
+	 * If it looks like we'll need to move the global durable timestamp,
+	 * attempt atomic cas and re-check.
 	 */
-	if (update_timestamp)
-		while (txn->commit_timestamp > prev_commit_timestamp) {
-			if (__wt_atomic_cas64(&txn_global->commit_timestamp,
-			    prev_commit_timestamp, txn->commit_timestamp)) {
-				txn_global->has_commit_timestamp = true;
+	if (update_durable_ts)
+		while (candidate_durable_timestamp > prev_durable_timestamp) {
+			if (__wt_atomic_cas64(&txn_global->durable_timestamp,
+			    prev_durable_timestamp,
+			    candidate_durable_timestamp)) {
+				txn_global->has_durable_timestamp = true;
 				break;
 			}
-			prev_commit_timestamp = txn_global->commit_timestamp;
+			prev_durable_timestamp = txn_global->durable_timestamp;
 		}
 
 	/*
@@ -1397,7 +1406,7 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 	WT_CONNECTION_STATS **stats;
 	WT_TXN_GLOBAL *txn_global;
 	wt_timestamp_t checkpoint_timestamp;
-	wt_timestamp_t commit_timestamp;
+	wt_timestamp_t durable_timestamp;
 	wt_timestamp_t oldest_active_read_timestamp;
 	wt_timestamp_t pinned_timestamp;
 	uint64_t checkpoint_pinned, snapshot_pinned;
@@ -1412,17 +1421,17 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 	    txn_global->current - txn_global->oldest_id);
 
 	checkpoint_timestamp = txn_global->checkpoint_timestamp;
-	commit_timestamp = txn_global->commit_timestamp;
+	durable_timestamp = txn_global->durable_timestamp;
 	pinned_timestamp = txn_global->pinned_timestamp;
 	if (checkpoint_timestamp != WT_TS_NONE &&
 	    checkpoint_timestamp < pinned_timestamp)
 		pinned_timestamp = checkpoint_timestamp;
 	WT_STAT_SET(session, stats, txn_pinned_timestamp,
-	    commit_timestamp - pinned_timestamp);
+	    durable_timestamp - pinned_timestamp);
 	WT_STAT_SET(session, stats, txn_pinned_timestamp_checkpoint,
-	    commit_timestamp - checkpoint_timestamp);
+	    durable_timestamp - checkpoint_timestamp);
 	WT_STAT_SET(session, stats, txn_pinned_timestamp_oldest,
-	    commit_timestamp - txn_global->oldest_timestamp);
+	    durable_timestamp - txn_global->oldest_timestamp);
 
 	if (__wt_txn_get_pinned_timestamp(
 	    session, &oldest_active_read_timestamp, 0) == 0) {
@@ -1431,7 +1440,7 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 		    oldest_active_read_timestamp);
 		WT_STAT_SET(session, stats,
 		    txn_pinned_timestamp_reader,
-		    commit_timestamp - oldest_active_read_timestamp);
+		    durable_timestamp - oldest_active_read_timestamp);
 	} else {
 		WT_STAT_SET(session,
 		    stats, txn_timestamp_oldest_active_read, 0);
@@ -1456,7 +1465,7 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 	WT_STAT_SET(
 	    session, stats, txn_checkpoint_time_total, conn->ckpt_time_total);
 	WT_STAT_SET(session,
-	    stats, txn_commit_queue_len, txn_global->commit_timestampq_len);
+	    stats, txn_durable_queue_len, txn_global->durable_timestampq_len);
 	WT_STAT_SET(session,
 	    stats, txn_read_queue_len, txn_global->read_timestampq_len);
 }
@@ -1514,8 +1523,8 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_rwlock_init(session, &txn_global->visibility_rwlock));
 
 	WT_RWLOCK_INIT_TRACKED(session,
-	    &txn_global->commit_timestamp_rwlock, commit_timestamp);
-	TAILQ_INIT(&txn_global->commit_timestamph);
+	    &txn_global->durable_timestamp_rwlock, durable_timestamp);
+	TAILQ_INIT(&txn_global->durable_timestamph);
 
 	WT_RWLOCK_INIT_TRACKED(session,
 	    &txn_global->read_timestamp_rwlock, read_timestamp);
@@ -1552,7 +1561,7 @@ __wt_txn_global_destroy(WT_SESSION_IMPL *session)
 
 	__wt_spin_destroy(session, &txn_global->id_lock);
 	__wt_rwlock_destroy(session, &txn_global->rwlock);
-	__wt_rwlock_destroy(session, &txn_global->commit_timestamp_rwlock);
+	__wt_rwlock_destroy(session, &txn_global->durable_timestamp_rwlock);
 	__wt_rwlock_destroy(session, &txn_global->read_timestamp_rwlock);
 	__wt_rwlock_destroy(session, &txn_global->nsnap_rwlock);
 	__wt_rwlock_destroy(session, &txn_global->visibility_rwlock);
@@ -1689,16 +1698,17 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
 	    "metadata_pinned ID: %" PRIu64, txn_global->metadata_pinned));
 	WT_RET(__wt_msg(session, "oldest ID: %" PRIu64, txn_global->oldest_id));
 
-	WT_RET(__wt_msg(session, "commit timestamp: %s",
-	    __wt_timestamp_to_string(txn_global->commit_timestamp, ts_string)));
+	WT_RET(__wt_msg(session, "durable timestamp: %s",
+	    __wt_timestamp_to_string(
+	    txn_global->durable_timestamp, ts_string)));
 	WT_RET(__wt_msg(session, "oldest timestamp: %s",
 	    __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string)));
 	WT_RET(__wt_msg(session, "pinned timestamp: %s",
 	    __wt_timestamp_to_string(txn_global->pinned_timestamp, ts_string)));
 	WT_RET(__wt_msg(session, "stable timestamp: %s",
 	    __wt_timestamp_to_string(txn_global->stable_timestamp, ts_string)));
-	WT_RET(__wt_msg(session, "has_commit_timestamp: %s",
-	    txn_global->has_commit_timestamp ? "yes" : "no"));
+	WT_RET(__wt_msg(session, "has_durable_timestamp: %s",
+	    txn_global->has_durable_timestamp ? "yes" : "no"));
 	WT_RET(__wt_msg(session, "has_oldest_timestamp: %s",
 	    txn_global->has_oldest_timestamp ? "yes" : "no"));
 	WT_RET(__wt_msg(session, "has_pinned_timestamp: %s",
