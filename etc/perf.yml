@@ -43,6 +43,8 @@ post:
           fi
 
 
+# Be sure to add the module to git.get_project revisions parameter so the revision in the manifest
+# is the version of the repository that's cloned.
 modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
@@ -53,6 +55,14 @@ modules:
   branch: master
 
 functions:
+  "git get project": &git_get_project
+    command: git.get_project
+    params:
+      directory: src
+      revisions:  # for each module include revision as <module_name> : ${<module_name>_rev}
+        enterprise: ${enterprise_rev}
+        genny: ${genny_rev}
+
   "download analysis scripts":
     - command: shell.exec
       params:
@@ -63,9 +73,7 @@ functions:
           git clone git@github.com:10gen/dsi.git
     # get the mongo source, note the s3.get calls put the
     # exe files in their respective make locations.
-    - command: git.get_project
-      params:
-        directory: src
+    - *git_get_project
   "start server":
     - command: shell.exec
       params:
@@ -202,11 +210,10 @@ functions:
   #   workload: the path relative to genny/src/workloads to run e.g.
   #             scale/InsertRemove.yml
   "run genny workload":
-    - command: git.get_project
-      params:
-        directory: src
-        revisions:
-          genny: ${genny_rev}
+    # Calling the git.get_project command here will clone the mongodb/mongo repository, as well as
+    # the repositories defined in the build variant's "modules" section. Build variants running a
+    # task which calls this function must include "genny" as a module.
+    - *git_get_project
     - command: shell.exec
       params:
         working_dir: src/genny
@@ -269,10 +276,9 @@ tasks:
 
 - name: compile
   commands:
-    - command: git.get_project
-      params:
-        directory: src
-    - command: manifest.load
+    # Calling the git.get_project command here will clone the mongodb/mongo repository, as well as
+    # the repositories defined in the build variant's "modules" section.
+    - func: "git get project"
     # We create a virtual environment with the Python dependencies for compiling the server
     # installed.
     - command: shell.exec
