@@ -10710,6 +10710,7 @@ buildvariants:
   - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel62-large
+  - name: .rollbackfuzzer
   - name: sharding_gen
 
 - name: enterprise-rhel-62-64-bit-coverage
