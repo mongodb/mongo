@@ -440,8 +440,9 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
 
             // Most of the time we can't use a multikey index for a $ne: null query, however there
             // are a few exceptions around $elemMatch.
-            if (isNotEqualsNull &&
-                !notEqualsNullCanUseIndex(index, keyPatternElt, keyPatternIdx, elemMatchContext)) {
+            const bool canUseIndexForNeNull =
+                notEqualsNullCanUseIndex(index, keyPatternElt, keyPatternIdx, elemMatchContext);
+            if (isNotEqualsNull && !canUseIndexForNeNull) {
                 return false;
             }
 
@@ -449,6 +450,12 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             if (MatchExpression::MATCH_IN == childtype) {
                 InMatchExpression* ime = static_cast<InMatchExpression*>(node->getChild(0));
                 if (!ime->getRegexes().empty()) {
+                    return false;
+                }
+
+                // If we can't use the index for $ne to null, then we cannot use it for the
+                // case {$nin: [null, <...>]}.
+                if (!canUseIndexForNeNull && ime->hasNull()) {
                     return false;
                 }
             }

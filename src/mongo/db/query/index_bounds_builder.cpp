@@ -137,6 +137,20 @@ void makeNullEqualityBounds(const IndexEntry& index,
     // Just to be sure, make sure the bounds are in the right order if the hash values are opposite.
     IndexBoundsBuilder::unionize(oil);
 }
+
+bool isEqualityOrInNull(MatchExpression* me) {
+    if (MatchExpression::EQ == me->matchType()) {
+        return static_cast<ComparisonMatchExpression*>(me)->getData().type() == BSONType::jstNULL;
+    }
+
+    if (me->matchType() == MatchExpression::MATCH_IN) {
+        const InMatchExpression* in = static_cast<const InMatchExpression*>(me);
+        return in->hasNull();
+    }
+
+    return false;
+}
+
 }  // namespace
 
 string IndexBoundsBuilder::simpleRegex(const char* regex,
@@ -421,11 +435,11 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // Until the index distinguishes between missing values and literal null values, we cannot
         // build exact bounds for equality predicates on the literal value null. However, we _can_
         // build exact bounds for the inverse, for example the query {a: {$ne: null}}.
-        if (MatchExpression::EQ == child->matchType() &&
-            static_cast<ComparisonMatchExpression*>(child)->getData().type() == BSONType::jstNULL) {
+        if (isEqualityOrInNull(child)) {
             *tightnessOut = IndexBoundsBuilder::EXACT;
         }
 
+        // If this invariant would fail, we would otherwise return incorrect query results.
         invariant(*tightnessOut == IndexBoundsBuilder::EXACT);
 
         // If the index is multikey on this path, it doesn't matter what the tightness of the child

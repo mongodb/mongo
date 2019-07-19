@@ -3325,6 +3325,20 @@ TEST_F(QueryPlannerTest, NENull) {
         "[['MinKey',undefined,true,false],[null,'MaxKey',false,true]]}}}}}");
 }
 
+TEST_F(QueryPlannerTest, NinNull) {
+    addIndex(BSON("a" << 1));
+    runQuery(fromjson("{a: {$nin: [null, 4]}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, "
+        "bounds: {a: [['MinKey',undefined,true,false],"
+        "[null,4,false,false],"
+        "[4,'MaxKey',false,true]]}}}}}");
+}
+
+
 TEST_F(QueryPlannerTest, NENullWithSort) {
     addIndex(BSON("a" << 1));
     runQuerySortProj(fromjson("{a: {$ne: null}}"), BSON("a" << 1), BSONObj());
@@ -3375,7 +3389,7 @@ TEST_F(QueryPlannerTest, NENullWithSortAndProjection) {
 
 // In general, a negated $nin can make use of an index.
 TEST_F(QueryPlannerTest, NinUsesMultikeyIndex) {
-    // true means multikey
+    // 'true' means multikey.
     addIndex(BSON("a" << 1), true);
     runQuery(fromjson("{a: {$nin: [4, 10]}}"));
 
@@ -3390,14 +3404,27 @@ TEST_F(QueryPlannerTest, NinUsesMultikeyIndex) {
 
 // But it can't if the $nin contains a regex because regex bounds can't
 // be complemented.
-TEST_F(QueryPlannerTest, NinCantUseMultikeyIndex) {
-    // true means multikey
+TEST_F(QueryPlannerTest, NinWithRegexCantUseMultikeyIndex) {
+    // 'true' means multikey.
     addIndex(BSON("a" << 1), true);
     runQuery(fromjson("{a: {$nin: [4, /foobar/]}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists("{cscan: {dir: 1}}");
 }
+
+// Or if it contains a null, because null is "equal" to undefined, and undefined can represent an
+// empty array. Therefore negating the bounds [undefined, null], would lead to the query missing
+// values for empty array.
+TEST_F(QueryPlannerTest, NinWithNullCantUseMultikeyIndex) {
+    // 'true' means multikey.
+    addIndex(BSON("a" << 1), true);
+    runQuery(fromjson("{a: {$nin: [4, null]}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
 
 //
 // Multikey indices
