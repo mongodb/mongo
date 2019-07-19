@@ -43,7 +43,6 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/log.h"
 
@@ -56,7 +55,7 @@ SortKeyGeneratorStage::SortKeyGeneratorStage(OperationContext* opCtx,
                                              WorkingSet* ws,
                                              const BSONObj& sortSpecObj,
                                              const CollatorInterface* collator)
-    : PlanStage(kStageType, opCtx), _ws(ws), _sortSpec(sortSpecObj), _collator(collator) {
+    : PlanStage(kStageType, opCtx), _ws(ws), _sortKeyGen(sortSpecObj, collator) {
     _children.emplace_back(child);
 }
 
@@ -65,28 +64,11 @@ bool SortKeyGeneratorStage::isEOF() {
 }
 
 PlanStage::StageState SortKeyGeneratorStage::doWork(WorkingSetID* out) {
-    if (!_sortKeyGen) {
-        _sortKeyGen = std::make_unique<SortKeyGenerator>(_sortSpec, _collator);
-        return PlanStage::NEED_TIME;
-    }
-
     auto stageState = child()->work(out);
     if (stageState == PlanStage::ADVANCED) {
         WorkingSetMember* member = _ws->get(*out);
 
-        StatusWith<BSONObj> sortKey = BSONObj();
-        if (member->hasObj()) {
-            SortKeyGenerator::Metadata metadata;
-            if (_sortKeyGen->sortHasMeta() && member->hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
-                auto scoreData = static_cast<const TextScoreComputedData*>(
-                    member->getComputed(WSM_COMPUTED_TEXT_SCORE));
-                metadata.textScore = scoreData->getScore();
-            }
-            sortKey = _sortKeyGen->getSortKey(member->obj.value(), &metadata);
-        } else {
-            sortKey = getSortKeyFromIndexKey(*member);
-        }
-
+        auto sortKey = _sortKeyGen.getSortKey(*member);
         if (!sortKey.isOK()) {
             *out = WorkingSetCommon::allocateStatusMember(_ws, sortKey.getStatus());
             return PlanStage::FAILURE;
@@ -114,26 +96,6 @@ std::unique_ptr<PlanStageStats> SortKeyGeneratorStage::getStats() {
 const SpecificStats* SortKeyGeneratorStage::getSpecificStats() const {
     // No specific stats are tracked for the sort key generation stage.
     return nullptr;
-}
-
-StatusWith<BSONObj> SortKeyGeneratorStage::getSortKeyFromIndexKey(
-    const WorkingSetMember& member) const {
-    invariant(member.getState() == WorkingSetMember::RID_AND_IDX);
-    invariant(!_sortKeyGen->sortHasMeta());
-
-    BSONObjBuilder objBuilder;
-    for (BSONElement specElt : _sortSpec) {
-        invariant(specElt.isNumber());
-        BSONElement sortKeyElt;
-        invariant(member.getFieldDotted(specElt.fieldName(), &sortKeyElt));
-        // If we were to call 'collationAwareIndexKeyAppend' with a non-simple collation and a
-        // 'sortKeyElt' representing a collated index key we would incorrectly encode for the
-        // collation twice. This is not currently possible as the query planner will ensure that
-        // the plan fetches the data before sort key generation in the case where the index has a
-        // non-simple collation.
-        CollationIndexKey::collationAwareIndexKeyAppend(sortKeyElt, _collator, &objBuilder);
-    }
-    return objBuilder.obj();
 }
 
 }  // namespace mongo

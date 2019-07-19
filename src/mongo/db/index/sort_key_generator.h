@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -56,6 +57,16 @@ public:
     SortKeyGenerator(const BSONObj& sortSpec, const CollatorInterface* collator);
 
     /**
+     * Returns the key which should be used to sort the WorkingSetMember, or a non-OK status if no
+     * key could be generated. The WorkingSetMember may represent either an index key, or a document
+     * (owned or unowned) that has been fetched from the collection.
+     *
+     * If the sort pattern contains a $meta sort (e.g. sort by "textScore" or "randVal"), then the
+     * necessary metadata is obtained from the WorkingSetMember.
+     */
+    StatusWith<BSONObj> getSortKey(const WorkingSetMember&) const;
+
+    /**
      * Returns the key which should be used to sort 'obj', or a non-OK status if no key could be
      * generated.
      *
@@ -63,14 +74,7 @@ public:
      * a $meta sort (i.e. if sortHasMeta() is true). These values are filled in at the corresponding
      * positions in the sort key.
      */
-    StatusWith<BSONObj> getSortKey(const BSONObj& obj, const Metadata*) const;
-
-    /**
-     * Returns true if the sort pattern for this sort key generator includes a $meta sort.
-     */
-    bool sortHasMeta() const {
-        return _sortHasMeta;
-    }
+    StatusWith<BSONObj> getSortKeyFromDocument(const BSONObj& obj, const Metadata*) const;
 
 private:
     // Describes whether a component of the sort pattern is a field path (e.g. sort by "a.b"), or
@@ -81,7 +85,15 @@ private:
         kMetaRandVal,
     };
 
-    StatusWith<BSONObj> getIndexKey(const BSONObj& obj) const;
+    // Extracts the sort key from a WorkingSetMember which represents an index key. It is illegal to
+    // call this if the working set member is not in RID_AND_IDX state. It is also illegal to call
+    // this if the sort pattern has any $meta components.
+    StatusWith<BSONObj> getSortKeyFromIndexKey(const WorkingSetMember& member) const;
+
+    // Extracts the sort key from 'obj', using '_sortSpecWithoutMeta' and thus ignoring any $meta
+    // sort components of the sort pattern. The caller is responsible for augmenting this key with
+    // the appropriate metadata if '_sortHasMeta' is true.
+    StatusWith<BSONObj> getSortKeyFromDocumentWithoutMetadata(const BSONObj& obj) const;
 
     const CollatorInterface* _collator = nullptr;
 

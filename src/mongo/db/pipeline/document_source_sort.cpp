@@ -347,7 +347,7 @@ BSONObj DocumentSourceSort::extractKeyWithArray(const Document& doc) const {
     // Convert the Document to a BSONObj, but only do the conversion for the paths we actually need.
     // Then run the result through the SortKeyGenerator to obtain the final sort key.
     auto bsonDoc = _sortExecutor->sortPattern().documentToBsonWithSortPaths(doc);
-    return uassertStatusOK(_sortKeyGen->getSortKey(std::move(bsonDoc), &metadata));
+    return uassertStatusOK(_sortKeyGen->getSortKeyFromDocument(bsonDoc, &metadata));
 }
 
 std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) const {

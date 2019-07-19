@@ -168,13 +168,9 @@ TEST_F(SortStageTest, SortEmptyWorkingSet) {
     // Check initial EOF state.
     ASSERT_FALSE(sort.isEOF());
 
-    // First call to work() initializes sort key generator.
+    // First call to work() sorts data in vector.
     WorkingSetID id = WorkingSet::INVALID_ID;
-    PlanStage::StageState state = sort.work(&id);
-    ASSERT_EQUALS(state, PlanStage::NEED_TIME);
-
-    // Second call to work() sorts data in vector.
-    state = sort.work(&id);
+    auto state = sort.work(&id);
     ASSERT_EQUALS(state, PlanStage::NEED_TIME);
 
     // Finally we hit EOF.
