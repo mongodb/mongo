@@ -38,6 +38,14 @@ env.Library(
         ],
     )
 
+env.CppUnitTest(
+    target= 'index_entry_comparison_test',
+    source = 'index_entry_comparison_test.cpp',
+    LIBDEPS=[
+        'index_entry_comparison',
+        ],
+    )
+
 env.Library(
     target='duplicate_key_error_info',
     source=[
