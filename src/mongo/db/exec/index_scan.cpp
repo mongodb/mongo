@@ -39,7 +39,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/index_bounds_builder.h"
@@ -217,8 +216,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     _workingSet->transitionToRecordIdAndIdx(id);
 
     if (_addKeyMetadata) {
-        member->addComputed(
-            new IndexKeyComputedData(IndexKeyComputedData::rehydrateKey(_keyPattern, kv->key)));
+        member->metadata().setIndexKey(IndexKeyEntry::rehydrateKey(_keyPattern, kv->key));
     }
 
     *out = id;

@@ -500,79 +500,139 @@ namespace MetaFields {
 using mongo::Document;
 TEST(MetaFields, TextScoreBasics) {
     // Documents should not have a text score until it is set.
-    ASSERT_FALSE(Document().hasTextScore());
+    ASSERT_FALSE(Document().metadata().hasTextScore());
 
     // Setting the text score should work as expected.
     MutableDocument docBuilder;
-    docBuilder.setTextScore(1.0);
+    docBuilder.metadata().setTextScore(1.0);
     Document doc = docBuilder.freeze();
-    ASSERT_TRUE(doc.hasTextScore());
-    ASSERT_EQ(1.0, doc.getTextScore());
+    ASSERT_TRUE(doc.metadata().hasTextScore());
+    ASSERT_EQ(1.0, doc.metadata().getTextScore());
 }
 
 TEST(MetaFields, RandValBasics) {
     // Documents should not have a random value until it is set.
-    ASSERT_FALSE(Document().hasRandMetaField());
+    ASSERT_FALSE(Document().metadata().hasRandVal());
 
     // Setting the random value field should work as expected.
     MutableDocument docBuilder;
-    docBuilder.setRandMetaField(1.0);
+    docBuilder.metadata().setRandVal(1.0);
     Document doc = docBuilder.freeze();
-    ASSERT_TRUE(doc.hasRandMetaField());
-    ASSERT_EQ(1, doc.getRandMetaField());
+    ASSERT_TRUE(doc.metadata().hasRandVal());
+    ASSERT_EQ(1, doc.metadata().getRandVal());
 
     // Setting the random value twice should keep the second value.
     MutableDocument docBuilder2;
-    docBuilder2.setRandMetaField(1.0);
-    docBuilder2.setRandMetaField(2.0);
+    docBuilder2.metadata().setRandVal(1.0);
+    docBuilder2.metadata().setRandVal(2.0);
     Document doc2 = docBuilder2.freeze();
-    ASSERT_TRUE(doc2.hasRandMetaField());
-    ASSERT_EQ(2.0, doc2.getRandMetaField());
+    ASSERT_TRUE(doc2.metadata().hasRandVal());
+    ASSERT_EQ(2.0, doc2.metadata().getRandVal());
 }
 
 TEST(MetaFields, SearchScoreBasic) {
     // Documents should not have a search score until it is set.
-    ASSERT_FALSE(Document().hasSearchScore());
+    ASSERT_FALSE(Document().metadata().hasSearchScore());
 
     // Setting the search score field should work as expected.
     MutableDocument docBuilder;
-    docBuilder.setSearchScore(1.23);
+    docBuilder.metadata().setSearchScore(1.23);
     Document doc = docBuilder.freeze();
-    ASSERT_TRUE(doc.hasSearchScore());
-    ASSERT_EQ(1.23, doc.getSearchScore());
+    ASSERT_TRUE(doc.metadata().hasSearchScore());
+    ASSERT_EQ(1.23, doc.metadata().getSearchScore());
 
     // Setting the searchScore twice should keep the second value.
     MutableDocument docBuilder2;
-    docBuilder2.setSearchScore(1.0);
-    docBuilder2.setSearchScore(2.0);
+    docBuilder2.metadata().setSearchScore(1.0);
+    docBuilder2.metadata().setSearchScore(2.0);
     Document doc2 = docBuilder2.freeze();
-    ASSERT_TRUE(doc2.hasSearchScore());
-    ASSERT_EQ(2.0, doc2.getSearchScore());
+    ASSERT_TRUE(doc2.metadata().hasSearchScore());
+    ASSERT_EQ(2.0, doc2.metadata().getSearchScore());
 }
 
 TEST(MetaFields, SearchHighlightsBasic) {
     // Documents should not have a search highlights until it is set.
-    ASSERT_FALSE(Document().hasSearchHighlights());
+    ASSERT_FALSE(Document().metadata().hasSearchHighlights());
 
     // Setting the search highlights field should work as expected.
     MutableDocument docBuilder;
     Value highlights = DOC_ARRAY("a"_sd
                                  << "b"_sd);
-    docBuilder.setSearchHighlights(highlights);
+    docBuilder.metadata().setSearchHighlights(highlights);
     Document doc = docBuilder.freeze();
-    ASSERT_TRUE(doc.hasSearchHighlights());
-    ASSERT_VALUE_EQ(doc.getSearchHighlights(), highlights);
+    ASSERT_TRUE(doc.metadata().hasSearchHighlights());
+    ASSERT_VALUE_EQ(doc.metadata().getSearchHighlights(), highlights);
 
     // Setting the searchHighlights twice should keep the second value.
     MutableDocument docBuilder2;
     Value otherHighlights = DOC_ARRAY("snippet1"_sd
                                       << "snippet2"_sd
                                       << "snippet3"_sd);
-    docBuilder2.setSearchHighlights(highlights);
-    docBuilder2.setSearchHighlights(otherHighlights);
+    docBuilder2.metadata().setSearchHighlights(highlights);
+    docBuilder2.metadata().setSearchHighlights(otherHighlights);
     Document doc2 = docBuilder2.freeze();
-    ASSERT_TRUE(doc2.hasSearchHighlights());
-    ASSERT_VALUE_EQ(doc2.getSearchHighlights(), otherHighlights);
+    ASSERT_TRUE(doc2.metadata().hasSearchHighlights());
+    ASSERT_VALUE_EQ(doc2.metadata().getSearchHighlights(), otherHighlights);
+}
+
+TEST(MetaFields, IndexKeyMetadataSerializesCorrectly) {
+    Document doc{BSON("a" << 1)};
+    MutableDocument mutableDoc{doc};
+    mutableDoc.metadata().setIndexKey(BSON("b" << 1));
+    doc = mutableDoc.freeze();
+
+    ASSERT_TRUE(doc.metadata().hasIndexKey());
+    ASSERT_BSONOBJ_EQ(doc.metadata().getIndexKey(), BSON("b" << 1));
+
+    auto serialized = doc.toBsonWithMetaData();
+    ASSERT_BSONOBJ_EQ(serialized, BSON("a" << 1 << "$indexKey" << BSON("b" << 1)));
+}
+
+TEST(MetaFields, FromBsonWithMetadataAcceptsIndexKeyMetadata) {
+    auto doc = Document::fromBsonWithMetaData(BSON("a" << 1 << "$indexKey" << BSON("b" << 1)));
+    ASSERT_TRUE(doc.metadata().hasIndexKey());
+    ASSERT_BSONOBJ_EQ(doc.metadata().getIndexKey(), BSON("b" << 1));
+    auto bsonWithoutMetadata = doc.toBson();
+    ASSERT_BSONOBJ_EQ(bsonWithoutMetadata, BSON("a" << 1));
+}
+
+TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
+    Document source = Document::fromBsonWithMetaData(BSON(
+        "a" << 1 << "$textScore" << 9.9 << "b" << 1 << "$randVal" << 42.0 << "c" << 1 << "$sortKey"
+            << BSON("x" << 1)
+            << "d"
+            << 1
+            << "$dis"
+            << 3.2
+            << "e"
+            << 1
+            << "$pt"
+            << BSON_ARRAY(1 << 2)
+            << "f"
+            << 1
+            << "$searchScore"
+            << 5.4
+            << "g"
+            << 1
+            << "$searchHighlights"
+            << "foo"
+            << "h"
+            << 1
+            << "$indexKey"
+            << BSON("y" << 1)));
+
+    MutableDocument destination{};
+    destination.copyMetaDataFrom(source);
+    auto result = destination.freeze();
+
+    ASSERT_EQ(result.metadata().getTextScore(), 9.9);
+    ASSERT_EQ(result.metadata().getRandVal(), 42.0);
+    ASSERT_BSONOBJ_EQ(result.metadata().getSortKey(), BSON("x" << 1));
+    ASSERT_EQ(result.metadata().getGeoNearDistance(), 3.2);
+    ASSERT_VALUE_EQ(result.metadata().getGeoNearPoint(), Value{BSON_ARRAY(1 << 2)});
+    ASSERT_EQ(result.metadata().getSearchScore(), 5.4);
+    ASSERT_VALUE_EQ(result.metadata().getSearchHighlights(), Value{"foo"_sd});
+    ASSERT_BSONOBJ_EQ(result.metadata().getIndexKey(), BSON("y" << 1));
 }
 
 class SerializationTest : public unittest::Test {
@@ -588,18 +648,22 @@ protected:
         // Round trip to/from a buffer.
         auto output = roundTrip(input);
         ASSERT_DOCUMENT_EQ(output, input);
-        ASSERT_EQ(output.hasTextScore(), input.hasTextScore());
-        ASSERT_EQ(output.hasRandMetaField(), input.hasRandMetaField());
-        ASSERT_EQ(output.hasSearchScore(), input.hasSearchScore());
-        ASSERT_EQ(output.hasSearchHighlights(), input.hasSearchHighlights());
-        if (input.hasTextScore())
-            ASSERT_EQ(output.getTextScore(), input.getTextScore());
-        if (input.hasRandMetaField())
-            ASSERT_EQ(output.getRandMetaField(), input.getRandMetaField());
-        if (input.hasSearchScore())
-            ASSERT_EQ(output.getSearchScore(), input.getSearchScore());
-        if (input.hasSearchHighlights())
-            ASSERT_VALUE_EQ(output.getSearchHighlights(), input.getSearchHighlights());
+        ASSERT_EQ(output.metadata().hasTextScore(), input.metadata().hasTextScore());
+        ASSERT_EQ(output.metadata().hasRandVal(), input.metadata().hasRandVal());
+        ASSERT_EQ(output.metadata().hasSearchScore(), input.metadata().hasSearchScore());
+        ASSERT_EQ(output.metadata().hasSearchHighlights(), input.metadata().hasSearchHighlights());
+        ASSERT_EQ(output.metadata().hasIndexKey(), input.metadata().hasIndexKey());
+        if (input.metadata().hasTextScore())
+            ASSERT_EQ(output.metadata().getTextScore(), input.metadata().getTextScore());
+        if (input.metadata().hasRandVal())
+            ASSERT_EQ(output.metadata().getRandVal(), input.metadata().getRandVal());
+        if (input.metadata().hasSearchScore())
+            ASSERT_EQ(output.metadata().getSearchScore(), input.metadata().getSearchScore());
+        if (input.metadata().hasSearchHighlights())
+            ASSERT_VALUE_EQ(output.metadata().getSearchHighlights(),
+                            input.metadata().getSearchHighlights());
+        if (input.metadata().hasIndexKey())
+            ASSERT_BSONOBJ_EQ(output.metadata().getIndexKey(), input.metadata().getIndexKey());
 
         ASSERT(output.toBson().binaryEqual(input.toBson()));
     }
@@ -607,42 +671,43 @@ protected:
 
 TEST_F(SerializationTest, MetaSerializationNoVals) {
     MutableDocument docBuilder;
-    docBuilder.setTextScore(10.0);
-    docBuilder.setRandMetaField(20.0);
-    docBuilder.setSearchScore(30.0);
-    docBuilder.setSearchHighlights(DOC_ARRAY("abc"_sd
-                                             << "def"_sd));
+    docBuilder.metadata().setTextScore(10.0);
+    docBuilder.metadata().setRandVal(20.0);
+    docBuilder.metadata().setSearchScore(30.0);
+    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
+                                                        << "def"_sd));
     assertRoundTrips(docBuilder.freeze());
 }
 
 TEST_F(SerializationTest, MetaSerializationWithVals) {
     // Same as above test, but add a non-meta field as well.
     MutableDocument docBuilder(DOC("foo" << 10));
-    docBuilder.setTextScore(10.0);
-    docBuilder.setRandMetaField(20.0);
-    docBuilder.setSearchScore(30.0);
-    docBuilder.setSearchHighlights(DOC_ARRAY("abc"_sd
-                                             << "def"_sd));
+    docBuilder.metadata().setTextScore(10.0);
+    docBuilder.metadata().setRandVal(20.0);
+    docBuilder.metadata().setSearchScore(30.0);
+    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
+                                                        << "def"_sd));
+    docBuilder.metadata().setIndexKey(BSON("key" << 42));
     assertRoundTrips(docBuilder.freeze());
 }
 
 TEST_F(SerializationTest, MetaSerializationSearchHighlightsNonArray) {
     MutableDocument docBuilder;
-    docBuilder.setTextScore(10.0);
-    docBuilder.setRandMetaField(20.0);
-    docBuilder.setSearchScore(30.0);
+    docBuilder.metadata().setTextScore(10.0);
+    docBuilder.metadata().setRandVal(20.0);
+    docBuilder.metadata().setSearchScore(30.0);
     // Everything should still round trip even if the searchHighlights metadata isn't an array.
-    docBuilder.setSearchHighlights(Value(1.23));
+    docBuilder.metadata().setSearchHighlights(Value(1.23));
     assertRoundTrips(docBuilder.freeze());
 }
 
 TEST(MetaFields, ToAndFromBson) {
     MutableDocument docBuilder;
-    docBuilder.setTextScore(10.0);
-    docBuilder.setRandMetaField(20.0);
-    docBuilder.setSearchScore(30.0);
-    docBuilder.setSearchHighlights(DOC_ARRAY("abc"_sd
-                                             << "def"_sd));
+    docBuilder.metadata().setTextScore(10.0);
+    docBuilder.metadata().setRandVal(20.0);
+    docBuilder.metadata().setSearchScore(30.0);
+    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
+                                                        << "def"_sd));
     Document doc = docBuilder.freeze();
     BSONObj obj = doc.toBsonWithMetaData();
     ASSERT_EQ(10.0, obj[Document::metaFieldTextScore].Double());
@@ -652,29 +717,29 @@ TEST(MetaFields, ToAndFromBson) {
                       BSON_ARRAY("abc"_sd
                                  << "def"_sd));
     Document fromBson = Document::fromBsonWithMetaData(obj);
-    ASSERT_TRUE(fromBson.hasTextScore());
-    ASSERT_TRUE(fromBson.hasRandMetaField());
-    ASSERT_EQ(10.0, fromBson.getTextScore());
-    ASSERT_EQ(20, fromBson.getRandMetaField());
+    ASSERT_TRUE(fromBson.metadata().hasTextScore());
+    ASSERT_TRUE(fromBson.metadata().hasRandVal());
+    ASSERT_EQ(10.0, fromBson.metadata().getTextScore());
+    ASSERT_EQ(20, fromBson.metadata().getRandVal());
 }
 
 TEST(MetaFields, MetaFieldsIncludedInDocumentApproximateSize) {
     MutableDocument docBuilder;
-    docBuilder.setSearchHighlights(DOC_ARRAY("abc"_sd
-                                             << "def"_sd));
+    docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
+                                                        << "def"_sd));
     const size_t smallMetadataDocSize = docBuilder.freeze().getApproximateSize();
 
     // The second document has a larger "search highlights" object.
     MutableDocument docBuilder2;
-    docBuilder2.setSearchHighlights(DOC_ARRAY("abc"_sd
-                                              << "def"_sd
-                                              << "ghijklmnop"_sd));
+    docBuilder2.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
+                                                         << "def"_sd
+                                                         << "ghijklmnop"_sd));
     Document doc2 = docBuilder2.freeze();
     const size_t bigMetadataDocSize = doc2.getApproximateSize();
     ASSERT_GT(bigMetadataDocSize, smallMetadataDocSize);
 
     // Do a sanity check on the amount of space taken by metadata in document 2.
-    ASSERT_LT(doc2.getMetadataApproximateSize(), 200U);
+    ASSERT_LT(doc2.getMetadataApproximateSize(), 250U);
 
     Document emptyDoc;
     ASSERT_LT(emptyDoc.getMetadataApproximateSize(), 100U);
@@ -686,7 +751,7 @@ TEST(MetaFields, BadSerialization) {
     // Signal there are 0 fields.
     bb.appendNum(0);
     // This would specify a meta field with an invalid type.
-    bb.appendNum(char(MetaType::NUM_FIELDS) + 1);
+    bb.appendNum(char(DocumentMetadataFields::MetaType::NUM_FIELDS) + 1);
     // Signals end of input.
     bb.appendNum(char(0));
     BufReader reader(bb.buf(), bb.len());

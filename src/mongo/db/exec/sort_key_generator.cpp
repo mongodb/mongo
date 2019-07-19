@@ -41,7 +41,6 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/log.h"
@@ -74,8 +73,8 @@ PlanStage::StageState SortKeyGeneratorStage::doWork(WorkingSetID* out) {
             return PlanStage::FAILURE;
         }
 
-        // Add the sort key to the WSM as computed data.
-        member->addComputed(new SortKeyComputedData(sortKey.getValue()));
+        // Add the sort key to the WSM as metadata.
+        member->metadata().setSortKey(sortKey.getValue());
 
         return PlanStage::ADVANCED;
     }

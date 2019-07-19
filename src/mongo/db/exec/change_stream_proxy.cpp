@@ -56,7 +56,7 @@ boost::optional<BSONObj> ChangeStreamProxyStage::getNextBson() {
         // the latest event observed in the oplog, the latter via its sort key metadata field.
         auto nextBSON = _validateAndConvertToBSON(*next);
         _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_pipeline.get());
-        _postBatchResumeToken = next->getSortKeyMetaField();
+        _postBatchResumeToken = next->metadata().getSortKey();
         _setSpeculativeReadTimestamp();
         return nextBSON;
     }
@@ -83,7 +83,7 @@ BSONObj ChangeStreamProxyStage::_validateAndConvertToBSON(const Document& event)
     }
     // Confirm that the document _id field matches the original resume token in the sort key field.
     auto eventBSON = event.toBson();
-    auto resumeToken = event.getSortKeyMetaField();
+    auto resumeToken = event.metadata().getSortKey();
     auto idField = eventBSON.getObjectField("_id");
     invariant(!resumeToken.isEmpty());
     uassert(ErrorCodes::ChangeStreamFatalError,

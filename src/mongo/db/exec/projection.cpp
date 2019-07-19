@@ -37,7 +37,6 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
@@ -51,33 +50,30 @@ static const char* kIdField = "_id";
 namespace {
 
 BSONObj indexKey(const WorkingSetMember& member) {
-    return static_cast<const IndexKeyComputedData*>(member.getComputed(WSM_INDEX_KEY))->getKey();
+    return member.metadata().getIndexKey();
 }
 
 BSONObj sortKey(const WorkingSetMember& member) {
-    return static_cast<const SortKeyComputedData*>(member.getComputed(WSM_SORT_KEY))->getSortKey();
+    return member.metadata().getSortKey();
 }
 
 double geoDistance(const WorkingSetMember& member) {
-    return static_cast<const GeoDistanceComputedData*>(
-               member.getComputed(WSM_COMPUTED_GEO_DISTANCE))
-        ->getDist();
+    return member.metadata().getGeoNearDistance();
 }
 
-BSONObj geoPoint(const WorkingSetMember& member) {
-    return static_cast<const GeoNearPointComputedData*>(member.getComputed(WSM_GEO_NEAR_POINT))
-        ->getPoint();
+Value geoPoint(const WorkingSetMember& member) {
+    return member.metadata().getGeoNearPoint();
 }
 
 double textScore(const WorkingSetMember& member) {
-    if (member.hasComputed(WSM_COMPUTED_TEXT_SCORE))
-        return static_cast<const TextScoreComputedData*>(
-                   member.getComputed(WSM_COMPUTED_TEXT_SCORE))
-            ->getScore();
-    // It is permitted to request a text score when none has been computed. Zero is returned as an
-    // empty value in this case.
-    else
+    auto&& metadata = member.metadata();
+    if (metadata.hasTextScore()) {
+        return metadata.getTextScore();
+    } else {
+        // It is permitted to request a text score when none has been computed. Zero is returned as
+        // an empty value in this case.
         return 0.0;
+    }
 }
 
 void transitionMemberToOwnedObj(const BSONObj& bo, WorkingSetMember* member) {
@@ -89,10 +85,10 @@ void transitionMemberToOwnedObj(const BSONObj& bo, WorkingSetMember* member) {
 
 StatusWith<BSONObj> provideMetaFieldsAndPerformExec(const ProjectionExec& exec,
                                                     const WorkingSetMember& member) {
-    if (exec.needsGeoNearDistance() && !member.hasComputed(WSM_COMPUTED_GEO_DISTANCE))
+    if (exec.needsGeoNearDistance() && !member.metadata().hasGeoNearDistance())
         return Status(ErrorCodes::InternalError, "near loc dist requested but no data available");
 
-    if (exec.needsGeoNearPoint() && !member.hasComputed(WSM_GEO_NEAR_POINT))
+    if (exec.needsGeoNearPoint() && !member.metadata().hasGeoNearPoint())
         return Status(ErrorCodes::InternalError, "near loc proj requested but no data available");
 
     return member.hasObj()
@@ -100,7 +96,7 @@ StatusWith<BSONObj> provideMetaFieldsAndPerformExec(const ProjectionExec& exec,
                        exec.needsGeoNearDistance()
                            ? boost::optional<const double>(geoDistance(member))
                            : boost::none,
-                       exec.needsGeoNearPoint() ? geoPoint(member) : BSONObj(),
+                       exec.needsGeoNearPoint() ? geoPoint(member) : Value{},
                        exec.needsSortKey() ? sortKey(member) : BSONObj(),
                        exec.needsTextScore() ? boost::optional<const double>(textScore(member))
                                              : boost::none,
@@ -109,7 +105,7 @@ StatusWith<BSONObj> provideMetaFieldsAndPerformExec(const ProjectionExec& exec,
               member.keyData,
               exec.needsGeoNearDistance() ? boost::optional<const double>(geoDistance(member))
                                           : boost::none,
-              exec.needsGeoNearPoint() ? geoPoint(member) : BSONObj(),
+              exec.needsGeoNearPoint() ? geoPoint(member) : Value{},
               exec.needsSortKey() ? sortKey(member) : BSONObj(),
               exec.needsTextScore() ? boost::optional<const double>(textScore(member))
                                     : boost::none,
@@ -204,13 +200,13 @@ ProjectionStageDefault::ProjectionStageDefault(OperationContext* opCtx,
 
 Status ProjectionStageDefault::transform(WorkingSetMember* member) const {
     // The default no-fast-path case.
-    if (_exec.needsSortKey() && !member->hasComputed(WSM_SORT_KEY))
+    if (_exec.needsSortKey() && !member->metadata().hasSortKey())
         return Status(ErrorCodes::InternalError,
                       "sortKey meta-projection requested but no data available");
 
     if (_exec.returnKey()) {
         auto keys = _exec.computeReturnKeyProjection(
-            member->hasComputed(WSM_INDEX_KEY) ? indexKey(*member) : BSONObj(),
+            member->metadata().hasIndexKey() ? indexKey(*member) : BSONObj(),
             _exec.needsSortKey() ? sortKey(*member) : BSONObj());
         if (!keys.isOK())
             return keys.getStatus();

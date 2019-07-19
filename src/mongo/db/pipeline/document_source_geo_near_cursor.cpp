@@ -88,25 +88,25 @@ Document DocumentSourceGeoNearCursor::transformBSONObjToDocument(const BSONObj& 
     MutableDocument output(Document::fromBsonWithMetaData(obj));
 
     // Scale the distance by the requested factor.
-    invariant(output.peek().hasGeoNearDistance(),
+    invariant(output.peek().metadata().hasGeoNearDistance(),
               str::stream()
                   << "Query returned a document that is unexpectedly missing the geoNear distance: "
                   << obj.jsonString());
-    const auto distance = output.peek().getGeoNearDistance() * _distanceMultiplier;
+    const auto distance = output.peek().metadata().getGeoNearDistance() * _distanceMultiplier;
 
     output.setNestedField(_distanceField, Value(distance));
     if (_locationField) {
         invariant(
-            output.peek().hasGeoNearPoint(),
+            output.peek().metadata().hasGeoNearPoint(),
             str::stream()
                 << "Query returned a document that is unexpectedly missing the geoNear point: "
                 << obj.jsonString());
-        output.setNestedField(*_locationField, output.peek().getGeoNearPoint());
+        output.setNestedField(*_locationField, output.peek().metadata().getGeoNearPoint());
     }
 
     // In a cluster, $geoNear will be merged via $sort, so add the sort key.
     if (pExpCtx->needsMerge) {
-        output.setSortKeyMetaField(BSON("" << distance));
+        output.metadata().setSortKey(BSON("" << distance));
     }
 
     return output.freeze();

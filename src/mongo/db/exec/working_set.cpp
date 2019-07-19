@@ -125,10 +125,7 @@ WorkingSetMember::WorkingSetMember() {}
 WorkingSetMember::~WorkingSetMember() {}
 
 void WorkingSetMember::clear() {
-    for (size_t i = 0; i < WSM_COMPUTED_NUM_TYPES; i++) {
-        _computed[i].reset();
-    }
-
+    _metadata = DocumentMetadataFields{};
     keyData.clear();
     obj.reset();
     _state = WorkingSetMember::INVALID;
@@ -160,21 +157,6 @@ void WorkingSetMember::makeObjOwnedIfNeeded() {
     if (_state == RID_AND_OBJ && !obj.value().isOwned()) {
         obj.setValue(obj.value().getOwned());
     }
-}
-
-bool WorkingSetMember::hasComputed(const WorkingSetComputedDataType type) const {
-    return _computed[type].get();
-}
-
-const WorkingSetComputedData* WorkingSetMember::getComputed(
-    const WorkingSetComputedDataType type) const {
-    verify(_computed[type]);
-    return _computed[type].get();
-}
-
-void WorkingSetMember::addComputed(WorkingSetComputedData* data) {
-    verify(!hasComputed(data->type()));
-    _computed[data->type()].reset(data);
 }
 
 bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) const {

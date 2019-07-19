@@ -640,8 +640,8 @@ TEST(InclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
     inclusion.parse(BSON("a" << true));
 
     MutableDocument inputDocBuilder(Document{{"a", 1}});
-    inputDocBuilder.setRandMetaField(1.0);
-    inputDocBuilder.setTextScore(10.0);
+    inputDocBuilder.metadata().setRandVal(1.0);
+    inputDocBuilder.metadata().setTextScore(10.0);
     Document inputDoc = inputDocBuilder.freeze();
 
     auto result = inclusion.applyProjection(inputDoc);

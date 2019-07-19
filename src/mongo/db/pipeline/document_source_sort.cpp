@@ -337,11 +337,11 @@ StatusWith<Value> DocumentSourceSort::extractKeyFast(const Document& doc) const 
 
 BSONObj DocumentSourceSort::extractKeyWithArray(const Document& doc) const {
     SortKeyGenerator::Metadata metadata;
-    if (doc.hasTextScore()) {
-        metadata.textScore = doc.getTextScore();
+    if (doc.metadata().hasTextScore()) {
+        metadata.textScore = doc.metadata().getTextScore();
     }
-    if (doc.hasRandMetaField()) {
-        metadata.randVal = doc.getRandMetaField();
+    if (doc.metadata().hasRandVal()) {
+        metadata.randVal = doc.metadata().getRandVal();
     }
 
     // Convert the Document to a BSONObj, but only do the conversion for the paths we actually need.
@@ -380,7 +380,7 @@ std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) co
         // We need to be merged, so will have to be serialized. Save the sort key here to avoid
         // re-computing it during the merge.
         invariant(serializedSortKey);
-        toBeSorted.setSortKeyMetaField(*serializedSortKey);
+        toBeSorted.metadata().setSortKey(*serializedSortKey);
     }
     return {inMemorySortKey, toBeSorted.freeze()};
 }

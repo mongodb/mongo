@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/pipeline/value.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -134,7 +135,7 @@ public:
      */
     StatusWith<BSONObj> project(const BSONObj& in,
                                 const boost::optional<const double> geoDistance = boost::none,
-                                const BSONObj& geoNearPoint = BSONObj(),
+                                Value geoNearPoint = Value{},
                                 const BSONObj& sortKey = BSONObj(),
                                 const boost::optional<const double> textScore = boost::none,
                                 const int64_t recordId = 0) const;
@@ -147,7 +148,7 @@ public:
     StatusWith<BSONObj> projectCovered(
         const std::vector<IndexKeyDatum>& keyData,
         const boost::optional<const double> geoDistance = boost::none,
-        const BSONObj& geoNearPoint = BSONObj(),
+        Value geoNearPoint = Value{},
         const BSONObj& sortKey = BSONObj(),
         const boost::optional<const double> textScore = boost::none,
         const int64_t recordId = 0) const;
@@ -167,7 +168,7 @@ private:
      */
     BSONObj addMeta(BSONObjBuilder bob,
                     const boost::optional<const double> geoDistance,
-                    const BSONObj& geoNearPoint,
+                    Value geoNearPoint,
                     const BSONObj& sortKey,
                     const boost::optional<const double> textScore,
                     const int64_t recordId) const;

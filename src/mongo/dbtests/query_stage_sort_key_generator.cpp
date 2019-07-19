@@ -33,7 +33,6 @@
 
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sort_key_generator.h"
-#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -52,9 +51,7 @@ BSONObj extractKeyFromKeyGenStage(SortKeyGeneratorStage* sortKeyGen, WorkingSet*
 
     ASSERT_EQ(state, PlanStage::ADVANCED);
     auto wsm = workingSet->get(wsid);
-    auto sortKeyComputedData =
-        static_cast<const SortKeyComputedData*>(wsm->getComputed(WSM_SORT_KEY));
-    return sortKeyComputedData->getSortKey();
+    return wsm->metadata().getSortKey();
 }
 
 /**

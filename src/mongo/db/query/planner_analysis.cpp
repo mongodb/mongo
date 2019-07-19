@@ -341,7 +341,7 @@ std::unique_ptr<ProjectionNode> analyzeProjection(const CanonicalQuery& query,
     const QueryRequest& qr = query.getQueryRequest();
 
     // If there's no sort stage but we have a sortKey meta-projection, we need to add a stage to
-    // generate the sort key computed data.
+    // generate the sort key metadata.
     auto addSortKeyGeneratorStageIfNeeded = [&]() {
         if (!hasSortStage && query.getProj()->wantSortKey()) {
             auto keyGenNode = std::make_unique<SortKeyGeneratorNode>();

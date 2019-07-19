@@ -92,11 +92,11 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNext() {
     _randMetaFieldVal -= smallestFromSampleOfUniform(&prng, _nDocsInColl);
 
     MutableDocument md(nextResult.releaseDocument());
-    md.setRandMetaField(_randMetaFieldVal);
+    md.metadata().setRandVal(_randMetaFieldVal);
     if (pExpCtx->needsMerge) {
         // This stage will be merged by sorting results according to this random metadata field, but
         // the merging logic expects to sort by the sort key metadata.
-        md.setSortKeyMetaField(BSON("" << _randMetaFieldVal));
+        md.metadata().setSortKey(BSON("" << _randMetaFieldVal));
     }
     return md.freeze();
 }

@@ -52,13 +52,7 @@ public:
         verify(src.hasRecordId());
         verify(dest->recordId == src.recordId);
 
-        // Merge computed data.
-        typedef WorkingSetComputedDataType WSCD;
-        for (WSCD i = WSCD(0); i < WSM_COMPUTED_NUM_TYPES; i = WSCD(i + 1)) {
-            if (!dest->hasComputed(i) && src.hasComputed(i)) {
-                dest->addComputed(src.getComputed(i)->clone());
-            }
-        }
+        dest->metadata().mergeWith(src.metadata());
 
         if (dest->hasObj()) {
             // The merged WSM that we're creating already has the full document, so there's

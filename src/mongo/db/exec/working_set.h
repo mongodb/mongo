@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/document_metadata_fields.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/stdx/unordered_set.h"
@@ -181,51 +182,6 @@ struct IndexKeyDatum {
 };
 
 /**
- * What types of computed data can we have?
- */
-enum WorkingSetComputedDataType {
-    // What's the score of the document retrieved from a $text query?
-    WSM_COMPUTED_TEXT_SCORE = 0,
-
-    // What's the distance from a geoNear query point to the document?
-    WSM_COMPUTED_GEO_DISTANCE = 1,
-
-    // The index key used to retrieve the document, for returnKey query option.
-    WSM_INDEX_KEY = 2,
-
-    // What point (of several possible points) was used to compute the distance to the document
-    // via geoNear?
-    WSM_GEO_NEAR_POINT = 3,
-
-    // Comparison key for sorting.
-    WSM_SORT_KEY = 4,
-
-    // Must be last.
-    WSM_COMPUTED_NUM_TYPES,
-};
-
-/**
- * Data that is a computed function of a WSM.
- */
-class WorkingSetComputedData {
-    WorkingSetComputedData(const WorkingSetComputedData&) = delete;
-    WorkingSetComputedData& operator=(const WorkingSetComputedData&) = delete;
-
-public:
-    WorkingSetComputedData(const WorkingSetComputedDataType type) : _type(type) {}
-    virtual ~WorkingSetComputedData() {}
-
-    WorkingSetComputedDataType type() const {
-        return _type;
-    }
-
-    virtual WorkingSetComputedData* clone() const = 0;
-
-private:
-    WorkingSetComputedDataType _type;
-};
-
-/**
  * The type of the data passed between query stages.  In particular:
  *
  * Index scan stages return a WorkingSetMember in the RID_AND_IDX state.
@@ -297,14 +253,6 @@ public:
      */
     void makeObjOwnedIfNeeded();
 
-    //
-    // Computed data
-    //
-
-    bool hasComputed(const WorkingSetComputedDataType type) const;
-    const WorkingSetComputedData* getComputed(const WorkingSetComputedDataType type) const;
-    void addComputed(WorkingSetComputedData* data);
-
     /**
      * getFieldDotted uses its state (obj or index data) to produce the field with the provided
      * name.
@@ -321,12 +269,28 @@ public:
      */
     size_t getMemUsage() const;
 
+    /**
+     * Returns a const reference to an object housing the metadata fields associated with this
+     * WorkingSetMember.
+     */
+    const DocumentMetadataFields& metadata() const {
+        return _metadata;
+    }
+
+    /**
+     * Returns a non-const reference to an object housing the metadata fields associated with this
+     * WorkingSetMember.
+     */
+    DocumentMetadataFields& metadata() {
+        return _metadata;
+    }
+
 private:
     friend class WorkingSet;
 
     MemberState _state = WorkingSetMember::INVALID;
 
-    std::unique_ptr<WorkingSetComputedData> _computed[WSM_COMPUTED_NUM_TYPES];
+    DocumentMetadataFields _metadata;
 };
 
 }  // namespace mongo

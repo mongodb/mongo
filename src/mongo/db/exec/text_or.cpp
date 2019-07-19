@@ -39,7 +39,6 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
 
@@ -236,8 +235,8 @@ PlanStage::StageState TextOrStage::returnResults(WorkingSetID* out) {
 
     WorkingSetMember* wsm = _ws->get(textRecordData.wsid);
 
-    // Populate the working set member with the text score and return it.
-    wsm->addComputed(new TextScoreComputedData(textRecordData.score));
+    // Populate the working set member with the text score metadata and return it.
+    wsm->metadata().setTextScore(textRecordData.score);
     *out = textRecordData.wsid;
     return PlanStage::ADVANCED;
 }

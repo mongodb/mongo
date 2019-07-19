@@ -6091,7 +6091,7 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchScore) {
     auto expressionMeta = ExpressionMeta::parse(expCtx, expr.firstElement(), vps);
 
     MutableDocument doc;
-    doc.setSearchScore(1.234);
+    doc.metadata().setSearchScore(1.234);
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
     ASSERT_EQ(val.getDouble(), 1.234);
 }
@@ -6104,7 +6104,7 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchHighlights) {
 
     MutableDocument doc;
     Document highlights = DOC("this part" << 1 << "is opaque to the server" << 1);
-    doc.setSearchHighlights(Value(highlights));
+    doc.metadata().setSearchHighlights(Value(highlights));
 
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx->variables);
     ASSERT_DOCUMENT_EQ(val.getDocument(), highlights);

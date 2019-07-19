@@ -62,7 +62,7 @@ DocumentSource::GetNextResult DocumentSourceSample::getNext() {
         auto nextInput = pSource->getNext();
         for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
             MutableDocument doc(nextInput.releaseDocument());
-            doc.setRandMetaField(prng.nextCanonicalDouble());
+            doc.metadata().setRandVal(prng.nextCanonicalDouble());
             _sortStage->loadDocument(doc.freeze());
         }
         switch (nextInput.getStatus()) {

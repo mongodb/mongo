@@ -328,7 +328,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
 
     // We set the resume token as the document's sort key in both the sharded and non-sharded cases,
     // since we will subsequently rely upon it to generate a correct postBatchResumeToken.
-    doc.setSortKeyMetaField(resumeToken.toBson());
+    doc.metadata().setSortKey(resumeToken.toBson());
 
     // "invalidate" and "newShardDetected" entries have fewer fields.
     if (operationType == DocumentSourceChangeStream::kInvalidateOpType ||

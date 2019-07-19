@@ -99,6 +99,7 @@ public:
     static constexpr StringData metaFieldGeoNearPoint = "$pt"_sd;
     static constexpr StringData metaFieldSearchScore = "$searchScore"_sd;
     static constexpr StringData metaFieldSearchHighlights = "$searchHighlights"_sd;
+    static constexpr StringData metaFieldIndexKey = "$indexKey"_sd;
 
     static const StringDataSet allMetadataFieldNames;
 
@@ -169,8 +170,7 @@ public:
     size_t getApproximateSize() const;
 
     /**
-     * Return the approximate amount of space used by metadata. Note that documents may reserve
-     * space for metadata even no metadata is used.
+     * Return the approximate amount of space used by metadata.
      */
     size_t getMetadataApproximateSize() const {
         return storage().getMetadataApproximateSize();
@@ -234,12 +234,6 @@ public:
      */
     static Document fromBsonWithMetaData(const BSONObj& bson);
 
-    /**
-     * Given a BSON object that may have metadata fields added as part of toBsonWithMetadata(),
-     * returns the same object without any of the metadata fields.
-     */
-    static BSONObj stripMetadataFields(const BSONObj& bsonWithMetadata);
-
     // Support BSONObjBuilder and BSONArrayBuilder "stream" API
     friend BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Document& d);
 
@@ -262,53 +256,12 @@ public:
         return Document(storage().clone().get());
     }
 
-    bool hasTextScore() const {
-        return storage().hasTextScore();
-    }
-    double getTextScore() const {
-        return storage().getTextScore();
-    }
-
-    bool hasRandMetaField() const {
-        return storage().hasRandMetaField();
-    }
-    double getRandMetaField() const {
-        return storage().getRandMetaField();
-    }
-
-    bool hasSortKeyMetaField() const {
-        return storage().hasSortKeyMetaField();
-    }
-    BSONObj getSortKeyMetaField() const {
-        return storage().getSortKeyMetaField();
-    }
-
-    bool hasGeoNearDistance() const {
-        return storage().hasGeoNearDistance();
-    }
-    double getGeoNearDistance() const {
-        return storage().getGeoNearDistance();
-    }
-
-    bool hasGeoNearPoint() const {
-        return storage().hasGeoNearPoint();
-    }
-    Value getGeoNearPoint() const {
-        return storage().getGeoNearPoint();
-    }
-
-    bool hasSearchScore() const {
-        return storage().hasSearchScore();
-    }
-    double getSearchScore() const {
-        return storage().getSearchScore();
-    }
-
-    bool hasSearchHighlights() const {
-        return storage().hasSearchHighlights();
-    }
-    Value getSearchHighlights() const {
-        return storage().getSearchHighlights();
+    /**
+     * Returns a const reference to an object housing the metadata fields associated with this
+     * WorkingSetMember.
+     */
+    const DocumentMetadataFields& metadata() const {
+        return storage().metadata();
     }
 
     /// members for Sorter
@@ -553,32 +506,12 @@ public:
         storage().copyMetaDataFrom(source.storage());
     }
 
-    void setTextScore(double score) {
-        storage().setTextScore(score);
-    }
-
-    void setRandMetaField(double val) {
-        storage().setRandMetaField(val);
-    }
-
-    void setSortKeyMetaField(BSONObj sortKey) {
-        storage().setSortKeyMetaField(sortKey);
-    }
-
-    void setGeoNearDistance(double dist) {
-        storage().setGeoNearDistance(dist);
-    }
-
-    void setGeoNearPoint(Value point) {
-        storage().setGeoNearPoint(std::move(point));
-    }
-
-    void setSearchScore(double score) {
-        storage().setSearchScore(score);
-    }
-
-    void setSearchHighlights(Value highlights) {
-        storage().setSearchHighlights(highlights);
+    /**
+     * Returns a non-const reference to an object housing the metadata fields associated with this
+     * WorkingSetMember.
+     */
+    DocumentMetadataFields& metadata() {
+        return storage().metadata();
     }
 
     /** Convert to a read-only document and release reference.

@@ -32,7 +32,6 @@
 #include "mongo/db/index/sort_key_generator.h"
 
 #include "mongo/bson/bsonobj_comparator.h"
-#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 
 namespace mongo {
@@ -87,10 +86,8 @@ SortKeyGenerator::SortKeyGenerator(const BSONObj& sortSpec, const CollatorInterf
 StatusWith<BSONObj> SortKeyGenerator::getSortKey(const WorkingSetMember& wsm) const {
     if (wsm.hasObj()) {
         SortKeyGenerator::Metadata metadata;
-        if (_sortHasMeta && wsm.hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
-            auto scoreData =
-                static_cast<const TextScoreComputedData*>(wsm.getComputed(WSM_COMPUTED_TEXT_SCORE));
-            metadata.textScore = scoreData->getScore();
+        if (_sortHasMeta && wsm.metadata().hasTextScore()) {
+            metadata.textScore = wsm.metadata().getTextScore();
         }
         return getSortKeyFromDocument(wsm.obj.value(), &metadata);
     }

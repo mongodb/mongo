@@ -32,7 +32,6 @@
 #include <memory>
 
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/death_test.h"
@@ -279,7 +278,7 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateKeyFromWSMForTextScoreMetaSort
     BSONObj pattern = fromjson("{a: 1, b: {$meta: 'textScore'}, c: -1}}");
     auto sortKeyGen = std::make_unique<SortKeyGenerator>(pattern, nullptr);
     setOwnedObj(BSON("x" << 1 << "a" << 2 << "y" << 3 << "c" << BSON_ARRAY(4 << 5 << 6)));
-    member().addComputed(new TextScoreComputedData(9.9));
+    member().metadata().setTextScore(9.9);
     auto sortKey = sortKeyGen->getSortKey(member());
     ASSERT_OK(sortKey);
     ASSERT_BSONOBJ_EQ(BSON("" << 2 << "" << 9.9 << "" << 6), sortKey.getValue());
@@ -314,7 +313,7 @@ DEATH_TEST_F(SortKeyGeneratorWorkingSetTest,
     BSONObj pattern = fromjson("{z: {$meta: 'textScore'}}");
     auto sortKeyGen = std::make_unique<SortKeyGenerator>(pattern, nullptr);
     setRecordIdAndIdx(BSON("a" << 1 << "b" << 1), BSON("" << 2 << "" << 3));
-    member().addComputed(new TextScoreComputedData(9.9));
+    member().metadata().setTextScore(9.9);
     MONGO_COMPILER_VARIABLE_UNUSED auto ignored = sortKeyGen->getSortKey(member());
 }
 

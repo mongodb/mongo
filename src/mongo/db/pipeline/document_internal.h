@@ -35,6 +35,7 @@
 #include <boost/intrusive_ptr.hpp>
 
 #include "mongo/base/static_assert.h"
+#include "mongo/db/pipeline/document_metadata_fields.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -261,118 +262,6 @@ private:
     const ValueElement* _end;
 };
 
-enum MetaType : char {
-    TEXT_SCORE,
-    RAND_VAL,
-    SORT_KEY,
-    GEONEAR_DIST,
-    GEONEAR_POINT,
-    SEARCH_SCORE,
-    SEARCH_HIGHLIGHTS,
-
-    // New fields must be added before the NUM_FIELDS sentinel.
-    NUM_FIELDS
-};
-
-/**
- * A simple container of all metadata fields
- *
- */
-struct MetadataFields {
-    std::bitset<MetaType::NUM_FIELDS> _metaFields;
-    double _textScore{0.0};
-    double _randVal{0.0};
-    BSONObj _sortKey;
-    double _geoNearDistance{0.0};
-    Value _geoNearPoint;
-    double _searchScore{0.0};
-    Value _searchHighlights;
-
-    MetadataFields() {}
-    // When adding a field, make sure to update the copy constructor.
-    MetadataFields(const MetadataFields& other);
-
-    size_t getApproximateSize() const;
-
-    bool hasTextScore() const {
-        return _metaFields.test(MetaType::TEXT_SCORE);
-    }
-    double getTextScore() const {
-        return _textScore;
-    }
-    void setTextScore(double score) {
-        _metaFields.set(MetaType::TEXT_SCORE);
-        _textScore = score;
-    }
-
-    bool hasRandMetaField() const {
-        return _metaFields.test(MetaType::RAND_VAL);
-    }
-    double getRandMetaField() const {
-        return _randVal;
-    }
-    void setRandMetaField(double val) {
-        _metaFields.set(MetaType::RAND_VAL);
-        _randVal = val;
-    }
-
-    bool hasSortKeyMetaField() const {
-        return _metaFields.test(MetaType::SORT_KEY);
-    }
-    BSONObj getSortKeyMetaField() const {
-        return _sortKey;
-    }
-    void setSortKeyMetaField(BSONObj sortKey) {
-        _metaFields.set(MetaType::SORT_KEY);
-        _sortKey = sortKey.getOwned();
-    }
-
-    bool hasGeoNearDistance() const {
-        return _metaFields.test(MetaType::GEONEAR_DIST);
-    }
-    double getGeoNearDistance() const {
-        return _geoNearDistance;
-    }
-    void setGeoNearDistance(double dist) {
-        _metaFields.set(MetaType::GEONEAR_DIST);
-        _geoNearDistance = dist;
-    }
-
-    bool hasGeoNearPoint() const {
-        return _metaFields.test(MetaType::GEONEAR_POINT);
-    }
-    Value getGeoNearPoint() const {
-        return _geoNearPoint;
-    }
-    void setGeoNearPoint(Value point) {
-        _metaFields.set(MetaType::GEONEAR_POINT);
-        _geoNearPoint = std::move(point);
-    }
-
-    bool hasSearchScore() const {
-        return _metaFields.test(MetaType::SEARCH_SCORE);
-    }
-    double getSearchScore() const {
-        return _searchScore;
-    }
-    void setSearchScore(double score) {
-        _metaFields.set(MetaType::SEARCH_SCORE);
-        _searchScore = score;
-    }
-
-    bool hasSearchHighlights() const {
-        return _metaFields.test(MetaType::SEARCH_HIGHLIGHTS);
-    }
-    Value getSearchHighlights() const {
-        return _searchHighlights;
-    }
-    void setSearchHighlights(Value highlights) {
-        _metaFields.set(MetaType::SEARCH_HIGHLIGHTS);
-        _searchHighlights = highlights;
-    }
-};
-
-
 /// Storage class used by both Document and MutableDocument
 class DocumentStorage : public RefCountable {
 public:
@@ -479,6 +368,7 @@ public:
     auto bsonObjSize() const {
         return _bson.objsize();
     }
+
     /**
      * Compute the space allocated for the metadata fields. Will account for space allocated for
      * unused metadata fields as well.
@@ -490,124 +380,32 @@ public:
      * Note: does not clear metadata from this.
      */
     void copyMetaDataFrom(const DocumentStorage& source) {
-        // It the underlying BSON object is shared and the source does not have metadata then
+        // If the underlying BSON object is shared and the source does not have metadata then
         // nothing needs to be copied. If the metadata is in the BSON then they are the same in
         // this and source.
         if (_bson.objdata() == source._bson.objdata() && !source._metadataFields) {
             return;
         }
-        if (source.hasTextScore()) {
-            setTextScore(source.getTextScore());
-        }
-        if (source.hasRandMetaField()) {
-            setRandMetaField(source.getRandMetaField());
-        }
-        if (source.hasSortKeyMetaField()) {
-            setSortKeyMetaField(source.getSortKeyMetaField());
-        }
-        if (source.hasGeoNearDistance()) {
-            setGeoNearDistance(source.getGeoNearDistance());
-        }
-        if (source.hasGeoNearPoint()) {
-            setGeoNearPoint(source.getGeoNearPoint());
-        }
-        if (source.hasSearchScore()) {
-            setSearchScore(source.getSearchScore());
-        }
-        if (source.hasSearchHighlights()) {
-            setSearchHighlights(source.getSearchHighlights());
-        }
+        loadLazyMetadata();
+        metadata().copyFrom(source.metadata());
     }
 
-    bool hasTextScore() const {
+    /**
+     * Returns a const reference to an object housing the metadata fields associated with this
+     * WorkingSetMember.
+     */
+    const DocumentMetadataFields& metadata() const {
         loadLazyMetadata();
-        return _metadataFields->hasTextScore();
-    }
-    double getTextScore() const {
-        loadLazyMetadata();
-        return _metadataFields->getTextScore();
-    }
-    void setTextScore(double score) {
-        loadLazyMetadata();
-        _metadataFields->setTextScore(score);
+        return _metadataFields;
     }
 
-    bool hasRandMetaField() const {
+    /**
+     * Returns a non-const reference to an object housing the metadata fields associated with this
+     * WorkingSetMember.
+     */
+    DocumentMetadataFields& metadata() {
         loadLazyMetadata();
-        return _metadataFields->hasRandMetaField();
-    }
-    double getRandMetaField() const {
-        loadLazyMetadata();
-        return _metadataFields->getRandMetaField();
-    }
-    void setRandMetaField(double val) {
-        loadLazyMetadata();
-        _metadataFields->setRandMetaField(val);
-    }
-
-    bool hasSortKeyMetaField() const {
-        loadLazyMetadata();
-        return _metadataFields->hasSortKeyMetaField();
-    }
-    BSONObj getSortKeyMetaField() const {
-        loadLazyMetadata();
-        return _metadataFields->getSortKeyMetaField();
-    }
-    void setSortKeyMetaField(BSONObj sortKey) {
-        loadLazyMetadata();
-        _metadataFields->setSortKeyMetaField(sortKey);
-    }
-
-    bool hasGeoNearDistance() const {
-        loadLazyMetadata();
-        return _metadataFields->hasGeoNearDistance();
-    }
-    double getGeoNearDistance() const {
-        loadLazyMetadata();
-        return _metadataFields->getGeoNearDistance();
-    }
-    void setGeoNearDistance(double dist) {
-        loadLazyMetadata();
-        _metadataFields->setGeoNearDistance(dist);
-    }
-
-    bool hasGeoNearPoint() const {
-        loadLazyMetadata();
-        return _metadataFields->hasGeoNearPoint();
-    }
-    Value getGeoNearPoint() const {
-        loadLazyMetadata();
-        return _metadataFields->getGeoNearPoint();
-    }
-    void setGeoNearPoint(Value point) {
-        loadLazyMetadata();
-        _metadataFields->setGeoNearPoint(point);
-    }
-
-    bool hasSearchScore() const {
-        loadLazyMetadata();
-        return _metadataFields->hasSearchScore();
-    }
-    double getSearchScore() const {
-        loadLazyMetadata();
-        return _metadataFields->getSearchScore();
-    }
-    void setSearchScore(double score) {
-        loadLazyMetadata();
-        _metadataFields->setSearchScore(score);
-    }
-
-    bool hasSearchHighlights() const {
-        loadLazyMetadata();
-        return _metadataFields->hasSearchHighlights();
-    }
-    Value getSearchHighlights() const {
-        loadLazyMetadata();
-        return _metadataFields->getSearchHighlights();
-    }
-    void setSearchHighlights(Value highlights) {
-        loadLazyMetadata();
-        _metadataFields->setSearchHighlights(highlights);
+        return _metadataFields;
     }
 
     static unsigned hashKey(StringData name) {
@@ -713,7 +511,7 @@ private:
     BSONObj _bson;
     mutable BSONObjIterator _bsonIt;
 
-    mutable std::unique_ptr<MetadataFields> _metadataFields;
+    mutable DocumentMetadataFields _metadataFields;
 
     // The storage constructed from a BSON value may contain metadata. When we process the BSON we
     // have to move the metadata to the MetadataFields object. If we know that the BSON does not

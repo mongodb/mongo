@@ -9,11 +9,11 @@ env.Library(
     target = "working_set",
     source = [
         "working_set.cpp",
-        "working_set_computed_data.cpp"
     ],
     LIBDEPS = [
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
+        "$BUILD_DIR/mongo/db/pipeline/document_value",
         "$BUILD_DIR/mongo/db/service_context",
     ],
 )

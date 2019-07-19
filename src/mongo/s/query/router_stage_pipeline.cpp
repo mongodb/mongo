@@ -97,7 +97,7 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
     }
     // Confirm that the document _id field matches the original resume token in the sort key field.
     auto eventBSON = event.toBson();
-    auto resumeToken = event.getSortKeyMetaField();
+    auto resumeToken = event.metadata().getSortKey();
     auto idField = eventBSON.getObjectField("_id");
     invariant(!resumeToken.isEmpty());
     uassert(ErrorCodes::ChangeStreamFatalError,

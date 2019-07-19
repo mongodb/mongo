@@ -45,7 +45,7 @@ class WorkingSetMember;
 
 /**
  * Passes results from the child through after adding the sort key for each result as
- * WorkingSetMember computed data.
+ * WorkingSetMember metadata.
  */
 class SortKeyGeneratorStage final : public PlanStage {
 public:

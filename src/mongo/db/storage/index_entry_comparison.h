@@ -45,6 +45,25 @@ namespace mongo {
  * and a disk location.
  */
 struct IndexKeyEntry {
+    /**
+     * Given an index key 'dehyratedKey' with no field names, returns a new BSONObj representing the
+     * index key after adding field names according to 'keyPattern'.
+     */
+    static BSONObj rehydrateKey(const BSONObj& keyPattern, const BSONObj& dehydratedKey) {
+        BSONObjBuilder bob;
+        BSONObjIterator keyIter(keyPattern);
+        BSONObjIterator valueIter(dehydratedKey);
+
+        while (keyIter.more() && valueIter.more()) {
+            bob.appendAs(valueIter.next(), keyIter.next().fieldNameStringData());
+        }
+
+        invariant(!keyIter.more());
+        invariant(!valueIter.more());
+
+        return bob.obj();
+    }
+
     IndexKeyEntry(BSONObj key, RecordId loc) : key(std::move(key)), loc(std::move(loc)) {}
 
     BSONObj key;

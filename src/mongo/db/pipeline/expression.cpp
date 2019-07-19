@@ -2585,15 +2585,16 @@ Value ExpressionMeta::serialize(bool explain) const {
 }
 
 Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const {
+    const auto& metadata = root.metadata();
     switch (_metaType) {
         case MetaType::TEXT_SCORE:
-            return root.hasTextScore() ? Value(root.getTextScore()) : Value();
+            return metadata.hasTextScore() ? Value(metadata.getTextScore()) : Value();
         case MetaType::RAND_VAL:
-            return root.hasRandMetaField() ? Value(root.getRandMetaField()) : Value();
+            return metadata.hasRandVal() ? Value(metadata.getRandVal()) : Value();
         case MetaType::SEARCH_SCORE:
-            return root.hasSearchScore() ? Value(root.getSearchScore()) : Value();
+            return metadata.hasSearchScore() ? Value(metadata.getSearchScore()) : Value();
         case MetaType::SEARCH_HIGHLIGHTS:
-            return root.hasSearchHighlights() ? Value(root.getSearchHighlights()) : Value();
+            return metadata.hasSearchHighlights() ? Value(metadata.getSearchHighlights()) : Value();
     }
     MONGO_UNREACHABLE;
 }

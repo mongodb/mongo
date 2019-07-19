@@ -107,7 +107,7 @@ DocumentSource::GetNextResult DocumentSourceCheckInvalidate::getNext() {
         // We set the resume token as the document's sort key in both the sharded and non-sharded
         // cases, since we will later rely upon it to generate a correct postBatchResumeToken. We
         // must therefore update the sort key to match the new resume token that we generated above.
-        result.setSortKeyMetaField(resumeTokenDoc.toBson());
+        result.metadata().setSortKey(resumeTokenDoc.toBson());
 
         _queuedInvalidate = result.freeze();
     }

@@ -218,7 +218,7 @@ StatusWith<BSONObj> ProjectionExec::computeReturnKeyProjection(const BSONObj& in
 
 StatusWith<BSONObj> ProjectionExec::project(const BSONObj& in,
                                             const boost::optional<const double> geoDistance,
-                                            const BSONObj& geoNearPoint,
+                                            Value geoNearPoint,
                                             const BSONObj& sortKey,
                                             const boost::optional<const double> textScore,
                                             const int64_t recordId) const {
@@ -241,7 +241,7 @@ StatusWith<BSONObj> ProjectionExec::project(const BSONObj& in,
 
 StatusWith<BSONObj> ProjectionExec::projectCovered(const std::vector<IndexKeyDatum>& keyData,
                                                    const boost::optional<const double> geoDistance,
-                                                   const BSONObj& geoNearPoint,
+                                                   Value geoNearPoint,
                                                    const BSONObj& sortKey,
                                                    const boost::optional<const double> textScore,
                                                    const int64_t recordId) const {
@@ -294,7 +294,7 @@ StatusWith<BSONObj> ProjectionExec::projectCovered(const std::vector<IndexKeyDat
 
 BSONObj ProjectionExec::addMeta(BSONObjBuilder bob,
                                 const boost::optional<const double> geoDistance,
-                                const BSONObj& geoNearPoint,
+                                Value geoNearPoint,
                                 const BSONObj& sortKey,
                                 const boost::optional<const double> textScore,
                                 const int64_t recordId) const {
@@ -305,13 +305,8 @@ BSONObj ProjectionExec::addMeta(BSONObjBuilder bob,
                 bob.append(it->first, geoDistance.get());
                 break;
             case META_GEONEAR_POINT: {
-                invariant(!geoNearPoint.isEmpty());
-                auto& ptObj = geoNearPoint;
-                if (ptObj.couldBeArray()) {
-                    bob.appendArray(it->first, ptObj);
-                } else {
-                    bob.append(it->first, ptObj);
-                }
+                invariant(!geoNearPoint.missing());
+                geoNearPoint.addToBsonObj(&bob, it->first);
                 break;
             }
             case META_TEXT_SCORE:

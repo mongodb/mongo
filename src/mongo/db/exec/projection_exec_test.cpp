@@ -37,7 +37,6 @@
 
 #include "mongo/db/exec/projection_exec.h"
 
-#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -81,10 +80,10 @@ boost::optional<std::string> project(
 
     auto objStr = stdx::get_if<const char*>(&objStrOrDatum);
     auto projected = objStr
-        ? exec.project(fromjson(*objStr), boost::none, BSONObj(), sortKey, textScore)
+        ? exec.project(fromjson(*objStr), boost::none, Value{}, sortKey, textScore)
         : exec.projectCovered({stdx::get<const IndexKeyDatum>(objStrOrDatum)},
                               boost::none,
-                              BSONObj(),
+                              Value{},
                               sortKey,
                               textScore);
 
