@@ -706,7 +706,6 @@ _SELECTOR_REGISTRY = {
     "sleep_test": (_SleepTestCaseSelectorConfig, _SleepTestCaseSelector),
     "genny_test": (_FileBasedSelectorConfig, _Selector),
     "gennylib_test": (_GennylibTestCaseSelectorConfig, _GennylibTestCaseSelector),
-    "cpp_libfuzzer_test": (_CppTestSelectorConfig, _CppTestSelector),
 }
 
 

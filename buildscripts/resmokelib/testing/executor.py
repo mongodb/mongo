@@ -238,6 +238,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
         fixture_config = {}
         fixture_class = fixtures.NOOP_FIXTURE_CLASS
+
         if self.fixture_config is not None:
             fixture_config = self.fixture_config.copy()
             fixture_class = fixture_config.pop("class")

@@ -36,27 +36,28 @@ const auto kV1 = mongo::KeyString::Version::V1;
 const auto kV0 = mongo::KeyString::Version::V0;
 
 uint8_t getZeroType(char val) {
+    using mongo::KeyString;
     switch (val % 10) {
         case 0:
-            return mongo::KeyString::TypeBits::kInt;
+            return KeyString::TypeBits::kInt;
         case 1:
-            return mongo::KeyString::TypeBits::kDouble;
+            return KeyString::TypeBits::kDouble;
         case 2:
-            return mongo::KeyString::TypeBits::kLong;
+            return KeyString::TypeBits::kLong;
         case 3:
-            return mongo::KeyString::TypeBits::kNegativeDoubleZero;
+            return KeyString::TypeBits::kNegativeDoubleZero;
         case 4:
-            return mongo::KeyString::TypeBits::kDecimalZero0xxx;
+            return KeyString::TypeBits::kDecimalZero0xxx;
         case 5:
-            return mongo::KeyString::TypeBits::kDecimalZero1xxx;
+            return KeyString::TypeBits::kDecimalZero1xxx;
         case 6:
-            return mongo::KeyString::TypeBits::kDecimalZero2xxx;
+            return KeyString::TypeBits::kDecimalZero2xxx;
         case 7:
-            return mongo::KeyString::TypeBits::kDecimalZero3xxx;
+            return KeyString::TypeBits::kDecimalZero3xxx;
         case 8:
-            return mongo::KeyString::TypeBits::kDecimalZero4xxx;
+            return KeyString::TypeBits::kDecimalZero4xxx;
         case 9:
-            return mongo::KeyString::TypeBits::kDecimalZero5xxx;
+            return KeyString::TypeBits::kDecimalZero5xxx;
         default:
             return 0x00;
     }
@@ -71,12 +72,12 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
 
     mongo::KeyString::TypeBits tb(version);
 
-    const size_t len = Data[2];
-    if (len > static_cast<size_t>(Size - 3))
+    const auto len = Data[2];
+    if (len > Size - 3)
         return 0;
     // Data[2] defines the number of types to append to the TypeBits
     // Data[3 + i] defines which types have to be added
-    for (size_t i = 0; i < len; i++) {
+    for (int i = 0; i < len; i++) {
         char randomType = Data[3 + i] & 0xf;
         char randomZeroType = (Data[3 + i] & 0xf0) >> 4;
         switch (randomType % 9) {
