@@ -743,7 +743,8 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
 
     invariant(nss,
               str::stream() << "Collection '" << replState->collectionUUID
-                            << "' should exist because an index build is in progress.");
+                            << "' should exist because an index build is in progress: "
+                            << replState->buildUUID);
 
     // Set up the thread's currentOp information to display createIndexes cmd information.
     _updateCurOpOpDescription(opCtx, *nss, replState->indexSpecs);
@@ -759,7 +760,8 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
         CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
     invariant(collection,
               str::stream() << "Collection " << *nss
-                            << " should exist because an index build is in progress.");
+                            << " should exist because an index build is in progress: "
+                            << replState->buildUUID);
 
     // TODO(SERVER-39484): Since 'replSetAndNotPrimary' is derived from the replication state at the
     // start of the index build, this value is not resilient to member state changes like
