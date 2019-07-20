@@ -13,7 +13,6 @@ import math
 import os
 import re
 import sys
-from collections import defaultdict
 from collections import namedtuple
 from distutils.util import strtobool  # pylint: disable=no-name-in-module
 
@@ -35,8 +34,11 @@ if __name__ == "__main__" and __package__ is None:
 import buildscripts.resmokelib.suitesconfig as suitesconfig  # pylint: disable=wrong-import-position
 import buildscripts.util.read_config as read_config  # pylint: disable=wrong-import-position
 import buildscripts.util.taskname as taskname  # pylint: disable=wrong-import-position
-import buildscripts.util.testname as testname  # pylint: disable=wrong-import-position
 import buildscripts.util.teststats as teststats  # pylint: disable=wrong-import-position
+
+# pylint: disable=wrong-import-position
+from buildscripts.patch_builds.task_generation import TimeoutInfo, resmoke_commands
+# pylint: enable=wrong-import-position
 
 LOGGER = logging.getLogger(__name__)
 
@@ -359,28 +361,30 @@ class EvergreenConfigGenerator(object):
 
         return variables
 
-    def _add_timeout_command(self, commands, max_test_runtime, expected_suite_runtime):
+    def _get_timeout_command(self, max_test_runtime, expected_suite_runtime, use_default):
         """
         Add an evergreen command to override the default timeouts to the list of commands.
 
-        :param commands: List of commands to add timeout command to.
         :param max_test_runtime: Maximum runtime of any test in the sub-suite.
         :param expected_suite_runtime: Expected runtime of the entire sub-suite.
+        :param use_default: Use default timeouts.
+        :return: Timeout information.
         """
         repeat_factor = self.options.repeat_suites
-        if max_test_runtime or expected_suite_runtime:
-            cmd_timeout = CmdTimeoutUpdate()
+        if (max_test_runtime or expected_suite_runtime) and not use_default:
+            timeout = None
+            exec_timeout = None
             if max_test_runtime:
                 timeout = calculate_timeout(max_test_runtime, 3) * repeat_factor
                 LOGGER.debug("Setting timeout to: %d (max=%d, repeat=%d)", timeout,
                              max_test_runtime, repeat_factor)
-                cmd_timeout.timeout(timeout)
             if expected_suite_runtime:
                 exec_timeout = calculate_timeout(expected_suite_runtime, 3) * repeat_factor
                 LOGGER.debug("Setting exec_timeout to: %d (runtime=%d, repeat=%d)", exec_timeout,
                              expected_suite_runtime, repeat_factor)
-                cmd_timeout.exec_timeout(exec_timeout)
-            commands.append(cmd_timeout.validate().resolve())
+            return TimeoutInfo.overridden(timeout=timeout, exec_timeout=exec_timeout)
+
+        return TimeoutInfo.default_timeout()
 
     @staticmethod
     def _is_task_dependency(task, possible_dependency):
@@ -418,13 +422,11 @@ class EvergreenConfigGenerator(object):
         target_suite_file = os.path.join(CONFIG_DIR, sub_suite_name)
         run_tests_vars = self._get_run_tests_vars(target_suite_file)
 
-        commands = []
-        if not self.options.use_default_timeouts:
-            self._add_timeout_command(commands, max_test_runtime, expected_suite_runtime)
-        commands.append(CommandDefinition().function("do setup"))
-        if self.options.use_multiversion:
-            commands.append(CommandDefinition().function("do multiversion setup"))
-        commands.append(CommandDefinition().function("run generated tests").vars(run_tests_vars))
+        use_multiversion = self.options.use_multiversion
+        timeout_info = self._get_timeout_command(max_test_runtime, expected_suite_runtime,
+                                                 self.options.use_default_timeouts)
+        commands = resmoke_commands("run generated tests", run_tests_vars, timeout_info,
+                                    use_multiversion)
 
         self._add_dependencies(task).commands(commands)
 

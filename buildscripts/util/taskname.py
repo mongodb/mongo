@@ -10,11 +10,12 @@ def name_generated_task(parent_name, task_index, total_tasks, variant=None):
     :param parent_name: Name of the parent task.
     :param task_index: Index of this sub-task.
     :param total_tasks: Total number of sub-tasks being generated.
+    :param variant: Build variant to run task in.
     :return: Zero-padded name of sub-task.
     """
     suffix = ""
     if variant:
-        suffix = "_{0}".format(variant)
+        suffix = f"_{variant}"
 
     index_width = int(math.ceil(math.log10(total_tasks)))
-    return "{0}_{1}{2}".format(parent_name, str(task_index).zfill(index_width), suffix)
+    return f"{parent_name}_{str(task_index).zfill(index_width)}{suffix}"

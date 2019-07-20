@@ -4831,23 +4831,17 @@ tasks:
         set -o verbose
 
         ${activate_virtualenv}
-        # If this is a scheduled build, we check for changes against the last scheduled commit.
-        if [ "${is_patch}" != "true" ]; then
-          burn_in_args="--checkEvergreen"
-        fi
-
         # Capture a list of new and modified tests. The expansion macro burn_in_tests_build_variant
         # is used to for finding the associated tasks from a different build varaint than the
         # burn_in_tests_gen task executes on.
-        build_variant_opts="--buildVariant=${build_variant}"
+        build_variant_opts="--build-variant=${build_variant}"
         if [ -n "${burn_in_tests_build_variant|}" ]; then
-          build_variant_opts="--buildVariant=${burn_in_tests_build_variant} --runBuildVariant=${build_variant}"
+          build_variant_opts="--build-variant=${burn_in_tests_build_variant} --run-build-variant=${build_variant}"
         fi
 
-        # Increase the burn_in repetition from 2 to 1000 executions or 10 minutes
-        burn_in_args="$burn_in_args --repeatTestsMin=2 --repeatTestsMax=1000 --repeatTestsSecs=600"
+        burn_in_args="$burn_in_args --repeat-tests-min=2 --repeat-tests-max=1000 --repeat-tests-secs=600"
         # Evergreen executable is in $HOME.
-        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --branch=${branch_name} --project=${project} $build_variant_opts --distro=${distro_id} --generateTasksFile=burn_in_tests_gen.json --noExec $burn_in_args
+        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_gen.json $burn_in_args
   - command: archive.targz_pack
     params:
       target: src/burn_in_tests_gen.tgz
@@ -10258,8 +10252,6 @@ buildvariants:
   - name: lint_fuzzer_sanity_patch
   - name: lint_yaml
   - name: burn_in_tests_gen
-    distros:
-    - rhel62-large
   - name: .aggfuzzer
   - name: .aggregation
   - name: audit

@@ -86,6 +86,10 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         # report intermediate results.
         self._partial_reports = None
 
+    def __repr__(self):
+        """Create a string representation of object for debugging."""
+        return f"{self.test_kind}:{self._suite_name}"
+
     def _get_tests_for_kind(self, test_kind):
         """Return the tests to run based on the 'test_kind'-specific filtering policy."""
         selector_config = self.get_selector_config()

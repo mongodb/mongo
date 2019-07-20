@@ -251,6 +251,10 @@ class Variant(object):
         for task in self.tasks:
             self.distro_names.update(task.run_on)
 
+    def __repr__(self):
+        """Create a string version of object for debugging."""
+        return self.name
+
     @property
     def name(self):
         """Get the build variant name."""
@@ -330,6 +334,10 @@ class VariantTask(Task):
         Task.__init__(self, task.raw)
         self.run_on = run_on
         self.variant = variant
+
+    def __repr__(self):
+        """Create a string representation of object for debugging."""
+        return f"{self.variant}: {self.name}"
 
     @property
     def combined_resmoke_args(self):

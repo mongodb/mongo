@@ -19,7 +19,8 @@ if __name__ == "__main__" and __package__ is None:
 # pylint: disable=wrong-import-position
 import buildscripts.util.read_config as read_config
 from buildscripts.ciconfig import evergreen
-from buildscripts.burn_in_tests import create_generate_tasks_config, create_tests_by_task
+from buildscripts.burn_in_tests import create_generate_tasks_config, create_tests_by_task, \
+    GenerateConfig, RepeatConfig
 # pylint: enable=wrong-import-position
 
 CONFIG_DIRECTORY = "generated_burn_in_tags_config"
@@ -28,8 +29,8 @@ EVERGREEN_FILE = "etc/evergreen.yml"
 EVG_CONFIG_FILE = ".evergreen.yml"
 
 ConfigOptions = namedtuple("ConfigOptions", [
-    "buildvariant",
-    "run_buildvariant",
+    "build_variant",
+    "run_build_variant",
     "base_commit",
     "max_revisions",
     "branch",
@@ -42,14 +43,14 @@ ConfigOptions = namedtuple("ConfigOptions", [
 ])
 
 
-def _get_config_options(expansions_file_data, buildvariant, run_buildvariant):
+def _get_config_options(expansions_file_data, build_variant, run_build_variant):
     """
     Get the configuration to use.
 
     :param expansions_file_data: Config data file to use.
-    :param buildvariant: The buildvariant the current patch should be compared against to figure
+    :param build_variant: The buildvariant the current patch should be compared against to figure
         out which tests have changed.
-    :param run_buildvariant: The buildvariant the generated task should be run on.
+    :param run_build_variant: The buildvariant the generated task should be run on.
     :return: ConfigOptions for the generated task to use.
     """
     base_commit = expansions_file_data["revision"]
@@ -60,54 +61,55 @@ def _get_config_options(expansions_file_data, buildvariant, run_buildvariant):
     distro = expansions_file_data["distro_id"]
     repeat_tests_min = int(expansions_file_data["repeat_tests_min"])
     repeat_tests_max = int(expansions_file_data["repeat_tests_max"])
-    repeat_tests_secs = float(expansions_file_data["repeat_tests_secs"])
+    repeat_tests_secs = int(expansions_file_data["repeat_tests_secs"])
     project = expansions_file_data["project"]
 
-    return ConfigOptions(buildvariant, run_buildvariant, base_commit, max_revisions, branch,
+    return ConfigOptions(build_variant, run_build_variant, base_commit, max_revisions, branch,
                          check_evergreen, distro, repeat_tests_secs, repeat_tests_min,
                          repeat_tests_max, project)
 
 
-def _create_evg_buildvariant_map(expansions_file_data):
+def _create_evg_build_variant_map(expansions_file_data, evergreen_conf):
     """
     Generate relationship of base buildvariant to generated buildvariant.
 
     :param expansions_file_data: Config data file to use.
+    :param evergreen_conf: Evergreen configuration.
     :return: Map of base buildvariants to their generated buildvariants.
     """
     burn_in_tags_gen_variant = expansions_file_data["build_variant"]
-    evergreen_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
     burn_in_tags_gen_variant_config = evergreen_conf.get_variant(burn_in_tags_gen_variant)
-    burn_in_tag_buildvariants = burn_in_tags_gen_variant_config.expansions.get(
+    burn_in_tag_build_variants = burn_in_tags_gen_variant_config.expansions.get(
         "burn_in_tag_buildvariants")
-    if burn_in_tag_buildvariants:
+
+    if burn_in_tag_build_variants:
         return {
             base_variant: f"{base_variant}-required"
-            for base_variant in burn_in_tag_buildvariants.split(" ")
+            for base_variant in burn_in_tag_build_variants.split(" ")
         }
+
     return {}
 
 
-def _generate_evg_buildvariant(shrub_config, buildvariant, run_buildvariant,
-                               burn_in_tags_gen_variant):
+def _generate_evg_build_variant(shrub_config, build_variant, run_build_variant,
+                                burn_in_tags_gen_variant, evg_conf):
     """
     Generate buildvariants for a given shrub config.
 
     :param shrub_config: Shrub config object that the generated buildvariant will be built upon.
-    :param buildvariant: The base variant that the generated run_buildvariant will be based on.
-    :param run_buildvariant: The generated buildvariant.
+    :param build_variant: The base variant that the generated run_buildvariant will be based on.
+    :param run_build_variant: The generated buildvariant.
     :param burn_in_tags_gen_variant: The buildvariant on which the burn_in_tags_gen task runs.
     """
-    evergreen_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
-    base_variant_config = evergreen_conf.get_variant(buildvariant)
+    base_variant_config = evg_conf.get_variant(build_variant)
 
     new_variant_display_name = f"! {base_variant_config.display_name}"
     new_variant_run_on = base_variant_config.run_on[0]
 
     task_spec = TaskSpec("compile_TG")
 
-    new_variant = shrub_config.variant(run_buildvariant).expansion("burn_in_bypass",
-                                                                   burn_in_tags_gen_variant)
+    new_variant = shrub_config.variant(run_build_variant).expansion("burn_in_bypass",
+                                                                    burn_in_tags_gen_variant)
     new_variant.display_name(new_variant_display_name)
     new_variant.run_on(new_variant_run_on)
     new_variant.task(task_spec)
@@ -119,24 +121,32 @@ def _generate_evg_buildvariant(shrub_config, buildvariant, run_buildvariant,
     new_variant.modules(modules)
 
 
-def _generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data, buildvariant_map, repo):
+# pylint: disable=too-many-arguments
+def _generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data, build_variant_map, repo,
+                        evg_conf):
     """
     Generate burn in tests tasks for a given shrub config and group of buildvariants.
 
     :param evergreen_api: Evergreen.py object.
     :param shrub_config: Shrub config object that the build variants will be built upon.
     :param expansions_file_data: Config data file to use.
-    :param buildvariant_map: Map of base buildvariants to their generated buildvariant.
+    :param build_variant_map: Map of base buildvariants to their generated buildvariant.
     :param repo: Git repository.
     """
-    for buildvariant, run_buildvariant in buildvariant_map.items():
-        config_options = _get_config_options(expansions_file_data, buildvariant, run_buildvariant)
-        tests_by_task = create_tests_by_task(config_options, repo)
+    for build_variant, run_build_variant in build_variant_map.items():
+        config_options = _get_config_options(expansions_file_data, build_variant, run_build_variant)
+        tests_by_task = create_tests_by_task(build_variant, repo, evg_conf)
         if tests_by_task:
-            _generate_evg_buildvariant(shrub_config, buildvariant, run_buildvariant,
-                                       expansions_file_data["build_variant"])
-            create_generate_tasks_config(evergreen_api, shrub_config, config_options, tests_by_task,
-                                         False)
+            _generate_evg_build_variant(shrub_config, build_variant, run_build_variant,
+                                        expansions_file_data["build_variant"], evg_conf)
+            gen_config = GenerateConfig(build_variant, config_options.project, run_build_variant,
+                                        config_options.distro).validate(evg_conf)
+            repeat_config = RepeatConfig(repeat_tests_min=config_options.repeat_tests_min,
+                                         repeat_tests_max=config_options.repeat_tests_max,
+                                         repeat_tests_secs=config_options.repeat_tests_secs)
+
+            create_generate_tasks_config(shrub_config, tests_by_task, gen_config, repeat_config,
+                                         evergreen_api, include_gen_task=False)
 
 
 def _write_to_file(shrub_config):
@@ -162,8 +172,10 @@ def main(evergreen_api, repo):
     expansions_file_data = read_config.read_config_file(cmd_line_options.expansion_file)
 
     shrub_config = Configuration()
-    buildvariant_map = _create_evg_buildvariant_map(expansions_file_data)
-    _generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data, buildvariant_map, repo)
+    evg_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
+    build_variant_map = _create_evg_build_variant_map(expansions_file_data, evg_conf)
+    _generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data, build_variant_map, repo,
+                        evg_conf)
     _write_to_file(shrub_config)
 
 
