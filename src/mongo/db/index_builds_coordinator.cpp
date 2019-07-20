@@ -551,7 +551,9 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
                                     << "' because the collection no longer exists.");
     }
 
-    AutoGetCollection autoColl(opCtx, *nssByUUID, MODE_X);
+    // AutoGetCollection throws an exception if it is unable to look up the collection by UUID.
+    NamespaceStringOrUUID nssOrUuid{dbName.toString(), collectionUUID};
+    AutoGetCollection autoColl(opCtx, nssOrUuid, MODE_X);
     if (!autoColl.getDb()) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "Failed to create index(es) on collection '"
