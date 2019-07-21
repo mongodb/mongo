@@ -544,33 +544,11 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
     const UUID& buildUUID,
     IndexBuildProtocol protocol,
     boost::optional<CommitQuorumOptions> commitQuorum) {
-    auto nssByUUID = CollectionCatalog::get(opCtx).lookupNSSByUUID(collectionUUID);
-    if (!nssByUUID) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Cannot create index on collection '" << collectionUUID
-                                    << "' because the collection no longer exists.");
-    }
 
     // AutoGetCollection throws an exception if it is unable to look up the collection by UUID.
     NamespaceStringOrUUID nssOrUuid{dbName.toString(), collectionUUID};
     AutoGetCollection autoColl(opCtx, nssOrUuid, MODE_X);
-    if (!autoColl.getDb()) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Failed to create index(es) on collection '"
-                                    << collectionUUID
-                                    << "' because the database no longer exists: "
-                                    << dbName);
-    }
-
     auto collection = autoColl.getCollection();
-    if (!collection) {
-        // The collection does not exist. We will not build an index.
-        return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Failed to create index(es) on collection '"
-                                    << collectionUUID
-                                    << "' because the collection no longer exists");
-    }
-
     const auto& nss = collection->ns();
 
     // TODO (SERVER-40807): disabling the following code for the v4.2 release so it does not have
