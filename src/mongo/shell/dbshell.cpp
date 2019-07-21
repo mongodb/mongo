@@ -1061,6 +1061,12 @@ int _main(int argc, char* argv[], char** envp) {
                         false,
                         true,
                         false);
+
+            scope->exec("shellHelper( 'show', 'nonGenuineMongoDBCheck' )",
+                        "(nonGenuineMongoDBCheck)",
+                        false,
+                        true,
+                        false);
         }
 
         shellHistoryInit();
