@@ -250,7 +250,9 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
 
 TEST_F(SplitChunkTest, SplitsOnShardWithLowerShardVersionDoesNotIncreaseCollectionVersion) {
     ChunkType chunk, chunk2;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
+    chunk2.setName(OID::gen());
     chunk2.setNS(kNamespace);
     auto collEpoch = OID::gen();
 
@@ -302,7 +304,9 @@ TEST_F(SplitChunkTest, SplitsOnShardWithLowerShardVersionDoesNotIncreaseCollecti
 
 TEST_F(SplitChunkTest, SplitsOnShardWithHighestShardVersionIncreasesCollectionVersion) {
     ChunkType chunk, chunk2;
+    chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
+    chunk2.setName(OID::gen());
     chunk2.setNS(kNamespace);
     auto collEpoch = OID::gen();
 
