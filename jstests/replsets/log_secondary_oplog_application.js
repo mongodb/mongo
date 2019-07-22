@@ -40,7 +40,7 @@
 
     // The op should not have been logged.
     assert.throws(function() {
-        checkLog.contains(secondary, "applied op: CRUD", 1 * 1000);
+        checkLog.contains(secondary, "cheetah", 1 * 1000);
     });
 
     /**
@@ -74,7 +74,7 @@
 
     // Make sure we log that insert op.
     rst.awaitReplication();
-    checkLog.contains(secondary, "applied op: CRUD");
+    checkLog.contains(secondary, "sloth");
 
     rst.stopSet();
 
