@@ -735,12 +735,11 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
     // Set up the thread's currentOp information to display createIndexes cmd information.
     _updateCurOpOpDescription(opCtx, *nss, replState->indexSpecs);
 
-    AutoGetDb autoDb(opCtx, nss->db(), MODE_IX);
+    boost::optional<AutoGetDb> autoDb;
 
     // Do not use AutoGetCollection since the lock will be in various modes throughout the index
     // build.
     boost::optional<Lock::CollectionLock> collLock;
-    collLock.emplace(opCtx, *nss, MODE_X);
 
     auto collection =
         CollectionCatalog::get(opCtx).lookupCollectionByUUID(replState->collectionUUID);
@@ -755,6 +754,10 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
     auto replSetAndNotPrimary = indexBuildOptions.replSetAndNotPrimary;
 
     try {
+        // Acquire locks here to ensure that we clean up the index build.
+        autoDb.emplace(opCtx, nss->db(), MODE_IX);
+        collLock.emplace(opCtx, *nss, MODE_X);
+
         if (replSetAndNotPrimary) {
             // This index build can only be interrupted at shutdown. For the duration of the
             // OperationContext::runWithoutInterruptionExceptAtGlobalShutdown() invocation, any kill
