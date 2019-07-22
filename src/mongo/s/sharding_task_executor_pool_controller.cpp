@@ -221,7 +221,7 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const HostState& 
 
     // If the pool isn't in a groupData, we can return now
     auto groupData = poolData.groupData.lock();
-    if (!groupData) {
+    if (!groupData || groupData->state.passives.count(poolData.host)) {
         return {{poolData.host}, poolData.isAbleToShutdown};
     }
 

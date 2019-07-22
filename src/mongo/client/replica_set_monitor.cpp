@@ -722,7 +722,7 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
             // and if this refresher has yet to find the replica set master, we add hosts listed in
             // the reply to the list of possible replica set members.
             if (!_scan->foundUpMaster) {
-                _scan->possibleNodes.insert(reply.normalHosts.begin(), reply.normalHosts.end());
+                _scan->possibleNodes.insert(reply.members.begin(), reply.members.end());
             }
         } else {
             error() << "replset name mismatch: expected \"" << _set->name << "\", "
@@ -752,7 +752,7 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
         _set->notify(/*finishedScan*/ false);
     } else {
         // Populate possibleNodes.
-        _scan->possibleNodes.insert(reply.normalHosts.begin(), reply.normalHosts.end());
+        _scan->possibleNodes.insert(reply.members.begin(), reply.members.end());
         _scan->unconfirmedReplies[from] = reply;
     }
 
@@ -846,35 +846,32 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
     }
 
     // Check if the master agrees with our current list of nodes.
-    // REMINDER: both _set->nodes and reply.normalHosts are sorted.
-    if (_set->nodes.size() != reply.normalHosts.size() ||
-        !std::equal(
-            _set->nodes.begin(), _set->nodes.end(), reply.normalHosts.begin(), hostsEqual)) {
+    // REMINDER: both _set->nodes and reply.members are sorted.
+    if (_set->nodes.size() != reply.members.size() ||
+        !std::equal(_set->nodes.begin(), _set->nodes.end(), reply.members.begin(), hostsEqual)) {
         LOG(2) << "Adjusting nodes in our view of replica set " << _set->name
                << " based on master reply: " << redact(reply.raw);
 
         // remove non-members from _set->nodes
         _set->nodes.erase(
-            std::remove_if(_set->nodes.begin(), _set->nodes.end(), HostNotIn(reply.normalHosts)),
+            std::remove_if(_set->nodes.begin(), _set->nodes.end(), HostNotIn(reply.members)),
             _set->nodes.end());
 
         // add new members to _set->nodes
-        for (std::set<HostAndPort>::const_iterator it = reply.normalHosts.begin();
-             it != reply.normalHosts.end();
-             ++it) {
-            _set->findOrCreateNode(*it);
+        for (auto& host : reply.members) {
+            _set->findOrCreateNode(host);
         }
 
         // replace hostToScan queue with untried normal hosts. can both add and remove
         // hosts from the queue.
         _scan->hostsToScan.clear();
-        _scan->enqueAllUntriedHosts(reply.normalHosts, _set->rand);
+        _scan->enqueAllUntriedHosts(reply.members, _set->rand);
 
         if (!_scan->waitingFor.empty()) {
             // make sure we don't wait for any hosts that aren't considered members
             std::set<HostAndPort> newWaitingFor;
-            std::set_intersection(reply.normalHosts.begin(),
-                                  reply.normalHosts.end(),
+            std::set_intersection(reply.members.begin(),
+                                  reply.members.end(),
                                   _scan->waitingFor.begin(),
                                   _scan->waitingFor.end(),
                                   std::inserter(newWaitingFor, newWaitingFor.end()));
@@ -882,18 +879,18 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
         }
     }
 
-    bool changedHosts = reply.normalHosts != _set->seedNodes;
+    bool changedHosts = reply.members != _set->seedNodes;
     bool changedPrimary = reply.host != _set->lastSeenMaster;
     if (changedHosts || changedPrimary) {
         ++_set->seedGen;
-        _set->seedNodes = reply.normalHosts;
+        _set->seedNodes = reply.members;
         _set->seedConnStr = _set->confirmedConnectionString();
 
         // LogLevel can be pretty low, since replica set reconfiguration should be pretty rare
         // and we want to record our changes
         log() << "Confirmed replica set for " << _set->name << " is " << _set->seedConnStr;
 
-        _set->notifier->onConfirmedSet(_set->seedConnStr, reply.host);
+        _set->notifier->onConfirmedSet(_set->seedConnStr, reply.host, reply.passives);
     }
 
     // Update our working string
@@ -942,12 +939,13 @@ void IsMasterReply::parse(const BSONObj& obj) {
         primary = primaryString.empty() ? HostAndPort() : HostAndPort(primaryString);
 
         // both hosts and passives, but not arbiters, are considered "normal hosts"
-        normalHosts.clear();
+        members.clear();
         BSONForEach(host, raw.getObjectField("hosts")) {
-            normalHosts.insert(HostAndPort(host.String()));
+            members.insert(HostAndPort(host.String()));
         }
         BSONForEach(host, raw.getObjectField("passives")) {
-            normalHosts.insert(HostAndPort(host.String()));
+            members.insert(HostAndPort(host.String()));
+            passives.insert(HostAndPort(host.String()));
         }
 
         tags = raw.getObjectField("tags");

@@ -394,7 +394,7 @@ TEST_F(IsMasterReplyTest, IsMasterReplyRSNotInitiated) {
     ASSERT_EQUALS(imr.configVersion, 0);
     ASSERT(!imr.electionId.isSet());
     ASSERT(imr.primary.empty());
-    ASSERT(imr.normalHosts.empty());
+    ASSERT(imr.members.empty());
     ASSERT(imr.tags.isEmpty());
 }
 
@@ -441,7 +441,7 @@ TEST_F(IsMasterReplyTest, IsMasterReplyRSPrimary) {
     ASSERT_EQUALS(imr.secondary, false);
     ASSERT_EQUALS(imr.isMaster, true);
     ASSERT_EQUALS(imr.primary.toString(), HostAndPort("mongo.example:3000").toString());
-    ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3000")));
+    ASSERT(imr.members.count(HostAndPort("mongo.example:3000")));
     ASSERT(imr.tags.isEmpty());
 }
 
@@ -491,8 +491,9 @@ TEST_F(IsMasterReplyTest, IsMasterReplyPassiveSecondary) {
     ASSERT_EQUALS(imr.secondary, true);
     ASSERT_EQUALS(imr.isMaster, false);
     ASSERT_EQUALS(imr.primary.toString(), HostAndPort("mongo.example:3000").toString());
-    ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3000")));
-    ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3001")));
+    ASSERT(imr.members.count(HostAndPort("mongo.example:3000")));
+    ASSERT(imr.members.count(HostAndPort("mongo.example:3001")));
+    ASSERT(imr.passives.count(HostAndPort("mongo.example:3001")));
     ASSERT(imr.tags.isEmpty());
     ASSERT(!imr.electionId.isSet());
 }
@@ -543,7 +544,7 @@ TEST_F(IsMasterReplyTest, IsMasterReplyHiddenSecondary) {
     ASSERT_EQUALS(imr.secondary, true);
     ASSERT_EQUALS(imr.isMaster, false);
     ASSERT_EQUALS(imr.primary.toString(), HostAndPort("mongo.example:3000").toString());
-    ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3000")));
+    ASSERT(imr.members.count(HostAndPort("mongo.example:3000")));
     ASSERT(imr.tags.isEmpty());
     ASSERT(!imr.electionId.isSet());
 }
@@ -596,8 +597,8 @@ TEST_F(IsMasterReplyTest, IsMasterSecondaryWithTags) {
     ASSERT_EQUALS(imr.secondary, true);
     ASSERT_EQUALS(imr.isMaster, false);
     ASSERT_EQUALS(imr.primary.toString(), HostAndPort("mongo.example:3000").toString());
-    ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3000")));
-    ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3001")));
+    ASSERT(imr.members.count(HostAndPort("mongo.example:3000")));
+    ASSERT(imr.members.count(HostAndPort("mongo.example:3001")));
     ASSERT(imr.tags.hasElement("dc"));
     ASSERT(imr.tags.hasElement("use"));
     ASSERT(!imr.electionId.isSet());
