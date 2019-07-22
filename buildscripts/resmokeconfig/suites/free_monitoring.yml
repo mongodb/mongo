@@ -9,6 +9,3 @@ executor:
     shell_options:
       nodb: ''
       readMode: commands
-  hooks:
-  - class: CleanEveryN
-    n: 20
