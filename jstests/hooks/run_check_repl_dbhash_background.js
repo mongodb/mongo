@@ -470,10 +470,20 @@
             }
         } finally {
             // Wait for each thread to finish. Throw an error if any thread fails.
+            let exception;
             const returnData = threads.map(thread => {
-                thread.join();
-                return thread.returnData();
+                try {
+                    thread.join();
+                    return thread.returnData();
+                } catch (e) {
+                    if (!exception) {
+                        exception = e;
+                    }
+                }
             });
+            if (exception) {
+                throw exception;
+            }
 
             returnData.forEach(res => {
                 assert.commandWorked(res, () => 'data consistency checks failed: ' + tojson(res));
