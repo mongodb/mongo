@@ -14,6 +14,3 @@ executor:
       tlsAllowInvalidCertificates: ''
       tlsCAFile: jstests/libs/ca.pem
       tlsCertificateKeyFile: jstests/libs/client.pem
-  hooks:
-  - class: CleanEveryN
-    n: 20
