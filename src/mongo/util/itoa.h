@@ -41,20 +41,23 @@ namespace mongo {
  * and only really should be used in hot code paths.
  */
 class ItoA {
-public:
-    // digits10 is 1 less than the maximum number of digits.
-    static constexpr size_t kBufSize = std::numeric_limits<std::uint64_t>::digits10 + 1;
-
-    explicit ItoA(std::uint64_t i);
     ItoA(const ItoA&) = delete;
     ItoA& operator=(const ItoA&) = delete;
 
-    operator StringData() const {
-        return _str;
+public:
+    static constexpr size_t kBufSize = std::numeric_limits<uint64_t>::digits10  //
+        + 1   // digits10 is 1 less than the maximum number of digits.
+        + 1;  // NUL byte.
+
+    explicit ItoA(std::uint64_t i);
+
+    operator StringData() {
+        return {_str, _len};
     }
 
 private:
-    StringData _str;
+    const char* _str{nullptr};
+    std::size_t _len{0};
     char _buf[kBufSize];
 };
 

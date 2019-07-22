@@ -417,16 +417,6 @@ env.Benchmark(
 )
 
 env.Benchmark(
-    target='itoa_bm',
-    source=[
-        'itoa_bm.cpp',
-    ],
-    LIBDEPS=[
-    ],
-)
-
-
-env.Benchmark(
     target='future_bm',
     source=[
         'future_bm.cpp',

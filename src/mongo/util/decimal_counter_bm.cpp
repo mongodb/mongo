@@ -37,60 +37,41 @@
 namespace mongo {
 
 void BM_decimalCounterPreInc(benchmark::State& state) {
-    uint64_t items = 0;
+    DecimalCounter<uint32_t> count;
     for (auto _ : state) {
-        DecimalCounter<uint32_t> count;
-        for (int i = state.range(0); i--;) {
-            benchmark::ClobberMemory();
-            benchmark::DoNotOptimize(StringData(++count));
-        }
-        items += state.range(0);
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(StringData(++count));
     }
-    state.SetItemsProcessed(items);
 }
 
 void BM_decimalCounterPostInc(benchmark::State& state) {
-    uint64_t items = 0;
+    DecimalCounter<uint32_t> count;
     for (auto _ : state) {
-        DecimalCounter<uint32_t> count;
-        for (int i = state.range(0); i--;) {
-            benchmark::ClobberMemory();
-            benchmark::DoNotOptimize(StringData(count++));
-        }
-        items += state.range(0);
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(StringData(count++));
     }
-    state.SetItemsProcessed(items);
 }
 
 void BM_ItoACounter(benchmark::State& state) {
-    uint64_t items = 0;
+    uint32_t count = 0;
     for (auto _ : state) {
-        uint32_t count = 0;
-        for (int i = state.range(0); i--;) {
-            benchmark::ClobberMemory();
-            benchmark::DoNotOptimize(StringData(ItoA(++count)));
-        }
-        items += state.range(0);
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(StringData(ItoA(++count)));
     }
-    state.SetItemsProcessed(items);
 }
 
 void BM_to_stringCounter(benchmark::State& state) {
-    uint64_t items = 0;
+    uint32_t count = 0;
+    std::string str;
     for (auto _ : state) {
-        uint32_t count = 0;
-        for (int i = state.range(0); i--;) {
-            benchmark::ClobberMemory();
-            benchmark::DoNotOptimize(std::to_string(++count));
-        }
-        items += state.range(0);
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(std::to_string(++count));
     }
-    state.SetItemsProcessed(items);
 }
 
-BENCHMARK(BM_decimalCounterPreInc)->Arg(10000);
-BENCHMARK(BM_decimalCounterPostInc)->Arg(10000);
-BENCHMARK(BM_ItoACounter)->Arg(10000);
-BENCHMARK(BM_to_stringCounter)->Arg(10000);
+BENCHMARK(BM_decimalCounterPreInc);
+BENCHMARK(BM_decimalCounterPostInc);
+BENCHMARK(BM_ItoACounter);
+BENCHMARK(BM_to_stringCounter);
 
 }  // namespace mongo
