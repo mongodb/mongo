@@ -53,32 +53,48 @@ else:
 class TestGenerator(testcase.IDLTestcase):
     """Test the IDL Generator."""
 
-    def test_compile(self):
-        # type: () -> None
-        """Exercise the code generator so code coverage can be measured."""
+    output_suffix = "_codecoverage_gen"
+    idl_files_to_test = ["unittest", "unittest_import"]
+
+    @property
+    def _src_dir(self):
+        """Get the directory of the src folder."""
         base_dir = os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        src_dir = os.path.join(
+        return os.path.join(
             base_dir,
             'src',
         )
-        idl_dir = os.path.join(src_dir, 'mongo', 'idl')
 
+    @property
+    def _idl_dir(self):
+        """Get the directory of the idl folder."""
+        return os.path.join(self._src_dir, 'mongo', 'idl')
+
+    def tearDown(self) -> None:
+        """Cleanup resources created by tests."""
+        for idl_file in self.idl_files_to_test:
+            for ext in ["h", "cpp"]:
+                file_path = os.path.join(self._idl_dir, f"{idl_file}{self.output_suffix}.{ext}")
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+
+    def test_compile(self):
+        # type: () -> None
+        """Exercise the code generator so code coverage can be measured."""
         args = idl.compiler.CompilerArgs()
-        args.output_suffix = "_codecoverage_gen"
-        args.import_directories = [src_dir]
+        args.output_suffix = self.output_suffix
+        args.import_directories = [self._src_dir]
 
-        unittest_idl_file = os.path.join(idl_dir, 'unittest.idl')
+        unittest_idl_file = os.path.join(self._idl_dir, f'{self.idl_files_to_test[0]}.idl')
         if not os.path.exists(unittest_idl_file):
             unittest.skip(
                 "Skipping IDL Generator testing since %s could not be found." % (unittest_idl_file))
             return
 
-        args.input_file = os.path.join(idl_dir, 'unittest_import.idl')
-        self.assertTrue(idl.compiler.compile_idl(args))
-
-        args.input_file = unittest_idl_file
-        self.assertTrue(idl.compiler.compile_idl(args))
+        for idl_file in self.idl_files_to_test:
+            args.input_file = os.path.join(self._idl_dir, f'{idl_file}.idl')
+            self.assertTrue(idl.compiler.compile_idl(args))
 
     def test_enum_non_const(self):
         # type: () -> None
