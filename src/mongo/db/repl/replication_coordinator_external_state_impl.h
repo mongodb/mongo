@@ -81,6 +81,7 @@ public:
     OpTime onTransitionToPrimary(OperationContext* txn, bool isV1ElectionProtocol) override;
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext* txn);
+    virtual Status createLocalLastVoteCollection(OperationContext* txn);
     virtual bool isSelf(const HostAndPort& host, ServiceContext* ctx);
     virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
     virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);

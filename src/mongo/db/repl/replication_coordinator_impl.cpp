@@ -436,16 +436,17 @@ void ReplicationCoordinatorImpl::appendConnectionStats(executor::ConnectionPoolS
 }
 
 bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
+    fassert(51240, _externalState->createLocalLastVoteCollection(txn));
     StatusWith<LastVote> lastVote = _externalState->loadLocalLastVoteDocument(txn);
     if (!lastVote.isOK()) {
-        if (lastVote.getStatus() == ErrorCodes::NoMatchingDocument) {
-            log() << "Did not find local voted for document at startup.";
-        } else {
-            severe() << "Error loading local voted for document at startup; "
-                     << lastVote.getStatus();
-            fassertFailedNoTrace(40367);
-        }
-    } else {
+        severe() << "Error loading local voted for document at startup; " << lastVote.getStatus();
+        fassertFailedNoTrace(40367);
+    }
+    if (lastVote.getValue().getTerm() == OpTime::kInitialTerm) {
+        // This log line is checked in unit tests.
+        log() << "Did not find local initialized voted for document at startup.";
+    }
+    {
         LockGuard topoLock(_topoMutex);
         _topCoord->loadLastVote(lastVote.getValue());
     }

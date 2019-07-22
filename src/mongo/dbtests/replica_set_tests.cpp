@@ -32,7 +32,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
-#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
 
@@ -47,9 +47,10 @@ class ReplicaSetTest : public mongo::unittest::Test {
 protected:
     void setUp() {
         auto txn = makeOpCtx();
-        _storageInterface = stdx::make_unique<repl::StorageInterfaceMock>();
+        _storageInterface = stdx::make_unique<repl::StorageInterfaceImpl>();
         _replCoordExternalState.reset(
             new repl::ReplicationCoordinatorExternalStateImpl(_storageInterface.get()));
+        ASSERT_OK(_replCoordExternalState->createLocalLastVoteCollection(txn.get()));
     }
 
     void tearDown() {

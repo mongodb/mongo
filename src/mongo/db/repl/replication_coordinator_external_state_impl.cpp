@@ -46,6 +46,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
@@ -569,6 +570,38 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
     }
 }
 
+Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
+    OperationContext* txn) {
+    auto status = _storageInterface->createCollection(
+        txn, NamespaceString(lastVoteCollectionName), CollectionOptions());
+    if (!status.isOK() && status.code() != ErrorCodes::NamespaceExists) {
+        return Status(ErrorCodes::CannotCreateCollection,
+                      str::stream() << "Failed to create local last vote collection. Ns: "
+                                    << lastVoteCollectionName
+                                    << " Error: "
+                                    << status.toString());
+    }
+
+    // Make sure there's always a last vote document.
+    try {
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            AutoGetCollection coll(txn, NamespaceString(lastVoteCollectionName), MODE_X);
+            BSONObj result;
+            bool exists = Helpers::getSingleton(txn, lastVoteCollectionName, result);
+            if (!exists) {
+                LastVote lastVote{OpTime::kInitialTerm, -1};
+                Helpers::putSingleton(txn, lastVoteCollectionName, lastVote.toBSON());
+            }
+        }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+            txn, "create initial replica set lastVote", lastVoteCollectionName);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
+    return Status::OK();
+}
+
 StatusWith<LastVote> ReplicationCoordinatorExternalStateImpl::loadLocalLastVoteDocument(
     OperationContext* txn) {
     try {
@@ -595,30 +628,29 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     try {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbWriteLock(txn->lockState(), lastVoteDatabaseName, MODE_X);
+            AutoGetCollection coll(txn, NamespaceString(lastVoteCollectionName), MODE_IX);
+            WriteUnitOfWork wunit(txn);
 
-            // If there is no last vote document, we want to store one. Otherwise, we only want to
-            // replace it if the new last vote document would have a higher term. We both check
-            // the term of the current last vote document and insert the new document under the
-            // DBLock to synchronize the two operations.
+            // We only want to replace the last vote document if the new last vote document
+            // would have a higher term. We check the term of the current last vote document and
+            // insert the new document in a WriteUnitOfWork to synchronize the two operations.
+            // We have already ensured at startup time that there is an old document.
             BSONObj result;
             bool exists = Helpers::getSingleton(txn, lastVoteCollectionName, result);
-            if (!exists) {
-                Helpers::putSingleton(txn, lastVoteCollectionName, lastVoteObj);
-            } else {
-                StatusWith<LastVote> oldLastVoteDoc = LastVote::readFromLastVote(result);
-                if (!oldLastVoteDoc.isOK()) {
-                    return oldLastVoteDoc.getStatus();
-                }
-                if (lastVote.getTerm() > oldLastVoteDoc.getValue().getTerm()) {
-                    Helpers::putSingleton(txn, lastVoteCollectionName, lastVoteObj);
-                }
+            fassert(51241, exists);
+            StatusWith<LastVote> oldLastVoteDoc = LastVote::readFromLastVote(result);
+            if (!oldLastVoteDoc.isOK()) {
+                return oldLastVoteDoc.getStatus();
             }
+            if (lastVote.getTerm() > oldLastVoteDoc.getValue().getTerm()) {
+                Helpers::putSingleton(txn, lastVoteCollectionName, lastVoteObj);
+            }
+            wunit.commit();
+            return Status::OK();
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
             txn, "save replica set lastVote", lastVoteCollectionName);
         txn->recoveryUnit()->waitUntilDurable();
-        return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

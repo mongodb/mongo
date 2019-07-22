@@ -206,6 +206,7 @@ error_code("KeyNotFound", 211)
 error_code("UpdateOperationFailed", 218)
 error_code("FTDCPathNotSet", 219)
 error_code("FTDCPathAlreadySet", 220)
+error_code("CannotCreateCollection", 242)
 error_code("ProducerConsumerQueueBatchTooLarge", 247)
 error_code("ProducerConsumerQueueEndClosed", 248)
 

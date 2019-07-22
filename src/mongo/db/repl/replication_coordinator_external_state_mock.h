@@ -124,6 +124,11 @@ public:
     void setLocalConfigDocument(const StatusWith<BSONObj>& localConfigDocument);
 
     /**
+     * Initializes the return value for subsequent calls to loadLocalLastVoteDocument().
+     */
+    virtual Status createLocalLastVoteCollection(OperationContext* txn);
+
+    /**
      * Sets the return value for subsequent calls to loadLocalLastVoteDocument().
      */
     void setLocalLastVoteDocument(const StatusWith<LastVote>& localLastVoteDocument);
