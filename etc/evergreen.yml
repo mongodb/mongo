@@ -10610,6 +10610,7 @@ buildvariants:
     distros:
     - rhel62-large
   - name: .jscore .common
+  - name: .jstestfuzz
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: .replica_sets !.encrypt !.auth
