@@ -10609,6 +10609,7 @@ buildvariants:
   - name: compile_TG
     distros:
     - rhel62-large
+  - name: .concurrency !.large !.ubsan !.no_txns
   - name: .jscore .common
   - name: .jstestfuzz
   - name: noPassthrough_gen
