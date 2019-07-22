@@ -489,8 +489,7 @@ public:
      *        If duplicates are not allowed, consider removing this method.
      */
     void addField(StringData fieldName, const Value& val) {
-        storage().appendField(
-            fieldName, DocumentStorage::hashKey(fieldName), ValueElement::Kind::kInserted) = val;
+        storage().appendField(fieldName, ValueElement::Kind::kInserted) = val;
     }
 
     /** Update field by key. If there is no field with that key, add one.

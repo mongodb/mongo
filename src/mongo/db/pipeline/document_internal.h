@@ -92,7 +92,6 @@ public:
 
     Value val;
     Position nextCollision;  // Position of next field with same hashBucket
-    const unsigned hash;     // Cache the hash value for faster field name comparisons
     const int nameLen;       // doesn't include '\0'
     Kind kind;               // See the possible kinds above for comments
     const char _name[1];     // pointer to start of name (use nameSD instead)
@@ -138,8 +137,8 @@ private:
 };
 // Real size is sizeof(ValueElement) + nameLen
 #pragma pack()
-MONGO_STATIC_ASSERT(sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(unsigned) +
-                                             sizeof(int) + sizeof(char) + 1));
+MONGO_STATIC_ASSERT(sizeof(ValueElement) ==
+                    (sizeof(Value) + sizeof(Position) + sizeof(int) + sizeof(char) + 1));
 
 class DocumentStorage;
 
@@ -448,12 +447,12 @@ public:
         _modified = true;
         Position pos = findField(name, policy);
         if (!pos.found())
-            return appendField(name, hashKey(name), ValueElement::Kind::kMaybeInserted);
+            return appendField(name, ValueElement::Kind::kMaybeInserted);
         return getField(pos).val;
     }
 
     /// Adds a new field with missing Value at the end of the document
-    Value& appendField(StringData name, unsigned hash, ValueElement::Kind kind);
+    Value& appendField(StringData name, ValueElement::Kind kind);
 
     /** Preallocates space for fields. Use this to attempt to prevent buffer growth.
      *  This is only valid to call before anything is added to the document.
