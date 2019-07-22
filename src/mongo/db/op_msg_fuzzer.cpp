@@ -62,7 +62,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         mongo::LogicalTime(mongo::Timestamp(3, 1));
 
     static const auto ret = [&]() {
-        auto ret = mongo::runGlobalInitializers(0, {nullptr}, nullptr);
+        auto ret = mongo::runGlobalInitializers(0, nullptr, nullptr);
         invariant(ret.isOK());
 
         setGlobalServiceContext(mongo::ServiceContext::make());
