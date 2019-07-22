@@ -461,7 +461,9 @@ public:
     CmdReplSetStepDown()
         : ReplSetCommand("replSetStepDown"),
           _stepDownCmdsWithForceExecutedMetric("commands.replSetStepDownWithForce.total",
-                                               &_stepDownCmdsWithForceExecuted) {}
+                                               &_stepDownCmdsWithForceExecuted),
+          _stepDownCmdsWithForceFailedMetric("commands.replSetStepDownWithForce.failed",
+                                             &_stepDownCmdsWithForceFailed) {}
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      const BSONObj& cmdObj,
@@ -471,6 +473,12 @@ public:
         if (force) {
             _stepDownCmdsWithForceExecuted.increment();
         }
+
+        auto onExitGuard = makeGuard([&] {
+            if (force) {
+                _stepDownCmdsWithForceFailed.increment();
+            }
+        });
 
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         uassertStatusOK(status);
@@ -516,12 +524,15 @@ public:
 
         log() << "replSetStepDown command completed";
 
+        onExitGuard.dismiss();
         return true;
     }
 
 private:
     mutable Counter64 _stepDownCmdsWithForceExecuted;
+    mutable Counter64 _stepDownCmdsWithForceFailed;
     ServerStatusMetricField<Counter64> _stepDownCmdsWithForceExecutedMetric;
+    ServerStatusMetricField<Counter64> _stepDownCmdsWithForceFailedMetric;
 
     ActionSet getAuthActionSet() const override {
         return ActionSet{ActionType::replSetStateChange};
