@@ -70,9 +70,10 @@ struct ReplicaSetMonitor::IsMasterReply {
     bool secondary;
     bool hidden;
     int configVersion{};
-    OID electionId;                     // Set if this isMaster reply is from the primary
-    HostAndPort primary;                // empty if not present
-    std::set<HostAndPort> normalHosts;  // both "hosts" and "passives"
+    OID electionId;                 // Set if this isMaster reply is from the primary
+    HostAndPort primary;            // empty if not present
+    std::set<HostAndPort> members;  // both "hosts" and "passives"
+    std::set<HostAndPort> passives;
     BSONObj tags;
     int minWireVersion{};
     int maxWireVersion{};

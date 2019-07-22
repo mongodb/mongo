@@ -79,7 +79,7 @@ void ReplicaSetChangeNotifier::onPossibleSet(ConnectionString connectionString) 
         auto& state = _replicaSetStates[name];
         ++state.generation;
 
-        state.connStr = connectionString;
+        state.connStr = std::move(connectionString);
         state.primary = {};
 
         return state;
@@ -94,7 +94,8 @@ void ReplicaSetChangeNotifier::onPossibleSet(ConnectionString connectionString) 
 }
 
 void ReplicaSetChangeNotifier::onConfirmedSet(ConnectionString connectionString,
-                                              HostAndPort primary) {
+                                              HostAndPort primary,
+                                              std::set<HostAndPort> passives) {
     LOG(2) << "Signaling confirmed set " << connectionString << " with primary " << primary;
 
     const auto& name = connectionString.getSetName();
@@ -104,8 +105,9 @@ void ReplicaSetChangeNotifier::onConfirmedSet(ConnectionString connectionString,
         auto& state = _replicaSetStates[name];
         ++state.generation;
 
-        state.connStr = connectionString;
-        state.primary = primary;
+        state.connStr = std::move(connectionString);
+        state.primary = std::move(primary);
+        state.passives = std::move(passives);
 
         return state;
     }();

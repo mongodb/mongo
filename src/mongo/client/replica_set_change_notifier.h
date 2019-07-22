@@ -71,7 +71,9 @@ public:
     /**
      * Notify every listener that a scan completed and found a new primary or config
      */
-    void onConfirmedSet(ConnectionString connectionString, HostAndPort primary);
+    void onConfirmedSet(ConnectionString connectionString,
+                        HostAndPort primary,
+                        std::set<HostAndPort> passives);
 
     /**
      * Notify every listener that a ReplicaSet is no longer in use and drop the State
@@ -169,6 +171,7 @@ using ReplicaSetChangeListenerHandle = ReplicaSetChangeNotifier::ListenerHandle;
 struct ReplicaSetChangeNotifier::State {
     ConnectionString connStr;
     HostAndPort primary;
+    std::set<HostAndPort> passives;
 
     int64_t generation = 0;
 };
