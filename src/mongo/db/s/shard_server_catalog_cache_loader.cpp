@@ -198,8 +198,7 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
  */
 CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* opCtx,
                                                             const NamespaceString& nss,
-                                                            ChunkVersion version,
-                                                            const bool okToReadWhileRefreshing) {
+                                                            ChunkVersion version) {
     ShardCollectionType shardCollectionEntry =
         uassertStatusOK(readShardCollectionsEntry(opCtx, nss));
 
@@ -243,7 +242,7 @@ StatusWith<CollectionAndChangedChunks> getIncompletePersistedMetadataSinceVersio
 
     try {
         CollectionAndChangedChunks collAndChunks =
-            getPersistedMetadataSinceVersion(opCtx, nss, version, false);
+            getPersistedMetadataSinceVersion(opCtx, nss, version);
         if (collAndChunks.changedChunks.empty()) {
             // Found a collections entry, but the chunks are being updated.
             return CollectionAndChangedChunks();
@@ -1111,7 +1110,7 @@ ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVer
 
         // Load the metadata.
         CollectionAndChangedChunks collAndChangedChunks =
-            getPersistedMetadataSinceVersion(opCtx, nss, version, true);
+            getPersistedMetadataSinceVersion(opCtx, nss, version);
 
         // Check that no updates were concurrently applied while we were loading the metadata: this
         // could cause the loaded metadata to provide an incomplete view of the chunk ranges.
