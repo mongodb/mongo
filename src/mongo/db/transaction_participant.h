@@ -359,8 +359,6 @@ public:
     public:
         // Indicates whether the future lock requests should have timeouts.
         enum class MaxLockTimeout { kNotAllowed, kAllowed };
-        // Indicates whether we should opt out of the ticket mechanism.
-        enum class AcquireTicket { kNoSkip, kSkip };
 
         explicit Participant(OperationContext* opCtx);
         explicit Participant(const SessionToKill& session);
@@ -773,28 +771,14 @@ public:
          *  - MaxLockTimeout::kAllowed will set the timeout as
          *    MaxTransactionLockRequestTimeoutMillis.
          *
-         * acquireTicket will determine we should acquire ticket on unstashing the transaction
-         * resources.
-         *  - AcquireTicket::kSkip will not acquire ticket.
-         *  - AcquireTicket::kNoSkip will retain the default behavior which is to acquire ticket.
-         *
-         * Below is the expected behavior.
-         * ----------------------------------------------------------------------------
-         * |                |                      |               |                  |
-         * |                |      PRIMARY         |  SECONDARY    | STATE TRANSITION |
-         * |                |                      |               |                  |
-         * |----------------|----------------------|---------------|------------------|
-         * |                |Unprepared | Prepared |               |                  |
-         * |                |    Txn    |   Txn    |               |                  |
-         * |                |----------------------|               |                  |
-         * |acquireTicket   | kNoSkip   |  kSkip   |  kNoSkip      |     kNoSkip      |
-         * |----------------|----------------------|---------------|------------------|
-         * |maxLockTimeout  |     kAllowed         | kNotAllowed   |  kNotAllowed     |
-         * ----------------------------------------------------------------------------
+         * ------------------------------------------------------------------
+         * |                | PRIMARY    | SECONDARY     | STATE TRANSITION |
+         * |----------------|------------|---------------|------------------|
+         * |maxLockTimeout  | kAllowed   | kNotAllowed   |  kNotAllowed     |
+         * ------------------------------------------------------------------
          */
         void _releaseTransactionResourcesToOpCtx(OperationContext* opCtx,
-                                                 MaxLockTimeout maxLockTimeout,
-                                                 AcquireTicket acquireTicket);
+                                                 MaxLockTimeout maxLockTimeout);
 
         TransactionParticipant::PrivateState& p() {
             return _tp->_p;
