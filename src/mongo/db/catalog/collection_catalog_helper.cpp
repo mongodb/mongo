@@ -51,18 +51,26 @@ void forEachCollectionFromDb(OperationContext* opCtx,
             continue;
         }
 
-        auto nss = catalog.lookupNSSByUUID(uuid);
+        boost::optional<Lock::CollectionLock> clk;
+        Collection* collection = nullptr;
 
-        // If the NamespaceString can't be resolved from the uuid, then the collection was dropped.
-        if (!nss) {
-            continue;
+        while (auto nss = catalog.lookupNSSByUUID(uuid)) {
+            // Get a fresh snapshot for each locked collection to see any catalog changes.
+            clk.emplace(opCtx, *nss, collLockMode);
+            opCtx->recoveryUnit()->abandonSnapshot();
+
+            if (catalog.lookupNSSByUUID(uuid) == nss) {
+                // Success: locked the namespace and the UUID still maps to it.
+                collection = catalog.lookupCollectionByUUID(uuid);
+                invariant(collection);
+                break;
+            }
+            // Failed: collection got renamed before locking it, so unlock and try again.
+            clk.reset();
         }
 
-        Lock::CollectionLock clk(opCtx, *nss, collLockMode);
-        opCtx->recoveryUnit()->abandonSnapshot();
-
-        auto collection = catalog.lookupCollectionByUUID(uuid);
-        if (!collection || collection->ns() != *nss)
+        // The NamespaceString couldn't be resolved from the uuid, so the collection was dropped.
+        if (!collection)
             continue;
 
         if (!callback(collection))
