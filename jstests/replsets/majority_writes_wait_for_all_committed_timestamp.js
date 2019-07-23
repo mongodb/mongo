@@ -2,6 +2,8 @@
  * This tests that writes with majority write concern will wait for at least the all committed
  * timestamp to reach the timestamp of the write. This guarantees that once a write is majority
  * committed, reading at the all committed timestamp will read that write.
+ *
+ * @tags: [requires_document_locking]
  */
 (function() {
     "use strict";
