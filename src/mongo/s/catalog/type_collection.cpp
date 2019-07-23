@@ -43,7 +43,6 @@ namespace {
 
 const BSONField<bool> kNoBalance("noBalance");
 const BSONField<bool> kDropped("dropped");
-const auto kIsAssignedShardKey = "isAssignedShardKey"_sd;
 
 }  // namespace
 
@@ -180,18 +179,6 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
         }
     }
 
-    {
-        bool isAssignedShardKey;
-        Status status = bsonExtractBooleanField(source, kIsAssignedShardKey, &isAssignedShardKey);
-        if (status.isOK()) {
-            coll._isAssignedShardKey = isAssignedShardKey;
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // isAssignedShardKey can be missing in which case it is presumed as true.
-        } else {
-            return status;
-        }
-    }
-
     return StatusWith<CollectionType>(coll);
 }
 
@@ -263,10 +250,6 @@ BSONObj CollectionType::toBSON() const {
 
     if (_allowBalance.is_initialized()) {
         builder.append(kNoBalance.name(), !_allowBalance.get());
-    }
-
-    if (_isAssignedShardKey) {
-        builder.append(kIsAssignedShardKey, !_isAssignedShardKey.get());
     }
 
     return builder.obj();

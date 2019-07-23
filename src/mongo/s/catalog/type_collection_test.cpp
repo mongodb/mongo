@@ -69,7 +69,6 @@ TEST(CollectionType, Basic) {
     ASSERT_EQUALS(coll.getUnique(), true);
     ASSERT_EQUALS(coll.getAllowBalance(), true);
     ASSERT_EQUALS(coll.getDropped(), false);
-    ASSERT_EQUALS(coll.isAssignedShardKey(), true);
 }
 
 TEST(CollectionType, AllFieldsPresent) {
@@ -81,8 +80,7 @@ TEST(CollectionType, AllFieldsPresent) {
         << CollectionType::keyPattern(BSON("a" << 1))
         << CollectionType::defaultCollation(BSON("locale"
                                                  << "fr_CA"))
-        << CollectionType::unique(true) << CollectionType::uuid() << uuid << "isAssignedShardKey"
-        << false));
+        << CollectionType::unique(true) << CollectionType::uuid() << uuid));
     ASSERT_TRUE(status.isOK());
 
     CollectionType coll = status.getValue();
@@ -99,7 +97,6 @@ TEST(CollectionType, AllFieldsPresent) {
     ASSERT_EQUALS(coll.getDropped(), false);
     ASSERT_TRUE(coll.getUUID());
     ASSERT_EQUALS(*coll.getUUID(), uuid);
-    ASSERT_EQUALS(coll.isAssignedShardKey(), false);
 }
 
 TEST(CollectionType, EmptyDefaultCollationFailsToParse) {
