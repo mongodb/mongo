@@ -1100,6 +1100,16 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     return prepareOplogSlot.getTimestamp();
 }
 
+void TransactionParticipant::Participant::setPrepareOpTimeForRecovery(OperationContext* opCtx,
+                                                                      repl::OpTime prepareOpTime) {
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    o(lk).recoveryPrepareOpTime = prepareOpTime;
+}
+
+const repl::OpTime TransactionParticipant::Participant::getPrepareOpTimeForRecovery() const {
+    return o().recoveryPrepareOpTime;
+}
+
 void TransactionParticipant::Participant::addTransactionOperation(
     OperationContext* opCtx, const repl::ReplOperation& operation) {
 
@@ -2029,6 +2039,7 @@ void TransactionParticipant::Participant::_resetTransactionState(
     p().transactionOperationBytes = 0;
     p().transactionOperations.clear();
     o(wl).prepareOpTime = repl::OpTime();
+    o(wl).recoveryPrepareOpTime = repl::OpTime();
     p().multikeyPathInfo.clear();
     p().autoCommit = boost::none;
 

@@ -339,6 +339,12 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     auto transaction = TransactionParticipant::get(opCtx);
     transaction.unstashTransactionResources(opCtx, "prepareTransaction");
 
+    // Set this in case the application of any ops need to use the prepare timestamp of this
+    // transaction. It should be cleared automatically when the transaction finishes.
+    if (oplogApplicationMode == repl::OplogApplication::Mode::kRecovering) {
+        transaction.setPrepareOpTimeForRecovery(opCtx, entry.getOpTime());
+    }
+
     auto status = _applyOperationsForTransaction(opCtx, ops, oplogApplicationMode);
     if (!status.isOK())
         return status;
