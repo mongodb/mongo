@@ -455,6 +455,16 @@ public:
                                      boost::optional<repl::OpTime> prepareOptime);
 
         /**
+         * Sets the prepare optime used for recovery.
+         */
+        void setPrepareOpTimeForRecovery(OperationContext* opCtx, repl::OpTime prepareOpTime);
+
+        /**
+         * Gets the prepare optime used for recovery. Returns a null optime if unset.
+         */
+        const repl::OpTime getPrepareOpTimeForRecovery() const;
+
+        /**
          * Commits the transaction, including committing the write unit of work and updating
          * transaction state.
          *
@@ -877,6 +887,12 @@ private:
 
         // Track the prepareOpTime, the OpTime of the 'prepare' oplog entry for a transaction.
         repl::OpTime prepareOpTime;
+
+        // The prepare optime of the transaction. This is exposed to consumers who may need to know
+        // the optime of the prepare oplog entry during replication recovery. It is stored
+        // separately from the 'prepareOpTime' since it serves a different purpose and may be
+        // updated at different times.
+        repl::OpTime recoveryPrepareOpTime;
 
         // Tracks and updates transaction metrics upon the appropriate transaction event.
         TransactionMetricsObserver transactionMetricsObserver;
