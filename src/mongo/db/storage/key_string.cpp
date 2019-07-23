@@ -325,40 +325,46 @@ string readInvertedCStringWithNuls(BufReader* reader) {
 }
 }  // namespace
 
-void Builder::resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId) {
+template <class BufferT>
+void BuilderBase<BufferT>::resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId) {
     resetToEmpty(ord);
-    _appendAllElementsForIndexing(obj, kInclusive);
+    _appendAllElementsForIndexing(obj, Discriminator::kInclusive);
     appendRecordId(recordId);
 }
 
-void Builder::resetToKey(const BSONObj& obj, Ordering ord, Discriminator discriminator) {
+template <class BufferT>
+void BuilderBase<BufferT>::resetToKey(const BSONObj& obj,
+                                      Ordering ord,
+                                      Discriminator discriminator) {
     resetToEmpty(ord, discriminator);
     _appendAllElementsForIndexing(obj, discriminator);
 }
 
-void Builder::appendBSONElement(const BSONElement& elem) {
+template <class BufferT>
+void BuilderBase<BufferT>::appendBSONElement(const BSONElement& elem) {
     const int elemIdx = _elemCount++;
     const bool invert = (_ordering.get(elemIdx) == -1);
 
-    if (_state == kEmpty) {
-        _transition(kAppendingBSONElements);
+    if (_state == BuildState::kEmpty) {
+        _transition(BuildState::kAppendingBSONElements);
     }
     _appendBsonValue(elem, invert, nullptr);
 }
 
-void Builder::_appendDiscriminator(const Discriminator discriminator) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendDiscriminator(const Discriminator discriminator) {
     // The discriminator forces this KeyString to compare Less/Greater than any KeyString with
     // the same prefix of keys. As an example, this can be used to land on the first key in the
     // index with the value "a" regardless of the RecordId. In compound indexes it can use a
     // prefix of the full key to ignore the later keys.
     switch (discriminator) {
-        case kExclusiveBefore:
+        case Discriminator::kExclusiveBefore:
             _append(kLess, false);
             break;
-        case kExclusiveAfter:
+        case Discriminator::kExclusiveAfter:
             _append(kGreater, false);
             break;
-        case kInclusive:
+        case Discriminator::kInclusive:
             break;  // No discriminator byte.
     }
 
@@ -370,13 +376,16 @@ void Builder::_appendDiscriminator(const Discriminator discriminator) {
 // -----------   APPEND CODE  -------------------------------------------
 // ----------------------------------------------------------------------
 
-void Builder::_appendEnd() {
-    _transition(kEndAdded);
+template <class BufferT>
+void BuilderBase<BufferT>::_appendEnd() {
+    _transition(BuildState::kEndAdded);
     _append(kEnd, false);
 }
 
-void Builder::_appendAllElementsForIndexing(const BSONObj& obj, Discriminator discriminator) {
-    _transition(kAppendingBSONElements);
+template <class BufferT>
+void BuilderBase<BufferT>::_appendAllElementsForIndexing(const BSONObj& obj,
+                                                         Discriminator discriminator) {
+    _transition(BuildState::kAppendingBSONElements);
     BSONObjIterator it(obj);
     while (auto elem = it.next()) {
         appendBSONElement(elem);
@@ -389,15 +398,17 @@ void Builder::_appendAllElementsForIndexing(const BSONObj& obj, Discriminator di
         if (char ch = *elem.fieldName()) {
             // l for less / g for greater.
             invariant(ch == 'l' || ch == 'g');
-            discriminator = ch == 'l' ? kExclusiveBefore : kExclusiveAfter;
+            discriminator =
+                ch == 'l' ? Discriminator::kExclusiveBefore : Discriminator::kExclusiveAfter;
             invariant(!it.more());
         }
     }
     _appendDiscriminator(discriminator);
 }
 
-void Builder::appendRecordId(RecordId loc) {
-    _transition(kAppendedRecordID);
+template <class BufferT>
+void BuilderBase<BufferT>::appendRecordId(RecordId loc) {
+    _transition(BuildState::kAppendedRecordID);
     // The RecordId encoding must be able to determine the full length starting from the last
     // byte, without knowing where the first byte is since it is stored at the end of a
     // KeyString, and we need to be able to read the RecordId without decoding the whole thing.
@@ -443,8 +454,9 @@ void Builder::appendRecordId(RecordId loc) {
     _append(lastByte, false);
 }
 
-void Builder::appendTypeBits(const TypeBits& typeBits) {
-    _transition(kAppendedTypeBits);
+template <class BufferT>
+void BuilderBase<BufferT>::appendTypeBits(const TypeBits& typeBits) {
+    _transition(BuildState::kAppendedTypeBits);
     // As an optimization, encode AllZeros as a single 0 byte.
     if (typeBits.isAllZeros()) {
         _append(uint8_t(0), false);
@@ -454,11 +466,13 @@ void Builder::appendTypeBits(const TypeBits& typeBits) {
     _appendBytes(typeBits.getBuffer(), typeBits.getSize(), false);
 }
 
-void Builder::_appendBool(bool val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendBool(bool val, bool invert) {
     _append(val ? CType::kBoolTrue : CType::kBoolFalse, invert);
 }
 
-void Builder::_appendDate(Date_t val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendDate(Date_t val, bool invert) {
     _append(CType::kDate, invert);
     // see: http://en.wikipedia.org/wiki/Offset_binary
     uint64_t encoded = static_cast<uint64_t>(val.asInt64());
@@ -466,40 +480,47 @@ void Builder::_appendDate(Date_t val, bool invert) {
     _append(endian::nativeToBig(encoded), invert);
 }
 
-void Builder::_appendTimestamp(Timestamp val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendTimestamp(Timestamp val, bool invert) {
     _append(CType::kTimestamp, invert);
     _append(endian::nativeToBig(val.asLL()), invert);
 }
 
-void Builder::_appendOID(OID val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendOID(OID val, bool invert) {
     _append(CType::kOID, invert);
     _appendBytes(val.view().view(), OID::kOIDSize, invert);
 }
 
-void Builder::_appendString(StringData val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendString(StringData val, bool invert) {
     _typeBits.appendString();
     _append(CType::kStringLike, invert);
     _appendStringLike(val, invert);
 }
 
-void Builder::_appendSymbol(StringData val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendSymbol(StringData val, bool invert) {
     _typeBits.appendSymbol();
     _append(CType::kStringLike, invert);  // Symbols and Strings compare equally
     _appendStringLike(val, invert);
 }
 
-void Builder::_appendCode(StringData val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendCode(StringData val, bool invert) {
     _append(CType::kCode, invert);
     _appendStringLike(val, invert);
 }
 
-void Builder::_appendCodeWString(const BSONCodeWScope& val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendCodeWString(const BSONCodeWScope& val, bool invert) {
     _append(CType::kCodeWithScope, invert);
     _appendStringLike(val.code, invert);
     _appendBson(val.scope, invert);
 }
 
-void Builder::_appendBinData(const BSONBinData& val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendBinData(const BSONBinData& val, bool invert) {
     _append(CType::kBinData, invert);
     if (val.length < 0xff) {
         // size fits in one byte so use one byte to encode.
@@ -513,7 +534,8 @@ void Builder::_appendBinData(const BSONBinData& val, bool invert) {
     _appendBytes(val.data, val.length, invert);
 }
 
-void Builder::_appendRegex(const BSONRegEx& val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendRegex(const BSONRegEx& val, bool invert) {
     _append(CType::kRegEx, invert);
     // note: NULL is not allowed in pattern or flags
     _appendBytes(val.pattern.rawData(), val.pattern.size(), invert);
@@ -522,14 +544,16 @@ void Builder::_appendRegex(const BSONRegEx& val, bool invert) {
     _append(int8_t(0), invert);
 }
 
-void Builder::_appendDBRef(const BSONDBRef& val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendDBRef(const BSONDBRef& val, bool invert) {
     _append(CType::kDBRef, invert);
     _append(endian::nativeToBig(int32_t(val.ns.size())), invert);
     _appendBytes(val.ns.rawData(), val.ns.size(), invert);
     _appendBytes(val.oid.view().view(), OID::kOIDSize, invert);
 }
 
-void Builder::_appendArray(const BSONArray& val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendArray(const BSONArray& val, bool invert) {
     _append(CType::kArray, invert);
     BSONForEach(elem, val) {
         // No generic ctype byte needed here since no name is encoded.
@@ -538,12 +562,14 @@ void Builder::_appendArray(const BSONArray& val, bool invert) {
     _append(int8_t(0), invert);
 }
 
-void Builder::_appendObject(const BSONObj& val, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendObject(const BSONObj& val, bool invert) {
     _append(CType::kObject, invert);
     _appendBson(val, invert);
 }
 
-void Builder::_appendNumberDouble(const double num, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendNumberDouble(const double num, bool invert) {
     if (num == 0.0 && std::signbit(num))
         _typeBits.appendZero(TypeBits::kNegativeDoubleZero);
     else
@@ -552,9 +578,10 @@ void Builder::_appendNumberDouble(const double num, bool invert) {
     _appendDoubleWithoutTypeBits(num, kDCMEqualToDouble, invert);
 }
 
-void Builder::_appendDoubleWithoutTypeBits(const double num,
-                                           DecimalContinuationMarker dcm,
-                                           bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendDoubleWithoutTypeBits(const double num,
+                                                        DecimalContinuationMarker dcm,
+                                                        bool invert) {
     const bool isNegative = num < 0.0;
     const double magnitude = isNegative ? -num : num;
 
@@ -625,17 +652,20 @@ void Builder::_appendDoubleWithoutTypeBits(const double num,
     }
 }
 
-void Builder::_appendNumberLong(const long long num, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendNumberLong(const long long num, bool invert) {
     _typeBits.appendNumberLong();
     _appendInteger(num, invert);
 }
 
-void Builder::_appendNumberInt(const int num, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendNumberInt(const int num, bool invert) {
     _typeBits.appendNumberInt();
     _appendInteger(num, invert);
 }
 
-void Builder::_appendNumberDecimal(const Decimal128 dec, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendNumberDecimal(const Decimal128 dec, bool invert) {
     bool isNegative = dec.isNegative();
     if (dec.isZero()) {
         uint32_t zeroExp = dec.getBiasedExponent();
@@ -789,7 +819,10 @@ void Builder::_appendNumberDecimal(const Decimal128 dec, bool invert) {
     _append(decimalContinuation, isNegative ? !invert : invert);
 }
 
-void Builder::_appendBsonValue(const BSONElement& elem, bool invert, const StringData* name) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendBsonValue(const BSONElement& elem,
+                                            bool invert,
+                                            const StringData* name) {
     if (name) {
         _appendBytes(name->rawData(), name->size() + 1, invert);  // + 1 for NUL
     }
@@ -872,7 +905,8 @@ void Builder::_appendBsonValue(const BSONElement& elem, bool invert, const Strin
 
 /// -- lowest level
 
-void Builder::_appendStringLike(StringData str, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendStringLike(StringData str, bool invert) {
     while (true) {
         size_t firstNul = strnlen(str.rawData(), str.size());
         // No NULs in string.
@@ -888,7 +922,8 @@ void Builder::_appendStringLike(StringData str, bool invert) {
     }
 }
 
-void Builder::_appendBson(const BSONObj& obj, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendBson(const BSONObj& obj, bool invert) {
     BSONForEach(elem, obj) {
         // Force the order to be based on (ctype, name, value).
         _append(bsonTypeToGenericKeyStringType(elem.type()), invert);
@@ -898,7 +933,10 @@ void Builder::_appendBson(const BSONObj& obj, bool invert) {
     _append(int8_t(0), invert);
 }
 
-void Builder::_appendSmallDouble(double value, DecimalContinuationMarker dcm, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendSmallDouble(double value,
+                                              DecimalContinuationMarker dcm,
+                                              bool invert) {
     bool isNegative = value < 0;
     double magnitude = isNegative ? -value : value;
     dassert(!std::isnan(value) && value != 0 && magnitude < 1);
@@ -936,7 +974,10 @@ void Builder::_appendSmallDouble(double value, DecimalContinuationMarker dcm, bo
     _append(endian::nativeToBig(encoded), isNegative ? !invert : invert);
 }
 
-void Builder::_appendLargeDouble(double value, DecimalContinuationMarker dcm, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendLargeDouble(double value,
+                                              DecimalContinuationMarker dcm,
+                                              bool invert) {
     dassert(!std::isnan(value));
     dassert(value != 0.0);
     invariant(dcm != kDCMEqualToDoubleRoundedUpTo15Digits);  // only single DCM bit here
@@ -961,9 +1002,10 @@ void Builder::_appendLargeDouble(double value, DecimalContinuationMarker dcm, bo
     _append(encoded, value > 0 ? invert : !invert);
 }
 
-void Builder::_appendTinyDecimalWithoutTypeBits(const Decimal128 dec,
-                                                const double bin,
-                                                bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendTinyDecimalWithoutTypeBits(const Decimal128 dec,
+                                                             const double bin,
+                                                             bool invert) {
     // This function is only for 'dec' that doesn't exactly equal a double, but rounds to 'bin'
     dassert(bin == dec.toDouble(Decimal128::kRoundTowardZero));
     dassert(std::abs(bin) < DBL_MIN);
@@ -1018,7 +1060,8 @@ void Builder::_appendTinyDecimalWithoutTypeBits(const Decimal128 dec,
 }
 
 
-void Builder::_appendHugeDecimalWithoutTypeBits(const Decimal128 dec, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendHugeDecimalWithoutTypeBits(const Decimal128 dec, bool invert) {
     // To allow us to use CType::kNumericNegativeLargeMagnitude we need to fit between the highest
     // finite double and the representation of +/-Inf. We do this by forcing the high bit to 1
     // (large doubles always have 0) and never encoding ~0 here.
@@ -1037,7 +1080,8 @@ void Builder::_appendHugeDecimalWithoutTypeBits(const Decimal128 dec, bool inver
 }
 
 // Handles NumberLong and NumberInt which are encoded identically except for the TypeBits.
-void Builder::_appendInteger(const long long num, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendInteger(const long long num, bool invert) {
     if (num == std::numeric_limits<long long>::min()) {
         // -2**63 is exactly representable as a double and not as a positive int64.
         // Therefore we encode it as a double.
@@ -1056,7 +1100,10 @@ void Builder::_appendInteger(const long long num, bool invert) {
     _appendPreshiftedIntegerPortion(magnitude << 1, isNegative, invert);
 }
 
-void Builder::_appendPreshiftedIntegerPortion(uint64_t value, bool isNegative, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendPreshiftedIntegerPortion(uint64_t value,
+                                                           bool isNegative,
+                                                           bool invert) {
     dassert(value != 0ULL);
     dassert(value != 1ULL);
 
@@ -1075,12 +1122,9 @@ void Builder::_appendPreshiftedIntegerPortion(uint64_t value, bool isNegative, b
     }
 }
 
-template <typename T>
-void Builder::_append(const T& thing, bool invert) {
-    _appendBytes(&thing, sizeof(thing), invert);
-}
 
-void Builder::_appendBytes(const void* source, size_t bytes, bool invert) {
+template <class BufferT>
+void BuilderBase<BufferT>::_appendBytes(const void* source, size_t bytes, bool invert) {
     char* const base = _buffer.skip(bytes);
 
     if (invert) {
@@ -1506,14 +1550,12 @@ void toBsonValue(uint8_t ctype,
                 }
                 case 0x3: {
                     // Small double, 2**(-255) or more in magnitude. Common case.
-                    auto dcm = static_cast<Builder::DecimalContinuationMarker>(encoded & 3);
+                    auto dcm = static_cast<DecimalContinuationMarker>(encoded & 3);
                     encoded >>= 2;
                     double bin;
                     memcpy(&bin, &encoded, sizeof(bin));
                     if (originalType == TypeBits::kDouble) {
-                        uassert(50824,
-                                "Decimal contuation mismatch.",
-                                dcm == Builder::kDCMEqualToDouble);
+                        uassert(50824, "Decimal contuation mismatch.", dcm == kDCMEqualToDouble);
                         *stream << (isNegative ? -bin : bin);
                         break;
                     }
@@ -1524,18 +1566,18 @@ void toBsonValue(uint8_t ctype,
                             originalType == TypeBits::kDecimal);
                     Decimal128 dec;
                     switch (dcm) {
-                        case Builder::kDCMEqualToDoubleRoundedUpTo15Digits:
+                        case kDCMEqualToDoubleRoundedUpTo15Digits:
                             dec = Decimal128(bin,
                                              Decimal128::kRoundTo15Digits,
                                              Decimal128::kRoundTowardPositive);
                             break;
-                        case Builder::kDCMEqualToDouble:
+                        case kDCMEqualToDouble:
                             dec = Decimal128(bin,
                                              Decimal128::kRoundTo34Digits,
                                              Decimal128::kRoundTowardPositive);
                             break;
-                        case Builder::kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits:
-                        case Builder::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits:
+                        case kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits:
+                        case kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits:
                             // Deal with decimal continuation
                             dec = Decimal128(bin,
                                              Decimal128::kRoundTo34Digits,
@@ -1656,19 +1698,19 @@ void toBsonValue(uint8_t ctype,
             }
 
             // The two lsb's are the DCM, except for the 8-byte case, where it's already known
-            Builder::DecimalContinuationMarker dcm = fracBytes
-                ? static_cast<Builder::DecimalContinuationMarker>(encodedFraction & 3)
-                : Builder::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits;
+            DecimalContinuationMarker dcm = fracBytes
+                ? static_cast<DecimalContinuationMarker>(encodedFraction & 3)
+                : kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits;
 
             // Deal with decimal cases
             uassert(50810, "Expected type Decimal.", originalType == TypeBits::kDecimal);
             Decimal128 dec;
             switch (dcm) {
-                case Builder::kDCMEqualToDoubleRoundedUpTo15Digits:
+                case kDCMEqualToDoubleRoundedUpTo15Digits:
                     dec = Decimal128(
                         bin, Decimal128::kRoundTo15Digits, Decimal128::kRoundTowardPositive);
                     break;
-                case Builder::kDCMEqualToDouble:
+                case kDCMEqualToDouble:
                     dec = Decimal128(
                         bin, Decimal128::kRoundTo34Digits, Decimal128::kRoundTowardPositive);
                     break;
@@ -1868,15 +1910,15 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
                 }
                 case 0x3: {
                     // Small double, 2**(-255) or more in magnitude. Common case.
-                    auto dcm = static_cast<Builder::DecimalContinuationMarker>(encoded & 3);
+                    auto dcm = static_cast<DecimalContinuationMarker>(encoded & 3);
 
                     // Deal with decimal cases
                     switch (dcm) {
-                        case Builder::kDCMEqualToDoubleRoundedUpTo15Digits:
-                        case Builder::kDCMEqualToDouble:
+                        case kDCMEqualToDoubleRoundedUpTo15Digits:
+                        case kDCMEqualToDouble:
                             break;
-                        case Builder::kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits:
-                        case Builder::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits:
+                        case kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits:
+                        case kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits:
                             // Deal with decimal continuation
                             reader->skip(sizeof(std::uint64_t));
                     }
@@ -1946,14 +1988,14 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
                 encodedFraction = (encodedFraction << 8) | readType<uint8_t>(reader, inverted);
 
             // The two lsb's are the DCM, except for the 8-byte case, where it's already known
-            Builder::DecimalContinuationMarker dcm = fracBytes
-                ? static_cast<Builder::DecimalContinuationMarker>(encodedFraction & 3)
-                : Builder::kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits;
+            DecimalContinuationMarker dcm = fracBytes
+                ? static_cast<DecimalContinuationMarker>(encodedFraction & 3)
+                : kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits;
 
             // Deal with decimal cases
             switch (dcm) {
-                case Builder::kDCMEqualToDoubleRoundedUpTo15Digits:
-                case Builder::kDCMEqualToDouble:
+                case kDCMEqualToDoubleRoundedUpTo15Digits:
+                case kDCMEqualToDouble:
                     break;
                 default:
                     // Deal with decimal continuation
@@ -2027,11 +2069,13 @@ Decimal128 adjustDecimalExponent(TypeBits::Reader* typeBits, Decimal128 num) {
 //  --------- MISC class utils --------
 // ----------------------------------------------------------------------
 
-std::string Builder::toString() const {
+template <class BufferT>
+std::string BuilderBase<BufferT>::toString() const {
     return toHex(getBuffer(), getSize());
 }
 
-int Builder::compare(const Builder& other) const {
+template <class BufferT>
+int BuilderBase<BufferT>::compare(const BuilderBase<BufferT>& other) const {
     int a = getSize();
     int b = other.getSize();
 
@@ -2053,7 +2097,8 @@ int Builder::compare(const Builder& other) const {
     return a < b ? -1 : 1;
 }
 
-int Builder::compareWithoutRecordId(const Builder& other) const {
+template <class BufferT>
+int BuilderBase<BufferT>::compareWithoutRecordId(const BuilderBase<BufferT>& other) const {
     int a = !isEmpty() ? sizeWithoutRecordIdAtEnd(getBuffer(), getSize()) : 0;
     int b = !other.isEmpty() ? sizeWithoutRecordIdAtEnd(other.getBuffer(), other.getSize()) : 0;
 
@@ -2126,6 +2171,7 @@ uint32_t TypeBits::readSizeFromBuffer(BufReader* reader) {
     return 0;
 }
 
+
 void TypeBits::setRawSize(uint32_t size) {
     // Grow the data buffer if needed.
     if (size > getDataBufferLen()) {
@@ -2140,6 +2186,7 @@ void TypeBits::setRawSize(uint32_t size) {
         DataView(getDataBuffer() - 1).write<uint8_t>(0x80 | size);
     }
 }
+
 
 void TypeBits::resetFromBuffer(BufReader* reader) {
     reset();
@@ -2247,7 +2294,7 @@ uint8_t TypeBits::Reader::readZero() {
 }
 
 uint32_t TypeBits::Reader::readDecimalZero(uint8_t zeroType) {
-    uint32_t whichZero = zeroType - TypeBits::kDecimalZero0xxx;
+    uint32_t whichZero = zeroType - kDecimalZero0xxx;
     for (int bitPos = 11; bitPos >= 0; bitPos--)
         whichZero = (whichZero << 1) | readBit();
 
@@ -2344,6 +2391,9 @@ RecordId decodeRecordId(BufReader* reader) {
     repr = (repr << 5) | (lastByte >> 3);  // fold in high 5 bits of last byte
     return RecordId(repr);
 }
+
+template class BuilderBase<BufBuilder>;
+template class BuilderBase<StackBufBuilder>;
 
 }  // namespace KeyString
 

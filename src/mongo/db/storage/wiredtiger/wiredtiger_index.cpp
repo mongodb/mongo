@@ -875,8 +875,9 @@ public:
 
         // NOTE: this uses the opposite rules as a normal seek because a forward scan should
         // end after the key if inclusive and before if exclusive.
-        const auto discriminator = _forward == inclusive ? KeyString::Builder::kExclusiveAfter
-                                                         : KeyString::Builder::kExclusiveBefore;
+        const auto discriminator = _forward == inclusive
+            ? KeyString::Discriminator::kExclusiveAfter
+            : KeyString::Discriminator::kExclusiveBefore;
         _endPosition = std::make_unique<KeyString::Builder>(_idx.getKeyStringVersion());
         _endPosition->resetToKey(stripFieldNames(key), _idx.getOrdering(), discriminator);
     }
@@ -886,8 +887,9 @@ public:
                                         RequestedInfo parts) override {
         dassert(_opCtx->lockState()->isReadLocked());
         const BSONObj finalKey = stripFieldNames(key);
-        const auto discriminator = _forward == inclusive ? KeyString::Builder::kExclusiveBefore
-                                                         : KeyString::Builder::kExclusiveAfter;
+        const auto discriminator = _forward == inclusive
+            ? KeyString::Discriminator::kExclusiveBefore
+            : KeyString::Discriminator::kExclusiveAfter;
 
         // By using a discriminator other than kInclusive, there is no need to distinguish
         // unique vs non-unique key formats since both start with the key.
@@ -904,8 +906,8 @@ public:
         BSONObj key = IndexEntryComparison::makeQueryObject(seekPoint, _forward);
 
         // makeQueryObject handles the discriminator in the real exclusive cases.
-        const auto discriminator =
-            _forward ? KeyString::Builder::kExclusiveBefore : KeyString::Builder::kExclusiveAfter;
+        const auto discriminator = _forward ? KeyString::Discriminator::kExclusiveBefore
+                                            : KeyString::Discriminator::kExclusiveAfter;
         _query.resetToKey(key, _idx.getOrdering(), discriminator);
         seekWTCursor(_query);
         updatePosition();

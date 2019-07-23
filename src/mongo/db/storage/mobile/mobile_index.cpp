@@ -453,8 +453,9 @@ public:
 
         // This uses the opposite rules as a normal seek because a forward scan should end after the
         // key if inclusive and before if exclusive.
-        const auto discriminator = _isForward == inclusive ? KeyString::Builder::kExclusiveAfter
-                                                           : KeyString::Builder::kExclusiveBefore;
+        const auto discriminator = _isForward == inclusive
+            ? KeyString::Discriminator::kExclusiveAfter
+            : KeyString::Discriminator::kExclusiveBefore;
         _endPosition = std::make_unique<KeyString::Builder>(_index.getKeyStringVersion());
         _endPosition->resetToKey(stripFieldNames(key), _index.getOrdering(), discriminator);
     }
@@ -465,8 +466,9 @@ public:
         const BSONObj startKey = stripFieldNames(key);
         // By using a discriminator other than kInclusive, there is no need to distinguish
         // unique vs non-unique key formats since both start with the key.
-        const auto discriminator = _isForward == inclusive ? KeyString::Builder::kExclusiveBefore
-                                                           : KeyString::Builder::kExclusiveAfter;
+        const auto discriminator = _isForward == inclusive
+            ? KeyString::Discriminator::kExclusiveBefore
+            : KeyString::Discriminator::kExclusiveAfter;
         _startPosition.resetToKey(startKey, _index.getOrdering(), discriminator);
 
         _doSeek();
@@ -479,8 +481,8 @@ public:
                                         RequestedInfo parts) override {
         BSONObj startKey = IndexEntryComparison::makeQueryObject(seekPoint, _isForward);
 
-        const auto discriminator =
-            _isForward ? KeyString::Builder::kExclusiveBefore : KeyString::Builder::kExclusiveAfter;
+        const auto discriminator = _isForward ? KeyString::Discriminator::kExclusiveBefore
+                                              : KeyString::Discriminator::kExclusiveAfter;
         _startPosition.resetToKey(startKey, _index.getOrdering(), discriminator);
 
         _doSeek();

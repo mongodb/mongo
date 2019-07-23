@@ -61,7 +61,8 @@ BSONObj toBson(const KeyString::Builder& ks, Ordering ord) {
     return KeyString::toBson(ks.getBuffer(), ks.getSize(), ord, ks.getTypeBits());
 }
 
-BSONObj toBsonAndCheckKeySize(const KeyString::Builder& ks, Ordering ord) {
+template <class T>
+BSONObj toBsonAndCheckKeySize(const KeyString::BuilderBase<T>& ks, Ordering ord) {
     auto KeyStringBuilderSize = ks.getSize();
 
     // Validate size of the key in KeyString::Builder.
@@ -74,7 +75,7 @@ BSONObj toBsonAndCheckKeySize(const KeyString::Builder& ks, Ordering ord) {
 BSONObj toBsonAndCheckKeySize(const KeyString::Value& ks, Ordering ord) {
     auto KeyStringSize = ks.getSize();
 
-    // Validate size of the key in KeyString::Builder.
+    // Validate size of the key in KeyString::Value.
     ASSERT_EQUALS(KeyStringSize,
                   KeyString::getKeySize(ks.getBuffer(), KeyStringSize, ord, ks.getTypeBits()));
     return KeyString::toBson(ks.getBuffer(), KeyStringSize, ord, ks.getTypeBits());
@@ -470,10 +471,10 @@ TEST_F(KeyStringBuilderTest, DecimalNumbers) {
 TEST_F(KeyStringBuilderTest, KeyStringValue) {
     // Test that KeyStringBuilder is releasable into a Value type that is comparable. Once
     // released, it is reusable once reset.
-    KeyString::Builder ks1(KeyString::Version::V1, BSON("" << 1), ALL_ASCENDING);
+    KeyString::HeapBuilder ks1(KeyString::Version::V1, BSON("" << 1), ALL_ASCENDING);
     KeyString::Value data1 = ks1.release();
 
-    KeyString::Builder ks2(KeyString::Version::V1, BSON("" << 2), ALL_ASCENDING);
+    KeyString::HeapBuilder ks2(KeyString::Version::V1, BSON("" << 2), ALL_ASCENDING);
     KeyString::Value data2 = ks2.release();
 
     ASSERT(data2.compare(data1) > 0);
@@ -502,7 +503,7 @@ TEST_F(KeyStringBuilderTest, KeyStringValueReleaseReusableTest) {
     BSONObj doc2 = BSON("fieldA" << 2 << "fieldB" << 3);
     BSONObj bson1 = BSON("" << 1 << "" << 2);
     BSONObj bson2 = BSON("" << 2 << "" << 3);
-    KeyString::Builder ks1(KeyString::Version::V1);
+    KeyString::HeapBuilder ks1(KeyString::Version::V1);
     ks1.appendBSONElement(doc1["fieldA"]);
     ks1.appendBSONElement(doc1["fieldB"]);
     KeyString::Value data1 = ks1.release();
@@ -518,7 +519,7 @@ TEST_F(KeyStringBuilderTest, KeyStringValueReleaseReusableTest) {
 TEST_F(KeyStringBuilderTest, KeyStringGetValueCopyTest) {
     // Test that KeyStringGetValueCopyTest creates a copy.
     BSONObj doc = BSON("fieldA" << 1);
-    KeyString::Builder ks(KeyString::Version::V1, ALL_ASCENDING);
+    KeyString::HeapBuilder ks(KeyString::Version::V1, ALL_ASCENDING);
     ks.appendBSONElement(doc["fieldA"]);
     KeyString::Value data1 = ks.getValueCopy();
     KeyString::Value data2 = ks.release();
@@ -534,7 +535,7 @@ TEST_F(KeyStringBuilderTest, KeyStringBuilderAppendBsonElement) {
     // Test that appendBsonElement works.
     {
         BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
-        KeyString::Builder ks(KeyString::Version::V1, ALL_ASCENDING);
+        KeyString::HeapBuilder ks(KeyString::Version::V1, ALL_ASCENDING);
         ks.appendBSONElement(doc["fieldA"]);
         ks.appendBSONElement(doc["fieldB"]);
         KeyString::Value data = ks.release();
@@ -543,7 +544,7 @@ TEST_F(KeyStringBuilderTest, KeyStringBuilderAppendBsonElement) {
 
     {
         BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
-        KeyString::Builder ks(KeyString::Version::V1, ONE_DESCENDING);
+        KeyString::HeapBuilder ks(KeyString::Version::V1, ONE_DESCENDING);
         ks.appendBSONElement(doc["fieldA"]);
         ks.appendBSONElement(doc["fieldB"]);
         KeyString::Value data = ks.release();
@@ -555,7 +556,7 @@ TEST_F(KeyStringBuilderTest, KeyStringBuilderAppendBsonElement) {
                            << "value1"
                            << "fieldB"
                            << "value2");
-        KeyString::Builder ks(KeyString::Version::V1, ONE_DESCENDING);
+        KeyString::HeapBuilder ks(KeyString::Version::V1, ONE_DESCENDING);
         ks.appendBSONElement(doc["fieldA"]);
         ks.appendBSONElement(doc["fieldB"]);
         KeyString::Value data = ks.release();
@@ -571,9 +572,9 @@ TEST_F(KeyStringBuilderTest, KeyStringBuilderAppendBsonElement) {
 TEST_F(KeyStringBuilderTest, KeyStringBuilderOrdering) {
     // Test that ordering works.
     BSONObj doc = BSON("fieldA" << 1);
-    KeyString::Builder ks1(KeyString::Version::V1, ALL_ASCENDING);
+    KeyString::HeapBuilder ks1(KeyString::Version::V1, ALL_ASCENDING);
     ks1.appendBSONElement(doc["fieldA"]);
-    KeyString::Builder ks2(KeyString::Version::V1, ONE_DESCENDING);
+    KeyString::HeapBuilder ks2(KeyString::Version::V1, ONE_DESCENDING);
     ks2.appendBSONElement(doc["fieldA"]);
     KeyString::Value data1 = ks1.release();
     KeyString::Value data2 = ks2.release();
@@ -587,8 +588,8 @@ TEST_F(KeyStringBuilderTest, KeyStringBuilderOrdering) {
 TEST_F(KeyStringBuilderTest, KeyStringBuilderDiscriminator) {
     // test that when passed in a Discriminator it gets added.
     BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
-    KeyString::Builder ks(
-        KeyString::Version::V1, ALL_ASCENDING, KeyString::Builder::kExclusiveBefore);
+    KeyString::HeapBuilder ks(
+        KeyString::Version::V1, ALL_ASCENDING, KeyString::Discriminator::kExclusiveBefore);
     ks.appendBSONElement(doc["fieldA"]);
     ks.appendBSONElement(doc["fieldB"]);
     KeyString::Value data = ks.release();

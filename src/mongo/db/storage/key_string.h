@@ -280,7 +280,7 @@ private:
      * the TypeBits size is in long encoding range(>127), all the bytes are used for the long
      * encoding format (first byte + 4 size bytes + data bytes).
      */
-    BufBuilder _buf;
+    StackBufBuilder _buf;
 };
 
 
@@ -338,57 +338,60 @@ inline bool operator!=(const Value& lhs, const Value& rhs) {
     return !(lhs == rhs);
 }
 
-class Builder {
+enum class Discriminator {
+    kInclusive,  // Anything to be stored in an index must use this.
+    kExclusiveBefore,
+    kExclusiveAfter,
+};
+
+enum class BuildState {
+    kEmpty,                  // Buffer is empty.
+    kAppendingBSONElements,  // In the process of appending BSON Elements
+    kEndAdded,               // Finished appedning BSON Elements.
+    kAppendedRecordID,       // Finished appending a RecordID.
+    kAppendedTypeBits,       // Finished appending a TypeBits.
+    kReleased                // Released the buffer and so the buffer is no longer valid.
+};
+
+/**
+ * Encodes the kind of NumberDecimal that is stored.
+ */
+enum DecimalContinuationMarker {
+    kDCMEqualToDouble = 0x0,
+    kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits = 0x1,
+    kDCMEqualToDoubleRoundedUpTo15Digits = 0x2,
+    kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits = 0x3
+};
+
+template <class BufferT>
+class BuilderBase {
 public:
-    enum Discriminator {
-        kInclusive,  // Anything to be stored in an index must use this.
-        kExclusiveBefore,
-        kExclusiveAfter,
-    };
-
-    enum BuildState {
-        kEmpty,                  // Buffer is empty.
-        kAppendingBSONElements,  // In the process of appending BSON Elements
-        kEndAdded,               // Finished appedning BSON Elements.
-        kAppendedRecordID,       // Finished appending a RecordID.
-        kAppendedTypeBits,       // Finished appending a TypeBits.
-        kReleased                // Released the buffer and so the buffer is no longer valid.
-    };
-
-    /**
-     * Encodes the kind of NumberDecimal that is stored.
-     */
-    enum DecimalContinuationMarker {
-        kDCMEqualToDouble = 0x0,
-        kDCMHasContinuationLessThanDoubleRoundedUpTo15Digits = 0x1,
-        kDCMEqualToDoubleRoundedUpTo15Digits = 0x2,
-        kDCMHasContinuationLargerThanDoubleRoundedUpTo15Digits = 0x3
-    };
-
-    Builder(Version version, Ordering ord, Discriminator discriminator)
+    BuilderBase(Version version, Ordering ord, Discriminator discriminator)
         : version(version),
           _typeBits(version),
-          _state(kEmpty),
+          _state(BuildState::kEmpty),
           _elemCount(0),
           _ordering(ord),
           _discriminator(discriminator) {}
-    Builder(Version version, Ordering ord) : Builder(version, ord, kInclusive) {}
-    explicit Builder(Version version) : Builder(version, ALL_ASCENDING, kInclusive) {}
+    BuilderBase(Version version, Ordering ord)
+        : BuilderBase(version, ord, Discriminator::kInclusive) {}
+    explicit BuilderBase(Version version)
+        : BuilderBase(version, ALL_ASCENDING, Discriminator::kInclusive) {}
 
-    Builder(Version version, const BSONObj& obj, Ordering ord, RecordId recordId)
-        : Builder(version, ord) {
+    BuilderBase(Version version, const BSONObj& obj, Ordering ord, RecordId recordId)
+        : BuilderBase(version, ord) {
         resetToKey(obj, ord, recordId);
     }
 
-    Builder(Version version,
-            const BSONObj& obj,
-            Ordering ord,
-            Discriminator discriminator = kInclusive)
-        : Builder(version, ord) {
+    BuilderBase(Version version,
+                const BSONObj& obj,
+                Ordering ord,
+                Discriminator discriminator = Discriminator::kInclusive)
+        : BuilderBase(version, ord) {
         resetToKey(obj, ord, discriminator);
     }
 
-    Builder(Version version, RecordId rid) : Builder(version) {
+    BuilderBase(Version version, RecordId rid) : BuilderBase(version) {
         appendRecordId(rid);
     }
 
@@ -396,12 +399,17 @@ public:
      * Releases the data held in this buffer into a Value type, releasing and transfering ownership
      * of the buffer _buffer and TypeBits _typeBits to the returned Value object from the current
      * Builder.
+     *
+     * The std::enable_if<std::is_same<T,BufBuilder>::value, Value>::type defines that the release
+     * function will only be a part of a given template instantiation if the template parameter
+     * BufferT is BufBuilder.
+     *
      */
-    Value release() {
+    template <typename T = BufferT>
+    typename std::enable_if<std::is_same<T, BufBuilder>::value, Value>::type release() {
         _prepareForRelease();
-        _transition(kReleased);
-        return {
-            version, std::move(_typeBits), static_cast<size_t>(_buffer.len()), _buffer.release()};
+        _transition(BuildState::kReleased);
+        return {version, _typeBits, static_cast<size_t>(_buffer.len()), _buffer.release()};
     }
 
     /**
@@ -410,11 +418,11 @@ public:
      */
     Value getValueCopy() {
         _prepareForRelease();
-        invariant(_state == kEndAdded || _state == kAppendedRecordID ||
-                  _state == kAppendedTypeBits);
+        invariant(_state == BuildState::kEndAdded || _state == BuildState::kAppendedRecordID ||
+                  _state == BuildState::kAppendedTypeBits);
         BufBuilder newBuf;
         newBuf.appendBuf(_buffer.buf(), _buffer.len());
-        return {version, TypeBits(_typeBits), static_cast<size_t>(newBuf.len()), newBuf.release()};
+        return {version, _typeBits, static_cast<size_t>(newBuf.len()), newBuf.release()};
     }
 
     void appendRecordId(RecordId loc);
@@ -425,49 +433,53 @@ public:
      * Resets to an empty state.
      * Equivalent to but faster than *this = Builder(ord, discriminator)
      */
-    void resetToEmpty(Ordering ord = ALL_ASCENDING, Discriminator discriminator = kInclusive) {
-        if (_state == kReleased) {
-            _buffer = BufBuilder();
-            _typeBits = TypeBits(version);
-        } else {
-            _buffer.reset();
-            _typeBits.reset();
+    void resetToEmpty(Ordering ord = ALL_ASCENDING,
+                      Discriminator discriminator = Discriminator::kInclusive) {
+        if constexpr (std::is_same<BufferT, BufBuilder>::value) {
+            if (_state == BuildState::kReleased) {
+                _buffer = BufferT();
+            }
         }
+        _buffer.reset();
+        _typeBits.reset();
+
         _elemCount = 0;
         _ordering = ord;
         _discriminator = discriminator;
-        _transition(kEmpty);
+        _transition(BuildState::kEmpty);
     }
 
     void resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId);
-    void resetToKey(const BSONObj& obj, Ordering ord, Discriminator discriminator = kInclusive);
+    void resetToKey(const BSONObj& obj,
+                    Ordering ord,
+                    Discriminator discriminator = Discriminator::kInclusive);
     void resetFromBuffer(const void* buffer, size_t size) {
         _buffer.reset();
         memcpy(_buffer.skip(size), buffer, size);
     }
 
     const char* getBuffer() const {
-        invariant(_state != kReleased);
+        invariant(_state != BuildState::kReleased);
         return _buffer.buf();
     }
 
     size_t getSize() const {
-        invariant(_state != kReleased);
+        invariant(_state != BuildState::kReleased);
         return _buffer.len();
     }
 
     bool isEmpty() const {
-        invariant(_state != kReleased);
+        invariant(_state != BuildState::kReleased);
         return _buffer.len() == 0;
     }
 
     const TypeBits& getTypeBits() const {
-        invariant(_state != kReleased);
+        invariant(_state != BuildState::kReleased);
         return _typeBits;
     }
 
-    int compare(const Builder& other) const;
-    int compareWithoutRecordId(const Builder& other) const;
+    int compare(const BuilderBase& other) const;
+    int compareWithoutRecordId(const BuilderBase& other) const;
 
     /**
      * @return a hex encoding of this key
@@ -522,46 +534,51 @@ private:
     void _appendEnd();
 
     template <typename T>
-    void _append(const T& thing, bool invert);
+    void _append(const T& thing, bool invert) {
+        _appendBytes(&thing, sizeof(thing), invert);
+    }
+
     void _appendBytes(const void* source, size_t bytes, bool invert);
 
     void _prepareForRelease() {
-        if (_state == kAppendingBSONElements) {
+        if (_state == BuildState::kAppendingBSONElements) {
             _appendDiscriminator(_discriminator);
         }
     }
 
     void _transition(BuildState to) {
         // We can empty at any point since it just means that we are clearing the buffer.
-        if (to == kEmpty) {
+        if (to == BuildState::kEmpty) {
             _state = to;
             return;
         }
 
         switch (_state) {
-            case kEmpty:
-                invariant(to == kAppendingBSONElements || to == kAppendedRecordID);
+            case BuildState::kEmpty:
+                invariant(to == BuildState::kAppendingBSONElements ||
+                          to == BuildState::kAppendedRecordID);
                 break;
-            case kAppendingBSONElements:
-                invariant(to == kEndAdded);
+            case BuildState::kAppendingBSONElements:
+                invariant(to == BuildState::kEndAdded);
                 break;
-            case kEndAdded:
-                invariant(to == kAppendedRecordID || to == kReleased);
+            case BuildState::kEndAdded:
+                invariant(to == BuildState::kAppendedRecordID || to == BuildState::kReleased);
                 break;
-            case kAppendedRecordID:
+            case BuildState::kAppendedRecordID:
                 // This first case is the special case in
                 // WiredTigerIndexUnique::_insertTimestampUnsafe.
                 // The third case is the case when we are appending a list of RecordIDs as in the
                 // KeyString test RecordIDs.
-                invariant(to == kAppendedTypeBits || to == kReleased || to == kAppendedRecordID);
+                invariant(to == BuildState::kAppendedTypeBits || to == BuildState::kReleased ||
+                          to == BuildState::kAppendedRecordID);
                 break;
-            case kAppendedTypeBits:
+            case BuildState::kAppendedTypeBits:
                 // This first case is the special case in
                 // WiredTigerIndexUnique::_insertTimestampUnsafe.
-                invariant(to == kAppendedRecordID || to == kReleased);
+                invariant(to == BuildState::kAppendedRecordID || to == BuildState::kReleased);
                 break;
-            case kReleased:
-                invariant(to == kEmpty);
+            case BuildState::kReleased:
+                invariant(to == BuildState::kEmpty);
                 break;
             default:
                 MONGO_UNREACHABLE;
@@ -571,38 +588,48 @@ private:
 
 
     TypeBits _typeBits;
-    BufBuilder _buffer;
-    enum BuildState _state;
+    BufferT _buffer;
+    BuildState _state;
     int _elemCount;
     Ordering _ordering;
     Discriminator _discriminator;
 };
 
-inline bool operator<(const Builder& lhs, const Builder& rhs) {
+using Builder = BuilderBase<StackBufBuilder>;
+using HeapBuilder = BuilderBase<BufBuilder>;
+
+template <class BufferT>
+inline bool operator<(const BuilderBase<BufferT>& lhs, const BuilderBase<BufferT>& rhs) {
     return lhs.compare(rhs) < 0;
 }
 
-inline bool operator<=(const Builder& lhs, const Builder& rhs) {
+template <class BufferT>
+inline bool operator<=(const BuilderBase<BufferT>& lhs, const BuilderBase<BufferT>& rhs) {
     return lhs.compare(rhs) <= 0;
 }
 
-inline bool operator==(const Builder& lhs, const Builder& rhs) {
+template <class BufferT>
+inline bool operator==(const BuilderBase<BufferT>& lhs, const BuilderBase<BufferT>& rhs) {
     return lhs.compare(rhs) == 0;
 }
 
-inline bool operator>(const Builder& lhs, const Builder& rhs) {
+template <class BufferT>
+inline bool operator>(const BuilderBase<BufferT>& lhs, const BuilderBase<BufferT>& rhs) {
     return lhs.compare(rhs) > 0;
 }
 
-inline bool operator>=(const Builder& lhs, const Builder& rhs) {
+template <class BufferT>
+inline bool operator>=(const BuilderBase<BufferT>& lhs, const BuilderBase<BufferT>& rhs) {
     return lhs.compare(rhs) >= 0;
 }
 
-inline bool operator!=(const Builder& lhs, const Builder& rhs) {
+template <class BufferT>
+inline bool operator!=(const BuilderBase<BufferT>& lhs, const BuilderBase<BufferT>& rhs) {
     return !(lhs == rhs);
 }
 
-inline std::ostream& operator<<(std::ostream& stream, const Builder& value) {
+template <class BufferT>
+inline std::ostream& operator<<(std::ostream& stream, const BuilderBase<BufferT>& value) {
     return stream << value.toString();
 }
 
