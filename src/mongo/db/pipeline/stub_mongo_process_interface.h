@@ -152,7 +152,8 @@ public:
                                        CurrentOpSessionsMode sessionMode,
                                        CurrentOpUserMode userMode,
                                        CurrentOpTruncateMode truncateMode,
-                                       CurrentOpCursorMode cursorMode) const override {
+                                       CurrentOpCursorMode cursorMode,
+                                       CurrentOpBacktraceMode backtraceMode) const override {
         MONGO_UNREACHABLE;
     }
 

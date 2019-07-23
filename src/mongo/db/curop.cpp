@@ -228,6 +228,7 @@ CurOp* CurOp::get(const OperationContext& opCtx) {
 void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
                                      Client* client,
                                      bool truncateOps,
+                                     bool backtraceMode,
                                      BSONObjBuilder* infoBuilder) {
     invariant(client);
     OperationContext* clientOpCtx = client->getOperationContext();
@@ -293,6 +294,13 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
         }
 
         CurOp::get(clientOpCtx)->reportState(infoBuilder, truncateOps);
+    }
+    if (backtraceMode) {
+        DiagnosticInfo& diagnostic = DiagnosticInfo::Diagnostic::get(client);
+        BSONObjBuilder waitingForLatchBuilder;
+        waitingForLatchBuilder.append("timestamp", diagnostic.getTimestamp());
+        waitingForLatchBuilder.append("captureName", diagnostic.getCaptureName());
+        infoBuilder->append("waitingForLatch", waitingForLatchBuilder.obj());
     }
 }
 

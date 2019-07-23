@@ -156,7 +156,8 @@ public:
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,
-                                      CurrentOpTruncateMode truncateOps) const final;
+                                      CurrentOpTruncateMode truncateOps,
+                                      CurrentOpBacktraceMode backtraceMode) const final;
 
     void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
                                           CurrentOpUserMode userMode,

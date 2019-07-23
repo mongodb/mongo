@@ -51,7 +51,8 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
     CurrentOpSessionsMode sessionMode,
     CurrentOpUserMode userMode,
     CurrentOpTruncateMode truncateMode,
-    CurrentOpCursorMode cursorMode) const {
+    CurrentOpCursorMode cursorMode,
+    CurrentOpBacktraceMode backtraceMode) const {
     OperationContext* opCtx = expCtx->opCtx;
     AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
 
@@ -76,7 +77,7 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
         }
 
         // Delegate to the mongoD- or mongoS-specific implementation of _reportCurrentOpForClient.
-        ops.emplace_back(_reportCurrentOpForClient(opCtx, client, truncateMode));
+        ops.emplace_back(_reportCurrentOpForClient(opCtx, client, truncateMode, backtraceMode));
     }
 
     // If 'cursorMode' is set to include idle cursors, retrieve them and add them to ops.

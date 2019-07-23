@@ -91,6 +91,7 @@ public:
     enum class CurrentOpLocalOpsMode { kLocalMongosOps, kRemoteShardOps };
     enum class CurrentOpSessionsMode { kIncludeIdle, kExcludeIdle };
     enum class CurrentOpCursorMode { kIncludeCursors, kExcludeCursors };
+    enum class CurrentOpBacktraceMode { kIncludeBacktrace, kExcludeBacktrace };
 
     /**
      * Factory function to create MongoProcessInterface of the right type. The implementation will
@@ -283,7 +284,8 @@ public:
         CurrentOpSessionsMode sessionMode,
         CurrentOpUserMode userMode,
         CurrentOpTruncateMode,
-        CurrentOpCursorMode) const = 0;
+        CurrentOpCursorMode,
+        CurrentOpBacktraceMode) const = 0;
 
     /**
      * Returns the name of the local shard if sharding is enabled, or an empty string.

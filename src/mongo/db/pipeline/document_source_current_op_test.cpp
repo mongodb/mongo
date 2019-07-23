@@ -71,7 +71,8 @@ public:
                                        CurrentOpSessionsMode sessionMode,
                                        CurrentOpUserMode userMode,
                                        CurrentOpTruncateMode truncateMode,
-                                       CurrentOpCursorMode cursorMode) const {
+                                       CurrentOpCursorMode cursorMode,
+                                       CurrentOpBacktraceMode backtraceMode) const {
         return _ops;
     }
 

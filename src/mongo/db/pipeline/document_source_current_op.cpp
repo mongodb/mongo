@@ -42,6 +42,7 @@ const StringData kIdleSessionsFieldName = "idleSessions"_sd;
 const StringData kLocalOpsFieldName = "localOps"_sd;
 const StringData kTruncateOpsFieldName = "truncateOps"_sd;
 const StringData kIdleCursorsFieldName = "idleCursors"_sd;
+const StringData kBacktraceFieldName = "backtrace"_sd;
 
 const StringData kOpIdFieldName = "opid"_sd;
 const StringData kClientFieldName = "client"_sd;
@@ -116,7 +117,8 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {
                                                              _includeIdleSessions,
                                                              _includeOpsFromAllUsers,
                                                              _truncateOps,
-                                                             _idleCursors);
+                                                             _idleCursors,
+                                                             _backtrace);
 
         _opsIter = _ops.begin();
 
@@ -192,6 +194,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
     LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps;
     TruncationMode truncateOps = TruncationMode::kNoTruncation;
     CursorMode idleCursors = CursorMode::kExcludeCursors;
+    BacktraceMode backtrace = BacktraceMode::kExcludeBacktrace;
 
     for (auto&& elem : spec.embeddedObject()) {
         const auto fieldName = elem.fieldNameStringData();
@@ -245,6 +248,14 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                     elem.type() == BSONType::Bool);
             idleCursors =
                 (elem.boolean() ? CursorMode::kIncludeCursors : CursorMode::kExcludeCursors);
+        } else if (fieldName == kBacktraceFieldName) {
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "The 'backtrace' parameter of the $currentOp stage must be "
+                                     "a boolean value, but found: "
+                                  << typeName(elem.type()),
+                    elem.type() == BSONType::Bool);
+            backtrace = (elem.boolean() ? BacktraceMode::kIncludeBacktrace
+                                        : BacktraceMode::kExcludeBacktrace);
         } else {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream() << "Unrecognized option '" << fieldName
@@ -258,7 +269,8 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                                        includeOpsFromAllUsers,
                                        showLocalOpsOnMongoS,
                                        truncateOps,
-                                       idleCursors);
+                                       idleCursors,
+                                       backtrace);
 }
 
 intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
@@ -268,14 +280,16 @@ intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
     UserMode includeOpsFromAllUsers,
     LocalOpsMode showLocalOpsOnMongoS,
     TruncationMode truncateOps,
-    CursorMode idleCursors) {
+    CursorMode idleCursors,
+    BacktraceMode backtrace) {
     return new DocumentSourceCurrentOp(pExpCtx,
                                        includeIdleConnections,
                                        includeIdleSessions,
                                        includeOpsFromAllUsers,
                                        showLocalOpsOnMongoS,
                                        truncateOps,
-                                       idleCursors);
+                                       idleCursors,
+                                       backtrace);
 }
 
 Value DocumentSourceCurrentOp::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
@@ -292,6 +306,8 @@ Value DocumentSourceCurrentOp::serialize(boost::optional<ExplainOptions::Verbosi
                   {kTruncateOpsFieldName,
                    _truncateOps == TruncationMode::kTruncateOps ? Value(true) : Value()},
                   {kIdleCursorsFieldName,
-                   _idleCursors == CursorMode::kIncludeCursors ? Value(true) : Value()}}}});
+                   _idleCursors == CursorMode::kIncludeCursors ? Value(true) : Value()},
+                  {kBacktraceFieldName,
+                   _backtrace == BacktraceMode::kIncludeBacktrace ? Value(true) : Value()}}}});
 }
 }  // namespace mongo

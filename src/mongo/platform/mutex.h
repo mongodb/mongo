@@ -36,6 +36,13 @@
 
 namespace mongo {
 
+class LockActions {
+public:
+    virtual ~LockActions() = default;
+    virtual void onContendedLock(const StringData& name) = 0;
+    virtual void onUnlock() = 0;
+};
+
 class Mutex {
 public:
     Mutex() : Mutex("AnonymousMutex"_sd) {}
@@ -48,9 +55,12 @@ public:
         return _name;
     }
 
+    static void setLockActions(std::unique_ptr<LockActions> actions);
+
 private:
     const StringData _name;
     const Seconds _lockTimeout = Seconds(60);
+    static constexpr Milliseconds kContendedLockTimeout = Milliseconds(100);
     stdx::timed_mutex _mutex;
 };
 

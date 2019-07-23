@@ -29,15 +29,10 @@
 
 #include "mongo/unittest/unittest.h"
 
-#include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/stdx/thread.h"
 
 namespace mongo {
 TEST(MongoMutexTest, BasicSingleThread) {
-    auto serviceContext = ServiceContext::make();
-    setGlobalServiceContext(std::move(serviceContext));
-
     Mutex m;
     m.lock();
     ASSERT(!m.try_lock());

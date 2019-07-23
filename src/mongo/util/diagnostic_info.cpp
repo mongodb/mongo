@@ -27,13 +27,54 @@
  *    it in the license file.
  */
 
+#include "mongo/base/init.h"
+#include "mongo/db/client.h"
 #include "mongo/platform/basic.h"
+#include "mongo/platform/mutex.h"
 
 #include "mongo/util/diagnostic_info.h"
 
 #include "mongo/util/clock_source.h"
 
 namespace mongo {
+
+namespace {
+const auto gDiagnosticHandle = Client::declareDecoration<DiagnosticInfo::Diagnostic>();
+
+MONGO_INITIALIZER(LockActions)(InitializerContext* context) {
+    class LockActionsSubclass : public LockActions {
+        void onContendedLock(const StringData& name) override {
+            if (haveClient()) {
+                DiagnosticInfo::Diagnostic::set(
+                    Client::getCurrent(),
+                    std::make_shared<DiagnosticInfo>(takeDiagnosticInfo(name)));
+            }
+        }
+        void onUnlock() override {
+            if (haveClient()) {
+                DiagnosticInfo::Diagnostic::set(Client::getCurrent(), nullptr);
+            }
+        }
+    };
+    std::unique_ptr<LockActions> myPointer = std::make_unique<LockActionsSubclass>();
+    Mutex::setLockActions(std::move(myPointer));
+
+    return Status::OK();
+}
+}  // namespace
+
+auto DiagnosticInfo::Diagnostic::get(Client* const client) -> DiagnosticInfo& {
+    auto& handle = gDiagnosticHandle(client);
+    stdx::lock_guard lk(handle.m);
+    return *handle.diagnostic;
+}
+
+void DiagnosticInfo::Diagnostic::set(Client* const client,
+                                     std::shared_ptr<DiagnosticInfo> newDiagnostic) {
+    auto& handle = gDiagnosticHandle(client);
+    stdx::lock_guard lk(handle.m);
+    handle.diagnostic = newDiagnostic;
+}
 
 DiagnosticInfo takeDiagnosticInfo(const StringData& captureName) {
     return DiagnosticInfo(getGlobalServiceContext()->getFastClockSource()->now(), captureName);
