@@ -769,51 +769,6 @@ TEST_F(TxnParticipantTest, ThrowDuringOnTransactionPrepareAbortsTransaction) {
     ASSERT(txnParticipant.transactionIsAborted());
 }
 
-TEST_F(TxnParticipantTest, UnstashFailsShouldLeaveTxnResourceStashUnchanged) {
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
-    ASSERT_TRUE(opCtx()->lockState()->isLocked());
-
-    // Simulate the locking of an insert.
-    {
-        Lock::DBLock dbLock(opCtx(), "test", MODE_IX);
-        Lock::CollectionLock collLock(opCtx(), NamespaceString("test.foo"), MODE_IX);
-    }
-
-    auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-
-    // Simulate a secondary style lock stashing such that the locks are yielded.
-    {
-        repl::UnreplicatedWritesBlock uwb(opCtx());
-        opCtx()->lockState()->unsetMaxLockTimeout();
-        txnParticipant.stashTransactionResources(opCtx());
-    }
-    ASSERT_FALSE(txnParticipant.getTxnResourceStashLockerForTest()->isLocked());
-
-    // Enable fail point.
-    getGlobalFailPointRegistry()->getFailPoint("restoreLocksFail")->setMode(FailPoint::alwaysOn);
-
-    ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction"),
-                       AssertionException,
-                       ErrorCodes::LockTimeout);
-
-    // Above unstash attempt fail should leave the txnResourceStash unchanged.
-    ASSERT_FALSE(txnParticipant.getTxnResourceStashLockerForTest()->isLocked());
-
-    // Disable fail point.
-    getGlobalFailPointRegistry()->getFailPoint("restoreLocksFail")->setMode(FailPoint::off);
-
-    // Should be successfully able to perform lock restore.
-    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
-    ASSERT_TRUE(opCtx()->lockState()->isLocked());
-
-    // Commit the transaction to release the locks.
-    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, boost::none);
-    ASSERT_TRUE(txnParticipant.transactionIsCommitted());
-}
-
 TEST_F(TxnParticipantTest, StepDownAfterPrepareDoesNotBlock) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());

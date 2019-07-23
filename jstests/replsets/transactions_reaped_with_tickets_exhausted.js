@@ -87,9 +87,8 @@
     }
 
     // Transaction should already be aborted.
-    let res = assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                           ErrorCodes.NoSuchTransaction);
-    assert(res.errmsg.match(/Transaction .* has been aborted/), res.errmsg);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     session.endSession();
     rst.stopSet();

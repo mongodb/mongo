@@ -83,8 +83,6 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeReleasingTransactionOplogHole);
 
 MONGO_FAIL_POINT_DEFINE(skipCommitTxnCheckPrepareMajorityCommitted);
 
-MONGO_FAIL_POINT_DEFINE(restoreLocksFail);
-
 const auto getTransactionParticipant = Session::declareDecoration<TransactionParticipant>();
 
 // The command names that are allowed in a prepared transaction.
@@ -703,7 +701,7 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     }
 
     // On secondaries, max lock timeout must not be set.
-    invariant(!(stashStyle == StashStyle::kSecondary && opCtx->lockState()->hasMaxLockTimeout()));
+    invariant(stashStyle != StashStyle::kSecondary || !opCtx->lockState()->hasMaxLockTimeout());
 
     _recoveryUnit = opCtx->releaseRecoveryUnit();
     opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(
@@ -729,41 +727,18 @@ TransactionParticipant::TxnResources::~TxnResources() {
 
 void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     // Perform operations that can fail the release before marking the TxnResources as released.
-    auto onError = makeGuard([&] {
-        // Release any locks acquired as part of lock restoration.
-        if (_lockSnapshot) {
-            // WUOW should be released before unlocking.
-            Locker::WUOWLockSnapshot dummyWUOWLockInfo;
-            _locker->releaseWriteUnitOfWork(&dummyWUOWLockInfo);
-
-            Locker::LockSnapshot dummyLockInfo;
-            _locker->saveLockStateAndUnlock(&dummyLockInfo);
-        }
-        // Release the ticket if acquired.
-        // restoreWriteUnitOfWorkAndLock() can reacquire the ticket as well.
-        if (_locker->getClientState() != Locker::ClientState::kInactive) {
-            _locker->releaseTicket();
-        }
-    });
 
     // Restore locks if they are yielded.
     if (_lockSnapshot) {
         invariant(!_locker->isLocked());
         // opCtx is passed in to enable the restoration to be interrupted.
         _locker->restoreWriteUnitOfWorkAndLock(opCtx, *_lockSnapshot);
+        _lockSnapshot.reset(nullptr);
     }
     _locker->reacquireTicket(opCtx);
 
-    if (MONGO_FAIL_POINT(restoreLocksFail)) {
-        uasserted(ErrorCodes::LockTimeout, str::stream() << "Lock restore failed due to failpoint");
-    }
-
     invariant(!_released);
     _released = true;
-
-    // Successfully reacquired the locks and tickets.
-    onError.dismiss();
-    _lockSnapshot.reset(nullptr);
 
     // It is necessary to lock the client to change the Locker on the OperationContext.
     stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -869,7 +844,7 @@ void TransactionParticipant::Participant::resetRetryableWriteState(OperationCont
 }
 
 void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
-    OperationContext* opCtx, MaxLockTimeout maxLockTimeout) {
+    OperationContext* opCtx) {
     // Transaction resources already exist for this transaction.  Transfer them from the
     // stash to the operation context.
     //
@@ -877,41 +852,14 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
     // must hold the Client clock to mutate txnResourceStash, we jump through some hoops here to
     // move the TxnResources in txnResourceStash into a local variable that can be manipulated
     // without holding the Client lock.
-    auto tempTxnResourceStash = [&]() noexcept {
+    [&]() noexcept {
         using std::swap;
         boost::optional<TxnResources> trs;
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         swap(trs, o(lk).txnResourceStash);
-        return trs;
+        return std::move(*trs);
     }
-    ();
-
-    auto releaseOnError = makeGuard([&] {
-        // Restore the lock resources back to transaction participant.
-        using std::swap;
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        swap(o(lk).txnResourceStash, tempTxnResourceStash);
-    });
-
-    invariant(tempTxnResourceStash);
-    auto stashLocker = tempTxnResourceStash->locker();
-    invariant(stashLocker);
-
-    if (maxLockTimeout == MaxLockTimeout::kNotAllowed) {
-        stashLocker->unsetMaxLockTimeout();
-    } else {
-        // If maxTransactionLockRequestTimeoutMillis is set, then we will ensure no
-        // future lock request waits longer than maxTransactionLockRequestTimeoutMillis
-        // to acquire a lock. This is to avoid deadlocks and minimize non-transaction
-        // operation performance degradations.
-        auto maxTransactionLockMillis = gMaxTransactionLockRequestTimeoutMillis.load();
-        if (maxTransactionLockMillis >= 0) {
-            stashLocker->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
-        }
-    }
-
-    tempTxnResourceStash->release(opCtx);
-    releaseOnError.dismiss();
+    ().release(opCtx);
 }
 
 void TransactionParticipant::Participant::unstashTransactionResources(OperationContext* opCtx,
@@ -927,14 +875,7 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
 
     _checkIsCommandValidWithTxnState(*opCtx->getTxnNumber(), cmdName);
     if (o().txnResourceStash) {
-        MaxLockTimeout maxLockTimeout;
-        // Max lock timeout must not be set on secondaries, since secondary oplog application cannot
-        // fail. And, primaries should respect the transaction lock timeout, since it can prevent
-        // the transaction from making progress.
-        maxLockTimeout =
-            opCtx->writesAreReplicated() ? MaxLockTimeout::kAllowed : MaxLockTimeout::kNotAllowed;
-
-        _releaseTransactionResourcesToOpCtx(opCtx, maxLockTimeout);
+        _releaseTransactionResourcesToOpCtx(opCtx);
         stdx::lock_guard<Client> lg(*opCtx->getClient());
         o(lg).transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
                                                    opCtx->getServiceContext()->getTickSource());
@@ -1007,13 +948,12 @@ void TransactionParticipant::Participant::refreshLocksForPreparedTransaction(
     invariant(!opCtx->lockState()->isRSTLLocked());
     invariant(!opCtx->lockState()->isLocked());
 
+
     // The node must have txn resource.
     invariant(o().txnResourceStash);
     invariant(o().txnState.isPrepared());
 
-    // Lock and Ticket reacquisition of a prepared transaction should not fail for
-    // state transitions (step up/step down).
-    _releaseTransactionResourcesToOpCtx(opCtx, MaxLockTimeout::kNotAllowed);
+    _releaseTransactionResourcesToOpCtx(opCtx);
 
     // Snapshot transactions don't conflict with PBWM lock on both primary and secondary.
     invariant(!opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
