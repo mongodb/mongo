@@ -63,7 +63,8 @@ class StatusWith;
  *      },
  *      "unique" : false,
  *      "uuid" : UUID,
- *      "noBalance" : false
+ *      "noBalance" : false,
+ *      "distributionMode" : "unsharded|sharded",
  *   }
  *
  */
@@ -79,15 +80,21 @@ public:
     static const BSONField<BSONObj> defaultCollation;
     static const BSONField<bool> unique;
     static const BSONField<UUID> uuid;
+    static const BSONField<std::string> distributionMode;
 
     /**
-     * Constructs a new DatabaseType object from BSON. Also does validation of the contents.
+     * Constructs a new CollectionType object from BSON. Also does validation of the contents.
      *
      * Dropped collections accumulate in the collections list, through 3.6, so that
      * mongos <= 3.4.x, when it retrieves the list from the config server, can delete its
      * cache entries for dropped collections.  See SERVER-27475, SERVER-27474
      */
     static StatusWith<CollectionType> fromBSON(const BSONObj& source);
+
+    enum class DistributionMode {
+        kUnsharded,
+        kSharded,
+    };
 
     /**
      * Returns OK if all fields have been set. Otherwise returns NoSuchKey and information
@@ -158,7 +165,15 @@ public:
         return _allowBalance.get_value_or(true);
     }
 
-    bool hasSameOptions(CollectionType& other);
+    void setDistributionMode(DistributionMode distributionMode) {
+        _distributionMode = distributionMode;
+    }
+
+    DistributionMode getDistributionMode() const {
+        return _distributionMode.get_value_or(DistributionMode::kSharded);
+    }
+
+    bool hasSameOptions(const CollectionType& other) const;
 
 private:
     // Required full namespace (with the database prefix).
@@ -169,6 +184,10 @@ private:
 
     // Required last updated time.
     boost::optional<Date_t> _updatedAt;
+
+    // New field in v4.4; optional in v4.4 for backwards compatibility with v4.2. Whether the
+    // collection is unsharded or sharded. If missing, implies sharded.
+    boost::optional<DistributionMode> _distributionMode;
 
     // Optional, whether the collection has been dropped. If missing, implies false.
     boost::optional<bool> _dropped;

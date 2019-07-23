@@ -418,6 +418,13 @@ boost::optional<CollectionType> InitialSplitPolicy::checkIfCollectionAlreadyShar
     requestedOptions.setDefaultCollation(*request.getCollation());
     requestedOptions.setUnique(request.getUnique());
 
+    // Set the distributionMode to "sharded" because this CollectionType represents the requested
+    // target state for the collection after shardCollection. The requested CollectionType will be
+    // compared with the existing CollectionType below, and if the existing CollectionType either
+    // does not have a distributionMode (FCV 4.2) or has distributionMode "sharded" (FCV 4.4), the
+    // collection will be considered to already be in its target state.
+    requestedOptions.setDistributionMode(CollectionType::DistributionMode::kSharded);
+
     // If the collection is already sharded, fail if the deduced options in this request do not
     // match the options the collection was originally sharded with.
     uassert(ErrorCodes::AlreadyInitialized,

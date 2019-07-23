@@ -55,6 +55,7 @@ const BSONField<BSONObj> CollectionType::keyPattern("key");
 const BSONField<BSONObj> CollectionType::defaultCollation("defaultCollation");
 const BSONField<bool> CollectionType::unique("unique");
 const BSONField<UUID> CollectionType::uuid("uuid");
+const BSONField<std::string> CollectionType::distributionMode("distributionMode");
 
 StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
     CollectionType coll;
@@ -84,6 +85,26 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
             return status;
 
         coll._updatedAt = collUpdatedAt.Date();
+    }
+
+    {
+        std::string collDistributionMode;
+        Status status =
+            bsonExtractStringField(source, distributionMode.name(), &collDistributionMode);
+        if (status.isOK()) {
+            if (collDistributionMode == "unsharded") {
+                coll._distributionMode = DistributionMode::kUnsharded;
+            } else if (collDistributionMode == "sharded") {
+                coll._distributionMode = DistributionMode::kSharded;
+            } else {
+                return {ErrorCodes::FailedToParse,
+                        str::stream() << "Unknown distribution mode " << collDistributionMode};
+            }
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // In v4.4, distributionMode can be missing in which case it is presumed "sharded"
+        } else {
+            return status;
+        }
     }
 
     {
@@ -252,6 +273,16 @@ BSONObj CollectionType::toBSON() const {
         builder.append(kNoBalance.name(), !_allowBalance.get());
     }
 
+    if (_distributionMode) {
+        if (*_distributionMode == DistributionMode::kUnsharded) {
+            builder.append(distributionMode.name(), "unsharded");
+        } else if (*_distributionMode == DistributionMode::kSharded) {
+            builder.append(distributionMode.name(), "sharded");
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    }
+
     return builder.obj();
 }
 
@@ -277,7 +308,7 @@ void CollectionType::setKeyPattern(const KeyPattern& keyPattern) {
     _keyPattern = keyPattern;
 }
 
-bool CollectionType::hasSameOptions(CollectionType& other) {
+bool CollectionType::hasSameOptions(const CollectionType& other) const {
     // The relevant options must have been set on this CollectionType.
     invariant(_fullNs && _keyPattern && _unique);
 
@@ -286,7 +317,7 @@ bool CollectionType::hasSameOptions(CollectionType& other) {
                                                     other.getKeyPattern().toBSON()) &&
         SimpleBSONObjComparator::kInstance.evaluate(_defaultCollation ==
                                                     other.getDefaultCollation()) &&
-        *_unique == other.getUnique();
+        *_unique == other.getUnique() && getDistributionMode() == other.getDistributionMode();
 }
 
 }  // namespace mongo

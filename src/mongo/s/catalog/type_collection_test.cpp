@@ -155,6 +155,165 @@ TEST(CollectionType, MissingDefaultCollationIsNotSerialized) {
     ASSERT_FALSE(serialized["defaultCollation"]);
 }
 
+TEST(CollectionType, MissingDistributionModeImpliesDistributionModeSharded) {
+    const OID oid = OID::gen();
+    StatusWith<CollectionType> status = CollectionType::fromBSON(BSON(
+        CollectionType::fullNs("db.coll")
+        << CollectionType::epoch(oid) << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+        << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)));
+    ASSERT_TRUE(status.isOK());
+
+    CollectionType coll = status.getValue();
+    ASSERT_TRUE(coll.validate().isOK());
+
+    ASSERT(CollectionType::DistributionMode::kSharded == coll.getDistributionMode());
+
+    // Since the distributionMode was not explicitly set, it does not get serialized.
+    BSONObj serialized = coll.toBSON();
+    ASSERT_FALSE(serialized["distributionMode"]);
+}
+
+TEST(CollectionType, DistributionModeUnshardedParses) {
+    const OID oid = OID::gen();
+    StatusWith<CollectionType> status = CollectionType::fromBSON(BSON(
+        CollectionType::fullNs("db.coll")
+        << CollectionType::epoch(oid) << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+        << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
+        << CollectionType::distributionMode("unsharded")));
+    ASSERT_TRUE(status.isOK());
+
+    CollectionType coll = status.getValue();
+    ASSERT_TRUE(coll.validate().isOK());
+
+    ASSERT(CollectionType::DistributionMode::kUnsharded == coll.getDistributionMode());
+
+    BSONObj serialized = coll.toBSON();
+    ASSERT("unsharded" == serialized["distributionMode"].str());
+}
+
+TEST(CollectionType, DistributionModeShardedParses) {
+    const OID oid = OID::gen();
+    StatusWith<CollectionType> status = CollectionType::fromBSON(BSON(
+        CollectionType::fullNs("db.coll")
+        << CollectionType::epoch(oid) << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+        << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
+        << CollectionType::distributionMode("sharded")));
+    ASSERT_TRUE(status.isOK());
+
+    CollectionType coll = status.getValue();
+    ASSERT_TRUE(coll.validate().isOK());
+
+    ASSERT(CollectionType::DistributionMode::kSharded == coll.getDistributionMode());
+
+    BSONObj serialized = coll.toBSON();
+    ASSERT("sharded" == serialized["distributionMode"].str());
+}
+
+TEST(CollectionType, UnknownDistributionModeFailsToParse) {
+    const OID oid = OID::gen();
+    StatusWith<CollectionType> status = CollectionType::fromBSON(BSON(
+        CollectionType::fullNs("db.coll")
+        << CollectionType::epoch(oid) << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+        << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
+        << CollectionType::distributionMode("badvalue")));
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status.getStatus());
+}
+
+TEST(CollectionType, HasSameOptionsReturnsTrueIfBothDistributionModesExplicitlySetToUnsharded) {
+    const auto collType1 = uassertStatusOK(CollectionType::fromBSON(
+        BSON(CollectionType::fullNs("db.coll")
+             << CollectionType::epoch(OID::gen())
+             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
+             << CollectionType::distributionMode("unsharded"))));
+
+    const auto collType2 = uassertStatusOK(CollectionType::fromBSON(
+        BSON(CollectionType::fullNs("db.coll")
+             << CollectionType::epoch(OID::gen())
+             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
+             << CollectionType::distributionMode("unsharded"))));
+
+    ASSERT(collType1.hasSameOptions(collType2));
+    ASSERT(collType2.hasSameOptions(collType1));
+}
+
+TEST(CollectionType, HasSameOptionsReturnsTrueIfBothDistributionModesExplicitlySetToSharded) {
+    const auto collType1 = uassertStatusOK(CollectionType::fromBSON(
+        BSON(CollectionType::fullNs("db.coll")
+             << CollectionType::epoch(OID::gen())
+             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
+             << CollectionType::distributionMode("sharded"))));
+
+    const auto collType2 = uassertStatusOK(CollectionType::fromBSON(
+        BSON(CollectionType::fullNs("db.coll")
+             << CollectionType::epoch(OID::gen())
+             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
+             << CollectionType::distributionMode("sharded"))));
+
+    ASSERT(collType1.hasSameOptions(collType2));
+    ASSERT(collType2.hasSameOptions(collType1));
+}
+
+TEST(
+    CollectionType,
+    HasSameOptionsReturnsFalseIfOneDistributionModeExplicitlySetToUnshardedAndOtherExplicitlySetToSharded) {
+    const auto collType1 = uassertStatusOK(CollectionType::fromBSON(
+        BSON(CollectionType::fullNs("db.coll")
+             << CollectionType::epoch(OID::gen())
+             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
+             << CollectionType::distributionMode("unsharded"))));
+
+    const auto collType2 = uassertStatusOK(CollectionType::fromBSON(
+        BSON(CollectionType::fullNs("db.coll")
+             << CollectionType::epoch(OID::gen())
+             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
+             << CollectionType::distributionMode("sharded"))));
+
+    ASSERT(!collType1.hasSameOptions(collType2));
+    ASSERT(!collType2.hasSameOptions(collType1));
+}
+
+TEST(CollectionType,
+     HasSameOptionsReturnsTrueIfOneDistributionModeExplicitlySetToShardedAndOtherIsNotSet) {
+    const auto collType1 = uassertStatusOK(CollectionType::fromBSON(
+        BSON(CollectionType::fullNs("db.coll")
+             << CollectionType::epoch(OID::gen())
+             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
+             << CollectionType::distributionMode("sharded"))));
+
+    const auto collType2 = uassertStatusOK(CollectionType::fromBSON(
+        BSON(CollectionType::fullNs("db.coll")
+             << CollectionType::epoch(OID::gen())
+             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true))));
+
+    ASSERT(collType1.hasSameOptions(collType2));
+    ASSERT(collType2.hasSameOptions(collType1));
+}
+
+TEST(CollectionType, HasSameOptionsReturnsTrueIfNeitherDistributionModeExplicitlySet) {
+    const auto collType1 = uassertStatusOK(CollectionType::fromBSON(
+        BSON(CollectionType::fullNs("db.coll")
+             << CollectionType::epoch(OID::gen())
+             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true))));
+
+    const auto collType2 = uassertStatusOK(CollectionType::fromBSON(
+        BSON(CollectionType::fullNs("db.coll")
+             << CollectionType::epoch(OID::gen())
+             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true))));
+
+    ASSERT(collType1.hasSameOptions(collType2));
+    ASSERT(collType2.hasSameOptions(collType1));
+}
+
 TEST(CollectionType, EpochCorrectness) {
     CollectionType coll;
     coll.setNs(NamespaceString{"db.coll"});

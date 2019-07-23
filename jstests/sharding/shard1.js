@@ -39,7 +39,9 @@ delete cconfig.dropped;
 delete cconfig.lastmodEpoch;
 delete cconfig.uuid;
 
-assert.eq(cconfig, {_id: "test.foo", key: {num: 1}, unique: false}, "Sharded content mismatch");
+assert.eq(cconfig,
+          {_id: "test.foo", key: {num: 1}, unique: false, distributionMode: "sharded"},
+          "Sharded content mismatch");
 
 s.config.collections.find().forEach(printjson);
 

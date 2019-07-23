@@ -638,6 +638,7 @@ void updateShardingCatalogEntryForCollection(
     coll.setKeyPattern(prerequisites.shardKeyPattern.toBSON());
     coll.setDefaultCollation(defaultCollator ? defaultCollator->getSpec().toBSON() : BSONObj());
     coll.setUnique(unique);
+    coll.setDistributionMode(CollectionType::DistributionMode::kSharded);
 
     uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
         opCtx, nss, coll, true /*upsert*/));
