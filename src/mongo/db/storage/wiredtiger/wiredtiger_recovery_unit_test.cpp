@@ -565,6 +565,62 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampAfterSetTimestampOnAbor
     ASSERT(!commitTs);
 }
 
+TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsAreNotCached) {
+    auto opCtx = clientAndCtx1.second.get();
+    auto ru = WiredTigerRecoveryUnit::get(opCtx);
+
+    std::unique_ptr<RecordStore> rs(
+        harnessHelper->createRecordStore(opCtx, "test.checkpoint_not_cached"));
+    auto uri = dynamic_cast<WiredTigerRecordStore*>(rs.get())->getURI();
+
+    WiredTigerKVEngine* engine = harnessHelper->getEngine();
+
+    // Insert a record.
+    ru->beginUnitOfWork(opCtx);
+    StatusWith<RecordId> s = rs->insertRecord(opCtx, "data", 4, Timestamp());
+    ASSERT_TRUE(s.isOK());
+    ASSERT_EQUALS(1, rs->numRecords(opCtx));
+    ru->commitUnitOfWork();
+
+    // Test 1: A normal read should create a new cursor and release it into the session cache.
+
+    // Close all cached cursors to establish a 'before' state.
+    ru->getSession()->closeAllCursors(uri);
+    int cachedCursorsBefore = ru->getSession()->cachedCursors();
+
+    RecordData rd;
+    ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
+
+    // A cursor should have been checked out and released into the cache.
+    ASSERT_GT(ru->getSession()->cachedCursors(), cachedCursorsBefore);
+    // All opened cursors are returned.
+    ASSERT_EQ(0, ru->getSession()->cursorsOut());
+
+    ru->abandonSnapshot();
+
+    // Force a checkpoint
+    ASSERT_EQUALS(1, engine->flushAllFiles(opCtx, true));
+
+    // Test 2: Checkpoint cursors are not expected to be cached, they
+    // should be immediately closed when destructed.
+    ru->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+
+    // Close any cached cursors to establish a new 'before' state.
+    ru->getSession()->closeAllCursors(uri);
+    cachedCursorsBefore = ru->getSession()->cachedCursors();
+
+    // Will search the checkpoint cursor for the record, then close the checkpoint cursor.
+    ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
+
+    // No new cursors should have been released into the cache.
+    ASSERT_EQ(ru->getSession()->cachedCursors(), cachedCursorsBefore);
+
+    // All opened cursors are closed.
+    ASSERT_EQ(0, ru->getSession()->cursorsOut());
+
+    ASSERT_EQ(ru->getTimestampReadSource(), WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+}
+
 TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsAreNotCached) {
     auto opCtx = clientAndCtx1.second.get();
     auto ru = WiredTigerRecoveryUnit::get(opCtx);
@@ -613,6 +669,65 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsAreNotCached) {
     ASSERT_EQ(0, ru->getSession()->cursorsOut());
 
     ASSERT(ru->getReadOnce());
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
+    auto opCtx = clientAndCtx1.second.get();
+    auto opCtx2 = clientAndCtx2.second.get();
+    auto ru = WiredTigerRecoveryUnit::get(opCtx);
+    auto ru2 = WiredTigerRecoveryUnit::get(opCtx2);
+
+    std::unique_ptr<RecordStore> rs(
+        harnessHelper->createRecordStore(opCtx, "test.checkpoint_stable"));
+
+    WiredTigerKVEngine* engine = harnessHelper->getEngine();
+
+    // Insert a record.
+    ru->beginUnitOfWork(opCtx);
+    StatusWith<RecordId> s1 = rs->insertRecord(opCtx, "data", 4, Timestamp());
+    ASSERT_TRUE(s1.isOK());
+    ASSERT_EQUALS(1, rs->numRecords(opCtx));
+    ru->commitUnitOfWork();
+
+    // Force a checkpoint
+    ASSERT_EQUALS(1, engine->flushAllFiles(opCtx, true));
+
+    // Test 1: Open a checkpoint cursor and ensure it has the first record.
+    ru2->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+    auto originalCheckpointCursor = rs->getCursor(opCtx2, true);
+    ASSERT(originalCheckpointCursor->seekExact(s1.getValue()));
+
+    // Insert a new record.
+    ru->beginUnitOfWork(opCtx);
+    StatusWith<RecordId> s2 = rs->insertRecord(opCtx, "data_2", 6, Timestamp());
+    ASSERT_TRUE(s2.isOK());
+    ASSERT_EQUALS(2, rs->numRecords(opCtx));
+    ru->commitUnitOfWork();
+
+    // Test 2: New record does not appear in original checkpoint cursor.
+    ASSERT(!originalCheckpointCursor->seekExact(s2.getValue()));
+    ASSERT(originalCheckpointCursor->seekExact(s1.getValue()));
+
+    // Test 3: New record does not appear in new checkpoint cursor since no
+    // checkpoint was created.
+    // TODO: Implement in SERVER-42221
+    //
+    // ru->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+    // auto newCheckpointCursor = rs->getCursor(opCtx, true);
+    // ASSERT(!newCheckpointCursor->seekExact(s2.getValue()));
+    //
+
+    // Force a checkpoint
+    ASSERT_EQUALS(1, engine->flushAllFiles(opCtx, true));
+
+    // Test 4: Old and new record should appear in new checkpoint cursor. Only old record
+    // should appear in the original checkpoint cursor
+    ru->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+    auto newCheckpointCursor = rs->getCursor(opCtx, true);
+    ASSERT(newCheckpointCursor->seekExact(s1.getValue()));
+    ASSERT(newCheckpointCursor->seekExact(s2.getValue()));
+    ASSERT(originalCheckpointCursor->seekExact(s1.getValue()));
+    ASSERT(!originalCheckpointCursor->seekExact(s2.getValue()));
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, CommitWithDurableTimestamp) {

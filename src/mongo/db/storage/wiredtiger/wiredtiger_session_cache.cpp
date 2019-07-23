@@ -104,8 +104,9 @@ void _openCursor(WT_SESSION* session,
 }
 }  // namespace
 
-
-WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, bool allowOverwrite) {
+WT_CURSOR* WiredTigerSession::getCachedCursor(const std::string& uri,
+                                              uint64_t id,
+                                              const char* config) {
     // Find the most recently used cursor
     for (CursorCache::iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
         if (i->_id == id) {
@@ -117,14 +118,12 @@ WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, boo
     }
 
     WT_CURSOR* cursor = nullptr;
-    _openCursor(_session, uri, allowOverwrite ? "" : "overwrite=false", &cursor);
+    _openCursor(_session, uri, config, &cursor);
     _cursorsOut++;
     return cursor;
 }
 
-WT_CURSOR* WiredTigerSession::getReadOnceCursor(const std::string& uri, bool allowOverwrite) {
-    const char* config = allowOverwrite ? "read_once=true" : "read_once=true,overwrite=false";
-
+WT_CURSOR* WiredTigerSession::getNewCursor(const std::string& uri, const char* config) {
     WT_CURSOR* cursor = nullptr;
     _openCursor(_session, uri, config, &cursor);
     _cursorsOut++;

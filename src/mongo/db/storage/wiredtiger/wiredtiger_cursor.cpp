@@ -30,6 +30,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
+
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
 namespace mongo {
@@ -42,20 +44,30 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
     _ru = WiredTigerRecoveryUnit::get(opCtx);
     _session = _ru->getSession();
     _readOnce = _ru->getReadOnce();
+    _isCheckpoint =
+        (_ru->getTimestampReadSource() == WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
 
-    if (_readOnce) {
-        _cursor = _session->getReadOnceCursor(uri, allowOverwrite);
+    str::stream builder;
+    builder << ((allowOverwrite) ? "" : "overwrite=false,");
+    builder << ((_readOnce) ? "read_once=true," : "");
+    builder << ((_isCheckpoint) ? "checkpoint=WiredTigerCheckpoint," : "");
+
+    const std::string config = builder;
+    if (_readOnce || _isCheckpoint) {
+        _cursor = _session->getNewCursor(uri, config.c_str());
     } else {
-        _cursor = _session->getCursor(uri, tableID, allowOverwrite);
+        _cursor = _session->getCachedCursor(uri, tableID, config.c_str());
     }
 }
 
 WiredTigerCursor::~WiredTigerCursor() {
     dassert(_ru->getReadOnce() == _readOnce);
+    dassert(_isCheckpoint ==
+            (_ru->getTimestampReadSource() == WiredTigerRecoveryUnit::ReadSource::kCheckpoint));
 
-    // Read-once cursors will never take cursors from the cursor cache, and should never release
-    // cursors into the cursor cache.
-    if (_readOnce) {
+    // Read-once and checkpoint cursors will never take cursors from the cursor cache, and
+    // should never release cursors into the cursor cache.
+    if (_readOnce || _isCheckpoint) {
         _session->closeCursor(_cursor);
     } else {
         _session->releaseCursor(_tableID, _cursor);

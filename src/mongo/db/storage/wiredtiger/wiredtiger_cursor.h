@@ -43,6 +43,11 @@ namespace mongo {
  */
 class WiredTigerCursor {
 public:
+    /**
+     * If 'allowOverwrite' is true, insert operations will not return an error if the record
+     * already exists, and update/remove operations will not return error if the record does not
+     * exist.
+     */
     WiredTigerCursor(const std::string& uri,
                      uint64_t tableID,
                      bool allowOverwrite,
@@ -74,6 +79,7 @@ protected:
     WiredTigerRecoveryUnit* _ru;
     WiredTigerSession* _session;
     bool _readOnce;
+    bool _isCheckpoint;
 
     WT_CURSOR* _cursor = nullptr;  // Owned
 };
