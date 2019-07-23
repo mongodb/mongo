@@ -340,6 +340,26 @@ DocumentStorage::~DocumentStorage() {
     }
 }
 
+void DocumentStorage::reset(const BSONObj& bson, bool stripMetadata) {
+    _bson = bson.getOwned();
+    _bsonIt = BSONObjIterator(_bson);
+    _stripMetadata = stripMetadata;
+    _modified = false;
+
+    // Clean cache.
+    for (auto it = iteratorCacheOnly(); !it.atEnd(); it.advance()) {
+        it->val.~Value();  // explicit destructor call
+    }
+
+    _cacheEnd = _cache;
+    _usedBytes = 0;
+    _numFields = 0;
+    _hashTabMask = 0;
+
+    // Clean metadata.
+    _metadataFields = DocumentMetadataFields{};
+}
+
 void DocumentStorage::loadLazyMetadata() const {
     if (_metadataFields) {
         return;

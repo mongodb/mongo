@@ -427,6 +427,16 @@ public:
         reset(std::move(d._storage));
     }
 
+    /**
+     * Replace the current base Document with bson.
+     *
+     * The paramater 'stripMetadata' controls whether we strip the metadata fields from the
+     * underlying bson when converting the document object back to bson.
+     */
+    void reset(const BSONObj& bson, bool stripMetadata) {
+        storage().reset(bson, stripMetadata);
+    }
+
     /** Add the given field to the Document.
      *
      *  BSON documents' fields are ordered; the new Field will be

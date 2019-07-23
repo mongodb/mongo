@@ -122,6 +122,17 @@ TEST(DocumentConstruction, FromEmptyDocumentClone) {
     ASSERT_DOCUMENT_EQ(document, documentClone3);
 }
 
+TEST(DocumentConstruction, FromBsonReset) {
+    auto document = Document{{"a", 1}, {"b", "q"_sd}};
+    auto bson = toBson(document);
+
+    MutableDocument md;
+    md.reset(bson, false);
+    auto newDocument = md.freeze();
+
+    ASSERT_BSONOBJ_EQ(bson, toBson(newDocument));
+}
+
 /**
  * Appends to 'builder' an object nested 'depth' levels deep.
  */

@@ -265,27 +265,26 @@ private:
 /// Storage class used by both Document and MutableDocument
 class DocumentStorage : public RefCountable {
 public:
-    DocumentStorage()
-        : _cache(nullptr),
-          _cacheEnd(nullptr),
-          _usedBytes(0),
-          _numFields(0),
-          _hashTabMask(0),
-          _bsonIt(_bson) {}
-
+    DocumentStorage() : DocumentStorage(BSONObj(), false, false) {}
     /**
      * Construct a storage from the BSON. The BSON is lazily processed as fields are requested from
      * the document. If we know that the BSON does not contain any metadata fields we can set the
      * 'stripMetadata' flag to false that will speed up the field iteration.
      */
-    DocumentStorage(const BSONObj& bson, bool stripMetadata, bool modified) : DocumentStorage() {
-        _bson = bson.getOwned();
-        _bsonIt = BSONObjIterator(_bson);
-        _stripMetadata = stripMetadata;
-        _modified = modified;
-    }
+    DocumentStorage(const BSONObj& bson, bool stripMetadata, bool modified)
+        : _cache(nullptr),
+          _cacheEnd(nullptr),
+          _usedBytes(0),
+          _numFields(0),
+          _hashTabMask(0),
+          _bson(bson.getOwned()),
+          _bsonIt(_bson),
+          _stripMetadata(stripMetadata),
+          _modified(modified) {}
 
     ~DocumentStorage();
+
+    void reset(const BSONObj& bson, bool stripMetadata);
 
     static const DocumentStorage& emptyDoc() {
         return kEmptyDoc;
@@ -520,9 +519,7 @@ private:
 
     // This flag is set to true anytime the storage returns a mutable field. It is used to optimize
     // a conversion to BSON; i.e. if there are not any modifications we can directly return _bson.
-    // Note that an empty (default) document is marked 'modified'. The reason for this is that the
-    // empty _bson is not owned but consumers expect toBson() to return owned BSON.
-    bool _modified{true};
+    bool _modified{false};
 
     // Defined in document.cpp
     static const DocumentStorage kEmptyDoc;
