@@ -32,7 +32,9 @@
 #include "mongo/platform/basic.h"
 
 #include <iterator>
+#include <memory>
 #include <set>
+#include <utility>
 #include <vector>
 
 #include "mongo/util/net/sockaddr.h"
@@ -59,34 +61,44 @@ namespace mongo {
 namespace {
 constexpr int SOCK_FAMILY_UNKNOWN_ERROR = 13078;
 
-using AddrInfo = std::unique_ptr<addrinfo, decltype(&freeaddrinfo)>;
-
-std::pair<int, AddrInfo> resolveAddrInfo(const std::string& hostOrIp,
-                                         int port,
-                                         sa_family_t familyHint) {
-    addrinfo hints;
-    memset(&hints, 0, sizeof(addrinfo));
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags |= AI_NUMERICHOST;  // first pass tries w/o DNS lookup
-    hints.ai_family = familyHint;
-    addrinfo* addrs = nullptr;
-
-    ItoA portStr(port);
-    int ret = getaddrinfo(hostOrIp.c_str(), StringData(portStr).rawData(), &hints, &addrs);
-
-// old C compilers on IPv6-capable hosts return EAI_NODATA error
-#ifdef EAI_NODATA
-    int nodata = (ret == EAI_NODATA);
-#else
-    int nodata = false;
-#endif
-    if ((ret == EAI_NONAME) || nodata) {
-        // iporhost isn't an IP address, allow DNS lookup
-        hints.ai_flags &= ~AI_NUMERICHOST;
-        ret = getaddrinfo(hostOrIp.c_str(), StringData(portStr).rawData(), &hints, &addrs);
+struct AddrInfoDeleter {
+    void operator()(addrinfo* p) const noexcept {
+        freeaddrinfo(p);
     }
+};
+using AddrInfoPtr = std::unique_ptr<addrinfo, AddrInfoDeleter>;
 
-    return {ret, AddrInfo(addrs, &freeaddrinfo)};
+struct AddrErr {
+    AddrInfoPtr addr;
+    int err;
+};
+
+AddrErr resolveAddrInfo(const std::string& hostOrIp, int port, sa_family_t familyHint) {
+    const std::string portStr{StringData{ItoA(port)}};
+    auto tryResolve = [&](bool allowDns) noexcept->AddrErr {
+        addrinfo hints;
+        memset(&hints, 0, sizeof(addrinfo));
+        hints.ai_socktype = SOCK_STREAM;
+        if (!allowDns)
+            hints.ai_flags |= AI_NUMERICHOST;
+        hints.ai_family = familyHint;
+        addrinfo* addrs = nullptr;
+        int ret = getaddrinfo(hostOrIp.c_str(), portStr.c_str(), &hints, &addrs);
+        AddrInfoPtr rvPtr(addrs);
+        return {std::move(rvPtr), ret};
+    };
+
+    switch (auto r = tryResolve(false); r.err) {
+        case EAI_NONAME:
+#ifdef EAI_NODATA
+#if (EAI_NODATA != EAI_NONAME)  // In MSVC these have the same value.
+        case EAI_NODATA:        // Old IPv6-capable hosts can return EAI_NODATA.
+#endif
+#endif
+            return tryResolve(true);  // Not an IP address. Retry with DNS.
+        default:
+            return r;
+    }
 }
 
 }  // namespace
@@ -141,12 +153,12 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
 
     auto addrErr = resolveAddrInfo(_hostOrIp, port, familyHint);
 
-    if (addrErr.first) {
+    if (addrErr.err) {
         // we were unsuccessful
         if (_hostOrIp != "0.0.0.0") {  // don't log if this as it is a
                                        // CRT construction and log() may not work yet.
             log() << "getaddrinfo(\"" << _hostOrIp
-                  << "\") failed: " << getAddrInfoStrError(addrErr.first);
+                  << "\") failed: " << getAddrInfoStrError(addrErr.err);
             _isValid = false;
             return;
         }
@@ -156,7 +168,7 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
 
     // This throws away all but the first address.
     // Use SockAddr::createAll() to get all addresses.
-    const auto* addrs = addrErr.second.get();
+    const auto* addrs = addrErr.addr.get();
     fassert(16501, static_cast<size_t>(addrs->ai_addrlen) <= sizeof(sa));
     memcpy(&sa, addrs->ai_addr, addrs->ai_addrlen);
     addressSize = addrs->ai_addrlen;
@@ -174,16 +186,15 @@ std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family
     }
 
     auto addrErr = resolveAddrInfo(hostOrIp, port, familyHint);
-    if (addrErr.first) {
-        log() << "getaddrinfo(\"" << hostOrIp
-              << "\") failed: " << getAddrInfoStrError(addrErr.first);
+    if (addrErr.err) {
+        log() << "getaddrinfo(\"" << hostOrIp << "\") failed: " << getAddrInfoStrError(addrErr.err);
         return {};
     }
 
     std::set<SockAddr> ret;
     struct sockaddr_storage storage;
     memset(&storage, 0, sizeof(storage));
-    for (const auto* addrs = addrErr.second.get(); addrs; addrs = addrs->ai_next) {
+    for (const auto* addrs = addrErr.addr.get(); addrs; addrs = addrs->ai_next) {
         fassert(40594, static_cast<size_t>(addrs->ai_addrlen) <= sizeof(struct sockaddr_storage));
         // Make a temp copy in a local sockaddr_storage so that the
         // SockAddr constructor below can copy the entire buffer
