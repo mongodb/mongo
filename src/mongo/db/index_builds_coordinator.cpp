@@ -732,9 +732,6 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
                             << "' should exist because an index build is in progress: "
                             << replState->buildUUID);
 
-    // Set up the thread's currentOp information to display createIndexes cmd information.
-    _updateCurOpOpDescription(opCtx, *nss, replState->indexSpecs);
-
     boost::optional<AutoGetDb> autoDb;
 
     // Do not use AutoGetCollection since the lock will be in various modes throughout the index
@@ -857,6 +854,9 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
                                          boost::optional<Lock::CollectionLock>* collLock) {
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+
+    // Set up the thread's currentOp information to display createIndexes cmd information.
+    _updateCurOpOpDescription(opCtx, nss, replState->indexSpecs);
 
     // Rebuilding system indexes during startup using the IndexBuildsCoordinator is done by all
     // storage engines if they're missing. This includes the mobile storage engine which builds
