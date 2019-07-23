@@ -425,8 +425,7 @@ public:
      * Resets to an empty state.
      * Equivalent to but faster than *this = Builder(ord, discriminator)
      */
-    void resetToEmpty(Ordering ord = ALL_ASCENDING,
-                      Discriminator discriminator = kInclusive) {
+    void resetToEmpty(Ordering ord = ALL_ASCENDING, Discriminator discriminator = kInclusive) {
         if (_state == kReleased) {
             _buffer = BufBuilder();
             _typeBits = TypeBits(version);
