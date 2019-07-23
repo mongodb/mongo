@@ -227,12 +227,10 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     BSONObj sortOrder,
     uint64_t limit,
     boost::optional<uint64_t> maxMemoryUsageBytes) {
-    auto resolvedMaxBytes = maxMemoryUsageBytes
-        ? *maxMemoryUsageBytes
-        : internalDocumentSourceSortMaxBlockingSortBytes.load();
+    auto resolvedMaxBytes =
+        maxMemoryUsageBytes ? *maxMemoryUsageBytes : internalQueryExecMaxBlockingSortBytes.load();
     intrusive_ptr<DocumentSourceSort> pSort(
         new DocumentSourceSort(pExpCtx, sortOrder.getOwned(), limit, resolvedMaxBytes));
-
     return pSort;
 }
 

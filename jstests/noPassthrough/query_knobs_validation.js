@@ -28,13 +28,12 @@
         internalQueryPlannerEnableHashIntersection: false,
         internalQueryPlanOrChildrenIndependently: true,
         internalQueryMaxScansToExplode: 200,
-        internalQueryExecMaxBlockingSortBytes: 32 * 1024 * 1024,
+        internalQueryExecMaxBlockingSortBytes: 100 * 1024 * 1024,
         internalQueryExecYieldIterations: 128,
         internalQueryExecYieldPeriodMS: 10,
         internalQueryFacetBufferSizeBytes: 100 * 1024 * 1024,
         internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024,
         internalDocumentSourceLookupCacheSizeBytes: 100 * 1024 * 1024,
-        internalDocumentSourceSortMaxBlockingSortBytes: 100 * 1024 * 1024,
         internalLookupStageIntermediateDocumentMaxSizeBytes: 100 * 1024 * 1024,
         internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024,
         // Should be half the value of 'internalQueryExecYieldIterations' parameter.
@@ -136,10 +135,6 @@
     assertSetParameterSucceeds("internalQueryFacetBufferSizeBytes", 1);
     assertSetParameterFails("internalQueryFacetBufferSizeBytes", 0);
     assertSetParameterFails("internalQueryFacetBufferSizeBytes", -1);
-
-    assertSetParameterSucceeds("internalDocumentSourceSortMaxBlockingSortBytes", 11);
-    assertSetParameterFails("internalDocumentSourceSortMaxBlockingSortBytes", 0);
-    assertSetParameterFails("internalDocumentSourceSortMaxBlockingSortBytes", -1);
 
     assertSetParameterSucceeds("internalDocumentSourceGroupMaxMemoryBytes", 11);
     assertSetParameterFails("internalDocumentSourceGroupMaxMemoryBytes", 0);

@@ -4,7 +4,13 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 2});
+    var st = new ShardingTest({
+        shards: 2,
+        other: {
+            shardOptions:
+                {setParameter: {internalQueryExecMaxBlockingSortBytes: 32 * 1024 * 1024}}
+        }
+    });
     assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
     st.ensurePrimaryShard('test', st.shard0.shardName);
 

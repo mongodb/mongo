@@ -6,7 +6,15 @@
 
     var MaxSizeMB = 1;
 
-    var s = new ShardingTest({shards: 2, other: {chunkSize: 1, manualAddShard: true}});
+    var s = new ShardingTest({
+        shards: 2,
+        other: {
+            chunkSize: 1,
+            manualAddShard: true,
+            shardOptions:
+                {setParameter: {internalQueryExecMaxBlockingSortBytes: 32 * 1024 * 1024}}
+        }
+    });
     var db = s.getDB("test");
 
     var names = s.getConnNames();

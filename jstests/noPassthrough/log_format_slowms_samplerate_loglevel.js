@@ -323,19 +323,19 @@
             },
             {
               test: function(db) {
-                  const originalSortBytes = db.adminCommand(
-                      {getParameter: 1, internalDocumentSourceSortMaxBlockingSortBytes: 1});
+                  const originalSortBytes =
+                      db.adminCommand({getParameter: 1, internalQueryExecMaxBlockingSortBytes: 1});
                   assert.commandWorked(originalSortBytes);
                   assert.commandWorked(db.adminCommand(
-                      {setParameter: 1, internalDocumentSourceSortMaxBlockingSortBytes: 10}));
+                      {setParameter: 1, internalQueryExecMaxBlockingSortBytes: 10}));
                   assert.eq(
                       coll.aggregate([{$match: {a: 1}}, {$sort: {a: 1}}], {allowDiskUse: true})
                           .itcount(),
                       1);
                   assert.commandWorked(db.adminCommand({
                       setParameter: 1,
-                      internalDocumentSourceSortMaxBlockingSortBytes:
-                          originalSortBytes.internalDocumentSourceSortMaxBlockingSortBytes
+                      internalQueryExecMaxBlockingSortBytes:
+                          originalSortBytes.internalQueryExecMaxBlockingSortBytes
                   }));
               },
               logFields:

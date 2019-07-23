@@ -6,7 +6,12 @@
         name: "slow_sharding_balance3",
         shards: 2,
         mongos: 1,
-        other: {chunkSize: 1, enableBalancer: true}
+        other: {
+            chunkSize: 1,
+            enableBalancer: true,
+            shardOptions:
+                {setParameter: {internalQueryExecMaxBlockingSortBytes: 32 * 1024 * 1024}}
+        }
     });
 
     s.adminCommand({enablesharding: "test"});
