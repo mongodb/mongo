@@ -9,7 +9,6 @@
  */
 
 var $config = (function() {
-
     var data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
@@ -17,7 +16,6 @@ var $config = (function() {
     };
 
     var states = (function() {
-
         function uniqueCollectionName(prefix, tid, num) {
             return prefix + tid + '_' + num;
         }
@@ -35,11 +33,30 @@ var $config = (function() {
             this.fromCollName = toCollName;
         }
 
-        return {init: init, rename: rename};
+        function listCollections(db, collName) {
+            const collectionInfos = db.getCollectionInfos();
+            if (!this.allCollectionsInitialized) {
+                if (collectionInfos.length === this.threadCount) {
+                    this.allCollectionsInitialized = true;
+                    jsTestLog(`All collections visible to thread ${this.tid}: ${
+                        tojsononeline(collectionInfos)}`);
+                }
+            } else {
+                const numColls =
+                    collectionInfos.filter((collInfo) => collInfo.name.startsWith(this.prefix))
+                        .length;
+                assertAlways.eq(numColls, this.threadCount, () => tojson(collectionInfos));
+            }
+        }
 
+        return {init: init, rename: rename, listCollections: listCollections};
     })();
 
-    var transitions = {init: {rename: 1}, rename: {rename: 1}};
+    var transitions = {
+        init: {rename: 1},
+        rename: {rename: 0.9, listCollections: 0.1},
+        listCollections: {rename: 1},
+    };
 
     return {
         threadCount: 10,
@@ -48,5 +65,4 @@ var $config = (function() {
         states: states,
         transitions: transitions,
     };
-
 })();
