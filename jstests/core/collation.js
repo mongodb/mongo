@@ -697,23 +697,6 @@
     planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
     assert.neq(null, planStage);
 
-    // Find with oplog replay should return correct results when no collation specified and
-    // collection has a default collation. Skip this test for the mobile SE because it doesn't
-    // support capped collections which are needed for oplog replay.
-    if (jsTest.options().storageEngine !== "mobile") {
-        coll.drop();
-        assert.commandWorked(db.createCollection(
-            coll.getName(),
-            {collation: {locale: "en_US", strength: 2}, capped: true, size: 16 * 1024}));
-        assert.writeOK(coll.insert({str: "FOO", ts: Timestamp(1000, 0)}));
-        assert.writeOK(coll.insert({str: "FOO", ts: Timestamp(1000, 1)}));
-        assert.writeOK(coll.insert({str: "FOO", ts: Timestamp(1000, 2)}));
-        assert.eq(2,
-                  coll.find({str: "foo", ts: {$gte: Timestamp(1000, 1)}})
-                      .addOption(DBQuery.Option.oplogReplay)
-                      .itcount());
-    }
-
     // Find should return correct results for query containing $expr when no collation specified and
     // collection has a default collation.
     coll.drop();
@@ -766,27 +749,6 @@
         assert.commandWorked(explainRes);
         planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
         assert.eq(null, planStage);
-
-        // Find with oplog replay should return correct results when "simple" collation specified
-        // and collection has a default collation. Skip this test for the mobile SE because it
-        // doesn't support capped collections which are needed for oplog replay.
-        if (jsTest.options().storageEngine !== "mobile") {
-            coll.drop();
-            assert.commandWorked(db.createCollection(
-                coll.getName(),
-                {collation: {locale: "en_US", strength: 2}, capped: true, size: 16 * 1024}));
-            const t0 = Timestamp(1000, 0);
-            const t1 = Timestamp(1000, 1);
-            const t2 = Timestamp(1000, 2);
-            assert.writeOK(coll.insert({str: "FOO", ts: Timestamp(1000, 0)}));
-            assert.writeOK(coll.insert({str: "FOO", ts: Timestamp(1000, 1)}));
-            assert.writeOK(coll.insert({str: "FOO", ts: Timestamp(1000, 2)}));
-            assert.eq(0,
-                      coll.find({str: "foo", ts: {$gte: Timestamp(1000, 1)}})
-                          .addOption(DBQuery.Option.oplogReplay)
-                          .collation({locale: "simple"})
-                          .itcount());
-        }
     }
 
     // Find should select compatible index when no collation specified and collection has a default

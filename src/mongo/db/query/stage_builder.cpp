@@ -60,6 +60,7 @@
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/storage/oplog_hack.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -81,6 +82,9 @@ PlanStage* buildStages(OperationContext* opCtx,
             params.direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
                                                      : CollectionScanParams::BACKWARD;
             params.shouldWaitForOplogVisibility = csn->shouldWaitForOplogVisibility;
+            params.minTs = csn->minTs;
+            params.maxTs = csn->maxTs;
+            params.stopApplyingFilterAfterFirstMatch = csn->stopApplyingFilterAfterFirstMatch;
             return new CollectionScan(opCtx, collection, params, ws, csn->filter.get());
         }
         case STAGE_IXSCAN: {

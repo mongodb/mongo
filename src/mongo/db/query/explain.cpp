@@ -361,6 +361,9 @@ void Explain::statsToBSON(const PlanStageStats& stats,
     } else if (STAGE_COLLSCAN == stats.stageType) {
         CollectionScanStats* spec = static_cast<CollectionScanStats*>(stats.specific.get());
         bob->append("direction", spec->direction > 0 ? "forward" : "backward");
+        if (spec->minTs) {
+            bob->append("minTs", *(spec->minTs));
+        }
         if (spec->maxTs) {
             bob->append("maxTs", *(spec->maxTs));
         }

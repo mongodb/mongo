@@ -689,7 +689,7 @@ public:
 class OplogReplayMode : public ClientBase {
 public:
     ~OplogReplayMode() {
-        _client.dropCollection("unittests.querytests.OplogReplayMode");
+        _client.dropCollection(ns);
     }
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
@@ -697,11 +697,22 @@ public:
             return;
         }
 
-        const char* ns = "unittests.querytests.OplogReplayMode";
-
         // Create a capped collection of size 10.
         _client.dropCollection(ns);
         _client.createCollection(ns, 10, true);
+        // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
+        // testing, so the oplog may already exist on the test node; in this case, trying to create
+        // the oplog once again would fail.
+        //
+        // To ensure we are working with a clean oplog (an oplog without entries), we resort
+        // to truncating the oplog instead.
+        if (getGlobalServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
+            BSONObj info;
+            _client.runCommand("local",
+                               BSON("emptycapped"
+                                    << "oplog.querytests.OplogReplayMode"),
+                               info);
+        }
 
         insert(ns, BSON("ts" << Timestamp(1000, 0)));
         insert(ns, BSON("ts" << Timestamp(1000, 1)));
@@ -711,8 +722,7 @@ public:
                           QUERY("ts" << GT << Timestamp(1000, 1)).hint(BSON("$natural" << 1)),
                           0,
                           0,
-                          nullptr,
-                          QueryOption_OplogReplay);
+                          nullptr);
         ASSERT(c->more());
         ASSERT_EQUALS(2u, c->next()["ts"].timestamp().getInc());
         ASSERT(!c->more());
@@ -722,18 +732,20 @@ public:
                           QUERY("ts" << GT << Timestamp(1000, 1)).hint(BSON("$natural" << 1)),
                           0,
                           0,
-                          nullptr,
-                          QueryOption_OplogReplay);
+                          nullptr);
         ASSERT(c->more());
         ASSERT_EQUALS(2u, c->next()["ts"].timestamp().getInc());
         ASSERT(c->more());
     }
+
+private:
+    const char* ns = "local.oplog.querytests.OplogReplayMode";
 };
 
 class OplogReplayExplain : public ClientBase {
 public:
     ~OplogReplayExplain() {
-        _client.dropCollection("unittests.querytests.OplogReplayExplain");
+        _client.dropCollection(string(ns));
     }
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
@@ -741,11 +753,22 @@ public:
             return;
         }
 
-        const char* ns = "unittests.querytests.OplogReplayExplain";
-
         // Create a capped collection of size 10.
         _client.dropCollection(ns);
         _client.createCollection(ns, 10, true);
+        // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
+        // testing, so the oplog may already exist on the test node; in this case, trying to create
+        // the oplog once again would fail.
+        //
+        // To ensure we are working with a clean oplog (an oplog without entries), we resort
+        // to truncating the oplog instead.
+        if (getGlobalServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
+            BSONObj info;
+            _client.runCommand("local",
+                               BSON("emptycapped"
+                                    << "oplog.querytests.OplogReplayExplain"),
+                               info);
+        }
 
         insert(ns, BSON("ts" << Timestamp(1000, 0)));
         insert(ns, BSON("ts" << Timestamp(1000, 1)));
@@ -755,8 +778,7 @@ public:
             QUERY("ts" << GT << Timestamp(1000, 1)).hint(BSON("$natural" << 1)).explain(),
             0,
             0,
-            nullptr,
-            QueryOption_OplogReplay);
+            nullptr);
         ASSERT(c->more());
 
         // Check number of results and filterSet flag in explain.
@@ -768,6 +790,9 @@ public:
 
         ASSERT(!c->more());
     }
+
+private:
+    const char* ns = "local.oplog.querytests.OplogReplayExplain";
 };
 
 class BasicCount : public ClientBase {
@@ -1498,7 +1523,7 @@ class FindingStart : public CollectionBase {
 public:
     FindingStart() : CollectionBase("findingstart") {}
     static const char* ns() {
-        return "local.querytests.findingstart";
+        return "local.oplog.querytests.findingstart";
     }
 
     void run() {
@@ -1509,16 +1534,28 @@ public:
 
         BSONObj info;
         // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
-        ASSERT(_client.runCommand("local",
-                                  BSON("create"
-                                       << "querytests.findingstart"
-                                       << "capped"
-                                       << true
-                                       << "size"
-                                       << 4096
-                                       << "autoIndexId"
-                                       << false),
-                                  info));
+        _client.runCommand("local",
+                           BSON("create"
+                                << "oplog.querytests.findingstart"
+                                << "capped"
+                                << true
+                                << "size"
+                                << 4096
+                                << "autoIndexId"
+                                << false),
+                           info);
+        // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
+        // testing, so the oplog may already exist on the test node; in this case, trying to create
+        // the oplog once again would fail.
+        //
+        // To ensure we are working with a clean oplog (an oplog without entries), we resort
+        // to truncating the oplog instead.
+        if (getGlobalServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
+            _client.runCommand("local",
+                               BSON("emptycapped"
+                                    << "oplog.querytests.findingstart"),
+                               info);
+        }
 
         unsigned i = 0;
         int max = 1;
@@ -1542,20 +1579,15 @@ public:
                     .timestamp()
                     .getInc();
             for (unsigned j = -1; j < i; ++j) {
-                unique_ptr<DBClientCursor> c =
-                    _client.query(NamespaceString(ns()),
-                                  QUERY("ts" << GTE << Timestamp(1000, j)),
-                                  0,
-                                  0,
-                                  nullptr,
-                                  QueryOption_OplogReplay);
+                unique_ptr<DBClientCursor> c = _client.query(
+                    NamespaceString(ns()), QUERY("ts" << GTE << Timestamp(1000, j)), 0, 0, nullptr);
                 ASSERT(c->more());
                 BSONObj next = c->next();
                 ASSERT(!next["ts"].eoo());
                 ASSERT_EQUALS((j > min ? j : min), next["ts"].timestamp().getInc());
             }
         }
-        ASSERT(_client.dropCollection(ns()));
+        _client.dropCollection(ns());
     }
 };
 
@@ -1563,7 +1595,7 @@ class FindingStartPartiallyFull : public CollectionBase {
 public:
     FindingStartPartiallyFull() : CollectionBase("findingstart") {}
     static const char* ns() {
-        return "local.querytests.findingstart";
+        return "local.oplog.querytests.findingstart";
     }
 
     void run() {
@@ -1576,16 +1608,28 @@ public:
 
         BSONObj info;
         // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
-        ASSERT(_client.runCommand("local",
-                                  BSON("create"
-                                       << "querytests.findingstart"
-                                       << "capped"
-                                       << true
-                                       << "size"
-                                       << 4096
-                                       << "autoIndexId"
-                                       << false),
-                                  info));
+        _client.runCommand("local",
+                           BSON("create"
+                                << "oplog.querytests.findingstart"
+                                << "capped"
+                                << true
+                                << "size"
+                                << 4096
+                                << "autoIndexId"
+                                << false),
+                           info);
+        // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
+        // testing, so the oplog may already exist on the test node; in this case, trying to create
+        // the oplog once again would fail.
+        //
+        // To ensure we are working with a clean oplog (an oplog without entries), we resort
+        // to truncating the oplog instead.
+        if (getGlobalServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
+            _client.runCommand("local",
+                               BSON("emptycapped"
+                                    << "oplog.querytests.findingstart"),
+                               info);
+        }
 
         unsigned i = 0;
         for (; i < 150; _client.insert(ns(), BSON("ts" << Timestamp(1000, i++))))
@@ -1599,13 +1643,8 @@ public:
                     .timestamp()
                     .getInc();
             for (unsigned j = -1; j < i; ++j) {
-                unique_ptr<DBClientCursor> c =
-                    _client.query(NamespaceString(ns()),
-                                  QUERY("ts" << GTE << Timestamp(1000, j)),
-                                  0,
-                                  0,
-                                  nullptr,
-                                  QueryOption_OplogReplay);
+                unique_ptr<DBClientCursor> c = _client.query(
+                    NamespaceString(ns()), QUERY("ts" << GTE << Timestamp(1000, j)), 0, 0, nullptr);
                 ASSERT(c->more());
                 BSONObj next = c->next();
                 ASSERT(!next["ts"].eoo());
@@ -1614,19 +1653,19 @@ public:
         }
 
         ASSERT_EQUALS(startNumCursors, numCursorsOpen());
-        ASSERT(_client.dropCollection(ns()));
+        _client.dropCollection(ns());
     }
 };
 
 /**
- * Check OplogReplay mode where query timestamp is earlier than the earliest
+ * Check oplog replay mode where query timestamp is earlier than the earliest
  * entry in the collection.
  */
 class FindingStartStale : public CollectionBase {
 public:
     FindingStartStale() : CollectionBase("findingstart") {}
     static const char* ns() {
-        return "local.querytests.findingstart";
+        return "local.oplog.querytests.findingstart";
     }
 
     void run() {
@@ -1637,53 +1676,57 @@ public:
 
         size_t startNumCursors = numCursorsOpen();
 
-        // Check OplogReplay mode with missing collection.
-        unique_ptr<DBClientCursor> c0 = _client.query(NamespaceString(ns()),
-                                                      QUERY("ts" << GTE << Timestamp(1000, 50)),
-                                                      0,
-                                                      0,
-                                                      nullptr,
-                                                      QueryOption_OplogReplay);
+        // Check oplog replay mode with missing collection.
+        unique_ptr<DBClientCursor> c0 =
+            _client.query(NamespaceString("local.oplog.querytests.missing"),
+                          QUERY("ts" << GTE << Timestamp(1000, 50)),
+                          0,
+                          0,
+                          nullptr);
         ASSERT(!c0->more());
 
         BSONObj info;
         // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
-        ASSERT(_client.runCommand("local",
-                                  BSON("create"
-                                       << "querytests.findingstart"
-                                       << "capped"
-                                       << true
-                                       << "size"
-                                       << 4096
-                                       << "autoIndexId"
-                                       << false),
-                                  info));
+        _client.runCommand("local",
+                           BSON("create"
+                                << "oplog.querytests.findingstart"
+                                << "capped"
+                                << true
+                                << "size"
+                                << 4096
+                                << "autoIndexId"
+                                << false),
+                           info);
+        // WiredTiger storage engines forbid dropping of the oplog. Evergreen reuses nodes for
+        // testing, so the oplog may already exist on the test node; in this case, trying to create
+        // the oplog once again would fail.
+        //
+        // To ensure we are working with a clean oplog (an oplog without entries), we resort
+        // to truncating the oplog instead.
+        if (getGlobalServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
+            _client.runCommand("local",
+                               BSON("emptycapped"
+                                    << "oplog.querytests.findingstart"),
+                               info);
+        }
 
-        // Check OplogReplay mode with empty collection.
-        unique_ptr<DBClientCursor> c = _client.query(NamespaceString(ns()),
-                                                     QUERY("ts" << GTE << Timestamp(1000, 50)),
-                                                     0,
-                                                     0,
-                                                     nullptr,
-                                                     QueryOption_OplogReplay);
+        // Check oplog replay mode with empty collection.
+        unique_ptr<DBClientCursor> c = _client.query(
+            NamespaceString(ns()), QUERY("ts" << GTE << Timestamp(1000, 50)), 0, 0, nullptr);
         ASSERT(!c->more());
 
         // Check with some docs in the collection.
         for (int i = 100; i < 150; _client.insert(ns(), BSON("ts" << Timestamp(1000, i++))))
             ;
-        c = _client.query(NamespaceString(ns()),
-                          QUERY("ts" << GTE << Timestamp(1000, 50)),
-                          0,
-                          0,
-                          nullptr,
-                          QueryOption_OplogReplay);
+        c = _client.query(
+            NamespaceString(ns()), QUERY("ts" << GTE << Timestamp(1000, 50)), 0, 0, nullptr);
         ASSERT(c->more());
         ASSERT_EQUALS(100u, c->next()["ts"].timestamp().getInc());
 
         // Check that no persistent cursors outlast our queries above.
         ASSERT_EQUALS(startNumCursors, numCursorsOpen());
 
-        ASSERT(_client.dropCollection(ns()));
+        _client.dropCollection(ns());
     }
 };
 
@@ -1761,8 +1804,7 @@ public:
                              0,
                              0,
                              nullptr,
-                             QueryOption_OplogReplay | QueryOption_CursorTailable |
-                                 QueryOption_Exhaust,
+                             QueryOption_CursorTailable | QueryOption_Exhaust,
                              message);
         DbMessage dbMessage(message);
         QueryMessage queryMessage(dbMessage);

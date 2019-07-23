@@ -166,7 +166,6 @@ private:
         const NamespaceString& nss,
         Pipeline* pipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        bool oplogReplay,
         const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
         std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
         const DepsTracker& deps,

@@ -381,6 +381,10 @@ DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTrac
     deps->fields.insert(repl::OplogEntry::kUuidFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kObjectFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kObject2FieldName.toString());
+    deps->fields.insert(repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName.toString());
+    deps->fields.insert(repl::OplogEntry::kSessionIdFieldName.toString());
+    deps->fields.insert(repl::OplogEntry::kTermFieldName.toString());
+    deps->fields.insert(repl::OplogEntry::kTxnNumberFieldName.toString());
     return DepsTracker::State::EXHAUSTIVE_ALL;
 }
 

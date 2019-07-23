@@ -168,7 +168,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     Collection* collection,
     const NamespaceString& nss,
     const intrusive_ptr<ExpressionContext>& pExpCtx,
-    bool oplogReplay,
     BSONObj queryObj,
     BSONObj projectionObj,
     BSONObj sortObj,
@@ -178,7 +177,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures) {
     auto qr = std::make_unique<QueryRequest>(nss);
     qr->setTailableMode(pExpCtx->tailableMode);
-    qr->setOplogReplay(oplogReplay);
     qr->setFilter(queryObj);
     qr->setProj(projectionObj);
     qr->setSort(sortObj);
@@ -442,12 +440,10 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
 
     // Look for an initial match. This works whether we got an initial query or not. If not, it
     // results in a "{}" query, which will be what we want in that case.
-    bool oplogReplay = false;
     const BSONObj queryObj = pipeline->getInitialQuery();
     if (!queryObj.isEmpty()) {
         auto matchStage = dynamic_cast<DocumentSourceMatch*>(sources.front().get());
         if (matchStage) {
-            oplogReplay = dynamic_cast<DocumentSourceOplogMatch*>(matchStage) != nullptr;
             // If a $match query is pulled into the cursor, the $match is redundant, and can be
             // removed from the pipeline.
             sources.pop_front();
@@ -487,7 +483,6 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
                                                 nss,
                                                 pipeline,
                                                 expCtx,
-                                                oplogReplay,
                                                 sortStage,
                                                 std::move(rewrittenGroupStage),
                                                 deps,
@@ -558,7 +553,6 @@ PipelineD::buildInnerQueryExecutorGeoNear(Collection* collection,
                                                 nss,
                                                 pipeline,
                                                 expCtx,
-                                                false,   /* oplogReplay */
                                                 nullptr, /* sortStage */
                                                 nullptr, /* rewrittenGroupStage */
                                                 deps,
@@ -600,7 +594,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     const NamespaceString& nss,
     Pipeline* pipeline,
     const intrusive_ptr<ExpressionContext>& expCtx,
-    bool oplogReplay,
     const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
     std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
     const DepsTracker& deps,
@@ -652,7 +645,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                                       collection,
                                                       nss,
                                                       expCtx,
-                                                      oplogReplay,
                                                       queryObj,
                                                       *projectionObj,
                                                       sortObj ? *sortObj : emptySort,
@@ -708,7 +700,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                  collection,
                                  nss,
                                  expCtx,
-                                 oplogReplay,
                                  queryObj,
                                  expCtx->needsMerge ? metaSortProjection : emptyProjection,
                                  *sortObj,
@@ -724,7 +715,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                      collection,
                                      nss,
                                      expCtx,
-                                     oplogReplay,
                                      queryObj,
                                      *projectionObj,
                                      *sortObj,
@@ -787,7 +777,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                                collection,
                                                nss,
                                                expCtx,
-                                               oplogReplay,
                                                queryObj,
                                                *projectionObj,
                                                *sortObj,
@@ -812,7 +801,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                 collection,
                                 nss,
                                 expCtx,
-                                oplogReplay,
                                 queryObj,
                                 *projectionObj,
                                 *sortObj,

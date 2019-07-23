@@ -200,9 +200,12 @@ struct CollectionScanStats : public SpecificStats {
 
     bool tailable{false};
 
-    // If present, indicates that the collection scan will stop and return EOF the first time it
-    // sees a document that does not pass the filter and has a "ts" Timestamp field greater than
-    // 'maxTs'.
+    // The start location of the scan. Must only be set on forward oplog scans.
+    boost::optional<Timestamp> minTs;
+
+    // Indicates that the collection scan will stop and return EOF the first time it sees a
+    // document that does not pass the filter and has a "ts" Timestamp field greater than 'maxTs'.
+    // Must only be set on forward oplog scans.
     boost::optional<Timestamp> maxTs;
 };
 

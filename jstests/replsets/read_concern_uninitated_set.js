@@ -51,7 +51,6 @@
         find: "oplog.rs",
         filter: {ts: {$gte: Timestamp(1520004466, 2)}},
         tailable: true,
-        oplogReplay: true,
         awaitData: true,
         maxTimeMS: 60000,
         batchSize: 13981010,

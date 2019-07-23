@@ -81,7 +81,6 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/log.h"
@@ -622,133 +621,12 @@ bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
     return me->path() == repl::OpTime::kTimestampFieldName;
 }
 
-/**
- * Extracts the lower and upper bounds on the "ts" field from 'me'. This only examines comparisons
- * of "ts" against a Timestamp at the top level or inside a top-level $and.
- */
-std::pair<boost::optional<Timestamp>, boost::optional<Timestamp>> extractTsRange(
-    const MatchExpression* me, bool topLevel = true) {
-    boost::optional<Timestamp> min;
-    boost::optional<Timestamp> max;
-
-    if (me->matchType() == MatchExpression::AND && topLevel) {
-        for (size_t i = 0; i < me->numChildren(); ++i) {
-            boost::optional<Timestamp> childMin;
-            boost::optional<Timestamp> childMax;
-            std::tie(childMin, childMax) = extractTsRange(me->getChild(i), false);
-            if (childMin && (!min || childMin.get() > min.get())) {
-                min = childMin;
-            }
-            if (childMax && (!max || childMax.get() < max.get())) {
-                max = childMax;
-            }
-        }
-        return {min, max};
-    }
-
-    if (!ComparisonMatchExpression::isComparisonMatchExpression(me) ||
-        me->path() != repl::OpTime::kTimestampFieldName) {
-        return {min, max};
-    }
-
-    auto rawElem = static_cast<const ComparisonMatchExpression*>(me)->getData();
-    if (rawElem.type() != BSONType::bsonTimestamp) {
-        return {min, max};
-    }
-
-    switch (me->matchType()) {
-        case MatchExpression::EQ:
-            min = rawElem.timestamp();
-            max = rawElem.timestamp();
-            return {min, max};
-        case MatchExpression::GT:
-        case MatchExpression::GTE:
-            min = rawElem.timestamp();
-            return {min, max};
-        case MatchExpression::LT:
-        case MatchExpression::LTE:
-            max = rawElem.timestamp();
-            return {min, max};
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
-    OperationContext* opCtx,
-    Collection* collection,
-    unique_ptr<CanonicalQuery> cq,
-    size_t plannerOptions,
-    PlanExecutor::YieldPolicy yieldPolicy) {
-    invariant(collection);
-    invariant(cq.get());
-
-    if (!collection->isCapped()) {
-        return Status(ErrorCodes::BadValue,
-                      "OplogReplay cursor requested on non-capped collection");
-    }
-
-    // If the canonical query does not have a user-specified collation, set it from the collection
-    // default.
-    if (cq->getQueryRequest().getCollation().isEmpty() && collection->getDefaultCollator()) {
-        cq->setCollator(collection->getDefaultCollator()->clone());
-    }
-
-    boost::optional<Timestamp> minTs, maxTs;
-    std::tie(minTs, maxTs) = extractTsRange(cq->root());
-
-    if (!minTs) {
-        return Status(ErrorCodes::OplogOperationUnsupported,
-                      "OplogReplay query does not contain top-level "
-                      "$eq, $gt, or $gte over the 'ts' field.");
-    }
-
-    boost::optional<RecordId> startLoc = boost::none;
-
-    // See if the RecordStore supports the oplogStartHack.
-    StatusWith<RecordId> goal = oploghack::keyForOptime(*minTs);
-    if (goal.isOK()) {
-        startLoc = collection->getRecordStore()->oplogStartHack(opCtx, goal.getValue());
-    }
-
-    // Build our collection scan.
-    CollectionScanParams params;
-    if (startLoc) {
-        LOG(3) << "Using direct oplog seek";
-        params.start = *startLoc;
-    }
-    params.maxTs = maxTs;
-    params.direction = CollectionScanParams::FORWARD;
-    params.tailable = cq->getQueryRequest().isTailable();
-    params.shouldTrackLatestOplogTimestamp =
-        plannerOptions & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
-    params.shouldWaitForOplogVisibility =
-        shouldWaitForOplogVisibility(opCtx, collection, params.tailable);
-
-    // If the query is just a lower bound on "ts", we know that every document in the collection
-    // after the first matching one must also match. To avoid wasting time running the match
-    // expression on every document to be returned, we tell the CollectionScan stage to stop
-    // applying the filter once it finds the first match.
-    if (isOplogTsLowerBoundPred(cq->root())) {
-        params.stopApplyingFilterAfterFirstMatch = true;
-    }
-
-    auto ws = std::make_unique<WorkingSet>();
-    auto cs = std::make_unique<CollectionScan>(opCtx, collection, params, ws.get(), cq->root());
-    return PlanExecutor::make(
-        opCtx, std::move(ws), std::move(cs), std::move(cq), collection, yieldPolicy);
-}
-
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getExecutorFind(
     OperationContext* opCtx,
     Collection* collection,
     unique_ptr<CanonicalQuery> canonicalQuery,
     PlanExecutor::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
-    if (nullptr != collection && canonicalQuery->getQueryRequest().isOplogReplay()) {
-        return getOplogStartHack(
-            opCtx, collection, std::move(canonicalQuery), plannerOptions, yieldPolicy);
-    }
 
     if (OperationShardingState::isOperationVersioned(opCtx)) {
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;

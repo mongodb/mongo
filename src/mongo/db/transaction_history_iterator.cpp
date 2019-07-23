@@ -58,7 +58,6 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
 
     auto qr = std::make_unique<QueryRequest>(NamespaceString::kRsOplogNamespace);
     qr->setFilter(opTime.asQuery());
-    qr->setOplogReplay(true);  // QueryOption_OplogReplay
 
     if (prevOpOnly) {
         qr->setProj(

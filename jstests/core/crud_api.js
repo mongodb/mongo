@@ -691,10 +691,6 @@
         var cursor = coll.find({}).noCursorTimeout();
         assert.eq(16, (cursor._options & ~DBQuery.Option.slaveOk));
 
-        // oplogReplay
-        var cursor = coll.find({}).oplogReplay();
-        assert.eq(8, (cursor._options & ~DBQuery.Option.slaveOk));
-
         //
         // Aggregation
         //

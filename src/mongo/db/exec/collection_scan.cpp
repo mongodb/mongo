@@ -42,6 +42,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/storage/oplog_hack.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -66,12 +67,20 @@ CollectionScan::CollectionScan(OperationContext* opCtx,
       _params(params) {
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
+    _specificStats.minTs = params.minTs;
     _specificStats.maxTs = params.maxTs;
     _specificStats.tailable = params.tailable;
+    if (params.minTs || params.maxTs) {
+        // The 'minTs' and 'maxTs' parameters are used for a special optimization that
+        // applies only to forwards scans of the oplog.
+        invariant(params.direction == CollectionScanParams::FORWARD);
+        invariant(collection->ns().isOplog());
+    }
     invariant(!_params.shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
 
+    // Set early stop condition.
     if (params.maxTs) {
-        _endConditionBSON = BSON("$gte" << *(params.maxTs));
+        _endConditionBSON = BSON("$gte"_sd << *(params.maxTs));
         _endCondition = std::make_unique<GTEMatchExpression>(repl::OpTime::kTimestampFieldName,
                                                              _endConditionBSON.firstElement());
     }
@@ -129,9 +138,20 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
             return PlanStage::NEED_TIME;
         }
 
-        if (_lastSeenId.isNull() && !_params.start.isNull()) {
-            record = _cursor->seekExact(_params.start);
-        } else {
+        if (_lastSeenId.isNull() && _params.minTs) {
+            // See if the RecordStore supports the oplogStartHack.
+            StatusWith<RecordId> goal = oploghack::keyForOptime(*_params.minTs);
+            if (goal.isOK()) {
+                boost::optional<RecordId> startLoc =
+                    collection()->getRecordStore()->oplogStartHack(getOpCtx(), goal.getValue());
+                if (startLoc && !startLoc->isNull()) {
+                    LOG(3) << "Using direct oplog seek";
+                    record = _cursor->seekExact(*startLoc);
+                }
+            }
+        }
+
+        if (!record) {
             record = _cursor->next();
         }
     } catch (const WriteConflictException&) {
@@ -190,7 +210,6 @@ PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
                                                       WorkingSetID memberID,
                                                       WorkingSetID* out) {
     ++_specificStats.docsTested;
-
     if (Filter::passes(member, _filter)) {
         if (_params.stopApplyingFilterAfterFirstMatch) {
             _filter = nullptr;

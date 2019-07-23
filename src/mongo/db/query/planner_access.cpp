@@ -143,6 +143,72 @@ namespace mongo {
 using std::unique_ptr;
 using std::vector;
 
+namespace {
+/**
+ * Extracts the lower and upper bounds on the "ts" field from 'me'. This only examines comparisons
+ * of "ts" against a Timestamp at the top level or inside a top-level $and.
+ */
+std::pair<boost::optional<Timestamp>, boost::optional<Timestamp>> extractTsRange(
+    const MatchExpression* me, bool topLevel = true) {
+    boost::optional<Timestamp> min;
+    boost::optional<Timestamp> max;
+
+    if (me->matchType() == MatchExpression::AND && topLevel) {
+        for (size_t i = 0; i < me->numChildren(); ++i) {
+            boost::optional<Timestamp> childMin;
+            boost::optional<Timestamp> childMax;
+            std::tie(childMin, childMax) = extractTsRange(me->getChild(i), false);
+            if (childMin && (!min || childMin.get() > min.get())) {
+                min = childMin;
+            }
+            if (childMax && (!max || childMax.get() < max.get())) {
+                max = childMax;
+            }
+        }
+        return {min, max};
+    }
+
+    if (!ComparisonMatchExpression::isComparisonMatchExpression(me) ||
+        me->path() != repl::OpTime::kTimestampFieldName) {
+        return {min, max};
+    }
+
+    auto rawElem = static_cast<const ComparisonMatchExpression*>(me)->getData();
+    if (rawElem.type() != BSONType::bsonTimestamp) {
+        return {min, max};
+    }
+
+    switch (me->matchType()) {
+        case MatchExpression::EQ:
+            min = rawElem.timestamp();
+            max = rawElem.timestamp();
+            return {min, max};
+        case MatchExpression::GT:
+        case MatchExpression::GTE:
+            min = rawElem.timestamp();
+            return {min, max};
+        case MatchExpression::LT:
+        case MatchExpression::LTE:
+            max = rawElem.timestamp();
+            return {min, max};
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+/**
+ * Returns true if 'me' is a GTE or GE predicate over the "ts" field.
+ */
+bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
+    if (mongo::MatchExpression::GT != me->matchType() &&
+        mongo::MatchExpression::GTE != me->matchType()) {
+        return false;
+    }
+
+    return me->path() == repl::OpTime::kTimestampFieldName;
+}
+}  // namespace
+
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params) {
     // Make the (only) node, a collection scan.
@@ -171,6 +237,20 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         BSONElement natural = dps::extractElementAtPath(sortObj, "$natural");
         if (!natural.eoo()) {
             csn->direction = natural.numberInt() >= 0 ? 1 : -1;
+        }
+    }
+
+    if (query.nss().isOplog() && csn->direction == 1) {
+        // Optimizes the start and end location parameters for a collection scan for an oplog
+        // collection.
+        std::tie(csn->minTs, csn->maxTs) = extractTsRange(query.root());
+
+        // If the query is just a lower bound on "ts" on a forward scan, every document in the
+        // collection after the first matching one must also match. To avoid wasting time
+        // running the match expression on every document to be returned, we tell the
+        // CollectionScan stage to stop applying the filter once it finds the first match.
+        if (isOplogTsLowerBoundPred(query.root())) {
+            csn->stopApplyingFilterAfterFirstMatch = true;
         }
     }
 

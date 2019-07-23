@@ -42,11 +42,13 @@ struct CollectionScanParams {
         BACKWARD = -1,
     };
 
-    // The RecordId to which we should seek to as the first document of the scan.
-    RecordId start;
+    // If present, the collection scan will seek directly to the RecordId of an oplog entry as
+    // close to 'minTs' as possible without going higher. Must only be set on forward oplog scans.
+    boost::optional<Timestamp> minTs;
 
     // If present, the collection scan will stop and return EOF the first time it sees a document
-    // that does not pass the filter and has 'ts' greater than 'maxTs'.
+    // that does not pass the filter and has 'ts' greater than 'maxTs'. Must only be set on forward
+    // oplog scans.
     boost::optional<Timestamp> maxTs;
 
     Direction direction = FORWARD;

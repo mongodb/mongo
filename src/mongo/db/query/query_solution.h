@@ -319,6 +319,15 @@ struct CollectionScanNode : public QuerySolutionNode {
     // Name of the namespace.
     std::string name;
 
+    // If present, the collection scan will seek directly to the RecordId of an oplog entry as
+    // close to 'minTs' as possible without going higher. Should only be set on forward oplog scans.
+    boost::optional<Timestamp> minTs;
+
+    // If present the collection scan will stop and return EOF the first time it sees a document
+    // that does not pass the filter and has 'ts' greater than 'maxTs'. Should only be set on
+    // forward oplog scans.
+    boost::optional<Timestamp> maxTs;
+
     // Should we make a tailable cursor?
     bool tailable;
 
@@ -327,10 +336,13 @@ struct CollectionScanNode : public QuerySolutionNode {
     // across a sharded cluster.
     bool shouldTrackLatestOplogTimestamp = false;
 
-    int direction;
+    int direction{1};
 
     // Whether or not to wait for oplog visibility on oplog collection scans.
     bool shouldWaitForOplogVisibility = false;
+
+    // Once the first matching document is found, assume that all documents after it must match.
+    bool stopApplyingFilterAfterFirstMatch = false;
 };
 
 struct AndHashNode : public QuerySolutionNode {

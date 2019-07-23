@@ -73,8 +73,7 @@ public:
         StringData ns,
         Collection* collection,
         PlanExecutor::YieldPolicy yieldPolicy,
-        const Direction direction = FORWARD,
-        const RecordId startLoc = RecordId());
+        const Direction direction = FORWARD);
 
     /**
      * Returns a FETCH => DELETE plan.
@@ -84,8 +83,7 @@ public:
         Collection* collection,
         std::unique_ptr<DeleteStageParams> params,
         PlanExecutor::YieldPolicy yieldPolicy,
-        Direction direction = FORWARD,
-        const RecordId& startLoc = RecordId());
+        Direction direction = FORWARD);
 
     /**
      * Returns an index scan.  Caller owns returned pointer.
@@ -135,8 +133,7 @@ private:
     static std::unique_ptr<PlanStage> _collectionScan(OperationContext* opCtx,
                                                       WorkingSet* ws,
                                                       const Collection* collection,
-                                                      Direction direction,
-                                                      const RecordId& startLoc);
+                                                      Direction direction);
 
     /**
      * Returns a plan stage that is either an index scan or an index scan with a fetch stage.

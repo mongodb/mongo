@@ -238,10 +238,6 @@ DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
         cmd["tailable"] = true;
     }
 
-    if ((this._options & DBQuery.Option.oplogReplay) != 0) {
-        cmd["oplogReplay"] = true;
-    }
-
     if ((this._options & DBQuery.Option.noTimeout) != 0) {
         cmd["noCursorTimeout"] = true;
     }
@@ -598,19 +594,6 @@ DBQuery.prototype.noCursorTimeout = function() {
 };
 
 /**
-* Internal replication use only - driver should not set
-*
-* @method
-* @see http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#op-query
-* @return {DBQuery}
-*/
-DBQuery.prototype.oplogReplay = function() {
-    this._checkModify();
-    this.addOption(DBQuery.Option.oplogReplay);
-    return this;
-};
-
-/**
 * Limits the fields to return for all matching documents.
 *
 * @method
@@ -694,7 +677,9 @@ DBQuery.shellBatchSize = 20;
 DBQuery.Option = {
     tailable: 0x2,
     slaveOk: 0x4,
-    oplogReplay: 0x8,
+    // 0x8 is reserved for oplogReplay, but not explicitly defined. This is because the flag no
+    // longer has any meaning to the server, and will be ignored, so there is no reason for it to
+    // be set by clients.
     noTimeout: 0x10,
     awaitData: 0x20,
     exhaust: 0x40,

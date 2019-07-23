@@ -51,8 +51,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     StringData ns,
     Collection* collection,
     PlanExecutor::YieldPolicy yieldPolicy,
-    const Direction direction,
-    const RecordId startLoc) {
+    const Direction direction) {
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
     if (nullptr == collection) {
@@ -66,7 +65,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
 
     invariant(ns == collection->ns().ns());
 
-    auto cs = _collectionScan(opCtx, ws.get(), collection, direction, startLoc);
+    auto cs = _collectionScan(opCtx, ws.get(), collection, direction);
 
     // Takes ownership of 'ws' and 'cs'.
     auto statusWithPlanExecutor =
@@ -80,12 +79,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     Collection* collection,
     std::unique_ptr<DeleteStageParams> params,
     PlanExecutor::YieldPolicy yieldPolicy,
-    Direction direction,
-    const RecordId& startLoc) {
+    Direction direction) {
     invariant(collection);
     auto ws = std::make_unique<WorkingSet>();
 
-    auto root = _collectionScan(opCtx, ws.get(), collection, direction, startLoc);
+    auto root = _collectionScan(opCtx, ws.get(), collection, direction);
 
     root = std::make_unique<DeleteStage>(
         opCtx, std::move(params), ws.get(), collection, root.release());
@@ -180,12 +178,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
 std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(OperationContext* opCtx,
                                                             WorkingSet* ws,
                                                             const Collection* collection,
-                                                            Direction direction,
-                                                            const RecordId& startLoc) {
+                                                            Direction direction) {
     invariant(collection);
 
     CollectionScanParams params;
-    params.start = startLoc;
     params.shouldWaitForOplogVisibility = shouldWaitForOplogVisibility(opCtx, collection, false);
 
     if (FORWARD == direction) {
