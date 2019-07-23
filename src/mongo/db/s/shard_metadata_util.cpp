@@ -432,6 +432,21 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
     }
 }
 
+void dropChunks(OperationContext* opCtx, const NamespaceString& nss) {
+    DBDirectClient client(opCtx);
+
+    // Drop the config.chunks collection associated with namespace 'nss'.
+    BSONObj result;
+    if (!client.dropCollection(ChunkType::ShardNSPrefix + nss.ns(), kLocalWriteConcern, &result)) {
+        auto status = getStatusFromCommandResult(result);
+        if (status != ErrorCodes::NamespaceNotFound) {
+            uassertStatusOK(status);
+        }
+    }
+
+    LOG(1) << "Successfully cleared persisted chunk metadata for collection '" << nss << "'.";
+}
+
 Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {
     try {
         DBDirectClient client(opCtx);

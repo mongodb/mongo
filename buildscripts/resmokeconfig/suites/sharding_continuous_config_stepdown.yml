@@ -206,6 +206,7 @@ selector:
   # TODO (SERVER-42143): The tests below need transactional support for refineCollectionShardKey.
   - jstests/sharding/refine_collection_shard_key_basic.js
   - jstests/sharding/refine_collection_shard_key_jumbo.js
+  - jstests/sharding/refine_collection_shard_key_drops_chunks.js
 
 executor:
   config:

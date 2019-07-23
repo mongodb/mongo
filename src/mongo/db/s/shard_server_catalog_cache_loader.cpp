@@ -46,6 +46,7 @@
 #include "mongo/s/catalog/type_shard_database.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -55,6 +56,8 @@ using namespace shardmetadatautil;
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangPersistCollectionAndChangedChunksAfterDropChunks);
 
 AtomicWord<unsigned long long> taskIdGenerator{0};
 
@@ -75,6 +78,24 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
     return options;
 }
 
+void dropChunksIfEpochChanged(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const CollectionAndChangedChunks& collAndChunks,
+                              const ChunkVersion& maxLoaderVersion) {
+    if (collAndChunks.epoch != maxLoaderVersion.epoch() &&
+        maxLoaderVersion != ChunkVersion::UNSHARDED()) {
+        // If the collection has a new epoch, delete all existing chunks in the persisted routing
+        // table cache.
+        dropChunks(opCtx, nss);
+
+        if (MONGO_FAIL_POINT(hangPersistCollectionAndChangedChunksAfterDropChunks)) {
+            log() << "Hit hangPersistCollectionAndChangedChunksAfterDropChunks failpoint";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+                opCtx, hangPersistCollectionAndChangedChunksAfterDropChunks);
+        }
+    }
+}
+
 /**
  * Takes a CollectionAndChangedChunks object and persists the changes to the shard's metadata
  * collections.
@@ -83,7 +104,8 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
  */
 Status persistCollectionAndChangedChunks(OperationContext* opCtx,
                                          const NamespaceString& nss,
-                                         const CollectionAndChangedChunks& collAndChunks) {
+                                         const CollectionAndChangedChunks& collAndChunks,
+                                         const ChunkVersion& maxLoaderVersion) {
     // Update the collections collection entry for 'nss' in case there are any new updates.
     ShardCollectionType update = ShardCollectionType(
         nss, collAndChunks.epoch, collAndChunks.shardKeyPattern, collAndChunks.shardKeyIsUnique);
@@ -107,6 +129,12 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
     }
 
     // Update the chunks.
+    try {
+        dropChunksIfEpochChanged(opCtx, nss, collAndChunks, maxLoaderVersion);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
     status = updateShardChunks(opCtx, nss, collAndChunks.changedChunks, collAndChunks.epoch);
     if (!status.isOK()) {
         return status;
@@ -1036,7 +1064,8 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
     }
 
     uassertStatusOKWithContext(
-        persistCollectionAndChangedChunks(opCtx, nss, *task.collectionAndChangedChunks),
+        persistCollectionAndChangedChunks(
+            opCtx, nss, *task.collectionAndChangedChunks, task.minQueryVersion),
         str::stream() << "Failed to update the persisted chunk metadata for collection '"
                       << nss.ns() << "' from '" << task.minQueryVersion.toString() << "' to '"
                       << task.maxQueryVersion.toString() << "'. Will be retried.");

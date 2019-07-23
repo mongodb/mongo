@@ -211,6 +211,11 @@ Status updateShardChunks(OperationContext* opCtx,
 Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
+ * Drops locally persisted chunk metadata associated with 'nss': only drops the chunks collection.
+ */
+void dropChunks(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
  * Deletes locally persisted database metadata associated with 'dbName': removes the databases
  * collection entry.
  */
