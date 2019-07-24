@@ -47,6 +47,7 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_access_method.h"
@@ -1036,7 +1037,20 @@ bool IndexCatalogImpl::haveAnyIndexesInProgress() const {
 
 int IndexCatalogImpl::numIndexesTotal(OperationContext* opCtx) const {
     int count = _readyIndexes.size() + _buildingIndexes.size();
-    dassert(DurableCatalog::get(opCtx)->getTotalIndexCount(opCtx, _collection->ns()) == count);
+
+    DEV {
+        try {
+            // Check if the in-memory index count matches the durable catalogs index count on disk.
+            // This can throw a WriteConflictException when retries on write conflicts are disabled
+            // during testing. The DurableCatalog fetches the metadata off of the disk using a
+            // findRecord() call.
+            dassert(DurableCatalog::get(opCtx)->getTotalIndexCount(opCtx, _collection->ns()) ==
+                    count);
+        } catch (const WriteConflictException& ex) {
+            log() << " Skipping dassert check due to: " << ex;
+        }
+    }
+
     return count;
 }
 
