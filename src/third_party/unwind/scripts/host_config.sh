@@ -27,8 +27,7 @@ pushd $HOST_DIR/build
 #   documentation : won't need them
 #   tests : won't need them
 #   dependency-tracking : (from automake) disabled because we only do one build
-# force enable:
-#   cxx-exceptions : configure.ac: "C++ exception handling doesn't work too well on x86"
+#   cxx-exceptions : intrusive exception handling runtime
 $SRC_DIR/configure \
     --disable-coredump \
     --disable-dependency-tracking \
@@ -38,7 +37,7 @@ $SRC_DIR/configure \
     --disable-setjmp \
     --disable-shared \
     --disable-tests \
-    --enable-cxx-exceptions \
+    --disable-cxx-exceptions \
     --prefix=$HOST_DIR/install \
     CC=$TOOLCHAIN_ROOT/bin/gcc \
     CXX=$TOOLCHAIN_ROOT/bin/g++
