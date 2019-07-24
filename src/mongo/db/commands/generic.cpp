@@ -174,6 +174,7 @@ public:
         for (const auto& c : commands) {
             BSONObjBuilder temp(b.subobjStart(c->getName()));
             temp.append("help", c->help());
+            temp.append("requiresAuth", c->requiresAuth());
             temp.append("slaveOk",
                         c->secondaryAllowed(opCtx->getServiceContext()) ==
                             Command::AllowedOnSecondary::kAlways);

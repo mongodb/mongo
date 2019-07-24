@@ -24,4 +24,16 @@
     assert(commands["commands"].hasOwnProperty("isMaster"));
     assert(commands["commands"].hasOwnProperty("insert"));
     assert(commands["commands"].hasOwnProperty("ping"));
+
+    // Test that commands listed have required properties
+    const isMaster = commands["commands"]["isMaster"];
+    assert(isMaster.hasOwnProperty("help"));
+    assert(isMaster.hasOwnProperty("slaveOk"));
+    assert(isMaster.hasOwnProperty("adminOnly"));
+    assert(isMaster.hasOwnProperty("requiresAuth"));
+
+    // Test that requiresAuth outputs correct value
+    const insert = commands["commands"]["insert"];
+    assert(isMaster["requiresAuth"] === false);
+    assert(insert["requiresAuth"] === true);
 })();
