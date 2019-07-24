@@ -53,6 +53,12 @@ size_t aeadCipherOutputLength(size_t plainTextLen);
 
 
 /**
+ * Returns the length of the plaintext output given the ciphertext length. Only for AEAD.
+ */
+StatusWith<size_t> aeadGetMaximumPlainTextLength(size_t cipherTextLen);
+
+
+/**
  * Encrypts the plaintext using following the AEAD_AES_256_CBC_HMAC_SHA_512 encryption
  * algorithm. Writes output to out.
  */

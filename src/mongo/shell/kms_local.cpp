@@ -93,7 +93,8 @@ BSONObj LocalKMSService::encryptDataKey(ConstDataRange cdr, StringData keyId) {
 }
 
 SecureVector<uint8_t> LocalKMSService::decrypt(ConstDataRange cdr, BSONObj masterKey) {
-    SecureVector<uint8_t> plaintext(cdr.length());
+    SecureVector<uint8_t> plaintext(
+        uassertStatusOK(crypto::aeadGetMaximumPlainTextLength(cdr.length())));
 
     size_t outLen = plaintext->size();
     uassertStatusOK(crypto::aeadDecrypt(_key,
