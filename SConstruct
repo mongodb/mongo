@@ -1997,6 +1997,15 @@ ssl_provider = None
 free_monitoring = get_option("enable-free-mon")
 http_client = get_option("enable-http-client")
 
+def isSanitizerEnabled(self, sanitizerName):
+    if 'SANITIZERS_ENABLED' not in self:
+        return False
+    if sanitizerName == 'fuzzer':
+        return 'fuzzer-no-link' in self['SANITIZERS_ENABLED']
+    return sanitizerName in self['SANITIZERS_ENABLED']
+
+env.AddMethod(isSanitizerEnabled, 'IsSanitizerEnabled')
+
 def doConfigure(myenv):
     global wiredtiger
     global ssl_provider
@@ -2665,8 +2674,37 @@ def doConfigure(myenv):
                 sanitizer_list.remove('leak')
 
         if using_fsan:
-            if not myenv.ToolchainIs('clang'):
-                myenv.FatalError("Using the fuzzer sanitizer requires clang")
+            def CheckForFuzzerCompilerSupport(context):
+
+                test_body = """
+                #include <stddef.h>
+                #include <stdint.h>
+
+                // fuzz_target.cc
+                extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
+                    return 0;
+                }
+                """
+
+                context.Message("Checking if libfuzzer is supported by the compiler... ")
+
+                context.env.AppendUnique(LINKFLAGS=['-fprofile-instr-generate',
+                                                    '-fcoverage-mapping',
+                                                    '-fsanitize=fuzzer'],
+                                         CCFLAGS=['-fprofile-instr-generate','-fcoverage-mapping'])
+
+                ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
+                context.Result(ret)
+                return ret
+
+            confEnv = myenv.Clone()
+            fuzzerConf = Configure(confEnv, help=False, custom_tests = {
+                    'CheckForFuzzerCompilerSupport': CheckForFuzzerCompilerSupport,
+                })
+            if not fuzzerConf.CheckForFuzzerCompilerSupport():
+                myenv.FatalError("libfuzzer is not supported by the compiler")
+            fuzzerConf.Finish()
+
             # We can't include the fuzzer flag with the other sanitize flags
             # The libfuzzer library already has a main function, which will cause the dependencies check
             # to fail
@@ -2683,6 +2721,8 @@ def doConfigure(myenv):
             myenv.Append(CCFLAGS=['-fno-omit-frame-pointer'])
         else:
             myenv.ConfError('Failed to enable sanitizers with flag: {0}', sanitizer_option )
+
+        myenv['SANITIZERS_ENABLED'] = sanitizer_list
 
         if has_option('sanitize-coverage') and using_fsan:
             sanitize_coverage_list = get_option('sanitize-coverage')

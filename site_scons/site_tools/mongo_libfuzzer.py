@@ -25,6 +25,8 @@ def libfuzzer_test_list_builder_action(env, target, source):
 
 def build_cpp_libfuzzer_test(env, target, source, **kwargs):
     myenv = env.Clone()
+    if not myenv.IsSanitizerEnabled('fuzzer'):
+        return []
 
     libdeps = kwargs.get('LIBDEPS', [])
     kwargs['LIBDEPS'] = libdeps
