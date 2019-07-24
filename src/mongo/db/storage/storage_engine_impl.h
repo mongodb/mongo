@@ -282,7 +282,6 @@ public:
 
         KVEngine* _engine;
         bool _running;
-        PeriodicJobAnchor _job;
 
         // The set of timestamps that were last reported to the listeners by the monitor.
         MonitoredTimestamps _currentTimestamps;
@@ -293,6 +292,12 @@ public:
         // Protects access to _listeners below.
         stdx::mutex _monitorMutex;
         std::vector<TimestampListener*> _listeners;
+
+        // This should remain as the last member variable so that its destructor gets executed first
+        // when the class instance is being deconstructed. This causes the PeriodicJobAnchor to stop
+        // the PeriodicJob, preventing us from accessing any destructed variables if this were to
+        // run during the destruction of this class instance.
+        PeriodicJobAnchor _job;
     };
 
     StorageEngine* getStorageEngine() override {
