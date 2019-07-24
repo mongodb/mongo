@@ -747,6 +747,14 @@ __txn_checkpoint_can_skip(WT_SESSION_IMPL *session,
 		return (0);
 
 	/*
+	 * It isn't currently safe to skip timestamp checkpoints - see WT-4958.
+	 * We should fix this so we can skip timestamp checkpoints if they
+	 * don't have new content.
+	 */
+	if (use_timestamp)
+		return (0);
+
+	/*
 	 * Skip checkpointing the database if nothing has been dirtied since
 	 * the last checkpoint. That said there can be short instances when a
 	 * btree gets marked dirty and the connection is yet to be. We might
