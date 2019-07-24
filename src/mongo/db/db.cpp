@@ -336,6 +336,11 @@ ExitCode _initAndListen(int listenPort) {
         }
         serviceContext->setTransportLayer(std::move(tl));
     }
+
+    // Set up the periodic runner for background job execution. This is required to be running
+    // before the storage engine is initialized.
+    auto runner = makePeriodicRunner(serviceContext);
+    serviceContext->setPeriodicRunner(std::move(runner));
     initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
@@ -614,11 +619,6 @@ ExitCode _initAndListen(int listenPort) {
 
     PeriodicTask::startRunningPeriodicTasks();
 
-    // Set up the periodic runner for background job execution
-    auto runner = makePeriodicRunner(serviceContext);
-    runner->startup();
-    serviceContext->setPeriodicRunner(std::move(runner));
-
     SessionKiller::set(serviceContext,
                        std::make_shared<SessionKiller>(serviceContext, killSessionsLocal));
 
@@ -626,7 +626,7 @@ ExitCode _initAndListen(int listenPort) {
     // Only do this on storage engines supporting snapshot reads, which hold resources we wish to
     // release periodically in order to avoid storage cache pressure build up.
     if (storageEngine->supportsReadConcernSnapshot()) {
-        startPeriodicThreadToAbortExpiredTransactions(serviceContext);
+        PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->start();
     }
 
     // Set up the logical session cache
@@ -923,12 +923,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // Shut down the global dbclient pool so callers stop waiting for connections.
     globalConnPool.shutdown();
 
-    // Shut down the background periodic task runner
-    if (auto runner = serviceContext->getPeriodicRunner()) {
-        runner->shutdown();
-    }
+    if (auto storageEngine = serviceContext->getStorageEngine()) {
+        if (storageEngine->supportsReadConcernSnapshot()) {
+            PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->stop();
+        }
 
-    if (serviceContext->getStorageEngine()) {
         ServiceContext::UniqueOperationContext uniqueOpCtx;
         OperationContext* opCtx = client->getOperationContext();
         if (!opCtx) {

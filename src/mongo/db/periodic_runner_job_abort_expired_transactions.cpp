@@ -43,11 +43,34 @@
 
 namespace mongo {
 
-void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContext) {
-    // Enforce calling this function once, and only once.
-    static bool firstCall = true;
-    invariant(firstCall);
-    firstCall = false;
+namespace {
+const auto gServiceDecoration =
+    ServiceContext::declareDecoration<PeriodicThreadToAbortExpiredTransactions>();
+}  // anonymous namespace
+
+auto PeriodicThreadToAbortExpiredTransactions::get(ServiceContext* serviceContext)
+    -> PeriodicThreadToAbortExpiredTransactions& {
+    auto& jobContainer = gServiceDecoration(serviceContext);
+    jobContainer._init(serviceContext);
+
+    return jobContainer;
+}
+
+auto PeriodicThreadToAbortExpiredTransactions::operator*() const noexcept -> PeriodicJobAnchor& {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return *_anchor;
+}
+
+auto PeriodicThreadToAbortExpiredTransactions::operator-> () const noexcept -> PeriodicJobAnchor* {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _anchor.get();
+}
+
+void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceContext) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_anchor) {
+        return;
+    }
 
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
@@ -94,7 +117,7 @@ void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContex
                                     },
                                     Seconds(1));
 
-    periodicRunner->scheduleJob(std::move(job));
+    _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 }
 
 }  // namespace mongo

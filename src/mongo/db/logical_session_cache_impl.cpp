@@ -43,7 +43,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/log.h"
-#include "mongo/util/periodic_runner.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

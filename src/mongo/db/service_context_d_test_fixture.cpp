@@ -44,6 +44,7 @@
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/periodic_runner_factory.h"
 
 #include "mongo/db/catalog/database_holder.h"
 
@@ -68,6 +69,10 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
     auto logicalClock = std::make_unique<LogicalClock>(serviceContext);
     LogicalClock::set(serviceContext, std::move(logicalClock));
+
+    // Set up the periodic runner to allow background job execution for tests that require it.
+    auto runner = makePeriodicRunner(getServiceContext());
+    getServiceContext()->setPeriodicRunner(std::move(runner));
 
     storageGlobalParams.dbpath = _tempDir.path();
 

@@ -533,11 +533,6 @@ private:
     stdx::mutex _mutex;
 
     /**
-     * The storage engine, if any.
-     */
-    std::unique_ptr<StorageEngine> _storageEngine;
-
-    /**
      * The periodic runner.
      */
     std::unique_ptr<PeriodicRunner> _runner;
@@ -556,6 +551,11 @@ private:
      * The ServiceExecutor
      */
     std::unique_ptr<transport::ServiceExecutor> _serviceExecutor;
+
+    /**
+     * The storage engine, if any.
+     */
+    std::unique_ptr<StorageEngine> _storageEngine;
 
     /**
      * Vector of registered observers.

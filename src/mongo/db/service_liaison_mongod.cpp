@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/service_liaison_mongod.h"
@@ -38,6 +40,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -87,17 +90,20 @@ LogicalSessionIdSet ServiceLiaisonMongod::getOpenCursorSessions() const {
 
 void ServiceLiaisonMongod::scheduleJob(PeriodicRunner::PeriodicJob job) {
     invariant(hasGlobalServiceContext());
-    auto jobHandle = getGlobalServiceContext()->getPeriodicRunner()->makeJob(std::move(job));
-    jobHandle->start();
-    _jobs.push_back(std::move(jobHandle));
+    auto jobAnchor = getGlobalServiceContext()->getPeriodicRunner()->makeJob(std::move(job));
+    jobAnchor.start();
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _jobs.push_back(std::move(jobAnchor));
+    }
 }
 
 void ServiceLiaisonMongod::join() {
-    invariant(hasGlobalServiceContext());
-    for (auto&& jobHandle : _jobs) {
-        jobHandle->stop();
-    }
-    _jobs.clear();
+    auto jobs = [&] {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return std::exchange(_jobs, {});
+    }();
 }
 
 Date_t ServiceLiaisonMongod::now() const {

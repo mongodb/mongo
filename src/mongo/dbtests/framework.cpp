@@ -54,6 +54,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
+#include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/version.h"
 
@@ -90,6 +91,11 @@ int runDbTests(int argc, char** argv) {
         });
 
     srand((unsigned)frameworkGlobalParams.seed);
+
+    // Set up the periodic runner for background job execution, which is required by the storage
+    // engine to be running beforehand.
+    auto runner = makePeriodicRunner(globalServiceContext);
+    globalServiceContext->setPeriodicRunner(std::move(runner));
 
     initializeStorageEngine(globalServiceContext, StorageEngineInitFlags::kNone);
     auto registry = stdx::make_unique<OpObserverRegistry>();
