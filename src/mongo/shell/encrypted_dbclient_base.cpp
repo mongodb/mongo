@@ -188,7 +188,8 @@ void EncryptedDBClientBase::decryptPayload(ConstDataRange data,
     UUID uuid = UUID::fromCDR(uuidCdr);
 
     auto key = getDataKey(uuid);
-    std::vector<uint8_t> out(data.length() - kAssociatedDataLength);
+    std::vector<uint8_t> out(uassertStatusOK(
+        crypto::aeadGetMaximumPlainTextLength(data.length() - kAssociatedDataLength)));
     size_t outLen = out.size();
 
     uassertStatusOK(
@@ -499,7 +500,8 @@ void EncryptedDBClientBase::decrypt(mozjs::MozJSImplScope* scope,
     UUID uuid = UUID::fromCDR(uuidCdr);
 
     auto key = getDataKey(uuid);
-    std::vector<uint8_t> out(binData.size() - kAssociatedDataLength);
+    std::vector<uint8_t> out(uassertStatusOK(
+        crypto::aeadGetMaximumPlainTextLength(binData.size() - kAssociatedDataLength)));
     size_t outLen = out.size();
 
     auto decryptStatus = crypto::aeadDecrypt(*key,

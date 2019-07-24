@@ -191,6 +191,14 @@ size_t aeadCipherOutputLength(size_t plainTextLen) {
     return aesOutLen + kHmacOutSize;
 }
 
+StatusWith<size_t> aeadGetMaximumPlainTextLength(size_t cipherTextLen) {
+    if (cipherTextLen > (aesCBCIVSize + kHmacOutSize)) {
+        return cipherTextLen - aesCBCIVSize - kHmacOutSize;
+    }
+
+    return Status(ErrorCodes::BadValue, "Invalid cipher text length");
+}
+
 Status aeadEncrypt(const SymmetricKey& key,
                    const uint8_t* in,
                    const size_t inLen,
@@ -336,7 +344,12 @@ Status aeadDecrypt(const SymmetricKey& key,
         return Status(ErrorCodes::BadValue, "Invalid AEAD parameters.");
     }
 
-    if ((*outLen) != cipherLen) {
+    if (cipherLen < kHmacOutSize) {
+        return Status(ErrorCodes::BadValue, "Ciphertext is not long enough.");
+    }
+
+    size_t expectedMaximumPlainTextSize = uassertStatusOK(aeadGetMaximumPlainTextLength(cipherLen));
+    if ((*outLen) != expectedMaximumPlainTextSize) {
         return Status(ErrorCodes::BadValue, "Output buffer must be as long as the cipherText.");
     }
 
@@ -351,9 +364,6 @@ Status aeadDecrypt(const SymmetricKey& key,
     const uint8_t* macKey = key.getKey();
     const uint8_t* encKey = key.getKey() + sym256KeySize;
 
-    if (cipherLen < kHmacOutSize) {
-        return Status(ErrorCodes::BadValue, "Ciphertext is not long enough.");
-    }
     size_t aesLen = cipherLen - kHmacOutSize;
 
     // According to the rfc on AES encryption, the associatedDataLength is defined as the
@@ -378,7 +388,8 @@ Status aeadDecrypt(const SymmetricKey& key,
 
     SymmetricKey symEncKey(encKey, sym256KeySize, aesAlgorithm, key.getKeyId(), 1);
 
-    auto sDecrypt = _aesDecrypt(symEncKey, ConstDataRange(cipherText, aesLen), out, aesLen, outLen);
+    auto sDecrypt =
+        _aesDecrypt(symEncKey, ConstDataRange(cipherText, aesLen), out, *outLen, outLen);
     if (!sDecrypt.isOK()) {
         return sDecrypt;
     }
