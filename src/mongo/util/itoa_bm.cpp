@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,35 +27,65 @@
  *    it in the license file.
  */
 
-#pragma once
 
+#include "mongo/platform/basic.h"
+
+#include <array>
 #include <cstdint>
 #include <limits>
+#include <random>
+#include <string>
+#include <vector>
+
+#include <benchmark/benchmark.h>
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/decimal_counter.h"
+#include "mongo/util/itoa.h"
 
 namespace mongo {
+namespace {
 
-/**
- * A utility class for performing itoa style integer formatting. This class is highly optimized
- * and only really should be used in hot code paths.
- */
-class ItoA {
-public:
-    // digits10 is 1 less than the maximum number of digits.
-    static constexpr size_t kBufSize = std::numeric_limits<std::uint64_t>::digits10 + 1;
+void BM_ItoA(benchmark::State& state) {
+    std::uint64_t n = state.range(0);
+    std::uint64_t items = 0;
+    for (auto _ : state) {
+        for (std::uint64_t i = 0; i < n; ++i) {
+            benchmark::DoNotOptimize(ItoA(i));
+            ++items;
+        }
+    }
+    state.SetItemsProcessed(items);
+}
 
-    explicit ItoA(std::uint64_t i);
-    ItoA(const ItoA&) = delete;
-    ItoA& operator=(const ItoA&) = delete;
+void BM_ItoADigits(benchmark::State& state) {
+    std::uint64_t n = state.range(0);
+    std::uint64_t items = 0;
 
-    operator StringData() const {
-        return _str;
+    std::uint64_t v = 0;
+    for (std::uint64_t i = 0; i < n; ++i) {
+        v = v * 10 + 9;
     }
 
-private:
-    StringData _str;
-    char _buf[kBufSize];
-};
+    for (auto _ : state) {
+        for (std::uint64_t i = 0; i < n; ++i) {
+            benchmark::DoNotOptimize(ItoA(v));
+            ++items;
+        }
+    }
+    state.SetItemsProcessed(items);
+}
 
+BENCHMARK(BM_ItoA)
+    ->Arg(1)
+    ->Arg(10)
+    ->Arg(100)
+    ->Arg(1000)
+    ->Arg(10000)
+    ->Arg(100000)
+    ->Arg(1000000)
+    ->Arg(10000000);
+BENCHMARK(BM_ItoADigits)->DenseRange(1, 20);
+
+}  // namespace
 }  // namespace mongo

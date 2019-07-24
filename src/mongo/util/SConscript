@@ -417,6 +417,16 @@ env.Benchmark(
 )
 
 env.Benchmark(
+    target='itoa_bm',
+    source=[
+        'itoa_bm.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
+
+env.Benchmark(
     target='future_bm',
     source=[
         'future_bm.cpp',
@@ -602,3 +612,17 @@ if env.TargetOSIs('windows'):
             env['LIBS']
         ],
     )
+
+generateItoATable = env.Command(
+    target=[
+        'itoa_table_4.h',
+    ],
+    source=[
+        'generate_itoa_table.py',
+    ],
+    action=[
+        '$PYTHON ${SOURCES[0]} 4 >${TARGETS[0]}'
+    ],
+)
+env.Alias('generated-sources', generateItoATable)
+
