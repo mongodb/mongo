@@ -38,17 +38,22 @@ for (let coll of [db1Coll, db2Coll]) {
 // by a 'dropDatabase' entry.
 assert.commandWorked(testDB2.dropDatabase());
 
+const changes = {
+    [testDB1.getName()]: [],
+    [testDB2.getName()]: []
+};
+
+for (let i = 0; i < 6; i++) {
+    const change = cst.getOneChange(aggCursor);
+    changes[change.ns.db].push(change);
+}
+
 // We should get 6 oplog entries; three ops of type insert, update, delete from each database.
 for (let expectedDB of [testDB1, testDB2]) {
-    let change = cst.getOneChange(aggCursor);
-    assert.eq(change.operationType, "insert", tojson(change));
-    assert.eq(change.ns.db, expectedDB.getName(), tojson(change));
-    change = cst.getOneChange(aggCursor);
-    assert.eq(change.operationType, "update", tojson(change));
-    assert.eq(change.ns.db, expectedDB.getName(), tojson(change));
-    change = cst.getOneChange(aggCursor);
-    assert.eq(change.operationType, "delete", tojson(change));
-    assert.eq(change.ns.db, expectedDB.getName(), tojson(change));
+    const dbChanges = changes[expectedDB.getName()];
+    assert.eq(dbChanges[0].operationType, "insert", tojson(changes));
+    assert.eq(dbChanges[1].operationType, "update", tojson(changes));
+    assert.eq(dbChanges[2].operationType, "delete", tojson(changes));
 }
 cst.assertDatabaseDrop({cursor: aggCursor, db: testDB2});
 
