@@ -207,11 +207,15 @@ void ReplicaSetMonitor::init() {
     }
 }
 
-ReplicaSetMonitor::~ReplicaSetMonitor() {
+void ReplicaSetMonitor::drop() {
     {
         stdx::lock_guard lk(_state->mutex);
         _state->drop();
     }
+}
+
+ReplicaSetMonitor::~ReplicaSetMonitor() {
+    drop();
 }
 
 void ReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy strategy) {
@@ -295,11 +299,6 @@ SemiFuture<std::vector<HostAndPort>> ReplicaSetMonitor::getHostsOrRefresh(
 
 Future<std::vector<HostAndPort>> ReplicaSetMonitor::_getHostsOrRefresh(
     const ReadPreferenceSetting& criteria, Milliseconds maxWait) {
-
-    // If we're in shutdown, don't bother
-    if (globalRSMonitorManager.isShutdown()) {
-        return Status(ErrorCodes::ShutdownInProgress, "Server is shutting down"_sd);
-    }
 
     if (_state->isRemovedFromManager.load()) {
         return Status(ErrorCodes::ReplicaSetMonitorRemoved,

@@ -74,6 +74,11 @@ public:
     void init();
 
     /**
+     * Ends any ongoing refreshes.
+     */
+    void drop();
+
+    /**
      * Returns a host matching the given read preference or an error, if no host matches.
      *
      * @param readPref Read preference to match against

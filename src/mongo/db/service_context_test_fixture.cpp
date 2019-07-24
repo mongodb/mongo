@@ -33,6 +33,7 @@
 
 #include <memory>
 
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/util/assert_util.h"
@@ -47,6 +48,9 @@ ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest() {
 }
 
 ScopedGlobalServiceContextForTest::~ScopedGlobalServiceContextForTest() {
+    // TODO Remove in SERVER-42437
+    ReplicaSetMonitor::shutdown();
+
     setGlobalServiceContext({});
 }
 

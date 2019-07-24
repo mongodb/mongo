@@ -115,7 +115,7 @@ private:
     // Needs to be after `_taskExecutor`, so that it will be destroyed before the `_taskExecutor`.
     ReplicaSetMonitorsMap _monitors;
 
-    void _setupTaskExecutorInLock(const std::string& name);
+    void _setupTaskExecutorInLock();
 
     // set to true when shutdown has been called.
     bool _isShutdown{false};

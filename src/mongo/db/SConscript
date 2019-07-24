@@ -1553,6 +1553,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'op_observer',
+        '$BUILD_DIR/mongo/client/clientdriver_network', # TODO Remove this in SERVER-42437
     ],
 )
 
