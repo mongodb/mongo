@@ -5,6 +5,8 @@
 
     load('jstests/noPassthrough/libs/configExpand/lib.js');
 
+    assert.eq(runNonMongoProgram.apply(null, makeReflectionCmd('12345', {sleep: 0}).split(" ")), 0);
+
     // Sleep 10 seconds during request.
     configExpandSuccess({
         setParameter: {

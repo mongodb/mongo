@@ -14,6 +14,14 @@ function getPython3Binary() {
         }
     }
 
-    assert(fileExists(cmd), "Python3 interpreter not found");
-    return cmd;
+    if (fileExists(cmd)) {
+        return cmd;
+    }
+
+    clearRawMongoProgramOutput();
+    assert.eq(runNonMongoProgram("python", "--version"), 0);
+    const pythonVersion = rawMongoProgramOutput();
+    assert(/Python 3/.exec(pythonVersion));
+
+    return "python";
 }
