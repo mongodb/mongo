@@ -276,7 +276,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
 
         for sess_kv in session_kv_pairs:
             # The Session is stored inside the SessionRuntimeInfo object.
-            session_runtime_info = sess_kv['second']['_M_ptr'].dereference()
+            session_runtime_info = get_unique_ptr(sess_kv['second']).dereference()  # pylint: disable=undefined-variable
             session = session_runtime_info['session']
             # TODO: Add a custom pretty printer for LogicalSessionId.
             lsid_str = str(session['_sessionId']['_id'])
