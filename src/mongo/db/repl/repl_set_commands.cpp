@@ -506,6 +506,9 @@ public:
 
         ReplicationCoordinator::get(opCtx)->stepDown(
             opCtx, force, Seconds(secondaryCatchUpPeriodSecs), Seconds(stepDownForSecs));
+
+        log() << "replSetStepDown command completed";
+
         return true;
     }
 
