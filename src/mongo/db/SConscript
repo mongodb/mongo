@@ -968,6 +968,7 @@ env.Library(
         'exec/ensure_sorted.cpp',
         'exec/eof.cpp',
         'exec/fetch.cpp',
+        'exec/find_projection_executor.cpp',
         'exec/geo_near.cpp',
         'exec/idhack.cpp',
         'exec/index_scan.cpp',

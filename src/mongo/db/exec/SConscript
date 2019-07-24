@@ -61,6 +61,7 @@ env.Library(
 env.CppUnitTest(
     target='db_exec_test',
     source=[
+        "find_projection_executor_test.cpp",
         "projection_exec_agg_test.cpp",
         "projection_exec_test.cpp",
         "queued_data_stage_test.cpp",
@@ -71,6 +72,8 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/projection_exec_agg",
+        "$BUILD_DIR/mongo/db/pipeline/document_value",
+        "$BUILD_DIR/mongo/db/pipeline/document_value_test_util",
         "$BUILD_DIR/mongo/db/query/collation/collator_factory_mock",
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
