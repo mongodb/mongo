@@ -123,7 +123,6 @@ public:
 private:
     void doTTLPass() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-        auto durableCatalog = DurableCatalog::get(opCtxPtr.get());
         OperationContext& opCtx = *opCtxPtr;
 
         // If part of replSet but not in a readable state (e.g. during initial sync), skip.
@@ -149,9 +148,10 @@ private:
             }
 
             std::vector<std::string> indexNames;
-            durableCatalog->getAllIndexes(&opCtx, coll->ns(), &indexNames);
+            DurableCatalog::get(opCtxPtr.get())->getAllIndexes(&opCtx, coll->ns(), &indexNames);
             for (const std::string& name : indexNames) {
-                BSONObj spec = durableCatalog->getIndexSpec(&opCtx, coll->ns(), name);
+                BSONObj spec =
+                    DurableCatalog::get(opCtxPtr.get())->getIndexSpec(&opCtx, coll->ns(), name);
                 if (spec.hasField(secondsExpireField)) {
                     ttlIndexes.push_back(spec.getOwned());
                 }
