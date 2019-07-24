@@ -335,12 +335,10 @@ void insertDocuments(OperationContext* opCtx,
 Status checkIfTransactionOnCappedColl(OperationContext* opCtx, Collection* collection) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     if (txnParticipant && txnParticipant.inMultiDocumentTransaction() && collection->isCapped()) {
-        return {
-            ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream()
-                << "Collection '"
-                << collection->ns()
-                << "' is a capped collection. Transactions are not allowed on capped collections."};
+        return {ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Collection '" << collection->ns()
+                              << "' is a capped collection. Writes in transactions are not allowed "
+                                 "on capped collections."};
     }
     return Status::OK();
 }

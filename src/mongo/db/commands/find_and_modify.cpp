@@ -197,6 +197,17 @@ void recordStatsForTopCommand(OperationContext* opCtx) {
                 curOp->getReadWriteType());
 }
 
+void checkIfTransactionOnCappedColl(Collection* coll, bool inTransaction) {
+    if (coll && coll->isCapped()) {
+        uassert(
+            ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Collection '" << coll->ns()
+                          << "' is a capped collection. Writes in transactions are not allowed on "
+                             "capped collections.",
+            !inTransaction);
+    }
+}
+
 class CmdFindAndModify : public BasicCommand {
 public:
     CmdFindAndModify() : BasicCommand("findAndModify", "findandmodify") {}
@@ -380,6 +391,8 @@ public:
                 assertCanWrite(opCtx, nsString);
 
                 Collection* const collection = autoColl.getCollection();
+                checkIfTransactionOnCappedColl(collection, inTransaction);
+
                 const auto exec =
                     uassertStatusOK(getExecutorDelete(opCtx, opDebug, collection, &parsedDelete));
 
@@ -477,6 +490,8 @@ public:
 
                     invariant(collection);
                 }
+
+                checkIfTransactionOnCappedColl(collection, inTransaction);
 
                 const auto exec =
                     uassertStatusOK(getExecutorUpdate(opCtx, opDebug, collection, &parsedUpdate));
