@@ -42,7 +42,7 @@ namespace mongo {
  */
 struct SnapshotWindowParams {
 
-    // maxTargetSnapshotHistoryWindowInSeconds (startup & runtime server paramter, range 0+).
+    // maxTargetSnapshotHistoryWindowInSeconds (startup & runtime server parameter, range 0+).
     //
     // Dictates the maximum lag in seconds oldest_timestamp should be behind stable_timestamp.
     // targetSnapshotHistoryWindowInSeconds below is the actual active lag setting target.
@@ -64,30 +64,32 @@ struct SnapshotWindowParams {
     AtomicWord<int> targetSnapshotHistoryWindowInSeconds{
         maxTargetSnapshotHistoryWindowInSeconds.load()};
 
-    // cachePressureThreshold (startup & runtime server paramter, range [0, 100]).
+    // cachePressureThreshold (startup & runtime server parameter, range [0, 100]).
     //
-    // Dictates what percentage of cache in use is considered too high. This setting helps preempt
-    // storage cache pressure immobilizing the system. Attempts to increase
-    // targetSnapshotHistoryWindowInSeconds will be ignored when the cache pressure reaches this
-    // threshold. Additionally, a periodic task will decrease targetSnapshotHistoryWindowInSeconds
-    // when cache pressure exceeds the threshold.
-    AtomicWord<int> cachePressureThreshold{50};
+    // Compares against a storage engine cache pressure indicator that ranges from 0 to 100.
+    // Currently, the only indicator is the WT lookaside score.
+    //
+    // This setting helps preempt storage cache pressure immobilizing the system. Attempts to
+    // increase targetSnapshotHistoryWindowInSeconds will be ignored when the cache pressure reaches
+    // this threshold. Additionally, a periodic task will decrease
+    // targetSnapshotHistoryWindowInSecond when cache pressure exceeds the threshold.
+    AtomicWord<int> cachePressureThreshold{95};
 
-    // snapshotWindowMultiplicativeDecrease (startup & runtime server paramter, range (0,1)).
+    // snapshotWindowMultiplicativeDecrease (startup & runtime server parameter, range (0,1)).
     //
     // Controls by what multiplier the target snapshot history window setting is decreased when
     // cache pressure becomes too high, per the cachePressureThreshold setting.
     AtomicDouble snapshotWindowMultiplicativeDecrease{0.75};
 
-    // snapshotWindowAdditiveIncreaseSeconds (startup & runtime server paramter, range 1+).
+    // snapshotWindowAdditiveIncreaseSeconds (startup & runtime server parameter, range 1+).
     //
     // Controls by how much the target snapshot history window setting is increased when cache
     // pressure is OK, per cachePressureThreshold, and we need to service older snapshots for global
     // point-in-time reads.
     AtomicWord<int> snapshotWindowAdditiveIncreaseSeconds{2};
 
-    // minMillisBetweenSnapshotWindowInc (startup & runtime server paramter, range 0+).
-    // minMillisBetweenSnapshotWindowDec (startup & runtime server paramter, range 0+).
+    // minMillisBetweenSnapshotWindowInc (startup & runtime server parameter, range 0+).
+    // minMillisBetweenSnapshotWindowDec (startup & runtime server parameter, range 0+).
     //
     // Controls how often attempting to increase/decrease the target snapshot window will have an
     // effect. Multiple callers within minMillisBetweenSnapshotWindowInc will have the same effect
@@ -97,7 +99,7 @@ struct SnapshotWindowParams {
     AtomicWord<int> minMillisBetweenSnapshotWindowInc{500};
     AtomicWord<int> minMillisBetweenSnapshotWindowDec{500};
 
-    // checkCachePressurePeriodSeconds (startup & runtime server paramter, range 1+)
+    // checkCachePressurePeriodSeconds (startup & runtime server parameter, range 1+)
     //
     // Controls the period of the task that checks for cache pressure and decreases
     // targetSnapshotHistoryWindowInSeconds if the pressure is above cachePressureThreshold. The
