@@ -324,7 +324,7 @@ __wt_block_checkpoint_last(WT_SESSION_IMPL *session, WT_BLOCK *block,
 				break;
 		}
 		if (ret != 0) {
-			ret = 0;
+			WT_NOT_READ(ret, 0);
 			continue;
 		}
 		/*

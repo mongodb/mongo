@@ -120,7 +120,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
 	wt_timestamp_t timestamp, ts;
 	size_t upd_memsize;
 	uint64_t max_txn, txnid;
-	bool all_visible, prepared, skipped_birthmark, uncommitted;
+	bool all_visible, list_prepared, list_uncommitted, skipped_birthmark;
 
 	/*
 	 * The "saved updates" return value is used independently of returning
@@ -133,7 +133,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
 	first_ts_upd = first_txn_upd = NULL;
 	upd_memsize = 0;
 	max_txn = WT_TXN_NONE;
-	prepared = skipped_birthmark = uncommitted = false;
+	list_prepared = list_uncommitted = skipped_birthmark = false;
 
 	/*
 	 * If called with a WT_INSERT item, use its WT_UPDATE list (which must
@@ -180,15 +180,16 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
 		 */
 		if (F_ISSET(r, WT_REC_EVICT)) {
 			if (upd->prepare_state == WT_PREPARE_LOCKED ||
-			    upd->prepare_state == WT_PREPARE_INPROGRESS)
-				prepared = true;
-			else if (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
+			    upd->prepare_state == WT_PREPARE_INPROGRESS) {
+				list_prepared = true;
+				continue;
+			}
+			if (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 			    WT_TXNID_LE(r->last_running, txnid) :
-			    !__txn_visible_id(session, txnid))
-				uncommitted = r->update_uncommitted = true;
-
-			if (prepared || uncommitted)
-			       continue;
+			    !__txn_visible_id(session, txnid)) {
+				r->update_uncommitted = list_uncommitted = true;
+				continue;
+			}
 		}
 
 		/* Track the first update with non-zero timestamp. */
@@ -227,7 +228,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
 			 */
 			if (F_ISSET(r, WT_REC_UPDATE_RESTORE) &&
 			    upd_select->upd != NULL &&
-			    (uncommitted || prepared)) {
+			    (list_prepared || list_uncommitted)) {
 				r->leave_dirty = true;
 				return (__wt_set_return(session, EBUSY));
 			}
@@ -342,8 +343,17 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
 	 */
 	if (upd != NULL &&
 	    (upd->type == WT_UPDATE_BIRTHMARK ||
-	    (F_ISSET(r, WT_REC_UPDATE_RESTORE) && skipped_birthmark)))
+	    (F_ISSET(r, WT_REC_UPDATE_RESTORE) && skipped_birthmark))) {
+		/*
+		 * Resolve the birthmark now regardless of whether the
+		 * update being written to the data file is the same as it
+		 * was the previous reconciliation. Otherwise lookaside can
+		 * end up with two birthmark records in the same update chain.
+		 */
+		WT_RET(
+		    __rec_append_orig_value(session, page, first_upd, vpack));
 		upd_select->upd = NULL;
+	}
 
 	/*
 	 * Check if all updates on the page are visible.  If not, it must stay
@@ -354,7 +364,8 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
 	 * with a timestamp (if any).
 	 */
 	timestamp = first_ts_upd == NULL ? 0 : first_ts_upd->durable_ts;
-	all_visible = upd == first_txn_upd && !(uncommitted || prepared) &&
+	all_visible = upd == first_txn_upd &&
+	    !list_prepared && !list_uncommitted &&
 	    (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 	    __wt_txn_visible_all(session, max_txn, timestamp) :
 	    __wt_txn_visible(session, max_txn, timestamp));
@@ -392,7 +403,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
 	 */
 	if (!F_ISSET(r, WT_REC_LOOKASIDE | WT_REC_UPDATE_RESTORE))
 		return (__wt_set_return(session, EBUSY));
-	if (uncommitted && !F_ISSET(r, WT_REC_UPDATE_RESTORE))
+	if (list_uncommitted && !F_ISSET(r, WT_REC_UPDATE_RESTORE))
 		return (__wt_set_return(session, EBUSY));
 
 	WT_ASSERT(session, r->max_txn != WT_TXN_NONE);

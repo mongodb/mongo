@@ -642,7 +642,7 @@ __checkpoint_prepare(
 	 */
 	WT_ASSERT(session, !F_ISSET(txn,
 	    WT_TXN_HAS_TS_COMMIT | WT_TXN_HAS_TS_READ |
-	    WT_TXN_PUBLIC_TS_COMMIT | WT_TXN_PUBLIC_TS_READ));
+	    WT_TXN_TS_PUBLISHED | WT_TXN_PUBLIC_TS_READ));
 
 	if (use_timestamp) {
 		/*
@@ -743,7 +743,15 @@ __txn_checkpoint_can_skip(WT_SESSION_IMPL *session,
 
 	/* Never skip named checkpoints. */
 	WT_RET(__wt_config_gets(session, cfg, "name", &cval));
-	if (cval.val != 0)
+	if (cval.len != 0)
+		return (0);
+
+	/*
+	 * It isn't currently safe to skip timestamp checkpoints - see WT-4958.
+	 * We should fix this so we can skip timestamp checkpoints if they
+	 * don't have new content.
+	 */
+	if (use_timestamp)
 		return (0);
 
 	/*

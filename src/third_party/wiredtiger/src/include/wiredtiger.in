@@ -2604,19 +2604,21 @@ struct __wt_connection {
 	 * @configstart{WT_CONNECTION.query_timestamp, see dist/api_data.py}
 	 * @config{get, specify which timestamp to query: \c all_committed
 	 * returns the largest timestamp such that all timestamps up to that
-	 * value have committed\, \c last_checkpoint returns the timestamp of
-	 * the most recent stable checkpoint\, \c oldest returns the most recent
-	 * \c oldest_timestamp set with WT_CONNECTION::set_timestamp\, \c
-	 * oldest_reader returns the minimum of the read timestamps of all
-	 * active readers \c pinned returns the minimum of the \c
-	 * oldest_timestamp and the read timestamps of all active readers\, \c
-	 * recovery returns the timestamp of the most recent stable checkpoint
-	 * taken prior to a shutdown and \c stable returns the most recent \c
-	 * stable_timestamp set with WT_CONNECTION::set_timestamp.  See @ref
-	 * transaction_timestamps., a string\, chosen from the following
-	 * options: \c "all_committed"\, \c "last_checkpoint"\, \c "oldest"\, \c
+	 * value have committed\, \c all_durable returns the largest timestamp
+	 * such that all timestamps up to that value have been made durable\, \c
+	 * last_checkpoint returns the timestamp of the most recent stable
+	 * checkpoint\, \c oldest returns the most recent \c oldest_timestamp
+	 * set with WT_CONNECTION::set_timestamp\, \c oldest_reader returns the
+	 * minimum of the read timestamps of all active readers \c pinned
+	 * returns the minimum of the \c oldest_timestamp and the read
+	 * timestamps of all active readers\, \c recovery returns the timestamp
+	 * of the most recent stable checkpoint taken prior to a shutdown and \c
+	 * stable returns the most recent \c stable_timestamp set with
+	 * WT_CONNECTION::set_timestamp.  See @ref transaction_timestamps., a
+	 * string\, chosen from the following options: \c "all_committed"\, \c
+	 * "all_durable"\, \c "last_checkpoint"\, \c "oldest"\, \c
 	 * "oldest_reader"\, \c "pinned"\, \c "recovery"\, \c "stable"; default
-	 * \c all_committed.}
+	 * \c all_durable.}
 	 * @configend
 	 * @errors
 	 * If there is no matching timestamp (e.g., if this method is called
@@ -2636,8 +2638,8 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @configstart{WT_CONNECTION.set_timestamp, see dist/api_data.py}
-	 * @config{commit_timestamp, reset the maximum commit timestamp tracked
-	 * by WiredTiger.  This will cause future calls to
+	 * @config{commit_timestamp, (deprecated) reset the maximum commit
+	 * timestamp tracked by WiredTiger.  This will cause future calls to
 	 * WT_CONNECTION::query_timestamp to ignore commit timestamps greater
 	 * than the specified value until the next commit moves the tracked
 	 * commit timestamp forwards.  This is only intended for use where the
@@ -2645,6 +2647,15 @@ struct __wt_connection {
 	 * supplied value must not be older than the current oldest and stable
 	 * timestamps.  See @ref transaction_timestamps., a string; default
 	 * empty.}
+	 * @config{durable_timestamp, reset the maximum durable timestamp
+	 * tracked by WiredTiger.  This will cause future calls to
+	 * WT_CONNECTION::query_timestamp to ignore durable timestamps greater
+	 * than the specified value until the next durable timestamp moves the
+	 * tracked durable timestamp forwards.  This is only intended for use
+	 * where the application is rolling back locally committed transactions.
+	 * The supplied value must not be older than the current oldest and
+	 * stable timestamps.  See @ref transaction_timestamps., a string;
+	 * default empty.}
 	 * @config{force, set timestamps even if they violate normal ordering
 	 * requirements.  For example allow the \c oldest_timestamp to move
 	 * backwards., a boolean flag; default \c false.}
@@ -5500,25 +5511,28 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOCK_CHECKPOINT_WAIT_APPLICATION	1202
 /*! lock: checkpoint lock internal thread wait time (usecs) */
 #define	WT_STAT_CONN_LOCK_CHECKPOINT_WAIT_INTERNAL	1203
+/*! lock: dhandle lock application thread time waiting (usecs) */
+#define	WT_STAT_CONN_LOCK_DHANDLE_WAIT_APPLICATION	1204
+/*! lock: dhandle lock internal thread time waiting (usecs) */
+#define	WT_STAT_CONN_LOCK_DHANDLE_WAIT_INTERNAL		1205
+/*! lock: dhandle read lock acquisitions */
+#define	WT_STAT_CONN_LOCK_DHANDLE_READ_COUNT		1206
+/*! lock: dhandle write lock acquisitions */
+#define	WT_STAT_CONN_LOCK_DHANDLE_WRITE_COUNT		1207
 /*!
- * lock: commit timestamp queue lock application thread time waiting
+ * lock: durable timestamp queue lock application thread time waiting
  * (usecs)
  */
-#define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_WAIT_APPLICATION	1204
-/*! lock: commit timestamp queue lock internal thread time waiting (usecs) */
-#define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_WAIT_INTERNAL	1205
-/*! lock: commit timestamp queue read lock acquisitions */
-#define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_READ_COUNT	1206
-/*! lock: commit timestamp queue write lock acquisitions */
-#define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_WRITE_COUNT	1207
-/*! lock: dhandle lock application thread time waiting (usecs) */
-#define	WT_STAT_CONN_LOCK_DHANDLE_WAIT_APPLICATION	1208
-/*! lock: dhandle lock internal thread time waiting (usecs) */
-#define	WT_STAT_CONN_LOCK_DHANDLE_WAIT_INTERNAL		1209
-/*! lock: dhandle read lock acquisitions */
-#define	WT_STAT_CONN_LOCK_DHANDLE_READ_COUNT		1210
-/*! lock: dhandle write lock acquisitions */
-#define	WT_STAT_CONN_LOCK_DHANDLE_WRITE_COUNT		1211
+#define	WT_STAT_CONN_LOCK_DURABLE_TIMESTAMP_WAIT_APPLICATION	1208
+/*!
+ * lock: durable timestamp queue lock internal thread time waiting
+ * (usecs)
+ */
+#define	WT_STAT_CONN_LOCK_DURABLE_TIMESTAMP_WAIT_INTERNAL	1209
+/*! lock: durable timestamp queue read lock acquisitions */
+#define	WT_STAT_CONN_LOCK_DURABLE_TIMESTAMP_READ_COUNT	1210
+/*! lock: durable timestamp queue write lock acquisitions */
+#define	WT_STAT_CONN_LOCK_DURABLE_TIMESTAMP_WRITE_COUNT	1211
 /*! lock: metadata lock acquisitions */
 #define	WT_STAT_CONN_LOCK_METADATA_COUNT		1212
 /*! lock: metadata lock application thread wait time (usecs) */
@@ -5809,16 +5823,16 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_PREPARED_UPDATES_LOOKASIDE_INSERTS	1346
 /*! transaction: Number of prepared updates resolved */
 #define	WT_STAT_CONN_TXN_PREPARED_UPDATES_RESOLVED	1347
-/*! transaction: commit timestamp queue entries walked */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_WALKED		1348
-/*! transaction: commit timestamp queue insert to empty */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_EMPTY		1349
-/*! transaction: commit timestamp queue inserts to head */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_HEAD		1350
-/*! transaction: commit timestamp queue inserts total */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_INSERTS		1351
-/*! transaction: commit timestamp queue length */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_LEN		1352
+/*! transaction: durable timestamp queue entries walked */
+#define	WT_STAT_CONN_TXN_DURABLE_QUEUE_WALKED		1348
+/*! transaction: durable timestamp queue insert to empty */
+#define	WT_STAT_CONN_TXN_DURABLE_QUEUE_EMPTY		1349
+/*! transaction: durable timestamp queue inserts to head */
+#define	WT_STAT_CONN_TXN_DURABLE_QUEUE_HEAD		1350
+/*! transaction: durable timestamp queue inserts total */
+#define	WT_STAT_CONN_TXN_DURABLE_QUEUE_INSERTS		1351
+/*! transaction: durable timestamp queue length */
+#define	WT_STAT_CONN_TXN_DURABLE_QUEUE_LEN		1352
 /*! transaction: number of named snapshots created */
 #define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1353
 /*! transaction: number of named snapshots dropped */
@@ -5851,10 +5865,10 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_ROLLBACK_LAS_REMOVED		1367
 /*! transaction: set timestamp calls */
 #define	WT_STAT_CONN_TXN_SET_TS				1368
-/*! transaction: set timestamp commit calls */
-#define	WT_STAT_CONN_TXN_SET_TS_COMMIT			1369
-/*! transaction: set timestamp commit updates */
-#define	WT_STAT_CONN_TXN_SET_TS_COMMIT_UPD		1370
+/*! transaction: set timestamp durable calls */
+#define	WT_STAT_CONN_TXN_SET_TS_DURABLE			1369
+/*! transaction: set timestamp durable updates */
+#define	WT_STAT_CONN_TXN_SET_TS_DURABLE_UPD		1370
 /*! transaction: set timestamp oldest calls */
 #define	WT_STAT_CONN_TXN_SET_TS_OLDEST			1371
 /*! transaction: set timestamp oldest updates */

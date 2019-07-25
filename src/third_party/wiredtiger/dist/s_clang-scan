@@ -1,9 +1,9 @@
 #! /bin/sh
 
 t=__wt.$$
-trap 'rm -rf $t' 0 1 2 3 13 15
-
-set -e
+a=__wt.$$.a
+b=__wt.$$.b
+trap 'rm -rf $a $b $t' 0 1 2 3 13 15
 
 # Find the top-level WiredTiger directory and move to there.
 top=`git rev-parse --show-toplevel` && cd $top || exit 1
@@ -45,8 +45,19 @@ $scan $args make -j 8 wt 1>/dev/null 2>$t
 make -j 8 distclean > /dev/null
 
 grep 'No bugs found' $t > /dev/null && exit 0
+
+# Compare the set of errors/warnings and exit success when they're expected.
+# clang-scan outputs errors/warnings with a leading file path followed by a
+# colon, followed by the string "error:" or "warning:".
+cat dist/s_clang-scan.diff |
+    egrep '^[a-z\./].*error: |^[a-z\./].*warning: ' | sed -e 's/:.*//' > $a
+cat $t |
+    egrep '^[a-z\./].*error: |^[a-z\./].*warning: ' | sed -e 's/:.*//' > $b
+diff $a $b > /dev/null && exit 0
+
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-echo 'scan-build output:'
+echo 'scan-build output differs from expected:'
+echo '<<<<<<<<<< Expected >>>>>>>>>> Current'
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-cat $t
+diff dist/s_clang-scan.diff $t
 exit 1

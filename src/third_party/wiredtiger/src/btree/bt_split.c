@@ -1469,12 +1469,12 @@ err:	if (parent != NULL)
 
 #ifdef HAVE_DIAGNOSTIC
 /*
- * __check_upd_list --
+ * __wt_count_birthmarks --
  *	Sanity check an update list.
  *	In particular, make sure there no birthmarks.
  */
-static void
-__check_upd_list(WT_SESSION_IMPL *session, WT_UPDATE *upd)
+int
+__wt_count_birthmarks(WT_UPDATE *upd)
 {
 	int birthmark_count;
 
@@ -1482,7 +1482,7 @@ __check_upd_list(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 		if (upd->type == WT_UPDATE_BIRTHMARK)
 			++birthmark_count;
 
-	WT_ASSERT(session, birthmark_count <= 1);
+	return (birthmark_count);
 }
 #endif
 
@@ -1585,9 +1585,7 @@ __split_multi_inmem(
 				key->size = WT_INSERT_KEY_SIZE(supd->ins);
 			}
 
-#ifdef HAVE_DIAGNOSTIC
-			__check_upd_list(session, upd);
-#endif
+			WT_ASSERT(session, __wt_count_birthmarks(upd) <= 1);
 
 			/* Search the page. */
 			WT_ERR(__wt_row_search(

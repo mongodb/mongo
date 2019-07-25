@@ -39,7 +39,7 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
 			break;
 		case '?':
 		default:
-			return (usage());
+			WT_ERR(usage());
 		}
 	argc -= __wt_optind;
 	argv += __wt_optind;

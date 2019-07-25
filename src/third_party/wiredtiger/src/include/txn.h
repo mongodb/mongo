@@ -128,14 +128,14 @@ struct __wt_txn_global {
 	 */
 	volatile uint64_t oldest_id;
 
-	wt_timestamp_t commit_timestamp;
+	wt_timestamp_t durable_timestamp;
 	wt_timestamp_t last_ckpt_timestamp;
 	wt_timestamp_t meta_ckpt_timestamp;
 	wt_timestamp_t oldest_timestamp;
 	wt_timestamp_t pinned_timestamp;
 	wt_timestamp_t recovery_timestamp;
 	wt_timestamp_t stable_timestamp;
-	bool has_commit_timestamp;
+	bool has_durable_timestamp;
 	bool has_oldest_timestamp;
 	bool has_pinned_timestamp;
 	bool has_stable_timestamp;
@@ -150,10 +150,10 @@ struct __wt_txn_global {
 	/* Protects logging, checkpoints and transaction visibility. */
 	WT_RWLOCK visibility_rwlock;
 
-	/* List of transactions sorted by commit timestamp. */
-	WT_RWLOCK commit_timestamp_rwlock;
-	TAILQ_HEAD(__wt_txn_cts_qh, __wt_txn) commit_timestamph;
-	uint32_t commit_timestampq_len;
+	/* List of transactions sorted by durable timestamp. */
+	WT_RWLOCK durable_timestamp_rwlock;
+	TAILQ_HEAD(__wt_txn_dts_qh, __wt_txn) durable_timestamph;
+	uint32_t durable_timestampq_len;
 
 	/* List of transactions sorted by read timestamp. */
 	WT_RWLOCK read_timestamp_rwlock;
@@ -308,9 +308,10 @@ struct __wt_txn {
 	/* Read updates committed as of this timestamp. */
 	wt_timestamp_t read_timestamp;
 
-	TAILQ_ENTRY(__wt_txn) commit_timestampq;
+	TAILQ_ENTRY(__wt_txn) durable_timestampq;
 	TAILQ_ENTRY(__wt_txn) read_timestampq;
-	bool clear_commit_q;	/* Set if need to clear from the commit queue */
+	/* Set if need to clear from the durable queue */
+	bool clear_durable_q;
 	bool clear_read_q;	/* Set if need to clear from the read queue */
 
 	/* Array of modifications by this transaction. */
@@ -332,6 +333,18 @@ struct __wt_txn {
 
 	const char *rollback_reason;		/* If rollback, the reason */
 
+/*
+ * WT_TXN_HAS_TS_COMMIT --
+ *	The transaction has a set commit timestamp.
+ * WT_TXN_HAS_TS_DURABLE --
+ *	The transaction has an explicitly set durable timestamp (that is, it
+ *	hasn't been mirrored from its commit timestamp value).
+ * WT_TXN_TS_PUBLISHED --
+ *	The transaction has been published to the durable queue. Setting this
+ *	flag lets us know that, on release, we need to mark the transaction for
+ *	clearing.
+ */
+
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define	WT_TXN_AUTOCOMMIT	0x0000001u
 #define	WT_TXN_ERROR		0x0000002u
@@ -344,17 +357,17 @@ struct __wt_txn {
 #define	WT_TXN_IGNORE_PREPARE	0x0000100u
 #define	WT_TXN_NAMED_SNAPSHOT	0x0000200u
 #define	WT_TXN_PREPARE		0x0000400u
-#define	WT_TXN_PUBLIC_TS_COMMIT	0x0000800u
-#define	WT_TXN_PUBLIC_TS_READ	0x0001000u
-#define	WT_TXN_READONLY		0x0002000u
-#define	WT_TXN_RUNNING		0x0004000u
-#define	WT_TXN_SYNC_SET		0x0008000u
-#define	WT_TXN_TS_COMMIT_ALWAYS	0x0010000u
-#define	WT_TXN_TS_COMMIT_KEYS	0x0020000u
-#define	WT_TXN_TS_COMMIT_NEVER	0x0040000u
-#define	WT_TXN_TS_DURABLE_ALWAYS	0x0080000u
-#define	WT_TXN_TS_DURABLE_KEYS	0x0100000u
-#define	WT_TXN_TS_DURABLE_NEVER	0x0200000u
+#define	WT_TXN_PUBLIC_TS_READ	0x0000800u
+#define	WT_TXN_READONLY		0x0001000u
+#define	WT_TXN_RUNNING		0x0002000u
+#define	WT_TXN_SYNC_SET		0x0004000u
+#define	WT_TXN_TS_COMMIT_ALWAYS	0x0008000u
+#define	WT_TXN_TS_COMMIT_KEYS	0x0010000u
+#define	WT_TXN_TS_COMMIT_NEVER	0x0020000u
+#define	WT_TXN_TS_DURABLE_ALWAYS	0x0040000u
+#define	WT_TXN_TS_DURABLE_KEYS	0x0080000u
+#define	WT_TXN_TS_DURABLE_NEVER	0x0100000u
+#define	WT_TXN_TS_PUBLISHED	0x0200000u
 #define	WT_TXN_TS_ROUND_PREPARED	0x0400000u
 #define	WT_TXN_TS_ROUND_READ	0x0800000u
 #define	WT_TXN_UPDATE	        0x1000000u

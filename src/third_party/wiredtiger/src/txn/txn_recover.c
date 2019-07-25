@@ -655,7 +655,8 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 			 */
 			r.ckpt_lsn = metafile->ckpt_lsn;
 			ret = __wt_log_scan(session,
-			    &metafile->ckpt_lsn, 0, __txn_log_recover, &r);
+			    &metafile->ckpt_lsn, WT_LOGSCAN_RECOVER_METADATA,
+			    __txn_log_recover, &r);
 		}
 		if (F_ISSET(conn, WT_CONN_SALVAGE))
 			ret = 0;
