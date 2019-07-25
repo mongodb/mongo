@@ -55,13 +55,14 @@
 
     jsTest.log("Start a snapshot transaction at a time that is too old.");
     session.startTransaction({readConcern: {level: "snapshot", atClusterTime: Timestamp(1, 1)}});
-    // Operation runs unstashTransactionResources() and throws prior to onUnstash().
+    // Operation runs unstashTransactionResources() and throws prior to onUnstash(). As a result,
+    // the transaction will be implicitly aborted.
     assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.SnapshotTooOld);
 
     newMetrics = assert.commandWorked(testDB.adminCommand({serverStatus: 1})).transactions;
     verifyMetricsChange(initialMetrics, newMetrics, "currentActive", 0);
-    verifyMetricsChange(initialMetrics, newMetrics, "currentInactive", 1);
-    verifyMetricsChange(initialMetrics, newMetrics, "currentOpen", 1);
+    verifyMetricsChange(initialMetrics, newMetrics, "currentInactive", 0);
+    verifyMetricsChange(initialMetrics, newMetrics, "currentOpen", 0);
 
     // Kill the session that threw exception before.
     jsTest.log("Kill session " + tojson(session.getSessionId()) + ".");

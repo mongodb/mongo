@@ -1,6 +1,6 @@
 /**
  * Test ensures that exhausting the number of write tickets in the system does not prevent
- * transactions from being reaped by the expired transaction reaper.
+ * transactions from being reaped/aborted.
  *
  * @tags: [uses_transactions]
  */
@@ -19,10 +19,9 @@
             setParameter: {
                 wiredTigerConcurrentWriteTransactions: kNumWriteTickets,
 
-                // Setting a transaction lifetime of 20 seconds works fine locally because the
-                // threads which attempt to run the drop command are spawned quickly enough. This
-                // might not be the case for Evergreen hosts and may need to be tuned accordingly.
-                transactionLifetimeLimitSeconds: 20,
+                // Setting a transaction lifetime of 1 hour to make sure the transaction reaper
+                // doesn't abort the transaction.
+                transactionLifetimeLimitSeconds: 3600,
             }
         }
     });
@@ -75,7 +74,7 @@
         });
 
     // Attempting to perform another operation inside of the transaction will block and should
-    // eventually cause it to be aborted.
+    // cause it to be aborted implicity.
     assert.commandFailedWithCode(sessionDb.mycoll.insert({}), ErrorCodes.LockTimeout);
 
     for (let thread of threads) {
