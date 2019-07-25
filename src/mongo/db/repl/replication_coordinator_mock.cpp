@@ -529,7 +529,7 @@ void ReplicationCoordinatorMock::alwaysAllowWrites(bool allowWrites) {
     _alwaysAllowWrites = allowWrites;
 }
 
-Status ReplicationCoordinatorMock::abortCatchupIfNeeded() {
+Status ReplicationCoordinatorMock::abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) {
     return Status::OK();
 }
 

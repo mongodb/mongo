@@ -760,7 +760,9 @@ public:
         uassertStatusOK(status);
         log() << "Received replSetAbortPrimaryCatchUp request";
 
-        status = ReplicationCoordinator::get(opCtx)->abortCatchupIfNeeded();
+        status = ReplicationCoordinator::get(opCtx)->abortCatchupIfNeeded(
+            ReplicationCoordinator::PrimaryCatchUpConclusionReason::
+                kFailedWithReplSetAbortPrimaryCatchUpCmd);
         if (!status.isOK()) {
             log() << "replSetAbortPrimaryCatchUp request failed" << causedBy(status);
         }

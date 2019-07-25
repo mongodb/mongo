@@ -303,7 +303,7 @@ public:
         return _service;
     }
 
-    virtual Status abortCatchupIfNeeded() override;
+    virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 

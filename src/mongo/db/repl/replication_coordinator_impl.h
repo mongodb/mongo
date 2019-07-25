@@ -321,7 +321,7 @@ public:
 
     virtual Status stepUpIfEligible(bool skipDryRun) override;
 
-    virtual Status abortCatchupIfNeeded() override;
+    virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 
@@ -669,7 +669,7 @@ private:
         // start() can only be called once.
         void start_inlock();
         // Reset the state itself to destruct the state.
-        void abort_inlock();
+        void abort_inlock(PrimaryCatchUpConclusionReason reason);
         // Heartbeat calls this function to update the target optime.
         void signalHeartbeatUpdate_inlock();
 

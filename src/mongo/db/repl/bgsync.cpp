@@ -305,7 +305,11 @@ void BackgroundSync::_produce() {
             log() << "Our newest OpTime : " << lastOpTimeFetched;
             log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen
                   << " from " << syncSourceResp.getSyncSource();
-            _replCoord->abortCatchupIfNeeded().transitional_ignore();
+            auto status = _replCoord->abortCatchupIfNeeded(
+                ReplicationCoordinator::PrimaryCatchUpConclusionReason::kFailedWithError);
+            if (!status.isOK()) {
+                LOG(1) << "Aborting catch-up failed with status: " << status;
+            }
             return;
         }
 
@@ -532,7 +536,11 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
                                   StorageInterface* storageInterface) {
     if (_replCoord->getMemberState().primary()) {
         warning() << "Rollback situation detected in catch-up mode. Aborting catch-up mode.";
-        _replCoord->abortCatchupIfNeeded().transitional_ignore();
+        auto status = _replCoord->abortCatchupIfNeeded(
+            ReplicationCoordinator::PrimaryCatchUpConclusionReason::kFailedWithError);
+        if (!status.isOK()) {
+            LOG(1) << "Aborting catch-up failed with status: " << status;
+        }
         return;
     }
 

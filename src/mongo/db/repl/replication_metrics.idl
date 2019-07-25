@@ -81,6 +81,39 @@ structs:
                               was behind"
                 type: long
                 default: 0
+            numCatchUpsSucceeded:
+                description: "Number of times primary catchup concluded because the primary caught
+                              up to the latest known optime successfully"
+                type: long
+                default: 0
+            numCatchUpsAlreadyCaughtUp:
+                description: "Number of times primary catchup concluded because the primary was
+                              already caught up"
+                type: long
+                default: 0
+            numCatchUpsSkipped:
+                description: "Number of times primary catchup concluded because it was skipped"
+                type: long
+                default: 0
+            numCatchUpsTimedOut:
+                description: "Number of times primary catchup concluded because it timed out"
+                type: long
+                default: 0
+            numCatchUpsFailedWithError:
+                description: "Number of times primary catchup concluded because it failed with an
+                              error"
+                type: long
+                default: 0
+            numCatchUpsFailedWithNewTerm:
+                description: "Number of times primary catchup concluded because the primary stepped
+                              down on seeing a higher term"
+                type: long
+                default: 0
+            numCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd:
+                description: "Number of times primary catchup concluded because of the
+                              replSetAbortPrimaryCatchUp command"
+                type: long
+                default: 0
 
     ElectionCandidateMetrics:
         description: "Stores metrics that are specific to the last election in which the node was a

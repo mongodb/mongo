@@ -36,6 +36,14 @@ ${tojson(serverStatusResponse)}`));
     verifyElectionReasonCounterFields(serverStatusResponse, "freezeTimeout");
     verifyElectionMetricsField(serverStatusResponse, "numStepDownsCausedByHigherTerm");
     verifyElectionMetricsField(serverStatusResponse, "numCatchUps");
+    verifyElectionMetricsField(serverStatusResponse, "numCatchUpsSucceeded");
+    verifyElectionMetricsField(serverStatusResponse, "numCatchUpsAlreadyCaughtUp");
+    verifyElectionMetricsField(serverStatusResponse, "numCatchUpsSkipped");
+    verifyElectionMetricsField(serverStatusResponse, "numCatchUpsTimedOut");
+    verifyElectionMetricsField(serverStatusResponse, "numCatchUpsFailedWithError");
+    verifyElectionMetricsField(serverStatusResponse, "numCatchUpsFailedWithNewTerm");
+    verifyElectionMetricsField(serverStatusResponse,
+                               "numCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd");
 }
 
 // Set up the replica set.

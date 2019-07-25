@@ -249,7 +249,7 @@ public:
 
     Status stepUpIfEligible(bool skipDryRun) override;
 
-    Status abortCatchupIfNeeded() override;
+    Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 
