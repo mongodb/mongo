@@ -5527,20 +5527,19 @@ tasks:
       resmoke_args: --suites=jstestfuzz_replication_continuous_stepdown --flowControlTicketOverride=1 --storageEngine=wiredTiger
       name: jstestfuzz_replication_continuous_stepdown_flow_control
 
-# TODO(SERVER-41608) Re-enable once root cause of failures has been addressed.
 ## jstestfuzz concurrent replication continuous stepdown with flow control engaged ##
-#- <<: *jstestfuzz_template
-#  name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control_gen
-#  tags: ["jstestfuzz", "common", "repl", "flow_control"]
-#  commands:
-#  - func: "generate fuzzer tasks"
-#    vars:
-#      <<: *jstestfuzz_config_vars
-#      num_files: ${jstestfuzz_concurrent_num_files|10}
-#      num_tasks: 15
-#      jstestfuzz_vars: --jsTestsDir ../jstests
-#      resmoke_args: --suites=jstestfuzz_replication_continuous_stepdown --flowControlTicketOverride=10 --storageEngine=wiredTiger --numClientsPerFixture=10
-#      name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control_gen
+  tags: ["jstestfuzz", "common", "repl", "flow_control"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: ${jstestfuzz_concurrent_num_files|10}
+      num_tasks: 15
+      jstestfuzz_vars: --jsTestsDir ../jstests
+      resmoke_args: --suites=jstestfuzz_replication_continuous_stepdown --flowControlTicketOverride=10 --storageEngine=wiredTiger --numClientsPerFixture=10
+      name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control
 
 ## jstestfuzz replica set ##
 - <<: *jstestfuzz_template
