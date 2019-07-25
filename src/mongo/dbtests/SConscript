@@ -129,6 +129,7 @@ if not has_option('noshell') and usemozjs:
             "$BUILD_DIR/mongo/db/bson/dotted_path_support",
             "$BUILD_DIR/mongo/db/catalog_raii",
             "$BUILD_DIR/mongo/db/transaction",
+            "$BUILD_DIR/mongo/db/catalog/collection_validation",
             "$BUILD_DIR/mongo/db/catalog/multi_index_block",
             "$BUILD_DIR/mongo/db/commands/mongod",
             "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
