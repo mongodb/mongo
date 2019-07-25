@@ -74,7 +74,7 @@ public:
         return _sortPattern.empty();
     }
 
-    SortPatternPart operator[](int idx) const {
+    const SortPatternPart& operator[](int idx) const {
         return _sortPattern[idx];
     }
 
