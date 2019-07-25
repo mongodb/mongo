@@ -861,11 +861,12 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
           << ". Indexes in catalog after build: " << replState->stats.numIndexesAfter;
 }
 
-void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
-                                         Collection* collection,
-                                         const NamespaceString& nss,
-                                         std::shared_ptr<ReplIndexBuildState> replState,
-                                         boost::optional<Lock::CollectionLock>* collLock) {
+void IndexBuildsCoordinator::_buildIndex(
+    OperationContext* opCtx,
+    Collection* collection,
+    const NamespaceString& nss,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    boost::optional<Lock::CollectionLock>* exclusiveCollectionLock) {
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
@@ -886,9 +887,12 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
 
     // Collection scan and insert into index, followed by a drain of writes received in the
     // background.
-    collLock->emplace(opCtx, nss, MODE_IX);
-    uassertStatusOK(
-        _indexBuildsManager.startBuildingIndex(opCtx, collection, replState->buildUUID));
+    exclusiveCollectionLock->reset();
+    {
+        Lock::CollectionLock colLock(opCtx, nss, MODE_IS);
+        uassertStatusOK(
+            _indexBuildsManager.startBuildingIndex(opCtx, collection, replState->buildUUID));
+    }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildDumpsInsertsFromBulk)) {
         log() << "Hanging after dumping inserts from bulk builder";
@@ -896,10 +900,13 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     }
 
     // Perform the first drain while holding an intent lock.
-    opCtx->recoveryUnit()->abandonSnapshot();
-    collLock->emplace(opCtx, nss, MODE_IS);
-    uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
-        opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
+    {
+        opCtx->recoveryUnit()->abandonSnapshot();
+        Lock::CollectionLock colLock(opCtx, nss, MODE_IS);
+
+        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
+            opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
+    }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
         log() << "Hanging after index build first drain";
@@ -907,11 +914,13 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     }
 
     // Perform the second drain while stopping writes on the collection.
-    opCtx->recoveryUnit()->abandonSnapshot();
-    collLock->emplace(opCtx, nss, MODE_S);
-    uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
-        opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
-    collLock->reset();
+    {
+        opCtx->recoveryUnit()->abandonSnapshot();
+        Lock::CollectionLock colLock(opCtx, nss, MODE_S);
+
+        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
+            opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
+    }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
         log() << "Hanging after index build second drain";
@@ -920,7 +929,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
 
     // Need to return the collection lock back to exclusive mode, to complete the index build.
     opCtx->recoveryUnit()->abandonSnapshot();
-    collLock->emplace(opCtx, nss, MODE_X);
+    exclusiveCollectionLock->emplace(opCtx, nss, MODE_X);
 
     // We hold the database MODE_IX lock throughout the index build.
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, nss.db());
