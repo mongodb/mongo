@@ -14,6 +14,7 @@ selector:
   # Also skip tests that require a ScopedThread, because ScopedThreads don't inherit credentials.
   - jstests/replsets/interrupted_batch_insert.js
   - jstests/replsets/transactions_reaped_with_tickets_exhausted.js
+  - jstests/replsets/transactions_committed_with_tickets_exhausted.js
 
 executor:
   config:
