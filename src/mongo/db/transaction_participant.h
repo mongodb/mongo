@@ -789,18 +789,18 @@ public:
          *  - AcquireTicket::kNoSkip will retain the default behavior which is to acquire ticket.
          *
          * Below is the expected behavior.
-         * ----------------------------------------------------------------------------
-         * |                |                      |               |                  |
-         * |                |      PRIMARY         |  SECONDARY    | STATE TRANSITION |
-         * |                |                      |               |                  |
-         * |----------------|----------------------|---------------|------------------|
-         * |                |Unprepared | Prepared |               |                  |
-         * |                |    Txn    |   Txn    |               |                  |
-         * |                |----------------------|               |                  |
-         * |acquireTicket   | kNoSkip   |  kSkip   |  kNoSkip      |     kNoSkip      |
-         * |----------------|----------------------|---------------|------------------|
-         * |maxLockTimeout  |     kAllowed         | kNotAllowed   |  kNotAllowed     |
-         * ----------------------------------------------------------------------------
+         * -----------------------------------------------------------------------------
+         * |                |                       |               |                  |
+         * |                |      PRIMARY          |  SECONDARY    | STATE TRANSITION |
+         * |                |                       |               |                  |
+         * |----------------|-----------------------|---------------|------------------|
+         * |                | Commit/   | Other Txn |               |                  |
+         * |                | Abort Cmd | Cmds      |               |                  |
+         * |                |-----------------------|               |                  |
+         * |acquireTicket   | kSkip     |  kNoSkip  |  kNoSkip      |     kNoSkip      |
+         * |----------------|-----------------------|---------------|------------------|
+         * |maxLockTimeout  |     kAllowed          | kNotAllowed   |  kNotAllowed     |
+         * -----------------------------------------------------------------------------
          */
         void _releaseTransactionResourcesToOpCtx(OperationContext* opCtx,
                                                  MaxLockTimeout maxLockTimeout,

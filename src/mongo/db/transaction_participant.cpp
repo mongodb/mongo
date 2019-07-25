@@ -916,8 +916,6 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
 
     tempTxnResourceStash->release(opCtx);
     releaseOnError.dismiss();
-
-    invariant(opCtx->lockState()->shouldAcquireTicket() || o().txnState.isPrepared());
 }
 
 void TransactionParticipant::Participant::unstashTransactionResources(OperationContext* opCtx,
@@ -941,10 +939,14 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
             // Primaries should respect the transaction lock timeout, since it can prevent
             // the transaction from making progress.
             maxLockTimeout = MaxLockTimeout::kAllowed;
+            // commitTransaction and abortTransaction commands can skip ticketing mechanism as they
+            // don't acquire any new storage resources (except writing to oplog) but they release
+            // any claimed storage resources.
             // Prepared transactions should not acquire ticket. Else, it can deadlock with other
             // non-transactional operations that have exhausted the write tickets and are blocked on
             // them due to prepare or lock conflict.
-            if (o().txnState.isPrepared()) {
+            if (o().txnState.isPrepared() || cmdName == "commitTransaction" ||
+                cmdName == "abortTransaction") {
                 acquireTicket = AcquireTicket::kSkip;
             }
         } else {
