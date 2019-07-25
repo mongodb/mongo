@@ -1613,6 +1613,10 @@ void toBsonValue(uint8_t ctype,
                 uassert(50832,
                         "Expected type double for fractional part.",
                         originalType == TypeBits::kDouble);
+                uassert(31209,
+                        "Integer part is too big to be a double.",
+                        integerPart < kMaxIntForDouble);
+
                 const uint64_t exponent = (64 - countLeadingZeros64(integerPart)) - 1;
                 const size_t fractionalBits = (52 - exponent);
                 const size_t fractionalBytes = (fractionalBits + 7) / 8;
