@@ -695,6 +695,18 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
         return it->second;
     }();
 
+    // Add build UUID to lock manager diagnostic output.
+    auto locker = opCtx->lockState();
+    auto oldLockerDebugInfo = locker->getDebugInfo();
+    {
+        str::stream ss;
+        ss << "index build: " << replState->buildUUID;
+        if (!oldLockerDebugInfo.empty()) {
+            ss << "; " << oldLockerDebugInfo;
+        }
+        locker->setDebugInfo(ss);
+    }
+
     auto status = [&]() {
         try {
             _runIndexBuildInner(opCtx, replState, indexBuildOptions);
@@ -703,6 +715,8 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
         }
         return Status::OK();
     }();
+
+    locker->setDebugInfo(oldLockerDebugInfo);
 
     // Ensure the index build is unregistered from the Coordinator and the Promise is set with
     // the build's result so that callers are notified of the outcome.
