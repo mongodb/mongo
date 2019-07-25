@@ -406,7 +406,17 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
                     readConcernArgs.isEmpty());
         }
 
+        // Release the transaction lock resources and abort storage transaction for unprepared
+        // transactions on failure to unstash the transaction resources to opCtx. We don't want to
+        // have this error guard for beginOrContinue as it can abort the transaction for any
+        // accidental invalid statements in the transaction.
+        auto abortOnError = makeGuard(
+            [&txnParticipant, opCtx] { txnParticipant.abortTransactionIfNotPrepared(opCtx); });
+
         txnParticipant.unstashTransactionResources(opCtx, invocation->definition()->getName());
+
+        // Unstash success.
+        abortOnError.dismiss();
     }
 
     auto guard = makeGuard([&txnParticipant, opCtx] {
