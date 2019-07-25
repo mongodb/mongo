@@ -71,6 +71,7 @@ class ExpressionIn;
 class ExpressionIndexOfArray;
 class ExpressionIndexOfBytes;
 class ExpressionIndexOfCP;
+class ExpressionIsNumber;
 class ExpressionLet;
 class ExpressionLn;
 class ExpressionLog;
@@ -194,6 +195,7 @@ public:
     virtual void visit(ExpressionIndexOfArray*) = 0;
     virtual void visit(ExpressionIndexOfBytes*) = 0;
     virtual void visit(ExpressionIndexOfCP*) = 0;
+    virtual void visit(ExpressionIsNumber*) = 0;
     virtual void visit(ExpressionLet*) = 0;
     virtual void visit(ExpressionLn*) = 0;
     virtual void visit(ExpressionLog*) = 0;

@@ -2378,6 +2378,18 @@ public:
     }
 };
 
+class ExpressionIsNumber final : public ExpressionFixedArity<ExpressionIsNumber, 1> {
+public:
+    explicit ExpressionIsNumber(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : ExpressionFixedArity<ExpressionIsNumber, 1>(expCtx) {}
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+};
 
 class ExpressionWeek final : public DateExpressionAcceptingTimeZone<ExpressionWeek> {
 public:

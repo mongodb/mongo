@@ -4944,6 +4944,18 @@ const char* ExpressionType::getOpName() const {
     return "$type";
 }
 
+/* ------------------------ ExpressionIsNumber --------------------------- */
+
+Value ExpressionIsNumber::evaluate(const Document& root, Variables* variables) const {
+    Value val(_children[0]->evaluate(root, variables));
+    return Value(val.numeric());
+}
+
+REGISTER_EXPRESSION(isNumber, ExpressionIsNumber::parse);
+const char* ExpressionIsNumber::getOpName() const {
+    return "$isNumber";
+}
+
 /* -------------------------- ExpressionZip ------------------------------ */
 
 REGISTER_EXPRESSION(zip, ExpressionZip::parse);

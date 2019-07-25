@@ -5520,6 +5520,102 @@ TEST(ExpressionTypeTest, WithMaxKeyValue) {
 
 }  // namespace Type
 
+namespace IsNumber {
+
+TEST(ExpressionIsNumberTest, WithMinKeyValue) {
+    assertExpectedResults("$isNumber", {{{Value(MINKEY)}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithDoubleValue) {
+    assertExpectedResults("$isNumber", {{{Value(1.0)}, Value(true)}});
+}
+
+TEST(ExpressionIsNumberTest, WithStringValue) {
+    assertExpectedResults("$isNumber", {{{Value("stringValue"_sd)}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithNumericStringValue) {
+    assertExpectedResults("$isNumber", {{{Value("5"_sd)}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithObjectValue) {
+    BSONObj objectVal = fromjson("{a: {$literal: 1}}");
+    assertExpectedResults("$isNumber", {{{Value(objectVal)}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithArrayValue) {
+    assertExpectedResults("$isNumber", {{{Value(BSON_ARRAY(1 << 2))}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithBinDataValue) {
+    BSONBinData binDataVal = BSONBinData("", 0, BinDataGeneral);
+    assertExpectedResults("$isNumber", {{{Value(binDataVal)}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithUndefinedValue) {
+    assertExpectedResults("$isNumber", {{{Value(BSONUndefined)}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithOIDValue) {
+    assertExpectedResults("$isNumber", {{{Value(OID())}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithBoolValue) {
+    assertExpectedResults("$isNumber", {{{Value(true)}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithDateValue) {
+    Date_t dateVal = BSON("" << DATENOW).firstElement().Date();
+    assertExpectedResults("$isNumber", {{{Value(dateVal)}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithNullValue) {
+    assertExpectedResults("$isNumber", {{{Value(BSONNULL)}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithRegexValue) {
+    assertExpectedResults("$isNumber", {{{Value(BSONRegEx("a.b"))}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithSymbolValue) {
+    assertExpectedResults("$isNumber", {{{Value(BSONSymbol("a"))}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithDBRefValue) {
+    assertExpectedResults("$isNumber", {{{Value(BSONDBRef("", OID()))}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithCodeWScopeValue) {
+    assertExpectedResults("$isNumber",
+                          {{{Value(BSONCodeWScope("var x = 3", BSONObj()))}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithCodeValue) {
+    assertExpectedResults("$isNumber", {{{Value(BSONCode("var x = 3"))}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithIntValue) {
+    assertExpectedResults("$isNumber", {{{Value(1)}, Value(true)}});
+}
+
+TEST(ExpressionIsNumberTest, WithDecimalValue) {
+    assertExpectedResults("$isNumber", {{{Value(Decimal128(0.3))}, Value(true)}});
+}
+
+TEST(ExpressionIsNumberTest, WithLongValue) {
+    assertExpectedResults("$isNumber", {{{Value(1LL)}, Value(true)}});
+}
+
+TEST(ExpressionIsNumberTest, WithTimestampValue) {
+    assertExpectedResults("$isNumber", {{{Value(Timestamp(0, 0))}, Value(false)}});
+}
+
+TEST(ExpressionIsNumberTest, WithMaxKeyValue) {
+    assertExpectedResults("$isNumber", {{{Value(MAXKEY)}, Value(false)}});
+}
+
+}  // namespace IsNumber
+
 namespace BuiltinRemoveVariable {
 
 TEST(BuiltinRemoveVariableTest, TypeOfRemoveIsMissing) {
