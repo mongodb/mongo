@@ -35,10 +35,15 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/rename_collection_gen.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangRenameCollectionAfterSendingRenameToPrimaryShard);
+
 namespace {
 /**
  * Internal command run on config servers to rename a collection.
@@ -50,18 +55,18 @@ public:
 
     class Invocation final : public InvocationBase {
     public:
-        using InvocationBase::InvocationBase;
+        BSONObj _requestBody;
+        Invocation(OperationContext* o, const Command* command, const OpMsgRequest& opMsgRequest)
+            : InvocationBase(o, command, opMsgRequest) {
+            _requestBody = opMsgRequest.body;
+        }
 
         void typedRun(OperationContext* opCtx) {
             const NamespaceString& nssSource = ns();
-            const NamespaceString nssTarget = Request().getTo();
-
+            const NamespaceString& nssTarget = request().getTo();
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrRenameCollection can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-            uassert(ErrorCodes::InvalidOptions,
-                    "renameCollection must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
             // Set the operation context read concern level to local for reads into the config
             // database.
@@ -69,7 +74,11 @@ public:
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
             const auto catalogClient = Grid::get(opCtx)->catalogClient();
-
+            auto sourceColl =
+                uassertStatusOK(catalogClient->getCollection(
+                                    opCtx, ns(), repl::ReadConcernLevel::kLocalReadConcern))
+                    .value;
+            uassert(ErrorCodes::InternalError, "Expected UUID", sourceColl.getUUID());
             // For renameCollection within a database, we already take an exclusive lock on the
             // database, so subsequent locks are more of a locking pattern formality rather than
             // a necessity. Currently only assumes renaming within a database not across databases.
@@ -95,6 +104,8 @@ public:
             shardsvrRenameCollectionRequest.setTo(nssTarget);
             shardsvrRenameCollectionRequest.setDropTarget(request().getDropTarget());
             shardsvrRenameCollectionRequest.setStayTemp(request().getStayTemp());
+            shardsvrRenameCollectionRequest.setDbName(request().getDbName());
+            shardsvrRenameCollectionRequest.setUuid(*sourceColl.getUUID());
 
             const auto dbType = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDatabase(
                                                     opCtx,
@@ -104,13 +115,20 @@ public:
             const auto primaryShardId = dbType.getPrimary();
             const auto primaryShard =
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
-            BSONObj unusedPassthroughObj;
             auto cmdResponse = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 "admin",
-                shardsvrRenameCollectionRequest.toBSON(unusedPassthroughObj),
+                shardsvrRenameCollectionRequest.toBSON(
+                    CommandHelpers::filterCommandRequestForPassthrough(_requestBody)),
                 Shard::RetryPolicy::kIdempotent));
+
+            if (MONGO_FAIL_POINT(hangRenameCollectionAfterSendingRenameToPrimaryShard)) {
+                log() << "Hit hangRenameCollectionAfterSendingRenameToPrimaryShard";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+                    opCtx, hangRenameCollectionAfterSendingRenameToPrimaryShard);
+            }
+
             uassertStatusOK(cmdResponse.commandStatus);
         }
 

@@ -79,3 +79,6 @@ commands:
                 description: "Whether or not we want the source collection
                     to be a temporary collection after the rename"
                 default: false
+            uuid:
+                type: uuid
+                description: "UUID of the source collection."

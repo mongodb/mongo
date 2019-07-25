@@ -33,6 +33,7 @@ env.Library(
     source=[
         'active_migrations_registry.cpp',
         'active_move_primaries_registry.cpp',
+        'active_rename_collection_registry.cpp',
         'active_shard_collection_registry.cpp',
         'chunk_move_write_concern_options.cpp',
         'chunk_splitter.cpp',

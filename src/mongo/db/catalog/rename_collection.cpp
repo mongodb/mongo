@@ -62,6 +62,9 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(useRenameCollectionPathThroughConfigsvr);
+
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(writeConflictInRenameCollCopyToTmp);
@@ -98,8 +101,11 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                       str::stream() << "Not primary while renaming collection " << source << " to "
                                     << target);
 
-    if (isCollectionSharded(opCtx, source))
-        return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
+    // TODO: SERVER-42638 Replace checks of cm() with cm()->distributionMode() == sharded
+    if (!MONGO_FAIL_POINT(useRenameCollectionPathThroughConfigsvr)) {
+        if (isCollectionSharded(opCtx, source))
+            return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
+    }
 
     if (isReplicatedChanged(opCtx, source, target))
         return {ErrorCodes::IllegalOperation,
@@ -450,8 +456,11 @@ Status renameBetweenDBs(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
     }
 
-    if (isCollectionSharded(opCtx, source))
-        return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
+    // TODO: SERVER-42638 Replace checks of cm() with cm()->distributionMode() == sharded
+    if (!MONGO_FAIL_POINT(useRenameCollectionPathThroughConfigsvr)) {
+        if (isCollectionSharded(opCtx, source))
+            return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
+    }
 
     if (isReplicatedChanged(opCtx, source, target))
         return {ErrorCodes::IllegalOperation,

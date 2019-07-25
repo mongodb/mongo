@@ -32,13 +32,21 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/active_rename_collection_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/rename_collection_gen.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangRenameCollectionAfterGettingRename);
+
 namespace {
 /**
  * Internal sharding command run on a primary shard server to rename a collection.
@@ -52,8 +60,47 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            validateAndRunRenameCollection(
-                opCtx, ns(), Request().getTo(), Request().getDropTarget(), Request().getStayTemp());
+            auto incomingRequest = request();
+            auto sourceCollUUID = request().getUuid();
+            auto nssFromUUID = CollectionCatalog::get(opCtx).lookupNSSByUUID(sourceCollUUID);
+            if (nssFromUUID == incomingRequest.getTo()) {
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+                return;
+            }
+            auto scopedRenameCollection =
+                uassertStatusOK(ActiveRenameCollectionRegistry::get(opCtx).registerRenameCollection(
+                    incomingRequest));
+
+            if (MONGO_FAIL_POINT(hangRenameCollectionAfterGettingRename)) {
+                log() << "Hit hangRenameCollectionAfterGettingRename";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+                    opCtx, hangRenameCollectionAfterGettingRename);
+            }
+
+            // Check if there is an existing renameCollection running and if so, join it
+            if (!scopedRenameCollection.mustExecute()) {
+                scopedRenameCollection.awaitExecution().get();
+            } else {
+                try {
+                    validateAndRunRenameCollection(opCtx,
+                                                   ns(),
+                                                   incomingRequest.getTo(),
+                                                   incomingRequest.getDropTarget(),
+                                                   incomingRequest.getStayTemp());
+                } catch (const DBException& e) {
+                    scopedRenameCollection.emplaceStatus(e.toStatus());
+                    throw;
+                } catch (const std::exception& e) {
+                    scopedRenameCollection.emplaceStatus(
+                        {ErrorCodes::InternalError,
+                         str::stream()
+                             << "Severe error occurred while running shardCollection command: "
+                             << e.what()});
+                    throw;
+                }
+                scopedRenameCollection.emplaceStatus(Status::OK());
+            }
         }
 
     private:
