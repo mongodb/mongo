@@ -864,9 +864,6 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhausted) {
 TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhaustedWithNonExhaustedRemotes) {
     auto mockCursor = allocateMockCursor();
 
-    // The mock should indicate that is has open remote cursors.
-    mockCursor->markRemotesNotExhausted();
-
     auto cursorId =
         assertGet(getManager()->registerCursor(_opCtx.get(),
                                                std::move(mockCursor),
@@ -925,7 +922,6 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorDestructorKill) {
 // Test that PinnedCursor::remotesExhausted() correctly forwards to the underlying mock cursor.
 TEST_F(ClusterCursorManagerTest, RemotesExhausted) {
     auto mockCursor = allocateMockCursor();
-    mockCursor->markRemotesNotExhausted();
     ASSERT_FALSE(mockCursor->remotesExhausted());
 
     auto cursorId =

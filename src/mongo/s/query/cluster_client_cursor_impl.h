@@ -34,6 +34,7 @@
 
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/cluster_client_cursor.h"
+#include "mongo/s/query/cluster_client_cursor_guard.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/query/router_exec_stage.h"
@@ -42,43 +43,6 @@
 namespace mongo {
 
 class RouterStageMock;
-
-/**
- * An RAII object which owns a ClusterClientCursor and kills the cursor if it is not explicitly
- * released.
- */
-class ClusterClientCursorGuard final {
-    ClusterClientCursorGuard(const ClusterClientCursorGuard&) = delete;
-    ClusterClientCursorGuard& operator=(const ClusterClientCursorGuard&) = delete;
-
-public:
-    ClusterClientCursorGuard(OperationContext* opCtx, std::unique_ptr<ClusterClientCursor> ccc);
-
-    /**
-     * If a cursor is owned, safely destroys the cursor, cleaning up remote cursor state if
-     * necessary. May block waiting for remote cursor cleanup.
-     *
-     * If no cursor is owned, does nothing.
-     */
-    ~ClusterClientCursorGuard();
-
-    ClusterClientCursorGuard(ClusterClientCursorGuard&&) = default;
-    ClusterClientCursorGuard& operator=(ClusterClientCursorGuard&&) = default;
-
-    /**
-     * Returns a pointer to the underlying cursor.
-     */
-    ClusterClientCursor* operator->();
-
-    /**
-     * Transfers ownership of the underlying cursor to the caller.
-     */
-    std::unique_ptr<ClusterClientCursor> releaseCursor();
-
-private:
-    OperationContext* _opCtx;
-    std::unique_ptr<ClusterClientCursor> _ccc;
-};
 
 class ClusterClientCursorImpl final : public ClusterClientCursor {
     ClusterClientCursorImpl(const ClusterClientCursorImpl&) = delete;

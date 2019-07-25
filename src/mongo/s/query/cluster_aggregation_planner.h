@@ -35,7 +35,9 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/query/cluster_client_cursor_guard.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/owned_remote_cursor.h"
 #include "mongo/s/shard_id.h"
 

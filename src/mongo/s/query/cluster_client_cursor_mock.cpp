@@ -43,7 +43,7 @@ ClusterClientCursorMock::ClusterClientCursorMock(boost::optional<LogicalSessionI
     : _killCallback(std::move(killCallback)), _lsid(lsid), _txnNumber(txnNumber) {}
 
 ClusterClientCursorMock::~ClusterClientCursorMock() {
-    invariant((_exhausted && _remotesExhausted) || _killed);
+    invariant(_remotesExhausted || _killed);
 }
 
 StatusWith<ClusterQueryResult> ClusterClientCursorMock::next(
@@ -51,7 +51,7 @@ StatusWith<ClusterQueryResult> ClusterClientCursorMock::next(
     invariant(!_killed);
 
     if (_resultsQueue.empty()) {
-        _exhausted = true;
+        _remotesExhausted = true;
         return {ClusterQueryResult()};
     }
 
@@ -127,10 +127,6 @@ void ClusterClientCursorMock::queueResult(const ClusterQueryResult& result) {
 
 bool ClusterClientCursorMock::remotesExhausted() {
     return _remotesExhausted;
-}
-
-void ClusterClientCursorMock::markRemotesNotExhausted() {
-    _remotesExhausted = false;
 }
 
 void ClusterClientCursorMock::queueError(Status status) {

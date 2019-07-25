@@ -40,24 +40,6 @@
 
 namespace mongo {
 
-ClusterClientCursorGuard::ClusterClientCursorGuard(OperationContext* opCtx,
-                                                   std::unique_ptr<ClusterClientCursor> ccc)
-    : _opCtx(opCtx), _ccc(std::move(ccc)) {}
-
-ClusterClientCursorGuard::~ClusterClientCursorGuard() {
-    if (_ccc && !_ccc->remotesExhausted()) {
-        _ccc->kill(_opCtx);
-    }
-}
-
-ClusterClientCursor* ClusterClientCursorGuard::operator->() {
-    return _ccc.get();
-}
-
-std::unique_ptr<ClusterClientCursor> ClusterClientCursorGuard::releaseCursor() {
-    return std::move(_ccc);
-}
-
 ClusterClientCursorGuard ClusterClientCursorImpl::make(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,

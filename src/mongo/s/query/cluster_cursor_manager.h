@@ -40,6 +40,7 @@
 #include "mongo/db/session_killer.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/query/cluster_client_cursor.h"
+#include "mongo/s/query/cluster_client_cursor_guard.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
@@ -198,7 +199,7 @@ public:
          * and 'cursorId' must be non-zero.
          */
         PinnedCursor(ClusterCursorManager* manager,
-                     std::unique_ptr<ClusterClientCursor> cursor,
+                     ClusterClientCursorGuard&& cursor,
                      const NamespaceString& nss,
                      CursorId cursorId);
 
@@ -427,9 +428,10 @@ private:
      *
      * Not thread-safe.
      */
-    StatusWith<std::unique_ptr<ClusterClientCursor>> _detachCursor(WithLock,
-                                                                   NamespaceString const& nss,
-                                                                   CursorId cursorId);
+    StatusWith<ClusterClientCursorGuard> _detachCursor(WithLock,
+                                                       OperationContext* opCtx,
+                                                       const NamespaceString& nss,
+                                                       CursorId cursorId);
 
     /**
      * Flags the OperationContext that's using the given cursor as interrupted.
@@ -502,25 +504,28 @@ private:
         }
 
         /**
+         * Returns a cursor guard holding the cursor owned by this CursorEntry for an operation to
+         * use. Only one operation may use the cursor at a time, so callers should check that
+         * getOperationUsingCursor() returns null before using this function. Callers may not pass
+         * nullptr for opCtx. Ownership of the cursor is given to the returned
+         * ClusterClientCursorGuard; callers that want to assume ownership over the cursor directly
+         * must unpack the cursor from the returned guard.
+         */
+        ClusterClientCursorGuard releaseCursor(OperationContext* opCtx) {
+            invariant(!_operationUsingCursor);
+            invariant(_cursor);
+            invariant(opCtx);
+            _operationUsingCursor = opCtx;
+            return ClusterClientCursorGuard(opCtx, std::move(_cursor));
+        }
+
+        /**
          * Creates a generic cursor from the cursor inside this entry. Should only be called on
          * idle cursors. The caller must supply the cursorId and namespace because the CursorEntry
          * does not have access to them.  Cannot be called if this CursorEntry does not own an
          * underlying ClusterClientCursor.
          */
         GenericCursor cursorToGenericCursor(CursorId cursorId, const NamespaceString& ns) const;
-
-        /**
-         * Returns the cursor owned by this CursorEntry for an operation to use. Only one operation
-         * may use the cursor at a time, so callers should check that getOperationUsingCursor()
-         * returns null before using this function. Callers may pass nullptr, but only if the
-         * released cursor is going to be deleted.
-         */
-        std::unique_ptr<ClusterClientCursor> releaseCursor(OperationContext* opCtx) {
-            invariant(!_operationUsingCursor);
-            invariant(_cursor);
-            _operationUsingCursor = opCtx;
-            return std::move(_cursor);
-        }
 
         OperationContext* getOperationUsingCursor() const {
             return _operationUsingCursor;

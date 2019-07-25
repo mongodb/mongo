@@ -101,12 +101,9 @@ public:
     void incNBatches() final;
 
     /**
-     * Returns true unless marked as having non-exhausted remote cursors via
-     * markRemotesNotExhausted().
+     * Returns false unless the mock cursor has been fully iterated.
      */
     bool remotesExhausted() final;
-
-    void markRemotesNotExhausted();
 
     /**
      * Queues an error response.
@@ -115,7 +112,6 @@ public:
 
 private:
     bool _killed = false;
-    bool _exhausted = false;
     std::queue<StatusWith<ClusterQueryResult>> _resultsQueue;
     std::function<void(void)> _killCallback;
 
@@ -128,7 +124,7 @@ private:
     // Number of returned documents.
     long long _numReturnedSoFar = 0;
 
-    bool _remotesExhausted = true;
+    bool _remotesExhausted = false;
 
     boost::optional<LogicalSessionId> _lsid;
 
