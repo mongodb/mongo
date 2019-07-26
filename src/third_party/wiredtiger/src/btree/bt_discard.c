@@ -289,7 +289,7 @@ __wt_free_ref(
 		__wt_free(session, ref->page_del);
 	}
 
-	__wt_overwrite_and_free(session, ref);
+	__wt_overwrite_and_free_len(session, ref, WT_REF_CLEAR_SIZE);
 }
 
 /*

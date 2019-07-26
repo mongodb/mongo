@@ -23,7 +23,7 @@ struct __wt_process {
 	double	 tsc_nsec_ratio;	/* rdtsc ticks to nanoseconds */
 	bool use_epochtime;		/* use expensive time */
 
-					/* Checksum function */
+					/* Checksum functions */
 #define	__wt_checksum(chunk, len)	__wt_process.checksum(chunk, len)
 	uint32_t (*checksum)(const void *, size_t);
 };
