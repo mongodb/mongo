@@ -1,7 +1,7 @@
 /**
- * This tests that writes with majority write concern will wait for at least the all committed
+ * This tests that writes with majority write concern will wait for at least the all durable
  * timestamp to reach the timestamp of the write. This guarantees that once a write is majority
- * committed, reading at the all committed timestamp will read that write.
+ * committed, reading at the all durable timestamp will read that write.
  *
  * @tags: [requires_document_locking]
  */
@@ -16,13 +16,13 @@
         assert(result.getWriteConcernError().errInfo.wtimeout, tojson(result));
     }
 
-    const rst = new ReplSetTest({name: "writes_wait_for_all_committed", nodes: 1});
+    const rst = new ReplSetTest({name: "writes_wait_for_all_durable", nodes: 1});
     rst.startSet();
     rst.initiate();
 
     const primary = rst.getPrimary();
     const dbName = "test";
-    const collName = "majority_writes_wait_for_all_committed";
+    const collName = "majority_writes_wait_for_all_durable";
     const testDB = primary.getDB(dbName);
     const testColl = testDB[collName];
 
@@ -39,7 +39,7 @@
     }));
 
     jsTestLog(
-        "Insert a document to hang before the insert completes to hold back the all committed timestamp.");
+        "Insert a document to hang before the insert completes to hold back the all durable timestamp.");
     const joinHungWrite = startParallelShell(() => {
         assert.commandWorked(
             db.getSiblingDB(TestData.dbName)[TestData.collName].insert({_id: "b"}));

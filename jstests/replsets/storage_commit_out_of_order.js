@@ -1,6 +1,6 @@
 /**
  * Tests that single voting primaries can commit majority writes when they storage-commit out of
- * order. This test first inserts a document to set the last applied optime, all committed
+ * order. This test first inserts a document to set the last applied optime, all_durable
  * timestamp, and stable timestamp. It then spawns 'n' threads and holds them behind a barrier. Once
  * the threads are all waiting at the barrier, the threads all do a w:majority insert. We turn on a
  * fail point that will block the first thread to receive an optime from the optime generator for a
