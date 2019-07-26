@@ -257,10 +257,10 @@ private:
     void _txnOpen();
 
     /**
-     * Starts a transaction at the current all-committed timestamp.
+     * Starts a transaction at the current all_durable timestamp.
      * Returns the timestamp the transaction was started at.
      */
-    Timestamp _beginTransactionAtAllCommittedTimestamp(WT_SESSION* session);
+    Timestamp _beginTransactionAtAllDurableTimestamp(WT_SESSION* session);
 
     /**
      * Starts a transaction at the no-overlap timestamp. Returns the timestamp the transaction

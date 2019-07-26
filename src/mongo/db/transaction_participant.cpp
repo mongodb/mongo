@@ -598,10 +598,10 @@ void TransactionParticipant::Participant::_setReadSnapshot(OperationContext* opC
         o(lk).transactionMetricsObserver.onChooseReadTimestamp(readTimestamp);
     } else if (readConcernArgs.getOriginalLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
         // For transactions with read concern level specified as 'snapshot', we will use
-        // 'kAllCommittedSnapshot' which ensures a snapshot with no 'holes'; that is, it is a state
+        // 'kAllDurableSnapshot' which ensures a snapshot with no 'holes'; that is, it is a state
         // of the system that could be reconstructed from the oplog.
         opCtx->recoveryUnit()->setTimestampReadSource(
-            RecoveryUnit::ReadSource::kAllCommittedSnapshot);
+            RecoveryUnit::ReadSource::kAllDurableSnapshot);
 
         const auto readTimestamp =
             repl::StorageInterface::get(opCtx)->getPointInTimeReadTimestamp(opCtx);
@@ -661,10 +661,10 @@ TransactionParticipant::OplogSlotReserver::~OplogSlotReserver() {
         _recoveryUnit->abortUnitOfWork();
     }
 
-    // After releasing the oplog hole, the "all committed timestamp" can advance past
-    // this oplog hole, if there are no other open holes. Check if we can advance the stable
-    // timestamp any further since a majority write may be waiting on the stable timestamp to
-    // advance beyond this oplog hole to acknowledge the write to the user.
+    // After releasing the oplog hole, the all_durable timestamp can advance past this oplog hole,
+    // if there are no other open holes. Check if we can advance the stable timestamp any further
+    // since a majority write may be waiting on the stable timestamp to advance beyond this oplog
+    // hole to acknowledge the write to the user.
     auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
     replCoord->attemptToAdvanceStableTimestamp();
 }

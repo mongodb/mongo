@@ -240,8 +240,8 @@ public:
      * a point in time. Any point in time returned will reflect one of the following:
      *  - when using ReadSource::kProvided, the timestamp provided.
      *  - when using ReadSource::kNoOverlap, the timestamp chosen by the storage engine.
-     *  - when using ReadSource::kAllCommittedSnapshot, the timestamp chosen using the storage
-     * engine's all-committed timestamp.
+     *  - when using ReadSource::kAllDurableSnapshot, the timestamp chosen using the storage
+     * engine's all_durable timestamp.
      *  - when using ReadSource::kLastApplied, the timestamp chosen using the storage engine's last
      * applied timestamp. Can return boost::none if no timestamp has been established.
      *  - when using ReadSource::kMajorityCommitted, the majority committed timestamp chosen by the
@@ -368,10 +368,10 @@ public:
          */
         kLastApplied,
         /**
-         * Read from the all-committed timestamp. New transactions will always read from the same
+         * Read from the all_durable timestamp. New transactions will always read from the same
          * timestamp and never advance.
          */
-        kAllCommittedSnapshot,
+        kAllDurableSnapshot,
         /**
          * Read from the timestamp provided to setTimestampReadSource.
          */

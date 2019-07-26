@@ -136,7 +136,7 @@ public:
 
     void setJournalListener(mongo::JournalListener* jl) final {}
 
-    virtual Timestamp getAllCommittedTimestamp() const override {
+    virtual Timestamp getAllDurableTimestamp() const override {
         RecordId id = _visibilityManager->getAllCommittedRecord();
         return Timestamp(id.repr());
     }

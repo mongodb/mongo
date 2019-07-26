@@ -1798,8 +1798,8 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
     return {stableTimestamp};
 }
 
-Timestamp WiredTigerKVEngine::getAllCommittedTimestamp() const {
-    return Timestamp(_oplogManager->fetchAllCommittedValue(_conn));
+Timestamp WiredTigerKVEngine::getAllDurableTimestamp() const {
+    return Timestamp(_oplogManager->fetchAllDurableValue(_conn));
 }
 
 Timestamp WiredTigerKVEngine::getOldestOpenReadTimestamp() const {

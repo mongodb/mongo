@@ -3459,26 +3459,26 @@ boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_chooseStableOpTi
     if (_readWriteAbility->canAcceptNonLocalWrites(lk) && _storage->supportsDocLocking(_service)) {
         // If the storage engine supports document level locking, then it is possible for oplog
         // writes to commit out of order. In that case, we don't want to set the stable timestamp
-        // ahead of the all committed timestamp. This is not a problem for oplog application
-        // because we only set lastApplied between batches when the all committed timestamp cannot
-        // be behind. During oplog application the all committed timestamp can jump around since
+        // ahead of the all_durable timestamp. This is not a problem for oplog application
+        // because we only set lastApplied between batches when the all_durable timestamp cannot
+        // be behind. During oplog application the all_durable timestamp can jump around since
         // we first write oplog entries to the oplog and then go back and apply them.
         //
         // We must construct an upper bound for the stable optime candidates such that the upper
         // bound is at most 'maximumStableOpTime' and any candidate with a timestamp higher than the
-        // all committed is greater than the upper bound. If the timestamp of 'maximumStableOpTime'
-        // is <= the all committed, then we use 'maximumStableOpTime'. Otherwise, we construct an
-        // optime using the all committed and the term of 'maximumStableOpTime'. We must argue that
-        // there are no stable optime candidates with a timestamp greater than the all committed and
+        // all_durable is greater than the upper bound. If the timestamp of 'maximumStableOpTime'
+        // is <= the all_durable, then we use 'maximumStableOpTime'. Otherwise, we construct an
+        // optime using the all_durable and the term of 'maximumStableOpTime'. We must argue that
+        // there are no stable optime candidates with a timestamp greater than the all_durable and
         // a term less than that of 'maximumStableOpTime'. Suppose there were. The
-        // 'maximumStableOpTime' is either the commit point or the lastApplied, so the all committed
+        // 'maximumStableOpTime' is either the commit point or the lastApplied, so the all_durable
         // can only be behind 'maximumStableOpTime' on a primary. If there is a candidate with a
-        // higher timestamp than the all committed but a lower term than 'maximumStableOpTime', then
-        // the all committed corresponds to a write in an earlier term than the current one. But
+        // higher timestamp than the all_durable but a lower term than 'maximumStableOpTime', then
+        // the all_durable corresponds to a write in an earlier term than the current one. But
         // this is not possible on a primary, since on step-up, the primary storage commits a 'new
         // primary' oplog entry in the new term before accepting any new writes, so the all
-        // committed must be in the current term.
-        maximumStableTimestamp = std::min(_storage->getAllCommittedTimestamp(_service),
+        // durable must be in the current term.
+        maximumStableTimestamp = std::min(_storage->getAllDurableTimestamp(_service),
                                           maximumStableOpTime.opTime.getTimestamp());
     }
 

@@ -396,12 +396,16 @@ public:
                                                          bool primaryOnly = false) = 0;
 
     /**
-     * Returns the all committed timestamp. All transactions with timestamps earlier than the
-     * all committed timestamp are committed. Only storage engines that support document level
-     * locking must provide an implementation. Other storage engines may provide a no-op
-     * implementation.
+     * Returns the all_durable timestamp. All transactions with timestamps earlier than the
+     * all_durable timestamp are committed. Only storage engines that support document level locking
+     * must provide an implementation. Other storage engines may provide a no-op implementation.
+     *
+     * The all_durable timestamp only includes non-prepared transactions that have been given a
+     * commit_timestamp and prepared transactions that have been given a durable_timestamp.
+     * Previously, the deprecated all_committed timestamp would also include prepared transactions
+     * that were prepared but not committed which could make the stable timestamp briefly jump back.
      */
-    virtual Timestamp getAllCommittedTimestamp(ServiceContext* serviceCtx) const = 0;
+    virtual Timestamp getAllDurableTimestamp(ServiceContext* serviceCtx) const = 0;
 
     /**
      * Returns the oldest read timestamp in use by an open transaction. Storage engines that support

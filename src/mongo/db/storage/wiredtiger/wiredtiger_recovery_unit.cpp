@@ -475,7 +475,7 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
         // opened.
         case ReadSource::kNoOverlap:
         case ReadSource::kLastApplied:
-        case ReadSource::kAllCommittedSnapshot:
+        case ReadSource::kAllDurableSnapshot:
             break;
     }
 
@@ -491,7 +491,7 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
             }
             return boost::none;
         case ReadSource::kNoOverlap:
-        case ReadSource::kAllCommittedSnapshot:
+        case ReadSource::kAllDurableSnapshot:
             invariant(!_readAtTimestamp.isNull());
             return _readAtTimestamp;
 
@@ -551,9 +551,9 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             _readAtTimestamp = _beginTransactionAtNoOverlapTimestamp(session);
             break;
         }
-        case ReadSource::kAllCommittedSnapshot: {
+        case ReadSource::kAllDurableSnapshot: {
             if (_readAtTimestamp.isNull()) {
-                _readAtTimestamp = _beginTransactionAtAllCommittedTimestamp(session);
+                _readAtTimestamp = _beginTransactionAtAllDurableTimestamp(session);
                 break;
             }
             // Intentionally continue to the next case to read at the _readAtTimestamp.
@@ -577,17 +577,17 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     LOG(3) << "WT begin_transaction for snapshot id " << _mySnapshotId;
 }
 
-Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllCommittedTimestamp(WT_SESSION* session) {
+Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllDurableTimestamp(WT_SESSION* session) {
     WiredTigerBeginTxnBlock txnOpen(session,
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound);
-    Timestamp txnTimestamp = Timestamp(_oplogManager->fetchAllCommittedValue(session->connection));
+    Timestamp txnTimestamp = Timestamp(_oplogManager->fetchAllDurableValue(session->connection));
     auto status = txnOpen.setReadSnapshot(txnTimestamp);
     fassert(50948, status);
 
     // Since this is not in a critical section, we might have rounded to oldest between
-    // calling getAllCommitted and setReadSnapshot.  We need to get the actual read timestamp we
+    // calling getAllDurable and setReadSnapshot.  We need to get the actual read timestamp we
     // used.
     auto readTimestamp = _getTransactionReadTimestamp(session);
     txnOpen.done();
@@ -597,7 +597,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllCommittedTimestamp(WT_SE
 Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSION* session) {
 
     auto lastApplied = _sessionCache->snapshotManager().getLocalSnapshot();
-    Timestamp allCommitted = Timestamp(_oplogManager->fetchAllCommittedValue(session->connection));
+    Timestamp allDurable = Timestamp(_oplogManager->fetchAllDurableValue(session->connection));
 
     // When using timestamps for reads and writes, it's important that readers and writers don't
     // overlap with the timestamps they use. In other words, at any point in the system there should
@@ -605,13 +605,13 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSI
     // at, or earlier than T. This time T is called the no-overlap point. Using the `kNoOverlap`
     // ReadSource will compute the most recent known time that is safe to read at.
 
-    // The no-overlap point is computed as the minimum of the storage engine's all-committed time
+    // The no-overlap point is computed as the minimum of the storage engine's all_durable time
     // and replication's last applied time. On primaries, the last applied time is updated as
     // transactions commit, which is not necessarily in the order they appear in the oplog. Thus
-    // the all-committed time is an appropriate value to read at.
+    // the all_durable time is an appropriate value to read at.
 
-    // On secondaries, however, the all-committed time, as computed by the storage engine, can
-    // advance before oplog application completes a batch. This is because the all-committed time
+    // On secondaries, however, the all_durable time, as computed by the storage engine, can
+    // advance before oplog application completes a batch. This is because the all_durable time
     // is only computed correctly if the storage engine is informed of commit timestamps in
     // increasing order. Because oplog application processes a batch of oplog entries out of order,
     // the timestamping requirement is not satisfied. Secondaries, however, only update the last
@@ -619,11 +619,11 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSI
     // secondaries.
 
     // By taking the minimum of the two values, storage can compute a legal time to read at without
-    // knowledge of the replication state. The no-overlap point is the minimum of the all-committed
+    // knowledge of the replication state. The no-overlap point is the minimum of the all_durable
     // time, which represents the point where no transactions will commit any earlier, and
     // lastApplied, which represents the highest optime a node has applied, a point no readers
     // should read afterward.
-    Timestamp readTimestamp = (lastApplied) ? std::min(*lastApplied, allCommitted) : allCommitted;
+    Timestamp readTimestamp = (lastApplied) ? std::min(*lastApplied, allDurable) : allDurable;
 
     WiredTigerBeginTxnBlock txnOpen(session,
                                     _prepareConflictBehavior,
@@ -632,7 +632,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSI
     auto status = txnOpen.setReadSnapshot(readTimestamp);
     fassert(51066, status);
 
-    // We might have rounded to oldest between calling getAllCommitted and setReadSnapshot. We need
+    // We might have rounded to oldest between calling getAllDurable and setReadSnapshot. We need
     // to get the actual read timestamp we used.
     readTimestamp = _getTransactionReadTimestamp(session);
     txnOpen.done();

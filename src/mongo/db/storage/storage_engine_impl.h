@@ -139,7 +139,7 @@ public:
 
     virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp() const override;
 
-    virtual Timestamp getAllCommittedTimestamp() const override;
+    virtual Timestamp getAllDurableTimestamp() const override;
 
     virtual Timestamp getOldestOpenReadTimestamp() const override;
 

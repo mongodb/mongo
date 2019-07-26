@@ -800,8 +800,8 @@ void StorageEngineImpl::replicationBatchIsComplete() const {
     return _engine->replicationBatchIsComplete();
 }
 
-Timestamp StorageEngineImpl::getAllCommittedTimestamp() const {
-    return _engine->getAllCommittedTimestamp();
+Timestamp StorageEngineImpl::getAllDurableTimestamp() const {
+    return _engine->getAllDurableTimestamp();
 }
 
 Timestamp StorageEngineImpl::getOldestOpenReadTimestamp() const {

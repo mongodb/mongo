@@ -339,17 +339,17 @@ public:
                 // shutting down. This isn't an actual concern because the testing infrastructure
                 // won't use the $_internalReadAtClusterTime option in any test suite where clean
                 // shutdown is expected to occur concurrently with tests running.
-                auto allCommittedTime = storageEngine->getAllCommittedTimestamp();
-                invariant(!allCommittedTime.isNull());
+                auto allDurableTime = storageEngine->getAllDurableTimestamp();
+                invariant(!allDurableTime.isNull());
 
                 uassert(ErrorCodes::InvalidOptions,
                         str::stream() << "$_internalReadAtClusterTime value must not be greater"
-                                         " than the all-committed timestamp. Requested"
+                                         " than the all_durable timestamp. Requested"
                                          " clusterTime: "
                                       << targetClusterTime->toString()
-                                      << "; all-committed timestamp: "
-                                      << allCommittedTime.toString(),
-                        allCommittedTime >= targetClusterTime);
+                                      << "; all_durable timestamp: "
+                                      << allDurableTime.toString(),
+                        allDurableTime >= targetClusterTime);
 
                 // The $_internalReadAtClusterTime option causes any storage-layer cursors created
                 // during plan execution to read from a consistent snapshot of data at the supplied

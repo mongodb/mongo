@@ -90,8 +90,8 @@ Timestamp StorageInterfaceMock::getInitialDataTimestamp() const {
     return _initialDataTimestamp;
 }
 
-Timestamp StorageInterfaceMock::getAllCommittedTimestamp(ServiceContext* serviceCtx) const {
-    return allCommittedTimestamp;
+Timestamp StorageInterfaceMock::getAllDurableTimestamp(ServiceContext* serviceCtx) const {
+    return allDurableTimestamp;
 }
 
 Timestamp StorageInterfaceMock::getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const {
