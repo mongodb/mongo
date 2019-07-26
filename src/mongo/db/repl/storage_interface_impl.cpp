@@ -1214,8 +1214,8 @@ bool StorageInterfaceImpl::supportsDocLocking(ServiceContext* serviceCtx) const 
     return serviceCtx->getStorageEngine()->supportsDocLocking();
 }
 
-Timestamp StorageInterfaceImpl::getAllCommittedTimestamp(ServiceContext* serviceCtx) const {
-    return serviceCtx->getStorageEngine()->getAllCommittedTimestamp();
+Timestamp StorageInterfaceImpl::getAllDurableTimestamp(ServiceContext* serviceCtx) const {
+    return serviceCtx->getStorageEngine()->getAllDurableTimestamp();
 }
 
 Timestamp StorageInterfaceImpl::getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const {

@@ -207,7 +207,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         _opsWaitingForJournal = false;
         lk.unlock();
 
-        const uint64_t newTimestamp = fetchAllCommittedValue(sessionCache->conn());
+        const uint64_t newTimestamp = fetchAllDurableValue(sessionCache->conn());
 
         // The newTimestamp may actually go backward during secondary batch application,
         // where we commit data file changes separately from oplog changes, so ignore
@@ -249,11 +249,11 @@ void WiredTigerOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimest
     LOG(2) << "Setting new oplogReadTimestamp: " << Timestamp(newTimestamp);
 }
 
-uint64_t WiredTigerOplogManager::fetchAllCommittedValue(WT_CONNECTION* conn) {
-    // Fetch the latest all_committed value from the storage engine.  This value will be a
-    // timestamp that has no holes (uncommitted transactions with lower timestamps) behind it.
+uint64_t WiredTigerOplogManager::fetchAllDurableValue(WT_CONNECTION* conn) {
+    // Fetch the latest all_durable value from the storage engine. This value will be a timestamp
+    // that has no holes (uncommitted transactions with lower timestamps) behind it.
     char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-    auto wtstatus = conn->query_timestamp(conn, buf, "get=all_committed");
+    auto wtstatus = conn->query_timestamp(conn, buf, "get=all_durable");
     if (wtstatus == WT_NOTFOUND) {
         // Treat this as lowest possible timestamp; we need to see all preexisting data but no new
         // (timestamped) data.

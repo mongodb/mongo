@@ -230,7 +230,7 @@ public:
      */
     boost::optional<Timestamp> getLastStableRecoveryTimestamp() const override;
 
-    Timestamp getAllCommittedTimestamp() const override;
+    Timestamp getAllDurableTimestamp() const override;
 
     Timestamp getOldestOpenReadTimestamp() const override;
 

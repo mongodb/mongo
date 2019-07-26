@@ -515,7 +515,7 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
     auto storageEngine = getGlobalServiceContext()->getStorageEngine();
     if (storageEngine) {
         // Set the oldestTimestamp to one because WiredTiger does not allow us to set it to zero
-        // since that would also set the all committed point to zero. We specifically don't set
+        // since that would also set the all_durable point to zero. We specifically don't set
         // the stable timestamp here because that will trigger taking a first stable checkpoint even
         // though the initialDataTimestamp is still set to kAllowUnstableCheckpointsSentinel.
         storageEngine->setOldestTimestamp(kTimestampOne);
@@ -803,7 +803,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
     auto filterBob = BSONObjBuilder(queryBob.subobjStart("filter"));
     filterBob.append("_id", FeatureCompatibilityVersionParser::kParameterName);
     filterBob.done();
-    // As part of reading the FCV, we ensure the source node "all committed" timestamp has advanced
+    // As part of reading the FCV, we ensure the source node's all_durable timestamp has advanced
     // to at least the timestamp of the last optime that we found in the lastOplogEntryFetcher.
     // When document locking is used, there could be oplog "holes" which would result in
     // inconsistent initial sync data if we didn't do this.

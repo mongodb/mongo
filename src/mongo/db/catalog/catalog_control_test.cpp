@@ -81,7 +81,7 @@ public:
         return false;
     }
     void clearDropPendingState() final {}
-    Timestamp getAllCommittedTimestamp() const final {
+    Timestamp getAllDurableTimestamp() const final {
         return {};
     }
     Timestamp getOldestOpenReadTimestamp() const final {

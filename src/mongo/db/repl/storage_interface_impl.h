@@ -172,7 +172,7 @@ public:
 
     bool supportsDocLocking(ServiceContext* serviceCtx) const override;
 
-    Timestamp getAllCommittedTimestamp(ServiceContext* serviceCtx) const override;
+    Timestamp getAllDurableTimestamp(ServiceContext* serviceCtx) const override;
 
     Timestamp getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const override;
 

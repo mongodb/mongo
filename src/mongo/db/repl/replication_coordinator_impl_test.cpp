@@ -4260,7 +4260,7 @@ TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorage) {
     ASSERT_EQUALS(Timestamp::min(), getStorageInterface()->getStableTimestamp());
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
-    getStorageInterface()->allCommittedTimestamp = Timestamp(1, 1);
+    getStorageInterface()->allDurableTimestamp = Timestamp(1, 1);
     replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(1, 1), Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(OpTimeWithTermOne(1, 1), Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
@@ -4274,7 +4274,7 @@ TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorage) {
     stableTimestamp = getStorageInterface()->getStableTimestamp();
     ASSERT_EQUALS(Timestamp(1, 1), getStorageInterface()->getStableTimestamp());
 
-    getStorageInterface()->allCommittedTimestamp = Timestamp(3, 1);
+    getStorageInterface()->allDurableTimestamp = Timestamp(3, 1);
 
     // Check that the stable timestamp is updated for the storage engine when we set the applied
     // optime.
@@ -4329,7 +4329,7 @@ TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorageDisableMajori
 
     // Check that the stable timestamp is updated for the storage engine when we set the applied
     // optime, even though the last committed optime is unset.
-    getStorageInterface()->allCommittedTimestamp = Timestamp(1, 1);
+    getStorageInterface()->allDurableTimestamp = Timestamp(1, 1);
     replCoordSetMyLastAppliedOpTime(OpTime({1, 1}, 1), Date_t() + Seconds(100));
     ASSERT_EQUALS(Timestamp(1, 1), getStorageInterface()->getStableTimestamp());
 }
@@ -4366,7 +4366,7 @@ TEST_F(StableOpTimeTest, AdvanceCommitPointSetsStableOpTimeForStorage) {
     long long term = 2;
 
     getStorageInterface()->supportsDocLockingBool = true;
-    getStorageInterface()->allCommittedTimestamp = Timestamp(2, 1);
+    getStorageInterface()->allDurableTimestamp = Timestamp(2, 1);
 
     // Add three stable optime candidates.
     replCoordSetMyLastAppliedOpTime(OpTime({2, 1}, term), Date_t() + Seconds(1));
@@ -4387,7 +4387,7 @@ TEST_F(StableOpTimeTest, AdvanceCommitPointSetsStableOpTimeForStorage) {
     stableTimestamp = getStorageInterface()->getStableTimestamp();
     ASSERT_EQUALS(Timestamp(2, 1), stableTimestamp);
 
-    getStorageInterface()->allCommittedTimestamp = Timestamp(4, 4);
+    getStorageInterface()->allDurableTimestamp = Timestamp(4, 4);
 
     // Check that the stable timestamp is updated when we advance the commit point.
     replCoordAdvanceCommitPoint(OpTime({3, 2}, term), Date_t() + Seconds(3), false);

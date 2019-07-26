@@ -117,7 +117,7 @@ public:
     }
     void cleanShutdown() override {}
     void setJournalListener(JournalListener* jl) override {}
-    Timestamp getAllCommittedTimestamp() const override {
+    Timestamp getAllDurableTimestamp() const override {
         return {};
     }
     Timestamp getOldestOpenReadTimestamp() const override {

@@ -310,7 +310,7 @@ public:
         return boost::none;
     }
 
-    Timestamp getAllCommittedTimestamp(ServiceContext* serviceCtx) const override;
+    Timestamp getAllDurableTimestamp(ServiceContext* serviceCtx) const override;
 
     Timestamp getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const override;
 
@@ -403,7 +403,7 @@ public:
     };
 
     bool supportsDocLockingBool = false;
-    Timestamp allCommittedTimestamp = Timestamp::min();
+    Timestamp allDurableTimestamp = Timestamp::min();
     Timestamp oldestOpenReadTimestamp = Timestamp::min();
 
 private:

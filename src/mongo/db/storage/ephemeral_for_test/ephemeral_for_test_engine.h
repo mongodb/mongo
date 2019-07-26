@@ -112,7 +112,7 @@ public:
         _journalListener = jl;
     }
 
-    virtual Timestamp getAllCommittedTimestamp() const override {
+    virtual Timestamp getAllDurableTimestamp() const override {
         MONGO_UNREACHABLE;
     }
 

@@ -121,7 +121,7 @@ public:
 
     void setJournalListener(JournalListener* jl) final {}
 
-    virtual Timestamp getAllCommittedTimestamp() const override {
+    virtual Timestamp getAllDurableTimestamp() const override {
         return Timestamp();
     }
 

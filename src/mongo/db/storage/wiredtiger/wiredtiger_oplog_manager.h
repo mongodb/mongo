@@ -41,7 +41,7 @@ class WiredTigerRecordStore;
 class WiredTigerSessionCache;
 
 
-// Manages oplog visibility, by periodically querying WiredTiger's all_committed timestamp value and
+// Manages oplog visibility, by periodically querying WiredTiger's all_durable timestamp value and
 // then using that timestamp for all transactions that read the oplog collection.
 class WiredTigerOplogManager {
     WiredTigerOplogManager(const WiredTigerOplogManager&) = delete;
@@ -78,9 +78,9 @@ public:
     void waitForAllEarlierOplogWritesToBeVisible(const WiredTigerRecordStore* oplogRecordStore,
                                                  OperationContext* opCtx);
 
-    // Returns the all committed timestamp. All transactions with timestamps earlier than the
-    // all committed timestamp are committed.
-    uint64_t fetchAllCommittedValue(WT_CONNECTION* conn);
+    // Returns the all_durable timestamp. All transactions with timestamps earlier than the
+    // all_durable timestamp are committed.
+    uint64_t fetchAllDurableValue(WT_CONNECTION* conn);
 
 private:
     void _oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache,
