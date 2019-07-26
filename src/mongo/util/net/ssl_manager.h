@@ -69,7 +69,7 @@ Status validateOpensslCipherConfig(const std::string&);
  * Validation callback for setParameter 'disableNonTLSConnectionLogging'.
  */
 Status validateDisableNonTLSConnectionLogging(const bool&);
-}
+}  // namespace mongo
 
 #ifdef MONGO_CONFIG_SSL
 namespace mongo {
@@ -220,8 +220,8 @@ public:
     virtual const SSLConfiguration& getSSLConfiguration() const = 0;
 
     /**
-    * Fetches the error text for an error code, in a thread-safe manner.
-    */
+     * Fetches the error text for an error code, in a thread-safe manner.
+     */
     static std::string getSSLErrorMessage(int code);
 
     /**

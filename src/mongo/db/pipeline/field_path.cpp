@@ -81,4 +81,4 @@ void FieldPath::uassertValidFieldName(StringData fieldName) {
     uassert(
         16412, "FieldPath field names may not contain '.'.", fieldName.find('.') == string::npos);
 }
-}
+}  // namespace mongo

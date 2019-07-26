@@ -54,4 +54,4 @@ TEST(BitsTest_CountZeros, EachBit) {
         ASSERT_EQUALS(countTrailingZeros64(x), i);
     }
 }
-}
+}  // namespace mongo

@@ -52,13 +52,9 @@ void UpdateLeafNode::checkViability(mutablebson::Element element,
     } else {
         uasserted(ErrorCodes::PathNotViable,
                   str::stream() << "Cannot use the part (" << pathToCreate.getPart(0) << ") of ("
-                                << pathTaken.dottedField()
-                                << "."
-                                << pathToCreate.dottedField()
-                                << ") to traverse the element ({"
-                                << element.toString()
-                                << "})");
+                                << pathTaken.dottedField() << "." << pathToCreate.dottedField()
+                                << ") to traverse the element ({" << element.toString() << "})");
     }
 }
 
-}  // namespace
+}  // namespace mongo

@@ -9,7 +9,6 @@
  */
 
 var $config = (function() {
-
     var data = {
         prefix: "create_index_background_unique_",
         numDocsToLoad: 5000,
@@ -56,7 +55,6 @@ var $config = (function() {
             buildIndex: buildIndex,
             dropIndex: dropIndex,
         };
-
     })();
 
     var transitions = {

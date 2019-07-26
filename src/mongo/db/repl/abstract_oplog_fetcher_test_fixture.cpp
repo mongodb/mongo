@@ -135,4 +135,4 @@ executor::RemoteCommandRequest AbstractOplogFetcherTest::processNetworkResponse(
 }
 
 }  // namespace repl
-}  // namespace mango
+}  // namespace mongo

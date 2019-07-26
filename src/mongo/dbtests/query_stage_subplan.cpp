@@ -120,8 +120,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
     dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
     addIndex(BSON("a"
                   << "2d"
-                  << "b"
-                  << 1));
+                  << "b" << 1));
     addIndex(BSON("a"
                   << "2d"));
 

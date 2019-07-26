@@ -389,10 +389,8 @@ StatusWith<RecordId> EphemeralForTestRecordStore::extractAndCheckLocForOplog(Wit
 
         return StatusWith<RecordId>(ErrorCodes::BadValue,
                                     str::stream() << "attempted out-of-order oplog insert of "
-                                                  << status.getValue()
-                                                  << " (oplog last insert was "
-                                                  << _data->records.rbegin()->first
-                                                  << " )");
+                                                  << status.getValue() << " (oplog last insert was "
+                                                  << _data->records.rbegin()->first << " )");
     }
     return status;
 }

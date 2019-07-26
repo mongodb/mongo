@@ -242,10 +242,12 @@ TEST(CollatorInterfaceMockSelfTest, BSONObjsEqualUnderCollatorHashEquallyNested)
     SimpleBSONObjComparator bsonCmpConsiderCase;
     BSONObjComparator bsonCmpIgnoreCase(
         BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, &toLowerCollator);
-    BSONObj obj1 = BSON("a" << 1 << "b" << BSON("c"
-                                                << "foo"));
-    BSONObj obj2 = BSON("a" << 1 << "b" << BSON("c"
-                                                << "FOO"));
+    BSONObj obj1 = BSON("a" << 1 << "b"
+                            << BSON("c"
+                                    << "foo"));
+    BSONObj obj2 = BSON("a" << 1 << "b"
+                            << BSON("c"
+                                    << "FOO"));
     ASSERT_NE(bsonCmpConsiderCase.hash(obj1), bsonCmpConsiderCase.hash(obj2));
     ASSERT_EQ(bsonCmpIgnoreCase.hash(obj1), bsonCmpIgnoreCase.hash(obj2));
 }

@@ -85,8 +85,7 @@ void checkShardKeyRestrictions(OperationContext* opCtx,
     const ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
     uassert(ErrorCodes::CannotCreateIndex,
             str::stream() << "cannot create unique index over " << newIdxKey
-                          << " with shard key pattern "
-                          << shardKeyPattern.toBSON(),
+                          << " with shard key pattern " << shardKeyPattern.toBSON(),
             shardKeyPattern.isUniqueIndexCompatible(newIdxKey));
 }
 
@@ -163,9 +162,9 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
     for (auto& spec : specs) {
         std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
         if (name.empty()) {
-            return Status(
-                ErrorCodes::CannotCreateIndex,
-                str::stream() << "Cannot create an index for a spec '" << spec
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream()
+                              << "Cannot create an index for a spec '" << spec
                               << "' without a non-empty string value for the 'name' field");
         }
         indexNames.push_back(name);
@@ -369,8 +368,7 @@ void IndexBuildsCoordinator::assertNoIndexBuildInProgress() const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
             str::stream() << "cannot perform operation: there are currently "
-                          << _allIndexBuilds.size()
-                          << " index builds running.",
+                          << _allIndexBuilds.size() << " index builds running.",
             _allIndexBuilds.size() == 0);
 }
 
@@ -487,12 +485,11 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
                 auto registeredIndexBuilds =
                     collIndexBuildsIt->second->getIndexBuildState(lk, name);
                 return Status(ErrorCodes::IndexBuildAlreadyInProgress,
-                              str::stream() << "There's already an index with name '" << name
-                                            << "' being built on the collection: "
-                                            << " ( "
-                                            << replIndexBuildState->collectionUUID
-                                            << " ). Index build: "
-                                            << registeredIndexBuilds->buildUUID);
+                              str::stream()
+                                  << "There's already an index with name '" << name
+                                  << "' being built on the collection: "
+                                  << " ( " << replIndexBuildState->collectionUUID
+                                  << " ). Index build: " << registeredIndexBuilds->buildUUID);
             }
         }
     }
@@ -847,8 +844,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
             }
             fassert(51101,
                     status.withContext(str::stream() << "Index build: " << replState->buildUUID
-                                                     << "; Database: "
-                                                     << replState->dbName));
+                                                     << "; Database: " << replState->dbName));
         }
 
         uassertStatusOK(status);
@@ -942,21 +938,13 @@ void IndexBuildsCoordinator::_buildIndex(
 
     invariant(db,
               str::stream() << "Database not found after relocking. Index build: "
-                            << replState->buildUUID
-                            << ": "
-                            << nss
-                            << " ("
-                            << replState->collectionUUID
-                            << ")");
+                            << replState->buildUUID << ": " << nss << " ("
+                            << replState->collectionUUID << ")");
 
     invariant(db->getCollection(opCtx, nss),
               str::stream() << "Collection not found after relocking. Index build: "
-                            << replState->buildUUID
-                            << ": "
-                            << nss
-                            << " ("
-                            << replState->collectionUUID
-                            << ")");
+                            << replState->buildUUID << ": " << nss << " ("
+                            << replState->collectionUUID << ")");
 
     // Perform the third and final drain after releasing a shared lock and reacquiring an
     // exclusive lock on the database.

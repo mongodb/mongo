@@ -667,19 +667,13 @@ Status GeoHashConverter::parseParameters(const BSONObj& paramDoc,
     if (params->bits < 1 || params->bits > 32) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "bits for hash must be > 0 and <= 32, "
-                                    << "but "
-                                    << params->bits
-                                    << " bits were specified");
+                                    << "but " << params->bits << " bits were specified");
     }
 
     if (params->min >= params->max) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "region for hash must be valid and have positive area, "
-                                    << "but ["
-                                    << params->min
-                                    << ", "
-                                    << params->max
-                                    << "] "
+                                    << "but [" << params->min << ", " << params->max << "] "
                                     << "was specified");
     }
 
@@ -774,8 +768,7 @@ GeoHash GeoHashConverter::hash(const BSONObj& o, const BSONObj* src) const {
 GeoHash GeoHashConverter::hash(double x, double y) const {
     uassert(16433,
             str::stream() << "point not in interval of [ " << _params.min << ", " << _params.max
-                          << " ]"
-                          << causedBy(BSON_ARRAY(x << y).toString()),
+                          << " ]" << causedBy(BSON_ARRAY(x << y).toString()),
             x <= _params.max && x >= _params.min && y <= _params.max && y >= _params.min);
 
     return GeoHash(convertToHashScale(x), convertToHashScale(y), _params.bits);

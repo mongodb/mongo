@@ -7,10 +7,10 @@
  * requires_majority_read_concern, uses_transactions, uses_prepare_transaction]
  */
 (function() {
-    "use strict";
-    load("jstests/replsets/libs/prepare_standalone_replication_recovery.js");
+"use strict";
+load("jstests/replsets/libs/prepare_standalone_replication_recovery.js");
 
-    const testName = "standalone_replication_recovery_prepare_only";
+const testName = "standalone_replication_recovery_prepare_only";
 
-    testPrepareRecoverFromOplogAsStandalone(testName, /* commitBeforeRecovery */ false);
+testPrepareRecoverFromOplogAsStandalone(testName, /* commitBeforeRecovery */ false);
 })();

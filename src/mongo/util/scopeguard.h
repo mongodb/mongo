@@ -37,7 +37,7 @@
 namespace mongo {
 
 template <typename F>
-class[[nodiscard]] ScopeGuard {
+class [[nodiscard]] ScopeGuard {
 public:
     template <typename FuncArg>
     explicit ScopeGuard(FuncArg && f) : _func(std::forward<FuncArg>(f)) {}

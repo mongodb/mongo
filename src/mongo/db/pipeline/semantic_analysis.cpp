@@ -92,7 +92,7 @@ StringMap<std::string> computeNamesAssumingAnyPathsNotRenamedAreUnmodified(
 
 StringMap<std::string> invertRenameMap(const StringMap<std::string>& originalMap) {
     StringMap<std::string> reversedMap;
-    for (auto && [ newName, oldName ] : originalMap) {
+    for (auto&& [newName, oldName] : originalMap) {
         reversedMap[oldName] = newName;
     }
     return reversedMap;
@@ -206,7 +206,7 @@ boost::optional<StringMap<std::string>> renamedPaths(const std::set<std::string>
         }
         case DocumentSource::GetModPathsReturn::Type::kAllExcept: {
             auto preservedPaths = modifiedPathsRet.paths;
-            for (auto && [ newName, oldName ] : modifiedPathsRet.renames) {
+            for (auto&& [newName, oldName] : modifiedPathsRet.renames) {
                 // For the purposes of checking which paths are modified, consider renames to
                 // preserve the path. We'll circle back later to figure out the new name if
                 // appropriate. If we are going forward, we want to consider the name of the path

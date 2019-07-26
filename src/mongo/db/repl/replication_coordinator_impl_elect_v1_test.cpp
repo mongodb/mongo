@@ -60,11 +60,7 @@ using ApplierState = ReplicationCoordinator::ApplierState;
 TEST_F(ReplCoordTest, RandomizedElectionOffsetWithinProperBounds) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "protocolVersion"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "protocolVersion" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
@@ -91,18 +87,14 @@ TEST_F(ReplCoordTest, RandomizedElectionOffsetWithinProperBounds) {
 TEST_F(ReplCoordTest, RandomizedElectionOffsetAvoidsDivideByZero) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1
-                             << "settings"
+                             << "protocolVersion" << 1 << "settings"
                              << BSON("electionTimeoutMillis" << 1));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
 
@@ -113,24 +105,17 @@ TEST_F(ReplCoordTest, RandomizedElectionOffsetAvoidsDivideByZero) {
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version"
-                            << 1
-                            << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345"
-                                                        << "votes"
-                                                        << 0
-                                                        << "hidden"
-                                                        << true
-                                                        << "priority"
-                                                        << 0))
-                            << "protocolVersion"
-                            << 1),
-                       HostAndPort("node1", 12345));
+    assertStartSuccess(
+        BSON("_id"
+             << "mySet"
+             << "version" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                      << "node1:12345")
+                           << BSON("_id" << 2 << "host"
+                                         << "node2:12345"
+                                         << "votes" << 0 << "hidden" << true << "priority" << 0))
+             << "protocolVersion" << 1),
+        HostAndPort("node1", 12345));
 
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -185,15 +170,12 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
 TEST_F(ReplCoordTest, StartElectionDoesNotStartAnElectionWhenNodeIsRecovering) {
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 1
-                            << "members"
+                            << "version" << 1 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
                                                         << "node2:12345"))
-                            << "protocolVersion"
-                            << 1),
+                            << "protocolVersion" << 1),
                        HostAndPort("node1", 12345));
 
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_RECOVERING));
@@ -213,13 +195,10 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     startCapturingLogMessages();
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 1
-                            << "members"
+                            << "version" << 1 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345"))
-                            << "protocolVersion"
-                            << 1),
+                            << "protocolVersion" << 1),
                        HostAndPort("node1", 12345));
 
     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(10, 1), 0), Date_t() + Seconds(10));
@@ -247,17 +226,14 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
 TEST_F(ReplCoordTest, ElectionSucceedsWhenAllNodesVoteYea) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     OperationContextNoop opCtx;
     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
@@ -296,9 +272,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenAllNodesVoteYea) {
 TEST_F(ReplCoordTest, ElectionSucceedsWhenMaxSevenNodesVoteYea) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
@@ -313,8 +287,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenMaxSevenNodesVoteYea) {
                                                          << "node6:12345")
                                            << BSON("_id" << 7 << "host"
                                                          << "node7:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     OperationContextNoop opCtx;
     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
@@ -338,17 +311,14 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -380,9 +350,9 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
         } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
             net->scheduleResponse(noi,
                                   net->now(),
-                                  makeResponseStatus(BSON(
-                                      "ok" << 1 << "term" << 0 << "voteGranted" << false << "reason"
-                                           << "don't like him much")));
+                                  makeResponseStatus(BSON("ok" << 1 << "term" << 0 << "voteGranted"
+                                                               << false << "reason"
+                                                               << "don't like him much")));
             voteRequests++;
         } else {
             net->blackHole(noi);
@@ -399,17 +369,14 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -443,9 +410,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
                 noi,
                 net->now(),
                 makeResponseStatus(BSON("ok" << 1 << "term" << request.cmdObj["term"].Long() + 1
-                                             << "voteGranted"
-                                             << false
-                                             << "reason"
+                                             << "voteGranted" << false << "reason"
                                              << "quit living in the past")));
             voteRequests++;
         } else {
@@ -466,9 +431,7 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     OperationContextNoop opCtx;
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -479,8 +442,7 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
                                                         << "node4:12345")
                                           << BSON("_id" << 5 << "host"
                                                         << "node5:12345"))
-                            << "protocolVersion"
-                            << 1),
+                            << "protocolVersion" << 1),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
@@ -498,15 +460,12 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     config
         .initialize(BSON("_id"
                          << "mySet"
-                         << "version"
-                         << 3
-                         << "members"
+                         << "version" << 3 << "members"
                          << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                   << "node1:12345")
                                        << BSON("_id" << 2 << "host"
                                                      << "node2:12345"))
-                         << "protocolVersion"
-                         << 1))
+                         << "protocolVersion" << 1))
         .transitional_ignore();
     hbResp2.setConfig(config);
     hbResp2.setConfigVersion(3);
@@ -593,17 +552,14 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequest
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -627,9 +583,9 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequest
         } else {
             net->scheduleResponse(noi,
                                   net->now(),
-                                  makeResponseStatus(BSON(
-                                      "ok" << 1 << "term" << 1 << "voteGranted" << false << "reason"
-                                           << "don't like him much")));
+                                  makeResponseStatus(BSON("ok" << 1 << "term" << 1 << "voteGranted"
+                                                               << false << "reason"
+                                                               << "don't like him much")));
         }
         net->runReadyNetworkOperations();
     }
@@ -644,17 +600,14 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequest
 TEST_F(ReplCoordTest, TransitionToRollbackFailsWhenElectionInProgress) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -683,17 +636,14 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -719,9 +669,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
                 noi,
                 net->now(),
                 makeResponseStatus(BSON("ok" << 1 << "term" << request.cmdObj["term"].Long() + 1
-                                             << "voteGranted"
-                                             << false
-                                             << "reason"
+                                             << "voteGranted" << false << "reason"
                                              << "quit living in the past")));
         }
         net->runReadyNetworkOperations();
@@ -738,17 +686,14 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
 
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
@@ -779,17 +724,14 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -816,10 +758,9 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
             net->scheduleResponse(
                 noi,
                 net->now(),
-                makeResponseStatus(BSON(
-                    "ok" << 1 << "term" << request.cmdObj["term"].Long() << "voteGranted" << true
-                         << "reason"
-                         << "")));
+                makeResponseStatus(BSON("ok" << 1 << "term" << request.cmdObj["term"].Long()
+                                             << "voteGranted" << true << "reason"
+                                             << "")));
         }
         net->runReadyNetworkOperations();
     }
@@ -982,18 +923,14 @@ private:
 TEST_F(TakeoverTest, DoesntScheduleCatchupTakeoverIfCatchupDisabledButTakeoverDelaySet) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1
-                             << "settings"
+                             << "protocolVersion" << 1 << "settings"
                              << BSON("catchUpTimeoutMillis" << 0 << "catchUpTakeoverDelay"
                                                             << 10000));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
@@ -1024,17 +961,14 @@ TEST_F(TakeoverTest, DoesntScheduleCatchupTakeoverIfCatchupDisabledButTakeoverDe
 TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfNodeIsFresherThanCurrentPrimary) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1071,21 +1005,16 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfNodeIsFresherThanCurrentPrimary) 
 TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345"
-                                                      << "priority"
-                                                      << 2)
+                                                      << "priority" << 2)
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"
-                                                         << "priority"
-                                                         << 3))
-                             << "protocolVersion"
-                             << 1);
+                                                         << "priority" << 3))
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1123,19 +1052,15 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
 TEST_F(TakeoverTest, PrefersPriorityToCatchupTakeoverIfNodeHasHighestPriority) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345"
-                                                      << "priority"
-                                                      << 2)
+                                                      << "priority" << 2)
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
 
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(2));
     startCapturingLogMessages();
@@ -1179,17 +1104,14 @@ TEST_F(TakeoverTest, PrefersPriorityToCatchupTakeoverIfNodeHasHighestPriority) {
 TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1236,21 +1158,16 @@ TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
 TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345"
-                                                      << "priority"
-                                                      << 2)
+                                                      << "priority" << 2)
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"
-                                                         << "priority"
-                                                         << 3))
-                             << "protocolVersion"
-                             << 1);
+                                                         << "priority" << 3))
+                             << "protocolVersion" << 1);
     // In order for node 1 to first schedule a catchup takeover, then a priority takeover
     // once the first gets canceled, it must have a higher priority than the current primary
     // (node 2). But, it must not have the highest priority in the replica set. Otherwise,
@@ -1302,17 +1219,14 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
 TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1376,17 +1290,14 @@ TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
 TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1439,17 +1350,14 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
 TEST_F(TakeoverTest, SuccessfulCatchupTakeover) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
     HostAndPort primaryHostAndPort("node2", 12345);
@@ -1522,9 +1430,7 @@ TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
@@ -1535,8 +1441,7 @@ TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
                                                          << "node4:12345")
                                            << BSON("_id" << 5 << "host"
                                                          << "node5:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
     HostAndPort primaryHostAndPort("node2", 12345);
@@ -1598,12 +1503,11 @@ TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
             net->blackHole(noi);
         } else {
             bool voteGranted = request.target != primaryHostAndPort;
-            net->scheduleResponse(
-                noi,
-                until,
-                makeResponseStatus(BSON("ok" << 1 << "term" << 1 << "voteGranted" << voteGranted
-                                             << "reason"
-                                             << "")));
+            net->scheduleResponse(noi,
+                                  until,
+                                  makeResponseStatus(BSON("ok" << 1 << "term" << 1 << "voteGranted"
+                                                               << voteGranted << "reason"
+                                                               << "")));
             voteRequests++;
         }
         net->runReadyNetworkOperations();
@@ -1631,17 +1535,14 @@ TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
 TEST_F(TakeoverTest, PrimaryCatchesUpBeforeCatchupTakeover) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1692,21 +1593,16 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeCatchupTakeover) {
 TEST_F(TakeoverTest, PrimaryCatchesUpBeforeHighPriorityNodeCatchupTakeover) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345"
-                                                      << "priority"
-                                                      << 2)
+                                                      << "priority" << 2)
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"
-                                                         << "priority"
-                                                         << 3))
-                             << "protocolVersion"
-                             << 1);
+                                                         << "priority" << 3))
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1776,19 +1672,15 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeHighPriorityNodeCatchupTakeover) {
 TEST_F(TakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurrentPrimary) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345"
-                                                      << "priority"
-                                                      << 2)
+                                                      << "priority" << 2)
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1823,19 +1715,15 @@ TEST_F(TakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurrent
 TEST_F(TakeoverTest, SuccessfulPriorityTakeover) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345"
-                                                      << "priority"
-                                                      << 2)
+                                                      << "priority" << 2)
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1894,19 +1782,15 @@ TEST_F(TakeoverTest, SuccessfulPriorityTakeover) {
 TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345"
-                                                      << "priority"
-                                                      << 2)
+                                                      << "priority" << 2)
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
     HostAndPort primaryHostAndPort("node2", 12345);
@@ -1973,19 +1857,15 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
 TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 1
-                             << "members"
+                             << "version" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345"
-                                                      << "priority"
-                                                      << 2)
+                                                      << "priority" << 2)
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345"))
-                             << "protocolVersion"
-                             << 1);
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
     HostAndPort primaryHostAndPort("node2", 12345);
@@ -2053,19 +1933,14 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
     // Start up and become electable.
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "protocolVersion"
-                            << 1
-                            << "members"
+                            << "version" << 2 << "protocolVersion" << 1 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 3 << "host"
                                                         << "node3:12345")
                                           << BSON("_id" << 2 << "host"
                                                         << "node2:12345"))
-                            << "settings"
-                            << BSON("heartbeatIntervalMillis" << 100)),
+                            << "settings" << BSON("heartbeatIntervalMillis" << 100)),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
@@ -2093,11 +1968,7 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
     ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {
         BSON("_id"
              << "mySet"
-             << "version"
-             << 4
-             << "protocolVersion"
-             << 1
-             << "members"
+             << "version" << 4 << "protocolVersion" << 1 << "members"
              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                       << "node1:12345")
                            << BSON("_id" << 2 << "host"
@@ -2118,19 +1989,14 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
     // Start up and become electable.
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "protocolVersion"
-                            << 1
-                            << "members"
+                            << "version" << 2 << "protocolVersion" << 1 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 3 << "host"
                                                         << "node3:12345")
                                           << BSON("_id" << 2 << "host"
                                                         << "node2:12345"))
-                            << "settings"
-                            << BSON("heartbeatIntervalMillis" << 100)),
+                            << "settings" << BSON("heartbeatIntervalMillis" << 100)),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
@@ -2143,11 +2009,7 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
     ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {
         BSON("_id"
              << "mySet"
-             << "version"
-             << 4
-             << "protocolVersion"
-             << 1
-             << "members"
+             << "version" << 4 << "protocolVersion" << 1 << "members"
              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                       << "node1:12345")
                            << BSON("_id" << 2 << "host"
@@ -2209,14 +2071,13 @@ protected:
                     net->getNextReadyRequest(), net->now(), makeHeartbeatResponse(opTime));
             } else if (request.cmdObj.firstElement().fieldNameStringData() ==
                        "replSetRequestVotes") {
-                net->scheduleResponse(net->getNextReadyRequest(),
-                                      net->now(),
-                                      makeResponseStatus(BSON("ok" << 1 << "reason"
-                                                                   << ""
-                                                                   << "term"
-                                                                   << request.cmdObj["term"].Long()
-                                                                   << "voteGranted"
-                                                                   << true)));
+                net->scheduleResponse(
+                    net->getNextReadyRequest(),
+                    net->now(),
+                    makeResponseStatus(BSON("ok" << 1 << "reason"
+                                                 << ""
+                                                 << "term" << request.cmdObj["term"].Long()
+                                                 << "voteGranted" << true)));
             } else {
                 // Stop the loop and let the caller handle unexpected requests.
                 net->exitNetwork();
@@ -2230,18 +2091,14 @@ protected:
     ReplSetConfig setUp3NodeReplSetAndRunForElection(OpTime opTime, long long timeout = 5000) {
         BSONObj configObj = BSON("_id"
                                  << "mySet"
-                                 << "version"
-                                 << 1
-                                 << "members"
+                                 << "version" << 1 << "members"
                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                           << "node1:12345")
                                                << BSON("_id" << 2 << "host"
                                                              << "node2:12345")
                                                << BSON("_id" << 3 << "host"
                                                              << "node3:12345"))
-                                 << "protocolVersion"
-                                 << 1
-                                 << "settings"
+                                 << "protocolVersion" << 1 << "settings"
                                  << BSON("heartbeatTimeoutSecs" << 1 << "catchUpTimeoutMillis"
                                                                 << timeout));
         assertStartSuccess(configObj, HostAndPort("node1", 12345));

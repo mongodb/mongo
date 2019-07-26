@@ -31,6 +31,4 @@
 
 // Terrible hack to work around clang-format being out of date.
 // TODO sed this away and delete this file when we upgrade clang-format.
-#define IF_CONSTEXPR \
-    if               \
-    constexpr
+#define IF_CONSTEXPR if constexpr

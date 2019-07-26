@@ -369,10 +369,7 @@ public:
     void validateArguments(const Expression::ExpressionVector& args) const override {
         uassert(28667,
                 str::stream() << "Expression " << this->getOpName() << " takes at least " << MinArgs
-                              << " arguments, and at most "
-                              << MaxArgs
-                              << ", but "
-                              << args.size()
+                              << " arguments, and at most " << MaxArgs << ", but " << args.size()
                               << " were passed in.",
                 MinArgs <= args.size() && args.size() <= MaxArgs);
     }
@@ -388,9 +385,7 @@ public:
     void validateArguments(const Expression::ExpressionVector& args) const override {
         uassert(16020,
                 str::stream() << "Expression " << this->getOpName() << " takes exactly " << NArgs
-                              << " arguments. "
-                              << args.size()
-                              << " were passed in.",
+                              << " arguments. " << args.size() << " were passed in.",
                 args.size() == NArgs);
     }
 };
@@ -613,9 +608,7 @@ public:
         uassert(40533,
                 str::stream() << _opName
                               << " requires a string for the timezone argument, but was given a "
-                              << typeName(timeZoneId.getType())
-                              << " ("
-                              << timeZoneId.toString()
+                              << typeName(timeZoneId.getType()) << " (" << timeZoneId.toString()
                               << ")",
                 timeZoneId.getType() == BSONType::String);
 
@@ -676,13 +669,12 @@ public:
                     } else {
                         uasserted(40535,
                                   str::stream() << "unrecognized option to " << opName << ": \""
-                                                << argName
-                                                << "\"");
+                                                << argName << "\"");
                     }
                 }
                 uassert(40539,
-                        str::stream() << "missing 'date' argument to " << opName << ", provided: "
-                                      << operatorElem,
+                        str::stream() << "missing 'date' argument to " << opName
+                                      << ", provided: " << operatorElem,
                         date);
                 return new SubClass(expCtx, std::move(date), std::move(timeZone));
             }
@@ -2718,4 +2710,4 @@ public:
 
     using ExpressionRegex::ExpressionRegex;
 };
-}
+}  // namespace mongo

@@ -6,7 +6,6 @@
  * Repeatedly creates and drops a database.
  */
 var $config = (function() {
-
     var states = {
         init: function init(db, collName) {
             this.uniqueDBName = db.getName() + 'drop_database' + this.tid;
@@ -27,5 +26,4 @@ var $config = (function() {
     var transitions = {init: {createAndDrop: 1}, createAndDrop: {createAndDrop: 1}};
 
     return {threadCount: 10, iterations: 20, states: states, transitions: transitions};
-
 })();

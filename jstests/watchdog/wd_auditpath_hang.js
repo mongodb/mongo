@@ -3,19 +3,18 @@
 load("jstests/watchdog/lib/wd_test_common.js");
 
 (function() {
-    'use strict';
+'use strict';
 
-    if (assert.commandWorked(db.runCommand({buildInfo: 1})).modules.includes("enterprise")) {
-        let control = new CharybdefsControl("auditpath_hang");
+if (assert.commandWorked(db.runCommand({buildInfo: 1})).modules.includes("enterprise")) {
+    let control = new CharybdefsControl("auditpath_hang");
 
-        const auditPath = control.getMountPath();
+    const auditPath = control.getMountPath();
 
-        testFuseAndMongoD(control, {
+    testFuseAndMongoD(control, {
 
-            auditDestination: 'file',
-            auditFormat: 'JSON',
-            auditPath: auditPath + "/auditLog.json"
-        });
-    }
-
+        auditDestination: 'file',
+        auditFormat: 'JSON',
+        auditPath: auditPath + "/auditLog.json"
+    });
+}
 })();

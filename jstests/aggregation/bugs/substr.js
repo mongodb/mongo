@@ -122,8 +122,8 @@ assert.eq(
              a: {
                  $substrBytes: [
                      {
-                       $substrBytes:
-                           [{$substrBytes: [{$substrBytes: ['abcdefghij', 1, 6]}, 2, 5]}, 0, 3]
+                         $substrBytes:
+                             [{$substrBytes: [{$substrBytes: ['abcdefghij', 1, 6]}, 2, 5]}, 0, 3]
                      },
                      1,
                      1

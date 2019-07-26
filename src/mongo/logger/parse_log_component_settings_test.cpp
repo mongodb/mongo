@@ -140,10 +140,7 @@ TEST(Multi, FailBadComponent) {
     BSONObj input =
         BSON("verbosity" << 6 << "accessControl" << BSON("verbosity" << 5) << "storage"
                          << BSON("verbosity" << 4 << "journal" << BSON("verbosity" << 6))
-                         << "No Such Component"
-                         << BSON("verbosity" << 2)
-                         << "extrafield"
-                         << 123);
+                         << "No Such Component" << BSON("verbosity" << 2) << "extrafield" << 123);
 
     StatusWith<Settings> result = parseLogComponentSettings(input);
 
@@ -175,4 +172,4 @@ TEST(DeeplyNested, FailLast) {
     ASSERT_EQUALS(result.getStatus().reason(),
                   "Invalid component name storage.journal.No Such Component");
 }
-}
+}  // namespace

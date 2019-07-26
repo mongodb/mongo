@@ -61,7 +61,7 @@ inline void appendUtf8Codepoint(char32_t codepoint, OutputIterator* outputIt) {
         *(*outputIt)++ = (((codepoint >> (6 * 0)) & 0x3f) | 0x80);
     }
 }
-}
+}  // namespace
 
 using linenoise_utf8::copyString32to8;
 using linenoise_utf8::copyString8to32;

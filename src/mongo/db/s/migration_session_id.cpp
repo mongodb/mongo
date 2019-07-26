@@ -53,8 +53,8 @@ MigrationSessionId MigrationSessionId::generate(StringData donor, StringData rec
     invariant(!donor.empty());
     invariant(!recipient.empty());
 
-    return MigrationSessionId(str::stream() << donor << "_" << recipient << "_"
-                                            << OID::gen().toString());
+    return MigrationSessionId(str::stream()
+                              << donor << "_" << recipient << "_" << OID::gen().toString());
 }
 
 StatusWith<MigrationSessionId> MigrationSessionId::extractFromBSON(const BSONObj& obj) {

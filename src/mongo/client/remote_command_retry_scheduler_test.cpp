@@ -401,8 +401,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerIgnoresEmbeddedErrorInSuccessfu
     // wire protocol.
     ResponseStatus response(BSON("ok" << 0 << "code" << int(ErrorCodes::FailedToParse) << "errmsg"
                                       << "injected error"
-                                      << "z"
-                                      << 456),
+                                      << "z" << 456),
                             Milliseconds(100));
 
     processNetworkResponse(response);

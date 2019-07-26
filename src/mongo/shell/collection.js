@@ -167,7 +167,7 @@ DBCollection.prototype._makeCommand = function(cmd, params) {
 };
 
 DBCollection.prototype._dbCommand = function(cmd, params) {
-    if (typeof(cmd) === "object")
+    if (typeof (cmd) === "object")
         return this._db._dbCommand(cmd, {}, this.getQueryOptions());
 
     return this._db._dbCommand(this._makeCommand(cmd, params), {}, this.getQueryOptions());
@@ -175,7 +175,7 @@ DBCollection.prototype._dbCommand = function(cmd, params) {
 
 // Like _dbCommand, but applies $readPreference
 DBCollection.prototype._dbReadCommand = function(cmd, params) {
-    if (typeof(cmd) === "object")
+    if (typeof (cmd) === "object")
         return this._db._dbReadCommand(cmd, {}, this.getQueryOptions());
 
     return this._db._dbReadCommand(this._makeCommand(cmd, params), {}, this.getQueryOptions());
@@ -210,7 +210,6 @@ DBCollection.prototype._massageObject = function(q) {
     }
 
     throw Error("don't know how to massage : " + type);
-
 };
 
 DBCollection.prototype.find = function(query, fields, limit, skip, batchSize, options) {
@@ -276,7 +275,7 @@ DBCollection.prototype.insert = function(obj, options) {
     var allowDottedFields = false;
     if (options === undefined) {
         // do nothing
-    } else if (typeof(options) == 'object') {
+    } else if (typeof (options) == 'object') {
         if (options.ordered === undefined) {
             // do nothing, like above
         } else {
@@ -299,7 +298,7 @@ DBCollection.prototype.insert = function(obj, options) {
 
     var result = undefined;
     var startTime =
-        (typeof(_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
+        (typeof (_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
 
     if (this.getMongo().writeMode() != "legacy") {
         // Bit 1 of option flag is continueOnError. Bit 0 (stop on error) is the default.
@@ -329,7 +328,7 @@ DBCollection.prototype.insert = function(obj, options) {
             }
         }
     } else {
-        if (typeof(obj._id) == "undefined" && !Array.isArray(obj)) {
+        if (typeof (obj._id) == "undefined" && !Array.isArray(obj)) {
             var tmp = obj;  // don't want to modify input
             obj = {_id: new ObjectId()};
             for (var key in tmp) {
@@ -361,7 +360,7 @@ DBCollection.prototype._parseRemove = function(t, justOne) {
 
     var wc = undefined;
     var collation = undefined;
-    if (typeof(justOne) === "object") {
+    if (typeof (justOne) === "object") {
         var opts = justOne;
         wc = opts.writeConcern;
         justOne = opts.justOne;
@@ -390,7 +389,7 @@ DBCollection.prototype.remove = function(t, justOne) {
 
     var result = undefined;
     var startTime =
-        (typeof(_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
+        (typeof (_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
 
     if (this.getMongo().writeMode() != "legacy") {
         var bulk = this.initializeOrderedBulkOp();
@@ -452,7 +451,7 @@ DBCollection.prototype._parseUpdate = function(query, updateSpec, upsert, multi)
     let hint = undefined;
 
     // can pass options via object for improved readability
-    if (typeof(upsert) === "object") {
+    if (typeof (upsert) === "object") {
         if (multi) {
             throw Error("Fourth argument must be empty when specifying " +
                         "upsert and multi with an object.");
@@ -502,7 +501,7 @@ DBCollection.prototype.update = function(query, updateSpec, upsert, multi) {
 
     var result = undefined;
     var startTime =
-        (typeof(_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
+        (typeof (_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
 
     if (this.getMongo().writeMode() != "legacy") {
         var bulk = this.initializeOrderedBulkOp();
@@ -567,10 +566,10 @@ DBCollection.prototype.save = function(obj, opts) {
     if (obj == null)
         throw Error("can't save a null");
 
-    if (typeof(obj) == "number" || typeof(obj) == "string")
+    if (typeof (obj) == "number" || typeof (obj) == "string")
         throw Error("can't save a number or string");
 
-    if (typeof(obj._id) == "undefined") {
+    if (typeof (obj._id) == "undefined") {
         obj._id = new ObjectId();
         return this.insert(obj, opts);
     } else {
@@ -598,11 +597,11 @@ DBCollection.prototype._indexSpec = function(keys, options) {
     var ret = {ns: this._fullName, key: keys, name: this._genIndexName(keys)};
 
     if (!options) {
-    } else if (typeof(options) == "string")
+    } else if (typeof (options) == "string")
         ret.name = options;
-    else if (typeof(options) == "boolean")
+    else if (typeof (options) == "boolean")
         ret.unique = true;
-    else if (typeof(options) == "object") {
+    else if (typeof (options) == "object") {
         if (Array.isArray(options)) {
             if (options.length > 3) {
                 throw new Error("Index options that are supplied in array form may only specify" +
@@ -610,9 +609,9 @@ DBCollection.prototype._indexSpec = function(keys, options) {
             }
             var nb = 0;
             for (var i = 0; i < options.length; i++) {
-                if (typeof(options[i]) == "string")
+                if (typeof (options[i]) == "string")
                     ret.name = options[i];
-                else if (typeof(options[i]) == "boolean") {
+                else if (typeof (options[i]) == "boolean") {
                     if (options[i]) {
                         if (nb == 0)
                             ret.unique = true;
@@ -626,7 +625,7 @@ DBCollection.prototype._indexSpec = function(keys, options) {
             Object.extend(ret, options);
         }
     } else {
-        throw Error("can't handle: " + typeof(options));
+        throw Error("can't handle: " + typeof (options));
     }
 
     return ret;
@@ -780,14 +779,14 @@ DBCollection.prototype._printExtraInfo = function(action, startTime) {
 DBCollection.prototype.validate = function(full) {
     var cmd = {validate: this.getName()};
 
-    if (typeof(full) == 'object')  // support arbitrary options here
+    if (typeof (full) == 'object')  // support arbitrary options here
         Object.extend(cmd, full);
     else
         cmd.full = full;
 
     var res = this._db.runCommand(cmd);
 
-    if (typeof(res.valid) == 'undefined') {
+    if (typeof (res.valid) == 'undefined') {
         // old-style format just put everything in a string. Now using proper fields
 
         res.valid = false;
@@ -842,7 +841,7 @@ DBCollection.prototype.hashAllDocs = function() {
     var res = this._dbCommand(cmd);
     var hash = res.collections[this._shortName];
     assert(hash);
-    assert(typeof(hash) == "string");
+    assert(typeof (hash) == "string");
     return hash;
 };
 
@@ -880,14 +879,14 @@ DBCollection.prototype.getCollection = function(subName) {
 };
 
 /**
-  * scale: The scale at which to deliver results. Unless specified, this command returns all data
-  *        in bytes.
-  * indexDetails: Includes indexDetails field in results. Default: false.
-  * indexDetailsKey: If indexDetails is true, filter contents in indexDetails by this index key.
-  * indexDetailsname: If indexDetails is true, filter contents in indexDetails by this index name.
-  *
-  * It is an error to provide both indexDetailsKey and indexDetailsName.
-  */
+ * scale: The scale at which to deliver results. Unless specified, this command returns all data
+ *        in bytes.
+ * indexDetails: Includes indexDetails field in results. Default: false.
+ * indexDetailsKey: If indexDetails is true, filter contents in indexDetails by this index key.
+ * indexDetailsname: If indexDetails is true, filter contents in indexDetails by this index name.
+ *
+ * It is an error to provide both indexDetailsKey and indexDetailsName.
+ */
 DBCollection.prototype.stats = function(args) {
     'use strict';
 
@@ -1040,8 +1039,8 @@ MapReduceResult.prototype.drop = function() {
 };
 
 /**
-* just for debugging really
-*/
+ * just for debugging really
+ */
 MapReduceResult.prototype.convertToSingleObject = function() {
     var z = {};
     var it = this.results != null ? this.results : this._coll.find();
@@ -1060,13 +1059,13 @@ DBCollection.prototype.convertToSingleObject = function(valueField) {
 };
 
 /**
-* @param optional object of optional fields;
-*/
+ * @param optional object of optional fields;
+ */
 DBCollection.prototype.mapReduce = function(map, reduce, optionsOrOutString) {
     var c = {mapreduce: this._shortName, map: map, reduce: reduce};
     assert(optionsOrOutString, "need to supply an optionsOrOutString");
 
-    if (typeof(optionsOrOutString) == "string")
+    if (typeof (optionsOrOutString) == "string")
         c["out"] = optionsOrOutString;
     else
         Object.extend(c, optionsOrOutString);
@@ -1086,7 +1085,6 @@ DBCollection.prototype.mapReduce = function(map, reduce, optionsOrOutString) {
         throw _getErrorWithCode(raw, "map reduce failed:" + tojson(raw));
     }
     return new MapReduceResult(this._db, raw);
-
 };
 
 DBCollection.prototype.toString = function() {
@@ -1142,7 +1140,6 @@ will actually
 */
 
 DBCollection.prototype.getShardDistribution = function() {
-
     var stats = this.stats();
 
     if (!stats.sharded) {
@@ -1175,8 +1172,8 @@ DBCollection.prototype.getShardDistribution = function() {
     }
 
     print("\nTotals");
-    print(" data : " + sh._dataFormat(stats.size) + " docs : " + stats.count + " chunks : " +
-          numChunks);
+    print(" data : " + sh._dataFormat(stats.size) + " docs : " + stats.count +
+          " chunks : " + numChunks);
     for (var shard in stats.shards) {
         var shardStats = stats.shards[shard];
 
@@ -1186,16 +1183,14 @@ DBCollection.prototype.getShardDistribution = function() {
             (stats.count == 0) ? 0 : (Math.floor(shardStats.count / stats.count * 10000) / 100);
 
         print(" Shard " + shard + " contains " + estDataPercent + "% data, " + estDocPercent +
-              "% docs in cluster, " + "avg obj size on shard : " +
-              sh._dataFormat(stats.shards[shard].avgObjSize));
+              "% docs in cluster, " +
+              "avg obj size on shard : " + sh._dataFormat(stats.shards[shard].avgObjSize));
     }
 
     print("\n");
-
 };
 
 DBCollection.prototype.getSplitKeysForChunks = function(chunkSize) {
-
     var stats = this.stats();
 
     if (!stats.sharded) {
@@ -1263,7 +1258,6 @@ DBCollection.prototype.getSplitKeysForChunks = function(chunkSize) {
     var admin = this.getDB().getSiblingDB("admin");
     var coll = this;
     var splitFunction = function() {
-
         // Turn off the balancer, just to be safe
         print("Turning off balancer...");
         config.settings.update({_id: "balancer"}, {$set: {stopped: true}}, true);
@@ -1290,11 +1284,11 @@ DBCollection.prototype.getSplitKeysForChunks = function(chunkSize) {
     };
 
     print("\nGenerated " + numSplits + " split keys, run output function to perform splits.\n" +
-          " ex : \n" + "  > var splitter = <collection>.getSplitKeysForChunks()\n" +
+          " ex : \n" +
+          "  > var splitter = <collection>.getSplitKeysForChunks()\n" +
           "  > splitter() // Execute splits on cluster !\n");
 
     return splitFunction;
-
 };
 
 DBCollection.prototype.setSlaveOk = function(value) {
@@ -1352,21 +1346,21 @@ DBCollection.prototype.unsetWriteConcern = function() {
 //
 
 /**
-* Count number of matching documents in the db to a query.
-*
-* @method
-* @param {object} query The query for the count.
-* @param {object} [options=null] Optional settings.
-* @param {number} [options.limit=null] The limit of documents to count.
-* @param {number} [options.skip=null] The number of documents to skip for the count.
-* @param {string|object} [options.hint=null] An index name hint or specification for the query.
-* @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
-* @param {string} [options.readConcern=null] The level of readConcern passed to the count command
-* @param {object} [options.collation=null] The collation that should be used for string comparisons
-* for this count op.
-* @return {number}
-*
-*/
+ * Count number of matching documents in the db to a query.
+ *
+ * @method
+ * @param {object} query The query for the count.
+ * @param {object} [options=null] Optional settings.
+ * @param {number} [options.limit=null] The limit of documents to count.
+ * @param {number} [options.skip=null] The number of documents to skip for the count.
+ * @param {string|object} [options.hint=null] An index name hint or specification for the query.
+ * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
+ * @param {string} [options.readConcern=null] The level of readConcern passed to the count command
+ * @param {object} [options.collation=null] The collation that should be used for string comparisons
+ * for this count op.
+ * @return {number}
+ *
+ */
 DBCollection.prototype.count = function(query, options) {
     query = this.find(query);
 
@@ -1375,19 +1369,19 @@ DBCollection.prototype.count = function(query, options) {
 };
 
 /**
-* Count number of matching documents in the db to a query using aggregation.
-*
-* @method
-* @param {object} query The query for the count.
-* @param {object} [options=null] Optional settings.
-* @param {number} [options.limit=null] The limit of documents to count.
-* @param {number} [options.skip=null] The number of documents to skip for the count.
-* @param {string|object} [options.hint=null] An index name hint or specification for the query.
-* @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
-* @param {object} [options.collation=null] The collation that should be used for string comparisons
-* for this count op.
-* @return {number}
-*/
+ * Count number of matching documents in the db to a query using aggregation.
+ *
+ * @method
+ * @param {object} query The query for the count.
+ * @param {object} [options=null] Optional settings.
+ * @param {number} [options.limit=null] The limit of documents to count.
+ * @param {number} [options.skip=null] The number of documents to skip for the count.
+ * @param {string|object} [options.hint=null] An index name hint or specification for the query.
+ * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
+ * @param {object} [options.collation=null] The collation that should be used for string comparisons
+ * for this count op.
+ * @return {number}
+ */
 DBCollection.prototype.countDocuments = function(query, options) {
     "use strict";
     let pipeline = [{"$match": query}];
@@ -1424,13 +1418,13 @@ DBCollection.prototype.countDocuments = function(query, options) {
 };
 
 /**
-* Estimates the count of documents in a collection using collection metadata.
-*
-* @method
-* @param {object} [options=null] Optional settings.
-* @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
-* @return {number}
-*/
+ * Estimates the count of documents in a collection using collection metadata.
+ *
+ * @method
+ * @param {object} [options=null] Optional settings.
+ * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
+ * @return {number}
+ */
 DBCollection.prototype.estimatedDocumentCount = function(options) {
     "use strict";
     let cmd = {count: this.getName()};
@@ -1452,17 +1446,17 @@ DBCollection.prototype.estimatedDocumentCount = function(options) {
 };
 
 /**
-* The distinct command returns returns a list of distinct values for the given key across a
-*collection.
-*
-* @method
-* @param {string} key Field of the document to find distinct values for.
-* @param {object} query The query for filtering the set of documents to which we apply the distinct
-*filter.
-* @param {object} [options=null] Optional settings.
-* @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
-* @return {object}
-*/
+ * The distinct command returns returns a list of distinct values for the given key across a
+ *collection.
+ *
+ * @method
+ * @param {string} key Field of the document to find distinct values for.
+ * @param {object} query The query for filtering the set of documents to which we apply the distinct
+ *filter.
+ * @param {object} [options=null] Optional settings.
+ * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
+ * @return {object}
+ */
 DBCollection.prototype.distinct = function(keyString, query, options) {
     var opts = Object.extend({}, options || {});
     var keyStringType = typeof keyString;
@@ -1576,7 +1570,7 @@ PlanCache.prototype._parseQueryShape = function(query, projection, sort, collati
     // Accept query shape object as only argument.
     // Query shape must contain 'query', 'projection', and 'sort', and may optionally contain
     // 'collation'. 'collation' must be non-empty if present.
-    if (typeof(query) == 'object' && projection == undefined && sort == undefined &&
+    if (typeof (query) == 'object' && projection == undefined && sort == undefined &&
         collation == undefined) {
         var keysSorted = Object.keys(query).sort();
         // Expected keys must be sorted for the comparison to work.

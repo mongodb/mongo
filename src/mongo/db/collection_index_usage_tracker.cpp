@@ -47,7 +47,7 @@ ServerStatusMetricField<Counter64> displayCollectionScans("queryExecutor.collect
                                                           &collectionScansCounter);
 ServerStatusMetricField<Counter64> displayCollectionScansNonTailable(
     "queryExecutor.collectionScans.nonTailable", &collectionScansNonTailableCounter);
-}
+}  // namespace
 
 CollectionIndexUsageTracker::CollectionIndexUsageTracker(ClockSource* clockSource)
     : _clockSource(clockSource) {

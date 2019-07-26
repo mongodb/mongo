@@ -60,32 +60,32 @@ public:
     ~LockManager();
 
     /**
-      * Acquires lock on the specified resource in the specified mode and returns the outcome
-      * of the operation. See the details for LockResult for more information on what the
-      * different results mean.
-      *
-      * Locking the same resource twice increments the reference count of the lock so each call
-      * to lock must be matched with a call to unlock with the same resource.
-      *
-      * @param resId Id of the resource to be locked.
-      * @param request LockRequest structure on which the state of the request will be tracked.
-      *                 This value cannot be NULL and the notify value must be set. If the
-      *                 return value is not LOCK_WAITING, this pointer can be freed and will
-      *                 not be used any more.
-      *
-      *                 If the return value is LOCK_WAITING, the notification method will be called
-      *                 at some point into the future, when the lock becomes granted. If unlock is
-      *                 called before the lock becomes granted, the notification will not be
-      *                 invoked.
-      *
-      *                 If the return value is LOCK_WAITING, the notification object *must*
-      *                 live at least until the notify method has been invoked or unlock has
-      *                 been called for the resource it was assigned to. Failure to do so will
-      *                 cause the lock manager to call into an invalid memory location.
-      * @param mode Mode in which the resource should be locked. Lock upgrades are allowed.
-      *
-      * @return See comments for LockResult.
-      */
+     * Acquires lock on the specified resource in the specified mode and returns the outcome
+     * of the operation. See the details for LockResult for more information on what the
+     * different results mean.
+     *
+     * Locking the same resource twice increments the reference count of the lock so each call
+     * to lock must be matched with a call to unlock with the same resource.
+     *
+     * @param resId Id of the resource to be locked.
+     * @param request LockRequest structure on which the state of the request will be tracked.
+     *                 This value cannot be NULL and the notify value must be set. If the
+     *                 return value is not LOCK_WAITING, this pointer can be freed and will
+     *                 not be used any more.
+     *
+     *                 If the return value is LOCK_WAITING, the notification method will be called
+     *                 at some point into the future, when the lock becomes granted. If unlock is
+     *                 called before the lock becomes granted, the notification will not be
+     *                 invoked.
+     *
+     *                 If the return value is LOCK_WAITING, the notification object *must*
+     *                 live at least until the notify method has been invoked or unlock has
+     *                 been called for the resource it was assigned to. Failure to do so will
+     *                 cause the lock manager to call into an invalid memory location.
+     * @param mode Mode in which the resource should be locked. Lock upgrades are allowed.
+     *
+     * @return See comments for LockResult.
+     */
     LockResult lock(ResourceId resId, LockRequest* request, LockMode mode);
     LockResult convert(ResourceId resId, LockRequest* request, LockMode newMode);
 

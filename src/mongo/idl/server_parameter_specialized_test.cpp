@@ -242,24 +242,20 @@ TEST(SpecializedServerParameter, multiValue) {
     ASSERT_APPENDED_OBJECT(edsp,
                            BSON("value"
                                 << "start value"
-                                << "flag"
-                                << true));
+                                << "flag" << true));
     ASSERT_OK(edsp->setFromString("second value"));
     ASSERT_APPENDED_OBJECT(edsp,
                            BSON("value"
                                 << "second value"
-                                << "flag"
-                                << false));
+                                << "flag" << false));
     ASSERT_OK(edsp->set(BSON("" << BSON("value"
                                         << "third value"
-                                        << "flag"
-                                        << true))
+                                        << "flag" << true))
                             .firstElement()));
     ASSERT_APPENDED_OBJECT(edsp,
                            BSON("value"
                                 << "third value"
-                                << "flag"
-                                << true));
+                                << "flag" << true));
 }
 
 // specializedWithCtorAndValue

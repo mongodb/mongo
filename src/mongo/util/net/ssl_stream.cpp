@@ -40,8 +40,8 @@ namespace asio {
 namespace ssl {
 namespace detail {
 MONGO_FAIL_POINT_DEFINE(smallTLSReads);
-}  // namespce detail
-}  // namespce ssl
-}  // namespce asio
+}  // namespace detail
+}  // namespace ssl
+}  // namespace asio
 
 #endif

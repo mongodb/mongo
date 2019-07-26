@@ -39,11 +39,11 @@
 
 namespace mongo {
 
+using write_ops::Delete;
+using write_ops::DeleteOpEntry;
 using write_ops::Insert;
 using write_ops::Update;
-using write_ops::Delete;
 using write_ops::UpdateOpEntry;
-using write_ops::DeleteOpEntry;
 
 namespace {
 
@@ -51,10 +51,7 @@ template <class T>
 void checkOpCountForCommand(const T& op, size_t numOps) {
     uassert(ErrorCodes::InvalidLength,
             str::stream() << "Write batch sizes must be between 1 and "
-                          << write_ops::kMaxWriteBatchSize
-                          << ". Got "
-                          << numOps
-                          << " operations.",
+                          << write_ops::kMaxWriteBatchSize << ". Got " << numOps << " operations.",
             numOps != 0 && numOps <= write_ops::kMaxWriteBatchSize);
 
     const auto& stmtIds = op.getWriteCommandBase().getStmtIds();

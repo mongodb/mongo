@@ -64,8 +64,9 @@ inline double rad2deg(const double rad) {
 
 inline double computeXScanDistance(double y, double maxDistDegrees) {
     // TODO: this overestimates for large maxDistDegrees far from the equator
-    return maxDistDegrees / std::min(cos(deg2rad(std::min(+89.0, y + maxDistDegrees))),
-                                     cos(deg2rad(std::max(-89.0, y - maxDistDegrees))));
+    return maxDistDegrees /
+        std::min(cos(deg2rad(std::min(+89.0, y + maxDistDegrees))),
+                 cos(deg2rad(std::max(-89.0, y - maxDistDegrees))));
 }
 
 bool isValidLngLat(double lng, double lat);

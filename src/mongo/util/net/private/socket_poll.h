@@ -36,4 +36,4 @@
 namespace mongo {
 bool isPollSupported();
 int socketPoll(pollfd* fdarray, unsigned long nfds, int timeout);
-}
+}  // namespace mongo

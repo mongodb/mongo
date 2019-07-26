@@ -55,7 +55,8 @@ out = db.runCommand({
     mapReduce: "srcNonSharded",  // use new name mapReduce rather than mapreduce
     map: map,
     reduce: reduce,
-    out: "mrBasic" + "srcNonSharded",
+    out: "mrBasic" +
+        "srcNonSharded",
 });
 verifyOutput(out);
 st.stop();

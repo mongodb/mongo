@@ -73,7 +73,7 @@ MONGO_INITIALIZER(SetTempDirDefaultRoot)(InitializerContext* context) {
     }
     return Status::OK();
 }
-}
+}  // namespace
 
 TempDir::TempDir(const std::string& namePrefix) {
     fassert(17146, namePrefix.find_first_of("/\\") == std::string::npos);

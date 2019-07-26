@@ -257,7 +257,6 @@ function runTest(conn) {
         assert.throws(function() {
             db.getUser(['user1']);
         });
-
     })();
 
     (function testDropUser() {

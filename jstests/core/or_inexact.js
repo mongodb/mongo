@@ -119,26 +119,26 @@ t.insert({_id: 1, pre: 4, loc: {type: "Point", coordinates: [0, 0]}});
 cursor = t.find({
     $or: [
         {
-          pre: 3,
-          loc: {
-              $geoWithin: {
-                  $geometry: {
-                      type: "Polygon",
-                      coordinates: [[[39, 4], [41, 4], [41, 6], [39, 6], [39, 4]]]
-                  }
-              }
-          }
+            pre: 3,
+            loc: {
+                $geoWithin: {
+                    $geometry: {
+                        type: "Polygon",
+                        coordinates: [[[39, 4], [41, 4], [41, 6], [39, 6], [39, 4]]]
+                    }
+                }
+            }
         },
         {
-          pre: 4,
-          loc: {
-              $geoWithin: {
-                  $geometry: {
-                      type: "Polygon",
-                      coordinates: [[[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]]
-                  }
-              }
-          }
+            pre: 4,
+            loc: {
+                $geoWithin: {
+                    $geometry: {
+                        type: "Polygon",
+                        coordinates: [[[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]]
+                    }
+                }
+            }
         }
     ]
 });
@@ -152,26 +152,26 @@ t.insert({_id: 1, pre: 4, loc: {type: "Point", coordinates: [0, 0]}});
 cursor = t.find({
     $or: [
         {
-          pre: 3,
-          loc: {
-              $geoWithin: {
-                  $geometry: {
-                      type: "Polygon",
-                      coordinates: [[[39, 4], [41, 4], [41, 6], [39, 6], [39, 4]]]
-                  }
-              }
-          }
+            pre: 3,
+            loc: {
+                $geoWithin: {
+                    $geometry: {
+                        type: "Polygon",
+                        coordinates: [[[39, 4], [41, 4], [41, 6], [39, 6], [39, 4]]]
+                    }
+                }
+            }
         },
         {
-          pre: 4,
-          loc: {
-              $geoWithin: {
-                  $geometry: {
-                      type: "Polygon",
-                      coordinates: [[[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]]
-                  }
-              }
-          }
+            pre: 4,
+            loc: {
+                $geoWithin: {
+                    $geometry: {
+                        type: "Polygon",
+                        coordinates: [[[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]]
+                    }
+                }
+            }
         }
     ]
 });
@@ -259,24 +259,24 @@ t.insert({_id: 1, loc: {type: "Point", coordinates: [0, 0]}});
 cursor = t.find({
     $or: [
         {
-          loc: {
-              $geoWithin: {
-                  $geometry: {
-                      type: "Polygon",
-                      coordinates: [[[39, 4], [41, 4], [41, 6], [39, 6], [39, 4]]]
-                  }
-              }
-          }
+            loc: {
+                $geoWithin: {
+                    $geometry: {
+                        type: "Polygon",
+                        coordinates: [[[39, 4], [41, 4], [41, 6], [39, 6], [39, 4]]]
+                    }
+                }
+            }
         },
         {
-          loc: {
-              $geoWithin: {
-                  $geometry: {
-                      type: "Polygon",
-                      coordinates: [[[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]]
-                  }
-              }
-          }
+            loc: {
+                $geoWithin: {
+                    $geometry: {
+                        type: "Polygon",
+                        coordinates: [[[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]]
+                    }
+                }
+            }
         }
     ]
 });

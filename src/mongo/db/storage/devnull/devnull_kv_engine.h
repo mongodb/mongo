@@ -156,4 +156,4 @@ private:
 
     int _cachePressureForTest;
 };
-}
+}  // namespace mongo

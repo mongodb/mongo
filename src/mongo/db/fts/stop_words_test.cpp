@@ -41,5 +41,5 @@ TEST(English, Basic1) {
     ASSERT(englishStopWords->isStopWord("the"));
     ASSERT(!englishStopWords->isStopWord("computer"));
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

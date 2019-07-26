@@ -11,7 +11,6 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
-
     // explicitly pass db to avoid accidentally using the global `db`
     function assertResult(db, res) {
         assertAlways.eq(0, res.nUpserted, tojson(res));
@@ -88,5 +87,4 @@ var $config = (function() {
         transitions: transitions,
         setup: setup
     };
-
 })();

@@ -142,4 +142,4 @@ TEST(KeyPattern, GlobalMinMax) {
     ASSERT_BSONOBJ_EQ(KeyPattern(BSON("a.b.c" << -1)).globalMin(), BSON("a.b.c" << MAXKEY));
     ASSERT_BSONOBJ_EQ(KeyPattern(BSON("a.b.c" << -1)).globalMax(), BSON("a.b.c" << MINKEY));
 }
-}
+}  // namespace

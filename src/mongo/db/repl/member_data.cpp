@@ -141,8 +141,9 @@ void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_
         // TODO(russotto): We think this should never happen, rollback or no rollback.  Make this an
         // invariant and see what happens.
         log() << "Durable progress (" << opTime.opTime << ") is ahead of the applied progress ("
-              << _lastAppliedOpTime << ". This is likely due to a "
-                                       "rollback."
+              << _lastAppliedOpTime
+              << ". This is likely due to a "
+                 "rollback."
               << " memberid: " << _memberId << _hostAndPort.toString()
               << " previous durable progress: " << _lastDurableOpTime;
     } else {

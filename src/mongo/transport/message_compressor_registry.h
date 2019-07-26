@@ -45,7 +45,7 @@ namespace mongo {
 namespace optionenvironment {
 class OptionSection;
 class Environment;
-}  // namespace option environment
+}  // namespace optionenvironment
 
 namespace moe = mongo::optionenvironment;
 

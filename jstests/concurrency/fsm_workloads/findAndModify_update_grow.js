@@ -13,13 +13,11 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod
 
 var $config = (function() {
-
     var data = {
         shardKey: {tid: 1},
     };
 
     var states = (function() {
-
         // Use the workload name as the field name (since it is assumed
         // to be unique) to avoid any potential issues with large keys
         // and indexes on the collection.
@@ -109,7 +107,6 @@ var $config = (function() {
             insert: insert,
             findAndModify: findAndModify,
         };
-
     })();
 
     var transitions = {insert: {findAndModify: 1}, findAndModify: {findAndModify: 1}};
@@ -122,5 +119,4 @@ var $config = (function() {
         startState: 'insert',
         transitions: transitions
     };
-
 })();

@@ -150,14 +150,14 @@ private:
 
 private:
     /**
-    * Private enum to track state.
-    *
-    *   +-----------------------------------------------------------+
-    *   |                                                           v
-    * +-------------+     +----------+     +----------------+     +-------+
-    * | kNotStarted | --> | kStarted | --> | kStopRequested | --> | kDone |
-    * +-------------+     +----------+     +----------------+     +-------+
-    */
+     * Private enum to track state.
+     *
+     *   +-----------------------------------------------------------+
+     *   |                                                           v
+     * +-------------+     +----------+     +----------------+     +-------+
+     * | kNotStarted | --> | kStarted | --> | kStopRequested | --> | kDone |
+     * +-------------+     +----------+     +----------------+     +-------+
+     */
     enum class State {
         /**
          * Initial state. Either start() or stop() can be called next.

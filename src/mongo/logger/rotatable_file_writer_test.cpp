@@ -143,4 +143,4 @@ TEST_F(RotatableFileWriterTest, RotationTest) {
     }
 }
 
-}  // namespace mongo
+}  // namespace

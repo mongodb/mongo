@@ -24,97 +24,97 @@
  * This is a regression test for SERVER-29197.
  */
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/libs/check_log.js");
+load("jstests/libs/check_log.js");
 
-    /**
-     * Overflow a capped collection 'coll' by continuously inserting a given document,
-     * 'docToInsert'.
-     */
-    function overflowCappedColl(coll, docToInsert) {
-        // Insert one document and save its _id.
-        assert.writeOK(coll.insert(docToInsert));
-        var origFirstDocId = coll.findOne()["_id"];
+/**
+ * Overflow a capped collection 'coll' by continuously inserting a given document,
+ * 'docToInsert'.
+ */
+function overflowCappedColl(coll, docToInsert) {
+    // Insert one document and save its _id.
+    assert.writeOK(coll.insert(docToInsert));
+    var origFirstDocId = coll.findOne()["_id"];
 
-        // Detect overflow by seeing if the original first doc of the collection is still present.
-        while (coll.findOne({_id: origFirstDocId})) {
-            assert.commandWorked(coll.insert(docToInsert));
-        }
+    // Detect overflow by seeing if the original first doc of the collection is still present.
+    while (coll.findOne({_id: origFirstDocId})) {
+        assert.commandWorked(coll.insert(docToInsert));
     }
+}
 
-    // Set up replica set.
-    var testName = "initial_sync_capped_index";
-    var dbName = testName;
-    var replTest = new ReplSetTest({name: testName, nodes: 1});
-    replTest.startSet();
-    replTest.initiate();
+// Set up replica set.
+var testName = "initial_sync_capped_index";
+var dbName = testName;
+var replTest = new ReplSetTest({name: testName, nodes: 1});
+replTest.startSet();
+replTest.initiate();
 
-    var primary = replTest.getPrimary();
-    var primaryDB = primary.getDB(dbName);
-    var cappedCollName = "capped_coll";
-    var primaryCappedColl = primaryDB[cappedCollName];
+var primary = replTest.getPrimary();
+var primaryDB = primary.getDB(dbName);
+var cappedCollName = "capped_coll";
+var primaryCappedColl = primaryDB[cappedCollName];
 
-    // Create a capped collection of the minimum allowed size.
-    var cappedCollSize = 4096;
+// Create a capped collection of the minimum allowed size.
+var cappedCollSize = 4096;
 
-    jsTestLog("Creating capped collection of size " + cappedCollSize + " bytes.");
-    assert.commandWorked(
-        primaryDB.createCollection(cappedCollName, {capped: true, size: cappedCollSize}));
+jsTestLog("Creating capped collection of size " + cappedCollSize + " bytes.");
+assert.commandWorked(
+    primaryDB.createCollection(cappedCollName, {capped: true, size: cappedCollSize}));
 
-    // Overflow the capped collection.
-    jsTestLog("Overflowing the capped collection.");
+// Overflow the capped collection.
+jsTestLog("Overflowing the capped collection.");
 
-    var docSize = cappedCollSize / 8;
-    var largeDoc = {a: new Array(docSize).join("*")};
-    overflowCappedColl(primaryCappedColl, largeDoc);
+var docSize = cappedCollSize / 8;
+var largeDoc = {a: new Array(docSize).join("*")};
+overflowCappedColl(primaryCappedColl, largeDoc);
 
-    // Check that there are more than two documents in the collection. This will ensure the
-    // secondary's collection cloner will send a getMore.
-    assert.gt(primaryCappedColl.find().itcount(), 2);
+// Check that there are more than two documents in the collection. This will ensure the
+// secondary's collection cloner will send a getMore.
+assert.gt(primaryCappedColl.find().itcount(), 2);
 
-    // Add a SECONDARY node. It should use batchSize=2 for its initial sync queries.
-    jsTestLog("Adding secondary node.");
-    replTest.add({setParameter: "collectionClonerBatchSize=2"});
+// Add a SECONDARY node. It should use batchSize=2 for its initial sync queries.
+jsTestLog("Adding secondary node.");
+replTest.add({setParameter: "collectionClonerBatchSize=2"});
 
-    var secondary = replTest.getSecondary();
-    var collectionClonerFailPoint = "initialSyncHangCollectionClonerAfterHandlingBatchResponse";
+var secondary = replTest.getSecondary();
+var collectionClonerFailPoint = "initialSyncHangCollectionClonerAfterHandlingBatchResponse";
 
-    // Make the collection cloner pause after its initial 'find' response on the capped collection.
-    var nss = dbName + "." + cappedCollName;
-    jsTestLog("Enabling collection cloner fail point for " + nss);
-    assert.commandWorked(secondary.adminCommand(
-        {configureFailPoint: collectionClonerFailPoint, mode: 'alwaysOn', data: {nss: nss}}));
+// Make the collection cloner pause after its initial 'find' response on the capped collection.
+var nss = dbName + "." + cappedCollName;
+jsTestLog("Enabling collection cloner fail point for " + nss);
+assert.commandWorked(secondary.adminCommand(
+    {configureFailPoint: collectionClonerFailPoint, mode: 'alwaysOn', data: {nss: nss}}));
 
-    // Let the SECONDARY begin initial sync.
-    jsTestLog("Re-initiating replica set with new secondary.");
-    replTest.reInitiate();
+// Let the SECONDARY begin initial sync.
+jsTestLog("Re-initiating replica set with new secondary.");
+replTest.reInitiate();
 
-    jsTestLog("Waiting for the initial 'find' response of capped collection cloner to complete.");
-    checkLog.contains(
-        secondary,
-        "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point enabled for " + nss);
+jsTestLog("Waiting for the initial 'find' response of capped collection cloner to complete.");
+checkLog.contains(
+    secondary,
+    "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point enabled for " + nss);
 
-    // Append documents to the capped collection so that the SECONDARY will clone these
-    // additional documents.
-    var docsToAppend = 2;
-    for (var i = 0; i < docsToAppend; i++) {
-        assert.writeOK(primaryDB[cappedCollName].insert(largeDoc));
-    }
+// Append documents to the capped collection so that the SECONDARY will clone these
+// additional documents.
+var docsToAppend = 2;
+for (var i = 0; i < docsToAppend; i++) {
+    assert.writeOK(primaryDB[cappedCollName].insert(largeDoc));
+}
 
-    // Let the 'getMore' requests for the capped collection clone continue.
-    jsTestLog("Disabling collection cloner fail point for " + nss);
-    assert.commandWorked(secondary.adminCommand(
-        {configureFailPoint: collectionClonerFailPoint, mode: 'off', data: {nss: nss}}));
+// Let the 'getMore' requests for the capped collection clone continue.
+jsTestLog("Disabling collection cloner fail point for " + nss);
+assert.commandWorked(secondary.adminCommand(
+    {configureFailPoint: collectionClonerFailPoint, mode: 'off', data: {nss: nss}}));
 
-    // Wait until initial sync completes.
-    replTest.awaitReplication();
+// Wait until initial sync completes.
+replTest.awaitReplication();
 
-    // Make sure the indexes created during initial sync are valid.
-    var secondaryCappedColl = secondary.getDB(dbName)[cappedCollName];
-    var validate_result = secondaryCappedColl.validate(true);
-    var failMsg =
-        "Index validation of '" + secondaryCappedColl.name + "' failed: " + tojson(validate_result);
-    assert(validate_result.valid, failMsg);
-    replTest.stopSet();
+// Make sure the indexes created during initial sync are valid.
+var secondaryCappedColl = secondary.getDB(dbName)[cappedCollName];
+var validate_result = secondaryCappedColl.validate(true);
+var failMsg =
+    "Index validation of '" + secondaryCappedColl.name + "' failed: " + tojson(validate_result);
+assert(validate_result.valid, failMsg);
+replTest.stopSet();
 })();

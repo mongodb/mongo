@@ -77,4 +77,4 @@ private:
     bool _elemMatchKeyRequested;
     std::unique_ptr<std::string> _elemMatchKey;
 };
-}
+}  // namespace mongo

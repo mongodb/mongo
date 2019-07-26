@@ -213,7 +213,7 @@ print.captureAllOutput = function(fn, args) {
 };
 
 var indentStr = function(indent, s) {
-    if (typeof(s) === "undefined") {
+    if (typeof (s) === "undefined") {
         s = indent;
         indent = 0;
     }
@@ -350,7 +350,7 @@ jsTestLog = function(msg) {
     if (typeof msg === "object") {
         msg = tojson(msg);
     }
-    assert.eq(typeof(msg), "string", "Received: " + msg);
+    assert.eq(typeof (msg), "string", "Received: " + msg);
     const msgs = ["----", ...msg.split("\n"), "----"].map(s => `[jsTest] ${s}`);
     print(`\n\n${msgs.join("\n")}\n\n`);
 };
@@ -596,10 +596,10 @@ if (typeof _shouldUseImplicitSessions === 'undefined') {
 }
 
 shellPrintHelper = function(x) {
-    if (typeof(x) == "undefined") {
+    if (typeof (x) == "undefined") {
         // Make sure that we have a db var before we use it
         // TODO: This implicit calling of GLE can cause subtle, hard to track issues - remove?
-        if (__callLastError && typeof(db) != "undefined" && db.getMongo &&
+        if (__callLastError && typeof (db) != "undefined" && db.getMongo &&
             db.getMongo().writeMode() == "legacy") {
             __callLastError = false;
             // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad
@@ -638,7 +638,6 @@ shellPrintHelper = function(x) {
 
 shellAutocomplete = function(
     /*prefix*/) {  // outer scope function called on init. Actual function at end
-
     var universalMethods =
         "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable"
             .split(' ');
@@ -743,7 +742,7 @@ shellAutocomplete = function(
             {};  // see http://dreaminginjavascript.wordpress.com/2008/08/22/eliminating-duplicates/
         for (var i = 0; i < possibilities.length; i++) {
             var p = possibilities[i];
-            if (typeof(curObj[p]) == "undefined" && curObj != global)
+            if (typeof (curObj[p]) == "undefined" && curObj != global)
                 continue;  // extraGlobals aren't in the global object
             if (p.length == 0 || p.length < lastPrefix.length)
                 continue;
@@ -829,7 +828,7 @@ shellHelper.set = function(str) {
 };
 
 shellHelper.it = function() {
-    if (typeof(___it___) == "undefined" || ___it___ == null) {
+    if (typeof (___it___) == "undefined" || ___it___ == null) {
         print("no cursor");
         return;
     }
@@ -862,7 +861,7 @@ shellHelper.show = function(what) {
                             continue;
 
                         var val = x[z];
-                        var mytype = typeof(val);
+                        var mytype = typeof (val);
 
                         if (mytype == "string" || mytype == "number")
                             l += z + ":" + val + " ";
@@ -1120,7 +1119,8 @@ shellHelper.show = function(what) {
         }
 
         if (matchesKnownImposterSignature) {
-            print("\n" + "Warning: Non-Genuine MongoDB Detected\n\n" +
+            print("\n" +
+                  "Warning: Non-Genuine MongoDB Detected\n\n" +
 
                   "This server or service appears to be an emulation of MongoDB " +
                   "rather than an official MongoDB product.\n\n" +
@@ -1137,7 +1137,6 @@ shellHelper.show = function(what) {
     }
 
     throw Error("don't know how to show [" + what + "]");
-
 };
 
 __promptWrapper__ = function(promptFunction) {
@@ -1173,8 +1172,8 @@ Math.sigFig = function(x, N) {
 
 var Random = (function() {
     var initialized = false;
-    var errorMsg =
-        "The random number generator hasn't been seeded yet; " + "call Random.setRandomSeed()";
+    var errorMsg = "The random number generator hasn't been seeded yet; " +
+        "call Random.setRandomSeed()";
 
     // Set the random generator seed.
     function srand(s) {
@@ -1248,7 +1247,6 @@ var Random = (function() {
         setRandomSeed: setRandomSeed,
         srand: srand,
     };
-
 })();
 
 /**
@@ -1351,7 +1349,8 @@ _awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
         desiredState = {ok: true};
     }
 
-    print("Awaiting " + hostAddr + " to be " + tojson(desiredState) + " in " + " rs " + rsName);
+    print("Awaiting " + hostAddr + " to be " + tojson(desiredState) + " in " +
+          " rs " + rsName);
 
     var tests = 0;
     assert.soon(
@@ -1387,8 +1386,8 @@ _awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
             }
             return false;
         },
-        "timed out waiting for replica set member: " + hostAddr + " to reach state: " +
-            tojson(desiredState),
+        "timed out waiting for replica set member: " + hostAddr +
+            " to reach state: " + tojson(desiredState),
         timeout);
 };
 
@@ -1700,35 +1699,52 @@ help = shellHelper.help = function(x) {
         print("\t                              returns a connection to the new server");
         return;
     } else if (x == "") {
-        print("\t" + "db.help()                    help on db methods");
-        print("\t" + "db.mycoll.help()             help on collection methods");
-        print("\t" + "sh.help()                    sharding helpers");
-        print("\t" + "rs.help()                    replica set helpers");
-        print("\t" + "help admin                   administrative help");
-        print("\t" + "help connect                 connecting to a db help");
-        print("\t" + "help keys                    key shortcuts");
-        print("\t" + "help misc                    misc things to know");
-        print("\t" + "help mr                      mapreduce");
+        print("\t" +
+              "db.help()                    help on db methods");
+        print("\t" +
+              "db.mycoll.help()             help on collection methods");
+        print("\t" +
+              "sh.help()                    sharding helpers");
+        print("\t" +
+              "rs.help()                    replica set helpers");
+        print("\t" +
+              "help admin                   administrative help");
+        print("\t" +
+              "help connect                 connecting to a db help");
+        print("\t" +
+              "help keys                    key shortcuts");
+        print("\t" +
+              "help misc                    misc things to know");
+        print("\t" +
+              "help mr                      mapreduce");
         print();
-        print("\t" + "show dbs                     show database names");
-        print("\t" + "show collections             show collections in current database");
-        print("\t" + "show users                   show users in current database");
+        print("\t" +
+              "show dbs                     show database names");
+        print("\t" +
+              "show collections             show collections in current database");
+        print("\t" +
+              "show users                   show users in current database");
         print(
             "\t" +
             "show profile                 show most recent system.profile entries with time >= 1ms");
-        print("\t" + "show logs                    show the accessible logger names");
+        print("\t" +
+              "show logs                    show the accessible logger names");
         print(
             "\t" +
             "show log [name]              prints out the last segment of log in memory, 'global' is default");
-        print("\t" + "use <db_name>                set current database");
-        print("\t" + "db.foo.find()                list objects in collection foo");
-        print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");
+        print("\t" +
+              "use <db_name>                set current database");
+        print("\t" +
+              "db.foo.find()                list objects in collection foo");
+        print("\t" +
+              "db.foo.find( { a : 1 } )     list objects in foo where a == 1");
         print(
             "\t" +
             "it                           result of the last line evaluated; use to further iterate");
         print("\t" +
               "DBQuery.shellBatchSize = x   set default number of items to display on shell");
-        print("\t" + "exit                         quit the mongo shell");
+        print("\t" +
+              "exit                         quit the mongo shell");
     } else
         print("unknown help option");
 };

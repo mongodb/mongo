@@ -38,18 +38,18 @@ var $config = (function() {
             doSnapshotGetMore(collName,
                               this,
                               [
-                                ErrorCodes.CursorKilled,
-                                ErrorCodes.CursorNotFound,
-                                ErrorCodes.Interrupted,
-                                ErrorCodes.LockTimeout,
-                                ErrorCodes.NoSuchTransaction,
+                                  ErrorCodes.CursorKilled,
+                                  ErrorCodes.CursorNotFound,
+                                  ErrorCodes.Interrupted,
+                                  ErrorCodes.LockTimeout,
+                                  ErrorCodes.NoSuchTransaction,
                               ],
                               [
-                                ErrorCodes.NoSuchTransaction,
-                                ErrorCodes.Interrupted,
-                                // Anonymous code for when user tries to send commit as the first
-                                // operation in a transaction without sending a recovery token
-                                50940
+                                  ErrorCodes.NoSuchTransaction,
+                                  ErrorCodes.Interrupted,
+                                  // Anonymous code for when user tries to send commit as the first
+                                  // operation in a transaction without sending a recovery token
+                                  50940
                               ]);
         },
 
@@ -151,5 +151,4 @@ var $config = (function() {
         teardown: teardown,
         data: data,
     };
-
 })();

@@ -53,8 +53,8 @@ var Cluster = function(options) {
         getObjectKeys(options).forEach(function(option) {
             assert.contains(option,
                             allowedKeys,
-                            'invalid option: ' + tojson(option) + '; valid options are: ' +
-                                tojson(allowedKeys));
+                            'invalid option: ' + tojson(option) +
+                                '; valid options are: ' + tojson(allowedKeys));
         });
 
         options.replication = options.replication || {};
@@ -271,7 +271,7 @@ var Cluster = function(options) {
     this.executeOnMongodNodes = function executeOnMongodNodes(fn) {
         assert(initialized, 'cluster must be initialized first');
 
-        if (!fn || typeof(fn) !== 'function' || fn.length !== 1) {
+        if (!fn || typeof (fn) !== 'function' || fn.length !== 1) {
             throw new Error('mongod function must be a function that takes a db as an argument');
         }
         _conns.mongod.forEach(function(mongodConn) {
@@ -282,7 +282,7 @@ var Cluster = function(options) {
     this.executeOnMongosNodes = function executeOnMongosNodes(fn) {
         assert(initialized, 'cluster must be initialized first');
 
-        if (!fn || typeof(fn) !== 'function' || fn.length !== 1) {
+        if (!fn || typeof (fn) !== 'function' || fn.length !== 1) {
             throw new Error('mongos function must be a function that takes a db as an argument');
         }
         _conns.mongos.forEach(function(mongosConn) {
@@ -293,7 +293,7 @@ var Cluster = function(options) {
     this.executeOnConfigNodes = function executeOnConfigNodes(fn) {
         assert(initialized, 'cluster must be initialized first');
 
-        if (!fn || typeof(fn) !== 'function' || fn.length !== 1) {
+        if (!fn || typeof (fn) !== 'function' || fn.length !== 1) {
             throw new Error('config function must be a function that takes a db as an argument');
         }
         st._configServers.forEach(function(conn) {
@@ -553,8 +553,8 @@ var Cluster = function(options) {
 
                 var primaryInfo = replSetStatus.members.find(memberInfo => memberInfo.self);
                 assert(primaryInfo !== undefined,
-                       phase + ', failed to find self in replication status: ' +
-                           tojson(replSetStatus));
+                       phase +
+                           ', failed to find self in replication status: ' + tojson(replSetStatus));
 
                 // Wait for all previous workload operations to complete, with "getLastError".
                 res = primary.getDB('test').runCommand({
@@ -565,7 +565,6 @@ var Cluster = function(options) {
                 });
                 assert.commandWorked(res, phase + ', error awaiting replication');
             }
-
         });
     };
 

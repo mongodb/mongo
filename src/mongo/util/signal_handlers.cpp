@@ -65,7 +65,7 @@ const char* strsignal(int signalNum) {
             return "UNKNOWN";
     }
 }
-}
+}  // namespace
 #endif
 
 namespace mongo {

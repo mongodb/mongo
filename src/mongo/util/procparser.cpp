@@ -93,8 +93,8 @@ StatusWith<std::string> readFileAsString(StringData filename) {
     if (fd == -1) {
         int err = errno;
         return Status(ErrorCodes::FileOpenFailed,
-                      str::stream() << "Failed to open file " << filename << " with error: "
-                                    << errnoWithDescription(err));
+                      str::stream() << "Failed to open file " << filename
+                                    << " with error: " << errnoWithDescription(err));
     }
     auto scopedGuard = makeGuard([fd] { close(fd); });
 
@@ -122,8 +122,8 @@ StatusWith<std::string> readFileAsString(StringData filename) {
                 }
 
                 return Status(ErrorCodes::FileStreamFailed,
-                              str::stream() << "Failed to read file " << filename << " with error: "
-                                            << errnoWithDescription(err));
+                              str::stream() << "Failed to read file " << filename
+                                            << " with error: " << errnoWithDescription(err));
             }
 
             break;
@@ -432,11 +432,10 @@ Status parseProcNetstat(const std::vector<StringData>& keys,
 
     // Split the file by lines.
     uint32_t lineNum = 0;
-    for (string_split_iterator
-             lineIt = string_split_iterator(
-                 data.begin(),
-                 data.end(),
-                 boost::token_finder([](char c) { return c == '\n'; }, boost::token_compress_on));
+    for (string_split_iterator lineIt = string_split_iterator(
+             data.begin(),
+             data.end(),
+             boost::token_finder([](char c) { return c == '\n'; }, boost::token_compress_on));
          lineIt != string_split_iterator();
          ++lineIt, ++lineNum) {
 

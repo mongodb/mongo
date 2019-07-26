@@ -1337,8 +1337,7 @@ TEST_F(CachePlanSelectionTest, Or2DSphereNonNear) {
 TEST_F(CachePlanSelectionTest, AndWithinPolygonWithinCenterSphere) {
     addIndex(BSON("a"
                   << "2dsphere"
-                  << "b"
-                  << 1),
+                  << "b" << 1),
              "a_2dsphere_b_2dsphere");
 
     BSONObj query = fromjson(

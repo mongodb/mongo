@@ -46,8 +46,7 @@ function removeFCVDocument(adminDB) {
     let dropOriginalAdminSystemVersionCollection =
         {op: "c", ns: "admin.$cmd", ui: originalUUID, o: {drop: "admin.tmp_system_version"}};
     assert.commandWorked(adminDB.runCommand({
-        applyOps:
-            [createNewAdminSystemVersionCollection, dropOriginalAdminSystemVersionCollection]
+        applyOps: [createNewAdminSystemVersionCollection, dropOriginalAdminSystemVersionCollection]
     }));
 
     res = adminDB.runCommand({listCollections: 1, filter: {name: "system.version"}});

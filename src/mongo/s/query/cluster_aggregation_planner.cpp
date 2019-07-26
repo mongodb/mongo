@@ -318,8 +318,7 @@ BSONObj buildNewKeyPattern(const ShardKeyPattern& shardKey, StringMap<std::strin
         auto it = renames.find(elem.fieldNameStringData());
         invariant(it != renames.end(),
                   str::stream() << "Could not find new name of shard key field \""
-                                << elem.fieldName()
-                                << "\": rename map was "
+                                << elem.fieldName() << "\": rename map was "
                                 << mapToString(renames));
         newPattern.appendAs(elem, it->second);
     }

@@ -98,4 +98,4 @@ private:
     mutable stdx::mutex _localSnapshotMutex;  // Guards _localSnapshot.
     boost::optional<Timestamp> _localSnapshot;
 };
-}
+}  // namespace mongo

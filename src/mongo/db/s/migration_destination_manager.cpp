@@ -436,8 +436,7 @@ Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
     if (!_sessionId->matches(sessionId)) {
         return {ErrorCodes::CommandFailed,
                 str::stream() << "received abort request from a stale session "
-                              << sessionId.toString()
-                              << ". Current session is "
+                              << sessionId.toString() << ". Current session is "
                               << _sessionId->toString()};
     }
 
@@ -462,8 +461,7 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
     if (_state != STEADY) {
         return {ErrorCodes::CommandFailed,
                 str::stream() << "Migration startCommit attempted when not in STEADY state."
-                              << " Sender's session is "
-                              << sessionId.toString()
+                              << " Sender's session is " << sessionId.toString()
                               << (_sessionId ? (". Current session is " + _sessionId->toString())
                                              : ". No active session on this shard.")};
     }
@@ -477,8 +475,7 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
     if (!_sessionId->matches(sessionId)) {
         return {ErrorCodes::CommandFailed,
                 str::stream() << "startCommit received commit request from a stale session "
-                              << sessionId.toString()
-                              << ". Current session is "
+                              << sessionId.toString() << ". Current session is "
                               << _sessionId->toString()};
     }
 
@@ -550,9 +547,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
         auto infos = infosRes.docs;
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "expected listCollections against the primary shard for "
-                              << nss.toString()
-                              << " to return 1 entry, but got "
-                              << infos.size()
+                              << nss.toString() << " to return 1 entry, but got " << infos.size()
                               << " entries",
                 infos.size() == 1);
 
@@ -574,8 +569,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
 
         uassert(ErrorCodes::InvalidUUID,
                 str::stream() << "The donor shard did not return a UUID for collection " << nss.ns()
-                              << " as part of its listCollections response: "
-                              << entry
+                              << " as part of its listCollections response: " << entry
                               << ", but this node expects to see a UUID.",
                 !info["uuid"].eoo());
 
@@ -602,11 +596,9 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
 
             uassert(ErrorCodes::InvalidUUID,
                     str::stream()
-                        << "Cannot create collection "
-                        << nss.ns()
+                        << "Cannot create collection " << nss.ns()
                         << " because we already have an identically named collection with UUID "
-                        << collection->uuid()
-                        << ", which differs from the donor's UUID "
+                        << collection->uuid() << ", which differs from the donor's UUID "
                         << (donorUUID ? donorUUID->toString() : "(none)")
                         << ". Manually drop the collection on this shard if it contains data from "
                            "a previous incarnation of "
@@ -622,10 +614,10 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
             if (!indexSpecs.empty()) {
                 // Only allow indexes to be copied if the collection does not have any documents.
                 uassert(ErrorCodes::CannotCreateCollection,
-                        str::stream() << "aborting, shard is missing " << indexSpecs.size()
-                                      << " indexes and "
-                                      << "collection is not empty. Non-trivial "
-                                      << "index creation should be scheduled manually",
+                        str::stream()
+                            << "aborting, shard is missing " << indexSpecs.size() << " indexes and "
+                            << "collection is not empty. Non-trivial "
+                            << "index creation should be scheduled manually",
                         collection->numRecords(opCtx) == 0);
             }
             return indexSpecs;
@@ -1152,10 +1144,9 @@ CollectionShardingRuntime::CleanupNotification MigrationDestinationManager::_not
     if (!optMetadata || !(*optMetadata)->isSharded() ||
         (*optMetadata)->getCollVersion().epoch() != _epoch) {
         return Status{ErrorCodes::StaleShardVersion,
-                      str::stream() << "Not marking chunk " << redact(range.toString())
-                                    << " as pending because the epoch of "
-                                    << _nss.ns()
-                                    << " changed"};
+                      str::stream()
+                          << "Not marking chunk " << redact(range.toString())
+                          << " as pending because the epoch of " << _nss.ns() << " changed"};
     }
 
     // Start clearing any leftovers that would be in the new chunk

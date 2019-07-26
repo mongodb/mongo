@@ -260,8 +260,9 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock, OperationConte
             // Skip the rest of the chain for this session since the ns is unrelated with the
             // current one being migrated. It is ok to not check the rest of the chain because
             // retryable writes doesn't allow touching different namespaces.
-            if (!nextStmtId || (nextStmtId && *nextStmtId != kIncompleteHistoryStmtId &&
-                                nextOplog->getNss() != _ns)) {
+            if (!nextStmtId ||
+                (nextStmtId && *nextStmtId != kIncompleteHistoryStmtId &&
+                 nextOplog->getNss() != _ns)) {
                 _currentOplogIterator.reset();
                 return false;
             }
@@ -420,8 +421,7 @@ boost::optional<repl::OplogEntry> SessionCatalogMigrationSource::SessionOplogIte
 
             uassert(40656,
                     str::stream() << "rollback detected, rollbackId was " << _initialRollbackId
-                                  << " but is now "
-                                  << rollbackId,
+                                  << " but is now " << rollbackId,
                     rollbackId == _initialRollbackId);
 
             // If the rollbackId hasn't changed, and this record corresponds to a retryable write,

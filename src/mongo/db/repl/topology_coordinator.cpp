@@ -249,8 +249,8 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
         _syncSource = _rsConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort();
         _forceSyncSourceIndex = -1;
         log() << "choosing sync source candidate by request: " << _syncSource;
-        std::string msg(str::stream() << "syncing from: " << _syncSource.toString()
-                                      << " by request");
+        std::string msg(str::stream()
+                        << "syncing from: " << _syncSource.toString() << " by request");
         setMyHeartbeatMessage(now, msg);
         return _syncSource;
     }
@@ -572,8 +572,7 @@ Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
               << "; remote node's: " << rshb;
         return Status(ErrorCodes::InconsistentReplicaSetNames,
                       str::stream() << "Our set name of " << ourSetName << " does not match name "
-                                    << rshb
-                                    << " reported by remote node");
+                                    << rshb << " reported by remote node");
     }
 
     const MemberState myState = getMemberState();
@@ -782,8 +781,9 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     }
     const int memberIndex = _rsConfig.findMemberIndexByHostAndPort(target);
     if (memberIndex == -1) {
-        LOG(1) << "Could not find " << target << " in current config so ignoring --"
-                                                 " current config: "
+        LOG(1) << "Could not find " << target
+               << " in current config so ignoring --"
+                  " current config: "
                << _rsConfig.toBSON();
         HeartbeatResponseAction nextAction = HeartbeatResponseAction::makeNoAction();
         nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
@@ -1131,8 +1131,9 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBDataV1(
         bool scheduleCatchupTakeover = false;
         bool schedulePriorityTakeover = false;
 
-        if (!catchupTakeoverDisabled && (_memberData.at(primaryIndex).getLastAppliedOpTime() <
-                                         _memberData.at(_selfIndex).getLastAppliedOpTime())) {
+        if (!catchupTakeoverDisabled &&
+            (_memberData.at(primaryIndex).getLastAppliedOpTime() <
+             _memberData.at(_selfIndex).getLastAppliedOpTime())) {
             LOG_FOR_ELECTION(2) << "I can take over the primary due to fresher data."
                                 << " Current primary index: " << primaryIndex << " in term "
                                 << _memberData.at(primaryIndex).getTerm() << "."
@@ -2712,38 +2713,30 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
     if (args.getTerm() < _term) {
         response->setVoteGranted(false);
         response->setReason(str::stream() << "candidate's term (" << args.getTerm()
-                                          << ") is lower than mine ("
-                                          << _term
-                                          << ")");
+                                          << ") is lower than mine (" << _term << ")");
     } else if (args.getConfigVersion() != _rsConfig.getConfigVersion()) {
         response->setVoteGranted(false);
-        response->setReason(str::stream() << "candidate's config version ("
-                                          << args.getConfigVersion()
-                                          << ") differs from mine ("
-                                          << _rsConfig.getConfigVersion()
-                                          << ")");
+        response->setReason(str::stream()
+                            << "candidate's config version (" << args.getConfigVersion()
+                            << ") differs from mine (" << _rsConfig.getConfigVersion() << ")");
     } else if (args.getSetName() != _rsConfig.getReplSetName()) {
         response->setVoteGranted(false);
-        response->setReason(str::stream() << "candidate's set name (" << args.getSetName()
-                                          << ") differs from mine ("
-                                          << _rsConfig.getReplSetName()
-                                          << ")");
+        response->setReason(str::stream()
+                            << "candidate's set name (" << args.getSetName()
+                            << ") differs from mine (" << _rsConfig.getReplSetName() << ")");
     } else if (args.getLastDurableOpTime() < getMyLastAppliedOpTime()) {
         response->setVoteGranted(false);
         response
             ->setReason(str::stream()
                         << "candidate's data is staler than mine. candidate's last applied OpTime: "
                         << args.getLastDurableOpTime().toString()
-                        << ", my last applied OpTime: "
-                        << getMyLastAppliedOpTime().toString());
+                        << ", my last applied OpTime: " << getMyLastAppliedOpTime().toString());
     } else if (!args.isADryRun() && _lastVote.getTerm() == args.getTerm()) {
         response->setVoteGranted(false);
         response->setReason(str::stream()
                             << "already voted for another candidate ("
                             << _rsConfig.getMemberAt(_lastVote.getCandidateIndex()).getHostAndPort()
-                            << ") this term ("
-                            << _lastVote.getTerm()
-                            << ")");
+                            << ") this term (" << _lastVote.getTerm() << ")");
     } else {
         int betterPrimary = _findHealthyPrimaryOfEqualOrGreaterPriority(args.getCandidateIndex());
         if (_selfConfig().isArbiter() && betterPrimary >= 0) {

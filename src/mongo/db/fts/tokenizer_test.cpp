@@ -117,5 +117,5 @@ TEST(Tokenizer, Quote1French) {
     ASSERT_EQUALS("s", b.data.toString());
     ASSERT_EQUALS("car", c.data.toString());
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

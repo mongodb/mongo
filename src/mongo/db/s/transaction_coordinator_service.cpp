@@ -147,7 +147,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
         _catalogAndScheduler->scheduler
             .scheduleWorkIn(
                 recoveryDelayForTesting,
-                [catalogAndScheduler = _catalogAndScheduler](OperationContext * opCtx) {
+                [catalogAndScheduler = _catalogAndScheduler](OperationContext* opCtx) {
                     auto& replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
                     replClientInfo.setLastOpToSystemLastOpTime(opCtx);
 

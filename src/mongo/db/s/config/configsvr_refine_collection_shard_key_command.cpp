@@ -96,8 +96,7 @@ public:
 
             uassert(ErrorCodes::StaleEpoch,
                     str::stream()
-                        << "refineCollectionShardKey namespace "
-                        << nss.toString()
+                        << "refineCollectionShardKey namespace " << nss.toString()
                         << " has a different epoch than mongos had in its routing table cache",
                     request().getEpoch() == collType.getEpoch());
 

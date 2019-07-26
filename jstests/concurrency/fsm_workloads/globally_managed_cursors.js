@@ -11,7 +11,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/kill_multicollection_aggregation.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.states.listCollections = function listCollections(unusedDB, _) {
         const db = unusedDB.getSiblingDB(this.uniqueDBName);
         const cmdRes =

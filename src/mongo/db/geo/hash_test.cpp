@@ -549,4 +549,4 @@ TEST(GeoHash, ClearUnusedBitsIsNoopIfNoBitsAreUnused) {
     GeoHash other = geoHash.parent(32);
     ASSERT_EQUALS(geoHash, other);
 }
-}
+}  // namespace

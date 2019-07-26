@@ -144,7 +144,7 @@ void scheduleCleanup(executor::TaskExecutor* executor,
                      Date_t when) {
     LOG(1) << "Scheduling cleanup on " << nss.ns() << " at " << when;
     auto swCallbackHandle = executor->scheduleWorkAt(
-        when, [ executor, nss = std::move(nss), epoch = std::move(epoch) ](auto& args) {
+        when, [executor, nss = std::move(nss), epoch = std::move(epoch)](auto& args) {
             auto& status = args.status;
             if (ErrorCodes::isCancelationError(status.code())) {
                 return;
@@ -230,11 +230,11 @@ MetadataManager::~MetadataManager() {
 }
 
 void MetadataManager::_clearAllCleanups(WithLock lock) {
-    _clearAllCleanups(
-        lock,
-        {ErrorCodes::InterruptedDueToReplStateChange,
-         str::stream() << "Range deletions in " << _nss.ns()
-                       << " abandoned because collection was dropped or became unsharded"});
+    _clearAllCleanups(lock,
+                      {ErrorCodes::InterruptedDueToReplStateChange,
+                       str::stream()
+                           << "Range deletions in " << _nss.ns()
+                           << " abandoned because collection was dropped or became unsharded"});
 }
 
 void MetadataManager::_clearAllCleanups(WithLock, Status status) {

@@ -118,9 +118,9 @@ TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
         << "OpTime returned from logOp() did not match that in the oplog entry written to the "
            "oplog: "
         << oplogEntry.toBSON();
-    ASSERT(OpTypeEnum::kNoop == oplogEntry.getOpType()) << "Expected 'n' op type but found '"
-                                                        << OpType_serializer(oplogEntry.getOpType())
-                                                        << "' instead: " << oplogEntry.toBSON();
+    ASSERT(OpTypeEnum::kNoop == oplogEntry.getOpType())
+        << "Expected 'n' op type but found '" << OpType_serializer(oplogEntry.getOpType())
+        << "' instead: " << oplogEntry.toBSON();
     ASSERT_BSONOBJ_EQ(msgObj, oplogEntry.getObject());
 
     // Ensure that the msg optime returned is the same as the last optime in the ReplClientInfo.

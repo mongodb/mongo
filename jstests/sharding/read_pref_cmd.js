@@ -198,10 +198,7 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
             aggregate: 1,
             pipeline: [
                 {$currentOp: {}},
-                {
-                  $lookup:
-                      {from: "dummy", localField: "dummy", foreignField: "dummy", as: "dummy"}
-                }
+                {$lookup: {from: "dummy", localField: "dummy", foreignField: "dummy", as: "dummy"}}
             ],
             comment: curOpComment,
             cursor: {}
@@ -251,7 +248,6 @@ var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
 };
 
 var testAllModes = function(conn, hostList, isMongos) {
-
     // The primary is tagged with { tag: 'one' } and the secondary with
     // { tag: 'two' } so we can test the interaction of modes and tags. Test
     // a bunch of combinations.

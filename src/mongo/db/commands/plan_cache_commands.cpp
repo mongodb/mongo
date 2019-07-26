@@ -104,8 +104,8 @@ namespace mongo {
 
 using std::string;
 using std::stringstream;
-using std::vector;
 using std::unique_ptr;
+using std::vector;
 
 PlanCacheCommand::PlanCacheCommand(const string& name,
                                    const string& helpText,

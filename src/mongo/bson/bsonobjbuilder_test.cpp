@@ -286,8 +286,7 @@ TEST(BSONObjBuilderTest, ResumeBuildingWithNesting) {
     ASSERT_BSONOBJ_EQ(obj,
                       BSON("ll" << BSON("f" << BSON("cc"
                                                     << "dd"))
-                                << "a"
-                                << BSON("c" << 3)));
+                                << "a" << BSON("c" << 3)));
 }
 
 TEST(BSONObjBuilderTest, ResetToEmptyResultsInEmptyObj) {
@@ -483,12 +482,10 @@ TEST(BSONObjBuilderTest, SizeChecks) {
         BSONObjBuilder builder;
         ASSERT_THROWS(
             [&]() {
-
                 for (StringData character : {"a", "b", "c"}) {
                     builder.append(character, obj);
                 }
                 BSONObj finalObj = builder.obj<BSONObj::LargeSizeTrait>();
-
             }(),
             DBException);
     }

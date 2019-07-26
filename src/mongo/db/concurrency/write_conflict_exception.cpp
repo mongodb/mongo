@@ -48,10 +48,10 @@ WriteConflictException::WriteConflictException()
 }
 
 void WriteConflictException::logAndBackoff(int attempt, StringData operation, StringData ns) {
-    mongo::logAndBackoff(
-        ::mongo::logger::LogComponent::kWrite,
-        logger::LogSeverity::Debug(1),
-        static_cast<size_t>(attempt),
-        str::stream() << "Caught WriteConflictException doing " << operation << " on " << ns);
+    mongo::logAndBackoff(::mongo::logger::LogComponent::kWrite,
+                         logger::LogSeverity::Debug(1),
+                         static_cast<size_t>(attempt),
+                         str::stream() << "Caught WriteConflictException doing " << operation
+                                       << " on " << ns);
 }
-}
+}  // namespace mongo

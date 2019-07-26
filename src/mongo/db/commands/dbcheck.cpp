@@ -339,7 +339,7 @@ private:
             return false;
         }
 
-        auto[prev, next] = getPrevAndNextUUIDs(opCtx, collection);
+        auto [prev, next] = getPrevAndNextUUIDs(opCtx, collection);
 
         // Find and report collection metadata.
         auto indices = collectionIndexInfo(opCtx, collection);
@@ -546,4 +546,4 @@ public:
 
 MONGO_REGISTER_TEST_COMMAND(DbCheckCmd);
 }  // namespace
-}
+}  // namespace mongo

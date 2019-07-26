@@ -14,7 +14,6 @@
  * ]
  */
 var $config = (function() {
-
     function mapper() {
         if (this.hasOwnProperty('key') && this.hasOwnProperty('value')) {
             var obj = {};
@@ -45,7 +44,6 @@ var $config = (function() {
     var data = {numDocs: 2000, mapper: mapper, reducer: reducer, finalizer: finalizer};
 
     var states = (function() {
-
         function init(db, collName) {
             // no-op
             // other workloads that extend this workload use this method
@@ -59,7 +57,6 @@ var $config = (function() {
         }
 
         return {init: init, mapReduce: mapReduce};
-
     })();
 
     var transitions = {init: {mapReduce: 1}, mapReduce: {mapReduce: 1}};
@@ -93,5 +90,4 @@ var $config = (function() {
         transitions: transitions,
         setup: setup
     };
-
 })();

@@ -38,8 +38,8 @@
 
 namespace {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 using namespace mongo;
@@ -62,8 +62,7 @@ unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query, const 
     Status status = ParsedProjection::make(opCtx.get(), projObj, queryMatchExpr.get(), &out);
     if (!status.isOK()) {
         FAIL(str::stream() << "failed to parse projection " << projObj << " (query: " << query
-                           << "): "
-                           << status.toString());
+                           << "): " << status.toString());
     }
     ASSERT(out);
     return unique_ptr<ParsedProjection>(out);

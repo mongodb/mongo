@@ -228,4 +228,4 @@ bool BigSimplePolygon::Decode(Decoder* const decoder) {
 bool BigSimplePolygon::DecodeWithinScope(Decoder* const decoder) {
     MONGO_UNREACHABLE;
 }
-}
+}  // namespace mongo

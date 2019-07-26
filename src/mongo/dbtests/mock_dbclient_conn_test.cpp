@@ -414,16 +414,10 @@ TEST(MockDBClientConnTest, CyclingCmd) {
         vector<BSONObj> isMasterSequence;
         isMasterSequence.push_back(BSON("set"
                                         << "a"
-                                        << "isMaster"
-                                        << true
-                                        << "ok"
-                                        << 1));
+                                        << "isMaster" << true << "ok" << 1));
         isMasterSequence.push_back(BSON("set"
                                         << "a"
-                                        << "isMaster"
-                                        << false
-                                        << "ok"
-                                        << 1));
+                                        << "isMaster" << false << "ok" << 1));
         server.setCommandReply("isMaster", isMasterSequence);
     }
 
@@ -630,4 +624,4 @@ TEST(MockDBClientConnTest, Delay) {
     ASSERT_EQUALS(1U, server.getQueryCount());
     ASSERT_EQUALS(1U, server.getCmdCount());
 }
-}
+}  // namespace mongo_test

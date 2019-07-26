@@ -7,7 +7,6 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 
 var $config = (function() {
-
     const states = {
         /**
          * This is a no-op, used only as a transition state.

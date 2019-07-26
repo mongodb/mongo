@@ -15,7 +15,6 @@ a = /.*b.*c/;
 x = /.*y.*/;
 
 doit = function() {
-
     assert.eq(1, t.find({x: a}).count(), "A");
     assert.eq(2, t.find({x: x}).count(), "B");
     assert.eq(2, t.find({x: {$in: [x]}}).count(), "C");            // SERVER-322

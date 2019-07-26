@@ -717,4 +717,4 @@ inline MutableValue MutableValue::getField(Position pos) {
 inline MutableValue MutableValue::getField(StringData key) {
     return MutableDocument(*this).getField(key);
 }
-}
+}  // namespace mongo

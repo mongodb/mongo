@@ -123,7 +123,7 @@ public:
 
     /** query N objects from the database into an array.  makes sense mostly when you want a small
      * number of results.  if a huge number, use query() and iterate the cursor.
-    */
+     */
     void findN(std::vector<BSONObj>& out,
                const std::string& ns,
                Query query,
@@ -293,9 +293,9 @@ public:
         int options = 0);
 
     /**
-    * Authenticates to another cluster member using appropriate authentication data.
-    * @return true if the authentication was successful
-    */
+     * Authenticates to another cluster member using appropriate authentication data.
+     * @return true if the authentication was successful
+     */
     virtual Status authenticateInternalUser();
 
     /**

@@ -13,7 +13,6 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
-
     var states = {
         set: function set(db, collName) {
             this.setOrUnset(db, collName, true, this.numDocs);
@@ -93,5 +92,4 @@ var $config = (function() {
         },
         setup: setup
     };
-
 })();

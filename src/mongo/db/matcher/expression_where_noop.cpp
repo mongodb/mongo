@@ -54,4 +54,4 @@ std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::shallowClone() const 
     }
     return std::move(e);
 }
-}
+}  // namespace mongo

@@ -1719,8 +1719,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
                       str::stream()
                           << "No stable timestamp available to recover to. Initial data timestamp: "
                           << initialDataTS.toString()
-                          << ", Stable timestamp: "
-                          << stableTS.toString());
+                          << ", Stable timestamp: " << stableTS.toString());
     }
 
     LOG_FOR_ROLLBACK(2) << "WiredTiger::RecoverToStableTimestamp syncing size storer to disk.";

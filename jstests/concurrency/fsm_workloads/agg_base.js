@@ -7,7 +7,6 @@
  * then each thread does an aggregation with an empty $match.
  */
 var $config = (function() {
-
     var data = {
         numDocs: 1000,
         // Use 12KB documents by default. This number is useful because 12,000 documents each of

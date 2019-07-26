@@ -156,18 +156,16 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     // is already performed at chunk split commit time, but we are performing it here for parity
     // with old auto-split code, which might rely on it.
     if (SimpleBSONObjComparator::kInstance.evaluate(chunkRange.getMin() == splitPoints.front())) {
-        const std::string msg(str::stream() << "not splitting chunk " << chunkRange.toString()
-                                            << ", split point "
-                                            << splitPoints.front()
-                                            << " is exactly on chunk bounds");
+        const std::string msg(str::stream()
+                              << "not splitting chunk " << chunkRange.toString() << ", split point "
+                              << splitPoints.front() << " is exactly on chunk bounds");
         return {ErrorCodes::CannotSplit, msg};
     }
 
     if (SimpleBSONObjComparator::kInstance.evaluate(chunkRange.getMax() == splitPoints.back())) {
-        const std::string msg(str::stream() << "not splitting chunk " << chunkRange.toString()
-                                            << ", split point "
-                                            << splitPoints.back()
-                                            << " is exactly on chunk bounds");
+        const std::string msg(str::stream()
+                              << "not splitting chunk " << chunkRange.toString() << ", split point "
+                              << splitPoints.back() << " is exactly on chunk bounds");
         return {ErrorCodes::CannotSplit, msg};
     }
 

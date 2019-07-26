@@ -34,7 +34,6 @@
 #include <boost/filesystem.hpp>
 #include <fstream>
 #include <memory>
-#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"

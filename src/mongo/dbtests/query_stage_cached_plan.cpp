@@ -65,7 +65,7 @@ std::unique_ptr<CanonicalQuery> canonicalQueryFromFilterObj(OperationContext* op
     uassertStatusOK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
-}
+}  // namespace
 
 class QueryStageCachedPlan : public unittest::Test {
 public:

@@ -15,7 +15,6 @@ ReplSetTest.prototype.upgradeSet = function(options, user, pwd) {
 
     // Then upgrade the primary after stepping down.
     this.upgradePrimary(primary, options, user, pwd);
-
 };
 
 ReplSetTest.prototype.upgradeSecondaries = function(primary, options, user, pwd) {
@@ -125,7 +124,7 @@ ReplSetTest.prototype.reconnect = function(node) {
     this.nodes[nodeId] = new Mongo(node.host);
     var except = {};
     for (var i in node) {
-        if (typeof(node[i]) == "function")
+        if (typeof (node[i]) == "function")
             continue;
         this.nodes[nodeId][i] = node[i];
     }

@@ -51,7 +51,7 @@ namespace {
 constexpr Milliseconds kWorkerThreadRunTime{1000};
 // Run time + generous scheduling time slice
 const Milliseconds kShutdownTime = kWorkerThreadRunTime + Milliseconds{50};
-}
+}  // namespace
 
 struct TestOptions : public ServiceExecutorAdaptive::Options {
     int reservedThreads() const final {

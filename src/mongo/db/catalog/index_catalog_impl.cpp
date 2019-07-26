@@ -171,8 +171,7 @@ string IndexCatalogImpl::_getAccessMethodName(const BSONObj& keyPattern) const {
     // supports an index plugin unsupported by this version.
     uassert(17197,
             str::stream() << "Invalid index type '" << pluginName << "' "
-                          << "in index "
-                          << keyPattern,
+                          << "in index " << keyPattern,
             IndexNames::isKnownName(pluginName));
 
     return pluginName;
@@ -392,17 +391,16 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     }
 
     if (!initFromDisk) {
-        opCtx->recoveryUnit()->onRollback(
-            [ this, opCtx, isReadyIndex, descriptor = descriptorPtr ] {
-                // Need to preserve indexName as descriptor no longer exists after remove().
-                const std::string indexName = descriptor->indexName();
-                if (isReadyIndex) {
-                    _readyIndexes.remove(descriptor);
-                } else {
-                    _buildingIndexes.remove(descriptor);
-                }
-                _collection->infoCache()->droppedIndex(opCtx, indexName);
-            });
+        opCtx->recoveryUnit()->onRollback([this, opCtx, isReadyIndex, descriptor = descriptorPtr] {
+            // Need to preserve indexName as descriptor no longer exists after remove().
+            const std::string indexName = descriptor->indexName();
+            if (isReadyIndex) {
+                _readyIndexes.remove(descriptor);
+            } else {
+                _buildingIndexes.remove(descriptor);
+            }
+            _collection->infoCache()->droppedIndex(opCtx, indexName);
+        });
     }
 
     return save;
@@ -413,10 +411,8 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
     invariant(_collection->numRecords(opCtx) == 0,
               str::stream() << "Collection must be empty. Collection: " << _collection->ns()
-                            << " UUID: "
-                            << _collection->uuid()
-                            << " Count: "
-                            << _collection->numRecords(opCtx));
+                            << " UUID: " << _collection->uuid()
+                            << " Count: " << _collection->numRecords(opCtx));
 
     _checkMagic();
 
@@ -523,8 +519,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
     if (!IndexDescriptor::isIndexVersionSupported(indexVersion)) {
         return Status(ErrorCodes::CannotCreateIndex,
                       str::stream() << "this version of mongod cannot build new indexes "
-                                    << "of version number "
-                                    << static_cast<int>(indexVersion));
+                                    << "of version number " << static_cast<int>(indexVersion));
     }
 
     if (nss.isOplog())
@@ -542,9 +537,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "the \"ns\" field of the index spec '"
                                         << specNamespace.valueStringData()
-                                        << "' does not match the collection name '"
-                                        << nss
-                                        << "'");
+                                        << "' does not match the collection name '" << nss << "'");
     }
 
     // logical name of the index
@@ -563,8 +556,8 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
     const Status keyStatus = index_key_validate::validateKeyPattern(key, indexVersion);
     if (!keyStatus.isOK()) {
         return Status(ErrorCodes::CannotCreateIndex,
-                      str::stream() << "bad index key pattern " << key << ": "
-                                    << keyStatus.reason());
+                      str::stream()
+                          << "bad index key pattern " << key << ": " << keyStatus.reason());
     }
 
     const string pluginName = IndexNames::findPluginName(key);
@@ -593,18 +586,16 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
         if (static_cast<IndexVersion>(vElt.numberInt()) < IndexVersion::kV2) {
             return {ErrorCodes::CannotCreateIndex,
                     str::stream() << "Index version " << vElt.fieldNameStringData() << "="
-                                  << vElt.numberInt()
-                                  << " does not support the '"
-                                  << collationElement.fieldNameStringData()
-                                  << "' option"};
+                                  << vElt.numberInt() << " does not support the '"
+                                  << collationElement.fieldNameStringData() << "' option"};
         }
 
         if ((pluginName != IndexNames::BTREE) && (pluginName != IndexNames::GEO_2DSPHERE) &&
             (pluginName != IndexNames::HASHED) && (pluginName != IndexNames::WILDCARD)) {
             return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream() << "Index type '" << pluginName
-                                        << "' does not support collation: "
-                                        << collator->getSpec().toBSON());
+                          str::stream()
+                              << "Index type '" << pluginName
+                              << "' does not support collation: " << collator->getSpec().toBSON());
         }
     }
 
@@ -625,8 +616,8 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
 
         if (spec.getField("expireAfterSeconds")) {
             return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream() << "Index type '" << pluginName
-                                        << "' cannot be a TTL index");
+                          str::stream()
+                              << "Index type '" << pluginName << "' cannot be a TTL index");
         }
     }
 
@@ -736,21 +727,18 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
                                   << "An index with the same key pattern, but a different "
                                   << "collation already exists with the same name.  Try again with "
                                   << "a unique name. "
-                                  << "Existing index: "
-                                  << desc->infoObj()
-                                  << " Requested index: "
-                                  << spec);
+                                  << "Existing index: " << desc->infoObj()
+                                  << " Requested index: " << spec);
             }
 
             if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() != key) ||
                 SimpleBSONObjComparator::kInstance.evaluate(
                     desc->infoObj().getObjectField("collation") != collation)) {
                 return Status(ErrorCodes::IndexKeySpecsConflict,
-                              str::stream() << "Index must have unique name."
-                                            << "The existing index: "
-                                            << desc->infoObj()
-                                            << " has the same name as the requested index: "
-                                            << spec);
+                              str::stream()
+                                  << "Index must have unique name."
+                                  << "The existing index: " << desc->infoObj()
+                                  << " has the same name as the requested index: " << spec);
             }
 
             IndexDescriptor temp(_collection, _getAccessMethodName(key), spec);
@@ -776,9 +764,9 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
             IndexDescriptor temp(_collection, _getAccessMethodName(key), spec);
             if (!desc->areIndexOptionsEquivalent(&temp))
                 return Status(ErrorCodes::IndexOptionsConflict,
-                              str::stream() << "Index: " << spec
-                                            << " already exists with different options: "
-                                            << desc->infoObj());
+                              str::stream()
+                                  << "Index: " << spec
+                                  << " already exists with different options: " << desc->infoObj());
 
             return Status(ErrorCodes::IndexOptionsConflict,
                           str::stream() << "Index with name: " << name
@@ -803,8 +791,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "only one text index per collection allowed, "
                                         << "found existing text index \""
-                                        << textIndexes[0]->indexName()
-                                        << "\"");
+                                        << textIndexes[0]->indexName() << "\"");
         }
     }
     return Status::OK();

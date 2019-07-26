@@ -44,8 +44,7 @@ TEST(CoordinatorCommitDecisionTest, SerializeCommitHasTimestampAndNoAbortStatus)
 
     ASSERT_BSONOBJ_EQ(BSON("decision"
                            << "commit"
-                           << "commitTimestamp"
-                           << Timestamp(100, 200)),
+                           << "commitTimestamp" << Timestamp(100, 200)),
                       obj);
 }
 

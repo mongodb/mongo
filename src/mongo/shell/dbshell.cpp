@@ -175,7 +175,7 @@ enum ShellExitCode : int {
 };
 
 Scope* shellMainScope;
-}
+}  // namespace mongo
 
 bool isSessionTimedOut() {
     static Date_t previousCommandTime = Date_t::now();
@@ -794,8 +794,8 @@ int _main(int argc, char* argv[], char** envp) {
 #else
     wchar_t programDataPath[MAX_PATH];
     if (S_OK == SHGetFolderPathW(nullptr, CSIDL_COMMON_APPDATA, nullptr, 0, programDataPath)) {
-        rcGlobalLocation = str::stream() << toUtf8String(programDataPath)
-                                         << "\\MongoDB\\mongorc.js";
+        rcGlobalLocation = str::stream()
+            << toUtf8String(programDataPath) << "\\MongoDB\\mongorc.js";
     }
 #endif
     if (!rcGlobalLocation.empty() && ::mongo::shell_utils::fileExists(rcGlobalLocation)) {
@@ -875,9 +875,9 @@ int _main(int argc, char* argv[], char** envp) {
                 rcLocation = str::stream() << getenv("HOME") << "/.mongorc.js";
 #else
             if (getenv("HOMEDRIVE") != nullptr && getenv("HOMEPATH") != nullptr)
-                rcLocation = str::stream() << toUtf8String(_wgetenv(L"HOMEDRIVE"))
-                                           << toUtf8String(_wgetenv(L"HOMEPATH"))
-                                           << "\\.mongorc.js";
+                rcLocation = str::stream()
+                    << toUtf8String(_wgetenv(L"HOMEDRIVE")) << toUtf8String(_wgetenv(L"HOMEPATH"))
+                    << "\\.mongorc.js";
 #endif
             if (!rcLocation.empty() && ::mongo::shell_utils::fileExists(rcLocation)) {
                 hasMongoRC = true;

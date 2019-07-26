@@ -183,34 +183,35 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task,
     }
 
     auto wrappedTask =
-        [ this, task = std::move(task), scheduleTime, pendingCounterPtr, taskName, flags ](
+        [this, task = std::move(task), scheduleTime, pendingCounterPtr, taskName, flags](
             auto status) {
-        pendingCounterPtr->subtractAndFetch(1);
-        auto start = _tickSource->getTicks();
-        _totalSpentQueued.addAndFetch(start - scheduleTime);
+            pendingCounterPtr->subtractAndFetch(1);
+            auto start = _tickSource->getTicks();
+            _totalSpentQueued.addAndFetch(start - scheduleTime);
 
-        _localThreadState->threadMetrics[static_cast<size_t>(taskName)]
-            ._totalSpentQueued.addAndFetch(start - scheduleTime);
-
-        if (_localThreadState->recursionDepth++ == 0) {
-            _localThreadState->executing.markRunning();
-            _threadsInUse.addAndFetch(1);
-        }
-        const auto guard = makeGuard([this, taskName] {
-            if (--_localThreadState->recursionDepth == 0) {
-                _localThreadState->executingCurRun += _localThreadState->executing.markStopped();
-                _threadsInUse.subtractAndFetch(1);
-            }
-            _totalExecuted.addAndFetch(1);
             _localThreadState->threadMetrics[static_cast<size_t>(taskName)]
-                ._totalExecuted.addAndFetch(1);
-        });
+                ._totalSpentQueued.addAndFetch(start - scheduleTime);
 
-        TickTimer _localTimer(_tickSource);
-        task();
-        _localThreadState->threadMetrics[static_cast<size_t>(taskName)]
-            ._totalSpentExecuting.addAndFetch(_localTimer.sinceStartTicks());
-    };
+            if (_localThreadState->recursionDepth++ == 0) {
+                _localThreadState->executing.markRunning();
+                _threadsInUse.addAndFetch(1);
+            }
+            const auto guard = makeGuard([this, taskName] {
+                if (--_localThreadState->recursionDepth == 0) {
+                    _localThreadState->executingCurRun +=
+                        _localThreadState->executing.markStopped();
+                    _threadsInUse.subtractAndFetch(1);
+                }
+                _totalExecuted.addAndFetch(1);
+                _localThreadState->threadMetrics[static_cast<size_t>(taskName)]
+                    ._totalExecuted.addAndFetch(1);
+            });
+
+            TickTimer _localTimer(_tickSource);
+            task();
+            _localThreadState->threadMetrics[static_cast<size_t>(taskName)]
+                ._totalSpentExecuting.addAndFetch(_localTimer.sinceStartTicks());
+        };
 
     // Dispatching a task on the io_context will run the task immediately, and may run it
     // on the current thread (if the current thread is running the io_context right now).

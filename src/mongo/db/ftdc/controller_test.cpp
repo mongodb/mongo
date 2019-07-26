@@ -119,8 +119,8 @@ public:
 
 private:
     /**
-    * Private enum to ensure caller uses class correctly.
-    */
+     * Private enum to ensure caller uses class correctly.
+     */
     enum class State {
         kNotStarted,
         kStarted,

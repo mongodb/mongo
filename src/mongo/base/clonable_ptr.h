@@ -264,8 +264,9 @@ public:
      * NOTE: This constructor is disabled for types with a stateless `CloneFactory` type.
      */
     template <typename CloneFactory_ = CloneFactory>
-    inline clonable_ptr(typename std::enable_if<!std::is_empty<CloneFactory_>::value,
-                                                std::nullptr_t>::type) = delete;
+    inline clonable_ptr(
+        typename std::enable_if<!std::is_empty<CloneFactory_>::value, std::nullptr_t>::type) =
+        delete;
 
     /*!
      * Constructs a pointer to nothing, with a default `CloneFactory`.

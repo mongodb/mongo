@@ -6,7 +6,6 @@
  * Simply checks that the serverStatus command works
  */
 var $config = (function() {
-
     var states = {
         status: function status(db, collName) {
             var opts =

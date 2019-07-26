@@ -2,23 +2,23 @@
  * Test that the $changeStream stage cannot be used in a $lookup pipeline or sub-pipeline.
  */
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/aggregation/extras/utils.js");       // For assertErrorCode.
-    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+load("jstests/aggregation/extras/utils.js");       // For assertErrorCode.
+load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 
-    const coll = assertDropAndRecreateCollection(db, "change_stream_ban_from_lookup");
-    const foreignColl = "unsharded";
+const coll = assertDropAndRecreateCollection(db, "change_stream_ban_from_lookup");
+const foreignColl = "unsharded";
 
-    assert.writeOK(coll.insert({_id: 1}));
+assert.writeOK(coll.insert({_id: 1}));
 
-    // Verify that we cannot create a $lookup using a pipeline which begins with $changeStream.
-    assertErrorCode(
-        coll, [{$lookup: {from: foreignColl, as: 'as', pipeline: [{$changeStream: {}}]}}], 51047);
+// Verify that we cannot create a $lookup using a pipeline which begins with $changeStream.
+assertErrorCode(
+    coll, [{$lookup: {from: foreignColl, as: 'as', pipeline: [{$changeStream: {}}]}}], 51047);
 
-    // Verify that we cannot create a $lookup if its pipeline contains a sub-$lookup whose pipeline
-    // begins with $changeStream.
-    assertErrorCode(
+// Verify that we cannot create a $lookup if its pipeline contains a sub-$lookup whose pipeline
+// begins with $changeStream.
+assertErrorCode(
         coll,
         [{
            $lookup: {

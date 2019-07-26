@@ -79,9 +79,7 @@ protected:
         valLong = 1LL;
 
         doc = BSON(aBool(valBool) << anArray(valArray) << anObj(valObj) << aDate(valDate)
-                                  << aString(valString)
-                                  << anOID(valOID)
-                                  << aLong(valLong));
+                                  << aString(valString) << anOID(valOID) << aLong(valLong));
     }
 
     void tearDown() {}
@@ -215,9 +213,10 @@ TEST(ComplexExtraction, GetStringVector) {
     BSONField<vector<string>> vectorField("testVector");
 
     BSONObjBuilder bob;
-    bob << vectorField() << BSON_ARRAY("a"
-                                       << "b"
-                                       << "c");
+    bob << vectorField()
+        << BSON_ARRAY("a"
+                      << "b"
+                      << "c");
     BSONObj obj = bob.obj();
 
     vector<string> parsedVector;
@@ -268,9 +267,10 @@ TEST(ComplexExtraction, RoundTripVector) {
     BSONObj obj;
     {
         BSONObjBuilder bob;
-        bob << vectorField() << BSON_ARRAY("a"
-                                           << "b"
-                                           << "c");
+        bob << vectorField()
+            << BSON_ARRAY("a"
+                          << "b"
+                          << "c");
         obj = bob.obj();
     }
 
@@ -297,12 +297,13 @@ TEST(ComplexExtraction, GetStringMap) {
     BSONField<map<string, string>> mapField("testMap");
 
     BSONObjBuilder bob;
-    bob << mapField() << BSON("a"
-                              << "a"
-                              << "b"
-                              << "b"
-                              << "c"
-                              << "c");
+    bob << mapField()
+        << BSON("a"
+                << "a"
+                << "b"
+                << "b"
+                << "c"
+                << "c");
     BSONObj obj = bob.obj();
 
     map<string, string> parsedMap;
@@ -319,14 +320,15 @@ TEST(ComplexExtraction, GetObjectMap) {
     BSONField<map<string, BSONObj>> mapField("testMap");
 
     BSONObjBuilder bob;
-    bob << mapField() << BSON("a" << BSON("a"
-                                          << "a")
-                                  << "b"
-                                  << BSON("b"
-                                          << "b")
-                                  << "c"
-                                  << BSON("c"
-                                          << "c"));
+    bob << mapField()
+        << BSON("a" << BSON("a"
+                            << "a")
+                    << "b"
+                    << BSON("b"
+                            << "b")
+                    << "c"
+                    << BSON("c"
+                            << "c"));
     BSONObj obj = bob.obj();
 
     map<string, BSONObj> parsedMap;
@@ -349,12 +351,11 @@ TEST(ComplexExtraction, GetBadMap) {
     BSONField<map<string, string>> mapField("testMap");
 
     BSONObjBuilder bob;
-    bob << mapField() << BSON("a"
-                              << "a"
-                              << "b"
-                              << 123
-                              << "c"
-                              << "c");
+    bob << mapField()
+        << BSON("a"
+                << "a"
+                << "b" << 123 << "c"
+                << "c");
     BSONObj obj = bob.obj();
 
     map<string, string> parsedMap;
@@ -371,12 +372,13 @@ TEST(ComplexExtraction, RoundTripMap) {
     BSONObj obj;
     {
         BSONObjBuilder bob;
-        bob << mapField() << BSON("a"
-                                  << "a"
-                                  << "b"
-                                  << "b"
-                                  << "c"
-                                  << "c");
+        bob << mapField()
+            << BSON("a"
+                    << "a"
+                    << "b"
+                    << "b"
+                    << "c"
+                    << "c");
         obj = bob.obj();
     }
 
@@ -432,9 +434,7 @@ TEST(ComplexExtraction, GetBadNestedMap) {
 
     BSONObj nestedMapObj = BSON("a"
                                 << "a"
-                                << "b"
-                                << 123
-                                << "c"
+                                << "b" << 123 << "c"
                                 << "c");
 
     BSONObjBuilder bob;

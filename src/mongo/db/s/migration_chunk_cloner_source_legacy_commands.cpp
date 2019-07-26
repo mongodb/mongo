@@ -86,8 +86,8 @@ public:
                 invariant(_chunkCloner);
             } else {
                 uasserted(ErrorCodes::IllegalOperation,
-                          str::stream() << "No active migrations were found for collection "
-                                        << nss->ns());
+                          str::stream()
+                              << "No active migrations were found for collection " << nss->ns());
             }
         }
 
@@ -317,9 +317,7 @@ public:
             auto rollbackId = repl::ReplicationProcess::get(opCtx)->getRollbackID();
             uassert(50881,
                     str::stream() << "rollback detected, rollbackId was "
-                                  << rollbackIdAtMigrationInit
-                                  << " but is now "
-                                  << rollbackId,
+                                  << rollbackIdAtMigrationInit << " but is now " << rollbackId,
                     rollbackId == rollbackIdAtMigrationInit);
         }
 

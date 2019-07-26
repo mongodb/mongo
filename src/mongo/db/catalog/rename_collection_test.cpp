@@ -329,8 +329,8 @@ void _createCollection(OperationContext* opCtx,
                         << " does not exist.";
 
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_TRUE(db->createCollection(opCtx, nss, options)) << "Failed to create collection "
-                                                               << nss << " due to unknown error.";
+        ASSERT_TRUE(db->createCollection(opCtx, nss, options))
+            << "Failed to create collection " << nss << " due to unknown error.";
         wuow.commit();
     });
 
@@ -414,11 +414,8 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
         ASSERT_TRUE(collection) << "Cannot create index on empty collection " << nss
                                 << " because collection " << nss << " does not exist.";
 
-        auto indexInfoObj = BSON(
-            "v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("a" << 1) << "name"
-                << indexName
-                << "ns"
-                << nss.ns());
+        auto indexInfoObj = BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key"
+                                     << BSON("a" << 1) << "name" << indexName << "ns" << nss.ns());
 
         auto indexCatalog = collection->getIndexCatalog();
         WriteUnitOfWork wuow(opCtx);
@@ -723,8 +720,8 @@ TEST_F(RenameCollectionTest, RenameCollectionMakesTargetCollectionDropPendingIfD
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, options));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss))
         << "source collection " << _sourceNss << " still exists after successful rename";
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss)) << "target collection " << _targetNss
-                                                             << " missing after successful rename";
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss))
+        << "target collection " << _targetNss << " missing after successful rename";
 
     ASSERT_TRUE(_opObserver->onRenameCollectionCalled);
     ASSERT(_opObserver->onRenameCollectionDropTarget);
@@ -748,8 +745,8 @@ TEST_F(RenameCollectionTest,
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, options));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss))
         << "source collection " << _sourceNss << " still exists after successful rename";
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss)) << "target collection " << _targetNss
-                                                             << " missing after successful rename";
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss))
+        << "target collection " << _targetNss << " missing after successful rename";
 
     ASSERT_TRUE(_opObserver->onRenameCollectionCalled);
     ASSERT_FALSE(_opObserver->onRenameCollectionDropTarget);
@@ -835,9 +832,8 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSo
     _createCollectionWithUUID(_opCtx.get(), _targetNss);
     auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), dropTargetNss);
     auto uuidDoc = BSON("ui" << UUID::gen());
-    auto cmd =
-        BSON("renameCollection" << missingSourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
-                                << dropTargetUUID);
+    auto cmd = BSON("renameCollection" << missingSourceNss.ns() << "to" << _targetNss.ns()
+                                       << "dropTarget" << dropTargetUUID);
     ASSERT_OK(renameCollectionForApplyOps(
         _opCtx.get(), missingSourceNss.db().toString(), uuidDoc["ui"], cmd, {}));
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss));
@@ -875,9 +871,8 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDEvenIfSo
 
     auto dropTargetUUID = _createCollectionWithUUID(_opCtx.get(), dropTargetNss);
     auto uuidDoc = BSON("ui" << _createCollectionWithUUID(_opCtx.get(), dropPendingNss));
-    auto cmd =
-        BSON("renameCollection" << dropPendingNss.ns() << "to" << _targetNss.ns() << "dropTarget"
-                                << dropTargetUUID);
+    auto cmd = BSON("renameCollection" << dropPendingNss.ns() << "to" << _targetNss.ns()
+                                       << "dropTarget" << dropTargetUUID);
 
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
     repl::OpTime renameOpTime = {Timestamp(Seconds(200), 1U), 1LL};
@@ -920,8 +915,8 @@ void _testRenameCollectionStayTemp(OperationContext* opCtx,
     RenameCollectionOptions options;
     options.stayTemp = stayTemp;
     ASSERT_OK(renameCollection(opCtx, sourceNss, targetNss, options));
-    ASSERT_FALSE(_collectionExists(opCtx, sourceNss)) << "source collection " << sourceNss
-                                                      << " still exists after successful rename";
+    ASSERT_FALSE(_collectionExists(opCtx, sourceNss))
+        << "source collection " << sourceNss << " still exists after successful rename";
 
     if (!isSourceCollectionTemporary) {
         ASSERT_FALSE(_isTempCollection(opCtx, targetNss))
@@ -1008,8 +1003,8 @@ void _testRenameCollectionAcrossDatabaseOplogEntries(
     _insertDocument(opCtx, sourceNss, BSON("_id" << 0));
     oplogEntries->clear();
     if (forApplyOps) {
-        auto cmd = BSON(
-            "renameCollection" << sourceNss.ns() << "to" << targetNss.ns() << "dropTarget" << true);
+        auto cmd = BSON("renameCollection" << sourceNss.ns() << "to" << targetNss.ns()
+                                           << "dropTarget" << true);
         ASSERT_OK(renameCollectionForApplyOps(opCtx, sourceNss.db().toString(), {}, cmd, {}));
     } else {
         RenameCollectionOptions options;

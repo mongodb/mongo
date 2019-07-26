@@ -146,13 +146,11 @@ TEST_F(FreeMonQueueTest, TestQueueStop) {
 
     auto swSchedule =
         _mockThreadPool->scheduleWork([&](const executor::TaskExecutor::CallbackArgs& cbArgs) {
-
             barrier.countDownAndWait();
 
             // Try to dequeue from a stopped task queue
             auto item = queue.dequeue(_opCtx.get()->getServiceContext()->getPreciseClockSource());
             ASSERT_FALSE(item.is_initialized());
-
         });
 
     ASSERT_OK(swSchedule.getStatus());

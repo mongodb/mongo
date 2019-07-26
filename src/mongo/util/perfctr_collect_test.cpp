@@ -178,22 +178,22 @@ TEST(FTDCPerfCollector, TestBadCollectionInput) {
     ASSERT_NOT_OK(collection.addCountersGroup("cpu", {"\\Processor(0)\\% Idle Time"}));
 
     // Duplicate counter
-    ASSERT_NOT_OK(collection.addCountersGroup(
-        "cpu2",
-        {
-            "\\Processor(0)\\% Idle Time", "\\Processor(0)\\% Idle Time",
-        }));
+    ASSERT_NOT_OK(collection.addCountersGroup("cpu2",
+                                              {
+                                                  "\\Processor(0)\\% Idle Time",
+                                                  "\\Processor(0)\\% Idle Time",
+                                              }));
 
     // Duplicate group
     ASSERT_NOT_OK(
         collection.addCountersGroupedByInstanceName("cpu", {"\\Processor(0)\\% Idle Time"}));
 
     // Duplicate counter
-    ASSERT_NOT_OK(collection.addCountersGroupedByInstanceName(
-        "cpu2",
-        {
-            "\\Processor(0)\\% Idle Time", "\\Processor(0)\\% Idle Time",
-        }));
+    ASSERT_NOT_OK(collection.addCountersGroupedByInstanceName("cpu2",
+                                                              {
+                                                                  "\\Processor(0)\\% Idle Time",
+                                                                  "\\Processor(0)\\% Idle Time",
+                                                              }));
 }
 
 // Test negative collector input

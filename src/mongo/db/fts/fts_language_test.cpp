@@ -175,5 +175,5 @@ TEST(FTSLanguageV1, Empty) {
     ASSERT(swl.getStatus().isOK());
     ASSERT_EQUALS(swl.getValue()->str(), "none");
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

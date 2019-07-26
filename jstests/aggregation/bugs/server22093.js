@@ -11,42 +11,42 @@
 load('jstests/libs/analyze_plan.js');
 
 (function() {
-    "use strict";
+"use strict";
 
-    var coll = db.countscan;
-    coll.drop();
+var coll = db.countscan;
+coll.drop();
 
-    for (var i = 0; i < 3; i++) {
-        for (var j = 0; j < 10; j += 2) {
-            coll.insert({foo: i, bar: j});
-        }
+for (var i = 0; i < 3; i++) {
+    for (var j = 0; j < 10; j += 2) {
+        coll.insert({foo: i, bar: j});
     }
+}
 
-    coll.ensureIndex({foo: 1});
+coll.ensureIndex({foo: 1});
 
-    var simpleGroup = coll.aggregate([{$group: {_id: null, count: {$sum: 1}}}]).toArray();
+var simpleGroup = coll.aggregate([{$group: {_id: null, count: {$sum: 1}}}]).toArray();
 
-    assert.eq(simpleGroup.length, 1);
-    assert.eq(simpleGroup[0]["count"], 15);
+assert.eq(simpleGroup.length, 1);
+assert.eq(simpleGroup[0]["count"], 15);
 
-    var explained = coll.explain().aggregate(
-        [{$match: {foo: {$gt: 0}}}, {$group: {_id: null, count: {$sum: 1}}}]);
+var explained =
+    coll.explain().aggregate([{$match: {foo: {$gt: 0}}}, {$group: {_id: null, count: {$sum: 1}}}]);
 
-    assert(planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+assert(planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
 
-    explained = coll.explain().aggregate([
-        {$match: {foo: {$gt: 0}}},
-        {$project: {_id: 0, a: {$literal: null}}},
-        {$group: {_id: null, count: {$sum: 1}}}
-    ]);
+explained = coll.explain().aggregate([
+    {$match: {foo: {$gt: 0}}},
+    {$project: {_id: 0, a: {$literal: null}}},
+    {$group: {_id: null, count: {$sum: 1}}}
+]);
 
-    assert(planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+assert(planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
 
-    // Make sure a $count stage can use the COUNT_SCAN optimization.
-    explained = coll.explain().aggregate([{$match: {foo: {$gt: 0}}}, {$count: "count"}]);
-    assert(planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+// Make sure a $count stage can use the COUNT_SCAN optimization.
+explained = coll.explain().aggregate([{$match: {foo: {$gt: 0}}}, {$count: "count"}]);
+assert(planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
 
-    // A $match that is not a single range cannot use the COUNT_SCAN optimization.
-    explained = coll.explain().aggregate([{$match: {foo: {$in: [0, 1]}}}, {$count: "count"}]);
-    assert(!planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+// A $match that is not a single range cannot use the COUNT_SCAN optimization.
+explained = coll.explain().aggregate([{$match: {foo: {$in: [0, 1]}}}, {$count: "count"}]);
+assert(!planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
 }());

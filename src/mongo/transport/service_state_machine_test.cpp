@@ -259,8 +259,9 @@ public:
         if (!_scheduleHook) {
             return Status::OK();
         } else {
-            return _scheduleHook(std::move(task)) ? Status::OK() : Status{ErrorCodes::InternalError,
-                                                                          "Hook returned error!"};
+            return _scheduleHook(std::move(task))
+                ? Status::OK()
+                : Status{ErrorCodes::InternalError, "Hook returned error!"};
         }
     }
 
@@ -497,10 +498,10 @@ TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndEmptyResponseNamespa
     Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
 
     // Construct a 'getMore' response with an empty namespace.
-    BSONObj getMoreTerminalResBody = BSON("ok" << 1 << "cursor" << BSON("id" << 42 << "ns"
-                                                                             << ""
-                                                                             << "nextBatch"
-                                                                             << BSONArray()));
+    BSONObj getMoreTerminalResBody = BSON("ok" << 1 << "cursor"
+                                               << BSON("id" << 42 << "ns"
+                                                            << ""
+                                                            << "nextBatch" << BSONArray()));
     Message getMoreTerminalRes = buildOpMsg(getMoreTerminalResBody);
 
     // Let the 'getMore' request be sourced from the network, processed in the database, and
@@ -794,7 +795,7 @@ TEST_F(ServiceStateMachineFixture, TerminateWorksForAllStatesWithScheduleFailure
 
         waitFor = testState;
         // This is a dummy thread that just advances the SSM while we track its state/kill it
-        stdx::thread runner([ ssm = _ssm, &scheduleFailed ] {
+        stdx::thread runner([ssm = _ssm, &scheduleFailed] {
             while (ssm->state() != State::Ended && !scheduleFailed) {
                 ssm->runNext();
             }

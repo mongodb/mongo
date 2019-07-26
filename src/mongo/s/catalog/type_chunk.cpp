@@ -68,8 +68,8 @@ const char kMaxKey[] = "max";
 Status extractObject(const BSONObj& obj, const std::string& fieldName, BSONElement* bsonElement) {
     Status elementStatus = bsonExtractTypedField(obj, fieldName, Object, bsonElement);
     if (!elementStatus.isOK()) {
-        return elementStatus.withContext(str::stream() << "The field '" << fieldName
-                                                       << "' cannot be parsed");
+        return elementStatus.withContext(str::stream()
+                                         << "The field '" << fieldName << "' cannot be parsed");
     }
 
     if (bsonElement->Obj().isEmpty()) {
@@ -108,8 +108,8 @@ StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {
 
     if (SimpleBSONObjComparator::kInstance.evaluate(minKey.Obj() >= maxKey.Obj())) {
         return {ErrorCodes::FailedToParse,
-                str::stream() << "min: " << minKey.Obj() << " should be less than max: "
-                              << maxKey.Obj()};
+                str::stream() << "min: " << minKey.Obj()
+                              << " should be less than max: " << maxKey.Obj()};
     }
 
     return ChunkRange(minKey.Obj().getOwned(), maxKey.Obj().getOwned());
@@ -135,8 +135,7 @@ const Status ChunkRange::extractKeyPattern(KeyPattern* shardKeyPatternOut) const
             (!min.more() && max.more())) {
             return {ErrorCodes::ShardKeyNotFound,
                     str::stream() << "the shard key of min " << _minKey << " doesn't match with "
-                                  << "the shard key of max "
-                                  << _maxKey};
+                                  << "the shard key of max " << _maxKey};
         }
         b.append(x.fieldName(), 1);
     }
@@ -348,8 +347,8 @@ StatusWith<ChunkType> ChunkType::fromShardBSON(const BSONObj& source, const OID&
 
         if (SimpleBSONObjComparator::kInstance.evaluate(minKey.Obj() >= maxKey.Obj())) {
             return {ErrorCodes::FailedToParse,
-                    str::stream() << "min: " << minKey.Obj() << " should be less than max: "
-                                  << maxKey.Obj()};
+                    str::stream() << "min: " << minKey.Obj()
+                                  << " should be less than max: " << maxKey.Obj()};
         }
 
         chunk._min = minKey.Obj().getOwned();

@@ -100,8 +100,7 @@ void ReplicationConsistencyMarkersImpl::initializeMinValidDocument(OperationCont
     // will always be greater than the provided ones.
     TimestampedBSONObj upsert;
     upsert.obj = BSON("$max" << BSON(MinValidDocument::kMinValidTimestampFieldName
-                                     << Timestamp()
-                                     << MinValidDocument::kMinValidTermFieldName
+                                     << Timestamp() << MinValidDocument::kMinValidTermFieldName
                                      << OpTime::kUninitializedTerm));
 
     // The initialization write should go into the first checkpoint taken, so we provide no
@@ -153,10 +152,8 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
     update.obj = BSON("$unset" << kInitialSyncFlag << "$set"
                                << BSON(MinValidDocument::kMinValidTimestampFieldName
                                        << time.getTimestamp()
-                                       << MinValidDocument::kMinValidTermFieldName
-                                       << time.getTerm()
-                                       << MinValidDocument::kAppliedThroughFieldName
-                                       << time));
+                                       << MinValidDocument::kMinValidTermFieldName << time.getTerm()
+                                       << MinValidDocument::kAppliedThroughFieldName << time));
 
     // We clear the initial sync flag at the 'lastAppliedOpTime'. This is unnecessary, since there
     // should not be any stable checkpoints being taken that this write could inadvertantly enter.
@@ -194,10 +191,10 @@ void ReplicationConsistencyMarkersImpl::setMinValid(OperationContext* opCtx,
     LOG(3) << "setting minvalid to exactly: " << minValid.toString() << "(" << minValid.toBSON()
            << ")";
     TimestampedBSONObj update;
-    update.obj = BSON("$set" << BSON(MinValidDocument::kMinValidTimestampFieldName
-                                     << minValid.getTimestamp()
-                                     << MinValidDocument::kMinValidTermFieldName
-                                     << minValid.getTerm()));
+    update.obj =
+        BSON("$set" << BSON(MinValidDocument::kMinValidTimestampFieldName
+                            << minValid.getTimestamp() << MinValidDocument::kMinValidTermFieldName
+                            << minValid.getTerm()));
 
     // This method is only used with storage engines that do not support recover to stable
     // timestamp. As a result, their timestamps do not matter.
@@ -346,8 +343,8 @@ Status ReplicationConsistencyMarkersImpl::createInternalCollections(OperationCon
         auto status = _storageInterface->createCollection(opCtx, nss, CollectionOptions());
         if (!status.isOK() && status.code() != ErrorCodes::NamespaceExists) {
             return {ErrorCodes::CannotCreateCollection,
-                    str::stream() << "Failed to create collection. Ns: " << nss.ns() << " Error: "
-                                  << status.toString()};
+                    str::stream() << "Failed to create collection. Ns: " << nss.ns()
+                                  << " Error: " << status.toString()};
         }
     }
 

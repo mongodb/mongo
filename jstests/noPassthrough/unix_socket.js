@@ -10,112 +10,112 @@
  */
 //@tags: [requires_sharding]
 (function() {
-    'use strict';
-    // This test will only work on POSIX machines.
-    if (_isWindows()) {
-        return;
+'use strict';
+// This test will only work on POSIX machines.
+if (_isWindows()) {
+    return;
+}
+
+// Do not fail if this test leaves unterminated processes because testSockOptions
+// is expected to throw before it calls stopMongod.
+TestData.failIfUnterminatedProcesses = false;
+
+var doesLogMatchRegex = function(logArray, regex) {
+    for (let i = (logArray.length - 1); i >= 0; i--) {
+        var regexInLine = regex.exec(logArray[i]);
+        if (regexInLine != null) {
+            return true;
+        }
+    }
+    return false;
+};
+
+var checkSocket = function(path) {
+    assert.eq(fileExists(path), true);
+    var conn = new Mongo(path);
+    assert.commandWorked(conn.getDB("admin").runCommand("ping"),
+                         `Expected ping command to succeed for ${path}`);
+};
+
+var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',', optMongos) {
+    var optDict = optDict || {};
+    if (bindPath) {
+        optDict["bind_ip"] = `${MongoRunner.dataDir}/${bindPath}${bindSep}127.0.0.1`;
     }
 
-    // Do not fail if this test leaves unterminated processes because testSockOptions
-    // is expected to throw before it calls stopMongod.
-    TestData.failIfUnterminatedProcesses = false;
+    var conn, shards;
+    if (optMongos) {
+        shards = new ShardingTest({shards: 1, mongos: 1, other: {mongosOptions: optDict}});
+        assert.neq(shards, null, "Expected cluster to start okay");
+        conn = shards.s0;
+    } else {
+        conn = MongoRunner.runMongod(optDict);
+    }
 
-    var doesLogMatchRegex = function(logArray, regex) {
-        for (let i = (logArray.length - 1); i >= 0; i--) {
-            var regexInLine = regex.exec(logArray[i]);
-            if (regexInLine != null) {
-                return true;
-            }
-        }
-        return false;
-    };
+    assert.neq(conn, null, `Expected ${optMongos ? "mongos" : "mongod"} to start okay`);
 
-    var checkSocket = function(path) {
-        assert.eq(fileExists(path), true);
-        var conn = new Mongo(path);
-        assert.commandWorked(conn.getDB("admin").runCommand("ping"),
-                             `Expected ping command to succeed for ${path}`);
-    };
+    const defaultUNIXSocket = `/tmp/mongodb-${conn.port}.sock`;
+    var checkPath = defaultUNIXSocket;
+    if (expectSockPath) {
+        checkPath = `${MongoRunner.dataDir}/${expectSockPath}`;
+    }
 
-    var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',', optMongos) {
-        var optDict = optDict || {};
-        if (bindPath) {
-            optDict["bind_ip"] = `${MongoRunner.dataDir}/${bindPath}${bindSep}127.0.0.1`;
-        }
+    checkSocket(checkPath);
 
-        var conn, shards;
-        if (optMongos) {
-            shards = new ShardingTest({shards: 1, mongos: 1, other: {mongosOptions: optDict}});
-            assert.neq(shards, null, "Expected cluster to start okay");
-            conn = shards.s0;
-        } else {
-            conn = MongoRunner.runMongod(optDict);
-        }
+    // Test the naming of the unix socket
+    var log = conn.adminCommand({getLog: 'global'});
+    assert.commandWorked(log, "Expected getting the log to work");
+    var ll = log.log;
+    var re = new RegExp("anonymous unix socket");
+    assert(doesLogMatchRegex(ll, re), "Log message did not contain 'anonymous unix socket'");
 
-        assert.neq(conn, null, `Expected ${optMongos ? "mongos" : "mongod"} to start okay`);
+    if (optMongos) {
+        shards.stop();
+    } else {
+        MongoRunner.stopMongod(conn);
+    }
 
-        const defaultUNIXSocket = `/tmp/mongodb-${conn.port}.sock`;
-        var checkPath = defaultUNIXSocket;
-        if (expectSockPath) {
-            checkPath = `${MongoRunner.dataDir}/${expectSockPath}`;
-        }
+    assert.eq(fileExists(checkPath), false);
+};
 
-        checkSocket(checkPath);
+// Check that the default unix sockets work
+testSockOptions();
+testSockOptions(undefined, undefined, undefined, ',', true);
 
-        // Test the naming of the unix socket
-        var log = conn.adminCommand({getLog: 'global'});
-        assert.commandWorked(log, "Expected getting the log to work");
-        var ll = log.log;
-        var re = new RegExp("anonymous unix socket");
-        assert(doesLogMatchRegex(ll, re), "Log message did not contain 'anonymous unix socket'");
+// Check that a custom unix socket path works
+testSockOptions("testsock.socket", "testsock.socket");
+testSockOptions("testsock.socket", "testsock.socket", undefined, ',', true);
 
-        if (optMongos) {
-            shards.stop();
-        } else {
-            MongoRunner.stopMongod(conn);
-        }
+// Check that a custom unix socket path works with spaces
+testSockOptions("test sock.socket", "test sock.socket");
+testSockOptions("test sock.socket", "test sock.socket", undefined, ',', true);
 
-        assert.eq(fileExists(checkPath), false);
-    };
+// Check that a custom unix socket path works with spaces before the comma and after
+testSockOptions("testsock.socket ", "testsock.socket", undefined, ', ');
+testSockOptions("testsock.socket ", "testsock.socket", undefined, ', ', true);
 
-    // Check that the default unix sockets work
-    testSockOptions();
-    testSockOptions(undefined, undefined, undefined, ',', true);
+// Check that a bad UNIX path breaks
+assert.throws(function() {
+    var badname = "a".repeat(200) + ".socket";
+    testSockOptions(badname, badname);
+});
 
-    // Check that a custom unix socket path works
-    testSockOptions("testsock.socket", "testsock.socket");
-    testSockOptions("testsock.socket", "testsock.socket", undefined, ',', true);
+// Check that if UNIX sockets are disabled that we aren't able to connect over UNIX sockets
+assert.throws(function() {
+    testSockOptions(undefined, undefined, {nounixsocket: ""});
+});
 
-    // Check that a custom unix socket path works with spaces
-    testSockOptions("test sock.socket", "test sock.socket");
-    testSockOptions("test sock.socket", "test sock.socket", undefined, ',', true);
+// Check the unixSocketPrefix option
+var socketPrefix = `${MongoRunner.dataDir}/socketdir`;
+mkdir(socketPrefix);
+var port = allocatePort();
+testSockOptions(
+    undefined, `socketdir/mongodb-${port}.sock`, {unixSocketPrefix: socketPrefix, port: port});
 
-    // Check that a custom unix socket path works with spaces before the comma and after
-    testSockOptions("testsock.socket ", "testsock.socket", undefined, ', ');
-    testSockOptions("testsock.socket ", "testsock.socket", undefined, ', ', true);
-
-    // Check that a bad UNIX path breaks
-    assert.throws(function() {
-        var badname = "a".repeat(200) + ".socket";
-        testSockOptions(badname, badname);
-    });
-
-    // Check that if UNIX sockets are disabled that we aren't able to connect over UNIX sockets
-    assert.throws(function() {
-        testSockOptions(undefined, undefined, {nounixsocket: ""});
-    });
-
-    // Check the unixSocketPrefix option
-    var socketPrefix = `${MongoRunner.dataDir}/socketdir`;
-    mkdir(socketPrefix);
-    var port = allocatePort();
-    testSockOptions(
-        undefined, `socketdir/mongodb-${port}.sock`, {unixSocketPrefix: socketPrefix, port: port});
-
-    port = allocatePort();
-    testSockOptions(undefined,
-                    `socketdir/mongodb-${port}.sock`,
-                    {unixSocketPrefix: socketPrefix, port: port},
-                    ',',
-                    true);
+port = allocatePort();
+testSockOptions(undefined,
+                `socketdir/mongodb-${port}.sock`,
+                {unixSocketPrefix: socketPrefix, port: port},
+                ',',
+                true);
 })();

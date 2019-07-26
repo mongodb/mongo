@@ -566,4 +566,4 @@ TEST(SingleElementElementIterator, Simple1) {
 
     ASSERT(!i.more());
 }
-}
+}  // namespace mongo

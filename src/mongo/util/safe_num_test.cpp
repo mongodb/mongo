@@ -40,8 +40,8 @@
 
 namespace {
 
-using mongo::SafeNum;
 using mongo::Decimal128;
+using mongo::SafeNum;
 
 TEST(Basics, Initialization) {
     const SafeNum numInt(0);

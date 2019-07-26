@@ -44,8 +44,8 @@ namespace mongo {
 namespace {
 
 using PipelineExecutorTest = UpdateNodeTest;
-using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
+using mongo::mutablebson::Element;
 
 TEST_F(PipelineExecutorTest, Noop) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

@@ -7,7 +7,6 @@
  * drops the user from the database.
  */
 var $config = (function() {
-
     var data = {
         // Use the workload name as a prefix for the username,
         // since the workload name is assumed to be unique.
@@ -15,7 +14,6 @@ var $config = (function() {
     };
 
     var states = (function() {
-
         function uniqueUsername(prefix, tid, num) {
             return prefix + tid + '_' + num;
         }
@@ -38,11 +36,9 @@ var $config = (function() {
         }
 
         return {init: init, createAndDropUser: createAndDropUser};
-
     })();
 
     var transitions = {init: {createAndDropUser: 1}, createAndDropUser: {createAndDropUser: 1}};
 
     return {threadCount: 10, iterations: 20, data: data, states: states, transitions: transitions};
-
 })();

@@ -55,8 +55,7 @@ TEST(ReadPreferenceSetting, ParseValid) {
     // that the tags are parsed as the empty TagSet.
     checkParse(BSON("mode"
                     << "primary"
-                    << "tags"
-                    << BSON_ARRAY(BSONObj())),
+                    << "tags" << BSON_ARRAY(BSONObj())),
                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
 
     checkParse(BSON("mode"
@@ -69,14 +68,12 @@ TEST(ReadPreferenceSetting, ParseValid) {
                                                             << "ny")))));
     checkParse(BSON("mode"
                     << "secondary"
-                    << "maxStalenessSeconds"
-                    << kMinMaxStaleness.count()),
+                    << "maxStalenessSeconds" << kMinMaxStaleness.count()),
                ReadPreferenceSetting(ReadPreference::SecondaryOnly, kMinMaxStaleness));
 
     checkParse(BSON("mode"
                     << "secondary"
-                    << "maxStalenessSeconds"
-                    << 0),
+                    << "maxStalenessSeconds" << 0),
                ReadPreferenceSetting(ReadPreference::SecondaryOnly, Seconds(0)));
 
     checkParse(BSON("mode"
@@ -84,8 +81,7 @@ TEST(ReadPreferenceSetting, ParseValid) {
                     << "tags"
                     << BSON_ARRAY(BSON("dc"
                                        << "ny"))
-                    << "maxStalenessSeconds"
-                    << kMinMaxStaleness.count()),
+                    << "maxStalenessSeconds" << kMinMaxStaleness.count()),
                ReadPreferenceSetting(ReadPreference::SecondaryOnly,
                                      TagSet(BSON_ARRAY(BSON("dc"
                                                             << "ny"))),
@@ -149,8 +145,7 @@ TEST(ReadPreferenceSetting, ParseInvalid) {
     // maxStalenessSeconds is negative
     checkParseFails(BSON("mode"
                          << "secondary"
-                         << "maxStalenessSeconds"
-                         << -1));
+                         << "maxStalenessSeconds" << -1));
 
     // maxStalenessSeconds is NaN
     checkParseFails(BSON("mode"
@@ -161,8 +156,7 @@ TEST(ReadPreferenceSetting, ParseInvalid) {
     // maxStalenessSeconds and primary
     checkParseFails(BSON("mode"
                          << "primary"
-                         << "maxStalenessSeconds"
-                         << kMinMaxStaleness.count()));
+                         << "maxStalenessSeconds" << kMinMaxStaleness.count()));
 
     // maxStalenessSeconds is less than min
     checkParseFailsWithError(BSON("mode"
@@ -174,13 +168,11 @@ TEST(ReadPreferenceSetting, ParseInvalid) {
     // maxStalenessSeconds is greater than max
     checkParseFails(BSON("mode"
                          << "secondary"
-                         << "maxStalenessSeconds"
-                         << Seconds::max().count()));
+                         << "maxStalenessSeconds" << Seconds::max().count()));
 
     checkParseContainerFailsWithError(BSON("$query" << BSON("pang"
                                                             << "pong")
-                                                    << "$readPreference"
-                                                    << 2),
+                                                    << "$readPreference" << 2),
                                       ErrorCodes::TypeMismatch);
 }
 

@@ -165,17 +165,16 @@ Status ClusterExplain::validateShardResults(const vector<Strategy::CommandResult
     for (size_t i = 0; i < shardResults.size(); i++) {
         auto status = getStatusFromCommandResult(shardResults[i].result);
         if (!status.isOK()) {
-            return status.withContext(str::stream() << "Explain command on shard "
-                                                    << shardResults[i].target.toString()
-                                                    << " failed");
+            return status.withContext(str::stream()
+                                      << "Explain command on shard "
+                                      << shardResults[i].target.toString() << " failed");
         }
 
         if (Object != shardResults[i].result["queryPlanner"].type()) {
             return Status(ErrorCodes::OperationFailed,
-                          str::stream() << "Explain command on shard "
-                                        << shardResults[i].target.toString()
-                                        << " failed, caused by: "
-                                        << shardResults[i].result);
+                          str::stream()
+                              << "Explain command on shard " << shardResults[i].target.toString()
+                              << " failed, caused by: " << shardResults[i].result);
         }
 
         if (shardResults[i].result.hasField("executionStats")) {
@@ -197,9 +196,9 @@ Status ClusterExplain::validateShardResults(const vector<Strategy::CommandResult
     // Either all shards should have all plans execution stats, or none should.
     if (0 != numShardsAllPlansStats && shardResults.size() != numShardsAllPlansStats) {
         return Status(ErrorCodes::InternalError,
-                      str::stream() << "Only " << numShardsAllPlansStats << "/"
-                                    << shardResults.size()
-                                    << " had allPlansExecution explain information.");
+                      str::stream()
+                          << "Only " << numShardsAllPlansStats << "/" << shardResults.size()
+                          << " had allPlansExecution explain information.");
     }
 
     return Status::OK();

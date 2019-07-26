@@ -725,8 +725,7 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       str::stream() << "Unable to load PEM from '" << keyfilepath << "'"
                                     << (passphrase.empty() ? "" : " with passphrase")
-                                    << (msg.empty() ? "" : ": ")
-                                    << msg);
+                                    << (msg.empty() ? "" : ": ") << msg);
     };
 
     std::ifstream pemFile(keyfilepath, std::ios::binary);
@@ -746,7 +745,9 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
             nullptr, reinterpret_cast<const uint8_t*>(passphrase.c_str()), passphrase.size()));
     }
     ::SecItemImportExportKeyParameters params = {
-        SEC_KEY_IMPORT_EXPORT_PARAMS_VERSION, 0, cfpass.get(),
+        SEC_KEY_IMPORT_EXPORT_PARAMS_VERSION,
+        0,
+        cfpass.get(),
     };
 
     CFUniquePtr<CFStringRef> cfkeyfile(
@@ -771,8 +772,8 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
                       "key. Consider using a certificate selector or PKCS#12 instead");
     }
     if (status != ::errSecSuccess) {
-        return retFail(str::stream() << "Failing importing certificate(s): "
-                                     << stringFromOSStatus(status));
+        return retFail(str::stream()
+                       << "Failing importing certificate(s): " << stringFromOSStatus(status));
     }
 
     if (mode == kLoadPEMBindIdentities) {

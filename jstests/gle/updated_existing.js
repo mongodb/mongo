@@ -1,7 +1,7 @@
 /**
-* SERVER-5872 : This test checks that the return message "updatedExisting" of
-*               an upsert is not missing when autosplit takes place.
-*/
+ * SERVER-5872 : This test checks that the return message "updatedExisting" of
+ *               an upsert is not missing when autosplit takes place.
+ */
 
 var st = new ShardingTest({shards: 1, mongos: 1, verbose: 1, chunkSize: 1});
 

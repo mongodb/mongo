@@ -44,14 +44,9 @@ TEST(BatchedCommandRequest, BasicInsert) {
 
     BSONObj origInsertRequestObj = BSON("insert"
                                         << "test"
-                                        << "documents"
-                                        << insertArray
-                                        << "writeConcern"
-                                        << BSON("w" << 1)
-                                        << "ordered"
-                                        << true
-                                        << "allowImplicitCollectionCreation"
-                                        << false);
+                                        << "documents" << insertArray << "writeConcern"
+                                        << BSON("w" << 1) << "ordered" << true
+                                        << "allowImplicitCollectionCreation" << false);
 
     for (auto docSeq : {false, true}) {
         const auto opMsgRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
@@ -70,13 +65,8 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
 
     BSONObj origInsertRequestObj = BSON("insert"
                                         << "test"
-                                        << "documents"
-                                        << insertArray
-                                        << "writeConcern"
-                                        << BSON("w" << 1)
-                                        << "ordered"
-                                        << true
-                                        << "shardVersion"
+                                        << "documents" << insertArray << "writeConcern"
+                                        << BSON("w" << 1) << "ordered" << true << "shardVersion"
                                         << BSON_ARRAY(Timestamp(1, 2) << epoch));
 
     for (auto docSeq : {false, true}) {

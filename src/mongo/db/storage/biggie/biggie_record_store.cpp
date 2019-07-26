@@ -55,8 +55,7 @@ Ordering allAscending = Ordering::make(BSONObj());
 auto const version = KeyString::Version::V1;
 BSONObj const sample = BSON(""
                             << "s"
-                            << ""
-                            << (int64_t)0);
+                            << "" << (int64_t)0);
 
 std::string createKey(StringData ident, int64_t recordId) {
     KeyString::Builder ks(version, BSON("" << ident << "" << recordId), allAscending);
@@ -561,7 +560,7 @@ RecordStore::SizeAdjuster::~SizeAdjuster() {
     int64_t deltaDataSize = _workingCopy->dataSize() - _origDataSize;
     _rs->_numRecords.fetchAndAdd(deltaNumRecords);
     _rs->_dataSize.fetchAndAdd(deltaDataSize);
-    RecoveryUnit::get(_opCtx)->onRollback([ rs = _rs, deltaNumRecords, deltaDataSize ]() {
+    RecoveryUnit::get(_opCtx)->onRollback([rs = _rs, deltaNumRecords, deltaDataSize]() {
         invariant(rs->_numRecords.load() >= deltaNumRecords);
         rs->_numRecords.fetchAndSubtract(deltaNumRecords);
         rs->_dataSize.fetchAndSubtract(deltaDataSize);

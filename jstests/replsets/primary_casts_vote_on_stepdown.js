@@ -6,30 +6,29 @@
  * successfully.
  */
 (function() {
-    "use strict";
+"use strict";
 
-    let name = "primary_casts_vote_on_stepdown";
-    let replTest = new ReplSetTest({name: name, nodes: 2});
+let name = "primary_casts_vote_on_stepdown";
+let replTest = new ReplSetTest({name: name, nodes: 2});
 
-    let nodes = replTest.startSet();
-    replTest.initiate();
+let nodes = replTest.startSet();
+replTest.initiate();
 
-    // Make sure node 0 is initially primary, and then step up node 1 and make sure it is able to
-    // become primary in one election, gathering the vote of node 0, who will be forced to step
-    // down in the act of granting its vote to node 1.
-    jsTestLog("Make sure node 0 (" + nodes[0] + ") is primary.");
-    replTest.waitForState(nodes[0], ReplSetTest.State.PRIMARY);
-    let res = assert.commandWorked(nodes[0].adminCommand("replSetGetStatus"));
-    let firstPrimaryTerm = res.term;
+// Make sure node 0 is initially primary, and then step up node 1 and make sure it is able to
+// become primary in one election, gathering the vote of node 0, who will be forced to step
+// down in the act of granting its vote to node 1.
+jsTestLog("Make sure node 0 (" + nodes[0] + ") is primary.");
+replTest.waitForState(nodes[0], ReplSetTest.State.PRIMARY);
+let res = assert.commandWorked(nodes[0].adminCommand("replSetGetStatus"));
+let firstPrimaryTerm = res.term;
 
-    jsTestLog("Stepping up node 1 (" + nodes[1] + ").");
-    replTest.stepUp(nodes[1]);
-    replTest.waitForState(nodes[1], ReplSetTest.State.PRIMARY);
-    // The election should have happened in a single attempt, so the term of the new primary should
-    // be exactly 1 greater than the old primary.
-    res = assert.commandWorked(nodes[1].adminCommand("replSetGetStatus"));
-    assert.eq(firstPrimaryTerm + 1, res.term);
+jsTestLog("Stepping up node 1 (" + nodes[1] + ").");
+replTest.stepUp(nodes[1]);
+replTest.waitForState(nodes[1], ReplSetTest.State.PRIMARY);
+// The election should have happened in a single attempt, so the term of the new primary should
+// be exactly 1 greater than the old primary.
+res = assert.commandWorked(nodes[1].adminCommand("replSetGetStatus"));
+assert.eq(firstPrimaryTerm + 1, res.term);
 
-    replTest.stopSet();
-
+replTest.stopSet();
 })();

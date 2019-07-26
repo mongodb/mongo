@@ -322,9 +322,9 @@ bool isMetadataDifferent(const std::shared_ptr<ChunkManager>& managerA,
 }
 
 /**
-* Whether or not the manager/primary pair was changed or refreshed from a previous version
-* of the metadata.
-*/
+ * Whether or not the manager/primary pair was changed or refreshed from a previous version
+ * of the metadata.
+ */
 bool wasMetadataRefreshed(const std::shared_ptr<ChunkManager>& managerA,
                           const std::shared_ptr<Shard>& primaryA,
                           const std::shared_ptr<ChunkManager>& managerB,
@@ -456,8 +456,9 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
     }
 
     // Utility function to target an update by shard key, and to handle any potential error results.
-    const auto targetByShardKey = [&collation, this](
-        StatusWith<BSONObj> shardKey, StringData msg) -> StatusWith<std::vector<ShardEndpoint>> {
+    const auto targetByShardKey = [&collation,
+                                   this](StatusWith<BSONObj> shardKey,
+                                         StringData msg) -> StatusWith<std::vector<ShardEndpoint>> {
         if (!shardKey.isOK()) {
             return shardKey.getStatus().withContext(msg);
         }
@@ -505,10 +506,8 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
                                  "collation) or must target a single shard (and have the simple "
                                  "collation), but this update targeted "
                               << shardEndPoints.getValue().size()
-                              << " shards. Update request: "
-                              << updateDoc.toBSON()
-                              << ", shard key pattern: "
-                              << shardKeyPattern.toString()};
+                              << " shards. Update request: " << updateDoc.toBSON()
+                              << ", shard key pattern: " << shardKeyPattern.toString()};
     }
 
     // If the request is {multi:false}, then this is a single op-style update which we are
@@ -567,8 +566,8 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetDelete(
                                            ExtensionsCallbackNoop(),
                                            MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!cq.isOK()) {
-        return cq.getStatus().withContext(str::stream() << "Could not parse delete query "
-                                                        << deleteDoc.getQ());
+        return cq.getStatus().withContext(str::stream()
+                                          << "Could not parse delete query " << deleteDoc.getQ());
     }
 
     // Single deletes must target a single shard or be exact-ID.
@@ -580,8 +579,7 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetDelete(
                              "match on _id (and have the collection default collation) or "
                              "contain the shard key (and have the simple collation). Delete "
                              "request: "
-                          << deleteDoc.toBSON()
-                          << ", shard key pattern: "
+                          << deleteDoc.toBSON() << ", shard key pattern: "
                           << _routingInfo->cm()->getShardKeyPattern().toString());
     }
 

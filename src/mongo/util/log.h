@@ -174,15 +174,15 @@ inline bool shouldLog(logger::LogSeverity severity) {
 }  // namespace
 
 // MONGO_LOG uses log component from MongoLogDefaultComponent from current or global namespace.
-#define MONGO_LOG(DLEVEL)                                                              \
-    if (!(::mongo::logger::globalLogDomain())                                          \
-             ->shouldLog(MongoLogDefaultComponent_component,                           \
-                         ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {           \
-    } else                                                                             \
-    ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),              \
-                                      ::mongo::getThreadName(),                        \
-                                      ::mongo::LogstreamBuilder::severityCast(DLEVEL), \
-                                      MongoLogDefaultComponent_component)
+#define MONGO_LOG(DLEVEL)                                                                  \
+    if (!(::mongo::logger::globalLogDomain())                                              \
+             ->shouldLog(MongoLogDefaultComponent_component,                               \
+                         ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {               \
+    } else                                                                                 \
+        ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),              \
+                                          ::mongo::getThreadName(),                        \
+                                          ::mongo::LogstreamBuilder::severityCast(DLEVEL), \
+                                          MongoLogDefaultComponent_component)
 
 #define LOG MONGO_LOG
 
@@ -190,32 +190,32 @@ inline bool shouldLog(logger::LogSeverity severity) {
     if (!(::mongo::logger::globalLogDomain())                                              \
              ->shouldLog((COMPONENT1), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) { \
     } else                                                                                 \
-    ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),                  \
-                                      ::mongo::getThreadName(),                            \
-                                      ::mongo::LogstreamBuilder::severityCast(DLEVEL),     \
-                                      (COMPONENT1))
+        ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),              \
+                                          ::mongo::getThreadName(),                        \
+                                          ::mongo::LogstreamBuilder::severityCast(DLEVEL), \
+                                          (COMPONENT1))
 
 #define MONGO_LOG_COMPONENT2(DLEVEL, COMPONENT1, COMPONENT2)                                     \
     if (!(::mongo::logger::globalLogDomain())                                                    \
              ->shouldLog(                                                                        \
                  (COMPONENT1), (COMPONENT2), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) { \
     } else                                                                                       \
-    ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),                        \
-                                      ::mongo::getThreadName(),                                  \
-                                      ::mongo::LogstreamBuilder::severityCast(DLEVEL),           \
-                                      (COMPONENT1))
+        ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),                    \
+                                          ::mongo::getThreadName(),                              \
+                                          ::mongo::LogstreamBuilder::severityCast(DLEVEL),       \
+                                          (COMPONENT1))
 
-#define MONGO_LOG_COMPONENT3(DLEVEL, COMPONENT1, COMPONENT2, COMPONENT3)               \
-    if (!(::mongo::logger::globalLogDomain())                                          \
-             ->shouldLog((COMPONENT1),                                                 \
-                         (COMPONENT2),                                                 \
-                         (COMPONENT3),                                                 \
-                         ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {           \
-    } else                                                                             \
-    ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),              \
-                                      ::mongo::getThreadName(),                        \
-                                      ::mongo::LogstreamBuilder::severityCast(DLEVEL), \
-                                      (COMPONENT1))
+#define MONGO_LOG_COMPONENT3(DLEVEL, COMPONENT1, COMPONENT2, COMPONENT3)                   \
+    if (!(::mongo::logger::globalLogDomain())                                              \
+             ->shouldLog((COMPONENT1),                                                     \
+                         (COMPONENT2),                                                     \
+                         (COMPONENT3),                                                     \
+                         ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {               \
+    } else                                                                                 \
+        ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(),              \
+                                          ::mongo::getThreadName(),                        \
+                                          ::mongo::LogstreamBuilder::severityCast(DLEVEL), \
+                                          (COMPONENT1))
 
 /**
  * Rotates the log files.  Returns true if all logs rotate successfully.

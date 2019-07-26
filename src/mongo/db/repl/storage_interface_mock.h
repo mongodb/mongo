@@ -345,8 +345,8 @@ public:
         [](const NamespaceString& nss,
            const CollectionOptions& options,
            const BSONObj idIndexSpec,
-           const std::vector<BSONObj>&
-               secondaryIndexSpecs) -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
+           const std::vector<BSONObj>& secondaryIndexSpecs)
+        -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
         return Status{ErrorCodes::IllegalOperation, "CreateCollectionForBulkFn not implemented."};
     };
     InsertDocumentFn insertDocumentFn = [](OperationContext* opCtx,
@@ -397,8 +397,9 @@ public:
     IsAdminDbValidFn isAdminDbValidFn = [](OperationContext*) {
         return Status{ErrorCodes::IllegalOperation, "IsAdminDbValidFn not implemented."};
     };
-    GetCollectionUUIDFn getCollectionUUIDFn = [](
-        OperationContext* opCtx, const NamespaceString& nss) -> StatusWith<OptionalCollectionUUID> {
+    GetCollectionUUIDFn getCollectionUUIDFn =
+        [](OperationContext* opCtx,
+           const NamespaceString& nss) -> StatusWith<OptionalCollectionUUID> {
         return Status{ErrorCodes::IllegalOperation, "GetCollectionUUIDFn not implemented."};
     };
 

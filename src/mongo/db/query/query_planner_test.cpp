@@ -434,7 +434,7 @@ TEST_F(QueryPlannerTest, NotEqualsNullSparseIndex) {
     addIndex(BSON("x" << 1),
              false,  // multikey
              true    // sparse
-             );
+    );
 
     runQuery(fromjson("{x: {$ne: null}}"));
 
@@ -449,7 +449,7 @@ TEST_F(QueryPlannerTest, NotEqualsNullSparseMultiKeyIndex) {
     addIndex(BSON("x" << 1),
              true,  // multikey
              true   // sparse
-             );
+    );
 
     runQuery(fromjson("{x: {$ne: null}}"));
 
@@ -462,7 +462,7 @@ TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchValueSparseMultiKeyIndex) {
     addIndex(BSON("x" << 1),
              true,  // multikey
              true   // sparse
-             );
+    );
 
     runQuery(fromjson("{'x': {$elemMatch: {$ne: null}}}"));
 
@@ -1674,8 +1674,7 @@ TEST_F(QueryPlannerTest, CantUseHashedIndexToProvideSortWithIndexablePred) {
 TEST_F(QueryPlannerTest, CantUseTextIndexToProvideSort) {
     addIndex(BSON("x" << 1 << "_fts"
                       << "text"
-                      << "_ftsx"
-                      << 1));
+                      << "_ftsx" << 1));
     runQuerySortProj(BSONObj(), BSON("x" << 1), BSONObj());
 
     ASSERT_EQUALS(getNumSolutions(), 1U);
@@ -2744,7 +2743,7 @@ TEST_F(QueryPlannerTest, NegationCannotUseSparseIndex) {
     addIndex(fromjson("{a: 1}"),
              false,  // multikey
              true    // sparse
-             );
+    );
     runQuery(fromjson("{a: {$ne: 5}}"));
     assertHasOnlyCollscan();
 
@@ -2758,7 +2757,7 @@ TEST_F(QueryPlannerTest, NegationInElemMatchDoesNotUseSparseIndex) {
     addIndex(fromjson("{a: 1}"),
              true,  // multikey
              true   // sparse
-             );
+    );
     runQuery(fromjson("{a: {$elemMatch: {$ne: 5}}}"));
     assertHasOnlyCollscan();
 
@@ -2770,7 +2769,7 @@ TEST_F(QueryPlannerTest, SparseIndexCannotSupportEqualsNull) {
     addIndex(BSON("i" << 1),
              false,  // multikey
              true    // sparse
-             );
+    );
 
     runQuery(fromjson("{i: {$eq: null}}"));
     assertHasOnlyCollscan();
@@ -2784,7 +2783,7 @@ TEST_F(QueryPlannerTest, SparseIndexCanSupportGTEOrLTENull) {
     addIndex(BSON("i" << 1),
              false,  // multikey
              true    // sparse
-             );
+    );
 
     runQuery(fromjson("{i: {$gte: null}}"));
     assertNumSolutions(1U);

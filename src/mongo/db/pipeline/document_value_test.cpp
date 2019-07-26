@@ -597,29 +597,13 @@ TEST(MetaFields, FromBsonWithMetadataAcceptsIndexKeyMetadata) {
 }
 
 TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
-    Document source = Document::fromBsonWithMetaData(BSON(
-        "a" << 1 << "$textScore" << 9.9 << "b" << 1 << "$randVal" << 42.0 << "c" << 1 << "$sortKey"
-            << BSON("x" << 1)
-            << "d"
-            << 1
-            << "$dis"
-            << 3.2
-            << "e"
-            << 1
-            << "$pt"
-            << BSON_ARRAY(1 << 2)
-            << "f"
-            << 1
-            << "$searchScore"
-            << 5.4
-            << "g"
-            << 1
-            << "$searchHighlights"
-            << "foo"
-            << "h"
-            << 1
-            << "$indexKey"
-            << BSON("y" << 1)));
+    Document source = Document::fromBsonWithMetaData(
+        BSON("a" << 1 << "$textScore" << 9.9 << "b" << 1 << "$randVal" << 42.0 << "c" << 1
+                 << "$sortKey" << BSON("x" << 1) << "d" << 1 << "$dis" << 3.2 << "e" << 1 << "$pt"
+                 << BSON_ARRAY(1 << 2) << "f" << 1 << "$searchScore" << 5.4 << "g" << 1
+                 << "$searchHighlights"
+                 << "foo"
+                 << "h" << 1 << "$indexKey" << BSON("y" << 1)));
 
     MutableDocument destination{};
     destination.copyMetaDataFrom(source);

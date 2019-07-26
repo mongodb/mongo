@@ -167,8 +167,8 @@ Status RoleGraph::addRoleToRole(const RoleName& recipient, const RoleName& role)
     }
     if (isBuiltinRole(recipient)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      str::stream() << "Cannot grant roles to built-in role: "
-                                    << role.getFullName());
+                      str::stream()
+                          << "Cannot grant roles to built-in role: " << role.getFullName());
     }
     if (!roleExists(role)) {
         return Status(ErrorCodes::RoleNotFound,
@@ -193,8 +193,8 @@ Status RoleGraph::removeRoleFromRole(const RoleName& recipient, const RoleName& 
     }
     if (isBuiltinRole(recipient)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      str::stream() << "Cannot remove roles from built-in role: "
-                                    << role.getFullName());
+                      str::stream()
+                          << "Cannot remove roles from built-in role: " << role.getFullName());
     }
     if (!roleExists(role)) {
         return Status(ErrorCodes::RoleNotFound,
@@ -207,8 +207,9 @@ Status RoleGraph::removeRoleFromRole(const RoleName& recipient, const RoleName& 
         _roleToMembers[role].erase(itToRm);
     } else {
         return Status(ErrorCodes::RolesNotRelated,
-                      str::stream() << recipient.getFullName() << " is not a member"
-                                                                  " of "
+                      str::stream() << recipient.getFullName()
+                                    << " is not a member"
+                                       " of "
                                     << role.getFullName());
     }
 
@@ -227,8 +228,8 @@ Status RoleGraph::removeAllRolesFromRole(const RoleName& victim) {
     }
     if (isBuiltinRole(victim)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      str::stream() << "Cannot remove roles from built-in role: "
-                                    << victim.getFullName());
+                      str::stream()
+                          << "Cannot remove roles from built-in role: " << victim.getFullName());
     }
 
     RoleNameVector& subordinatesOfVictim = _roleToSubordinates[victim];
@@ -253,8 +254,8 @@ Status RoleGraph::addPrivilegeToRole(const RoleName& role, const Privilege& priv
     }
     if (isBuiltinRole(role)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      str::stream() << "Cannot grant privileges to built-in role: "
-                                    << role.getFullName());
+                      str::stream()
+                          << "Cannot grant privileges to built-in role: " << role.getFullName());
     }
 
     _addPrivilegeToRoleNoChecks(role, privilegeToAdd);
@@ -277,8 +278,8 @@ Status RoleGraph::addPrivilegesToRole(const RoleName& role,
     }
     if (isBuiltinRole(role)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      str::stream() << "Cannot grant privileges to built-in role: "
-                                    << role.getFullName());
+                      str::stream()
+                          << "Cannot grant privileges to built-in role: " << role.getFullName());
     }
 
     for (PrivilegeVector::const_iterator it = privilegesToAdd.begin(); it != privilegesToAdd.end();
@@ -296,8 +297,8 @@ Status RoleGraph::removePrivilegeFromRole(const RoleName& role,
     }
     if (isBuiltinRole(role)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      str::stream() << "Cannot remove privileges from built-in role: "
-                                    << role.getFullName());
+                      str::stream()
+                          << "Cannot remove privileges from built-in role: " << role.getFullName());
     }
 
     PrivilegeVector& currentPrivileges = _directPrivilegesForRole[role];
@@ -325,8 +326,9 @@ Status RoleGraph::removePrivilegeFromRole(const RoleName& role,
         }
     }
     return Status(ErrorCodes::PrivilegeNotFound,
-                  str::stream() << "Role: " << role.getFullName() << " does not "
-                                                                     "contain any privileges on "
+                  str::stream() << "Role: " << role.getFullName()
+                                << " does not "
+                                   "contain any privileges on "
                                 << privilegeToRemove.getResourcePattern().toString());
 }
 
@@ -350,8 +352,8 @@ Status RoleGraph::removeAllPrivilegesFromRole(const RoleName& role) {
     }
     if (isBuiltinRole(role)) {
         return Status(ErrorCodes::InvalidRoleModification,
-                      str::stream() << "Cannot remove privileges from built-in role: "
-                                    << role.getFullName());
+                      str::stream()
+                          << "Cannot remove privileges from built-in role: " << role.getFullName());
     }
     _directPrivilegesForRole[role].clear();
     return Status::OK();
@@ -434,8 +436,8 @@ Status RoleGraph::_recomputePrivilegeDataHelper(const RoleName& startingRole,
 
         if (!roleExists(currentRole)) {
             return Status(ErrorCodes::RoleNotFound,
-                          str::stream() << "Role: " << currentRole.getFullName()
-                                        << " does not exist");
+                          str::stream()
+                              << "Role: " << currentRole.getFullName() << " does not exist");
         }
 
         // Check for cycles

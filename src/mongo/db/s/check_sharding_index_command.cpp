@@ -165,8 +165,8 @@ public:
             BSONObjIterator i(currKey);
             for (int k = 0; k < keyPatternLength; k++) {
                 if (!i.more()) {
-                    errmsg = str::stream() << "index key " << currKey << " too short for pattern "
-                                           << keyPattern;
+                    errmsg = str::stream()
+                        << "index key " << currKey << " too short for pattern " << keyPattern;
                     return false;
                 }
                 BSONElement currKeyElt = i.next();
@@ -192,8 +192,9 @@ public:
 
                 const string msg = str::stream()
                     << "There are documents which have missing or incomplete shard key fields ("
-                    << redact(currKey) << "). Please ensure that all documents in the collection "
-                                          "include all fields from the shard key.";
+                    << redact(currKey)
+                    << "). Please ensure that all documents in the collection "
+                       "include all fields from the shard key.";
                 log() << "checkShardingIndex for '" << nss.toString() << "' failed: " << msg;
 
                 errmsg = msg;

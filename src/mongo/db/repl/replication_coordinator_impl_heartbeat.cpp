@@ -174,11 +174,11 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         if (replMetadata.isOK() && _rsConfig.isInitialized() && _rsConfig.hasReplicaSetId() &&
             replMetadata.getValue().getReplicaSetId().isSet() &&
             _rsConfig.getReplicaSetId() != replMetadata.getValue().getReplicaSetId()) {
-            responseStatus = Status(ErrorCodes::InvalidReplicaSetConfig,
-                                    str::stream() << "replica set IDs do not match, ours: "
-                                                  << _rsConfig.getReplicaSetId()
-                                                  << "; remote node's: "
-                                                  << replMetadata.getValue().getReplicaSetId());
+            responseStatus =
+                Status(ErrorCodes::InvalidReplicaSetConfig,
+                       str::stream()
+                           << "replica set IDs do not match, ours: " << _rsConfig.getReplicaSetId()
+                           << "; remote node's: " << replMetadata.getValue().getReplicaSetId());
             // Ignore metadata.
             replMetadata = responseStatus;
         }

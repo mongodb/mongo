@@ -83,4 +83,4 @@ private:
 
     bool _allPathsIndexed;
 };
-}
+}  // namespace mongo

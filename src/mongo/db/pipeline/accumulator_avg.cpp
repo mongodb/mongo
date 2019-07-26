@@ -134,4 +134,4 @@ void AccumulatorAvg::reset() {
     _decimalTotal = {};
     _count = 0;
 }
-}
+}  // namespace mongo

@@ -120,8 +120,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                         str::stream()
                             << "Unable to read from a snapshot due to pending collection catalog "
                                "changes; please retry the operation. Snapshot timestamp is "
-                            << mySnapshot->toString()
-                            << ". Collection minimum is "
+                            << mySnapshot->toString() << ". Collection minimum is "
                             << minSnapshot->toString(),
                         !minSnapshot || *mySnapshot >= *minSnapshot);
             }
@@ -155,8 +154,7 @@ NamespaceString AutoGetCollection::resolveNamespaceStringOrUUID(OperationContext
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "UUID " << nsOrUUID.toString() << " specified in " << nsOrUUID.dbname()
-                          << " resolved to a collection in a different database: "
-                          << *resolvedNss,
+                          << " resolved to a collection in a different database: " << *resolvedNss,
             resolvedNss->db() == nsOrUUID.dbname());
 
     return *resolvedNss;

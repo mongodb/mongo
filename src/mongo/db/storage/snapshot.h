@@ -93,4 +93,4 @@ private:
     SnapshotId _id;
     T _value;
 };
-}
+}  // namespace mongo

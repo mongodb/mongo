@@ -295,8 +295,7 @@ private:
 
         uassert(18537,
                 str::stream() << "Could not convert date to string: date component was outside "
-                              << "the supported range of 0-9999: "
-                              << number,
+                              << "the supported range of 0-9999: " << number,
                 (number >= 0) && (number <= 9999));
 
         int digits = 1;

@@ -51,8 +51,7 @@ DocumentSource::GetNextResult DocumentSourceListCachedAndActiveUsers::getNext() 
         const auto info = std::move(_users.back());
         _users.pop_back();
         return Document(BSON("username" << info.userName.getUser() << "db" << info.userName.getDB()
-                                        << "active"
-                                        << info.active));
+                                        << "active" << info.active));
     }
 
     return GetNextResult::makeEOF();

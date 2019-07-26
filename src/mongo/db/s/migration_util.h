@@ -56,6 +56,6 @@ BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
                                     const BSONObj& min,
                                     const BSONObj& max);
 
-}  // namespace shardutil
+}  // namespace migrationutil
 
 }  // namespace mongo

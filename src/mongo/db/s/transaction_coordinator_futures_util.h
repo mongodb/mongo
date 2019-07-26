@@ -115,7 +115,7 @@ public:
             ul.unlock();
 
             return std::move(pf.future).tapAll(
-                [ this, it = std::move(it) ](StatusOrStatusWith<ReturnType> s) {
+                [this, it = std::move(it)](StatusOrStatusWith<ReturnType> s) {
                     stdx::lock_guard<stdx::mutex> lg(_mutex);
                     _activeHandles.erase(it);
                     _notifyAllTasksComplete(lg);
@@ -284,7 +284,7 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
               combiner(std::move(combiner)) {}
         /*****************************************************
          * The first few fields have fixed values.           *
-        ******************************************************/
+         ******************************************************/
         // Protects all state in the SharedBlock.
         stdx::mutex mutex;
 
@@ -299,7 +299,7 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
 
         /*****************************************************
          * The below have initial values based on user input.*
-        ******************************************************/
+         ******************************************************/
         // The number of input futures that have not yet been resolved and processed.
         size_t numOutstandingResponses;
         // The variable where the intermediate results and final result is stored.
@@ -374,26 +374,25 @@ Future<FutureContinuationResult<LoopBodyFn>> doWhile(AsyncWorkScheduler& schedul
                                                      LoopBodyFn&& f) {
     using ReturnType = typename decltype(f())::value_type;
     auto future = f();
-    return std::move(future).onCompletion([
-        &scheduler,
-        backoff = std::move(backoff),
-        shouldRetryFn = std::forward<ShouldRetryFn>(shouldRetryFn),
-        f = std::forward<LoopBodyFn>(f)
-    ](StatusOrStatusWith<ReturnType> s) mutable {
-        if (!shouldRetryFn(s))
-            return Future<ReturnType>(std::move(s));
+    return std::move(future).onCompletion(
+        [&scheduler,
+         backoff = std::move(backoff),
+         shouldRetryFn = std::forward<ShouldRetryFn>(shouldRetryFn),
+         f = std::forward<LoopBodyFn>(f)](StatusOrStatusWith<ReturnType> s) mutable {
+            if (!shouldRetryFn(s))
+                return Future<ReturnType>(std::move(s));
 
-        // Retry after a delay.
-        const auto delayMillis = (backoff ? backoff->nextSleep() : Milliseconds(0));
-        return scheduler.scheduleWorkIn(delayMillis, [](OperationContext* opCtx) {}).then([
-            &scheduler,
-            backoff = std::move(backoff),
-            shouldRetryFn = std::move(shouldRetryFn),
-            f = std::move(f)
-        ]() mutable {
-            return doWhile(scheduler, std::move(backoff), std::move(shouldRetryFn), std::move(f));
+            // Retry after a delay.
+            const auto delayMillis = (backoff ? backoff->nextSleep() : Milliseconds(0));
+            return scheduler.scheduleWorkIn(delayMillis, [](OperationContext* opCtx) {})
+                .then([&scheduler,
+                       backoff = std::move(backoff),
+                       shouldRetryFn = std::move(shouldRetryFn),
+                       f = std::move(f)]() mutable {
+                    return doWhile(
+                        scheduler, std::move(backoff), std::move(shouldRetryFn), std::move(f));
+                });
         });
-    });
 }
 
 }  // namespace txn

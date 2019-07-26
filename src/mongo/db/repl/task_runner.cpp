@@ -182,7 +182,6 @@ void TaskRunner::_runTasks() {
                                  "this task has been canceled by a previously invoked task"));
         }
         tasks.clear();
-
     };
     cancelTasks();
 

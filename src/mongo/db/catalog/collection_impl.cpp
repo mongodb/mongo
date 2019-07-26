@@ -320,17 +320,13 @@ StatusWithMatchExpression CollectionImpl::parseValidator(
     if (ns().isSystem() && !ns().isDropPendingNamespace()) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Document validators not allowed on system collection " << ns()
-                              << " with UUID "
-                              << _uuid};
+                              << " with UUID " << _uuid};
     }
 
     if (ns().isOnInternalDb()) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Document validators are not allowed on collection " << ns().ns()
-                              << " with UUID "
-                              << _uuid
-                              << " in the "
-                              << ns().db()
+                              << " with UUID " << _uuid << " in the " << ns().db()
                               << " internal database"};
     }
 
@@ -418,8 +414,9 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
         const auto firstIdElem = data["first_id"];
         // If the failpoint specifies no collection or matches the existing one, hang.
         if ((!collElem || _ns.ns() == collElem.str()) &&
-            (!firstIdElem || (begin != end && firstIdElem.type() == mongo::String &&
-                              begin->doc["_id"].str() == firstIdElem.str()))) {
+            (!firstIdElem ||
+             (begin != end && firstIdElem.type() == mongo::String &&
+              begin->doc["_id"].str() == firstIdElem.str()))) {
             string whenFirst =
                 firstIdElem ? (string(" when first _id is ") + firstIdElem.str()) : "";
             while (MONGO_FAIL_POINT(hangAfterCollectionInserts)) {
@@ -675,9 +672,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     if (_recordStore->isCapped() && oldSize != newDoc.objsize())
         uasserted(ErrorCodes::CannotGrowDocumentInCappedNamespace,
                   str::stream() << "Cannot change the size of a document in a capped collection: "
-                                << oldSize
-                                << " != "
-                                << newDoc.objsize());
+                                << oldSize << " != " << newDoc.objsize());
 
     args->preImageDoc = oldDoc.value().getOwned();
 
@@ -850,11 +845,9 @@ Status CollectionImpl::setValidator(OperationContext* opCtx, BSONObj validatorDo
     DurableCatalog::get(opCtx)->updateValidator(
         opCtx, ns(), validatorDoc, getValidationLevel(), getValidationAction());
 
-    opCtx->recoveryUnit()->onRollback([
-        this,
-        oldValidator = std::move(_validator),
-        oldValidatorDoc = std::move(_validatorDoc)
-    ]() mutable {
+    opCtx->recoveryUnit()->onRollback([this,
+                                       oldValidator = std::move(_validator),
+                                       oldValidatorDoc = std::move(_validatorDoc)]() mutable {
         this->_validator = std::move(oldValidator);
         this->_validatorDoc = std::move(oldValidatorDoc);
     });
@@ -930,13 +923,11 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
                                        StringData newAction) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
 
-    opCtx->recoveryUnit()->onRollback([
-        this,
-        oldValidator = std::move(_validator),
-        oldValidatorDoc = std::move(_validatorDoc),
-        oldValidationLevel = _validationLevel,
-        oldValidationAction = _validationAction
-    ]() mutable {
+    opCtx->recoveryUnit()->onRollback([this,
+                                       oldValidator = std::move(_validator),
+                                       oldValidatorDoc = std::move(_validatorDoc),
+                                       oldValidationLevel = _validationLevel,
+                                       oldValidationAction = _validationAction]() mutable {
         this->_validator = std::move(oldValidator);
         this->_validatorDoc = std::move(oldValidatorDoc);
         this->_validationLevel = oldValidationLevel;

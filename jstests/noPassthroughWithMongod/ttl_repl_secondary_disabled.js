@@ -1,4 +1,5 @@
-/** Test TTL docs are not deleted from secondaries directly
+/**
+ * Test TTL docs are not deleted from secondaries directly
  * @tags: [requires_replication]
  */
 

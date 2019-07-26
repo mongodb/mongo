@@ -132,11 +132,11 @@ private:
     void _shardingOnTransitionToPrimaryHook(OperationContext* opCtx);
 
     /**
-    * Drops all temporary collections on all databases except "local".
-    *
-    * The implementation may assume that the caller has acquired the global exclusive lock
-    * for "opCtx".
-    */
+     * Drops all temporary collections on all databases except "local".
+     *
+     * The implementation may assume that the caller has acquired the global exclusive lock
+     * for "opCtx".
+     */
     void _dropAllTempCollections(OperationContext* opCtx);
 
     ServiceContext* _service;

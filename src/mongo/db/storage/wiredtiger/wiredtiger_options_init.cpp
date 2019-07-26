@@ -50,4 +50,4 @@ MONGO_STARTUP_OPTIONS_STORE(WiredTigerOptions)(InitializerContext* context) {
     }
     return Status::OK();
 }
-}
+}  // namespace mongo

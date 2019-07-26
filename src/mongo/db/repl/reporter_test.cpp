@@ -380,8 +380,7 @@ TEST_F(ReporterTestNoTriggerAtSetUp,
     processNetworkResponse(BSON("ok" << 0 << "code" << int(ErrorCodes::InvalidReplicaSetConfig)
                                      << "errmsg"
                                      << "newer config"
-                                     << "configVersion"
-                                     << 100));
+                                     << "configVersion" << 100));
 
     ASSERT_EQUALS(Status(ErrorCodes::InvalidReplicaSetConfig, "invalid config"), reporter->join());
     assertReporterDone();
@@ -400,8 +399,7 @@ TEST_F(ReporterTest, InvalidReplicaSetResponseWithSameConfigVersionOnSyncTargetS
     processNetworkResponse(BSON("ok" << 0 << "code" << int(ErrorCodes::InvalidReplicaSetConfig)
                                      << "errmsg"
                                      << "invalid config"
-                                     << "configVersion"
-                                     << posUpdater->getConfigVersion()));
+                                     << "configVersion" << posUpdater->getConfigVersion()));
 
     ASSERT_EQUALS(Status(ErrorCodes::InvalidReplicaSetConfig, "invalid config"), reporter->join());
     assertReporterDone();
@@ -417,8 +415,7 @@ TEST_F(ReporterTest,
     processNetworkResponse(BSON("ok" << 0 << "code" << int(ErrorCodes::InvalidReplicaSetConfig)
                                      << "errmsg"
                                      << "newer config"
-                                     << "configVersion"
-                                     << posUpdater->getConfigVersion() + 1));
+                                     << "configVersion" << posUpdater->getConfigVersion() + 1));
 
     ASSERT_TRUE(reporter->isActive());
 }

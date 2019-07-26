@@ -79,16 +79,13 @@ void mergeChunks(OperationContext* opCtx,
                  const BSONObj& minKey,
                  const BSONObj& maxKey,
                  const OID& epoch) {
-    const std::string whyMessage = str::stream() << "merging chunks in " << nss.ns() << " from "
-                                                 << minKey << " to " << maxKey;
+    const std::string whyMessage = str::stream()
+        << "merging chunks in " << nss.ns() << " from " << minKey << " to " << maxKey;
     auto scopedDistLock = uassertStatusOKWithContext(
         Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
             opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout),
         str::stream() << "could not acquire collection lock for " << nss.ns()
-                      << " to merge chunks in ["
-                      << redact(minKey)
-                      << ", "
-                      << redact(maxKey)
+                      << " to merge chunks in [" << redact(minKey) << ", " << redact(maxKey)
                       << ")");
 
     auto const shardingState = ShardingState::get(opCtx);
@@ -109,20 +106,14 @@ void mergeChunks(OperationContext* opCtx,
     const auto shardVersion = metadata->getShardVersion();
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "could not merge chunks, collection " << nss.ns()
-                          << " has changed since merge was sent (sent epoch: "
-                          << epoch.toString()
-                          << ", current epoch: "
-                          << shardVersion.epoch()
-                          << ")",
+                          << " has changed since merge was sent (sent epoch: " << epoch.toString()
+                          << ", current epoch: " << shardVersion.epoch() << ")",
             shardVersion.epoch() == epoch);
 
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "could not merge chunks, the range "
-                          << redact(ChunkRange(minKey, maxKey).toString())
-                          << " is not valid"
-                          << " for collection "
-                          << nss.ns()
-                          << " with key pattern "
+                          << redact(ChunkRange(minKey, maxKey).toString()) << " is not valid"
+                          << " for collection " << nss.ns() << " with key pattern "
                           << metadata->getKeyPattern().toString(),
             metadata->isValidKey(minKey) && metadata->isValidKey(maxKey));
 
@@ -145,11 +136,8 @@ void mergeChunks(OperationContext* opCtx,
 
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "could not merge chunks, collection " << nss.ns()
-                          << " range starting at "
-                          << redact(minKey)
-                          << " and ending at "
-                          << redact(maxKey)
-                          << " does not belong to shard "
+                          << " range starting at " << redact(minKey) << " and ending at "
+                          << redact(maxKey) << " does not belong to shard "
                           << shardingState->shardId(),
             !chunksToMerge.empty());
 
@@ -164,9 +152,7 @@ void mergeChunks(OperationContext* opCtx,
 
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "could not merge chunks, collection " << nss.ns()
-                          << " range starting at "
-                          << redact(minKey)
-                          << " does not belong to shard "
+                          << " range starting at " << redact(minKey) << " does not belong to shard "
                           << shardingState->shardId(),
             minKeyInRange);
 
@@ -177,9 +163,7 @@ void mergeChunks(OperationContext* opCtx,
 
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "could not merge chunks, collection " << nss.ns()
-                          << " range ending at "
-                          << redact(maxKey)
-                          << " does not belong to shard "
+                          << " range ending at " << redact(maxKey) << " does not belong to shard "
                           << shardingState->shardId(),
             maxKeyInRange);
 
@@ -205,11 +189,8 @@ void mergeChunks(OperationContext* opCtx,
         uassert(
             ErrorCodes::IllegalOperation,
             str::stream()
-                << "could not merge chunks, collection "
-                << nss.ns()
-                << " has a hole in the range "
-                << ChunkRange(minKey, maxKey).toString()
-                << " at "
+                << "could not merge chunks, collection " << nss.ns() << " has a hole in the range "
+                << ChunkRange(minKey, maxKey).toString() << " at "
                 << ChunkRange(chunksToMerge[i - 1].getMax(), chunksToMerge[i].getMin()).toString(),
             chunksToMerge[i - 1].getMax().woCompare(chunksToMerge[i].getMin()) == 0);
     }

@@ -168,9 +168,7 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
     IndexDescriptor desc(collection.get(),
                          "",
                          BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "ns"
-                                  << ns.ns()
-                                  << "key"
-                                  << BSON("a" << 1)));
+                                  << ns.ns() << "key" << BSON("a" << 1)));
     std::unique_ptr<SortedDataInterface> sorted;
     {
         MyOperationContext opCtx(engine);
@@ -706,10 +704,7 @@ DEATH_TEST_F(DurableCatalogImplTest, TerminateOnNonNumericIndexVersion, "Fatal A
                          "",
                          BSON("v"
                               << "1"
-                              << "ns"
-                              << ns.ns()
-                              << "key"
-                              << BSON("a" << 1)));
+                              << "ns" << ns.ns() << "key" << BSON("a" << 1)));
     std::unique_ptr<SortedDataInterface> sorted;
     {
         MyOperationContext opCtx(engine);

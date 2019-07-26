@@ -152,8 +152,8 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
     StringData userDBStr = userDBElement.valueStringData();
     if (!NamespaceString::validDBName(userDBStr, NamespaceString::DollarInDbNameBehavior::Allow) &&
         userDBStr != "$external") {
-        return _badValue(str::stream() << "'" << userDBStr
-                                       << "' is not a valid value for the db field.");
+        return _badValue(str::stream()
+                         << "'" << userDBStr << "' is not a valid value for the db field.");
     }
 
     // Validate the "credentials" element
@@ -184,8 +184,8 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
                               str::stream() << fieldName << " does not exist");
             }
             if (scramElement.type() != Object) {
-                return _badValue(str::stream() << fieldName
-                                               << " credential must be an object, if present");
+                return _badValue(str::stream()
+                                 << fieldName << " credential must be an object, if present");
             }
             return Status::OK();
         };

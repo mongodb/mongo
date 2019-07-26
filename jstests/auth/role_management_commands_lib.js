@@ -194,8 +194,8 @@ function runAllRoleManagementCommandsTests(conn, writeConcern) {
         adminUserAdmin.grantPrivilegesToRole(
             'adminRole',
             [
-              {resource: {cluster: true}, actions: ['serverStatus']},
-              {resource: {db: "", collection: ""}, actions: ['find']}
+                {resource: {cluster: true}, actions: ['serverStatus']},
+                {resource: {db: "", collection: ""}, actions: ['find']}
             ],
             writeConcern);
         assert.doesNotThrow(function() {
@@ -212,8 +212,8 @@ function runAllRoleManagementCommandsTests(conn, writeConcern) {
         testUserAdmin.grantPrivilegesToRole(
             'testRole2',
             [
-              {resource: {db: 'test', collection: ''}, actions: ['insert', 'update']},
-              {resource: {db: 'test', collection: 'foo'}, actions: ['find']}
+                {resource: {db: 'test', collection: ''}, actions: ['insert', 'update']},
+                {resource: {db: 'test', collection: 'foo'}, actions: ['find']}
             ],
             writeConcern);
         assert.doesNotThrow(function() {

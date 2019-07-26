@@ -529,4 +529,4 @@ private:
 
     friend class DocumentStorageIterator;
 };
-}
+}  // namespace mongo

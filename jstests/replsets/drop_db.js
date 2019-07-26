@@ -4,57 +4,56 @@
  * @tags: [requires_replication]
  */
 (function() {
-    "use strict";
+"use strict";
 
-    function checkWriteConcern(testFn, checkFn) {
-        const mongoRunCommandOriginal = Mongo.prototype.runCommand;
+function checkWriteConcern(testFn, checkFn) {
+    const mongoRunCommandOriginal = Mongo.prototype.runCommand;
 
-        const sentinel = {};
-        let cmdObjSeen = sentinel;
+    const sentinel = {};
+    let cmdObjSeen = sentinel;
 
-        Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
-            cmdObjSeen = cmdObj;
-            return mongoRunCommandOriginal.apply(this, arguments);
-        };
+    Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
+        cmdObjSeen = cmdObj;
+        return mongoRunCommandOriginal.apply(this, arguments);
+    };
 
-        try {
-            assert.doesNotThrow(testFn);
-        } finally {
-            Mongo.prototype.runCommand = mongoRunCommandOriginal;
-        }
-
-        if (cmdObjSeen == sentinel) {
-            throw new Error("Mongo.prototype.runCommand() was never called: " + testFn.toString());
-        }
-
-        checkFn(cmdObjSeen);
+    try {
+        assert.doesNotThrow(testFn);
+    } finally {
+        Mongo.prototype.runCommand = mongoRunCommandOriginal;
     }
 
-    const rst = new ReplSetTest({nodes: 2});
-    rst.startSet();
-    rst.initiate();
+    if (cmdObjSeen == sentinel) {
+        throw new Error("Mongo.prototype.runCommand() was never called: " + testFn.toString());
+    }
 
-    const dbName = "dbDrop";
-    const collName = "coll";
-    const primaryDB = rst.getPrimary().getDB(dbName);
+    checkFn(cmdObjSeen);
+}
 
-    primaryDB.createCollection(collName);
-    checkWriteConcern(() => assert.commandWorked(primaryDB.dropDatabase({w: "majority"})),
-                      (cmdObj) => {
-                          assert.eq(cmdObj.writeConcern, {w: "majority"});
-                      });
+const rst = new ReplSetTest({nodes: 2});
+rst.startSet();
+rst.initiate();
 
-    primaryDB.createCollection(collName);
-    checkWriteConcern(() => assert.commandWorked(primaryDB.dropDatabase({w: 1})), (cmdObj) => {
-        assert.eq(cmdObj.writeConcern, {w: 1});
-    });
+const dbName = "dbDrop";
+const collName = "coll";
+const primaryDB = rst.getPrimary().getDB(dbName);
 
-    primaryDB.createCollection(collName);
-    checkWriteConcern(() => assert.commandFailedWithCode(primaryDB.dropDatabase({w: 100000}),
-                                                         ErrorCodes.UnsatisfiableWriteConcern),
-                      (cmdObj) => {
-                          assert.eq(cmdObj.writeConcern, {w: 100000});
-                      });
+primaryDB.createCollection(collName);
+checkWriteConcern(() => assert.commandWorked(primaryDB.dropDatabase({w: "majority"})), (cmdObj) => {
+    assert.eq(cmdObj.writeConcern, {w: "majority"});
+});
 
-    rst.stopSet();
+primaryDB.createCollection(collName);
+checkWriteConcern(() => assert.commandWorked(primaryDB.dropDatabase({w: 1})), (cmdObj) => {
+    assert.eq(cmdObj.writeConcern, {w: 1});
+});
+
+primaryDB.createCollection(collName);
+checkWriteConcern(() => assert.commandFailedWithCode(primaryDB.dropDatabase({w: 100000}),
+                                                     ErrorCodes.UnsatisfiableWriteConcern),
+                  (cmdObj) => {
+                      assert.eq(cmdObj.writeConcern, {w: 100000});
+                  });
+
+rst.stopSet();
 })();

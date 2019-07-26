@@ -296,9 +296,7 @@ StatusWith<std::vector<PerfCounterCollector::CounterInfo>> PerfCounterCollector:
     if (status != PDH_MORE_DATA) {
         return {ErrorCodes::WindowsPdhError,
                 str::stream() << formatFunctionCallError("PdhExpandCounterPathW", status)
-                              << " for counter '"
-                              << path
-                              << "'"};
+                              << " for counter '" << path << "'"};
     }
 
     auto buf = std::make_unique<wchar_t[]>(pathListLength);

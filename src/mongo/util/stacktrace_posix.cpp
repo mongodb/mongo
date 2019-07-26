@@ -543,12 +543,12 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
         }
     }
 }
-}  // namepace
+}  // namespace
 }  // namespace mongo
 #else
 namespace mongo {
 namespace {
 void addOSComponentsToSoMap(BSONObjBuilder* soMap) {}
-}  // namepace
+}  // namespace
 }  // namespace mongo
 #endif

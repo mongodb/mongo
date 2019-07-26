@@ -139,4 +139,4 @@ private:
 };
 
 extern NetworkCounter networkCounter;
-}
+}  // namespace mongo

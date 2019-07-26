@@ -13,45 +13,45 @@
  */
 
 (function() {
-    "use strict";
-    var coll = db.apply_ops_errors;
-    coll.drop();
+"use strict";
+var coll = db.apply_ops_errors;
+coll.drop();
 
-    // Scenario 1: only one operation
-    assert.eq(0, coll.find().count(), "test collection not empty");
-    coll.ensureIndex({x: 1}, {unique: true});
-    coll.insert({_id: 1, x: "init"});
+// Scenario 1: only one operation
+assert.eq(0, coll.find().count(), "test collection not empty");
+coll.ensureIndex({x: 1}, {unique: true});
+coll.insert({_id: 1, x: "init"});
 
-    var res = db.runCommand({
-        applyOps: [
-            {op: "i", ns: coll.getFullName(), o: {_id: 2, x: "init"}},
-        ]
-    });
+var res = db.runCommand({
+    applyOps: [
+        {op: "i", ns: coll.getFullName(), o: {_id: 2, x: "init"}},
+    ]
+});
 
-    assert.eq(1, res.applied);
-    assert(res.code);
-    assert(res.errmsg);
-    assert.eq([false], res.results);
-    assert.eq(0, res.ok);
+assert.eq(1, res.applied);
+assert(res.code);
+assert(res.errmsg);
+assert.eq([false], res.results);
+assert.eq(0, res.ok);
 
-    coll.drop();
+coll.drop();
 
-    // Scenario 2: Three operations, first two should run, second should fail.
-    assert.eq(0, coll.find().count(), "test collection not empty");
-    coll.ensureIndex({x: 1}, {unique: true});
-    coll.insert({_id: 1, x: "init"});
+// Scenario 2: Three operations, first two should run, second should fail.
+assert.eq(0, coll.find().count(), "test collection not empty");
+coll.ensureIndex({x: 1}, {unique: true});
+coll.insert({_id: 1, x: "init"});
 
-    var res = db.runCommand({
-        applyOps: [
-            {op: "i", ns: coll.getFullName(), o: {_id: 3, x: "not init"}},
-            {op: "i", ns: coll.getFullName(), o: {_id: 4, x: "init"}},
-            {op: "i", ns: coll.getFullName(), o: {_id: 5, x: "not init again"}},
-        ]
-    });
+var res = db.runCommand({
+    applyOps: [
+        {op: "i", ns: coll.getFullName(), o: {_id: 3, x: "not init"}},
+        {op: "i", ns: coll.getFullName(), o: {_id: 4, x: "init"}},
+        {op: "i", ns: coll.getFullName(), o: {_id: 5, x: "not init again"}},
+    ]
+});
 
-    assert.eq(2, res.applied);
-    assert(res.code);
-    assert(res.errmsg);
-    assert.eq([false, false], res.results);
-    assert.eq(0, res.ok);
+assert.eq(2, res.applied);
+assert(res.code);
+assert(res.errmsg);
+assert.eq([false, false], res.results);
+assert.eq(0, res.ok);
 })();

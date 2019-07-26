@@ -7,7 +7,6 @@
  * index catalog.
  */
 var $config = (function() {
-
     var states = (function() {
         // Picks a random index to drop and recreate.
         function modifyIndices(db, collName) {

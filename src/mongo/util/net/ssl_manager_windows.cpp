@@ -70,8 +70,8 @@ extern SSLManagerInterface* theSSLManager;
 namespace {
 
 /**
-* Free a Certificate Context.
-*/
+ * Free a Certificate Context.
+ */
 struct CERTFree {
     void operator()(const CERT_CONTEXT* p) noexcept {
         if (p) {
@@ -83,8 +83,8 @@ struct CERTFree {
 using UniqueCertificate = std::unique_ptr<const CERT_CONTEXT, CERTFree>;
 
 /**
-* Free a CRL Handle
-*/
+ * Free a CRL Handle
+ */
 struct CryptCRLFree {
     void operator()(const CRL_CONTEXT* p) noexcept {
         if (p) {
@@ -97,8 +97,8 @@ using UniqueCRL = std::unique_ptr<const CRL_CONTEXT, CryptCRLFree>;
 
 
 /**
-* Free a Certificate Chain Context
-*/
+ * Free a Certificate Chain Context
+ */
 struct CryptCertChainFree {
     void operator()(const CERT_CHAIN_CONTEXT* p) noexcept {
         if (p) {
@@ -111,10 +111,10 @@ using UniqueCertChain = std::unique_ptr<const CERT_CHAIN_CONTEXT, CryptCertChain
 
 
 /**
-* A simple generic class to manage Windows handle like things. Behaves similiar to std::unique_ptr.
-*
-* Only supports move.
-*/
+ * A simple generic class to manage Windows handle like things. Behaves similiar to std::unique_ptr.
+ *
+ * Only supports move.
+ */
 template <typename HandleT, class Deleter>
 class AutoHandle {
 public:
@@ -157,8 +157,8 @@ private:
 };
 
 /**
-* Free a HCRYPTPROV  Handle
-*/
+ * Free a HCRYPTPROV  Handle
+ */
 struct CryptProviderFree {
     void operator()(HCRYPTPROV const h) noexcept {
         if (h) {
@@ -170,8 +170,8 @@ struct CryptProviderFree {
 using UniqueCryptProvider = AutoHandle<HCRYPTPROV, CryptProviderFree>;
 
 /**
-* Free a HCRYPTKEY  Handle
-*/
+ * Free a HCRYPTKEY  Handle
+ */
 struct CryptKeyFree {
     void operator()(HCRYPTKEY const h) noexcept {
         if (h) {
@@ -184,7 +184,7 @@ using UniqueCryptKey = AutoHandle<HCRYPTKEY, CryptKeyFree>;
 
 /**
  * Free a CERTSTORE Handle
-*/
+ */
 struct CertStoreFree {
     void operator()(HCERTSTORE const p) noexcept {
         if (p) {
@@ -199,8 +199,8 @@ struct CertStoreFree {
 using UniqueCertStore = AutoHandle<HCERTSTORE, CertStoreFree>;
 
 /**
-* Free a HCERTCHAINENGINE Handle
-*/
+ * Free a HCERTCHAINENGINE Handle
+ */
 struct CertChainEngineFree {
     void operator()(HCERTCHAINENGINE const p) noexcept {
         if (p) {
@@ -816,8 +816,8 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
         // Use the the log file if possible
         if (!serverGlobalParams.logpath.empty()) {
             static AtomicWord<int> counter{0};
-            std::string keyContainerName = str::stream() << serverGlobalParams.logpath
-                                                         << counter.fetchAndAdd(1);
+            std::string keyContainerName = str::stream()
+                << serverGlobalParams.logpath << counter.fetchAndAdd(1);
             wstr = toNativeString(keyContainerName.c_str());
         } else {
             auto us = UUID::gen().toString();
@@ -846,8 +846,8 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
 
             } else {
                 return Status(ErrorCodes::InvalidSSLConfiguration,
-                              str::stream() << "CryptAcquireContextW failed "
-                                            << errnoWithDescription(gle));
+                              str::stream()
+                                  << "CryptAcquireContextW failed " << errnoWithDescription(gle));
             }
         }
     } else {
@@ -857,8 +857,8 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
         if (!ret) {
             DWORD gle = GetLastError();
             return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "CryptAcquireContextW failed  "
-                                        << errnoWithDescription(gle));
+                          str::stream()
+                              << "CryptAcquireContextW failed  " << errnoWithDescription(gle));
         }
     }
     UniqueCryptProvider cryptProvider(hProv);
@@ -1013,8 +1013,8 @@ Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
         if (!ret) {
             DWORD gle = GetLastError();
             return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "CertAddCRLContextToStore Failed  "
-                                        << errnoWithDescription(gle));
+                          str::stream()
+                              << "CertAddCRLContextToStore Failed  " << errnoWithDescription(gle));
         }
     }
 
@@ -1061,8 +1061,7 @@ StatusWith<UniqueCertificate> loadCertificateSelectorFromStore(
         DWORD gle = GetLastError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       str::stream() << "CertOpenStore failed to open store 'My' from '" << storeName
-                                    << "': "
-                                    << errnoWithDescription(gle));
+                                    << "': " << errnoWithDescription(gle));
     }
 
     UniqueCertStore storeHolder(store);
@@ -1082,11 +1081,8 @@ StatusWith<UniqueCertificate> loadCertificateSelectorFromStore(
                 ErrorCodes::InvalidSSLConfiguration,
                 str::stream()
                     << "CertFindCertificateInStore failed to find cert with subject name '"
-                    << selector.subject.c_str()
-                    << "' in 'My' store in '"
-                    << storeName
-                    << "': "
-                    << errnoWithDescription(gle));
+                    << selector.subject.c_str() << "' in 'My' store in '" << storeName
+                    << "': " << errnoWithDescription(gle));
         }
 
         return UniqueCertificate(cert);
@@ -1106,10 +1102,8 @@ StatusWith<UniqueCertificate> loadCertificateSelectorFromStore(
                           str::stream()
                               << "CertFindCertificateInStore failed to find cert with thumbprint '"
                               << toHex(selector.thumbprint.data(), selector.thumbprint.size())
-                              << "' in 'My' store in '"
-                              << storeName
-                              << "': "
-                              << errnoWithDescription(gle));
+                              << "' in 'My' store in '" << storeName
+                              << "': " << errnoWithDescription(gle));
         }
 
         return UniqueCertificate(cert);
@@ -1636,8 +1630,8 @@ Status validatePeerCertificate(const std::string& remoteHost,
     if (!ret) {
         DWORD gle = GetLastError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "CertGetCertificateChain failed: "
-                                    << errnoWithDescription(gle));
+                      str::stream()
+                          << "CertGetCertificateChain failed: " << errnoWithDescription(gle));
     }
 
     UniqueCertChain certChainHolder(chainContext);
@@ -1761,8 +1755,8 @@ StatusWith<TLSVersion> mapTLSVersion(PCtxtHandle ssl) {
 
     if (ss != SEC_E_OK) {
         return Status(ErrorCodes::SSLHandshakeFailed,
-                      str::stream() << "QueryContextAttributes for connection info failed with"
-                                    << ss);
+                      str::stream()
+                          << "QueryContextAttributes for connection info failed with" << ss);
     }
 
     switch (connInfo.dwProtocol) {

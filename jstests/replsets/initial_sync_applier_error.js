@@ -10,47 +10,47 @@
  */
 
 (function() {
-    "use strict";
-    load("jstests/libs/check_log.js");
+"use strict";
+load("jstests/libs/check_log.js");
 
-    var name = 'initial_sync_applier_error';
-    var replSet = new ReplSetTest({
-        name: name,
-        nodes: [{}, {rsConfig: {arbiterOnly: true}}],
-    });
+var name = 'initial_sync_applier_error';
+var replSet = new ReplSetTest({
+    name: name,
+    nodes: [{}, {rsConfig: {arbiterOnly: true}}],
+});
 
-    replSet.startSet();
-    replSet.initiate();
-    var primary = replSet.getPrimary();
+replSet.startSet();
+replSet.initiate();
+var primary = replSet.getPrimary();
 
-    var coll = primary.getDB('test').getCollection(name);
-    assert.writeOK(coll.insert({_id: 0, content: "hi"}));
+var coll = primary.getDB('test').getCollection(name);
+assert.writeOK(coll.insert({_id: 0, content: "hi"}));
 
-    // Add a secondary node but make it hang after retrieving the last op on the source
-    // but before copying databases.
-    var secondary = replSet.add({setParameter: "numInitialSyncAttempts=2"});
-    secondary.setSlaveOk();
+// Add a secondary node but make it hang after retrieving the last op on the source
+// but before copying databases.
+var secondary = replSet.add({setParameter: "numInitialSyncAttempts=2"});
+secondary.setSlaveOk();
 
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
-    replSet.reInitiate();
+assert.commandWorked(secondary.getDB('admin').runCommand(
+    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
+replSet.reInitiate();
 
-    // Wait for fail point message to be logged.
-    checkLog.contains(secondary,
-                      'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
+// Wait for fail point message to be logged.
+checkLog.contains(secondary,
+                  'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
 
-    var newCollName = name + '_2';
-    assert.commandWorked(coll.renameCollection(newCollName, true));
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
+var newCollName = name + '_2';
+assert.commandWorked(coll.renameCollection(newCollName, true));
+assert.commandWorked(secondary.getDB('admin').runCommand(
+    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
 
-    checkLog.contains(secondary, 'initial sync done');
+checkLog.contains(secondary, 'initial sync done');
 
-    replSet.awaitReplication();
-    replSet.awaitSecondaryNodes();
+replSet.awaitReplication();
+replSet.awaitSecondaryNodes();
 
-    assert.eq(0, secondary.getDB('test').getCollection(name).count());
-    assert.eq(1, secondary.getDB('test').getCollection(newCollName).count());
-    assert.eq("hi", secondary.getDB('test').getCollection(newCollName).findOne({_id: 0}).content);
-    replSet.stopSet();
+assert.eq(0, secondary.getDB('test').getCollection(name).count());
+assert.eq(1, secondary.getDB('test').getCollection(newCollName).count());
+assert.eq("hi", secondary.getDB('test').getCollection(newCollName).findOne({_id: 0}).content);
+replSet.stopSet();
 })();

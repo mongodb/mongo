@@ -46,9 +46,9 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::endl;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 namespace dps = ::mongo::dotted_path_support;

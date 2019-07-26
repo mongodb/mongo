@@ -17,28 +17,28 @@
 load("jstests/noPassthrough/libs/backup_restore.js");
 
 (function() {
-    "use strict";
+"use strict";
 
-    // Grab the storage engine, default is wiredTiger
-    var storageEngine = jsTest.options().storageEngine || "wiredTiger";
+// Grab the storage engine, default is wiredTiger
+var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
-    // Skip this test if not running with the "wiredTiger" storage engine.
-    if (storageEngine !== 'wiredTiger') {
-        jsTest.log('Skipping test because storageEngine is not "wiredTiger"');
-        return;
-    }
+// Skip this test if not running with the "wiredTiger" storage engine.
+if (storageEngine !== 'wiredTiger') {
+    jsTest.log('Skipping test because storageEngine is not "wiredTiger"');
+    return;
+}
 
-    // Skip this test if running with --nojournal and WiredTiger.
-    if (jsTest.options().noJournal) {
-        print("Skipping test because running WiredTiger without journaling isn't a valid" +
-              " replica set configuration");
-        return;
-    }
+// Skip this test if running with --nojournal and WiredTiger.
+if (jsTest.options().noJournal) {
+    print("Skipping test because running WiredTiger without journaling isn't a valid" +
+          " replica set configuration");
+    return;
+}
 
-    // if rsync is not available on the host, then this test is skipped
-    if (!runProgram('bash', '-c', 'which rsync')) {
-        new BackupRestoreTest({backup: 'rolling', clientTime: 30000}).run();
-    } else {
-        jsTestLog("Skipping test for " + storageEngine + ' rolling');
-    }
+// if rsync is not available on the host, then this test is skipped
+if (!runProgram('bash', '-c', 'which rsync')) {
+    new BackupRestoreTest({backup: 'rolling', clientTime: 30000}).run();
+} else {
+    jsTestLog("Skipping test for " + storageEngine + ' rolling');
+}
 }());

@@ -221,17 +221,17 @@ private:
     ReplicationProcess* _replicationProcess;
 
     /**
-      * All member variables are labeled with one of the following codes indicating the
-      * synchronization rules for accessing them:
-      *
-      * (PR) Completely private to BackgroundSync. Can be read or written to from within the main
-      *      BackgroundSync thread without synchronization. Shouldn't be accessed outside of this
-      *      thread.
-      *
-      * (S)  Self-synchronizing; access in any way from any context.
-      *
-      * (M)  Reads and writes guarded by _mutex
-      *
+     * All member variables are labeled with one of the following codes indicating the
+     * synchronization rules for accessing them:
+     *
+     * (PR) Completely private to BackgroundSync. Can be read or written to from within the main
+     *      BackgroundSync thread without synchronization. Shouldn't be accessed outside of this
+     *      thread.
+     *
+     * (S)  Self-synchronizing; access in any way from any context.
+     *
+     * (M)  Reads and writes guarded by _mutex
+     *
      */
 
     // Protects member data of BackgroundSync.

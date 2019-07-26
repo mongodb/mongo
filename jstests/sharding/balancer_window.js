@@ -11,83 +11,81 @@
  *    sure that some chunks are moved.
  */
 (function() {
-    'use strict';
+'use strict';
 
-    /**
-     * Simple representation for wall clock time. Hour and minutes should be integers.
-     */
-    var HourAndMinute = function(hour, minutes) {
-        return {
-            /**
-             * Returns a new HourAndMinute object with the amount of hours added.
-             * Amount can be negative.
-             */
-            addHour: function(amount) {
-                var newHour = (hour + amount) % 24;
-                if (newHour < 0) {
-                    newHour += 24;
-                }
-
-                return new HourAndMinute(newHour, minutes);
-            },
-
-            /**
-             * Returns a string representation that is compatible with the format for the balancer
-             * window settings.
-             */
-            toString: function() {
-                var minStr = (minutes < 10) ? ('0' + minutes) : ('' + minutes);
-                var hourStr = (hour < 10) ? ('0' + hour) : ('' + hour);
-                return hourStr + ':' + minStr;
+/**
+ * Simple representation for wall clock time. Hour and minutes should be integers.
+ */
+var HourAndMinute = function(hour, minutes) {
+    return {
+        /**
+         * Returns a new HourAndMinute object with the amount of hours added.
+         * Amount can be negative.
+         */
+        addHour: function(amount) {
+            var newHour = (hour + amount) % 24;
+            if (newHour < 0) {
+                newHour += 24;
             }
-        };
-    };
 
-    var st = new ShardingTest({shards: 2});
-    var configDB = st.s.getDB('config');
-    assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
-    assert.commandWorked(configDB.adminCommand({shardCollection: 'test.user', key: {_id: 1}}));
-
-    for (var x = 0; x < 150; x += 10) {
-        configDB.adminCommand({split: 'test.user', middle: {_id: x}});
-    }
-
-    var shard0Chunks = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
-
-    var startDate = new Date();
-    var hourMinStart = new HourAndMinute(startDate.getHours(), startDate.getMinutes());
-    assert.writeOK(configDB.settings.update({_id: 'balancer'},
-                                            {
-                                              $set: {
-                                                  activeWindow: {
-                                                      start: hourMinStart.addHour(-2).toString(),
-                                                      stop: hourMinStart.addHour(-1).toString()
-                                                  },
-                                              }
-                                            },
-                                            true));
-    st.startBalancer();
-
-    st.waitForBalancer(true, 60000);
-
-    var shard0ChunksAfter =
-        configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
-    assert.eq(shard0Chunks, shard0ChunksAfter);
-
-    assert.writeOK(configDB.settings.update(
-        {_id: 'balancer'},
-        {
-          $set: {
-              activeWindow:
-                  {start: hourMinStart.toString(), stop: hourMinStart.addHour(2).toString()}
-          }
+            return new HourAndMinute(newHour, minutes);
         },
-        true));
 
-    st.waitForBalancer(true, 60000);
+        /**
+         * Returns a string representation that is compatible with the format for the balancer
+         * window settings.
+         */
+        toString: function() {
+            var minStr = (minutes < 10) ? ('0' + minutes) : ('' + minutes);
+            var hourStr = (hour < 10) ? ('0' + hour) : ('' + hour);
+            return hourStr + ':' + minStr;
+        }
+    };
+};
 
-    shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
-    assert.neq(shard0Chunks, shard0ChunksAfter);
+var st = new ShardingTest({shards: 2});
+var configDB = st.s.getDB('config');
+assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
+assert.commandWorked(configDB.adminCommand({shardCollection: 'test.user', key: {_id: 1}}));
 
-    st.stop();
+for (var x = 0; x < 150; x += 10) {
+    configDB.adminCommand({split: 'test.user', middle: {_id: x}});
+}
+
+var shard0Chunks = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
+
+var startDate = new Date();
+var hourMinStart = new HourAndMinute(startDate.getHours(), startDate.getMinutes());
+assert.writeOK(configDB.settings.update({_id: 'balancer'},
+                                        {
+                                            $set: {
+                                                activeWindow: {
+                                                    start: hourMinStart.addHour(-2).toString(),
+                                                    stop: hourMinStart.addHour(-1).toString()
+                                                },
+                                            }
+                                        },
+                                        true));
+st.startBalancer();
+
+st.waitForBalancer(true, 60000);
+
+var shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
+assert.eq(shard0Chunks, shard0ChunksAfter);
+
+assert.writeOK(configDB.settings.update(
+    {_id: 'balancer'},
+    {
+        $set: {
+            activeWindow: {start: hourMinStart.toString(), stop: hourMinStart.addHour(2).toString()}
+        }
+    },
+    true));
+
+st.waitForBalancer(true, 60000);
+
+shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
+assert.neq(shard0Chunks, shard0ChunksAfter);
+
+st.stop();
 })();

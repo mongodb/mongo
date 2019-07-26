@@ -284,8 +284,7 @@ Status appendExplainResults(sharded_agg_helpers::DispatchShardPipelineResults&& 
             auto queryPlannerElement = data["queryPlanner"];
             uassert(51157,
                     str::stream() << "Malformed explain response received from shard " << shardId
-                                  << ": "
-                                  << data.toString(),
+                                  << ": " << data.toString(),
                     queryPlannerElement);
             explain << "queryPlanner" << queryPlannerElement;
             if (auto executionStatsElement = data["executionStats"]) {
@@ -739,8 +738,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             !request.getRuntimeConstants());
     uassert(51089,
             str::stream() << "Internal parameter(s) [" << AggregationRequest::kNeedsMergeName
-                          << ", "
-                          << AggregationRequest::kFromMongosName
+                          << ", " << AggregationRequest::kFromMongosName
                           << "] cannot be set to 'true' when sent to mongos",
             !request.needsMerge() && !request.isFromMongos());
     auto executionNsRoutingInfoStatus =

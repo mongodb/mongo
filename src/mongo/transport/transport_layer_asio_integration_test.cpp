@@ -65,9 +65,10 @@ TEST(TransportLayerASIO, HTTPRequestGetsHTTPError) {
     log() << "Sending HTTP request";
     std::string httpReq = str::stream() << "GET /\r\n"
                                            "Host: "
-                                        << server << "\r\n"
-                                                     "User-Agent: MongoDB Integration test\r\n"
-                                                     "Accept: */*";
+                                        << server
+                                        << "\r\n"
+                                           "User-Agent: MongoDB Integration test\r\n"
+                                           "Accept: */*";
     asio::write(socket, asio::buffer(httpReq.data(), httpReq.size()));
 
     log() << "Waiting for response";

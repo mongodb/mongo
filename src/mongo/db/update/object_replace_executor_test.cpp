@@ -42,8 +42,8 @@ namespace mongo {
 namespace {
 
 using ObjectReplaceExecutorTest = UpdateNodeTest;
-using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
+using mongo::mutablebson::Element;
 
 TEST_F(ObjectReplaceExecutorTest, Noop) {
     auto obj = fromjson("{a: 1, b: 2}");

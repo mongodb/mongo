@@ -96,5 +96,5 @@ extern stdx::mutex& mongoProgramOutputMutex;
 // Helper to tell if a file exists cross platform
 // TODO: Remove this when we have a cross platform file utility library
 bool fileExists(const std::string& file);
-}
-}
+}  // namespace shell_utils
+}  // namespace mongo

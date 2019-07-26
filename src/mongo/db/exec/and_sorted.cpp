@@ -38,8 +38,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::numeric_limits;
+using std::unique_ptr;
 using std::vector;
 
 // static

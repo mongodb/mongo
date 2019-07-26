@@ -41,14 +41,14 @@ REGISTER_DOCUMENT_SOURCE(planCacheStats,
 
 boost::intrusive_ptr<DocumentSource> DocumentSourcePlanCacheStats::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(
-        ErrorCodes::FailedToParse,
-        str::stream() << kStageName << " value must be an object. Found: " << typeName(spec.type()),
-        spec.type() == BSONType::Object);
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << kStageName
+                          << " value must be an object. Found: " << typeName(spec.type()),
+            spec.type() == BSONType::Object);
 
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << kStageName << " parameters object must be empty. Found: "
-                          << typeName(spec.type()),
+            str::stream() << kStageName
+                          << " parameters object must be empty. Found: " << typeName(spec.type()),
             spec.embeddedObject().isEmpty());
 
     uassert(50932,

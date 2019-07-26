@@ -19,7 +19,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');          // for extendW
 load('jstests/concurrency/fsm_workloads/map_reduce_replace.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.states.remove = function remove(db, collName) {
         for (var i = 0; i < 20; ++i) {
             var res = db[collName].remove({value: {$gte: Random.randInt(this.numDocs / 10)}},

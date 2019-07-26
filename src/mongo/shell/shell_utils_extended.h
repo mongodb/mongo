@@ -37,4 +37,4 @@ class Scope;
 namespace shell_utils {
 void installShellUtilsExtended(Scope& scope);
 }
-}
+}  // namespace mongo

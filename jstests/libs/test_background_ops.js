@@ -6,7 +6,6 @@
  * Allows synchronization between background ops and the test operations
  */
 var waitForLock = function(mongo, name) {
-
     var ts = new ObjectId();
     var lockColl = mongo.getCollection("config.testLocks");
 
@@ -32,13 +31,13 @@ var waitForLock = function(mongo, name) {
         return gleObj.n == 1 || gleObj.updatedExisting;
     }, "could not acquire lock", 30 * 1000, 100);
 
-    print("Acquired lock " + tojson({_id: name, ts: ts}) + " curr : " +
-          tojson(lockColl.findOne({_id: name})));
+    print("Acquired lock " + tojson({_id: name, ts: ts}) +
+          " curr : " + tojson(lockColl.findOne({_id: name})));
 
     // Set the state back to 0
     var unlock = function() {
-        print("Releasing lock " + tojson({_id: name, ts: ts}) + " curr : " +
-              tojson(lockColl.findOne({_id: name})));
+        print("Releasing lock " + tojson({_id: name, ts: ts}) +
+              " curr : " + tojson(lockColl.findOne({_id: name})));
         lockColl.update({_id: name, ts: ts}, {$set: {state: 0}});
     };
 
@@ -101,7 +100,6 @@ function startParallelShell(jsCode, port) {
 }
 
 startParallelOps = function(mongo, proc, args, context) {
-
     var procName = proc.name + "-" + new ObjectId();
     var seed = new ObjectId(new ObjectId().valueOf().split("").reverse().join(""))
                    .getTimestamp()
@@ -121,7 +119,6 @@ startParallelOps = function(mongo, proc, args, context) {
         setResult: setResult,
 
         setup: function(context, stored) {
-
             waitForLock = function() {
                 return context.waitForLock(db.getMongo(), context.procName);
             };
@@ -138,7 +135,6 @@ startParallelOps = function(mongo, proc, args, context) {
     };
 
     var bootstrapper = function(stored) {
-
         var procContext = stored.procContext;
         eval("procContext = " + procContext);
         procContext.setup(procContext, stored);
@@ -147,7 +143,7 @@ startParallelOps = function(mongo, proc, args, context) {
         eval("contexts = " + contexts);
 
         for (var i = 0; i < contexts.length; i++) {
-            if (typeof(contexts[i]) != "undefined") {
+            if (typeof (contexts[i]) != "undefined") {
                 // Evaluate all contexts
                 contexts[i](procContext);
             }
@@ -188,8 +184,11 @@ startParallelOps = function(mongo, proc, args, context) {
 
     var bootstrapStartup = "{ var procName = '" + procName + "'; " +
         "var stored = db.getMongo().getCollection( '" + testDataColl + "' )" +
-        ".findOne({ _id : procName }); " + "var bootstrapper = stored.bootstrapper; " +
-        "eval( 'bootstrapper = ' + bootstrapper ); " + "bootstrapper( stored ); " + "}";
+        ".findOne({ _id : procName }); " +
+        "var bootstrapper = stored.bootstrapper; " +
+        "eval( 'bootstrapper = ' + bootstrapper ); " +
+        "bootstrapper( stored ); " +
+        "}";
 
     // Save the global db object if it exists, so that we can restore it after starting the parallel
     // shell.
@@ -236,7 +235,6 @@ startParallelOps = function(mongo, proc, args, context) {
 };
 
 var RandomFunctionContext = function(context) {
-
     Random.srand(context.seed);
 
     Random.randBool = function() {
@@ -244,7 +242,6 @@ var RandomFunctionContext = function(context) {
     };
 
     Random.randInt = function(min, max) {
-
         if (max == undefined) {
             max = min;
             min = 0;
@@ -254,7 +251,6 @@ var RandomFunctionContext = function(context) {
     };
 
     Random.randShardKey = function() {
-
         var numFields = 2;  // Random.randInt(1, 3)
 
         var key = {};
@@ -267,7 +263,6 @@ var RandomFunctionContext = function(context) {
     };
 
     Random.randShardKeyValue = function(shardKey) {
-
         var keyValue = {};
         for (field in shardKey) {
             keyValue[field] = Random.randInt(1, 100);
@@ -277,7 +272,6 @@ var RandomFunctionContext = function(context) {
     };
 
     Random.randCluster = function() {
-
         var numShards = 2;  // Random.randInt( 1, 10 )
         var rs = false;     // Random.randBool()
         var st = new ShardingTest({shards: numShards, mongos: 4, other: {rs: rs}});

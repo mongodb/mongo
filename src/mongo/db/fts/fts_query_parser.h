@@ -84,5 +84,5 @@ private:
     bool _previousWhiteSpace;
     const StringData _raw;
 };
-}
-}
+}  // namespace fts
+}  // namespace mongo

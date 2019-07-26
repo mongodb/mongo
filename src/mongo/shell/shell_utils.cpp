@@ -164,10 +164,9 @@ size_t skipOverString(const std::string& code, size_t start, char quote) {
         // that the escaping backslash is not itself escaped.  Comparisons of start and pos
         // are to keep us from reading beyond the beginning of the quoted string.
         //
-        if (start == pos || code[pos - 1] != '\\' ||  // previous char was backslash
-            start == pos - 1 ||
-            code[pos - 2] == '\\'  // char before backslash was not another
-            ) {
+        if (start == pos || code[pos - 1] != '\\' ||   // previous char was backslash
+            start == pos - 1 || code[pos - 2] == '\\'  // char before backslash was not another
+        ) {
             break;  // The quote we found was not preceded by an unescaped backslash; it is real
         }
         ++pos;  // The quote we found was escaped with backslash, so it doesn't count

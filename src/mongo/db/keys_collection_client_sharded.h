@@ -49,8 +49,8 @@ public:
                                                                bool useMajority) override;
 
     /**
-    * Directly inserts a key document to the storage
-    */
+     * Directly inserts a key document to the storage
+     */
     Status insertNewKey(OperationContext* opCtx, const BSONObj& doc) override;
 
     bool supportsMajorityReads() const final {

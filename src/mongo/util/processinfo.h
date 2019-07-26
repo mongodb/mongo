@@ -245,4 +245,4 @@ private:
 };
 
 bool writePidFile(const std::string& path);
-}
+}  // namespace mongo

@@ -58,4 +58,4 @@ TEST(ConditionVariable, BasicSingleThread) {
     cv.notify_one();
     worker.join();
 }
-}
+}  // namespace mongo

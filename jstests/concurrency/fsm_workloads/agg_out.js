@@ -19,7 +19,6 @@ load('jstests/concurrency/fsm_workloads/agg_base.js');             // for $confi
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 
 var $config = extendWorkload($config, function($config, $super) {
-
     // Use a smaller document size, but more iterations. The smaller documents will ensure each
     // operation is faster, giving us time to do more operations and thus increasing the likelihood
     // that any two operations will be happening concurrently.

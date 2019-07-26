@@ -144,8 +144,7 @@ StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& option
             // Return error on first unrecognized field.
             return StatusWith<std::string>(ErrorCodes::InvalidOptions,
                                            str::stream() << '\'' << elem.fieldNameStringData()
-                                                         << '\''
-                                                         << " is not a supported option.");
+                                                         << '\'' << " is not a supported option.");
         }
     }
     return StatusWith<std::string>(ss.str());
@@ -337,10 +336,10 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
             warning() << msg;
             fullResults->warnings.push_back(msg);
         } else if (err) {
-            std::string msg = str::stream() << "verify() returned " << wiredtiger_strerror(err)
-                                            << ". "
-                                            << "This indicates structural damage. "
-                                            << "Not examining individual index entries.";
+            std::string msg = str::stream()
+                << "verify() returned " << wiredtiger_strerror(err) << ". "
+                << "This indicates structural damage. "
+                << "Not examining individual index entries.";
             error() << msg;
             fullResults->errors.push_back(msg);
             fullResults->valid = false;
@@ -538,12 +537,11 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
         ctx, uri, kMinimumIndexVersion, kMaximumIndexVersion);
     if (!version.isOK()) {
         Status versionStatus = version.getStatus();
-        Status indexVersionStatus(
-            ErrorCodes::UnsupportedFormat,
-            str::stream() << versionStatus.reason() << " Index: {name: " << desc->indexName()
-                          << ", ns: "
-                          << desc->parentNS()
-                          << "} - version either too old or too new for this mongod.");
+        Status indexVersionStatus(ErrorCodes::UnsupportedFormat,
+                                  str::stream()
+                                      << versionStatus.reason() << " Index: {name: "
+                                      << desc->indexName() << ", ns: " << desc->parentNS()
+                                      << "} - version either too old or too new for this mongod.");
         fassertFailedWithStatusNoTrace(28579, indexVersionStatus);
     }
     _dataFormatVersion = version.getValue();
@@ -553,14 +551,13 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                 _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2
             ? Status::OK()
             : Status(ErrorCodes::UnsupportedFormat,
-                     str::stream() << "Index: {name: " << desc->indexName() << ", ns: "
-                                   << desc->parentNS()
-                                   << "} has incompatible format version: "
-                                   << _dataFormatVersion
-                                   << ". MongoDB 4.2 onwards, WT secondary unique indexes use "
-                                      "either format version 11 or 12. See "
-                                      "https://dochub.mongodb.org/core/upgrade-4.2-procedures for "
-                                      "detailed instructions on upgrading the index format.");
+                     str::stream()
+                         << "Index: {name: " << desc->indexName() << ", ns: " << desc->parentNS()
+                         << "} has incompatible format version: " << _dataFormatVersion
+                         << ". MongoDB 4.2 onwards, WT secondary unique indexes use "
+                            "either format version 11 or 12. See "
+                            "https://dochub.mongodb.org/core/upgrade-4.2-procedures for "
+                            "detailed instructions on upgrading the index format.");
         fassertNoTrace(31179, versionStatus);
     }
 

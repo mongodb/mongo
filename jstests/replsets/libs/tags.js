@@ -56,56 +56,57 @@ var TagsTest = function(options) {
             protocolVersion: 1,
             members: [
                 {
-                  _id: 0,
-                  host: nodes[0],
-                  tags: {
-                      server: '0',
-                      dc: 'ny',
-                      ny: '1',
-                      rack: 'ny.rk1',
-                  },
+                    _id: 0,
+                    host: nodes[0],
+                    tags: {
+                        server: '0',
+                        dc: 'ny',
+                        ny: '1',
+                        rack: 'ny.rk1',
+                    },
                 },
                 {
-                  _id: 1,
-                  host: nodes[1],
-                  tags: {
-                      server: '1',
-                      dc: 'ny',
-                      ny: '2',
-                      rack: 'ny.rk1',
-                  },
+                    _id: 1,
+                    host: nodes[1],
+                    tags: {
+                        server: '1',
+                        dc: 'ny',
+                        ny: '2',
+                        rack: 'ny.rk1',
+                    },
                 },
                 {
-                  _id: 2,
-                  host: nodes[2],
-                  tags: {
-                      server: '2',
-                      dc: 'ny',
-                      ny: '3',
-                      rack: 'ny.rk2', 2: 'this',
-                  },
+                    _id: 2,
+                    host: nodes[2],
+                    tags: {
+                        server: '2',
+                        dc: 'ny',
+                        ny: '3',
+                        rack: 'ny.rk2',
+                        2: 'this',
+                    },
                 },
                 {
-                  _id: 3,
-                  host: nodes[3],
-                  priority: 0,
-                  tags: {
-                      server: '3',
-                      dc: 'sf',
-                      sf: '1',
-                      rack: 'sf.rk1',
-                  },
+                    _id: 3,
+                    host: nodes[3],
+                    priority: 0,
+                    tags: {
+                        server: '3',
+                        dc: 'sf',
+                        sf: '1',
+                        rack: 'sf.rk1',
+                    },
                 },
                 {
-                  _id: 4,
-                  host: nodes[4],
-                  priority: 0,
-                  tags: {
-                      server: '4',
-                      dc: 'sf',
-                      sf: '2',
-                      rack: 'sf.rk2',
-                  },
+                    _id: 4,
+                    host: nodes[4],
+                    priority: 0,
+                    tags: {
+                        server: '4',
+                        dc: 'sf',
+                        sf: '2',
+                        rack: 'sf.rk2',
+                    },
                 },
             ],
             settings: {
@@ -171,13 +172,12 @@ var TagsTest = function(options) {
                 primary.forceWriteMode(options.forceWriteMode);
             }
             var writeConcern = {
-                writeConcern:
-                    {w: expectedWritableNodesCount, wtimeout: replTest.kDefaultTimeoutMS}
+                writeConcern: {w: expectedWritableNodesCount, wtimeout: replTest.kDefaultTimeoutMS}
             };
             assert.writeOK(primary.getDB('foo').bar.insert({x: 100}, writeConcern));
             jsTestLog('ensurePrimary - Successfully written a document to primary node (' +
-                      replTest.nodes[nodeId].host + ') using a write concern of w:' +
-                      expectedWritableNodesCount);
+                      replTest.nodes[nodeId].host +
+                      ') using a write concern of w:' + expectedWritableNodesCount);
             return primary;
         };
 
@@ -308,5 +308,4 @@ var TagsTest = function(options) {
 
         replTest.stopSet();
     };
-
 };

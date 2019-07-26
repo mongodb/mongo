@@ -347,12 +347,14 @@ Status initializeSharding(OperationContext* opCtx) {
     auto targeterFactoryPtr = targeterFactory.get();
 
     ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr](
-        const ShardId& shardId, const ConnectionString& connStr) {
+                                                   const ShardId& shardId,
+                                                   const ConnectionString& connStr) {
         return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
     };
 
     ShardFactory::BuilderCallable masterBuilder = [targeterFactoryPtr](
-        const ShardId& shardId, const ConnectionString& connStr) {
+                                                      const ShardId& shardId,
+                                                      const ConnectionString& connStr) {
         return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
     };
 
@@ -426,7 +428,7 @@ public:
     void onConfirmedSet(const State& state) final {
         auto connStr = state.connStr;
 
-        auto fun = [ serviceContext = _serviceContext, connStr ](auto args) {
+        auto fun = [serviceContext = _serviceContext, connStr](auto args) {
             if (ErrorCodes::isCancelationError(args.status.code())) {
                 return;
             }

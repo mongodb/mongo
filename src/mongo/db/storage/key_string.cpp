@@ -1315,9 +1315,9 @@ void toBsonValue(uint8_t ctype,
             break;
         }
 
-        //
-        // Numerics
-        //
+            //
+            // Numerics
+            //
 
         case CType::kNumericNaN: {
             auto type = typeBits->readNumeric();
@@ -1430,7 +1430,7 @@ void toBsonValue(uint8_t ctype,
         case CType::kNumericNegativeSmallMagnitude:
             inverted = !inverted;
             isNegative = true;
-        // fallthrough (format is the same as positive, but inverted)
+            // fallthrough (format is the same as positive, but inverted)
 
         case CType::kNumericPositiveSmallMagnitude: {
             const uint8_t originalType = typeBits->readNumeric();
@@ -1561,7 +1561,7 @@ void toBsonValue(uint8_t ctype,
         case CType::kNumericNegative1ByteInt:
             inverted = !inverted;
             isNegative = true;
-        // fallthrough (format is the same as positive, but inverted)
+            // fallthrough (format is the same as positive, but inverted)
 
         case CType::kNumericPositive1ByteInt:
         case CType::kNumericPositive2ByteInt:
@@ -1795,9 +1795,9 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
             break;
         }
 
-        //
-        // Numerics
-        //
+            //
+            // Numerics
+            //
 
         case CType::kNumericNaN: {
             break;
@@ -1836,7 +1836,7 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
         case CType::kNumericNegativeSmallMagnitude:
             inverted = !inverted;
             isNegative = true;
-        // fallthrough (format is the same as positive, but inverted)
+            // fallthrough (format is the same as positive, but inverted)
 
         case CType::kNumericPositiveSmallMagnitude: {
             uint64_t encoded = readType<uint64_t>(reader, inverted);
@@ -1898,7 +1898,7 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
         case CType::kNumericNegative1ByteInt:
             inverted = !inverted;
             isNegative = true;
-        // fallthrough (format is the same as positive, but inverted)
+            // fallthrough (format is the same as positive, but inverted)
 
         case CType::kNumericPositive1ByteInt:
         case CType::kNumericPositive2ByteInt:

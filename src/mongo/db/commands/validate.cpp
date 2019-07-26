@@ -212,4 +212,4 @@ public:
     }
 
 } validateCmd;
-}
+}  // namespace mongo

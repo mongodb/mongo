@@ -81,8 +81,7 @@ OplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
     } else {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "Unknown oplog entry command type: " << commandString
-                                << " Object field: "
-                                << redact(objectField));
+                                << " Object field: " << redact(objectField));
     }
     MONGO_UNREACHABLE;
 }
@@ -202,7 +201,7 @@ StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {
     MONGO_UNREACHABLE;
 }
 
-void MutableOplogEntry::setOpTime(const OpTime& opTime)& {
+void MutableOplogEntry::setOpTime(const OpTime& opTime) & {
     setTimestamp(opTime.getTimestamp());
     if (opTime.getTerm() != OpTime::kUninitializedTerm)
         setTerm(opTime.getTerm());

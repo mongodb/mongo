@@ -1131,7 +1131,7 @@ NOINLINE_DECL auto ExecutorFuture<T>::wrapCBHelper(unique_function<Sig>&& func) 
         exec = _exec  // can't move this!
     ](auto&&... args) mutable noexcept
         ->Future<UnwrappedType<decltype(func(std::forward<decltype(args)>(args)...))>> {
-        auto[promise, future] = makePromiseFuture<
+        auto [promise, future] = makePromiseFuture<
             UnwrappedType<decltype(func(std::forward<decltype(args)>(args)...))>>();
 
         exec->schedule([

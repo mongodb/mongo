@@ -658,12 +658,11 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
 
     BSONObj saslFirstCommandPrefix =
         BSON("copydbsaslstart" << 1 << "fromhost" << fromHost << "fromdb" << fromDb
-                               << saslCommandMechanismFieldName
-                               << "SCRAM-SHA-1");
+                               << saslCommandMechanismFieldName << "SCRAM-SHA-1");
 
-    BSONObj saslFollowupCommandPrefix = BSON(
-        "copydb" << 1 << "fromhost" << fromHost << "fromdb" << fromDb << "todb" << toDb << "slaveOk"
-                 << slaveOk);
+    BSONObj saslFollowupCommandPrefix =
+        BSON("copydb" << 1 << "fromhost" << fromHost << "fromdb" << fromDb << "todb" << toDb
+                      << "slaveOk" << slaveOk);
 
     BSONObj saslCommandPrefix = saslFirstCommandPrefix;
     BSONObj inputObj = BSON(saslCommandPayloadFieldName << "");

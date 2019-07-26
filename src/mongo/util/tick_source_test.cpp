@@ -52,5 +52,5 @@ TEST(TickSourceTest, TicksToDurationConversion) {
     tsMicros.reset(1);
     ASSERT_EQ(tsMicros.ticksTo<Microseconds>(tsMicros.getTicks()).count(), 1);
 }
-}
+}  // namespace
 }  // namespace mongo

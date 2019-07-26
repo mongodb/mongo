@@ -248,7 +248,6 @@ protected:
             SSLPeerInfo::forSession(shared_from_this()) =
                 uassertStatusOK(getSSLManager()->parseAndValidatePeerCertificate(
                     _sslSocket->native_handle(), target.host(), target));
-
         });
     }
 
@@ -354,7 +353,7 @@ private:
         auto headerBuffer = SharedBuffer::allocate(kHeaderSize);
         auto ptr = headerBuffer.get();
         return read(asio::buffer(ptr, kHeaderSize), baton)
-            .then([ headerBuffer = std::move(headerBuffer), this, baton ]() mutable {
+            .then([headerBuffer = std::move(headerBuffer), this, baton]() mutable {
                 if (checkForHTTPRequest(asio::buffer(headerBuffer.get(), kHeaderSize))) {
                     return sendHTTPResponse(baton);
                 }
@@ -383,7 +382,7 @@ private:
 
                 MsgData::View msgView(buffer.get());
                 return read(asio::buffer(msgView.data(), msgView.dataLen()), baton)
-                    .then([ this, buffer = std::move(buffer), msgLen ]() mutable {
+                    .then([this, buffer = std::move(buffer), msgLen]() mutable {
                         if (_isIngressSession) {
                             networkCounter.hitPhysicalIn(msgLen);
                         }

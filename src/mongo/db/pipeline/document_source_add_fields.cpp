@@ -83,4 +83,4 @@ intrusive_ptr<DocumentSource> DocumentSourceAddFields::createFromBson(
 
     return DocumentSourceAddFields::create(elem.Obj(), expCtx, specifiedName);
 }
-}
+}  // namespace mongo

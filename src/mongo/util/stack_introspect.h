@@ -44,4 +44,4 @@ bool inConstructorChain(bool printOffending = false);
  * @return if supported on platform, compile options may still prevent it from working
  */
 bool inConstructorChainSupported();
-}
+}  // namespace mongo

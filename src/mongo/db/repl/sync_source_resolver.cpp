@@ -75,8 +75,7 @@ SyncSourceResolver::SyncSourceResolver(executor::TaskExecutor* taskExecutor,
             str::stream() << "required optime (if provided) must be more recent than last "
                              "fetched optime. requiredOpTime: "
                           << requiredOpTime.toString()
-                          << ", lastOpTimeFetched: "
-                          << lastOpTimeFetched.toString(),
+                          << ", lastOpTimeFetched: " << lastOpTimeFetched.toString(),
             requiredOpTime.isNull() || requiredOpTime > lastOpTimeFetched);
     uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
 }
@@ -172,9 +171,8 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
         kLocalOplogNss.db().toString(),
         BSON("find" << kLocalOplogNss.coll() << "limit" << 1 << "sort" << BSON("$natural" << 1)
                     << "projection"
-                    << BSON(OplogEntryBase::kTimestampFieldName << 1
-                                                                << OplogEntryBase::kTermFieldName
-                                                                << 1)),
+                    << BSON(OplogEntryBase::kTimestampFieldName
+                            << 1 << OplogEntryBase::kTermFieldName << 1)),
         [=](const StatusWith<Fetcher::QueryResponse>& response,
             Fetcher::NextAction*,
             BSONObjBuilder*) {
@@ -414,12 +412,11 @@ Status SyncSourceResolver::_compareRequiredOpTimeWithQueryResponse(
     const auto opTime = oplogEntry.getOpTime();
     if (_requiredOpTime != opTime) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "remote oplog contain entry with matching timestamp "
-                                    << opTime.getTimestamp().toString()
-                                    << " but optime "
-                                    << opTime.toString()
-                                    << " does not "
-                                       "match our required optime");
+                      str::stream()
+                          << "remote oplog contain entry with matching timestamp "
+                          << opTime.getTimestamp().toString() << " but optime " << opTime.toString()
+                          << " does not "
+                             "match our required optime");
     }
     if (_requiredOpTime.getTerm() != opTime.getTerm()) {
         return Status(ErrorCodes::BadValue,
@@ -440,8 +437,7 @@ void SyncSourceResolver::_requiredOpTimeFetcherCallback(
                                str::stream() << "sync source resolver shut down while looking for "
                                                 "required optime "
                                              << _requiredOpTime.toString()
-                                             << " in candidate's oplog: "
-                                             << candidate))
+                                             << " in candidate's oplog: " << candidate))
             .transitional_ignore();
         return;
     }

@@ -20,15 +20,15 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.aggregate = function aggregate(db, collName, connCache) {
         const res = db[collName].aggregate([
             {
-              $project: {
-                  "_id.tid": {$literal: this.tid},
-                  "_id.count": {$literal: this.threadRunCount},
-                  "_id.doc": "$_id"
-              }
+                $project: {
+                    "_id.tid": {$literal: this.tid},
+                    "_id.count": {$literal: this.threadRunCount},
+                    "_id.doc": "$_id"
+                }
             },
             {
-              $merge:
-                  {into: this.collWithMigrations, whenMatched: "fail", whenNotMatched: "insert"}
+                $merge:
+                    {into: this.collWithMigrations, whenMatched: "fail", whenNotMatched: "insert"}
             },
         ]);
 

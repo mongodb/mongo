@@ -299,7 +299,7 @@ void _appendCursorStats(BSONObjBuilder& b) {
     b.appendNumber("totalNoTimeout", cursorStatsOpenNoTimeout.get());
     b.appendNumber("timedOut", cursorStatsTimedOut.get());
 }
-}
+}  // namespace
 
 void startClientCursorMonitor() {
     clientCursorMonitor.go();

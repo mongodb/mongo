@@ -23,11 +23,11 @@ var $config = extendWorkload($config, function($config, $super) {
         const res = db[collName].aggregate([
             {$addFields: {_id: this.tid, count: this.threadRunCount}},
             {
-              $merge: {
-                  into: this.collWithMigrations,
-                  whenMatched: "replace",
-                  whenNotMatched: "insert"
-              }
+                $merge: {
+                    into: this.collWithMigrations,
+                    whenMatched: "replace",
+                    whenNotMatched: "insert"
+                }
             },
         ]);
 

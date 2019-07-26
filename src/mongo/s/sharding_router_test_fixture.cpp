@@ -152,12 +152,14 @@ ShardingTestFixture::ShardingTestFixture() {
     _targeterFactory->addTargeterToReturn(configCS, std::move(configTargeter));
 
     ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr](
-        const ShardId& shardId, const ConnectionString& connStr) {
+                                                   const ShardId& shardId,
+                                                   const ConnectionString& connStr) {
         return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
     };
 
     ShardFactory::BuilderCallable masterBuilder = [targeterFactoryPtr](
-        const ShardId& shardId, const ConnectionString& connStr) {
+                                                      const ShardId& shardId,
+                                                      const ConnectionString& connStr) {
         return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
     };
 
@@ -334,10 +336,8 @@ void ShardingTestFixture::expectConfigCollectionCreate(const HostAndPort& config
             BSON("create" << collName << "capped" << true << "size" << cappedSize << "writeConcern"
                           << BSON("w"
                                   << "majority"
-                                  << "wtimeout"
-                                  << 60000)
-                          << "maxTimeMS"
-                          << 30000);
+                                  << "wtimeout" << 60000)
+                          << "maxTimeMS" << 30000);
         ASSERT_BSONOBJ_EQ(expectedCreateCmd, request.cmdObj);
 
         return response;

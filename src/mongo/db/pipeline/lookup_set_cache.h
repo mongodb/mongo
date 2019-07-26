@@ -47,10 +47,10 @@
 namespace mongo {
 
 using boost::multi_index_container;
-using boost::multi_index::sequenced;
 using boost::multi_index::hashed_unique;
-using boost::multi_index::member;
 using boost::multi_index::indexed_by;
+using boost::multi_index::member;
+using boost::multi_index::sequenced;
 
 /**
  * A least-recently-used cache from key to a vector of values. It does not implement any default

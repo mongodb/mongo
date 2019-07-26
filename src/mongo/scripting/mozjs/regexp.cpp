@@ -37,7 +37,8 @@ namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec RegExpInfo::methods[2] = {
-    MONGO_ATTACH_JS_FUNCTION(toJSON), JS_FS_END,
+    MONGO_ATTACH_JS_FUNCTION(toJSON),
+    JS_FS_END,
 };
 
 const char* const RegExpInfo::className = "RegExp";

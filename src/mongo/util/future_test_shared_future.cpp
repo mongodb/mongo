@@ -67,7 +67,8 @@ TEST(SharedFuture, isReady_shared_TSAN_OK) {
     auto fut = async([&] {
                    done = true;
                    return 1;
-               }).share();
+               })
+                   .share();
     //(void)*const_cast<volatile bool*>(&done);  // Data Race! Uncomment to make sure TSAN works.
     while (!fut.isReady()) {
     }
@@ -183,7 +184,7 @@ TEST(SharedFuture, NoStackOverflow_Destruction) {
                             // Add 100 children that each use 100K of stack space on destruction.
                             for (int i = 0; i < 100; i++) {
                                 collector.push_back(
-                                    shared.thenRunOn(exec).then([x = Evil()]{}).semi());
+                                    shared.thenRunOn(exec).then([x = Evil()] {}).semi());
                             }
 
                             for (auto&& collected : collector) {

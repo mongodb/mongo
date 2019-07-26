@@ -47,8 +47,8 @@ std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj,
     expCtx->setCollator(collator);
     StatusWithMatchExpression status = MatchExpressionParser::parse(obj, std::move(expCtx));
     if (!status.isOK()) {
-        FAIL(str::stream() << "failed to parse query: " << obj.toString() << ". Reason: "
-                           << status.getStatus().toString());
+        FAIL(str::stream() << "failed to parse query: " << obj.toString()
+                           << ". Reason: " << status.getStatus().toString());
     }
     return std::move(status.getValue());
 }

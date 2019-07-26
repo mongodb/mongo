@@ -76,8 +76,8 @@ StatusWith<std::unique_ptr<FTDCFileManager>> FTDCFileManager::create(
         boost::filesystem::create_directories(dir, ec);
         if (ec) {
             return {ErrorCodes::NonExistentPath,
-                    str::stream() << "\"" << dir.generic_string() << "\" could not be created: "
-                                  << ec.message()};
+                    str::stream() << "\"" << dir.generic_string()
+                                  << "\" could not be created: " << ec.message()};
         }
     }
 
@@ -233,9 +233,9 @@ Status FTDCFileManager::trimDirectory(std::vector<boost::filesystem::path>& file
             boost::filesystem::remove(*it, ec);
             if (ec) {
                 return {ErrorCodes::NonExistentPath,
-                        str::stream() << "\"" << (*it).generic_string()
-                                      << "\" could not be removed during trimming: "
-                                      << ec.message()};
+                        str::stream()
+                            << "\"" << (*it).generic_string()
+                            << "\" could not be removed during trimming: " << ec.message()};
             }
         }
     }

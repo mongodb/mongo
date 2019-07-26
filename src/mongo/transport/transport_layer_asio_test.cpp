@@ -236,7 +236,7 @@ public:
 
     void startSession(transport::SessionHandle session) override {
         log() << "Accepted connection from " << session->remote();
-        startWorkerThread([ this, session = std::move(session) ]() mutable {
+        startWorkerThread([this, session = std::move(session)]() mutable {
             log() << "waiting for message";
             session->setTimeout(Milliseconds{500});
             auto status = session->sourceMessage().getStatus();
@@ -332,7 +332,7 @@ class TimeoutSwitchModesSEP : public TimeoutSEP {
 public:
     void startSession(transport::SessionHandle session) override {
         log() << "Accepted connection from " << session->remote();
-        startWorkerThread([ this, session = std::move(session) ]() mutable {
+        startWorkerThread([this, session = std::move(session)]() mutable {
             log() << "waiting for message";
             auto sourceMessage = [&] { return session->sourceMessage().getStatus(); };
 

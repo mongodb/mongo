@@ -273,8 +273,7 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
     for (int tries = 0; tries < 3; ++tries) {
         err = GetAdaptersAddresses(family,
                                    GAA_FLAG_SKIP_ANYCAST |  // only want unicast addrs
-                                       GAA_FLAG_SKIP_MULTICAST |
-                                       GAA_FLAG_SKIP_DNS_SERVER,
+                                       GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER,
                                    nullptr,
                                    adapters,
                                    &adaptersLen);

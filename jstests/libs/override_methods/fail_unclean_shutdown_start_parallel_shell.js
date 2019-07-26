@@ -3,10 +3,10 @@
  * unclean shutdown and won't be restarted when the node is restarted.
  */
 (function() {
-    "use strict";
+"use strict";
 
-    startParallelShell = function(jsCode, port, noConnect) {
-        throw new Error("Cowardly fail if startParallelShell is run with a mongod that had" +
-                        " an unclean shutdown.");
-    };
+startParallelShell = function(jsCode, port, noConnect) {
+    throw new Error("Cowardly fail if startParallelShell is run with a mongod that had" +
+                    " an unclean shutdown.");
+};
 })();

@@ -40,8 +40,8 @@ void logAndBackoff(logger::LogComponent logComponent,
                    logger::LogSeverity logLevel,
                    size_t numAttempts,
                    StringData message) {
-    MONGO_LOG_COMPONENT(logLevel, logComponent) << message
-                                                << ". Retrying, attempt: " << numAttempts;
+    MONGO_LOG_COMPONENT(logLevel, logComponent)
+        << message << ". Retrying, attempt: " << numAttempts;
 
     if (numAttempts < 4) {
         // no-op

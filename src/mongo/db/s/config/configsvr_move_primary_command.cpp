@@ -160,10 +160,9 @@ public:
             if (!toShardStatus.isOK()) {
                 log() << "Could not move database '" << dbname << "' to shard '" << to
                       << causedBy(toShardStatus.getStatus());
-                uassertStatusOKWithContext(
-                    toShardStatus.getStatus(),
-                    str::stream() << "Could not move database '" << dbname << "' to shard '" << to
-                                  << "'");
+                uassertStatusOKWithContext(toShardStatus.getStatus(),
+                                           str::stream() << "Could not move database '" << dbname
+                                                         << "' to shard '" << to << "'");
             }
 
             return toShardStatus.getValue();

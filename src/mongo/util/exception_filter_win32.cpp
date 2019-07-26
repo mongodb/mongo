@@ -178,7 +178,7 @@ LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
     // We won't reach here
     return EXCEPTION_EXECUTE_HANDLER;
 }
-}
+}  // namespace
 
 LPTOP_LEVEL_EXCEPTION_FILTER filtLast = 0;
 
@@ -192,6 +192,6 @@ void setWindowsUnhandledExceptionFilter() {
 
 namespace mongo {
 void setWindowsUnhandledExceptionFilter() {}
-}
+}  // namespace mongo
 
 #endif  // _WIN32

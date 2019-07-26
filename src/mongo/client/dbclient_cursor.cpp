@@ -60,9 +60,9 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::endl;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 namespace {
@@ -256,7 +256,7 @@ void DBClientCursor::requestMore() {
 
     invariant(_scopedHost.size());
     DBClientBase::withConnection_do_not_use(_scopedHost, [&](DBClientBase* conn) {
-        ON_BLOCK_EXIT([&, origClient = _client ] { _client = origClient; });
+        ON_BLOCK_EXIT([&, origClient = _client] { _client = origClient; });
         _client = conn;
         doRequestMore();
     });

@@ -116,9 +116,7 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDu
                             << _idField
                             << " field in order to de-duplicate results, but encountered a "
                                "document without a "
-                            << _idField
-                            << " field: "
-                            << nextInput.getDocument().toString(),
+                            << _idField << " field: " << nextInput.getDocument().toString(),
                         !idField.missing());
 
                 if (_seenDocs.insert(std::move(idField)).second) {
@@ -163,4 +161,4 @@ intrusive_ptr<DocumentSourceSampleFromRandomCursor> DocumentSourceSampleFromRand
         new DocumentSourceSampleFromRandomCursor(expCtx, size, idField, nDocsInCollection));
     return source;
 }
-}  // mongo
+}  // namespace mongo

@@ -76,4 +76,4 @@ intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
     }
     return new DocumentSourceMock(std::move(results));
 }
-}
+}  // namespace mongo

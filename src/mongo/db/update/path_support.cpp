@@ -53,8 +53,8 @@ Status maybePadTo(mutablebson::Element* elemArray, size_t sizeRequired) {
 
         if (toPad > kMaxPaddingAllowed) {
             return Status(ErrorCodes::CannotBackfillArray,
-                          str::stream() << "can't backfill more than " << kMaxPaddingAllowed
-                                        << " elements");
+                          str::stream()
+                              << "can't backfill more than " << kMaxPaddingAllowed << " elements");
         }
 
         for (size_t i = 0; i < toPad; i++) {
@@ -128,10 +128,8 @@ Status findLongestPrefix(const FieldRef& prefix,
         *elemFound = prev;
         return Status(ErrorCodes::PathNotViable,
                       str::stream() << "cannot use the part (" << prefix.getPart(i - 1) << " of "
-                                    << prefix.dottedField()
-                                    << ") to traverse the element ({"
-                                    << curr.toString()
-                                    << "})");
+                                    << prefix.dottedField() << ") to traverse the element ({"
+                                    << curr.toString() << "})");
     } else if (curr.ok()) {
         *idxFound = i - 1;
         *elemFound = curr;
@@ -153,9 +151,7 @@ StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
     if (elemFound.getType() != BSONType::Object && elemFound.getType() != BSONType::Array) {
         return Status(ErrorCodes::PathNotViable,
                       str::stream() << "Cannot create field '" << prefix.getPart(idxFound)
-                                    << "' in element {"
-                                    << elemFound.toString()
-                                    << "}");
+                                    << "' in element {" << elemFound.toString() << "}");
     }
 
     // Sanity check that 'idxField' is an actual part.
@@ -175,9 +171,7 @@ StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
         if (!newIdx) {
             return Status(ErrorCodes::PathNotViable,
                           str::stream() << "Cannot create field '" << prefix.getPart(idxFound)
-                                        << "' in element {"
-                                        << elemFound.toString()
-                                        << "}");
+                                        << "' in element {" << elemFound.toString() << "}");
         }
 
         status = maybePadTo(&elemFound, *newIdx);

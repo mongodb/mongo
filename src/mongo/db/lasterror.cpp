@@ -53,7 +53,7 @@ void appendDupKeyFields(BSONObjBuilder& builder, std::string errMsg) {
     builder.append("ns", collName);
     builder.append("index", indexName);
 }
-}
+}  // namespace
 
 void LastError::reset(bool valid) {
     *this = LastError();

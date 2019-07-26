@@ -123,7 +123,7 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
 
         for (let authoritativeCollMetadata of authoritativeCollMetadataArr) {
             const ns = authoritativeCollMetadata._id;
-            const[dbName, collName] = parseNs(ns);
+            const [dbName, collName] = parseNs(ns);
 
             for (let shardConnString of authoritativeCollMetadata.shardConnStrings) {
                 // A connection the shard may not be cached in ShardingTest if the shard was added

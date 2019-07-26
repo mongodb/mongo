@@ -47,24 +47,24 @@ public:
     using ShardCollectionTypeBase::kUuidFieldName;
 
     // Make getters and setters accessible.
-    using ShardCollectionTypeBase::getNss;
-    using ShardCollectionTypeBase::setNss;
-    using ShardCollectionTypeBase::getUuid;
-    using ShardCollectionTypeBase::setUuid;
-    using ShardCollectionTypeBase::getEpoch;
-    using ShardCollectionTypeBase::setEpoch;
-    using ShardCollectionTypeBase::getKeyPattern;
-    using ShardCollectionTypeBase::setKeyPattern;
     using ShardCollectionTypeBase::getDefaultCollation;
-    using ShardCollectionTypeBase::setDefaultCollation;
-    using ShardCollectionTypeBase::getUnique;
-    using ShardCollectionTypeBase::setUnique;
-    using ShardCollectionTypeBase::getRefreshing;
-    using ShardCollectionTypeBase::setRefreshing;
-    using ShardCollectionTypeBase::getLastRefreshedCollectionVersion;
-    using ShardCollectionTypeBase::setLastRefreshedCollectionVersion;
     using ShardCollectionTypeBase::getEnterCriticalSectionCounter;
+    using ShardCollectionTypeBase::getEpoch;
+    using ShardCollectionTypeBase::getKeyPattern;
+    using ShardCollectionTypeBase::getLastRefreshedCollectionVersion;
+    using ShardCollectionTypeBase::getNss;
+    using ShardCollectionTypeBase::getRefreshing;
+    using ShardCollectionTypeBase::getUnique;
+    using ShardCollectionTypeBase::getUuid;
+    using ShardCollectionTypeBase::setDefaultCollation;
     using ShardCollectionTypeBase::setEnterCriticalSectionCounter;
+    using ShardCollectionTypeBase::setEpoch;
+    using ShardCollectionTypeBase::setKeyPattern;
+    using ShardCollectionTypeBase::setLastRefreshedCollectionVersion;
+    using ShardCollectionTypeBase::setNss;
+    using ShardCollectionTypeBase::setRefreshing;
+    using ShardCollectionTypeBase::setUnique;
+    using ShardCollectionTypeBase::setUuid;
 
     ShardCollectionType() : ShardCollectionTypeBase() {}
 

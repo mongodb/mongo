@@ -86,7 +86,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
 
 /**
  * Loads cluster ID and waits for the reload of the Shard Registry.
-*/
+ */
 
 Status waitForShardRegistryReload(OperationContext* opCtx);
 

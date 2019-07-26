@@ -33,7 +33,6 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/client.h"
-#include "mongo/db/client.h"
 #include "mongo/db/concurrency/deferred_writer.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -57,7 +56,7 @@ struct BSONObjCompare {
         return SimpleBSONObjComparator::kInstance.compare(lhs, rhs) < 0;
     }
 };
-}
+}  // namespace
 
 static const NamespaceString kTestNamespace("unittests", "deferred_writer_tests");
 
@@ -384,4 +383,4 @@ public:
         add<DeferredWriterTestAsync>();
     }
 } deferredWriterTests;
-}
+}  // namespace deferred_writer_tests

@@ -11,7 +11,6 @@ load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMong
 load('jstests/libs/analyze_plan.js');                              // for planHasStage
 
 var $config = extendWorkload($config, function($config, $super) {
-
     function assertNCounted(num, obj, db) {
         var stage = obj.executionStats.executionStages;
         // get sharded stage(s) if counting on mongos

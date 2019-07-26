@@ -93,23 +93,23 @@ struct SSLParams {
 
     enum SSLModes : int {
         /**
-        * Make unencrypted outgoing connections and do not accept incoming SSL-connections.
-        */
+         * Make unencrypted outgoing connections and do not accept incoming SSL-connections.
+         */
         SSLMode_disabled,
 
         /**
-        * Make unencrypted outgoing connections and accept both unencrypted and SSL-connections.
-        */
+         * Make unencrypted outgoing connections and accept both unencrypted and SSL-connections.
+         */
         SSLMode_allowSSL,
 
         /**
-        * Make outgoing SSL-connections and accept both unecrypted and SSL-connections.
-        */
+         * Make outgoing SSL-connections and accept both unecrypted and SSL-connections.
+         */
         SSLMode_preferSSL,
 
         /**
-        * Make outgoing SSL-connections and only accept incoming SSL-connections.
-        */
+         * Make outgoing SSL-connections and only accept incoming SSL-connections.
+         */
         SSLMode_requireSSL
     };
 
@@ -137,10 +137,10 @@ Status storeSSLDisabledProtocols(
     SSLDisabledProtocolsMode mode = SSLDisabledProtocolsMode::kStandardFormat);
 
 /**
-* The global SSL configuration. This should be accessed only after global initialization has
-* completed. If it must be accessed in an initializer, the initializer should have
-* "EndStartupOptionStorage" as a prerequisite.
-*/
+ * The global SSL configuration. This should be accessed only after global initialization has
+ * completed. If it must be accessed in an initializer, the initializer should have
+ * "EndStartupOptionStorage" as a prerequisite.
+ */
 const SSLParams& getSSLGlobalParams();
 
 Status parseCertificateSelector(SSLParams::CertificateSelector* selector,

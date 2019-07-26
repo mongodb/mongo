@@ -74,7 +74,7 @@ void emplaceOrInvariant(Map&& map, Args&&... args) noexcept {
     invariant(ret.second, "Element already existed in map/set");
 }
 
-}  // anonymous
+}  // namespace
 
 namespace executor {
 
@@ -164,7 +164,8 @@ public:
         const auto& data = getOrInvariant(_poolData, id);
 
         return {
-            getPool()->_options.maxConnecting, data.target,
+            getPool()->_options.maxConnecting,
+            data.target,
         };
     }
 
@@ -219,11 +220,11 @@ public:
     template <typename Callback>
     auto guardCallback(Callback&& cb) {
         return
-            [ this, cb = std::forward<Callback>(cb), anchor = shared_from_this() ](auto&&... args) {
-            stdx::lock_guard lk(_parent->_mutex);
-            cb(std::forward<decltype(args)>(args)...);
-            updateState();
-        };
+            [this, cb = std::forward<Callback>(cb), anchor = shared_from_this()](auto&&... args) {
+                stdx::lock_guard lk(_parent->_mutex);
+                cb(std::forward<decltype(args)>(args)...);
+                updateState();
+            };
     }
 
     SpecificPool(std::shared_ptr<ConnectionPool> parent,
@@ -519,7 +520,7 @@ void ConnectionPool::get_forTest(const HostAndPort& hostAndPort,
                                  Milliseconds timeout,
                                  GetConnectionCallback cb) {
     // We kick ourselves onto the executor queue to prevent us from deadlocking with our own thread
-    auto getConnectionFunc = [ this, hostAndPort, timeout, cb = std::move(cb) ](Status &&) mutable {
+    auto getConnectionFunc = [this, hostAndPort, timeout, cb = std::move(cb)](Status&&) mutable {
         get(hostAndPort, transport::kGlobalSSLMode, timeout)
             .thenRunOn(_factory->getExecutor())
             .getAsync(std::move(cb));
@@ -650,7 +651,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
 }
 
 auto ConnectionPool::SpecificPool::makeHandle(ConnectionInterface* connection) -> ConnectionHandle {
-    auto deleter = [ this, anchor = shared_from_this() ](ConnectionInterface * connection) {
+    auto deleter = [this, anchor = shared_from_this()](ConnectionInterface* connection) {
         stdx::lock_guard lk(_parent->_mutex);
         returnConnection(connection);
         _lastActiveTime = _parent->_factory->now();
@@ -1120,7 +1121,7 @@ void ConnectionPool::SpecificPool::updateState() {
     }
 
     ExecutorFuture(ExecutorPtr(_parent->_factory->getExecutor()))  //
-        .getAsync([ this, anchor = shared_from_this() ](Status && status) mutable {
+        .getAsync([this, anchor = shared_from_this()](Status&& status) mutable {
             invariant(status);
 
             stdx::lock_guard lk(_parent->_mutex);

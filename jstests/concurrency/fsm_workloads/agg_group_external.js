@@ -12,7 +12,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/agg_base.js');    // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     // use enough docs to exceed 100MB, the in-memory limit for $sort and $group
     $config.data.numDocs = 24 * 1000;
     var MB = 1024 * 1024;  // bytes

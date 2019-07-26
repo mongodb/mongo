@@ -44,9 +44,9 @@
 
 namespace mongo {
 
+using std::string;
 using std::unique_ptr;
 using std::vector;
-using std::string;
 
 using fts::FTSSpec;
 

@@ -35,5 +35,5 @@ namespace fts {
 
 const std::string INDEX_NAME = "text";
 const std::string WILDCARD = "$**";
-}
-}
+}  // namespace fts
+}  // namespace mongo

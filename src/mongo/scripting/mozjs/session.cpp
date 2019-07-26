@@ -122,9 +122,7 @@ void endSession(SessionHolder* holder) {
     if (holder->txnState == SessionHolder::TransactionState::kActive) {
         holder->txnState = SessionHolder::TransactionState::kAborted;
         BSONObj abortObj = BSON("abortTransaction" << 1 << "lsid" << holder->lsid << "txnNumber"
-                                                   << holder->txnNumber
-                                                   << "autocommit"
-                                                   << false);
+                                                   << holder->txnNumber << "autocommit" << false);
 
         MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
             holder->client->runCommand("admin", abortObj, out);

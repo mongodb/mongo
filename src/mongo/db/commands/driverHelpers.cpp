@@ -87,4 +87,4 @@ public:
         return true;
     }
 } driverObjectIdTest;
-}
+}  // namespace mongo

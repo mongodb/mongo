@@ -243,9 +243,9 @@ bool hasReplSetConfigDoc(OperationContext* opCtx) {
 }
 
 /**
-* Check that the oplog is capped, and abort the process if it is not.
-* Caller must lock DB before calling this function.
-*/
+ * Check that the oplog is capped, and abort the process if it is not.
+ * Caller must lock DB before calling this function.
+ */
 void checkForCappedOplog(OperationContext* opCtx, Database* db) {
     const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
     invariant(opCtx->lockState()->isDbLockedForMode(oplogNss.db(), MODE_IS));
@@ -283,15 +283,13 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
             fassert(40590,
                     {ErrorCodes::InternalError,
                      str::stream() << "failed to get index spec for index " << indexName
-                                   << " in collection "
-                                   << collNss.toString()});
+                                   << " in collection " << collNss.toString()});
         }
 
         auto& indexesToRebuild = swIndexSpecs.getValue();
         invariant(indexesToRebuild.first.size() == 1 && indexesToRebuild.second.size() == 1,
                   str::stream() << "Num Index Names: " << indexesToRebuild.first.size()
-                                << " Num Index Objects: "
-                                << indexesToRebuild.second.size());
+                                << " Num Index Objects: " << indexesToRebuild.second.size());
         auto& ino = nsToIndexNameObjMap[collNss.ns()];
         ino.first.emplace_back(std::move(indexesToRebuild.first.back()));
         ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
@@ -515,8 +513,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                                 << swVersion.getStatus()
                                 << "). If the current featureCompatibilityVersion is below "
                                    "4.0, see the documentation on upgrading at "
-                                << feature_compatibility_version_documentation::kUpgradeLink
-                                << ".",
+                                << feature_compatibility_version_documentation::kUpgradeLink << ".",
                             swVersion.isOK());
 
                     fcvDocumentExists = true;
@@ -535,8 +532,9 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                               << startupWarningsLog;
                         log() << "**          To fix this, use the setFeatureCompatibilityVersion "
                               << "command to resume upgrade to 4.2." << startupWarningsLog;
-                    } else if (version == ServerGlobalParams::FeatureCompatibility::Version::
-                                              kDowngradingTo40) {
+                    } else if (version ==
+                               ServerGlobalParams::FeatureCompatibility::Version::
+                                   kDowngradingTo40) {
                         log() << "** WARNING: A featureCompatibilityVersion downgrade did not "
                               << "complete. " << startupWarningsLog;
                         log() << "**          The current featureCompatibilityVersion is "

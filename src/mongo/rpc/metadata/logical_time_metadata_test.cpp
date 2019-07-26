@@ -191,6 +191,6 @@ TEST(LogicalTimeMetadataTest, UpconvertPass) {
                       converted.body);
 }
 
+}  // namespace
 }  // namespace rpc
 }  // namespace mongo
-}

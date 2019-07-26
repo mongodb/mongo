@@ -8,7 +8,6 @@
  * value is the thread's id.
  */
 var $config = (function() {
-
     function makeSortSpecFromIndexSpec(ixSpec) {
         var sort = {};
 
@@ -102,5 +101,4 @@ var $config = (function() {
         },
         setup: setup
     };
-
 })();

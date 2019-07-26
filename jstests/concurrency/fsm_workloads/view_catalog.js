@@ -8,7 +8,6 @@
  */
 
 var $config = (function() {
-
     var data = {
         // Use the workload name as a prefix for the view name, since the workload name is assumed
         // to be unique.
@@ -17,7 +16,6 @@ var $config = (function() {
     };
 
     var states = (function() {
-
         function init(db, collName) {
             this.threadCollName = db[collName].getName();
             this.threadViewName = this.prefix + '_' + this.tid;
@@ -65,7 +63,6 @@ var $config = (function() {
         }
 
         return {init: init, create: create, modify: modify, drop: drop};
-
     })();
 
     var transitions = {
@@ -100,5 +97,4 @@ var $config = (function() {
         states: states,
         transitions: transitions,
     };
-
 })();

@@ -44,7 +44,6 @@
 #include "mongo/base/deinitializer_context.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/free_mon/free_mon_op_observer.h"
@@ -119,8 +118,8 @@ public:
 
 private:
     /**
-    * Private enum to ensure caller uses class correctly.
-    */
+     * Private enum to ensure caller uses class correctly.
+     */
     enum class State {
         kNotStarted,
         kStarted,
@@ -248,10 +247,9 @@ public:
         if (_options.doSync) {
             pf.promise.setFrom(doRegister(req));
         } else {
-            auto swSchedule =
-                _threadPool->scheduleWork([ sharedPromise = std::move(pf.promise), req, this ](
+            auto swSchedule = _threadPool->scheduleWork(
+                [sharedPromise = std::move(pf.promise), req, this](
                     const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
-
                     sharedPromise.setWith([&] { return doRegister(req); });
                 });
 
@@ -295,10 +293,9 @@ public:
         if (_options.doSync) {
             pf.promise.setFrom(doMetrics(req));
         } else {
-            auto swSchedule =
-                _threadPool->scheduleWork([ sharedPromise = std::move(pf.promise), req, this ](
+            auto swSchedule = _threadPool->scheduleWork(
+                [sharedPromise = std::move(pf.promise), req, this](
                     const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
-
                     sharedPromise.setWith([&] { return doMetrics(req); });
                 });
 
@@ -543,8 +540,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << 1LL))));
+                       << "reportingInterval" << 1LL))));
 
     // max reporting interval
     ASSERT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
@@ -555,8 +551,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << 30 * 60 * 60 * 24LL))));
+                       << "reportingInterval" << 30 * 60 * 60 * 24LL))));
 
     // Positive: version 2
     ASSERT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
@@ -567,8 +562,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << 1LL))));
+                       << "reportingInterval" << 1LL))));
 
     // Positive: empty registration id string
     ASSERT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
@@ -579,8 +573,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << 1LL))));
+                       << "reportingInterval" << 1LL))));
 
     // Negative: bad protocol version
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
@@ -591,8 +584,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << 1LL))));
+                       << "reportingInterval" << 1LL))));
 
     // Negative: halt uploading
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
@@ -603,8 +595,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << 1LL))));
+                       << "reportingInterval" << 1LL))));
 
     // Negative: large registartation id
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
@@ -614,20 +605,16 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << 1LL))));
+                       << "reportingInterval" << 1LL))));
 
     // Negative: large URL
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
         IDLParserErrorContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "id"
                        << "mock123"
-                       << "informationalURL"
-                       << std::string(5000, 'b')
-                       << "message"
+                       << "informationalURL" << std::string(5000, 'b') << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << 1LL))));
+                       << "reportingInterval" << 1LL))));
 
     // Negative: large message
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
@@ -636,10 +623,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "mock123"
                        << "informationalURL"
                        << "http://www.example.com/123"
-                       << "message"
-                       << std::string(5000, 'c')
-                       << "reportingInterval"
-                       << 1LL))));
+                       << "message" << std::string(5000, 'c') << "reportingInterval" << 1LL))));
 
     // Negative: too small a reporting interval
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
@@ -650,8 +634,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << 0LL))));
+                       << "reportingInterval" << 0LL))));
 
     // Negative: too large a reporting interval
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
@@ -662,39 +645,36 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << (60LL * 60 * 24 * 30 + 1LL)))));
+                       << "reportingInterval" << (60LL * 60 * 24 * 30 + 1LL)))));
 }
 
 
 // Positive: Ensure the response is validated correctly
 TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
-    ASSERT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
-        IDLParserErrorContext("foo"),
+    ASSERT_OK(FreeMonProcessor::validateMetricsResponse(
+        FreeMonMetricsResponse::parse(IDLParserErrorContext("foo"),
 
-        BSON("version" << 1LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
-                       << "id"
-                       << "mock123"
-                       << "informationalURL"
-                       << "http://www.example.com/123"
-                       << "message"
-                       << "msg456"
-                       << "reportingInterval"
-                       << 1LL))));
+                                      BSON("version" << 1LL << "haltMetricsUploading" << false
+                                                     << "permanentlyDelete" << false << "id"
+                                                     << "mock123"
+                                                     << "informationalURL"
+                                                     << "http://www.example.com/123"
+                                                     << "message"
+                                                     << "msg456"
+                                                     << "reportingInterval" << 1LL))));
 
     // Positive: Support version 2
-    ASSERT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
-        IDLParserErrorContext("foo"),
+    ASSERT_OK(FreeMonProcessor::validateMetricsResponse(
+        FreeMonMetricsResponse::parse(IDLParserErrorContext("foo"),
 
-        BSON("version" << 2LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
-                       << "id"
-                       << "mock123"
-                       << "informationalURL"
-                       << "http://www.example.com/123"
-                       << "message"
-                       << "msg456"
-                       << "reportingInterval"
-                       << 1LL))));
+                                      BSON("version" << 2LL << "haltMetricsUploading" << false
+                                                     << "permanentlyDelete" << false << "id"
+                                                     << "mock123"
+                                                     << "informationalURL"
+                                                     << "http://www.example.com/123"
+                                                     << "message"
+                                                     << "msg456"
+                                                     << "reportingInterval" << 1LL))));
 
     // Positive: Add resendRegistration
     ASSERT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
@@ -707,10 +687,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << 1LL
-                       << "resendRegistration"
-                       << true))));
+                       << "reportingInterval" << 1LL << "resendRegistration" << true))));
 
 
     // Positive: max reporting interval
@@ -724,63 +701,52 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << 60 * 60 * 24 * 30LL))));
+                       << "reportingInterval" << 60 * 60 * 24 * 30LL))));
 
     // Negative: bad protocol version
-    ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
-        IDLParserErrorContext("foo"),
-        BSON("version" << 42LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
-                       << "id"
-                       << "mock123"
-                       << "informationalURL"
-                       << "http://www.example.com/123"
-                       << "message"
-                       << "msg456"
-                       << "reportingInterval"
-                       << 1LL))));
+    ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(
+        FreeMonMetricsResponse::parse(IDLParserErrorContext("foo"),
+                                      BSON("version" << 42LL << "haltMetricsUploading" << false
+                                                     << "permanentlyDelete" << false << "id"
+                                                     << "mock123"
+                                                     << "informationalURL"
+                                                     << "http://www.example.com/123"
+                                                     << "message"
+                                                     << "msg456"
+                                                     << "reportingInterval" << 1LL))));
 
     // Negative: halt uploading
-    ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
-        IDLParserErrorContext("foo"),
-        BSON("version" << 1LL << "haltMetricsUploading" << true << "permanentlyDelete" << false
-                       << "id"
-                       << "mock123"
-                       << "informationalURL"
-                       << "http://www.example.com/123"
-                       << "message"
-                       << "msg456"
-                       << "reportingInterval"
-                       << 1LL))));
+    ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(
+        FreeMonMetricsResponse::parse(IDLParserErrorContext("foo"),
+                                      BSON("version" << 1LL << "haltMetricsUploading" << true
+                                                     << "permanentlyDelete" << false << "id"
+                                                     << "mock123"
+                                                     << "informationalURL"
+                                                     << "http://www.example.com/123"
+                                                     << "message"
+                                                     << "msg456"
+                                                     << "reportingInterval" << 1LL))));
 
     // Negative: large registartation id
     ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
         IDLParserErrorContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
-                       << "id"
-                       << std::string(5000, 'a')
-                       << "informationalURL"
+                       << "id" << std::string(5000, 'a') << "informationalURL"
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << 1LL))));
+                       << "reportingInterval" << 1LL))));
 
     // Negative: large URL
-    ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(
-        FreeMonMetricsResponse::parse(IDLParserErrorContext("foo"),
-                                      BSON("version" << 1LL << "haltMetricsUploading" << false
+    ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
+        IDLParserErrorContext("foo"),
+        BSON("version" << 1LL << "haltMetricsUploading" << false
 
-                                                     << "permanentlyDelete"
-                                                     << false
-                                                     << "id"
-                                                     << "mock123"
-                                                     << "informationalURL"
-                                                     << std::string(5000, 'b')
-                                                     << "message"
-                                                     << "msg456"
-                                                     << "reportingInterval"
-                                                     << 1LL))));
+                       << "permanentlyDelete" << false << "id"
+                       << "mock123"
+                       << "informationalURL" << std::string(5000, 'b') << "message"
+                       << "msg456"
+                       << "reportingInterval" << 1LL))));
 
     // Negative: large message
     ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
@@ -790,23 +756,19 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
                        << "mock123"
                        << "informationalURL"
                        << "http://www.example.com/123"
-                       << "message"
-                       << std::string(5000, 'c')
-                       << "reportingInterval"
-                       << 1LL))));
+                       << "message" << std::string(5000, 'c') << "reportingInterval" << 1LL))));
 
     // Negative: too small a reporting interval
-    ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
-        IDLParserErrorContext("foo"),
-        BSON("version" << 1LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
-                       << "id"
-                       << "mock123"
-                       << "informationalURL"
-                       << "http://www.example.com/123"
-                       << "message"
-                       << "msg456"
-                       << "reportingInterval"
-                       << 0LL))));
+    ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(
+        FreeMonMetricsResponse::parse(IDLParserErrorContext("foo"),
+                                      BSON("version" << 1LL << "haltMetricsUploading" << false
+                                                     << "permanentlyDelete" << false << "id"
+                                                     << "mock123"
+                                                     << "informationalURL"
+                                                     << "http://www.example.com/123"
+                                                     << "message"
+                                                     << "msg456"
+                                                     << "reportingInterval" << 0LL))));
 
     // Negative: too large a reporting interval
     ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
@@ -818,8 +780,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
                        << "http://www.example.com/123"
                        << "message"
                        << "msg456"
-                       << "reportingInterval"
-                       << (60LL * 60 * 24 * 30 + 1LL)))));
+                       << "reportingInterval" << (60LL * 60 * 24 * 30 + 1LL)))));
 }
 
 /**

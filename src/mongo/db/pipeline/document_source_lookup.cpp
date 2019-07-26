@@ -261,8 +261,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::getNext() {
         objsize += result->getApproximateSize();
         uassert(4568,
                 str::stream() << "Total size of documents in " << _fromNs.coll()
-                              << " matching pipeline's $lookup stage exceeds "
-                              << maxBytes
+                              << " matching pipeline's $lookup stage exceeds " << maxBytes
                               << " bytes",
 
                 objsize <= maxBytes);
@@ -687,8 +686,7 @@ void DocumentSourceLookUp::serializeToArray(
             const boost::optional<FieldPath> indexPath = _unwindSrc->indexPath();
             output[getSourceName()]["unwinding"] =
                 Value(DOC("preserveNullAndEmptyArrays"
-                          << _unwindSrc->preserveNullAndEmptyArrays()
-                          << "includeArrayIndex"
+                          << _unwindSrc->preserveNullAndEmptyArrays() << "includeArrayIndex"
                           << (indexPath ? Value(indexPath->fullPath()) : Value())));
         }
 
@@ -810,8 +808,7 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         if (argName == "let") {
             uassert(ErrorCodes::FailedToParse,
                     str::stream() << "$lookup argument '" << argument
-                                  << "' must be an object, is type "
-                                  << argument.type(),
+                                  << "' must be an object, is type " << argument.type(),
                     argument.type() == BSONType::Object);
             letVariables = argument.Obj();
             hasLet = true;
@@ -820,9 +817,7 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
 
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "$lookup argument '" << argName << "' must be a string, found "
-                              << argument
-                              << ": "
-                              << argument.type(),
+                              << argument << ": " << argument.type(),
                 argument.type() == BSONType::String);
 
         if (argName == "from") {

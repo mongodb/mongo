@@ -449,7 +449,7 @@ public:
     }
 };
 
-}  // namspace
+}  // namespace
 
 MONGO_INITIALIZER(KMSRegister)(::mongo::InitializerContext* context) {
     kms_message_init();

@@ -439,8 +439,7 @@ sasl_client_plug_t sspiClientPlugin[] = {
     {sspiPluginName, /* mechanism name */
      112, /* TODO: (taken from gssapi) best mech additional security layer strength factor */
      SASL_SEC_NOPLAINTEXT /* eam: copied from gssapi */
-         |
-         SASL_SEC_NOACTIVE | SASL_SEC_NOANONYMOUS | SASL_SEC_MUTUAL_AUTH |
+         | SASL_SEC_NOACTIVE | SASL_SEC_NOANONYMOUS | SASL_SEC_MUTUAL_AUTH |
          SASL_SEC_PASS_CREDENTIALS, /* security_flags */
      SASL_FEAT_NEEDSERVERFQDN | SASL_FEAT_WANT_CLIENT_FIRST | SASL_FEAT_ALLOWS_PROXY,
      nullptr, /* required prompt ids, nullptr = user/pass only */
@@ -482,8 +481,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SaslSspiClientPlugin,
     if (SASL_OK != ret) {
         return Status(ErrorCodes::UnknownError,
                       str::stream() << "could not add SASL Client SSPI plugin " << sspiPluginName
-                                    << ": "
-                                    << sasl_errstring(ret, nullptr, nullptr));
+                                    << ": " << sasl_errstring(ret, nullptr, nullptr));
     }
 
     return Status::OK();
@@ -496,8 +494,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SaslPlainClientPlugin,
     if (SASL_OK != ret) {
         return Status(ErrorCodes::UnknownError,
                       str::stream() << "Could not add SASL Client PLAIN plugin " << sspiPluginName
-                                    << ": "
-                                    << sasl_errstring(ret, nullptr, nullptr));
+                                    << ": " << sasl_errstring(ret, nullptr, nullptr));
     }
 
     return Status::OK();

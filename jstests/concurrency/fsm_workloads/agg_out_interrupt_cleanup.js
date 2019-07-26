@@ -9,7 +9,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/agg_base.js');    // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.states.aggregate = function aggregate(db, collName) {
         // $out to the same collection so that concurrent aggregate commands would cause congestion.
         db[collName].runCommand(

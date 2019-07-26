@@ -341,12 +341,12 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
     // Check keys in cache before dropping {b: 1}
     vector<BSONObj> shapesBefore = getShapes(planCache);
     ASSERT_EQUALS(shapesBefore.size(), 2U);
-    BSONObj shapeA = BSON(
-        "query" << cqA->getQueryObj() << "sort" << cqA->getQueryRequest().getSort() << "projection"
-                << cqA->getQueryRequest().getProj());
-    BSONObj shapeB = BSON(
-        "query" << cqB->getQueryObj() << "sort" << cqB->getQueryRequest().getSort() << "projection"
-                << cqB->getQueryRequest().getProj());
+    BSONObj shapeA =
+        BSON("query" << cqA->getQueryObj() << "sort" << cqA->getQueryRequest().getSort()
+                     << "projection" << cqA->getQueryRequest().getProj());
+    BSONObj shapeB =
+        BSON("query" << cqB->getQueryObj() << "sort" << cqB->getQueryRequest().getSort()
+                     << "projection" << cqB->getQueryRequest().getProj());
     ASSERT_TRUE(
         std::find_if(shapesBefore.begin(), shapesBefore.end(), [&shapeA](const BSONObj& obj) {
             auto filteredObj = obj.removeField("queryHash");
@@ -413,14 +413,11 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKeyCollation) {
     vector<BSONObj> shapesBefore = getShapes(planCache);
     ASSERT_EQUALS(shapesBefore.size(), 2U);
     BSONObj shape = BSON("query" << cq->getQueryObj() << "sort" << cq->getQueryRequest().getSort()
-                                 << "projection"
-                                 << cq->getQueryRequest().getProj());
-    BSONObj shapeWithCollation = BSON("query" << cqCollation->getQueryObj() << "sort"
-                                              << cqCollation->getQueryRequest().getSort()
-                                              << "projection"
-                                              << cqCollation->getQueryRequest().getProj()
-                                              << "collation"
-                                              << cqCollation->getCollator()->getSpec().toBSON());
+                                 << "projection" << cq->getQueryRequest().getProj());
+    BSONObj shapeWithCollation = BSON(
+        "query" << cqCollation->getQueryObj() << "sort" << cqCollation->getQueryRequest().getSort()
+                << "projection" << cqCollation->getQueryRequest().getProj() << "collation"
+                << cqCollation->getCollator()->getSpec().toBSON());
     ASSERT_TRUE(
         std::find_if(shapesBefore.begin(), shapesBefore.end(), [&shape](const BSONObj& obj) {
             auto filteredObj = obj.removeField("queryHash");

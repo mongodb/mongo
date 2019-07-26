@@ -42,4 +42,4 @@ std::string getShutdownSignalName(int processId) {
     return str::stream() << strEventNamePrefix << processId;
 }
 #endif
-}
+}  // namespace mongo

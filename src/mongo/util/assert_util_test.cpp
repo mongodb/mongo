@@ -311,8 +311,8 @@ DEATH_TEST(InvariantTerminationTest,
 DEATH_TEST(InvariantTerminationTest,
            invariantWithStdStringMsg,
            "Terminating with std::string invariant message: 12345") {
-    const std::string msg = str::stream() << "Terminating with std::string invariant message: "
-                                          << 12345;
+    const std::string msg = str::stream()
+        << "Terminating with std::string invariant message: " << 12345;
     invariant(false, msg);
 }
 
@@ -326,8 +326,8 @@ DEATH_TEST(InvariantTerminationTest,
 DEATH_TEST(InvariantTerminationTest,
            invariantOverloadWithStdStringMsg,
            "Terminating with std::string invariant message: 12345") {
-    const std::string msg = str::stream() << "Terminating with std::string invariant message: "
-                                          << 12345;
+    const std::string msg = str::stream()
+        << "Terminating with std::string invariant message: " << 12345;
     invariant(Status(ErrorCodes::InternalError, "Terminating with invariant"), msg);
 }
 
@@ -341,8 +341,8 @@ DEATH_TEST(InvariantTerminationTest,
 DEATH_TEST(InvariantTerminationTest,
            invariantStatusWithOverloadWithStdStringMsg,
            "Terminating with std::string invariant message: 12345") {
-    const std::string msg = str::stream() << "Terminating with std::string invariant message: "
-                                          << 12345;
+    const std::string msg = str::stream()
+        << "Terminating with std::string invariant message: " << 12345;
     invariant(StatusWith<std::string>(ErrorCodes::InternalError, "Terminating with invariant"),
               msg);
 }
@@ -367,8 +367,8 @@ DEATH_TEST(DassertTerminationTest,
 DEATH_TEST(DassertTerminationTest,
            dassertWithStdStringMsg,
            "Terminating with std::string dassert message: 12345") {
-    const std::string msg = str::stream() << "Terminating with std::string dassert message: "
-                                          << 12345;
+    const std::string msg = str::stream()
+        << "Terminating with std::string dassert message: " << 12345;
     dassert(false, msg);
 }
 #endif  // defined(MONGO_CONFIG_DEBUG_BUILD)

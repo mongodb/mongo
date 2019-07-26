@@ -9,7 +9,6 @@
  * index drops.
  */
 var $config = (function() {
-
     let data = {
         collName: 'drop_index_during_replan',
         indexSpecs: [
@@ -75,5 +74,4 @@ var $config = (function() {
         transitions: transitions,
         setup: setup
     };
-
 })();

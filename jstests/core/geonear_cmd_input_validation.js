@@ -69,7 +69,6 @@ indexTypes.forEach(function(indexType) {
 
                 // Try several bad values for min/maxDistance.
                 badNumbers.concat(outOfRangeDistances).forEach(function(badDistance) {
-
                     var msg = ("geoNear with spherical=" + spherical + " and " + pointDescription +
                                " and " + indexType + " index should've failed with " + optionName +
                                " " + badDistance);
@@ -80,7 +79,6 @@ indexTypes.forEach(function(indexType) {
                 // Bad values for limit / num.
                 ['num', 'limit'].forEach(function(limitOptionName) {
                     [-1, 'foo'].forEach(function(badLimit) {
-
                         var msg =
                             ("geoNear with spherical=" + spherical + " and " + pointDescription +
                              " and " + indexType + " index should've failed with '" +
@@ -94,7 +92,6 @@ indexTypes.forEach(function(indexType) {
 
                 // Bad values for distanceMultiplier.
                 badNumbers.forEach(function(badNumber) {
-
                     var msg = ("geoNear with spherical=" + spherical + " and " + pointDescription +
                                " and " + indexType +
                                " index should've failed with distanceMultiplier " + badNumber);

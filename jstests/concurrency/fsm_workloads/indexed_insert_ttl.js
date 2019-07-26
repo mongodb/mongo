@@ -9,7 +9,6 @@
  * doc inserted by each thread is no longer in the collection.
  */
 var $config = (function() {
-
     var states = {
         init: function init(db, collName) {
             var res = db[collName].insert({indexed_insert_ttl: new ISODate(), first: true});

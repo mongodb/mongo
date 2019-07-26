@@ -217,4 +217,4 @@ boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
         return nprocs;
     return boost::none;
 }
-}
+}  // namespace mongo

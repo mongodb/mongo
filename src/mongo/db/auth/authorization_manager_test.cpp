@@ -127,9 +127,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
                                                           << "v2read"
                                                           << "db"
                                                           << "test"
-                                                          << "credentials"
-                                                          << credentials
-                                                          << "roles"
+                                                          << "credentials" << credentials << "roles"
                                                           << BSON_ARRAY(BSON("role"
                                                                              << "read"
                                                                              << "db"
@@ -142,9 +140,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
                                                           << "v2cluster"
                                                           << "db"
                                                           << "admin"
-                                                          << "credentials"
-                                                          << credentials
-                                                          << "roles"
+                                                          << "credentials" << credentials << "roles"
                                                           << BSON_ARRAY(BSON("role"
                                                                              << "clusterAdmin"
                                                                              << "db"
@@ -249,19 +245,17 @@ public:
 
 private:
     Status _getUserDocument(OperationContext* opCtx, const UserName& userName, BSONObj* userDoc) {
-        Status status = findOne(opCtx,
-                                AuthorizationManager::usersCollectionNamespace,
-                                BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                     << userName.getUser()
-                                     << AuthorizationManager::USER_DB_FIELD_NAME
-                                     << userName.getDB()),
-                                userDoc);
+        Status status =
+            findOne(opCtx,
+                    AuthorizationManager::usersCollectionNamespace,
+                    BSON(AuthorizationManager::USER_NAME_FIELD_NAME
+                         << userName.getUser() << AuthorizationManager::USER_DB_FIELD_NAME
+                         << userName.getDB()),
+                    userDoc);
         if (status == ErrorCodes::NoMatchingDocument) {
             status = Status(ErrorCodes::UserNotFound,
                             str::stream() << "Could not find user \"" << userName.getUser()
-                                          << "\" for db \""
-                                          << userName.getDB()
-                                          << "\"");
+                                          << "\" for db \"" << userName.getDB() << "\"");
         }
         return status;
     }
@@ -297,9 +291,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
              << "myUser"
              << "db"
              << "test"
-             << "credentials"
-             << credentials
-             << "roles"
+             << "credentials" << credentials << "roles"
              << BSON_ARRAY(BSON("role"
                                 << "myRole"
                                 << "db"

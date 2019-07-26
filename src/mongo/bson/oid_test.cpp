@@ -166,4 +166,4 @@ TEST(Basic, FromTerm) {
     ASSERT_OK(mongo::NumberParser::strToAny()(oidTail, &oidTailInt));
     ASSERT_EQUALS(term, oidTailInt);
 }
-}
+}  // namespace

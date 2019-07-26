@@ -140,4 +140,4 @@ TEST(DBMessage1, GoodInsert2) {
 }
 
 
-}  // mongo namespace
+}  // namespace mongo

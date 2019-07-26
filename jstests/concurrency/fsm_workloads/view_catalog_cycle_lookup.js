@@ -9,7 +9,6 @@
  */
 
 var $config = (function() {
-
     // Use the workload name as a prefix for the view names, since the workload name is assumed
     // to be unique.
     const prefix = 'view_catalog_cycle_lookup_';
@@ -19,13 +18,14 @@ var $config = (function() {
         getRandomView: function(viewList) {
             return viewList[Random.randInt(viewList.length)];
         },
-        getRandomViewPipeline: function() {
-            const lookupViewNs1 = this.getRandomView(this.viewList);
-            const lookupViewNs2 = this.getRandomView(this.viewList);
-            const index = Random.randInt(4);
-            switch (index) {
-                case 0:
-                    return [{
+        getRandomViewPipeline:
+            function() {
+                const lookupViewNs1 = this.getRandomView(this.viewList);
+                const lookupViewNs2 = this.getRandomView(this.viewList);
+                const index = Random.randInt(4);
+                switch (index) {
+                    case 0:
+                        return [{
                         $lookup: {
                             from: lookupViewNs1,
                             localField: 'a',
@@ -33,8 +33,8 @@ var $config = (function() {
                             as: 'result1'
                         }
                     }];
-                case 1:
-                    return [{
+                    case 1:
+                        return [{
                         $lookup: {
                             from: lookupViewNs1,
                             let : {a1: '$a'},
@@ -52,8 +52,8 @@ var $config = (function() {
                             as: 'result2'
                         }
                     }];
-                case 2:
-                    return [{
+                    case 2:
+                        return [{
                         $graphLookup: {
                             from: lookupViewNs1,
                             startWith: '$a',
@@ -62,12 +62,12 @@ var $config = (function() {
                             as: 'result3'
                         }
                     }];
-                case 3:
-                    return [];
-                default:
-                    assertAlways(false, "Invalid index: " + index);
-            }
-        },
+                    case 3:
+                        return [];
+                    default:
+                        assertAlways(false, "Invalid index: " + index);
+                }
+            },
     };
 
     var states = (function() {
@@ -114,7 +114,6 @@ var $config = (function() {
             remapViewToCollection: remapViewToCollection,
             readFromView: readFromView,
         };
-
     })();
 
     var transitions = {

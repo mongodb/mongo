@@ -171,9 +171,7 @@ std::string RFC4514Parser::extractAttributeName() {
     } else {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "DN attribute names must begin with either a digit or an alpha"
-                                << " not \'"
-                                << ch
-                                << "\'");
+                                << " not \'" << ch << "\'");
     }
 
     for (; ch != '=' && !done(); ch = _advance()) {
@@ -218,8 +216,7 @@ std::pair<std::string, RFC4514Parser::ValueTerminator> RFC4514Parser::extractVal
 
                 uassert(ErrorCodes::BadValue,
                         str::stream() << "Escaped hex value contains invalid character \'"
-                                      << hexValStr[1]
-                                      << "\'",
+                                      << hexValStr[1] << "\'",
                         isHex(hexValStr[1]));
                 const char hexVal = uassertStatusOK(fromHex(StringData(hexValStr.data(), 2)));
                 sb << hexVal;
@@ -247,8 +244,8 @@ std::pair<std::string, RFC4514Parser::ValueTerminator> RFC4514Parser::extractVal
             }
         } else if (isEscaped(ch)) {
             uasserted(ErrorCodes::BadValue,
-                      str::stream() << "Found unescaped character that should be escaped: \'" << ch
-                                    << "\'");
+                      str::stream()
+                          << "Found unescaped character that should be escaped: \'" << ch << "\'");
         } else {
             if (ch != ' ') {
                 trailingSpaces = 0;
@@ -832,9 +829,9 @@ StatusWith<std::string> readDERString(ConstDataRangeCursor& cdc) {
 
     if (derString.getType() != DERType::UTF8String) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "Unexpected DER Tag, Got "
-                                    << static_cast<char>(derString.getType())
-                                    << ", Expected UTF8String");
+                      str::stream()
+                          << "Unexpected DER Tag, Got " << static_cast<char>(derString.getType())
+                          << ", Expected UTF8String");
     }
 
     return derString.readUtf8String();
@@ -970,9 +967,9 @@ StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExten
 
     if (swSet.getValue().getType() != DERType::SET) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "Unexpected DER Tag, Got "
-                                    << static_cast<char>(swSet.getValue().getType())
-                                    << ", Expected SET");
+                      str::stream()
+                          << "Unexpected DER Tag, Got "
+                          << static_cast<char>(swSet.getValue().getType()) << ", Expected SET");
     }
 
     ConstDataRangeCursor cdcSet(swSet.getValue().getSetRange());

@@ -124,8 +124,7 @@ void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss)
             str::stream() << "A previous attempt to shard collection " << nss.ns()
                           << " failed after writing some initial chunks to config.chunks. Please "
                              "manually delete the partially written chunks for collection "
-                          << nss.ns()
-                          << " from config.chunks",
+                          << nss.ns() << " from config.chunks",
             numChunks == 0);
 }
 
@@ -229,9 +228,7 @@ void createCollectionOrValidateExisting(OperationContext* opCtx,
         bool isUnique = idx["unique"].trueValue();
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "can't shard collection '" << nss.ns() << "' with unique index on "
-                              << currentKey
-                              << " and proposed shard key "
-                              << proposedKey
+                              << currentKey << " and proposed shard key " << proposedKey
                               << ". Uniqueness can't be maintained unless shard key is a prefix",
                 !isUnique || shardKeyPattern.isUniqueIndexCompatible(currentKey));
     }
@@ -249,8 +246,7 @@ void createCollectionOrValidateExisting(OperationContext* opCtx,
             // per field per collection.
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "can't shard collection " << nss.ns()
-                                  << " with hashed shard key "
-                                  << proposedKey
+                                  << " with hashed shard key " << proposedKey
                                   << " because the hashed index uses a non-default seed of "
                                   << idx["seed"].numberInt(),
                     !shardKeyPattern.isHashedPattern() || idx["seed"].eoo() ||
@@ -336,9 +332,7 @@ void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
             BSONElement tagMaxKeyElement = tagMaxFields.next();
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "the min and max of the existing zone " << tag.getMinKey()
-                                  << " -->> "
-                                  << tag.getMaxKey()
-                                  << " have non-matching keys",
+                                  << " -->> " << tag.getMaxKey() << " have non-matching keys",
                     tagMinKeyElement.fieldNameStringData() ==
                         tagMaxKeyElement.fieldNameStringData());
 
@@ -350,20 +344,15 @@ void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "the proposed shard key " << proposedKey.toString()
                                   << " does not match with the shard key of the existing zone "
-                                  << tag.getMinKey()
-                                  << " -->> "
-                                  << tag.getMaxKey(),
+                                  << tag.getMinKey() << " -->> " << tag.getMaxKey(),
                     match);
 
             if (ShardKeyPattern::isHashedPatternEl(proposedKeyElement) &&
                 (tagMinKeyElement.type() != NumberLong || tagMaxKeyElement.type() != NumberLong)) {
                 uasserted(ErrorCodes::InvalidOptions,
                           str::stream() << "cannot do hash sharding with the proposed key "
-                                        << proposedKey.toString()
-                                        << " because there exists a zone "
-                                        << tag.getMinKey()
-                                        << " -->> "
-                                        << tag.getMaxKey()
+                                        << proposedKey.toString() << " because there exists a zone "
+                                        << tag.getMinKey() << " -->> " << tag.getMaxKey()
                                         << " whose boundaries are not "
                                            "of type NumberLong");
             }
@@ -418,8 +407,7 @@ boost::optional<UUID> getUUIDFromPrimaryShard(OperationContext* opCtx, const Nam
 
     uassert(ErrorCodes::InternalError,
             str::stream() << "expected to return a UUID for collection " << nss.ns()
-                          << " as part of 'info' field but got "
-                          << res,
+                          << " as part of 'info' field but got " << res,
             collectionInfo.hasField("uuid"));
 
     return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
@@ -503,8 +491,7 @@ ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
     if (fromMapReduce) {
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "Map reduce with sharded output to a new collection found "
-                              << nss.ns()
-                              << " to be non-empty which is not supported.",
+                              << nss.ns() << " to be non-empty which is not supported.",
                 isEmpty);
     }
 
@@ -704,17 +691,21 @@ UUID shardCollection(OperationContext* opCtx,
     InitialSplitPolicy::ShardCollectionConfig initialChunks;
     boost::optional<ShardCollectionTargetState> targetState;
 
-    auto writeChunkDocumentsAndRefreshShards = [&](
-        const ShardCollectionTargetState& targetState,
-        const InitialSplitPolicy::ShardCollectionConfig& initialChunks) {
-        // Insert chunk documents to config.chunks on the config server.
-        writeFirstChunksToConfig(opCtx, initialChunks);
+    auto writeChunkDocumentsAndRefreshShards =
+        [&](const ShardCollectionTargetState& targetState,
+            const InitialSplitPolicy::ShardCollectionConfig& initialChunks) {
+            // Insert chunk documents to config.chunks on the config server.
+            writeFirstChunksToConfig(opCtx, initialChunks);
 
-        updateShardingCatalogEntryForCollection(
-            opCtx, nss, targetState, initialChunks, *request.getCollation(), request.getUnique());
+            updateShardingCatalogEntryForCollection(opCtx,
+                                                    nss,
+                                                    targetState,
+                                                    initialChunks,
+                                                    *request.getCollation(),
+                                                    request.getUnique());
 
-        refreshAllShards(opCtx, nss, dbPrimaryShardId, initialChunks.chunks);
-    };
+            refreshAllShards(opCtx, nss, dbPrimaryShardId, initialChunks.chunks);
+        };
 
     {
         // From this point onward the collection can only be read, not written to, so it is safe to

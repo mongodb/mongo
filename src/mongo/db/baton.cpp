@@ -80,7 +80,7 @@ public:
             }
         }
 
-        _baton->schedule([ this, anchor = shared_from_this() ](Status status) {
+        _baton->schedule([this, anchor = shared_from_this()](Status status) {
             _runJobs(stdx::unique_lock(_mutex), status);
         });
     }

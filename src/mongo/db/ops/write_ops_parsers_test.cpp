@@ -44,9 +44,7 @@ TEST(CommandWriteOpsParsers, CommonFields_BypassDocumentValidation) {
     for (BSONElement bypassDocumentValidation : BSON_ARRAY(true << false << 1 << 0 << 1.0 << 0.0)) {
         auto cmd = BSON("insert"
                         << "bar"
-                        << "documents"
-                        << BSON_ARRAY(BSONObj())
-                        << "bypassDocumentValidation"
+                        << "documents" << BSON_ARRAY(BSONObj()) << "bypassDocumentValidation"
                         << bypassDocumentValidation);
         for (bool seq : {false, true}) {
             auto request = toOpMsg("foo", cmd, seq);
@@ -61,10 +59,7 @@ TEST(CommandWriteOpsParsers, CommonFields_Ordered) {
     for (bool ordered : {true, false}) {
         auto cmd = BSON("insert"
                         << "bar"
-                        << "documents"
-                        << BSON_ARRAY(BSONObj())
-                        << "ordered"
-                        << ordered);
+                        << "documents" << BSON_ARRAY(BSONObj()) << "ordered" << ordered);
         for (bool seq : {false, true}) {
             auto request = toOpMsg("foo", cmd, seq);
             auto op = InsertOp::parse(request);
@@ -77,14 +72,8 @@ TEST(CommandWriteOpsParsers, CommonFields_IgnoredFields) {
     // These flags are ignored, so there is nothing to check other than that this doesn't throw.
     auto cmd = BSON("insert"
                     << "bar"
-                    << "documents"
-                    << BSON_ARRAY(BSONObj())
-                    << "maxTimeMS"
-                    << 1000
-                    << "shardVersion"
-                    << BSONObj()
-                    << "writeConcern"
-                    << BSONObj());
+                    << "documents" << BSON_ARRAY(BSONObj()) << "maxTimeMS" << 1000 << "shardVersion"
+                    << BSONObj() << "writeConcern" << BSONObj());
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
         InsertOp::parse(request);
@@ -94,10 +83,7 @@ TEST(CommandWriteOpsParsers, CommonFields_IgnoredFields) {
 TEST(CommandWriteOpsParsers, GarbageFieldsAtTopLevel_Body) {
     auto cmd = BSON("insert"
                     << "bar"
-                    << "documents"
-                    << BSON_ARRAY(BSONObj())
-                    << "GARBAGE"
-                    << BSON_ARRAY(BSONObj()));
+                    << "documents" << BSON_ARRAY(BSONObj()) << "GARBAGE" << BSON_ARRAY(BSONObj()));
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
         ASSERT_THROWS(InsertOp::parse(request), AssertionException);
@@ -105,12 +91,10 @@ TEST(CommandWriteOpsParsers, GarbageFieldsAtTopLevel_Body) {
 }
 
 TEST(CommandWriteOpsParsers, ErrorOnDuplicateCommonField) {
-    auto cmd = BSON("insert"
-                    << "bar"
-                    << "documents"
-                    << BSON_ARRAY(BSONObj())
-                    << "documents"
-                    << BSON_ARRAY(BSONObj()));
+    auto cmd =
+        BSON("insert"
+             << "bar"
+             << "documents" << BSON_ARRAY(BSONObj()) << "documents" << BSON_ARRAY(BSONObj()));
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
         ASSERT_THROWS(InsertOp::parse(request), AssertionException);
@@ -121,9 +105,7 @@ TEST(CommandWriteOpsParsers, ErrorOnDuplicateCommonFieldBetweenBodyAndSequence) 
     OpMsgRequest request;
     request.body = BSON("insert"
                         << "bar"
-                        << "documents"
-                        << BSON_ARRAY(BSONObj())
-                        << "$db"
+                        << "documents" << BSON_ARRAY(BSONObj()) << "$db"
                         << "foo");
     request.sequences = {{"documents",
                           {
@@ -134,12 +116,10 @@ TEST(CommandWriteOpsParsers, ErrorOnDuplicateCommonFieldBetweenBodyAndSequence) 
 }
 
 TEST(CommandWriteOpsParsers, ErrorOnWrongSizeStmtIdsArray) {
-    auto cmd = BSON("insert"
-                    << "bar"
-                    << "documents"
-                    << BSON_ARRAY(BSONObj() << BSONObj())
-                    << "stmtIds"
-                    << BSON_ARRAY(12));
+    auto cmd =
+        BSON("insert"
+             << "bar"
+             << "documents" << BSON_ARRAY(BSONObj() << BSONObj()) << "stmtIds" << BSON_ARRAY(12));
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
         ASSERT_THROWS_CODE(InsertOp::parse(request), AssertionException, ErrorCodes::InvalidLength);
@@ -149,12 +129,8 @@ TEST(CommandWriteOpsParsers, ErrorOnWrongSizeStmtIdsArray) {
 TEST(CommandWriteOpsParsers, ErrorOnStmtIdSpecifiedTwoWays) {
     auto cmd = BSON("insert"
                     << "bar"
-                    << "documents"
-                    << BSON_ARRAY(BSONObj())
-                    << "stmtIds"
-                    << BSON_ARRAY(12)
-                    << "stmtId"
-                    << 13);
+                    << "documents" << BSON_ARRAY(BSONObj()) << "stmtIds" << BSON_ARRAY(12)
+                    << "stmtId" << 13);
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
         ASSERT_THROWS_CODE(
@@ -174,10 +150,10 @@ TEST(CommandWriteOpsParsers, GarbageFieldsInUpdateDoc) {
 }
 
 TEST(CommandWriteOpsParsers, GarbageFieldsInDeleteDoc) {
-    auto cmd = BSON("delete"
-                    << "bar"
-                    << "deletes"
-                    << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << 0 << "GARBAGE" << 1)));
+    auto cmd =
+        BSON("delete"
+             << "bar"
+             << "deletes" << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << 0 << "GARBAGE" << 1)));
     for (bool seq : {false, true}) {
         auto request = toOpMsg("foo", cmd, seq);
         ASSERT_THROWS(DeleteOp::parse(request), AssertionException);
@@ -324,12 +300,7 @@ TEST(CommandWriteOpsParsers, Update) {
         for (bool multi : {false, true}) {
             auto rawUpdate =
                 BSON("q" << query << "u" << update << "arrayFilters" << BSON_ARRAY(arrayFilter)
-                         << "multi"
-                         << multi
-                         << "upsert"
-                         << upsert
-                         << "collation"
-                         << collation);
+                         << "multi" << multi << "upsert" << upsert << "collation" << collation);
             auto cmd = BSON("update" << ns.coll() << "updates" << BSON_ARRAY(rawUpdate));
             for (bool seq : {false, true}) {
                 auto request = toOpMsg(ns.db(), cmd, seq);
@@ -365,10 +336,8 @@ TEST(CommandWriteOpsParsers, UpdateWithPipeline) {
                                    << "en_US");
     for (bool upsert : {false, true}) {
         for (bool multi : {false, true}) {
-            auto rawUpdate = BSON(
-                "q" << query["q"] << "u" << update["u"] << "multi" << multi << "upsert" << upsert
-                    << "collation"
-                    << collation);
+            auto rawUpdate = BSON("q" << query["q"] << "u" << update["u"] << "multi" << multi
+                                      << "upsert" << upsert << "collation" << collation);
             auto cmd = BSON("update" << ns.coll() << "updates" << BSON_ARRAY(rawUpdate));
             for (bool seq : {false, true}) {
                 auto request = toOpMsg(ns.db(), cmd, seq);
@@ -423,8 +392,7 @@ TEST(CommandWriteOpsParsers, RemoveErrorsWithBadLimit) {
     for (BSONElement limit : BSON_ARRAY(-1 << 2 << 0.5)) {
         auto cmd = BSON("delete"
                         << "bar"
-                        << "deletes"
-                        << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << limit)));
+                        << "deletes" << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << limit)));
         for (bool seq : {false, true}) {
             auto request = toOpMsg("foo", cmd, seq);
             ASSERT_THROWS_CODE(

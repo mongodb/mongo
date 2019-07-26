@@ -232,16 +232,9 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                                   << "readConcern"
                                   << BSON("level"
                                           << "snapshot"
-                                          << "atClusterTime"
-                                          << kInMemoryLogicalTime.asTimestamp())
-                                  << "startTransaction"
-                                  << true
-                                  << "coordinator"
-                                  << true
-                                  << "autocommit"
-                                  << false
-                                  << "txnNumber"
-                                  << txnNum);
+                                          << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                                  << "startTransaction" << true << "coordinator" << true
+                                  << "autocommit" << false << "txnNumber" << txnNum);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -258,11 +251,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                                                              << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
-                               << "coordinator"
-                               << true
-                               << "autocommit"
-                               << false
-                               << "txnNumber"
+                               << "coordinator" << true << "autocommit" << false << "txnNumber"
                                << txnNum),
                           newCmd);
     }
@@ -281,16 +270,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, BasicStartTxnWithAtClusterTime) 
                                   << "readConcern"
                                   << BSON("level"
                                           << "snapshot"
-                                          << "atClusterTime"
-                                          << kInMemoryLogicalTime.asTimestamp())
-                                  << "startTransaction"
-                                  << true
-                                  << "coordinator"
-                                  << true
-                                  << "autocommit"
-                                  << false
-                                  << "txnNumber"
-                                  << txnNum);
+                                          << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                                  << "startTransaction" << true << "coordinator" << true
+                                  << "autocommit" << false << "txnNumber" << txnNum);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -307,11 +289,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, BasicStartTxnWithAtClusterTime) 
                                                              << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
-                               << "coordinator"
-                               << true
-                               << "autocommit"
-                               << false
-                               << "txnNumber"
+                               << "coordinator" << true << "autocommit" << false << "txnNumber"
                                << txnNum),
                           newCmd);
     }
@@ -341,16 +319,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
                                   << "readConcern"
                                   << BSON("level"
                                           << "snapshot"
-                                          << "atClusterTime"
-                                          << kInMemoryLogicalTime.asTimestamp())
-                                  << "startTransaction"
-                                  << true
-                                  << "coordinator"
-                                  << true
-                                  << "autocommit"
-                                  << false
-                                  << "txnNumber"
-                                  << txnNum);
+                                          << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                                  << "startTransaction" << true << "coordinator" << true
+                                  << "autocommit" << false << "txnNumber" << txnNum);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -367,11 +338,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
                                                              << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
-                               << "coordinator"
-                               << true
-                               << "autocommit"
-                               << false
-                               << "txnNumber"
+                               << "coordinator" << true << "autocommit" << false << "txnNumber"
                                << txnNum),
                           newCmd);
     }
@@ -381,13 +348,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
                           << "readConcern"
                           << BSON("level"
                                   << "snapshot"
-                                  << "atClusterTime"
-                                  << kInMemoryLogicalTime.asTimestamp())
-                          << "startTransaction"
-                          << true
-                          << "autocommit"
-                          << false
-                          << "txnNumber"
+                                  << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                          << "startTransaction" << true << "autocommit" << false << "txnNumber"
                           << txnNum);
 
     {
@@ -405,10 +367,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
                                                              << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
-                               << "autocommit"
-                               << false
-                               << "txnNumber"
-                               << txnNum),
+                               << "autocommit" << false << "txnNumber" << txnNum),
                           newCmd);
     }
 }
@@ -431,16 +390,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) 
                                << "readConcern"
                                << BSON("level"
                                        << "snapshot"
-                                       << "atClusterTime"
-                                       << kInMemoryLogicalTime.asTimestamp())
-                               << "startTransaction"
-                               << true
-                               << "coordinator"
-                               << true
-                               << "autocommit"
-                               << false
-                               << "txnNumber"
-                               << txnNum),
+                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                               << "startTransaction" << true << "coordinator" << true
+                               << "autocommit" << false << "txnNumber" << txnNum),
                           newCmd);
     }
 
@@ -454,16 +406,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) 
                                   << "readConcern"
                                   << BSON("level"
                                           << "snapshot"
-                                          << "atClusterTime"
-                                          << kInMemoryLogicalTime.asTimestamp())
-                                  << "startTransaction"
-                                  << true
-                                  << "coordinator"
-                                  << true
-                                  << "autocommit"
-                                  << false
-                                  << "txnNumber"
-                                  << txnNum2);
+                                          << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                                  << "startTransaction" << true << "coordinator" << true
+                                  << "autocommit" << false << "txnNumber" << txnNum2);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -707,26 +652,18 @@ TEST_F(TransactionRouterTestWithDefaultSession, DoesNotAttachTxnNumIfAlreadyTher
 
     BSONObj expectedNewObj = BSON("insert"
                                   << "test"
-                                  << "txnNumber"
-                                  << txnNum
-                                  << "readConcern"
+                                  << "txnNumber" << txnNum << "readConcern"
                                   << BSON("level"
                                           << "snapshot"
-                                          << "atClusterTime"
-                                          << kInMemoryLogicalTime.asTimestamp())
-                                  << "startTransaction"
-                                  << true
-                                  << "coordinator"
-                                  << true
-                                  << "autocommit"
-                                  << false);
+                                          << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                                  << "startTransaction" << true << "coordinator" << true
+                                  << "autocommit" << false);
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,
                                                     BSON("insert"
                                                          << "test"
-                                                         << "txnNumber"
-                                                         << txnNum));
+                                                         << "txnNumber" << txnNum));
     ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
 }
 
@@ -744,8 +681,7 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
                                       shard1,
                                       BSON("insert"
                                            << "test"
-                                           << "txnNumber"
-                                           << TxnNumber(10)));
+                                           << "txnNumber" << TxnNumber(10)));
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, AttachTxnValidatesReadConcernIfAlreadyOnCmd) {
@@ -769,16 +705,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, AttachTxnValidatesReadConcernIfA
                                << "readConcern"
                                << BSON("level"
                                        << "snapshot"
-                                       << "atClusterTime"
-                                       << kInMemoryLogicalTime.asTimestamp())
-                               << "startTransaction"
-                               << true
-                               << "coordinator"
-                               << true
-                               << "autocommit"
-                               << false
-                               << "txnNumber"
-                               << txnNum),
+                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                               << "startTransaction" << true << "coordinator" << true
+                               << "autocommit" << false << "txnNumber" << txnNum),
                           newCmd);
     }
 }
@@ -810,14 +739,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, PassesThroughNoReadConcernToPart
 
     BSONObj expectedNewObj = BSON("insert"
                                   << "test"
-                                  << "startTransaction"
-                                  << true
-                                  << "coordinator"
-                                  << true
-                                  << "autocommit"
-                                  << false
-                                  << "txnNumber"
-                                  << txnNum);
+                                  << "startTransaction" << true << "coordinator" << true
+                                  << "autocommit" << false << "txnNumber" << txnNum);
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,
@@ -843,14 +766,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                                   << "test"
                                   << "readConcern"
                                   << BSON("afterClusterTime" << kAfterClusterTime.asTimestamp())
-                                  << "startTransaction"
-                                  << true
-                                  << "coordinator"
-                                  << true
-                                  << "autocommit"
-                                  << false
-                                  << "txnNumber"
-                                  << txnNum);
+                                  << "startTransaction" << true << "coordinator" << true
+                                  << "autocommit" << false << "txnNumber" << txnNum);
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,
@@ -1489,8 +1406,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime
 
     BSONObj expectedReadConcern = BSON("level"
                                        << "snapshot"
-                                       << "atClusterTime"
-                                       << kInMemoryLogicalTime.asTimestamp());
+                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp());
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -1516,8 +1432,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime
 
     expectedReadConcern = BSON("level"
                                << "snapshot"
-                               << "atClusterTime"
-                               << laterTime.asTimestamp());
+                               << "atClusterTime" << laterTime.asTimestamp());
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -1539,8 +1454,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     BSONObj expectedReadConcern = BSON("level"
                                        << "snapshot"
-                                       << "atClusterTime"
-                                       << kInMemoryLogicalTime.asTimestamp());
+                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp());
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -1560,8 +1474,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     expectedReadConcern = BSON("level"
                                << "snapshot"
-                               << "atClusterTime"
-                               << laterTimeSameStmt.asTimestamp());
+                               << "atClusterTime" << laterTimeSameStmt.asTimestamp());
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -1835,8 +1748,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     BSONObj expectedReadConcern = BSON("level"
                                        << "snapshot"
-                                       << "atClusterTime"
-                                       << kInMemoryLogicalTime.asTimestamp());
+                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp());
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,
@@ -2348,8 +2260,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     BSONObj expectedReadConcern = BSON("level"
                                        << "snapshot"
-                                       << "atClusterTime"
-                                       << kInMemoryLogicalTime.asTimestamp());
+                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp());
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,
@@ -3194,12 +3105,10 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingPrintsTransactionParameters) {
 
     BSONObjBuilder lsidBob;
     getSessionId().serialize(&lsidBob);
-    ASSERT_EQUALS(
-        1,
-        countLogLinesContaining(str::stream() << "parameters:{ lsid: " << lsidBob.done().toString()
-                                              << ", txnNumber: "
-                                              << kTxnNumber
-                                              << ", autocommit: false"));
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining(
+                      str::stream() << "parameters:{ lsid: " << lsidBob.done().toString()
+                                    << ", txnNumber: " << kTxnNumber << ", autocommit: false"));
 }
 
 TEST_F(TransactionRouterMetricsTest, SlowLoggingPrintsDurationAtEnd) {

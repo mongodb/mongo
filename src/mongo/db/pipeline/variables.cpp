@@ -68,9 +68,7 @@ void Variables::uassertValidNameForUserWrite(StringData varName) {
 
         uassert(16868,
                 str::stream() << "'" << varName << "' contains an invalid character "
-                              << "for a variable name: '"
-                              << varName[i]
-                              << "'",
+                              << "for a variable name: '" << varName[i] << "'",
                 charIsValid);
     }
 }
@@ -95,9 +93,7 @@ void Variables::uassertValidNameForUserRead(StringData varName) {
 
         uassert(16871,
                 str::stream() << "'" << varName << "' contains an invalid character "
-                              << "for a variable name: '"
-                              << varName[i]
-                              << "'",
+                              << "for a variable name: '" << varName[i] << "'",
                 charIsValid);
     }
 }
@@ -258,4 +254,4 @@ std::set<Variables::Id> VariablesParseState::getDefinedVariableIDs() const {
 
     return ids;
 }
-}
+}  // namespace mongo

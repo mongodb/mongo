@@ -183,4 +183,4 @@ public:
 private:
     RamLog* _ramlog;
 };
-}
+}  // namespace mongo

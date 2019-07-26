@@ -253,10 +253,10 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStuckThreads) {
 }
 
 /*
-* This tests that the executor will launch more threads when starvation is detected. We launch
-* another task from itself so there will always be a queue of a waiting task if there's just one
-* thread.
-*/
+ * This tests that the executor will launch more threads when starvation is detected. We launch
+ * another task from itself so there will always be a queue of a waiting task if there's just one
+ * thread.
+ */
 TEST_F(ServiceExecutorAdaptiveFixture, TestStarvation) {
     auto exec = makeAndStartExecutor<TestOptions>();
 
@@ -269,7 +269,6 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStarvation) {
 
     std::function<void()> task;
     task = [this, &task, &exec, &scheduleMutex, &scheduleNew] {
-
         // This sleep needs to be larger than the sleep below to be able to limit the amount of
         // starvation.
         stdx::this_thread::sleep_for(config->maxQueueLatency().toSystemDuration() * 5);
@@ -304,9 +303,9 @@ TEST_F(ServiceExecutorAdaptiveFixture, TestStarvation) {
 }
 
 /*
-* This tests that the executor can execute tasks recursively. If it can't starvation will be
-* detected and new threads started.
-*/
+ * This tests that the executor can execute tasks recursively. If it can't starvation will be
+ * detected and new threads started.
+ */
 TEST_F(ServiceExecutorAdaptiveFixture, TestRecursion) {
     auto exec = makeAndStartExecutor<RecursionOptions>();
 

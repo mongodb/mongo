@@ -252,7 +252,7 @@ TEST_F(DropPendingCollectionReaperTest,
     decltype(dpns) droppedNss;
     bool writesAreReplicatedDuringDrop = true;
     storageInterfaceMock.dropCollFn = [&droppedNss, &writesAreReplicatedDuringDrop](
-        OperationContext* opCtx, const NamespaceString& nss) {
+                                          OperationContext* opCtx, const NamespaceString& nss) {
         droppedNss = nss;
         writesAreReplicatedDuringDrop = opCtx->writesAreReplicated();
         return Status::OK();

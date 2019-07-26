@@ -136,4 +136,4 @@ private:
     const char* _pos;
     const char* _end;
 };
-}
+}  // namespace mongo

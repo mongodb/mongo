@@ -13,7 +13,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');                // for e
 load('jstests/concurrency/fsm_workloads/sharded_base_partitioned.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.iterations = 8;
     $config.threadCount = 5;
 
@@ -250,7 +249,6 @@ var $config = extendWorkload($config, function($config, $super) {
                 assertWhenOwnColl.eq(numChunksAfter, numChunksBefore, msg);
             }
         }
-
     };
 
     $config.transitions = {init: {mergeChunks: 1}, mergeChunks: {mergeChunks: 1}};

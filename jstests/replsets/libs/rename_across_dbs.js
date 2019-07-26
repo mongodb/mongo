@@ -68,18 +68,18 @@ var RenameAcrossDatabasesTest = function(options) {
             protocolVersion: 1,
             members: [
                 {
-                  _id: 0,
-                  host: hosts[0],
+                    _id: 0,
+                    host: hosts[0],
                 },
                 {
-                  _id: 1,
-                  host: hosts[1],
-                  priority: 0,
+                    _id: 1,
+                    host: hosts[1],
+                    priority: 0,
                 },
                 {
-                  _id: 2,
-                  host: hosts[2],
-                  arbiterOnly: true,
+                    _id: 2,
+                    host: hosts[2],
+                    arbiterOnly: true,
                 },
             ],
             version: nextVersion,
@@ -160,5 +160,4 @@ var RenameAcrossDatabasesTest = function(options) {
         _testLog('Test completed. Stopping replica set.');
         replTest.stopSet();
     };
-
 };

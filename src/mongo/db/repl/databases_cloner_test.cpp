@@ -177,19 +177,19 @@ protected:
                    const BSONObj idIndexSpec,
                    const std::vector<BSONObj>& secondaryIndexSpecs)
             -> StatusWith<std::unique_ptr<CollectionBulkLoaderMock>> {
-                // Get collection info from map.
-                const auto collInfo = &_collections[nss];
-                if (collInfo->stats->initCalled) {
-                    log() << "reusing collection during test which may cause problems, ns:" << nss;
-                }
-                auto localLoader = std::make_unique<CollectionBulkLoaderMock>(collInfo->stats);
-                auto status = localLoader->init(secondaryIndexSpecs);
-                if (!status.isOK())
-                    return status;
-                collInfo->loader = localLoader.get();
+            // Get collection info from map.
+            const auto collInfo = &_collections[nss];
+            if (collInfo->stats->initCalled) {
+                log() << "reusing collection during test which may cause problems, ns:" << nss;
+            }
+            auto localLoader = std::make_unique<CollectionBulkLoaderMock>(collInfo->stats);
+            auto status = localLoader->init(secondaryIndexSpecs);
+            if (!status.isOK())
+                return status;
+            collInfo->loader = localLoader.get();
 
-                return std::move(localLoader);
-            };
+            return std::move(localLoader);
+        };
 
         _dbWorkThreadPool.startup();
         _target = HostAndPort{"local:1234"};
@@ -924,13 +924,13 @@ TEST_F(DBsClonerTest, SingleDatabaseCopiesCompletely) {
         {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}]}")},
         // listCollections for "a"
         {"listCollections",
-         BSON("ok" << 1 << "cursor" << BSON("id" << 0ll << "ns"
-                                                 << "a.$cmd.listCollections"
-                                                 << "firstBatch"
-                                                 << BSON_ARRAY(BSON("name"
-                                                                    << "a"
-                                                                    << "options"
-                                                                    << options.toBSON()))))},
+         BSON("ok" << 1 << "cursor"
+                   << BSON("id" << 0ll << "ns"
+                                << "a.$cmd.listCollections"
+                                << "firstBatch"
+                                << BSON_ARRAY(BSON("name"
+                                                   << "a"
+                                                   << "options" << options.toBSON()))))},
         // count:a
         {"count", BSON("n" << 1 << "ok" << 1)},
         // listIndexes:a
@@ -957,13 +957,13 @@ TEST_F(DBsClonerTest, TwoDatabasesCopiesCompletely) {
         {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}, {name:'b'}]}")},
         // listCollections for "a"
         {"listCollections",
-         BSON("ok" << 1 << "cursor" << BSON("id" << 0ll << "ns"
-                                                 << "a.$cmd.listCollections"
-                                                 << "firstBatch"
-                                                 << BSON_ARRAY(BSON("name"
-                                                                    << "a"
-                                                                    << "options"
-                                                                    << options1.toBSON()))))},
+         BSON("ok" << 1 << "cursor"
+                   << BSON("id" << 0ll << "ns"
+                                << "a.$cmd.listCollections"
+                                << "firstBatch"
+                                << BSON_ARRAY(BSON("name"
+                                                   << "a"
+                                                   << "options" << options1.toBSON()))))},
         // count:a
         {"count", BSON("n" << 1 << "ok" << 1)},
         // listIndexes:a
@@ -974,13 +974,13 @@ TEST_F(DBsClonerTest, TwoDatabasesCopiesCompletely) {
                                 << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
         // listCollections for "b"
         {"listCollections",
-         BSON("ok" << 1 << "cursor" << BSON("id" << 0ll << "ns"
-                                                 << "b.$cmd.listCollections"
-                                                 << "firstBatch"
-                                                 << BSON_ARRAY(BSON("name"
-                                                                    << "b"
-                                                                    << "options"
-                                                                    << options2.toBSON()))))},
+         BSON("ok" << 1 << "cursor"
+                   << BSON("id" << 0ll << "ns"
+                                << "b.$cmd.listCollections"
+                                << "firstBatch"
+                                << BSON_ARRAY(BSON("name"
+                                                   << "b"
+                                                   << "options" << options2.toBSON()))))},
         // count:b
         {"count", BSON("n" << 2 << "ok" << 1)},
         // listIndexes:b

@@ -11,7 +11,6 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
-
     function makeQuery(options) {
         var query = {};
         if (!options.multi) {
@@ -103,5 +102,4 @@ var $config = (function() {
         },
         setup: setup
     };
-
 })();

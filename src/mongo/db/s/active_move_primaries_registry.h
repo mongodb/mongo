@@ -159,4 +159,4 @@ private:
     // This is the future, which will be signaled at the end of a movePrimary command.
     std::shared_ptr<Notification<Status>> _completionNotification;
 };
-}
+}  // namespace mongo

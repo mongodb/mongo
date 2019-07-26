@@ -171,8 +171,7 @@ TEST(CollationIndexKeyTest, CollationAwareAppendThrowsIfSymbolInsideObject) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj dataObj = BSON("" << BSON("a"
                                       << "foo"
-                                      << "b"
-                                      << BSONSymbol("mySymbol")));
+                                      << "b" << BSONSymbol("mySymbol")));
     BSONObjBuilder out;
     ASSERT_THROWS_CODE(
         CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out),

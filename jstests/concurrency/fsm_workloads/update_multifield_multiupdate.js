@@ -13,7 +13,6 @@ load('jstests/concurrency/fsm_workloads/update_multifield.js');  // for $config
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.data.multi = true;
 
     $config.data.assertResult = function(res, db, collName, query) {

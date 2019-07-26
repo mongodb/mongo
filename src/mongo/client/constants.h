@@ -49,4 +49,4 @@ enum ResultFlagType {
     */
     ResultFlag_AwaitCapable = 8
 };
-}
+}  // namespace mongo

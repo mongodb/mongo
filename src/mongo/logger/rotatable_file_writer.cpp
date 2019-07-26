@@ -70,7 +70,7 @@ std::wstring utf8ToWide(StringData utf8Str) {
                                         utf8Str.size(),     // Count
                                         tempBuffer.get(),   // UTF-16 output buffer
                                         utf8Str.size()      // Buffer size in wide characters
-                                        );
+    );
     // TODO(schwerin): fassert finalSize > 0?
     return std::wstring(tempBuffer.get(), finalSize);
 }
@@ -142,7 +142,7 @@ bool Win32FileStreambuf::open(StringData fileName, bool append) {
                               OPEN_ALWAYS,                          // dwCreationDisposition
                               FILE_ATTRIBUTE_NORMAL,                // dwFlagsAndAttributes
                               nullptr                               // hTemplateFile
-                              );
+    );
 
 
     if (INVALID_HANDLE_VALUE == _fileHandle)
@@ -212,9 +212,9 @@ Status RotatableFileWriter::Use::rotate(bool renameOnRotate, const std::string& 
             try {
                 if (boost::filesystem::exists(renameTarget)) {
                     return Status(ErrorCodes::FileRenameFailed,
-                                  str::stream() << "Renaming file " << _writer->_fileName << " to "
-                                                << renameTarget
-                                                << " failed; destination already exists");
+                                  str::stream()
+                                      << "Renaming file " << _writer->_fileName << " to "
+                                      << renameTarget << " failed; destination already exists");
                 }
             } catch (const std::exception& e) {
                 return Status(ErrorCodes::FileRenameFailed,
@@ -229,11 +229,9 @@ Status RotatableFileWriter::Use::rotate(bool renameOnRotate, const std::string& 
             boost::filesystem::rename(_writer->_fileName, renameTarget, ec);
             if (ec) {
                 return Status(ErrorCodes::FileRenameFailed,
-                              str::stream() << "Failed  to rename \"" << _writer->_fileName
-                                            << "\" to \""
-                                            << renameTarget
-                                            << "\": "
-                                            << ec.message());
+                              str::stream()
+                                  << "Failed  to rename \"" << _writer->_fileName << "\" to \""
+                                  << renameTarget << "\": " << ec.message());
                 // TODO(schwerin): Make errnoWithDescription() available in the logger library, and
                 // use it here.
             }

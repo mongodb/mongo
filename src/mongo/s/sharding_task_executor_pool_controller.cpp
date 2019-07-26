@@ -53,7 +53,7 @@ void emplaceOrInvariant(Map&& map, Args&&... args) noexcept {
     invariant(ret.second, "Element already existed in map/set");
 }
 
-}  // anonymous
+}  // namespace
 
 Status ShardingTaskExecutorPoolController::validateHostTimeout(const int& hostTimeoutMS) {
     auto toRefreshTimeoutMS = gParameters.toRefreshTimeoutMS.load();

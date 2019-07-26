@@ -248,4 +248,4 @@ TEST(UpdateSerialization, CompoundStatementsSerialize) {
 }
 
 }  // namespace
-}  // mongo
+}  // namespace mongo

@@ -115,8 +115,7 @@ void assertRequiredPathsPresent(const mb::Document& document, const FieldRefSet&
             uassert(ErrorCodes::NoSuchKey,
                     str::stream() << "After applying the update, the new document was missing the "
                                      "required field '"
-                                  << (*path).dottedField()
-                                  << "'",
+                                  << (*path).dottedField() << "'",
                     elem.ok());
             uassert(
                 ErrorCodes::NotSingleValueField,

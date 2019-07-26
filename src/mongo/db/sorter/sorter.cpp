@@ -188,24 +188,21 @@ public:
     void openSource() {
         _file.open(_fileName.c_str(), std::ios::in | std::ios::binary);
         uassert(16814,
-                str::stream() << "error opening file \"" << _fileName << "\": "
-                              << myErrnoWithDescription(),
+                str::stream() << "error opening file \"" << _fileName
+                              << "\": " << myErrnoWithDescription(),
                 _file.good());
         _file.seekg(_fileStartOffset);
         uassert(50979,
                 str::stream() << "error seeking starting offset of '" << _fileStartOffset
-                              << "' in file \""
-                              << _fileName
-                              << "\": "
-                              << myErrnoWithDescription(),
+                              << "' in file \"" << _fileName << "\": " << myErrnoWithDescription(),
                 _file.good());
     }
 
     void closeSource() {
         _file.close();
         uassert(50969,
-                str::stream() << "error closing file \"" << _fileName << "\": "
-                              << myErrnoWithDescription(),
+                str::stream() << "error closing file \"" << _fileName
+                              << "\": " << myErrnoWithDescription(),
                 !_file.fail());
 
         // If the file iterator reads through all data objects, we can ensure non-corrupt data
@@ -328,8 +325,8 @@ private:
 
         const std::streampos offset = _file.tellg();
         uassert(51049,
-                str::stream() << "error reading file \"" << _fileName << "\": "
-                              << myErrnoWithDescription(),
+                str::stream() << "error reading file \"" << _fileName
+                              << "\": " << myErrnoWithDescription(),
                 offset >= 0);
 
         if (offset >= _fileEndOffset) {
@@ -340,8 +337,8 @@ private:
 
         _file.read(reinterpret_cast<char*>(out), size);
         uassert(16817,
-                str::stream() << "error reading file \"" << _fileName << "\": "
-                              << myErrnoWithDescription(),
+                str::stream() << "error reading file \"" << _fileName
+                              << "\": " << myErrnoWithDescription(),
                 _file.good());
         verify(_file.gcount() == static_cast<std::streamsize>(size));
     }
@@ -605,8 +602,7 @@ private:
             // need to be revisited.
             uasserted(16819,
                       str::stream()
-                          << "Sort exceeded memory limit of "
-                          << _opts.maxMemoryUsageBytes
+                          << "Sort exceeded memory limit of " << _opts.maxMemoryUsageBytes
                           << " bytes, but did not opt in to external sorting. Aborting operation."
                           << " Pass allowDiskUse:true to opt in.");
         }
@@ -893,8 +889,7 @@ private:
             // need to be revisited.
             uasserted(16820,
                       str::stream()
-                          << "Sort exceeded memory limit of "
-                          << _opts.maxMemoryUsageBytes
+                          << "Sort exceeded memory limit of " << _opts.maxMemoryUsageBytes
                           << " bytes, but did not opt in to external sorting. Aborting operation."
                           << " Pass allowDiskUse:true to opt in.");
         }
@@ -970,8 +965,8 @@ SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
     // limits.
     _file.open(_fileName.c_str(), std::ios::binary | std::ios::app | std::ios::out);
     uassert(16818,
-            str::stream() << "error opening file \"" << _fileName << "\": "
-                          << sorter::myErrnoWithDescription(),
+            str::stream() << "error opening file \"" << _fileName
+                          << "\": " << sorter::myErrnoWithDescription(),
             _file.good());
     // The file descriptor is positioned at the end of a file when opened in append mode, but
     // _file.tellp() is not initialized on all systems to reflect this. Therefore, we must also pass
@@ -1044,8 +1039,8 @@ void SortedFileWriter<Key, Value>::spill() {
         _file.write(outBuffer, std::abs(size));
     } catch (const std::exception&) {
         msgasserted(16821,
-                    str::stream() << "error writing to file \"" << _fileName << "\": "
-                                  << sorter::myErrnoWithDescription());
+                    str::stream() << "error writing to file \"" << _fileName
+                                  << "\": " << sorter::myErrnoWithDescription());
     }
 
     _buffer.reset();
@@ -1057,8 +1052,7 @@ SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
     std::streampos currentFileOffset = _file.tellp();
     uassert(50980,
             str::stream() << "error fetching current file descriptor offset in file \"" << _fileName
-                          << "\": "
-                          << sorter::myErrnoWithDescription(),
+                          << "\": " << sorter::myErrnoWithDescription(),
             currentFileOffset >= 0);
 
     // In case nothing was written to disk, use _fileStartOffset because tellp() may not be
@@ -1106,4 +1100,4 @@ Sorter<Key, Value>* Sorter<Key, Value>::make(const SortOptions& opts,
             return new sorter::TopKSorter<Key, Value, Comparator>(opts, comp, settings);
     }
 }
-}
+}  // namespace mongo

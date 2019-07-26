@@ -97,36 +97,36 @@ public:
 
     // Update the shard identy config string
     void onConfirmedSet(const State& state) final {
-        Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor()->schedule([
-            serviceContext = _serviceContext,
-            connStr = state.connStr
-        ](Status status) {
-            if (ErrorCodes::isCancelationError(status.code())) {
-                LOG(2) << "Unable to schedule confirmed set update due to " << status;
-                return;
-            }
-            uassertStatusOK(status);
+        Grid::get(_serviceContext)
+            ->getExecutorPool()
+            ->getFixedExecutor()
+            ->schedule([serviceContext = _serviceContext, connStr = state.connStr](Status status) {
+                if (ErrorCodes::isCancelationError(status.code())) {
+                    LOG(2) << "Unable to schedule confirmed set update due to " << status;
+                    return;
+                }
+                uassertStatusOK(status);
 
-            LOG(0) << "Updating config server with confirmed set " << connStr;
-            Grid::get(serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
+                LOG(0) << "Updating config server with confirmed set " << connStr;
+                Grid::get(serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
 
-            if (MONGO_FAIL_POINT(failUpdateShardIdentityConfigString)) {
-                return;
-            }
+                if (MONGO_FAIL_POINT(failUpdateShardIdentityConfigString)) {
+                    return;
+                }
 
-            auto configsvrConnStr =
-                Grid::get(serviceContext)->shardRegistry()->getConfigServerConnectionString();
+                auto configsvrConnStr =
+                    Grid::get(serviceContext)->shardRegistry()->getConfigServerConnectionString();
 
-            // Only proceed if the notification is for the configsvr
-            if (configsvrConnStr.getSetName() != connStr.getSetName()) {
-                return;
-            }
+                // Only proceed if the notification is for the configsvr
+                if (configsvrConnStr.getSetName() != connStr.getSetName()) {
+                    return;
+                }
 
-            ThreadClient tc("updateShardIdentityConfigString", serviceContext);
-            auto opCtx = tc->makeOperationContext();
+                ThreadClient tc("updateShardIdentityConfigString", serviceContext);
+                auto opCtx = tc->makeOperationContext();
 
-            ShardingInitializationMongoD::updateShardIdentityConfigString(opCtx.get(), connStr);
-        });
+                ShardingInitializationMongoD::updateShardIdentityConfigString(opCtx.get(), connStr);
+            });
     }
     void onPossibleSet(const State& state) final {
         Grid::get(_serviceContext)->shardRegistry()->updateReplSetHosts(state.connStr);
@@ -373,12 +373,14 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
     auto targeterFactoryPtr = targeterFactory.get();
 
     ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr](
-        const ShardId& shardId, const ConnectionString& connStr) {
+                                                   const ShardId& shardId,
+                                                   const ConnectionString& connStr) {
         return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
     };
 
     ShardFactory::BuilderCallable masterBuilder = [targeterFactoryPtr](
-        const ShardId& shardId, const ConnectionString& connStr) {
+                                                      const ShardId& shardId,
+                                                      const ConnectionString& connStr) {
         return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
     };
 

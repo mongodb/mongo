@@ -103,4 +103,4 @@ private:
     mutable stdx::mutex _bufferMutex;  // Guards _buffer
     Buffer _buffer;
 };
-}
+}  // namespace mongo

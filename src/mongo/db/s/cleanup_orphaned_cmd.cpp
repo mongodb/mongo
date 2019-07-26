@@ -89,9 +89,9 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
         BSONObj keyPattern = metadata->getKeyPattern();
         if (!startingFromKey.isEmpty()) {
             if (!metadata->isValidKey(startingFromKey)) {
-                *errMsg = str::stream() << "could not cleanup orphaned data, start key "
-                                        << startingFromKey << " does not match shard key pattern "
-                                        << keyPattern;
+                *errMsg = str::stream()
+                    << "could not cleanup orphaned data, start key " << startingFromKey
+                    << " does not match shard key pattern " << keyPattern;
 
                 log() << *errMsg;
                 return CleanupResult_Error;

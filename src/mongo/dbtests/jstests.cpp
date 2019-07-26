@@ -411,8 +411,7 @@ public:
                              << "eliot"
                              << "z"
                              << "sara"
-                             << "zz"
-                             << BSONObj());
+                             << "zz" << BSONObj());
         s->setObject("blah", o, true);
 
         BSONObj out;
@@ -1239,7 +1238,22 @@ class NovelNaN {
 public:
     void run() {
         uint8_t bits[] = {
-            16, 0, 0, 0, 0x01, 'a', '\0', 0x61, 0x79, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
+            16,
+            0,
+            0,
+            0,
+            0x01,
+            'a',
+            '\0',
+            0x61,
+            0x79,
+            0xfe,
+            0xff,
+            0xff,
+            0xff,
+            0xff,
+            0xff,
+            0,
         };
         unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 

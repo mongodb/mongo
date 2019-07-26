@@ -1,7 +1,6 @@
 "use strict";
 
 var {runMongoeBench} = (function() {
-
     /**
      * Spawns a mongoebench process with the specified options.
      *

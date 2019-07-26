@@ -487,12 +487,14 @@ void NetworkInterfaceMock::_enqueueOperation_inlock(
         ResponseStatus rs(
             ErrorCodes::NetworkInterfaceExceededTimeLimit, "Network timeout", Milliseconds(0));
         std::vector<NetworkOperationList*> queuesToCheck{&_unscheduled, &_blackHoled, &_scheduled};
-        _alarms.emplace(cbh, _now_inlock() + timeout, [
-            this,
-            cbh = std::move(cbh),
-            queuesToCheck = std::move(queuesToCheck),
-            rs = std::move(rs)
-        ](Status) { _interruptWithResponse_inlock(cbh, queuesToCheck, rs); });
+        _alarms.emplace(cbh,
+                        _now_inlock() + timeout,
+                        [this,
+                         cbh = std::move(cbh),
+                         queuesToCheck = std::move(queuesToCheck),
+                         rs = std::move(rs)](Status) {
+                            _interruptWithResponse_inlock(cbh, queuesToCheck, rs);
+                        });
     }
 }
 
@@ -535,25 +537,25 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
     auto cbh = op.getCallbackHandle();
     // The completion handler for the postconnect command schedules the original command.
     auto postconnectCompletionHandler =
-        [ this, op = std::move(op) ](TaskExecutor::ResponseOnAnyStatus rs) mutable {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        if (!rs.isOK()) {
-            op.setResponse(_now_inlock(), rs);
-            op.finishResponse();
-            return;
-        }
+        [this, op = std::move(op)](TaskExecutor::ResponseOnAnyStatus rs) mutable {
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            if (!rs.isOK()) {
+                op.setResponse(_now_inlock(), rs);
+                op.finishResponse();
+                return;
+            }
 
-        auto handleStatus = _hook->handleReply(op.getRequest().target, std::move(rs));
+            auto handleStatus = _hook->handleReply(op.getRequest().target, std::move(rs));
 
-        if (!handleStatus.isOK()) {
-            op.setResponse(_now_inlock(), handleStatus);
-            op.finishResponse();
-            return;
-        }
+            if (!handleStatus.isOK()) {
+                op.setResponse(_now_inlock(), handleStatus);
+                op.finishResponse();
+                return;
+            }
 
-        _connections.emplace(op.getRequest().target);
-        _enqueueOperation_inlock(std::move(op));
-    };
+            _connections.emplace(op.getRequest().target);
+            _enqueueOperation_inlock(std::move(op));
+        };
 
     auto postconnectOp = NetworkOperation(cbh,
                                           std::move(*hookPostconnectCommand),

@@ -145,8 +145,8 @@ void setThreadName(StringData name) {
         //  limit, it's best to shorten long names.
         int error = 0;
         if (threadName.size() > 15) {
-            std::string shortName = str::stream() << threadName.substr(0, 7) << '.'
-                                                  << threadName.substr(threadName.size() - 7);
+            std::string shortName = str::stream()
+                << threadName.substr(0, 7) << '.' << threadName.substr(threadName.size() - 7);
             error = pthread_setname_np(pthread_self(), shortName.c_str());
         } else {
             error = pthread_setname_np(pthread_self(), threadName.rawData());

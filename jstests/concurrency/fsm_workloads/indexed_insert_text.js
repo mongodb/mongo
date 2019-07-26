@@ -6,7 +6,6 @@
  * Inserts some documents into a collection with a text index.
  */
 var $config = (function() {
-
     var states = {
         init: function init(db, collName) {
             // noop
@@ -126,5 +125,4 @@ var $config = (function() {
         },
         setup: setup
     };
-
 })();

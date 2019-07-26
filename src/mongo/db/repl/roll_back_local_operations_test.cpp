@@ -50,26 +50,18 @@ BSONObj makeOp(long long seconds, long long term = 1LL) {
     auto uuid = unittest::assertGet(UUID::parse("b4c66a44-c1ca-4d86-8d25-12e82fa2de5b"));
     return BSON("ts" << Timestamp(seconds, seconds) << "t" << term << "op"
                      << "n"
-                     << "o"
-                     << BSONObj()
-                     << "ns"
+                     << "o" << BSONObj() << "ns"
                      << "roll_back_local_operations.test"
-                     << "ui"
-                     << uuid);
+                     << "ui" << uuid);
 }
 
 BSONObj makeOpWithWallClockTime(long count, long wallClockMillis, long long term = 1LL) {
     auto uuid = unittest::assertGet(UUID::parse("b4c66a44-c1ca-4d86-8d25-12e82fa2de5b"));
     return BSON("ts" << Timestamp(count, count) << "t" << term << "op"
                      << "n"
-                     << "o"
-                     << BSONObj()
-                     << "ns"
+                     << "o" << BSONObj() << "ns"
                      << "roll_back_local_operations.test"
-                     << "ui"
-                     << uuid
-                     << "wall"
-                     << Date_t::fromMillisSinceEpoch(wallClockMillis));
+                     << "ui" << uuid << "wall" << Date_t::fromMillisSinceEpoch(wallClockMillis));
 };
 
 int recordId = 0;
@@ -150,7 +142,8 @@ TEST(RollBackLocalOperationsTest, RollbackMultipleLocalOperations) {
 TEST(RollBackLocalOperationsTest, RollbackOperationFailed) {
     auto commonOperation = makeOpAndRecordId(1);
     OplogInterfaceMock::Operations localOperations({
-        makeOpAndRecordId(2), commonOperation,
+        makeOpAndRecordId(2),
+        commonOperation,
     });
     OplogInterfaceMock localOplog(localOperations);
     auto rollbackOperation = [&](const BSONObj& operation) {
@@ -175,7 +168,10 @@ TEST(RollBackLocalOperationsTest, EndOfLocalOplog) {
 TEST(RollBackLocalOperationsTest, SkipRemoteOperations) {
     auto commonOperation = makeOpAndRecordId(1);
     OplogInterfaceMock::Operations localOperations({
-        makeOpAndRecordId(5), makeOpAndRecordId(4), makeOpAndRecordId(2), commonOperation,
+        makeOpAndRecordId(5),
+        makeOpAndRecordId(4),
+        makeOpAndRecordId(2),
+        commonOperation,
     });
     OplogInterfaceMock localOplog(localOperations);
     auto i = localOperations.cbegin();
@@ -209,7 +205,8 @@ TEST(RollBackLocalOperationsTest, SkipRemoteOperations) {
 TEST(RollBackLocalOperationsTest, SameTimestampDifferentTermsRollbackNoSuchKey) {
     auto commonOperation = makeOpAndRecordId(1, 1);
     OplogInterfaceMock::Operations localOperations({
-        makeOpAndRecordId(2, 3), commonOperation,
+        makeOpAndRecordId(2, 3),
+        commonOperation,
     });
     OplogInterfaceMock localOplog(localOperations);
     auto rollbackOperation = [&](const BSONObj& operation) {
@@ -242,7 +239,9 @@ TEST(SyncRollBackLocalOperationsTest, RollbackTwoOperations) {
     auto commonOperation = makeOpWithWallClockTimeAndRecordId(1, 1 * 5000);
     auto firstOpAfterCommonPoint = makeOpWithWallClockTimeAndRecordId(2, 2 * 60 * 60 * 24 * 1000);
     OplogInterfaceMock::Operations localOperations({
-        makeOpAndRecordId(3), firstOpAfterCommonPoint, commonOperation,
+        makeOpAndRecordId(3),
+        firstOpAfterCommonPoint,
+        commonOperation,
     });
     auto i = localOperations.cbegin();
     auto result = syncRollBackLocalOperations(OplogInterfaceMock(localOperations),

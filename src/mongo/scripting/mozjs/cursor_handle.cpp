@@ -41,7 +41,8 @@ namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec CursorHandleInfo::methods[2] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(zeroCursorId, CursorHandleInfo), JS_FS_END,
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(zeroCursorId, CursorHandleInfo),
+    JS_FS_END,
 };
 
 const char* const CursorHandleInfo::className = "CursorHandle";

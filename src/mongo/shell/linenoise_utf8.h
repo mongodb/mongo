@@ -141,10 +141,7 @@ struct UtfStringMixin {
     UtfStringMixin() : _len(0), _cap(0), _chars(0) {}
 
     UtfStringMixin(const UtfStringMixin& other)  // copies like std::string
-        : _len(other._len),
-          _cap(other._len + 1),
-          _chars(other._chars),
-          _str(new char_t[_cap]) {
+        : _len(other._len), _cap(other._len + 1), _chars(other._chars), _str(new char_t[_cap]) {
         memcpy(_str.get(), other._str.get(), _cap * sizeof(char_t));
     }
 

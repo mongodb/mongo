@@ -98,9 +98,7 @@ BSONElement BtreeKeyGenerator::_extractNextElement(const BSONObj& obj,
         16746,
         str::stream() << "Ambiguous field name found in array (do not use numeric field names in "
                          "embedded elements in an array), field: '"
-                      << arrField.fieldName()
-                      << "' for array: "
-                      << positionalInfo.arrayObj,
+                      << arrField.fieldName() << "' for array: " << positionalInfo.arrayObj,
         !haveObjField || !positionalInfo.hasPositionallyIndexedElt());
 
     *arrayNestedArray = false;

@@ -43,8 +43,8 @@ namespace mongo {
 namespace {
 
 using UnsetNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
+using mongo::mutablebson::Element;
 
 DEATH_TEST(UnsetNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
     auto update = fromjson("{$unset: {}}");

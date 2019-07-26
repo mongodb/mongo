@@ -1,54 +1,53 @@
 // Tests that merging chunks does not prevent cluster from doing other metadata ops
 
 (function() {
-    'use strict';
+'use strict';
 
-    var st = new ShardingTest({shards: 2});
+var st = new ShardingTest({shards: 2});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
-    var coll = mongos.getCollection("foo.bar");
+var mongos = st.s0;
+var admin = mongos.getDB("admin");
+var coll = mongos.getCollection("foo.bar");
 
-    assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-    st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
-    assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
+st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
+assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
-    st.printShardingStatus();
+st.printShardingStatus();
 
-    // Split and merge the first chunk repeatedly
-    jsTest.log("Splitting and merging repeatedly...");
+// Split and merge the first chunk repeatedly
+jsTest.log("Splitting and merging repeatedly...");
 
-    for (var i = 0; i < 5; i++) {
-        assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: i}}));
-        assert.commandWorked(
-            admin.runCommand({mergeChunks: coll + "", bounds: [{_id: MinKey}, {_id: MaxKey}]}));
-        printjson(mongos.getDB("config").chunks.find().toArray());
-    }
-
-    // Move the first chunk to the other shard
-    jsTest.log("Moving to another shard...");
-
+for (var i = 0; i < 5; i++) {
+    assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: i}}));
     assert.commandWorked(
-        admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
+        admin.runCommand({mergeChunks: coll + "", bounds: [{_id: MinKey}, {_id: MaxKey}]}));
+    printjson(mongos.getDB("config").chunks.find().toArray());
+}
 
-    // Split and merge the chunk repeatedly
-    jsTest.log("Splitting and merging repeatedly (again)...");
+// Move the first chunk to the other shard
+jsTest.log("Moving to another shard...");
 
-    for (var i = 0; i < 5; i++) {
-        assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: i}}));
-        assert.commandWorked(
-            admin.runCommand({mergeChunks: coll + "", bounds: [{_id: MinKey}, {_id: MaxKey}]}));
-        printjson(mongos.getDB("config").chunks.find().toArray());
-    }
+assert.commandWorked(
+    admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
 
-    // Move the chunk back to the original shard
-    jsTest.log("Moving to original shard...");
+// Split and merge the chunk repeatedly
+jsTest.log("Splitting and merging repeatedly (again)...");
 
+for (var i = 0; i < 5; i++) {
+    assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: i}}));
     assert.commandWorked(
-        admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard0.shardName}));
+        admin.runCommand({mergeChunks: coll + "", bounds: [{_id: MinKey}, {_id: MaxKey}]}));
+    printjson(mongos.getDB("config").chunks.find().toArray());
+}
 
-    st.printShardingStatus();
+// Move the chunk back to the original shard
+jsTest.log("Moving to original shard...");
 
-    st.stop();
+assert.commandWorked(
+    admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard0.shardName}));
 
+st.printShardingStatus();
+
+st.stop();
 })();

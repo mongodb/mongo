@@ -7,7 +7,6 @@
  * for SERVER-17132.
  */
 var $config = (function() {
-
     var states = (function() {
         function multiUpdate(db, collName) {
             // Set 'c' to some random value.

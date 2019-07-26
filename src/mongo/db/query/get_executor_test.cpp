@@ -189,14 +189,13 @@ TEST(GetExecutorTest, GetAllowedIndicesDescendingOrder) {
 }
 
 TEST(GetExecutorTest, GetAllowedIndicesMatchesByName) {
-    testAllowedIndices(
-        {buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-         buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1:en")},
-        // BSONObjSet default constructor is explicit, so we cannot copy-list-initialize until
-        // C++14.
-        SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
-        {"a_1"},
-        {"a_1"});
+    testAllowedIndices({buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
+                        buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1:en")},
+                       // BSONObjSet default constructor is explicit, so we cannot
+                       // copy-list-initialize until C++14.
+                       SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
+                       {"a_1"},
+                       {"a_1"});
 }
 
 TEST(GetExecutorTest, GetAllowedIndicesMatchesMultipleIndexesByKey) {

@@ -126,16 +126,16 @@ using std::vector;
 
 using std::unique_ptr;
 
-using linenoise_utf8::UChar8;
-using linenoise_utf8::UChar32;
-using linenoise_utf8::copyString8to32;
 using linenoise_utf8::copyString32;
 using linenoise_utf8::copyString32to8;
+using linenoise_utf8::copyString8to32;
 using linenoise_utf8::strlen32;
 using linenoise_utf8::strncmp32;
-using linenoise_utf8::write32;
-using linenoise_utf8::Utf8String;
+using linenoise_utf8::UChar32;
+using linenoise_utf8::UChar8;
 using linenoise_utf8::Utf32String;
+using linenoise_utf8::Utf8String;
+using linenoise_utf8::write32;
 
 struct linenoiseCompletions {
     vector<Utf32String> completionStrings;
@@ -1234,7 +1234,7 @@ static UChar32 setMetaRoutine(UChar32 c) {
     return doDispatch(c, initialDispatch);
 }
 
-}  // namespace EscapeSequenceProcessing // move these out of global namespace
+}  // namespace EscapeSequenceProcessing
 
 #endif  // #ifndef _WIN32
 

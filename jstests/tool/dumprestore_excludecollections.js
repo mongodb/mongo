@@ -35,10 +35,10 @@ assert.neq(ret, 0, "mongodump started successfully with --excludeCollection and 
 resetDbpath(dumpDir);
 ret = MongoRunner.runMongoTool(
     "mongodump", {out: dumpDir, excludeCollectionsWithPrefix: "test", host: mongodSource.host});
-assert.neq(
-    ret,
-    0,
-    "mongodump started successfully with --excludeCollectionsWithPrefix but " + "no --db option");
+assert.neq(ret,
+           0,
+           "mongodump started successfully with --excludeCollectionsWithPrefix but " +
+               "no --db option");
 
 resetDbpath(dumpDir);
 ret = MongoRunner.runMongoTool("mongodump", {
@@ -48,10 +48,10 @@ ret = MongoRunner.runMongoTool("mongodump", {
     excludeCollectionsWithPrefix: "test",
     host: mongodSource.host
 });
-assert.neq(
-    ret,
-    0,
-    "mongodump started successfully with --excludeCollectionsWithPrefix and " + "--collection");
+assert.neq(ret,
+           0,
+           "mongodump started successfully with --excludeCollectionsWithPrefix and " +
+               "--collection");
 
 jsTest.log("Testing proper behavior of collection exclusion");
 resetDbpath(dumpDir);

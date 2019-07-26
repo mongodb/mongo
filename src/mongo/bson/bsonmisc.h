@@ -281,4 +281,4 @@ private:
 
 // considers order
 bool fieldsMatch(const BSONObj& lhs, const BSONObj& rhs);
-}
+}  // namespace mongo

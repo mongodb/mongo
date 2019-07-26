@@ -99,9 +99,7 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
                 ErrorCodes::Overflow,
                 str::stream()
                     << "sum of limit and skip cannot be represented as a 64-bit integer, limit: "
-                    << *qr.getLimit()
-                    << ", skip: "
-                    << qr.getSkip().value_or(0));
+                    << *qr.getLimit() << ", skip: " << qr.getSkip().value_or(0));
         }
         newLimit = newLimitValue;
     }
@@ -118,9 +116,7 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
                               str::stream()
                                   << "sum of ntoreturn and skip cannot be represented as a 64-bit "
                                      "integer, ntoreturn: "
-                                  << *qr.getNToReturn()
-                                  << ", skip: "
-                                  << qr.getSkip().value_or(0));
+                                  << *qr.getNToReturn() << ", skip: " << qr.getSkip().value_or(0));
             }
             newLimit = newLimitValue;
         } else {
@@ -131,9 +127,7 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
                               str::stream()
                                   << "sum of ntoreturn and skip cannot be represented as a 64-bit "
                                      "integer, ntoreturn: "
-                                  << *qr.getNToReturn()
-                                  << ", skip: "
-                                  << qr.getSkip().value_or(0));
+                                  << *qr.getNToReturn() << ", skip: " << qr.getSkip().value_or(0));
             }
             newNToReturn = newNToReturnValue;
         }
@@ -412,8 +406,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "Projection contains illegal field '"
                                 << AsyncResultsMerger::kSortKeyField
-                                << "': "
-                                << query.getQueryRequest().getProj());
+                                << "': " << query.getQueryRequest().getProj());
     }
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
@@ -436,8 +429,8 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             if (retries >= kMaxRetries) {
                 // Check if there are no retries remaining, so the last received error can be
                 // propagated to the caller.
-                ex.addContext(str::stream() << "Failed to run query after " << kMaxRetries
-                                            << " retries");
+                ex.addContext(str::stream()
+                              << "Failed to run query after " << kMaxRetries << " retries");
                 throw;
             }
 
@@ -463,8 +456,8 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             if (retries >= kMaxRetries) {
                 // Check if there are no retries remaining, so the last received error can be
                 // propagated to the caller.
-                ex.addContext(str::stream() << "Failed to run query after " << kMaxRetries
-                                            << " retries");
+                ex.addContext(str::stream()
+                              << "Failed to run query after " << kMaxRetries << " retries");
                 throw;
             } else if (!ErrorCodes::isStaleShardVersionError(ex.code()) &&
                        ex.code() != ErrorCodes::ShardNotFound) {
@@ -514,8 +507,7 @@ void validateLSID(OperationContext* opCtx,
     if (!opCtx->getLogicalSessionId() && cursor->getLsid()) {
         uasserted(50800,
                   str::stream() << "Cannot run getMore on cursor " << request.cursorid
-                                << ", which was created in session "
-                                << *cursor->getLsid()
+                                << ", which was created in session " << *cursor->getLsid()
                                 << ", without an lsid");
     }
 
@@ -523,10 +515,8 @@ void validateLSID(OperationContext* opCtx,
         (*opCtx->getLogicalSessionId() != *cursor->getLsid())) {
         uasserted(50801,
                   str::stream() << "Cannot run getMore on cursor " << request.cursorid
-                                << ", which was created in session "
-                                << *cursor->getLsid()
-                                << ", in session "
-                                << *opCtx->getLogicalSessionId());
+                                << ", which was created in session " << *cursor->getLsid()
+                                << ", in session " << *opCtx->getLogicalSessionId());
     }
 }
 
@@ -547,8 +537,7 @@ void validateTxnNumber(OperationContext* opCtx,
     if (!opCtx->getTxnNumber() && cursor->getTxnNumber()) {
         uasserted(50803,
                   str::stream() << "Cannot run getMore on cursor " << request.cursorid
-                                << ", which was created in transaction "
-                                << *cursor->getTxnNumber()
+                                << ", which was created in transaction " << *cursor->getTxnNumber()
                                 << ", without a txnNumber");
     }
 
@@ -556,10 +545,8 @@ void validateTxnNumber(OperationContext* opCtx,
         (*opCtx->getTxnNumber() != *cursor->getTxnNumber())) {
         uasserted(50804,
                   str::stream() << "Cannot run getMore on cursor " << request.cursorid
-                                << ", which was created in transaction "
-                                << *cursor->getTxnNumber()
-                                << ", in transaction "
-                                << *opCtx->getTxnNumber());
+                                << ", which was created in transaction " << *cursor->getTxnNumber()
+                                << ", in transaction " << *opCtx->getTxnNumber());
     }
 }
 

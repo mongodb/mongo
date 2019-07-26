@@ -153,7 +153,7 @@ Message makeMessage(NetworkOp op, Func&& bodyBuilder) {
     out.header().setLen(size);
     return out;
 }
-}
+}  // namespace
 
 Message makeInsertMessage(StringData ns, const BSONObj* objs, size_t count, int flags) {
     return makeMessage(dbInsert, [&](BufBuilder& b) {
@@ -238,4 +238,4 @@ DbResponse replyToQuery(int queryResultFlags,
     reply.bufBuilderForResults().appendBuf(data, size);
     return DbResponse{reply.toQueryReply(queryResultFlags, nReturned, startingFrom, cursorId)};
 }
-}
+}  // namespace mongo

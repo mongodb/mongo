@@ -132,12 +132,11 @@ public:
                     replClient.setLastOp(opCtx, prepareOpTime);
                 }
 
-                invariant(opCtx->recoveryUnit()->getPrepareTimestamp() ==
-                              prepareOpTime.getTimestamp(),
-                          str::stream() << "recovery unit prepareTimestamp: "
-                                        << opCtx->recoveryUnit()->getPrepareTimestamp().toString()
-                                        << " participant prepareOpTime: "
-                                        << prepareOpTime.toString());
+                invariant(
+                    opCtx->recoveryUnit()->getPrepareTimestamp() == prepareOpTime.getTimestamp(),
+                    str::stream() << "recovery unit prepareTimestamp: "
+                                  << opCtx->recoveryUnit()->getPrepareTimestamp().toString()
+                                  << " participant prepareOpTime: " << prepareOpTime.toString());
 
                 if (MONGO_FAIL_POINT(
                         participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic)) {

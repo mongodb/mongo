@@ -116,10 +116,9 @@ public:
 
         const auto toStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, toString);
         if (!toStatus.isOK()) {
-            std::string msg(str::stream() << "Could not move chunk in '" << nss.ns()
-                                          << "' to shard '"
-                                          << toString
-                                          << "' because that shard does not exist");
+            std::string msg(str::stream()
+                            << "Could not move chunk in '" << nss.ns() << "' to shard '" << toString
+                            << "' because that shard does not exist");
             log() << msg;
             uasserted(ErrorCodes::ShardNotFound, msg);
         }
@@ -158,10 +157,10 @@ public:
             // bounds
             if (!cm->getShardKeyPattern().isShardKey(bounds[0].Obj()) ||
                 !cm->getShardKeyPattern().isShardKey(bounds[1].Obj())) {
-                errmsg = str::stream() << "shard key bounds "
-                                       << "[" << bounds[0].Obj() << "," << bounds[1].Obj() << ")"
-                                       << " are not valid for shard key pattern "
-                                       << cm->getShardKeyPattern().toBSON();
+                errmsg = str::stream()
+                    << "shard key bounds "
+                    << "[" << bounds[0].Obj() << "," << bounds[1].Obj() << ")"
+                    << " are not valid for shard key pattern " << cm->getShardKeyPattern().toBSON();
                 return false;
             }
 

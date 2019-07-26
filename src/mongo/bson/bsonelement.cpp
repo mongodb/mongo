@@ -599,8 +599,8 @@ StatusWith<long long> BSONElement::parseIntegerElementToLong() const {
         // NaN doubles are rejected.
         if (std::isnan(eDouble)) {
             return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Expected an integer, but found NaN in: "
-                                        << toString(true, true));
+                          str::stream()
+                              << "Expected an integer, but found NaN in: " << toString(true, true));
         }
 
         // No integral doubles that are too large to be represented as a 64 bit signed integer.
@@ -609,8 +609,8 @@ StatusWith<long long> BSONElement::parseIntegerElementToLong() const {
         if (eDouble >= kLongLongMaxPlusOneAsDouble ||
             eDouble < std::numeric_limits<long long>::min()) {
             return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Cannot represent as a 64-bit integer: "
-                                        << toString(true, true));
+                          str::stream()
+                              << "Cannot represent as a 64-bit integer: " << toString(true, true));
         }
 
         // This checks if elem is an integral double.
@@ -625,8 +625,8 @@ StatusWith<long long> BSONElement::parseIntegerElementToLong() const {
         number = numberDecimal().toLongExact(&signalingFlags);
         if (signalingFlags != Decimal128::kNoFlag) {
             return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Cannot represent as a 64-bit integer: "
-                                        << toString(true, true));
+                          str::stream()
+                              << "Cannot represent as a 64-bit integer: " << toString(true, true));
         }
     } else {
         number = numberLong();
@@ -697,7 +697,7 @@ BSONElement BSONElement::operator[](StringData field) const {
 }
 
 namespace {
-NOINLINE_DECL void msgAssertedBadType[[noreturn]](int8_t type) {
+NOINLINE_DECL void msgAssertedBadType [[noreturn]] (int8_t type) {
     msgasserted(10320, str::stream() << "BSONElement: bad type " << (int)type);
 }
 }  // namespace

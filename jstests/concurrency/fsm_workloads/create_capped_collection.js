@@ -10,7 +10,6 @@
  */
 
 var $config = (function() {
-
     // Returns a document of the form { _id: ObjectId(...), field: '...' }
     // with specified BSON size.
     function makeDocWithSize(targetSize) {
@@ -84,7 +83,6 @@ var $config = (function() {
     };
 
     var states = (function() {
-
         var options = {
             capped: true,
             size: 8192  // multiple of 256; larger than 4096 default
@@ -107,7 +105,6 @@ var $config = (function() {
         }
 
         return {init: init, create: create};
-
     })();
 
     var transitions = {init: {create: 1}, create: {create: 1}};
@@ -119,5 +116,4 @@ var $config = (function() {
         states: states,
         transitions: transitions,
     };
-
 })();

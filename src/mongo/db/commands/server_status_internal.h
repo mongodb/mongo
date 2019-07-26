@@ -52,4 +52,4 @@ private:
     std::map<std::string, MetricTree*> _subtrees;
     std::map<std::string, ServerStatusMetric*> _metrics;
 };
-}
+}  // namespace mongo

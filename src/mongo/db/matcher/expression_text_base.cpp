@@ -60,10 +60,8 @@ void TextMatchExpressionBase::serialize(BSONObjBuilder* out) const {
     const fts::FTSQuery& ftsQuery = getFTSQuery();
     out->append("$text",
                 BSON("$search" << ftsQuery.getQuery() << "$language" << ftsQuery.getLanguage()
-                               << "$caseSensitive"
-                               << ftsQuery.getCaseSensitive()
-                               << "$diacriticSensitive"
-                               << ftsQuery.getDiacriticSensitive()));
+                               << "$caseSensitive" << ftsQuery.getCaseSensitive()
+                               << "$diacriticSensitive" << ftsQuery.getDiacriticSensitive()));
 }
 
 bool TextMatchExpressionBase::equivalent(const MatchExpression* other) const {

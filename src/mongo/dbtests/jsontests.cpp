@@ -939,7 +939,8 @@ TEST(FromJsonTest, NumericTypes) {
         double d;
     };
     const Val vals[] = {
-        {123, kMaxS64, 3.14}, {-123, -kMaxS64, -3.14},
+        {123, kMaxS64, 3.14},
+        {-123, -kMaxS64, -3.14},
     };
     for (const Val& val : vals) {
         const BSONObj obj =

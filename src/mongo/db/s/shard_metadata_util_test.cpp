@@ -103,8 +103,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
             maxCollVersion.incMajor();
             BSONObj shardChunk =
                 BSON(ChunkType::minShardID(mins[i])
-                     << ChunkType::max(maxs[i])
-                     << ChunkType::shard(kShardId.toString())
+                     << ChunkType::max(maxs[i]) << ChunkType::shard(kShardId.toString())
                      << ChunkType::lastmod(Date_t::fromMillisSinceEpoch(maxCollVersion.toLong())));
 
             chunks.push_back(
@@ -144,8 +143,8 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
         try {
             DBDirectClient client(operationContext());
             for (auto& chunk : chunks) {
-                Query query(BSON(ChunkType::minShardID() << chunk.getMin() << ChunkType::max()
-                                                         << chunk.getMax()));
+                Query query(BSON(ChunkType::minShardID()
+                                 << chunk.getMin() << ChunkType::max() << chunk.getMax()));
                 query.readPref(ReadPreference::Nearest, BSONArray());
 
                 std::unique_ptr<DBClientCursor> cursor = client.query(chunkMetadataNss, query, 1);

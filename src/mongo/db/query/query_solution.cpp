@@ -154,7 +154,7 @@ void addEqualityFieldSorts(const BSONObj& sortPattern,
         sortsOut->insert(prefixBob.obj());
     }
 }
-}
+}  // namespace
 
 string QuerySolutionNode::toString() const {
     str::stream ss;

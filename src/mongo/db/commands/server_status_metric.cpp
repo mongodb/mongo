@@ -49,4 +49,4 @@ string ServerStatusMetric::_parseLeafName(const string& name) {
 
     return name.substr(idx + 1);
 }
-}
+}  // namespace mongo

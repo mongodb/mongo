@@ -102,8 +102,8 @@ public:
 
 private:
     /**
-        * Gets the front element from _sessions and then pops it off the queue.
-        */
+     * Gets the front element from _sessions and then pops it off the queue.
+     */
     sqlite3* _popSession_inlock();
 
     // This is used to lock the _sessions vector.

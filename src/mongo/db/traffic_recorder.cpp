@@ -100,7 +100,7 @@ public:
     }
 
     void run() {
-        _thread = stdx::thread([ consumer = std::move(_pcqPipe.consumer), this ] {
+        _thread = stdx::thread([consumer = std::move(_pcqPipe.consumer), this] {
             try {
                 DataBuilder db;
                 std::fstream out(_path,

@@ -92,8 +92,7 @@ BSONObj ChangeStreamProxyStage::_validateAndConvertToBSON(const Document& event)
                              "event makes it impossible to resume the stream from that point. Only "
                              "transformations that retain the unmodified _id field are allowed. "
                              "Expected: "
-                          << BSON("_id" << resumeToken)
-                          << " but found: "
+                          << BSON("_id" << resumeToken) << " but found: "
                           << (eventBSON["_id"] ? BSON("_id" << eventBSON["_id"]) : BSONObj()),
             idField.binaryEqual(resumeToken));
     return eventBSON;

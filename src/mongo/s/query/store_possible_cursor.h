@@ -72,7 +72,7 @@ class TaskExecutor;
  * @ cursorManager the ClusterCursorManager on which to register the resulting ClusterClientCursor
  * @ privileges the PrivilegeVector of privileges needed for the original command, to be used for
  * auth checking by GetMore
-*/
+ */
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const ShardId& shardId,
                                         const HostAndPort& server,

@@ -187,7 +187,10 @@ TEST(SSLManager, MongoDBRolesParser) {
     // Negative: Runt, only a tag and long length with wrong missing length
     {
         unsigned char derData[] = {
-            0x31, 0x88, 0xff, 0xff,
+            0x31,
+            0x88,
+            0xff,
+            0xff,
         };
         auto swPeer = parsePeerRoles(ConstDataRange(derData));
         ASSERT_NOT_OK(swPeer.getStatus());
@@ -196,7 +199,10 @@ TEST(SSLManager, MongoDBRolesParser) {
     // Negative: Runt, only a tag and long length
     {
         unsigned char derData[] = {
-            0x31, 0x82, 0xff, 0xff,
+            0x31,
+            0x82,
+            0xff,
+            0xff,
         };
         auto swPeer = parsePeerRoles(ConstDataRange(derData));
         ASSERT_NOT_OK(swPeer.getStatus());
@@ -362,9 +368,7 @@ TEST(SSLManager, DNParsingAndNormalization) {
 }
 
 TEST(SSLManager, BadDNParsing) {
-    std::vector<std::string> tests = {"CN=#12345",
-                                      R"(CN=\B)",
-                                      R"(CN=<", "\)"};
+    std::vector<std::string> tests = {"CN=#12345", R"(CN=\B)", R"(CN=<", "\)"};
     for (const auto& test : tests) {
         log() << "Testing bad DN: \"" << test << "\"";
         auto swDN = parseDN(test);

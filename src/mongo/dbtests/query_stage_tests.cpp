@@ -242,4 +242,4 @@ public:
 
 SuiteInstance<All> queryStageTestsAll;
 
-}  // namespace
+}  // namespace QueryStageTests

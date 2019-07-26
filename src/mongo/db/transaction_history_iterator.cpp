@@ -95,8 +95,7 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
     uassert(ErrorCodes::IncompleteTransactionHistory,
             str::stream() << "oplog no longer contains the complete write history of this "
                              "transaction, log with opTime "
-                          << opTime.toBSON()
-                          << " cannot be found",
+                          << opTime.toBSON() << " cannot be found",
             getNextResult != PlanExecutor::IS_EOF);
     if (getNextResult != PlanExecutor::ADVANCED) {
         uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(oplogBSON),

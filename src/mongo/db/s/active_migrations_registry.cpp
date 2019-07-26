@@ -148,9 +148,7 @@ Status ActiveMigrationsRegistry::ActiveMoveChunkState::constructErrorStatus() co
             str::stream() << "Unable to start new migration because this shard is currently "
                              "donating chunk "
                           << ChunkRange(args.getMinKey(), args.getMaxKey()).toString()
-                          << " for namespace "
-                          << args.getNss().ns()
-                          << " to "
+                          << " for namespace " << args.getNss().ns() << " to "
                           << args.getToShardId()};
 }
 
@@ -158,10 +156,7 @@ Status ActiveMigrationsRegistry::ActiveReceiveChunkState::constructErrorStatus()
     return {ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Unable to start new migration because this shard is currently "
                              "receiving chunk "
-                          << range.toString()
-                          << " for namespace "
-                          << nss.ns()
-                          << " from "
+                          << range.toString() << " for namespace " << nss.ns() << " from "
                           << fromShardId};
 }
 

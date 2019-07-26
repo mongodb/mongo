@@ -61,8 +61,8 @@ struct Validator<char> {
 namespace {
 
 using namespace mongo;
-using std::end;
 using std::begin;
+using std::end;
 
 TEST(DataTypeValidated, SuccessfulValidation) {
     char buf[1];

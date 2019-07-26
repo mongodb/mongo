@@ -169,9 +169,9 @@ void Pipeline::validateTopLevelPipeline() const {
         if (nss.isCollectionlessAggregateNS() &&
             !firstStageConstraints.isIndependentOfAnyCollection) {
             uasserted(ErrorCodes::InvalidNamespace,
-                      str::stream() << "{aggregate: 1} is not valid for '"
-                                    << _sources.front()->getSourceName()
-                                    << "'; a collection is required.");
+                      str::stream()
+                          << "{aggregate: 1} is not valid for '"
+                          << _sources.front()->getSourceName() << "'; a collection is required.");
         }
 
         if (!nss.isCollectionlessAggregateNS() &&

@@ -241,5 +241,5 @@ StringData LogComponent::getNameForLog() const {
     MONGO_UNREACHABLE;
 }
 
-}  // logv2
-}  // mongo
+}  // namespace logv2
+}  // namespace mongo

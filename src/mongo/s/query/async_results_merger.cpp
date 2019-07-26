@@ -644,15 +644,13 @@ bool AsyncResultsMerger::_addBatchToBuffer(WithLock lk,
                 remote.status =
                     Status(ErrorCodes::InternalError,
                            str::stream() << "Missing field '" << AsyncResultsMerger::kSortKeyField
-                                         << "' in document: "
-                                         << obj);
+                                         << "' in document: " << obj);
                 return false;
             } else if (!_params.getCompareWholeSortKey() && key.type() != BSONType::Object) {
                 remote.status =
                     Status(ErrorCodes::InternalError,
                            str::stream() << "Field '" << AsyncResultsMerger::kSortKeyField
-                                         << "' was not of type Object in document: "
-                                         << obj);
+                                         << "' was not of type Object in document: " << obj);
                 return false;
             }
         }

@@ -36,7 +36,6 @@ function SecondaryReadsTest(name = "secondary_reads_test") {
     }
 
     this.startSecondaryReaders = function(nReaders, readFn) {
-
         let read = function() {
             db.getMongo().setSlaveOk();
             db = db.getSiblingDB(TestData.dbName);
@@ -70,7 +69,6 @@ function SecondaryReadsTest(name = "secondary_reads_test") {
     // The returned function will return once the batch has reached the point where it has applied
     // but not updated the last applied optime.
     this.pauseSecondaryBatchApplication = function() {
-
         clearRawMongoProgramOutput();
 
         assert.commandWorked(
@@ -102,7 +100,7 @@ function SecondaryReadsTest(name = "secondary_reads_test") {
         assert.writeOK(primaryDB.getCollection(signalColl).insert({_id: testDoneId}));
         for (let i = 0; i < readers.length; i++) {
             const await = readers[i];
-            await();
+            await ();
             print("reader " + i + " done");
         }
         readers = [];

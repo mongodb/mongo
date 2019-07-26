@@ -176,8 +176,7 @@ BSONObj findExtremeKeyForShard(OperationContext* opCtx,
 
         uassert(40618,
                 str::stream() << "failed to initialize cursor during auto split due to "
-                              << "connection problem with "
-                              << client.getServerAddress(),
+                              << "connection problem with " << client.getServerAddress(),
                 cursor.get() != nullptr);
 
         if (cursor->more()) {
@@ -273,8 +272,8 @@ void ChunkSplitter::trySplitting(std::shared_ptr<ChunkSplitStateDriver> chunkSpl
         return;
     }
     _threadPool.schedule(
-        [ this, csd = std::move(chunkSplitStateDriver), nss, min, max, dataWritten ](
-            auto status) noexcept {
+        [ this, csd = std::move(chunkSplitStateDriver), nss, min, max,
+          dataWritten ](auto status) noexcept {
             invariant(status);
 
             _runAutosplit(csd, nss, min, max, dataWritten);
@@ -384,7 +383,8 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
         log() << "autosplitted " << nss << " chunk: " << redact(chunk.toString()) << " into "
               << (splitPoints.size() + 1) << " parts (maxChunkSizeBytes " << maxChunkSizeBytes
               << ")"
-              << (topChunkMinKey.isEmpty() ? "" : " (top chunk migration suggested" +
+              << (topChunkMinKey.isEmpty() ? ""
+                                           : " (top chunk migration suggested" +
                           (std::string)(shouldBalance ? ")" : ", but no migrations allowed)"));
 
         // Because the ShardServerOpObserver uses the metadata from the CSS for tracking incoming

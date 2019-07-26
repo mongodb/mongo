@@ -18,7 +18,6 @@ load('jstests/concurrency/fsm_workloads/findAndModify_remove_queue.js');  // for
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = extendWorkload($config, function($config, $super) {
-
     // Use the workload name as the database name, since the workload name is assumed to be
     // unique.
     $config.data.uniqueDBName = 'findAndModify_update_queue';
@@ -34,7 +33,6 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.opName = 'updated';
 
     var states = (function() {
-
         function update(db, collName) {
             // Update the counter field to avoid matching the same document again.
             var res = db.runCommand({
@@ -61,7 +59,6 @@ var $config = extendWorkload($config, function($config, $super) {
         }
 
         return {update: update};
-
     })();
 
     var transitions = {update: {update: 1}};

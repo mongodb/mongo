@@ -64,8 +64,9 @@ Status _checkNoExtraFields(const BSONObj& cmdObj,
         StringData fieldName = (*iter).fieldNameStringData();
         if (!isGenericArgument(fieldName) && !validFieldNames.count(fieldName.toString())) {
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "\"" << fieldName << "\" is not "
-                                                                "a valid argument to "
+                          str::stream() << "\"" << fieldName
+                                        << "\" is not "
+                                           "a valid argument to "
                                         << cmdName);
         }
     }
@@ -175,8 +176,9 @@ Status parseRolePossessionManipulationCommands(const BSONObj& cmdObj,
 
     if (!parsedRoleNames->size()) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << cmdName << " command requires a non-empty "
-                                                  "\"roles\" array");
+                      str::stream() << cmdName
+                                    << " command requires a non-empty "
+                                       "\"roles\" array");
     }
     return Status::OK();
 }
@@ -634,8 +636,9 @@ Status parseAndValidateRolePrivilegeManipulationCommands(const BSONObj& cmdObj,
     }
     if (!parsedPrivileges->size()) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << cmdName << " command requires a non-empty "
-                                                  "\"privileges\" array");
+                      str::stream() << cmdName
+                                    << " command requires a non-empty "
+                                       "\"privileges\" array");
     }
 
     return Status::OK();

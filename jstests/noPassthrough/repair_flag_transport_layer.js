@@ -3,20 +3,18 @@
  */
 
 (function() {
-    "use strict";
-    let dbpath = MongoRunner.dataPath + "repair_flag_transport_layer";
-    resetDbpath(dbpath);
+"use strict";
+let dbpath = MongoRunner.dataPath + "repair_flag_transport_layer";
+resetDbpath(dbpath);
 
-    function runTest(conn) {
-        let returnCode =
-            runNonMongoProgram("mongod", "--port", conn.port, "--repair", "--dbpath", dbpath);
-        assert.eq(
-            returnCode, 0, "expected mongod --repair to execute successfully regardless of port");
-    }
+function runTest(conn) {
+    let returnCode =
+        runNonMongoProgram("mongod", "--port", conn.port, "--repair", "--dbpath", dbpath);
+    assert.eq(returnCode, 0, "expected mongod --repair to execute successfully regardless of port");
+}
 
-    let conn = MongoRunner.runMongod();
+let conn = MongoRunner.runMongod();
 
-    runTest(conn);
-    MongoRunner.stopMongod(conn);
-
+runTest(conn);
+MongoRunner.stopMongod(conn);
 })();

@@ -70,4 +70,4 @@ std::string KVPrefix::toString() const {
     stdx::lock_guard<stdx::mutex> lk(_nextValueMutex);
     return KVPrefix(_nextValue++);
 }
-}
+}  // namespace mongo

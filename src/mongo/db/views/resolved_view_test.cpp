@@ -57,9 +57,8 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithEmptyPipelineOnNoOpViewYieldsEmpty
     AggregationRequest requestOnView{viewNss, emptyPipeline};
 
     auto result = resolvedView.asExpandedViewAggregation(requestOnView);
-    BSONObj expected =
-        BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor"
-                         << kDefaultCursorOptionDocument);
+    BSONObj expected = BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray()
+                                        << "cursor" << kDefaultCursorOptionDocument);
     ASSERT_BSONOBJ_EQ(result.serializeToCommandObj().toBson(), expected);
 }
 
@@ -72,8 +71,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithNonemptyPipelineAppendsToViewPipel
 
     BSONObj expected = BSON("aggregate" << backingNss.coll() << "pipeline"
                                         << BSON_ARRAY(BSON("skip" << 7) << BSON("limit" << 3))
-                                        << "cursor"
-                                        << kDefaultCursorOptionDocument);
+                                        << "cursor" << kDefaultCursorOptionDocument);
     ASSERT_BSONOBJ_EQ(result.serializeToCommandObj().toBson(), expected);
 }
 
@@ -216,9 +214,8 @@ TEST(ResolvedViewTest, FromBSONFailsOnInvalidPipelineType) {
 }
 
 TEST(ResolvedViewTest, FromBSONFailsOnInvalidCollationType) {
-    BSONObj badCmdResponse =
-        BSON("resolvedView" << BSON(
-                 "ns" << backingNss.ns() << "pipeline" << BSONArray() << "collation" << 1));
+    BSONObj badCmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns() << "pipeline"
+                                                              << BSONArray() << "collation" << 1));
     ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40639);
 }
 
@@ -234,10 +231,10 @@ TEST(ResolvedViewTest, FromBSONSuccessfullyParsesEmptyBSONArrayIntoEmptyVector) 
 }
 
 TEST(ResolvedViewTest, FromBSONSuccessfullyParsesCollation) {
-    BSONObj cmdResponse = BSON(
-        "resolvedView" << BSON("ns" << backingNss.ns() << "pipeline" << BSONArray() << "collation"
-                                    << BSON("locale"
-                                            << "fil")));
+    BSONObj cmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns() << "pipeline"
+                                                           << BSONArray() << "collation"
+                                                           << BSON("locale"
+                                                                   << "fil")));
     const ResolvedView result = ResolvedView::fromBSON(cmdResponse);
     ASSERT_EQ(result.getNamespace(), backingNss);
     ASSERT(std::equal(emptyPipeline.begin(),
@@ -257,8 +254,7 @@ TEST(ResolvedViewTest, FromBSONSuccessfullyParsesPopulatedBSONArrayIntoVector) {
     BSONArray pipeline = BSON_ARRAY(matchStage << sortStage << limitStage);
     BSONObj cmdResponse = BSON("resolvedView" << BSON("ns"
                                                       << "testdb.testcoll"
-                                                      << "pipeline"
-                                                      << pipeline));
+                                                      << "pipeline" << pipeline));
 
     const ResolvedView result = ResolvedView::fromBSON(cmdResponse);
     ASSERT_EQ(result.getNamespace(), backingNss);
@@ -274,8 +270,7 @@ TEST(ResolvedViewTest, IsResolvedViewErrorResponseDetectsKickbackErrorCodeSucces
     BSONObj errorResponse =
         BSON("ok" << 0 << "code" << ErrorCodes::CommandOnShardedViewNotSupportedOnMongod << "errmsg"
                   << "This view is sharded and cannot be run on mongod"
-                  << "resolvedView"
-                  << BSON("ns" << backingNss.ns() << "pipeline" << BSONArray()));
+                  << "resolvedView" << BSON("ns" << backingNss.ns() << "pipeline" << BSONArray()));
     auto status = getStatusFromCommandResult(errorResponse);
     ASSERT_EQ(status, ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
     ASSERT(status.extraInfo<ResolvedView>());

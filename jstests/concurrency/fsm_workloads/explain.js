@@ -9,7 +9,6 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod
 
 var $config = (function() {
-
     var data = {
         collNotExist: 'donotexist__',
         nInserted: 0,
@@ -62,7 +61,6 @@ var $config = (function() {
         }
 
         return {insert: insert, explain: explain, explainNonExistentNS: explainNonExistentNS};
-
     })();
 
     var transitions = {

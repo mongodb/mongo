@@ -138,17 +138,17 @@ protected:
     // Random static initialization order can result in X constructor running before Y constructor
     // if X and Y are defined in different source files. Defining variables here to enforce order.
     const BSONObj kShard0 =
-        BSON(ShardType::name(kShardId0.toString()) << ShardType::host(kShardHost0.toString())
-                                                   << ShardType::maxSizeMB(kMaxSizeMB));
+        BSON(ShardType::name(kShardId0.toString())
+             << ShardType::host(kShardHost0.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
     const BSONObj kShard1 =
-        BSON(ShardType::name(kShardId1.toString()) << ShardType::host(kShardHost1.toString())
-                                                   << ShardType::maxSizeMB(kMaxSizeMB));
+        BSON(ShardType::name(kShardId1.toString())
+             << ShardType::host(kShardHost1.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
     const BSONObj kShard2 =
-        BSON(ShardType::name(kShardId2.toString()) << ShardType::host(kShardHost2.toString())
-                                                   << ShardType::maxSizeMB(kMaxSizeMB));
+        BSON(ShardType::name(kShardId2.toString())
+             << ShardType::host(kShardHost2.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
     const BSONObj kShard3 =
-        BSON(ShardType::name(kShardId3.toString()) << ShardType::host(kShardHost3.toString())
-                                                   << ShardType::maxSizeMB(kMaxSizeMB));
+        BSON(ShardType::name(kShardId3.toString())
+             << ShardType::host(kShardHost3.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
 
     const KeyPattern kKeyPattern = KeyPattern(BSON(kPattern << 1));
 

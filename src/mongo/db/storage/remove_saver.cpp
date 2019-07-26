@@ -45,8 +45,8 @@
 
 using std::ios_base;
 using std::ofstream;
-using std::stringstream;
 using std::string;
+using std::stringstream;
 
 namespace mongo {
 

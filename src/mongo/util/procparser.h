@@ -60,12 +60,12 @@ Status parseProcStat(const std::vector<StringData>& keys,
                      BSONObjBuilder* builder);
 
 /**
-* Read from file, and write the specified list of keys into builder.
-*
-* See parseProcStat.
-*
-* Returns Status errors on file reading issues.
-*/
+ * Read from file, and write the specified list of keys into builder.
+ *
+ * See parseProcStat.
+ *
+ * Returns Status errors on file reading issues.
+ */
 Status parseProcStatFile(StringData filename,
                          const std::vector<StringData>& keys,
                          BSONObjBuilder* builder);

@@ -295,12 +295,9 @@ void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(
     auto commonOpUuid = unittest::assertGet(UUID::parse("f005ba11-cafe-bead-f00d-123456789abc"));
     auto commonOpBson = BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "op"
                                   << "n"
-                                  << "o"
-                                  << BSONObj()
-                                  << "ns"
+                                  << "o" << BSONObj() << "ns"
                                   << "rollback_test.test"
-                                  << "ui"
-                                  << commonOpUuid);
+                                  << "ui" << commonOpUuid);
 
     auto commonOperation = std::make_pair(commonOpBson, RecordId(1));
 

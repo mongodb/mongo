@@ -364,8 +364,7 @@ bool runMapReduce(OperationContext* opCtx,
             opCtx, dbname, shardedCommand, nss.ns(), q, collation, &mrCommandResults);
     } catch (DBException& e) {
         e.addContext(str::stream() << "could not run map command on all shards for ns " << nss.ns()
-                                   << " and query "
-                                   << q);
+                                   << " and query " << q);
         throw;
     }
 
@@ -396,8 +395,8 @@ bool runMapReduce(OperationContext* opCtx,
 
             if (!ok) {
                 // At this point we will return
-                errmsg = str::stream() << "MR parallel processing failed: "
-                                       << singleResult.toString();
+                errmsg = str::stream()
+                    << "MR parallel processing failed: " << singleResult.toString();
                 continue;
             }
 
@@ -515,11 +514,11 @@ bool runMapReduce(OperationContext* opCtx,
                 // the output collection exists and is unsharded, fail because we should not go
                 // from unsharded to sharded.
                 BSONObj listCollsCmdResponse;
-                ok = conn->runCommand(
-                    outDB,
-                    BSON("listCollections" << 1 << "filter"
-                                           << BSON("name" << outputCollNss.coll())),
-                    listCollsCmdResponse);
+                ok =
+                    conn->runCommand(outDB,
+                                     BSON("listCollections"
+                                          << 1 << "filter" << BSON("name" << outputCollNss.coll())),
+                                     listCollsCmdResponse);
                 BSONObj cursorObj = listCollsCmdResponse.getObjectField("cursor");
                 BSONObj collections = cursorObj["firstBatch"].Obj();
 
@@ -592,9 +591,7 @@ bool runMapReduce(OperationContext* opCtx,
                 ok = true;
             } catch (DBException& e) {
                 e.addContext(str::stream() << "could not run final reduce on all shards for "
-                                           << nss.ns()
-                                           << ", output "
-                                           << outputCollNss.ns());
+                                           << nss.ns() << ", output " << outputCollNss.ns());
                 throw;
             }
 

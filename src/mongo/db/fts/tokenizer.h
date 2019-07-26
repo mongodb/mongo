@@ -70,5 +70,5 @@ private:
     const StringData _raw;
     bool _english;
 };
-}
-}
+}  // namespace fts
+}  // namespace mongo

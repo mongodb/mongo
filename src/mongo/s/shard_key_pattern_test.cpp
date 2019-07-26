@@ -140,8 +140,7 @@ TEST(ShardKeyPattern, ExtractDocShardKeySingle) {
                       BSON("a" << regex));
     const BSONObj ref = BSON("$ref"
                              << "coll"
-                             << "$id"
-                             << 1);
+                             << "$id" << 1);
     ASSERT_BSONOBJ_EQ(docKey(pattern, BSON("a" << ref)), BSON("a" << ref));
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{$dollarPrefixKey:true}}")),
                       fromjson("{a:{$dollarPrefixKey:true}}"));
@@ -169,8 +168,7 @@ TEST(ShardKeyPattern, ExtractDocShardKeyCompound) {
     ASSERT_BSONOBJ_EQ(docKey(pattern,
                              BSON("c" << 30 << "b"
                                       << "20"
-                                      << "a"
-                                      << 10)),
+                                      << "a" << 10)),
                       fromjson("{a:10, b:'20'}"));
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:10, b:{$dollarPrefixKey:true}}")),
                       fromjson("{a:10, b:{$dollarPrefixKey:true}}"));
@@ -199,8 +197,7 @@ TEST(ShardKeyPattern, ExtractDocShardKeyNested) {
                       fromjson("{'a.b':10, c:30}"));
     const BSONObj ref = BSON("$ref"
                              << "coll"
-                             << "$id"
-                             << 1);
+                             << "$id" << 1);
     ASSERT_BSONOBJ_EQ(docKey(pattern, BSON("a" << BSON("b" << ref) << "c" << 30)),
                       BSON("a.b" << ref << "c" << 30));
 
@@ -308,8 +305,7 @@ TEST(ShardKeyPattern, ExtractQueryShardKeyCompound) {
     ASSERT_BSONOBJ_EQ(queryKey(pattern,
                                BSON("c" << 30 << "b"
                                         << "20"
-                                        << "a"
-                                        << 10)),
+                                        << "a" << 10)),
                       fromjson("{a:10, b:'20'}"));
 
     ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:10, b:[1, 2]}")), BSONObj());

@@ -2,41 +2,39 @@
 //
 // @tags: [uses_transactions]
 (function() {
-    "use strict";
+"use strict";
 
-    const dbName = "test";
-    const collName = "foo";
-    const ns = dbName + "." + collName;
+const dbName = "test";
+const collName = "foo";
+const ns = dbName + "." + collName;
 
-    const st = new ShardingTest({shards: 2});
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {skey: "hashed"}}));
+const st = new ShardingTest({shards: 2});
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {skey: "hashed"}}));
 
-    const session = st.s.startSession();
-    const sessionDB = session.getDatabase("test");
+const session = st.s.startSession();
+const sessionDB = session.getDatabase("test");
 
-    // Failed update.
+// Failed update.
 
-    session.startTransaction();
+session.startTransaction();
 
-    let res = sessionDB.runCommand(
-        {update: collName, updates: [{q: {skey: {$lte: 5}}, u: {$set: {x: 1}}, multi: false}]});
-    assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
-    assert(res.hasOwnProperty("writeErrors"), "expected write errors, res: " + tojson(res));
+let res = sessionDB.runCommand(
+    {update: collName, updates: [{q: {skey: {$lte: 5}}, u: {$set: {x: 1}}, multi: false}]});
+assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
+assert(res.hasOwnProperty("writeErrors"), "expected write errors, res: " + tojson(res));
 
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-    // Failed delete.
+// Failed delete.
 
-    session.startTransaction();
+session.startTransaction();
 
-    res = sessionDB.runCommand({delete: collName, deletes: [{q: {skey: {$lte: 5}}, limit: 1}]});
-    assert.commandFailedWithCode(res, ErrorCodes.ShardKeyNotFound);
-    assert(res.hasOwnProperty("writeErrors"), "expected write errors, res: " + tojson(res));
+res = sessionDB.runCommand({delete: collName, deletes: [{q: {skey: {$lte: 5}}, limit: 1}]});
+assert.commandFailedWithCode(res, ErrorCodes.ShardKeyNotFound);
+assert(res.hasOwnProperty("writeErrors"), "expected write errors, res: " + tojson(res));
 
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-    st.stop();
+st.stop();
 }());

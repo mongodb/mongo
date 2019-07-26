@@ -1,38 +1,38 @@
 var db;
 (function() {
-    "use strict";
-    const conn = MongoRunner.runMongod();
-    assert.neq(null, conn, "mongod failed to start.");
-    db = conn.getDB("test");
+"use strict";
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod failed to start.");
+db = conn.getDB("test");
 
-    const t = db.foo;
-    t.drop();
+const t = db.foo;
+t.drop();
 
-    const N = 10000;
+const N = 10000;
 
-    var bulk = t.initializeUnorderedBulkOp();
-    for (let i = 0; i < N; i++) {
-        bulk.insert({_id: i, x: 1});
+var bulk = t.initializeUnorderedBulkOp();
+for (let i = 0; i < N; i++) {
+    bulk.insert({_id: i, x: 1});
+}
+assert.writeOK(bulk.execute());
+
+const join = startParallelShell(
+    "while( db.foo.findOne( { _id : 0 } ).x == 1 ); db.foo.ensureIndex( { x : 1 } );");
+
+t.update({
+    $where: function() {
+        sleep(1);
+        return true;
     }
-    assert.writeOK(bulk.execute());
+},
+         {$set: {x: 5}},
+         false,
+         true);
+db.getLastError();
 
-    const join = startParallelShell(
-        "while( db.foo.findOne( { _id : 0 } ).x == 1 ); db.foo.ensureIndex( { x : 1 } );");
+join();
 
-    t.update({
-        $where: function() {
-            sleep(1);
-            return true;
-        }
-    },
-             {$set: {x: 5}},
-             false,
-             true);
-    db.getLastError();
+assert.eq(N, t.find({x: 5}).count());
 
-    join();
-
-    assert.eq(N, t.find({x: 5}).count());
-
-    MongoRunner.stopMongod(conn);
+MongoRunner.stopMongod(conn);
 })();

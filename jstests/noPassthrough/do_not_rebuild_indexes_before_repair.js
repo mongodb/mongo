@@ -6,72 +6,71 @@
  * @tags: [requires_persistence, requires_replication, requires_majority_read_concern]
  */
 (function() {
-    "use strict";
+"use strict";
 
-    const dbName = "indexRebuild";
-    const collName = "coll";
+const dbName = "indexRebuild";
+const collName = "coll";
 
-    const rst = new ReplSetTest({
-        name: "doNotRebuildIndexesBeforeRepair",
-        nodes: 2,
-        nodeOptions:
-            {setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}}
-    });
-    const nodes = rst.startSet();
-    rst.initiate();
+const rst = new ReplSetTest({
+    name: "doNotRebuildIndexesBeforeRepair",
+    nodes: 2,
+    nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}}
+});
+const nodes = rst.startSet();
+rst.initiate();
 
-    if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapshotReadConcern) {
-        // Only snapshotting storage engines can pause advancing the stable timestamp allowing us
-        // to get into a state where indexes exist, but the underlying tables were dropped.
-        rst.stopSet();
-        return;
-    }
+if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapshotReadConcern) {
+    // Only snapshotting storage engines can pause advancing the stable timestamp allowing us
+    // to get into a state where indexes exist, but the underlying tables were dropped.
+    rst.stopSet();
+    return;
+}
 
-    let primary = rst.getPrimary();
-    let testDB = primary.getDB(dbName);
-    let coll = testDB.getCollection(collName);
-    assert.commandWorked(testDB.runCommand({
-        createIndexes: collName,
-        indexes: [
-            {key: {a: 1}, name: 'a_1'},
-            {key: {b: 1}, name: 'b_1'},
-        ],
-        writeConcern: {w: "majority"},
-    }));
-    assert.eq(3, coll.getIndexes().length);
-    rst.awaitReplication(undefined, ReplSetTest.OpTimeType.LAST_DURABLE);
+let primary = rst.getPrimary();
+let testDB = primary.getDB(dbName);
+let coll = testDB.getCollection(collName);
+assert.commandWorked(testDB.runCommand({
+    createIndexes: collName,
+    indexes: [
+        {key: {a: 1}, name: 'a_1'},
+        {key: {b: 1}, name: 'b_1'},
+    ],
+    writeConcern: {w: "majority"},
+}));
+assert.eq(3, coll.getIndexes().length);
+rst.awaitReplication(undefined, ReplSetTest.OpTimeType.LAST_DURABLE);
 
-    // Lock the index entries into a stable checkpoint by shutting down.
-    rst.stopSet(undefined, true);
-    rst.startSet(undefined, true);
+// Lock the index entries into a stable checkpoint by shutting down.
+rst.stopSet(undefined, true);
+rst.startSet(undefined, true);
 
-    // Disable snapshotting on all members of the replica set so that further operations do not
-    // enter the majority snapshot.
-    nodes.forEach(node => assert.commandWorked(node.adminCommand(
-                      {configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})));
+// Disable snapshotting on all members of the replica set so that further operations do not
+// enter the majority snapshot.
+nodes.forEach(node => assert.commandWorked(node.adminCommand(
+                  {configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})));
 
-    // Dropping the index would normally modify the collection metadata and drop the
-    // table. Because we're not advancing the stable timestamp and we're going to crash the
-    // server, the catalog change won't take effect, but ident being dropped will.
-    primary = rst.getPrimary();
-    testDB = primary.getDB(dbName);
-    coll = testDB.getCollection(collName);
-    assert.commandWorked(coll.dropIndexes());
-    rst.awaitReplication();
+// Dropping the index would normally modify the collection metadata and drop the
+// table. Because we're not advancing the stable timestamp and we're going to crash the
+// server, the catalog change won't take effect, but ident being dropped will.
+primary = rst.getPrimary();
+testDB = primary.getDB(dbName);
+coll = testDB.getCollection(collName);
+assert.commandWorked(coll.dropIndexes());
+rst.awaitReplication();
 
-    let primaryDbpath = rst.getPrimary().dbpath;
-    let primaryPort = rst.getPrimary().port;
-    rst.stopSet(9, true, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+let primaryDbpath = rst.getPrimary().dbpath;
+let primaryPort = rst.getPrimary().port;
+rst.stopSet(9, true, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
 
-    // This should succeed in rebuilding the indexes, but only after the databases have been
-    // repaired.
-    assert.eq(
-        0, runMongoProgram("mongod", "--repair", "--port", primaryPort, "--dbpath", primaryDbpath));
+// This should succeed in rebuilding the indexes, but only after the databases have been
+// repaired.
+assert.eq(0,
+          runMongoProgram("mongod", "--repair", "--port", primaryPort, "--dbpath", primaryDbpath));
 
-    // Restarting the replica set would roll back the index drop. Instead we want to start a
-    // standalone and verify that repair rebuilt the indexes.
-    let mongod = MongoRunner.runMongod({dbpath: primaryDbpath, noCleanData: true});
-    assert.eq(3, mongod.getDB(dbName)[collName].getIndexes().length);
+// Restarting the replica set would roll back the index drop. Instead we want to start a
+// standalone and verify that repair rebuilt the indexes.
+let mongod = MongoRunner.runMongod({dbpath: primaryDbpath, noCleanData: true});
+assert.eq(3, mongod.getDB(dbName)[collName].getIndexes().length);
 
-    MongoRunner.stopMongod(mongod);
+MongoRunner.stopMongod(mongod);
 })();

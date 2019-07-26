@@ -38,10 +38,10 @@
 namespace mongo {
 namespace {
 
-using std::unique_ptr;
 using std::set;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 
 // Create a random iterator for empty record store.
 TEST(RecordStoreTestHarness, GetRandomIteratorEmpty) {

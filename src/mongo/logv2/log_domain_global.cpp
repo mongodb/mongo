@@ -42,5 +42,5 @@ LogSource& LogDomainGlobal::source() {
 boost::shared_ptr<boost::log::core> LogDomainGlobal::core() {
     return boost::log::core::get();
 }
-}
-}
+}  // namespace logv2
+}  // namespace mongo

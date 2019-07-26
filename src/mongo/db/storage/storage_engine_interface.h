@@ -46,4 +46,4 @@ public:
                                      StringData ident) = 0;
     virtual DurableCatalog* getCatalog() = 0;
 };
-}
+}  // namespace mongo

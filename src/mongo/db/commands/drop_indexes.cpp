@@ -243,4 +243,4 @@ public:
         return true;
     }
 } cmdReIndex;
-}
+}  // namespace mongo

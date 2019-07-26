@@ -3,64 +3,64 @@
  * @tags: [requires_sharding]
  */
 (function() {
-    'use strict';
+'use strict';
 
-    let checkLog = function(conn) {
-        let coll = conn.getCollection("test.foo");
-        assert.writeOK(coll.insert({_id: 1}));
+let checkLog = function(conn) {
+    let coll = conn.getCollection("test.foo");
+    assert.writeOK(coll.insert({_id: 1}));
 
-        print(`Checking ${conn.fullOptions.logFile} for client metadata message`);
-        let log = cat(conn.fullOptions.logFile);
+    print(`Checking ${conn.fullOptions.logFile} for client metadata message`);
+    let log = cat(conn.fullOptions.logFile);
 
-        assert(
-            /received client metadata from .*: { application: { name: ".*" }, driver: { name: ".*", version: ".*" }, os: { type: ".*", name: ".*", architecture: ".*", version: ".*" } }/
-                .test(log),
-            "'received client metadata' log line missing in log file!\n" + "Log file contents: " +
-                conn.fullOptions.logFile +
-                "\n************************************************************\n" + log +
-                "\n************************************************************");
+    assert(
+        /received client metadata from .*: { application: { name: ".*" }, driver: { name: ".*", version: ".*" }, os: { type: ".*", name: ".*", architecture: ".*", version: ".*" } }/
+            .test(log),
+        "'received client metadata' log line missing in log file!\n" +
+            "Log file contents: " + conn.fullOptions.logFile +
+            "\n************************************************************\n" + log +
+            "\n************************************************************");
+};
+
+// Test MongoD
+let testMongoD = function() {
+    let conn = MongoRunner.runMongod({useLogFiles: true});
+    assert.neq(null, conn, 'mongod was unable to start up');
+
+    checkLog(conn);
+
+    MongoRunner.stopMongod(conn);
+};
+
+// Test MongoS
+let testMongoS = function() {
+    let options = {
+        mongosOptions: {useLogFiles: true},
     };
 
-    // Test MongoD
-    let testMongoD = function() {
-        let conn = MongoRunner.runMongod({useLogFiles: true});
-        assert.neq(null, conn, 'mongod was unable to start up');
+    let st = new ShardingTest({shards: 1, mongos: 1, other: options});
 
-        checkLog(conn);
+    checkLog(st.s0);
 
-        MongoRunner.stopMongod(conn);
-    };
+    // Validate db.currentOp() contains mongos information
+    let curOp = st.s0.adminCommand({currentOp: 1});
+    print(tojson(curOp));
 
-    // Test MongoS
-    let testMongoS = function() {
-        let options = {
-            mongosOptions: {useLogFiles: true},
-        };
-
-        let st = new ShardingTest({shards: 1, mongos: 1, other: options});
-
-        checkLog(st.s0);
-
-        // Validate db.currentOp() contains mongos information
-        let curOp = st.s0.adminCommand({currentOp: 1});
-        print(tojson(curOp));
-
-        var inprogSample = null;
-        for (let inprog of curOp.inprog) {
-            if (inprog.hasOwnProperty("clientMetadata") &&
-                inprog.clientMetadata.hasOwnProperty("mongos")) {
-                inprogSample = inprog;
-                break;
-            }
+    var inprogSample = null;
+    for (let inprog of curOp.inprog) {
+        if (inprog.hasOwnProperty("clientMetadata") &&
+            inprog.clientMetadata.hasOwnProperty("mongos")) {
+            inprogSample = inprog;
+            break;
         }
+    }
 
-        assert.neq(inprogSample.clientMetadata.mongos.host, "unknown");
-        assert.neq(inprogSample.clientMetadata.mongos.client, "unknown");
-        assert.neq(inprogSample.clientMetadata.mongos.version, "unknown");
+    assert.neq(inprogSample.clientMetadata.mongos.host, "unknown");
+    assert.neq(inprogSample.clientMetadata.mongos.client, "unknown");
+    assert.neq(inprogSample.clientMetadata.mongos.version, "unknown");
 
-        st.stop();
-    };
+    st.stop();
+};
 
-    testMongoD();
-    testMongoS();
+testMongoD();
+testMongoS();
 })();

@@ -74,9 +74,7 @@ void TimerImpl::fireIfNecessary() {
 
     for (auto&& x : timers) {
         if (_timers.count(x) && (x->_expiration <= x->now())) {
-            auto execCB = [cb = std::move(x->_cb)](auto&&) mutable {
-                std::move(cb)();
-            };
+            auto execCB = [cb = std::move(x->_cb)](auto&&) mutable { std::move(cb)(); };
             auto global = x->_global;
             _timers.erase(x);
             global->_executor->schedule(std::move(execCB));
@@ -122,7 +120,7 @@ void ConnectionImpl::processSetup() {
     _setupQueue.pop_front();
     _pushSetupQueue.pop_front();
 
-    connPtr->_global->_executor->schedule([ connPtr, callback = std::move(callback) ](auto&&) {
+    connPtr->_global->_executor->schedule([connPtr, callback = std::move(callback)](auto&&) {
         auto cb = std::move(connPtr->_setupCallback);
         connPtr->indicateUsed();
         cb(connPtr, callback());
@@ -152,7 +150,7 @@ void ConnectionImpl::processRefresh() {
     _refreshQueue.pop_front();
     _pushRefreshQueue.pop_front();
 
-    connPtr->_global->_executor->schedule([ connPtr, callback = std::move(callback) ](auto&&) {
+    connPtr->_global->_executor->schedule([connPtr, callback = std::move(callback)](auto&&) {
         auto cb = std::move(connPtr->_refreshCallback);
         connPtr->indicateUsed();
         cb(connPtr, callback());

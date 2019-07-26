@@ -54,10 +54,10 @@
 
 namespace QueryStageMergeSortTests {
 
+using std::make_unique;
 using std::set;
 using std::string;
 using std::unique_ptr;
-using std::make_unique;
 
 class QueryStageMergeSortTestBase {
 public:
@@ -884,4 +884,4 @@ public:
 
 SuiteInstance<All> queryStageMergeSortTest;
 
-}  // namespace
+}  // namespace QueryStageMergeSortTests

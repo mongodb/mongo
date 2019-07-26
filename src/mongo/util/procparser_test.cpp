@@ -208,7 +208,12 @@ TEST(FTDCProcStat, TestStat) {
 // otherwise.
 TEST(FTDCProcStat, TestLocalStat) {
     std::vector<StringData> keys{
-        "btime", "cpu", "ctxt", "processes", "procs_blocked", "procs_running",
+        "btime",
+        "cpu",
+        "ctxt",
+        "processes",
+        "procs_blocked",
+        "procs_running",
     };
 
     BSONObjBuilder builder;
@@ -237,7 +242,12 @@ TEST(FTDCProcStat, TestLocalStat) {
 
 TEST(FTDCProcStat, TestLocalNonExistentStat) {
     std::vector<StringData> keys{
-        "btime", "cpu", "ctxt", "processes", "procs_blocked", "procs_running",
+        "btime",
+        "cpu",
+        "ctxt",
+        "processes",
+        "procs_blocked",
+        "procs_running",
     };
     BSONObjBuilder builder;
 

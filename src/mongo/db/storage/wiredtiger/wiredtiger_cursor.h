@@ -77,4 +77,4 @@ protected:
 
     WT_CURSOR* _cursor = nullptr;  // Owned
 };
-}
+}  // namespace mongo

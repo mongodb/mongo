@@ -240,10 +240,8 @@ TEST(InclusionProjectionExecutionTest, ShouldOptimizeNestedExpressions) {
 
 TEST(InclusionProjectionExecutionTest, ShouldReportThatAllExceptIncludedFieldsAreModified) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies();
-    inclusion.parse(BSON(
-        "a" << wrapInLiteral("computedVal") << "b.c" << wrapInLiteral("computedVal") << "d" << true
-            << "e.f"
-            << true));
+    inclusion.parse(BSON("a" << wrapInLiteral("computedVal") << "b.c"
+                             << wrapInLiteral("computedVal") << "d" << true << "e.f" << true));
 
     auto modifiedPaths = inclusion.getModifiedPaths();
     ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);
@@ -261,11 +259,7 @@ TEST(InclusionProjectionExecutionTest,
      ShouldReportThatAllExceptIncludedFieldsAreModifiedWithIdExclusion) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("_id" << false << "a" << wrapInLiteral("computedVal") << "b.c"
-                               << wrapInLiteral("computedVal")
-                               << "d"
-                               << true
-                               << "e.f"
-                               << true));
+                               << wrapInLiteral("computedVal") << "d" << true << "e.f" << true));
 
     auto modifiedPaths = inclusion.getModifiedPaths();
     ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);
@@ -573,11 +567,10 @@ TEST(InclusionProjectionExecutionTest, ShouldAllowMixedNestedAndDottedFields) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     // Include all of "a.b", "a.c", "a.d", and "a.e".
     // Add new computed fields "a.W", "a.X", "a.Y", and "a.Z".
-    inclusion.parse(BSON(
-        "a.b" << true << "a.c" << true << "a.W" << wrapInLiteral("W") << "a.X" << wrapInLiteral("X")
-              << "a"
-              << BSON("d" << true << "e" << true << "Y" << wrapInLiteral("Y") << "Z"
-                          << wrapInLiteral("Z"))));
+    inclusion.parse(BSON("a.b" << true << "a.c" << true << "a.W" << wrapInLiteral("W") << "a.X"
+                               << wrapInLiteral("X") << "a"
+                               << BSON("d" << true << "e" << true << "Y" << wrapInLiteral("Y")
+                                           << "Z" << wrapInLiteral("Z"))));
     auto result = inclusion.applyProjection(Document{
         {"a",
          Document{{"b", "b"_sd}, {"c", "c"_sd}, {"d", "d"_sd}, {"e", "e"_sd}, {"f", "f"_sd}}}});

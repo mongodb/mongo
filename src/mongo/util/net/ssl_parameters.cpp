@@ -70,9 +70,9 @@ StatusWith<ServerGlobalParams::ClusterAuthModes> clusterAuthModeParse(StringData
     } else if (strMode == "x509") {
         return ServerGlobalParams::ClusterAuthMode_x509;
     } else {
-        return Status(
-            ErrorCodes::BadValue,
-            str::stream() << "Invalid clusterAuthMode '" << strMode
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "Invalid clusterAuthMode '" << strMode
                           << "', expected one of: 'keyFile', 'sendKeyFile', 'sendX509', or 'x509'");
     }
 }
@@ -97,8 +97,7 @@ StatusWith<SSLParams::SSLModes> checkTLSModeTransition(T modeToString,
         return {ErrorCodes::BadValue,
                 str::stream() << "Illegal state transition for " << parameterName
                               << ", attempt to change from "
-                              << modeToString(static_cast<SSLParams::SSLModes>(oldMode))
-                              << " to "
+                              << modeToString(static_cast<SSLParams::SSLModes>(oldMode)) << " to "
                               << strMode};
     }
 }

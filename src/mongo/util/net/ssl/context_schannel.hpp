@@ -53,28 +53,28 @@ public:
 #if defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
     /// Move-construct a context from another.
     /**
-    * This constructor moves an SSL context from one object to another.
-    *
-    * @param other The other context object from which the move will occur.
-    *
-    * @note Following the move, the following operations only are valid for the
-    * moved-from object:
-    * @li Destruction.
-    * @li As a target for move-assignment.
-    */
+     * This constructor moves an SSL context from one object to another.
+     *
+     * @param other The other context object from which the move will occur.
+     *
+     * @note Following the move, the following operations only are valid for the
+     * moved-from object:
+     * @li Destruction.
+     * @li As a target for move-assignment.
+     */
     ASIO_DECL context(context&& other);
 
     /// Move-assign a context from another.
     /**
-    * This assignment operator moves an SSL context from one object to another.
-    *
-    * @param other The other context object from which the move will occur.
-    *
-    * @note Following the move, the following operations only are valid for the
-    * moved-from object:
-    * @li Destruction.
-    * @li As a target for move-assignment.
-    */
+     * This assignment operator moves an SSL context from one object to another.
+     *
+     * @param other The other context object from which the move will occur.
+     *
+     * @note Following the move, the following operations only are valid for the
+     * moved-from object:
+     * @li Destruction.
+     * @li As a target for move-assignment.
+     */
     ASIO_DECL context& operator=(context&& other);
 #endif  // defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
 
@@ -83,10 +83,10 @@ public:
 
     /// Get the underlying implementation in the native type.
     /**
-    * This function may be used to obtain the underlying implementation of the
-    * context. This is intended to allow access to context functionality that is
-    * not otherwise provided.
-    */
+     * This function may be used to obtain the underlying implementation of the
+     * context. This is intended to allow access to context functionality that is
+     * not otherwise provided.
+     */
     ASIO_DECL native_handle_type native_handle();
 
 private:

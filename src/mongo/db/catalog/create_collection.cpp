@@ -237,11 +237,10 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                           << " - existing collection with conflicting UUID " << uuid
                           << " is in a drop-pending state: " << *currentName;
                     return Result(Status(ErrorCodes::NamespaceExists,
-                                         str::stream() << "existing collection "
-                                                       << currentName->toString()
-                                                       << " with conflicting UUID "
-                                                       << uuid.toString()
-                                                       << " is in a drop-pending state."));
+                                         str::stream()
+                                             << "existing collection " << currentName->toString()
+                                             << " with conflicting UUID " << uuid.toString()
+                                             << " is in a drop-pending state."));
                 }
 
                 // In the case of oplog replay, a future command may have created or renamed a

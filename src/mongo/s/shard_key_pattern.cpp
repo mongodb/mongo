@@ -89,8 +89,7 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
         // Numeric and ascending (1.0), or "hashed" and single field
         uassert(ErrorCodes::BadValue,
                 str::stream()
-                    << "Shard key "
-                    << keyPattern.toString()
+                    << "Shard key " << keyPattern.toString()
                     << " can contain either a single 'hashed' field"
                     << " or multiple numerical fields set to a value of 1. Failed to parse field "
                     << patternEl.fieldNameStringData(),
@@ -163,10 +162,7 @@ Status ShardKeyPattern::checkShardKeySize(const BSONObj& shardKey) {
 
     return {ErrorCodes::ShardKeyTooBig,
             str::stream() << "shard keys must be less than " << kMaxShardKeySizeBytes
-                          << " bytes, but key "
-                          << shardKey
-                          << " is "
-                          << shardKey.objsize()
+                          << " bytes, but key " << shardKey << " is " << shardKey.objsize()
                           << " bytes"};
 }
 

@@ -80,10 +80,10 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::endl;
 using std::map;
 using std::string;
+using std::unique_ptr;
 
 MONGO_FAIL_POINT_DEFINE(dbClientConnectionDisableChecksum);
 
@@ -109,8 +109,8 @@ private:
 };
 
 /**
-* Initializes the wire version of conn, and returns the isMaster reply.
-*/
+ * Initializes the wire version of conn, and returns the isMaster reply.
+ */
 executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
                                                 StringData applicationName,
                                                 const MongoURI& uri,
@@ -327,8 +327,7 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
     if (!sws.isOK()) {
         return Status(ErrorCodes::HostUnreachable,
                       str::stream() << "couldn't connect to server " << _serverAddress.toString()
-                                    << ", connection attempt failed: "
-                                    << sws.getStatus());
+                                    << ", connection attempt failed: " << sws.getStatus());
     }
 
     {
@@ -622,9 +621,7 @@ bool DBClientConnection::call(Message& toSend,
         if (assertOk)
             uasserted(10278,
                       str::stream() << "dbclient error communicating with server "
-                                    << getServerAddress()
-                                    << ": "
-                                    << redact(errStatus));
+                                    << getServerAddress() << ": " << redact(errStatus));
         return false;
     };
 
@@ -672,7 +669,7 @@ void DBClientConnection::checkResponse(const std::vector<BSONObj>& batch,
                                        string* host) {
     /* check for errors.  the only one we really care about at
      * this stage is "not master"
-    */
+     */
 
     *retry = false;
     *host = _serverAddress.toString();
@@ -701,8 +698,7 @@ void DBClientConnection::handleNotMasterResponse(const BSONObj& replyBody,
         monitor->failedHost(_serverAddress,
                             {ErrorCodes::NotMaster,
                              str::stream() << "got not master from: " << _serverAddress
-                                           << " of repl set: "
-                                           << _parentReplSetName});
+                                           << " of repl set: " << _parentReplSetName});
     }
 
     _markFailed(kSetFlag);

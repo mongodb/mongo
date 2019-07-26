@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/active_move_primaries_registry.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/client.h"
+#include "mongo/db/s/active_move_primaries_registry.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/s/request_types/move_primary_gen.h"
 #include "mongo/unittest/unittest.h"

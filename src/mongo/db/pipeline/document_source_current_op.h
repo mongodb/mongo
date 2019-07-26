@@ -83,8 +83,7 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "Aggregation stage " << kStageName << " cannot run with a "
                                   << "readConcern other than 'local', or in a multi-document "
-                                  << "transaction. Current readConcern: "
-                                  << readConcern.toString(),
+                                  << "transaction. Current readConcern: " << readConcern.toString(),
                     readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
         }
 

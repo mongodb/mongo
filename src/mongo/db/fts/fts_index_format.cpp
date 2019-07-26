@@ -117,8 +117,8 @@ BSONElement extractNonFTSKeyElement(const BSONObj& obj, StringData path) {
     dps::extractAllElementsAlongPath(
         obj, path, indexedElements, expandArrayOnTrailingField, &arrayComponents);
     uassert(ErrorCodes::CannotBuildIndexKeys,
-            str::stream() << "Field '" << path << "' of text index contains an array in document: "
-                          << obj,
+            str::stream() << "Field '" << path
+                          << "' of text index contains an array in document: " << obj,
             arrayComponents.empty());
 
     // Since there aren't any arrays, there cannot be more than one extracted element on 'path'.
@@ -241,5 +241,5 @@ void FTSIndexFormat::_appendIndexKey(BSONObjBuilder& b,
         b.append("", weight);
     }
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

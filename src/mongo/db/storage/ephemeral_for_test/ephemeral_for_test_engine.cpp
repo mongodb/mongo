@@ -124,4 +124,4 @@ std::vector<std::string> EphemeralForTestEngine::getAllIdents(OperationContext* 
     }
     return all;
 }
-}
+}  // namespace mongo

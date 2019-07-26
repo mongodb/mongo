@@ -10,7 +10,6 @@
  * This workload was designed to reproduce SERVER-24761.
  */
 var $config = (function() {
-
     // Use the workload name as the collection name, since the workload name is assumed to be
     // unique. Note that we choose our own collection name instead of using the collection provided
     // by the concurrency framework, because this workload drops its collection.
@@ -110,5 +109,4 @@ var $config = (function() {
         transitions: transitions,
         setup: setup
     };
-
 })();

@@ -47,7 +47,8 @@ namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec URIInfo::methods[2] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, URIInfo), JS_FS_END,
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, URIInfo),
+    JS_FS_END,
 };
 
 const char* const URIInfo::className = "MongoURI";

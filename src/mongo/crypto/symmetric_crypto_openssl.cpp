@@ -63,8 +63,8 @@ void initCipherContext(
         }
     }
     uassert(ErrorCodes::BadValue,
-            str::stream() << "Unrecognized AES key size/cipher mode. Size: " << keySize << " Mode: "
-                          << getStringFromCipherMode(mode),
+            str::stream() << "Unrecognized AES key size/cipher mode. Size: " << keySize
+                          << " Mode: " << getStringFromCipherMode(mode),
             cipher);
 
     const bool initOk = (1 == init(ctx, cipher, nullptr, key.getKey(), iv));
@@ -188,8 +188,9 @@ public:
         // validateEncryptionOption asserts that platforms without GCM will never start in GCM mode
         if (_mode == aesMode::gcm) {
 #ifdef EVP_CTRL_GCM_GET_TAG
-            if (1 != EVP_CIPHER_CTX_ctrl(
-                         _ctx.get(), EVP_CTRL_GCM_SET_TAG, tagLen, const_cast<uint8_t*>(tag))) {
+            if (1 !=
+                EVP_CIPHER_CTX_ctrl(
+                    _ctx.get(), EVP_CTRL_GCM_SET_TAG, tagLen, const_cast<uint8_t*>(tag))) {
                 return Status(ErrorCodes::UnknownError,
                               str::stream()
                                   << "Unable to set GCM tag: "

@@ -190,9 +190,7 @@ void addContextForTransactionAbortingError(StringData txnIdAsString,
                                            DBException& ex,
                                            StringData reason) {
     ex.addContext(str::stream() << "Transaction " << txnIdAsString << " was aborted on statement "
-                                << latestStmtId
-                                << " due to: "
-                                << reason);
+                                << latestStmtId << " due to: " << reason);
 }
 
 void execCommandClient(OperationContext* opCtx,
@@ -646,9 +644,7 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
     if (q.queryOptions & QueryOption_Exhaust) {
         uasserted(18526,
                   str::stream() << "The 'exhaust' query option is invalid for mongos queries: "
-                                << nss.ns()
-                                << " "
-                                << q.query.toString());
+                                << nss.ns() << " " << q.query.toString());
     }
 
     // Determine the default read preference mode based on the value of the slaveOk flag.
@@ -873,9 +869,7 @@ void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
     const int numCursors = dbm->pullInt();
     massert(34425,
             str::stream() << "Invalid killCursors message. numCursors: " << numCursors
-                          << ", message size: "
-                          << dbm->msg().dataSize()
-                          << ".",
+                          << ", message size: " << dbm->msg().dataSize() << ".",
             dbm->msg().dataSize() == 8 + (8 * numCursors));
     uassert(28794,
             str::stream() << "numCursors must be between 1 and 29999.  numCursors: " << numCursors

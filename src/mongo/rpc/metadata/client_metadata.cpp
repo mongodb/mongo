@@ -99,8 +99,7 @@ Status ClientMetadata::parseClientMetadataDocument(const BSONObj& doc) {
     if (static_cast<uint32_t>(doc.objsize()) > maxLength) {
         return Status(ErrorCodes::ClientMetadataDocumentTooLarge,
                       str::stream() << "The client metadata document must be less then or equal to "
-                                    << maxLength
-                                    << "bytes");
+                                    << maxLength << "bytes");
     }
 
     // Get a copy so that we can take a stable reference to the app name inside
@@ -135,9 +134,10 @@ Status ClientMetadata::parseClientMetadataDocument(const BSONObj& doc) {
         } else if (name == kDriver) {
             if (!e.isABSONObj()) {
                 return Status(ErrorCodes::TypeMismatch,
-                              str::stream() << "The '" << kDriver << "' field is required to be a "
-                                                                     "BSON document in the client "
-                                                                     "metadata document");
+                              str::stream() << "The '" << kDriver
+                                            << "' field is required to be a "
+                                               "BSON document in the client "
+                                               "metadata document");
             }
 
             Status s = validateDriverDocument(e.Obj());
@@ -196,10 +196,10 @@ StatusWith<StringData> ClientMetadata::parseApplicationDocument(const BSONObj& d
         if (name == kName) {
 
             if (e.type() != String) {
-                return {
-                    ErrorCodes::TypeMismatch,
-                    str::stream() << "The '" << kApplication << "." << kName
-                                  << "' field must be a string in the client metadata document"};
+                return {ErrorCodes::TypeMismatch,
+                        str::stream()
+                            << "The '" << kApplication << "." << kName
+                            << "' field must be a string in the client metadata document"};
             }
 
             StringData value = e.checkAndGetStringData();
@@ -230,18 +230,18 @@ Status ClientMetadata::validateDriverDocument(const BSONObj& doc) {
 
         if (name == kName) {
             if (e.type() != String) {
-                return Status(
-                    ErrorCodes::TypeMismatch,
-                    str::stream() << "The '" << kDriver << "." << kName
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream()
+                                  << "The '" << kDriver << "." << kName
                                   << "' field must be a string in the client metadata document");
             }
 
             foundName = true;
         } else if (name == kVersion) {
             if (e.type() != String) {
-                return Status(
-                    ErrorCodes::TypeMismatch,
-                    str::stream() << "The '" << kDriver << "." << kVersion
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream()
+                                  << "The '" << kDriver << "." << kVersion
                                   << "' field must be a string in the client metadata document");
             }
 
@@ -274,9 +274,9 @@ Status ClientMetadata::validateOperatingSystemDocument(const BSONObj& doc) {
 
         if (name == kType) {
             if (e.type() != String) {
-                return Status(
-                    ErrorCodes::TypeMismatch,
-                    str::stream() << "The '" << kOperatingSystem << "." << kType
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream()
+                                  << "The '" << kOperatingSystem << "." << kType
                                   << "' field must be a string in the client metadata document");
             }
 
@@ -287,8 +287,7 @@ Status ClientMetadata::validateOperatingSystemDocument(const BSONObj& doc) {
     if (foundType == false) {
         return Status(ErrorCodes::ClientMetadataMissingField,
                       str::stream() << "Missing required field '" << kOperatingSystem << "."
-                                    << kType
-                                    << "' in the client metadata document");
+                                    << kType << "' in the client metadata document");
     }
 
     return Status::OK();

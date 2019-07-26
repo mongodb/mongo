@@ -350,8 +350,9 @@ TEST_F(LogicalSessionCacheTest, RefreshMatrixSessionState) {
         failText << " session case failed: ";
 
         ASSERT(sessions()->has(ids[i]) == testCases[i].inCollection)
-            << failText.str() << (testCases[i].inCollection ? "session wasn't in collection"
-                                                            : "session was in collection");
+            << failText.str()
+            << (testCases[i].inCollection ? "session wasn't in collection"
+                                          : "session was in collection");
         ASSERT((service()->matchKilled(ids[i]) != nullptr) == testCases[i].killed)
             << failText.str()
             << (testCases[i].killed ? "session wasn't killed" : "session was killed");

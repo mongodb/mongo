@@ -205,10 +205,10 @@ public:
             // bounds
             if (!cm->getShardKeyPattern().isShardKey(bounds[0].Obj()) ||
                 !cm->getShardKeyPattern().isShardKey(bounds[1].Obj())) {
-                errmsg = str::stream() << "shard key bounds "
-                                       << "[" << bounds[0].Obj() << "," << bounds[1].Obj() << ")"
-                                       << " are not valid for shard key pattern "
-                                       << cm->getShardKeyPattern().toBSON();
+                errmsg = str::stream()
+                    << "shard key bounds "
+                    << "[" << bounds[0].Obj() << "," << bounds[1].Obj() << ")"
+                    << " are not valid for shard key pattern " << cm->getShardKeyPattern().toBSON();
                 return false;
             }
 
@@ -225,9 +225,9 @@ public:
         } else {
             // middle
             if (!cm->getShardKeyPattern().isShardKey(middle)) {
-                errmsg = str::stream() << "new split key " << middle
-                                       << " is not valid for shard key pattern "
-                                       << cm->getShardKeyPattern().toBSON();
+                errmsg = str::stream()
+                    << "new split key " << middle << " is not valid for shard key pattern "
+                    << cm->getShardKeyPattern().toBSON();
                 return false;
             }
 
@@ -239,9 +239,9 @@ public:
             chunk.emplace(cm->findIntersectingChunkWithSimpleCollation(middle));
 
             if (chunk->getMin().woCompare(middle) == 0 || chunk->getMax().woCompare(middle) == 0) {
-                errmsg = str::stream() << "new split key " << middle
-                                       << " is a boundary key of existing chunk "
-                                       << "[" << chunk->getMin() << "," << chunk->getMax() << ")";
+                errmsg = str::stream()
+                    << "new split key " << middle << " is a boundary key of existing chunk "
+                    << "[" << chunk->getMin() << "," << chunk->getMax() << ")";
                 return false;
             }
         }

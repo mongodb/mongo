@@ -99,8 +99,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "Incorrect number of arguments for first SCRAM client message, got "
-                          << got
-                          << " expected at least 3");
+                          << got << " expected at least 3");
     };
 
     /**
@@ -168,8 +167,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     if (!authzId.empty() && ServerMechanismBase::_principalName != authzId) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "SCRAM user name " << ServerMechanismBase::_principalName
-                                    << " does not match authzid "
-                                    << authzId);
+                                    << " does not match authzid " << authzId);
     }
 
     if (!str::startsWith(input[1], "r=") || input[1].size() < 6) {
@@ -267,7 +265,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
  * e=message
  *
  * NOTE: we are ignoring the channel binding part of the message
-**/
+ **/
 template <typename Policy>
 StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_secondStep(
     OperationContext* opCtx, StringData inputData) {
@@ -275,8 +273,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "Incorrect number of arguments for second SCRAM client message, got "
-                          << got
-                          << " expected at least 3");
+                          << got << " expected at least 3");
     };
 
     /**
@@ -322,9 +319,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "Unmatched SCRAM nonce received from client in second step, expected "
-                          << _nonce
-                          << " but received "
-                          << nonce);
+                          << _nonce << " but received " << nonce);
     }
 
     // Do server side computations, compare storedKeys and generate client-final-message

@@ -125,8 +125,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
             fassert(40689,
                     {ErrorCodes::InternalError,
                      str::stream() << "failed to get index spec for index " << indexName
-                                   << " in collection "
-                                   << collNss.toString()});
+                                   << " in collection " << collNss.toString()});
         }
         auto indexesToRebuild = indexSpecs.getValue();
         invariant(
@@ -171,8 +170,8 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
             // Note that the collection name already includes the database component.
             auto collection = db->getCollection(opCtx, collNss);
             invariant(collection,
-                      str::stream() << "failed to get valid collection pointer for namespace "
-                                    << collNss);
+                      str::stream()
+                          << "failed to get valid collection pointer for namespace " << collNss);
 
             if (minVisibleTimestampMap.count(collection->uuid()) > 0) {
                 collection->setMinimumVisibleSnapshot(

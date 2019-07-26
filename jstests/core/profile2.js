@@ -24,7 +24,7 @@ var result = results[0];
 assert(result.hasOwnProperty('ns'));
 assert(result.hasOwnProperty('millis'));
 assert(result.hasOwnProperty('command'));
-assert.eq('string', typeof(result.command.$truncated));
+assert.eq('string', typeof (result.command.$truncated));
 // String value is truncated.
 assert(result.command.$truncated.match(/filter: { a: "a+\.\.\." }/));
 
@@ -40,7 +40,7 @@ var result = results[0];
 assert(result.hasOwnProperty('ns'));
 assert(result.hasOwnProperty('millis'));
 assert(result.hasOwnProperty('command'));
-assert.eq('string', typeof(result.command.$truncated));
+assert.eq('string', typeof (result.command.$truncated));
 // String value is truncated.
 assert(result.command.$truncated.match(
     /^{ q: { a: "a+\.\.\." }, u: {}, multi: false, upsert: false }$/));
@@ -57,7 +57,7 @@ var result = results[0];
 assert(result.hasOwnProperty('ns'));
 assert(result.hasOwnProperty('millis'));
 assert(result.hasOwnProperty('command'));
-assert.eq('string', typeof(result.command.$truncated));
+assert.eq('string', typeof (result.command.$truncated));
 // String value is truncated.
 assert(result.command.$truncated.match(
     /^{ q: {}, u: { a: "a+\.\.\." }, multi: false, upsert: false }$/));
@@ -78,7 +78,7 @@ var result = results[0];
 assert(result.hasOwnProperty('ns'));
 assert(result.hasOwnProperty('millis'));
 assert(result.hasOwnProperty('command'));
-assert.eq('string', typeof(result.command.$truncated));
+assert.eq('string', typeof (result.command.$truncated));
 // Query object itself is truncated.
 assert(result.command.$truncated.match(/filter: { a0: 1\.0, a1: .*\.\.\.$/));
 

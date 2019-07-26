@@ -63,7 +63,7 @@ void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj
             fieldName == IndexDescriptor::kDropDuplicatesFieldName ||  // this is now ignored
             fieldName == IndexDescriptor::kSparseFieldName ||          // checked specially
             fieldName == IndexDescriptor::kUniqueFieldName             // check specially
-            ) {
+        ) {
             continue;
         }
         theMap[fieldName] = e;
@@ -152,8 +152,7 @@ Status IndexDescriptor::isIndexVersionAllowedForCreation(
     }
     return {ErrorCodes::CannotCreateIndex,
             str::stream() << "Invalid index specification " << indexSpec
-                          << "; cannot create an index with v="
-                          << static_cast<int>(indexVersion)};
+                          << "; cannot create an index with v=" << static_cast<int>(indexVersion)};
 }
 
 IndexVersion IndexDescriptor::getDefaultIndexVersion() {

@@ -50,8 +50,7 @@ TEST(CountCommandTest, ParserDealsWithMissingFieldsCorrectly) {
                            << "TestColl"
                            << "$db"
                            << "TestDB"
-                           << "query"
-                           << BSON("a" << BSON("$lte" << 10)));
+                           << "query" << BSON("a" << BSON("$lte" << 10)));
     auto countCmd = CountCommand::parse(ctxt, commandObj);
 
     ASSERT_BSONOBJ_EQ(countCmd.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
@@ -70,15 +69,8 @@ TEST(CountCommandTest, ParserParsesCommandWithAllFieldsCorrectly) {
                            << "TestColl"
                            << "$db"
                            << "TestDB"
-                           << "query"
-                           << BSON("a" << BSON("$gte" << 11))
-                           << "limit"
-                           << 100
-                           << "skip"
-                           << 1000
-                           << "hint"
-                           << BSON("b" << 5)
-                           << "collation"
+                           << "query" << BSON("a" << BSON("$gte" << 11)) << "limit" << 100 << "skip"
+                           << 1000 << "hint" << BSON("b" << 5) << "collation"
                            << BSON("locale"
                                    << "en_US")
                            << "readConcern"
@@ -89,8 +81,7 @@ TEST(CountCommandTest, ParserParsesCommandWithAllFieldsCorrectly) {
                                    << "secondary")
                            << "comment"
                            << "aComment"
-                           << "maxTimeMS"
-                           << 10000);
+                           << "maxTimeMS" << 10000);
     const auto countCmd = CountCommand::parse(ctxt, commandObj);
 
     ASSERT_BSONOBJ_EQ(countCmd.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
@@ -110,8 +101,7 @@ TEST(CountCommandTest, ParsingNegativeLimitGivesPositiveLimit) {
                            << "TestColl"
                            << "$db"
                            << "TestDB"
-                           << "limit"
-                           << -100);
+                           << "limit" << -100);
     const auto countCmd = CountCommand::parse(ctxt, commandObj);
 
     ASSERT_EQ(countCmd.getLimit().get(), 100);
@@ -122,9 +112,7 @@ TEST(CountCommandTest, LimitCannotBeMinLong) {
                            << "TestColl"
                            << "$db"
                            << "TestDB"
-                           << "query"
-                           << BSON("a" << BSON("$gte" << 11))
-                           << "limit"
+                           << "query" << BSON("a" << BSON("$gte" << 11)) << "limit"
                            << std::numeric_limits<long long>::min());
 
     ASSERT_THROWS_CODE(
@@ -132,31 +120,28 @@ TEST(CountCommandTest, LimitCannotBeMinLong) {
 }
 
 TEST(CountCommandTest, FailParseBadSkipValue) {
-    ASSERT_THROWS_CODE(CountCommand::parse(ctxt,
-                                           BSON("count"
-                                                << "TestColl"
-                                                << "$db"
-                                                << "TestDB"
-                                                << "query"
-                                                << BSON("a" << BSON("$gte" << 11))
-                                                << "skip"
-                                                << -1000)),
-                       AssertionException,
-                       ErrorCodes::FailedToParse);
+    ASSERT_THROWS_CODE(
+        CountCommand::parse(ctxt,
+                            BSON("count"
+                                 << "TestColl"
+                                 << "$db"
+                                 << "TestDB"
+                                 << "query" << BSON("a" << BSON("$gte" << 11)) << "skip" << -1000)),
+        AssertionException,
+        ErrorCodes::FailedToParse);
 }
 
 TEST(CountCommandTest, FailParseBadCollationType) {
-    ASSERT_THROWS_CODE(CountCommand::parse(ctxt,
-                                           BSON("count"
-                                                << "TestColl"
-                                                << "$db"
-                                                << "TestDB"
-                                                << "query"
-                                                << BSON("a" << BSON("$gte" << 11))
-                                                << "collation"
-                                                << "en_US")),
-                       AssertionException,
-                       ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(
+        CountCommand::parse(ctxt,
+                            BSON("count"
+                                 << "TestColl"
+                                 << "$db"
+                                 << "TestDB"
+                                 << "query" << BSON("a" << BSON("$gte" << 11)) << "collation"
+                                 << "en_US")),
+        AssertionException,
+        ErrorCodes::TypeMismatch);
 }
 
 TEST(CountCommandTest, FailParseUnknownField) {
@@ -176,8 +161,7 @@ TEST(CountCommandTest, ConvertToAggregationWithHint) {
                            << "TestColl"
                            << "$db"
                            << "TestDB"
-                           << "hint"
-                           << BSON("x" << 1));
+                           << "hint" << BSON("x" << 1));
     auto countCmd = CountCommand::parse(ctxt, commandObj);
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
 
@@ -198,12 +182,7 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryAndFilterAndLimit) {
                            << "TestColl"
                            << "$db"
                            << "TestDB"
-                           << "limit"
-                           << 200
-                           << "skip"
-                           << 300
-                           << "query"
-                           << BSON("x" << 7));
+                           << "limit" << 200 << "skip" << 300 << "query" << BSON("x" << 7));
     auto countCmd = CountCommand::parse(ctxt, commandObj);
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
 
@@ -227,9 +206,7 @@ TEST(CountCommandTest, ConvertToAggregationWithMaxTimeMS) {
     auto countCmd = CountCommand::parse(ctxt,
                                         BSON("count"
                                              << "TestColl"
-                                             << "maxTimeMS"
-                                             << 100
-                                             << "$db"
+                                             << "maxTimeMS" << 100 << "$db"
                                              << "TestDB"));
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
 

@@ -134,4 +134,4 @@ private:
     uint64_t _sockCreationTime;
     bool _autoReconnect;
 };
-}
+}  // namespace mongo

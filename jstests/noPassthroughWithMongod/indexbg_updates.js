@@ -4,57 +4,57 @@
 // Variation of index_multi.js
 
 (function() {
-    "use strict";
-    Random.setRandomSeed();
+"use strict";
+Random.setRandomSeed();
 
-    var coll = db.getSiblingDB("indexbg_updates").coll;
-    coll.drop();
+var coll = db.getSiblingDB("indexbg_updates").coll;
+coll.drop();
 
-    var numDocs = 10000;
+var numDocs = 10000;
 
-    var bulk = coll.initializeUnorderedBulkOp();
-    print("Populate the collection with random data");
-    for (var i = 0; i < numDocs; i++) {
-        var doc = {"_id": i, "field0": Random.rand()};
+var bulk = coll.initializeUnorderedBulkOp();
+print("Populate the collection with random data");
+for (var i = 0; i < numDocs; i++) {
+    var doc = {"_id": i, "field0": Random.rand()};
 
-        bulk.insert(doc);
-    }
-    assert.writeOK(bulk.execute());
+    bulk.insert(doc);
+}
+assert.writeOK(bulk.execute());
 
-    // Perform a bulk update on a single document, targeting the updates on the
-    // field being actively indexed in the background
-    bulk = coll.initializeUnorderedBulkOp();
-    for (i = 0; i < numDocs; i++) {
-        var criteria = {"_id": 1000};
-        var mod = {};
+// Perform a bulk update on a single document, targeting the updates on the
+// field being actively indexed in the background
+bulk = coll.initializeUnorderedBulkOp();
+for (i = 0; i < numDocs; i++) {
+    var criteria = {"_id": 1000};
+    var mod = {};
 
-        if (Random.rand() < .8) {
-            mod["$set"] = {};
-            mod["$set"]["field0"] = Random.rand();
-        } else {
-            mod["$unset"] = {};
-            mod["$unset"]["field0"] = true;
-        }
-
-        bulk.find(criteria).update(mod);
+    if (Random.rand() < .8) {
+        mod["$set"] = {};
+        mod["$set"]["field0"] = Random.rand();
+    } else {
+        mod["$unset"] = {};
+        mod["$unset"]["field0"] = true;
     }
 
-    // Build an index in the background on field0
-    var backgroundIndexBuildShell = startParallelShell(
-        function() {
-            var coll = db.getSiblingDB("indexbg_updates").coll;
-            assert.commandWorked(coll.createIndex({"field0": 1}, {"background": true}));
-        },
-        null,  // port -- use default
-        false  // noconnect
-        );
+    bulk.find(criteria).update(mod);
+}
 
-    print("Do some sets and unsets");
-    assert.writeOK(bulk.execute());
+// Build an index in the background on field0
+var backgroundIndexBuildShell = startParallelShell(
+    function() {
+        var coll = db.getSiblingDB("indexbg_updates").coll;
+        assert.commandWorked(coll.createIndex({"field0": 1}, {"background": true}));
+    },
+    null,  // port -- use default
+    false  // noconnect
+);
 
-    print("Start background index build");
-    backgroundIndexBuildShell();
+print("Do some sets and unsets");
+assert.writeOK(bulk.execute());
 
-    var explain = coll.find().hint({"field0": 1}).explain();
-    assert("queryPlanner" in explain, tojson(explain));
+print("Start background index build");
+backgroundIndexBuildShell();
+
+var explain = coll.find().hint({"field0": 1}).explain();
+assert("queryPlanner" in explain, tojson(explain));
 }());

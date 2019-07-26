@@ -267,4 +267,4 @@ BSONObj FailPoint::toBSON() const {
 
     return builder.obj();
 }
-}
+}  // namespace mongo

@@ -10,7 +10,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/multi_statement_transaction_simple.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.data.numReads = 5;
 
     $config.states.repeatedRead = function repeatedRead(db, collName) {
@@ -22,13 +21,13 @@ var $config = extendWorkload($config, function($config, $super) {
                 assertWhenOwnColl.eq(
                     this.numAccounts, collectionDocs.length, () => tojson(collectionDocs));
                 if (prevDocuments) {
-                    assertAlways.sameMembers(prevDocuments,
-                                             collectionDocs,
-                                             () => "Document mismatch - previous documents: " +
-                                                 tojsononeline(prevDocuments) +
-                                                 ", current documents: " +
-                                                 tojsononeline(collectionDocs),
-                                             bsonBinaryEqual);  // Exact document matches.
+                    assertAlways.sameMembers(
+                        prevDocuments,
+                        collectionDocs,
+                        () => "Document mismatch - previous documents: " +
+                            tojsononeline(prevDocuments) +
+                            ", current documents: " + tojsononeline(collectionDocs),
+                        bsonBinaryEqual);  // Exact document matches.
                 }
                 prevDocuments = collectionDocs;
             }

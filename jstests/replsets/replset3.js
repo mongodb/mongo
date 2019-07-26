@@ -33,7 +33,7 @@ var doTest = function(signal) {
     try {
         var new_master = replTest.getPrimary();
     } catch (err) {
-        throw("Could not elect new master before timeout.");
+        throw ("Could not elect new master before timeout.");
     }
 
     print(phase++);

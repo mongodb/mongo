@@ -150,4 +150,4 @@ private:
 
     std::string _primaryHost;
 };
-}
+}  // namespace mongo

@@ -21,8 +21,8 @@ function testGridFS(name) {
     // upload file (currently calls filemd5 internally)
     var exitCode = MongoRunner.runMongoTool("mongofiles",
                                             {
-                                              port: mongos.port,
-                                              db: name,
+                                                port: mongos.port,
+                                                db: name,
                                             },
                                             "put",
                                             filename);

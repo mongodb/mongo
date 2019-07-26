@@ -90,5 +90,5 @@ MONGO_INITIALIZER(RegisterWaitForOngoingChunkSplitsCommand)(InitializerContext* 
     }
     return Status::OK();
 }
-}
-}
+}  // namespace
+}  // namespace mongo

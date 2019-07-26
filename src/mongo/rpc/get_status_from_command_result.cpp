@@ -98,14 +98,14 @@ Status getWriteConcernStatusFromCommandResult(const BSONObj& obj) {
     std::string wcErrorParseMsg;
     if (!wcError.parseBSON(wcErrObj, &wcErrorParseMsg)) {
         return Status(ErrorCodes::UnsupportedFormat,
-                      str::stream() << "Failed to parse write concern section due to "
-                                    << wcErrorParseMsg);
+                      str::stream()
+                          << "Failed to parse write concern section due to " << wcErrorParseMsg);
     }
     std::string wcErrorInvalidMsg;
     if (!wcError.isValid(&wcErrorInvalidMsg)) {
         return Status(ErrorCodes::UnsupportedFormat,
-                      str::stream() << "Failed to parse write concern section due to "
-                                    << wcErrorInvalidMsg);
+                      str::stream()
+                          << "Failed to parse write concern section due to " << wcErrorInvalidMsg);
     }
     return wcError.toStatus();
 }

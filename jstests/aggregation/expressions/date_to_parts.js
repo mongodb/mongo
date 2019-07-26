@@ -1,365 +1,122 @@
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
 
 (function() {
-    "use strict";
+"use strict";
 
-    const coll = db.dateToParts;
-    coll.drop();
+const coll = db.dateToParts;
+coll.drop();
 
-    /* --------------------------------------------------------------------------------------- */
-    assert.writeOK(coll.insert([
-        {_id: 0, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: "UTC"},
-        {_id: 1, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: "Europe/London"},
-        {_id: 2, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: "America/New_York", iso: true},
-        {_id: 3, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: "America/New_York", iso: false},
-    ]));
+/* --------------------------------------------------------------------------------------- */
+assert.writeOK(coll.insert([
+    {_id: 0, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: "UTC"},
+    {_id: 1, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: "Europe/London"},
+    {_id: 2, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: "America/New_York", iso: true},
+    {_id: 3, date: new ISODate("2017-06-19T15:13:25.713Z"), tz: "America/New_York", iso: false},
+]));
 
-    assert.eq(
-        [
-          {
-            _id: 0,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 15,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 1,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 15,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 2,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 15,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 3,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 15,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-        ],
-        coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date"}}}}, {$sort: {_id: 1}}])
-            .toArray());
-
-    assert.eq(
-        [
-          {
-            _id: 0,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 15,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 1,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 16,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 2,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 11,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 3,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 11,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-        ],
-        coll.aggregate([
-                {$project: {date: {'$dateToParts': {date: "$date", "timezone": "$tz"}}}},
-                {$sort: {_id: 1}}
-            ])
-            .toArray());
-
-    assert.eq(
-        [
-          {
-            _id: 0,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 15,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 1,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 16,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 2,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 11,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 3,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 11,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-        ],
-        coll.aggregate([
-                {
-                  $project: {
-                      date:
-                          {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": false}}
-                  }
-                },
-                {$sort: {_id: 1}}
-            ])
-            .toArray());
-
-    assert.eq(
-        [
-          {
-            _id: 0,
-            date: {
-                isoWeekYear: 2017,
-                isoWeek: 25,
-                isoDayOfWeek: 1,
-                hour: 15,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 1,
-            date: {
-                isoWeekYear: 2017,
-                isoWeek: 25,
-                isoDayOfWeek: 1,
-                hour: 16,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 2,
-            date: {
-                isoWeekYear: 2017,
-                isoWeek: 25,
-                isoDayOfWeek: 1,
-                hour: 11,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 3,
-            date: {
-                isoWeekYear: 2017,
-                isoWeek: 25,
-                isoDayOfWeek: 1,
-                hour: 11,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-        ],
-        coll.aggregate([
-                {
-                  $project: {
-                      date: {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": true}}
-                  }
-                },
-                {$sort: {_id: 1}}
-            ])
-            .toArray());
-
-    assert.eq(
-        [
-          {
-            _id: 2,
-            date: {
-                isoWeekYear: 2017,
-                isoWeek: 25,
-                isoDayOfWeek: 1,
-                hour: 11,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 3,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 11,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-        ],
-        coll.aggregate([
-                {$match: {iso: {$exists: true}}},
-                {
-                  $project: {
-                      date:
-                          {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": "$iso"}}
-                  }
-                },
-                {$sort: {_id: 1}}
-            ])
-            .toArray());
-
-    /* --------------------------------------------------------------------------------------- */
-    /* Tests with timestamp */
-    assert(coll.drop());
-
-    assert.writeOK(coll.insert([
+assert.eq(
+    [
         {
-          _id: ObjectId("58c7cba47bbadf523cf2c313"),
-          date: new ISODate("2017-06-19T15:13:25.713Z"),
-          tz: "Europe/London"
+            _id: 0,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 15, minute: 13, second: 25, millisecond: 713}
         },
-    ]));
+        {
+            _id: 1,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 15, minute: 13, second: 25, millisecond: 713}
+        },
+        {
+            _id: 2,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 15, minute: 13, second: 25, millisecond: 713}
+        },
+        {
+            _id: 3,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 15, minute: 13, second: 25, millisecond: 713}
+        },
+    ],
+    coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date"}}}}, {$sort: {_id: 1}}])
+        .toArray());
 
-    assert.eq(
-        [
-          {
-            _id: ObjectId("58c7cba47bbadf523cf2c313"),
+assert.eq(
+    [
+        {
+            _id: 0,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 15, minute: 13, second: 25, millisecond: 713}
+        },
+        {
+            _id: 1,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 16, minute: 13, second: 25, millisecond: 713}
+        },
+        {
+            _id: 2,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 11, minute: 13, second: 25, millisecond: 713}
+        },
+        {
+            _id: 3,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 11, minute: 13, second: 25, millisecond: 713}
+        },
+    ],
+    coll.aggregate([
+            {$project: {date: {'$dateToParts': {date: "$date", "timezone": "$tz"}}}},
+            {$sort: {_id: 1}}
+        ])
+        .toArray());
+
+assert.eq(
+    [
+        {
+            _id: 0,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 15, minute: 13, second: 25, millisecond: 713}
+        },
+        {
+            _id: 1,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 16, minute: 13, second: 25, millisecond: 713}
+        },
+        {
+            _id: 2,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 11, minute: 13, second: 25, millisecond: 713}
+        },
+        {
+            _id: 3,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 11, minute: 13, second: 25, millisecond: 713}
+        },
+    ],
+    coll.aggregate([
+            {
+                $project:
+                    {date: {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": false}}}
+            },
+            {$sort: {_id: 1}}
+        ])
+        .toArray());
+
+assert.eq(
+    [
+        {
+            _id: 0,
             date: {
-                year: 2017,
-                month: 6,
-                day: 19,
+                isoWeekYear: 2017,
+                isoWeek: 25,
+                isoDayOfWeek: 1,
                 hour: 15,
                 minute: 13,
                 second: 25,
                 millisecond: 713
             }
-          },
-        ],
-        coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date"}}}}]).toArray());
-
-    assert.eq(
-        [
-          {
-            _id: ObjectId("58c7cba47bbadf523cf2c313"),
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 16,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-        ],
-        coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date", "timezone": "$tz"}}}}])
-            .toArray());
-
-    assert.eq(
-        [
-          {
-            _id: ObjectId("58c7cba47bbadf523cf2c313"),
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 16,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-        ],
-        coll.aggregate([{
-                $project: {
-                    date: {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": false}}
-                }
-            }])
-            .toArray());
-
-    assert.eq(
-        [
-          {
-            _id: ObjectId("58c7cba47bbadf523cf2c313"),
+        },
+        {
+            _id: 1,
             date: {
                 isoWeekYear: 2017,
                 isoWeek: 25,
@@ -369,86 +126,212 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                 second: 25,
                 millisecond: 713
             }
-          },
-        ],
-        coll.aggregate([{
+        },
+        {
+            _id: 2,
+            date: {
+                isoWeekYear: 2017,
+                isoWeek: 25,
+                isoDayOfWeek: 1,
+                hour: 11,
+                minute: 13,
+                second: 25,
+                millisecond: 713
+            }
+        },
+        {
+            _id: 3,
+            date: {
+                isoWeekYear: 2017,
+                isoWeek: 25,
+                isoDayOfWeek: 1,
+                hour: 11,
+                minute: 13,
+                second: 25,
+                millisecond: 713
+            }
+        },
+    ],
+    coll.aggregate([
+            {
                 $project:
                     {date: {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": true}}}
-            }])
-            .toArray());
+            },
+            {$sort: {_id: 1}}
+        ])
+        .toArray());
 
-    assert.eq(
-        [
-          {
+assert.eq(
+    [
+        {
+            _id: 2,
+            date: {
+                isoWeekYear: 2017,
+                isoWeek: 25,
+                isoDayOfWeek: 1,
+                hour: 11,
+                minute: 13,
+                second: 25,
+                millisecond: 713
+            }
+        },
+        {
+            _id: 3,
+            date:
+                {year: 2017, month: 6, day: 19, hour: 11, minute: 13, second: 25, millisecond: 713}
+        },
+    ],
+    coll.aggregate([
+            {$match: {iso: {$exists: true}}},
+            {
+                $project:
+                    {date: {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": "$iso"}}}
+            },
+            {$sort: {_id: 1}}
+        ])
+        .toArray());
+
+/* --------------------------------------------------------------------------------------- */
+/* Tests with timestamp */
+assert(coll.drop());
+
+assert.writeOK(coll.insert([
+    {
+        _id: ObjectId("58c7cba47bbadf523cf2c313"),
+        date: new ISODate("2017-06-19T15:13:25.713Z"),
+        tz: "Europe/London"
+    },
+]));
+
+assert.eq(
+    [
+        {
             _id: ObjectId("58c7cba47bbadf523cf2c313"),
             date:
-                {year: 2017, month: 3, day: 14, hour: 10, minute: 53, second: 24, millisecond: 0}
-          },
-        ],
-        coll.aggregate([{
-                $project:
-                    {date: {'$dateToParts': {date: "$_id", "timezone": "$tz", "iso8601": false}}}
-            }])
-            .toArray());
+                {year: 2017, month: 6, day: 19, hour: 15, minute: 13, second: 25, millisecond: 713}
+        },
+    ],
+    coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date"}}}}]).toArray());
 
-    /* --------------------------------------------------------------------------------------- */
-    assert(coll.drop());
+assert.eq(
+    [
+        {
+            _id: ObjectId("58c7cba47bbadf523cf2c313"),
+            date:
+                {year: 2017, month: 6, day: 19, hour: 16, minute: 13, second: 25, millisecond: 713}
+        },
+    ],
+    coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date", "timezone": "$tz"}}}}])
+        .toArray());
 
-    assert.writeOK(coll.insert([
-        {_id: 0, date: ISODate("2017-06-27T12:00:20Z")},
-    ]));
+assert.eq(
+    [
+        {
+            _id: ObjectId("58c7cba47bbadf523cf2c313"),
+            date:
+                {year: 2017, month: 6, day: 19, hour: 16, minute: 13, second: 25, millisecond: 713}
+        },
+    ],
+    coll.aggregate([{
+            $project: {date: {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": false}}}
+        }])
+        .toArray());
 
-    assert.eq(
-        [
-          {_id: 0, date: null},
-        ],
-        coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date", timezone: "$tz"}}}}])
-            .toArray());
+assert.eq(
+    [
+        {
+            _id: ObjectId("58c7cba47bbadf523cf2c313"),
+            date: {
+                isoWeekYear: 2017,
+                isoWeek: 25,
+                isoDayOfWeek: 1,
+                hour: 16,
+                minute: 13,
+                second: 25,
+                millisecond: 713
+            }
+        },
+    ],
+    coll.aggregate([{
+            $project: {date: {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": true}}}
+        }])
+        .toArray());
 
-    /* --------------------------------------------------------------------------------------- */
-    assert(coll.drop());
+assert.eq(
+    [
+        {
+            _id: ObjectId("58c7cba47bbadf523cf2c313"),
+            date: {year: 2017, month: 3, day: 14, hour: 10, minute: 53, second: 24, millisecond: 0}
+        },
+    ],
+    coll.aggregate([{
+            $project: {date: {'$dateToParts': {date: "$_id", "timezone": "$tz", "iso8601": false}}}
+        }])
+        .toArray());
 
-    assert.writeOK(coll.insert([
-        {_id: 0, date: ISODate("2017-06-27T12:00:20Z")},
-    ]));
+/* --------------------------------------------------------------------------------------- */
+assert(coll.drop());
 
-    assert.eq(
-        [
-          {_id: 0, date: null},
-        ],
-        coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date", iso8601: "$iso8601"}}}}])
-            .toArray());
+assert.writeOK(coll.insert([
+    {_id: 0, date: ISODate("2017-06-27T12:00:20Z")},
+]));
 
-    /* --------------------------------------------------------------------------------------- */
-    assert(coll.drop());
+assert.eq(
+    [
+        {_id: 0, date: null},
+    ],
+    coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date", timezone: "$tz"}}}}])
+        .toArray());
 
-    assert.writeOK(coll.insert([
-        {_id: 0, tz: "Europe/London"},
-    ]));
+/* --------------------------------------------------------------------------------------- */
+assert(coll.drop());
 
-    assert.eq(
-        [
-          {_id: 0, date: null},
-        ],
-        coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date"}}}}]).toArray());
+assert.writeOK(coll.insert([
+    {_id: 0, date: ISODate("2017-06-27T12:00:20Z")},
+]));
 
-    /* --------------------------------------------------------------------------------------- */
+assert.eq(
+    [
+        {_id: 0, date: null},
+    ],
+    coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date", iso8601: "$iso8601"}}}}])
+        .toArray());
 
-    let pipeline = {$project: {date: {'$dateToParts': {"timezone": "$tz"}}}};
-    assertErrorCode(coll, pipeline, 40522);
+/* --------------------------------------------------------------------------------------- */
+assert(coll.drop());
 
-    pipeline = {
-        $project: {date: {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": 5}}}
-    };
-    assertErrorCode(coll, pipeline, 40521);
+assert.writeOK(coll.insert([
+    {_id: 0, tz: "Europe/London"},
+]));
 
-    pipeline = {$project: {date: {'$dateToParts': {date: 42}}}};
-    assertErrorCode(coll, pipeline, 16006);
+assert.eq(
+    [
+        {_id: 0, date: null},
+    ],
+    coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date"}}}}]).toArray());
 
-    pipeline = {$project: {date: {'$dateToParts': {date: "$date", "timezone": 5}}}};
-    assertErrorCode(coll, pipeline, 40517);
+/* --------------------------------------------------------------------------------------- */
 
-    pipeline = {$project: {date: {'$dateToParts': {date: "$date", "timezone": "DoesNot/Exist"}}}};
-    assertErrorCode(coll, pipeline, 40485);
+let pipeline = {$project: {date: {'$dateToParts': {"timezone": "$tz"}}}};
+assertErrorCode(coll, pipeline, 40522);
 
+pipeline = {
+    $project: {date: {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": 5}}}
+};
+assertErrorCode(coll, pipeline, 40521);
+
+pipeline = {
+    $project: {date: {'$dateToParts': {date: 42}}}
+};
+assertErrorCode(coll, pipeline, 16006);
+
+pipeline = {
+    $project: {date: {'$dateToParts': {date: "$date", "timezone": 5}}}
+};
+assertErrorCode(coll, pipeline, 40517);
+
+pipeline = {
+    $project: {date: {'$dateToParts': {date: "$date", "timezone": "DoesNot/Exist"}}}
+};
+assertErrorCode(coll, pipeline, 40485);
 })();

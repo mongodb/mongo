@@ -123,9 +123,10 @@ void generateLegacyQueryErrorResponse(const AssertionException& exception,
     curop->debug().errInfo = exception.toStatus();
 
     log(LogComponent::kQuery) << "assertion " << exception.toString() << " ns:" << queryMessage.ns
-                              << " query:" << (queryMessage.query.valid(BSONVersion::kLatest)
-                                                   ? redact(queryMessage.query)
-                                                   : "query object is corrupt");
+                              << " query:"
+                              << (queryMessage.query.valid(BSONVersion::kLatest)
+                                      ? redact(queryMessage.query)
+                                      : "query object is corrupt");
     if (queryMessage.ntoskip || queryMessage.ntoreturn) {
         log(LogComponent::kQuery) << " ntoskip:" << queryMessage.ntoskip
                                   << " ntoreturn:" << queryMessage.ntoreturn;
@@ -977,8 +978,8 @@ DbResponse receivedCommands(OperationContext* opCtx,
             // However, the complete command object will still be echoed to the client.
             if (!(c = CommandHelpers::findCommand(request.getCommandName()))) {
                 globalCommandRegistry()->incrementUnknownCommands();
-                std::string msg = str::stream() << "no such command: '" << request.getCommandName()
-                                                << "'";
+                std::string msg = str::stream()
+                    << "no such command: '" << request.getCommandName() << "'";
                 LOG(2) << msg;
                 uasserted(ErrorCodes::CommandNotFound, str::stream() << msg);
             }
@@ -1014,12 +1015,10 @@ DbResponse receivedCommands(OperationContext* opCtx,
         if (LastError::get(opCtx->getClient()).hadNotMasterError()) {
             notMasterUnackWrites.increment();
             uasserted(ErrorCodes::NotMaster,
-                      str::stream() << "Not-master error while processing '"
-                                    << request.getCommandName()
-                                    << "' operation  on '"
-                                    << request.getDatabase()
-                                    << "' database via "
-                                    << "fire-and-forget command execution.");
+                      str::stream()
+                          << "Not-master error while processing '" << request.getCommandName()
+                          << "' operation  on '" << request.getDatabase() << "' database via "
+                          << "fire-and-forget command execution.");
         }
         return {};  // Don't reply.
     }
@@ -1318,10 +1317,8 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
                 if (!opCtx->getClient()->isInDirectClient()) {
                     uassert(18663,
                             str::stream() << "legacy writeOps not longer supported for "
-                                          << "versioned connections, ns: "
-                                          << nsString.ns()
-                                          << ", op: "
-                                          << networkOpToString(op),
+                                          << "versioned connections, ns: " << nsString.ns()
+                                          << ", op: " << networkOpToString(op),
                             !ShardedConnectionInfo::get(&c, false));
                 }
 
@@ -1349,12 +1346,10 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
         if (LastError::get(opCtx->getClient()).hadNotMasterError()) {
             notMasterLegacyUnackWrites.increment();
             uasserted(ErrorCodes::NotMaster,
-                      str::stream() << "Not-master error while processing '"
-                                    << networkOpToString(op)
-                                    << "' operation  on '"
-                                    << nsString
-                                    << "' namespace via legacy "
-                                    << "fire-and-forget command execution.");
+                      str::stream()
+                          << "Not-master error while processing '" << networkOpToString(op)
+                          << "' operation  on '" << nsString << "' namespace via legacy "
+                          << "fire-and-forget command execution.");
         }
     }
 

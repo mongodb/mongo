@@ -7,7 +7,6 @@
  * Serves as a template for new workloads.
  */
 var $config = (function() {
-
     // 'data' is passed (copied) to each of the worker threads.
     var data = {};
 
@@ -81,5 +80,4 @@ var $config = (function() {
         teardown: teardown,  // optional, default empty function
         data: data           // optional, default empty object
     };
-
 })();

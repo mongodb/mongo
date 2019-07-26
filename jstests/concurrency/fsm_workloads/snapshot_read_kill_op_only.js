@@ -13,7 +13,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');                     // 
 load('jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.transitions = {
         init: {snapshotFind: 1.0},
         snapshotFind: {incrementTxnNumber: 0.33, killOp: 0.34, snapshotGetMore: 0.33},

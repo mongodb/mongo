@@ -161,11 +161,10 @@ Status checkRemoteOplogStart(const Fetcher::Documents& documents,
     // sync source is now behind us, choose a new sync source to prevent going into rollback.
     if (remoteLastOpApplied && (*remoteLastOpApplied < lastFetched)) {
         return Status(ErrorCodes::InvalidSyncSource,
-                      str::stream() << "Sync source's last applied OpTime "
-                                    << remoteLastOpApplied->toString()
-                                    << " is older than our last fetched OpTime "
-                                    << lastFetched.toString()
-                                    << ". Choosing new sync source.");
+                      str::stream()
+                          << "Sync source's last applied OpTime " << remoteLastOpApplied->toString()
+                          << " is older than our last fetched OpTime " << lastFetched.toString()
+                          << ". Choosing new sync source.");
     }
 
     // If 'requireFresherSyncSource' is true, we must check that the sync source's
@@ -181,8 +180,7 @@ Status checkRemoteOplogStart(const Fetcher::Documents& documents,
         return Status(ErrorCodes::InvalidSyncSource,
                       str::stream()
                           << "Sync source must be ahead of me. My last fetched oplog optime: "
-                          << lastFetched.toString()
-                          << ", latest oplog optime of sync source: "
+                          << lastFetched.toString() << ", latest oplog optime of sync source: "
                           << remoteLastOpApplied->toString());
     }
 
@@ -202,9 +200,7 @@ Status checkRemoteOplogStart(const Fetcher::Documents& documents,
         return Status(ErrorCodes::InvalidBSON,
                       str::stream() << "our last optime fetched: " << lastFetched.toString()
                                     << ". failed to parse optime from first oplog on source: "
-                                    << o.toString()
-                                    << ": "
-                                    << opTimeResult.getStatus().toString());
+                                    << o.toString() << ": " << opTimeResult.getStatus().toString());
     }
     auto opTime = opTimeResult.getValue();
     if (opTime != lastFetched) {
@@ -289,15 +285,9 @@ StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
         if (lastTS >= docTS) {
             return Status(ErrorCodes::OplogOutOfOrder,
                           str::stream() << "Out of order entries in oplog. lastTS: "
-                                        << lastTS.toString()
-                                        << " outOfOrderTS:"
-                                        << docTS.toString()
-                                        << " in batch with "
-                                        << info.networkDocumentCount
-                                        << "docs; first-batch:"
-                                        << first
-                                        << ", doc:"
-                                        << doc);
+                                        << lastTS.toString() << " outOfOrderTS:" << docTS.toString()
+                                        << " in batch with " << info.networkDocumentCount
+                                        << "docs; first-batch:" << first << ", doc:" << doc);
         }
         lastTS = docTS;
     }

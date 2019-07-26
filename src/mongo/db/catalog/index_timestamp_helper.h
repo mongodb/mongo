@@ -55,6 +55,6 @@ void setGhostCommitTimestampForWrite(OperationContext* opCtx, const NamespaceStr
  * also throw WriteConflictException.
  */
 bool setGhostCommitTimestampForCatalogWrite(OperationContext* opCtx, const NamespaceString& nss);
-};
+};  // namespace IndexTimestampHelper
 
-}  // mongo
+}  // namespace mongo

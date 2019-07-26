@@ -102,7 +102,10 @@ uint32_t modeMask(LockMode mode) {
  * Maps the LockRequest status to a human-readable string.
  */
 static const char* LockRequestStatusNames[] = {
-    "new", "granted", "waiting", "converting",
+    "new",
+    "granted",
+    "waiting",
+    "converting",
 };
 
 // Ensure we do not add new status types without updating the names array

@@ -112,8 +112,8 @@ public:
         const auto shardStatus =
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, ShardId(target));
         if (!shardStatus.isOK()) {
-            std::string msg(str::stream() << "Could not drop shard '" << target
-                                          << "' because it does not exist");
+            std::string msg(str::stream()
+                            << "Could not drop shard '" << target << "' because it does not exist");
             log() << msg;
             uasserted(ErrorCodes::ShardNotFound, msg);
         }

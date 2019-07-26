@@ -59,4 +59,4 @@ TEST(DiagnosticInfo, BasicSingleThread) {
     clockSourcePointer->advance(Seconds(1));
     ASSERT_LT(capture2.getTimestamp(), clockSourcePointer->now());
 }
-}
+}  // namespace mongo

@@ -193,18 +193,18 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc,
     if (memberStateElement.eoo()) {
         _stateSet = false;
     } else if (memberStateElement.type() != NumberInt && memberStateElement.type() != NumberLong) {
-        return Status(
-            ErrorCodes::TypeMismatch,
-            str::stream() << "Expected \"" << kMemberStateFieldName
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream()
+                          << "Expected \"" << kMemberStateFieldName
                           << "\" field in response to replSetHeartbeat "
                              "command to have type NumberInt or NumberLong, but found type "
                           << typeName(memberStateElement.type()));
     } else {
         long long stateInt = memberStateElement.numberLong();
         if (stateInt < 0 || stateInt > MemberState::RS_MAX) {
-            return Status(
-                ErrorCodes::BadValue,
-                str::stream() << "Value for \"" << kMemberStateFieldName
+            return Status(ErrorCodes::BadValue,
+                          str::stream()
+                              << "Value for \"" << kMemberStateFieldName
                               << "\" in response to replSetHeartbeat is "
                                  "out of range; legal values are non-negative and no more than "
                               << MemberState::RS_MAX);
@@ -217,8 +217,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc,
     if (configVersionElement.eoo()) {
         return Status(ErrorCodes::NoSuchKey,
                       str::stream() << "Response to replSetHeartbeat missing required \""
-                                    << kConfigVersionFieldName
-                                    << "\" field");
+                                    << kConfigVersionFieldName << "\" field");
     }
     if (configVersionElement.type() != NumberInt) {
         return Status(ErrorCodes::TypeMismatch,

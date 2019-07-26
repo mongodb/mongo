@@ -20,123 +20,117 @@
  *
  */
 (function() {
-    'use strict';
+'use strict';
 
-    load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries,
-                                                 // restartServerReplication,
-                                                 // restartReplSetReplication
+load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries,
+                                             // restartServerReplication,
+                                             // restartReplSetReplication
 
-    var name = 'stepdown_needs_electable_secondary';
+var name = 'stepdown_needs_electable_secondary';
 
-    var replTest = new ReplSetTest({name: name, nodes: 5});
-    var nodes = replTest.nodeList();
+var replTest = new ReplSetTest({name: name, nodes: 5});
+var nodes = replTest.nodeList();
 
-    replTest.startSet();
-    replTest.initiate({
-        "_id": name,
-        "members": [
-            {"_id": 0, "host": nodes[0]},
-            {"_id": 1, "host": nodes[1]},
-            {"_id": 2, "host": nodes[2]},
-            {"_id": 3, "host": nodes[3], "priority": 0},  // unelectable
-            {"_id": 4, "host": nodes[4], "priority": 0}   // unelectable
-        ],
-        "settings": {"chainingAllowed": false}
-    });
+replTest.startSet();
+replTest.initiate({
+    "_id": name,
+    "members": [
+        {"_id": 0, "host": nodes[0]},
+        {"_id": 1, "host": nodes[1]},
+        {"_id": 2, "host": nodes[2]},
+        {"_id": 3, "host": nodes[3], "priority": 0},  // unelectable
+        {"_id": 4, "host": nodes[4], "priority": 0}   // unelectable
+    ],
+    "settings": {"chainingAllowed": false}
+});
 
-    function assertStepDownFailsWithExceededTimeLimit(node) {
-        assert.commandFailedWithCode(
-            node.adminCommand({replSetStepDown: 5, secondaryCatchUpPeriodSecs: 5}),
-            ErrorCodes.ExceededTimeLimit,
-            "step down did not fail with 'ExceededTimeLimit'");
-    }
+function assertStepDownFailsWithExceededTimeLimit(node) {
+    assert.commandFailedWithCode(
+        node.adminCommand({replSetStepDown: 5, secondaryCatchUpPeriodSecs: 5}),
+        ErrorCodes.ExceededTimeLimit,
+        "step down did not fail with 'ExceededTimeLimit'");
+}
 
-    function assertStepDownSucceeds(node) {
-        assert.commandWorked(
-            node.adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60}));
-    }
+function assertStepDownSucceeds(node) {
+    assert.commandWorked(node.adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60}));
+}
 
-    var primary = replTest.getPrimary();
+var primary = replTest.getPrimary();
 
-    jsTestLog("Blocking writes to all secondaries.");
-    stopReplicationOnSecondaries(replTest);
+jsTestLog("Blocking writes to all secondaries.");
+stopReplicationOnSecondaries(replTest);
 
-    jsTestLog("Doing a write to primary.");
-    var testDB = replTest.getPrimary().getDB('testdb');
-    var coll = testDB.stepdown_needs_electable_secondary;
-    var timeout = ReplSetTest.kDefaultTimeoutMS;
-    assert.writeOK(
-        coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 1, wtimeout: timeout}}));
+jsTestLog("Doing a write to primary.");
+var testDB = replTest.getPrimary().getDB('testdb');
+var coll = testDB.stepdown_needs_electable_secondary;
+var timeout = ReplSetTest.kDefaultTimeoutMS;
+assert.writeOK(coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 1, wtimeout: timeout}}));
 
-    // Try to step down with only the primary caught up (1 node out of 5).
-    // stepDown should fail.
-    jsTestLog("Trying to step down primary with only 1 node out of 5 caught up.");
-    assertStepDownFailsWithExceededTimeLimit(primary);
+// Try to step down with only the primary caught up (1 node out of 5).
+// stepDown should fail.
+jsTestLog("Trying to step down primary with only 1 node out of 5 caught up.");
+assertStepDownFailsWithExceededTimeLimit(primary);
 
-    // Get the two unelectable secondaries
-    var secondaryB_unelectable = replTest.nodes[3];
-    var secondaryC_unelectable = replTest.nodes[4];
+// Get the two unelectable secondaries
+var secondaryB_unelectable = replTest.nodes[3];
+var secondaryC_unelectable = replTest.nodes[4];
 
-    // Get an electable secondary
-    var secondaryA_electable = replTest.getSecondaries().find(function(s) {
-        var nodeId = replTest.getNodeId(s);
-        return (nodeId !== 3 && nodeId !== 4);  // nodes 3 and 4 are set to be unelectable
-    });
+// Get an electable secondary
+var secondaryA_electable = replTest.getSecondaries().find(function(s) {
+    var nodeId = replTest.getNodeId(s);
+    return (nodeId !== 3 && nodeId !== 4);  // nodes 3 and 4 are set to be unelectable
+});
 
-    // Enable writes to Secondary B (unelectable). Await replication.
-    // (2 out of 5 nodes caught up, 0 electable)
-    // stepDown should fail due to no caught up majority.
-    jsTestLog("Re-enabling writes to unelectable secondary: node #" +
-              replTest.getNodeId(secondaryB_unelectable) + ", " + secondaryB_unelectable);
-    restartServerReplication(secondaryB_unelectable);
+// Enable writes to Secondary B (unelectable). Await replication.
+// (2 out of 5 nodes caught up, 0 electable)
+// stepDown should fail due to no caught up majority.
+jsTestLog("Re-enabling writes to unelectable secondary: node #" +
+          replTest.getNodeId(secondaryB_unelectable) + ", " + secondaryB_unelectable);
+restartServerReplication(secondaryB_unelectable);
 
-    // Wait for this secondary to catch up by issuing a write that must be replicated to 2 nodes
-    assert.writeOK(
-        coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 2, wtimeout: timeout}}));
+// Wait for this secondary to catch up by issuing a write that must be replicated to 2 nodes
+assert.writeOK(coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 2, wtimeout: timeout}}));
 
-    // Try to step down and fail
-    jsTestLog("Trying to step down primary with only 2 nodes out of 5 caught up.");
-    assertStepDownFailsWithExceededTimeLimit(primary);
+// Try to step down and fail
+jsTestLog("Trying to step down primary with only 2 nodes out of 5 caught up.");
+assertStepDownFailsWithExceededTimeLimit(primary);
 
-    // Enable writes to Secondary C (unelectable). Await replication.
-    // (3 out of 5 nodes caught up, 0 electable)
-    // stepDown should fail due to caught up majority without electable node.
-    jsTestLog("Re-enabling writes to unelectable secondary: node #" +
-              replTest.getNodeId(secondaryC_unelectable) + ", " + secondaryC_unelectable);
-    restartServerReplication(secondaryC_unelectable);
+// Enable writes to Secondary C (unelectable). Await replication.
+// (3 out of 5 nodes caught up, 0 electable)
+// stepDown should fail due to caught up majority without electable node.
+jsTestLog("Re-enabling writes to unelectable secondary: node #" +
+          replTest.getNodeId(secondaryC_unelectable) + ", " + secondaryC_unelectable);
+restartServerReplication(secondaryC_unelectable);
 
-    // Wait for this secondary to catch up by issuing a write that must be replicated to 3 nodes
-    assert.writeOK(
-        coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 3, wtimeout: timeout}}));
+// Wait for this secondary to catch up by issuing a write that must be replicated to 3 nodes
+assert.writeOK(coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 3, wtimeout: timeout}}));
 
-    // Try to step down and fail
-    jsTestLog("Trying to step down primary with a caught up majority that " +
-              "doesn't contain an electable node.");
-    assertStepDownFailsWithExceededTimeLimit(primary);
+// Try to step down and fail
+jsTestLog("Trying to step down primary with a caught up majority that " +
+          "doesn't contain an electable node.");
+assertStepDownFailsWithExceededTimeLimit(primary);
 
-    // Enable writes to Secondary A (electable). Await replication.
-    // (4 out of 5 nodes caught up, 1 electable)
-    // stepDown should succeed due to caught up majority containing an electable node.
-    jsTestLog("Re-enabling writes to electable secondary: node #" +
-              replTest.getNodeId(secondaryA_electable) + ", " + secondaryA_electable);
-    restartServerReplication(secondaryA_electable);
+// Enable writes to Secondary A (electable). Await replication.
+// (4 out of 5 nodes caught up, 1 electable)
+// stepDown should succeed due to caught up majority containing an electable node.
+jsTestLog("Re-enabling writes to electable secondary: node #" +
+          replTest.getNodeId(secondaryA_electable) + ", " + secondaryA_electable);
+restartServerReplication(secondaryA_electable);
 
-    // Wait for this secondary to catch up by issuing a write that must be replicated to 4 nodes
-    assert.writeOK(
-        coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 4, wtimeout: timeout}}));
+// Wait for this secondary to catch up by issuing a write that must be replicated to 4 nodes
+assert.writeOK(coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 4, wtimeout: timeout}}));
 
-    // Try to step down. We expect success, so catch the exception thrown by 'replSetStepDown'.
-    jsTestLog("Trying to step down primary with a caught up majority that " +
-              "does contain an electable node.");
+// Try to step down. We expect success, so catch the exception thrown by 'replSetStepDown'.
+jsTestLog("Trying to step down primary with a caught up majority that " +
+          "does contain an electable node.");
 
-    assertStepDownSucceeds(primary);
+assertStepDownSucceeds(primary);
 
-    // Make sure that original primary has transitioned to SECONDARY state
-    jsTestLog("Wait for PRIMARY " + primary.host + " to completely step down.");
-    replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
+// Make sure that original primary has transitioned to SECONDARY state
+jsTestLog("Wait for PRIMARY " + primary.host + " to completely step down.");
+replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
 
-    // Disable all fail points for clean shutdown
-    restartReplSetReplication(replTest);
-    replTest.stopSet();
-
+// Disable all fail points for clean shutdown
+restartReplSetReplication(replTest);
+replTest.stopSet();
 }());

@@ -42,7 +42,7 @@ struct OperationTimeTrackerHolder {
 
 const OperationContext::Decoration<OperationTimeTrackerHolder> OperationTimeTrackerHolder::get =
     OperationContext::declareDecoration<OperationTimeTrackerHolder>();
-}
+}  // namespace
 
 std::shared_ptr<OperationTimeTracker> OperationTimeTracker::get(OperationContext* opCtx) {
     auto timeTrackerHolder = OperationTimeTrackerHolder::get(opCtx);

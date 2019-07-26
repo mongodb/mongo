@@ -128,15 +128,13 @@ TEST(BSONElement, ExtractLargeSubObject) {
 }
 
 TEST(BSONElement, SafeNumberLongPositiveBound) {
-    BSONObj obj = BSON("kLongLongMaxPlusOneAsDouble"
-                       << BSONElement::kLongLongMaxPlusOneAsDouble
-                       << "towardsZero"
-                       << std::nextafter(BSONElement::kLongLongMaxPlusOneAsDouble, 0.0)
-                       << "towardsInfinity"
-                       << std::nextafter(BSONElement::kLongLongMaxPlusOneAsDouble,
-                                         std::numeric_limits<double>::max())
-                       << "positiveInfinity"
-                       << std::numeric_limits<double>::infinity());
+    BSONObj obj =
+        BSON("kLongLongMaxPlusOneAsDouble"
+             << BSONElement::kLongLongMaxPlusOneAsDouble << "towardsZero"
+             << std::nextafter(BSONElement::kLongLongMaxPlusOneAsDouble, 0.0) << "towardsInfinity"
+             << std::nextafter(BSONElement::kLongLongMaxPlusOneAsDouble,
+                               std::numeric_limits<double>::max())
+             << "positiveInfinity" << std::numeric_limits<double>::infinity());
 
     // kLongLongMaxPlusOneAsDouble is the least double value that will overflow a 64-bit signed
     // two's-complement integer. Historically, converting this value with safeNumberLong() would
@@ -182,13 +180,10 @@ TEST(BSONElement, SafeNumberLongNegativeBound) {
         static_cast<double>(std::numeric_limits<long long>::lowest());
     BSONObj obj =
         BSON("lowestLongLongAsDouble"  // This comment forces clang-format to break here.
-             << lowestLongLongAsDouble
-             << "towardsZero"
-             << std::nextafter(lowestLongLongAsDouble, 0.0)
-             << "towardsNegativeInfinity"
+             << lowestLongLongAsDouble << "towardsZero"
+             << std::nextafter(lowestLongLongAsDouble, 0.0) << "towardsNegativeInfinity"
              << std::nextafter(lowestLongLongAsDouble, std::numeric_limits<double>::lowest())
-             << "negativeInfinity"
-             << -std::numeric_limits<double>::infinity());
+             << "negativeInfinity" << -std::numeric_limits<double>::infinity());
 
     ASSERT_EQ(obj["lowestLongLongAsDouble"].safeNumberLongForHash(),
               std::numeric_limits<long long>::lowest());

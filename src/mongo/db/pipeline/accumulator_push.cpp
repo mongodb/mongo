@@ -86,4 +86,4 @@ intrusive_ptr<Accumulator> AccumulatorPush::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return new AccumulatorPush(expCtx);
 }
-}
+}  // namespace mongo

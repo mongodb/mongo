@@ -15,9 +15,7 @@
  */
 
 var $config = (function() {
-
     var states = (function() {
-
         function init(db, collName) {
             this.session = db.getMongo().startSession();
         }
@@ -41,10 +39,10 @@ var $config = (function() {
             } catch (e) {
                 assertWhenOwnColl.contains(e.code,
                                            [
-                                             ErrorCodes.LockTimeout,
-                                             ErrorCodes.WriteConflict,
-                                             ErrorCodes.SnapshotUnavailable,
-                                             ErrorCodes.OperationNotSupportedInTransaction
+                                               ErrorCodes.LockTimeout,
+                                               ErrorCodes.WriteConflict,
+                                               ErrorCodes.SnapshotUnavailable,
+                                               ErrorCodes.OperationNotSupportedInTransaction
                                            ],
                                            () => tojson(e));
             }
@@ -338,5 +336,4 @@ var $config = (function() {
         setup: setup,
         teardown: teardown
     };
-
 })();

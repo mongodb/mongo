@@ -1,7 +1,7 @@
 (function() {
-    'use strict';
+'use strict';
 
-    load("jstests/replsets/libs/rename_across_dbs.js");
+load("jstests/replsets/libs/rename_across_dbs.js");
 
-    new RenameAcrossDatabasesTest().run();
+new RenameAcrossDatabasesTest().run();
 }());

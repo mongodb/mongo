@@ -10,7 +10,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation.js');
 
 var $config = extendWorkload($config, ($config, $super) => {
-
     // Number of unique collections and number of unique databases. The square root is used
     // here to ensure the total number of namespaces (coll * db) is roughly equal to the
     // number of threads.

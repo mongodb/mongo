@@ -49,34 +49,28 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_VersionMustBe1) {
     rses.addSelf(HostAndPort("h1"));
 
     ReplSetConfig config;
-    ASSERT_OK(config.initializeForInitiate(BSON("_id"
-                                                << "rs0"
-                                                << "version"
-                                                << 2
-                                                << "protocolVersion"
-                                                << 1
-                                                << "members"
-                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                         << "h1")))));
+    ASSERT_OK(
+        config.initializeForInitiate(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")))));
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                   validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
     ReplSetConfig config;
-    ASSERT_OK(config.initializeForInitiate(BSON("_id"
-                                                << "rs0"
-                                                << "version"
-                                                << 1
-                                                << "protocolVersion"
-                                                << 1
-                                                << "members"
-                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                         << "h1")
-                                                              << BSON("_id" << 2 << "host"
-                                                                            << "h2")
-                                                              << BSON("_id" << 3 << "host"
-                                                                            << "h3")))));
+    ASSERT_OK(
+        config.initializeForInitiate(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2")
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3")))));
     ReplicationCoordinatorExternalStateMock notPresentExternalState;
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -99,21 +93,17 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
 
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
     ReplSetConfig config;
-    ASSERT_OK(config.initializeForInitiate(BSON("_id"
-                                                << "rs0"
-                                                << "version"
-                                                << 1
-                                                << "protocolVersion"
-                                                << 1
-                                                << "members"
-                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                         << "h1")
-                                                              << BSON("_id" << 2 << "host"
-                                                                            << "h2"
-                                                                            << "priority"
-                                                                            << 0)
-                                                              << BSON("_id" << 3 << "host"
-                                                                            << "h3")))));
+    ASSERT_OK(
+        config.initializeForInitiate(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2"
+                                                                      << "priority" << 0)
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3")))));
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
 
@@ -128,11 +118,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_WriteConcernMustBeSatisfiab
     ASSERT_OK(
         config.initializeForInitiate(BSON("_id"
                                           << "rs0"
-                                          << "version"
-                                          << 1
-                                          << "protocolVersion"
-                                          << 1
-                                          << "members"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                    << "h1"))
                                           << "settings"
@@ -152,55 +138,37 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOr
     ReplSetConfig twoConfig;
     ASSERT_OK(zeroConfig.initialize(BSON("_id"
                                          << "rs0"
-                                         << "version"
-                                         << 1
-                                         << "protocolVersion"
-                                         << 1
-                                         << "members"
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                   << "h1")
                                                        << BSON("_id" << 2 << "host"
                                                                      << "h2"
-                                                                     << "priority"
-                                                                     << 0
-                                                                     << "arbiterOnly"
-                                                                     << true)
+                                                                     << "priority" << 0
+                                                                     << "arbiterOnly" << true)
                                                        << BSON("_id" << 3 << "host"
                                                                      << "h3")))));
 
     ASSERT_OK(oneConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "priority"
-                                                                    << 1
-                                                                    << "arbiterOnly"
-                                                                    << true)
+                                                                    << "priority" << 1
+                                                                    << "arbiterOnly" << true)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
     ASSERT_OK(twoConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "priority"
-                                                                    << 2
-                                                                    << "arbiterOnly"
-                                                                    << true)
+                                                                    << "priority" << 2
+                                                                    << "arbiterOnly" << true)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
@@ -228,11 +196,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigVersionNumberMustB
     // Two configurations, identical except for version.
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
@@ -242,11 +206,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigVersionNumberMustB
 
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 3
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 3 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
@@ -296,11 +256,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetNa
     // Two configurations, compatible except for set name.
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
@@ -310,11 +266,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetNa
 
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs1"
-                                        << "version"
-                                        << 3
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 3 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
@@ -345,35 +297,25 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetId
     // Two configurations, compatible except for set ID.
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2")
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3"))
-                                        << "settings"
-                                        << BSON("replicaSetId" << OID::gen()))));
+                                        << "settings" << BSON("replicaSetId" << OID::gen()))));
 
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 3
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 3 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2")
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3"))
-                                        << "settings"
-                                        << BSON("replicaSetId" << OID::gen()))));
+                                        << "settings" << BSON("replicaSetId" << OID::gen()))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -402,57 +344,40 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipBuildIn
     // The third, compatible with the first.
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "buildIndexes"
-                                                                    << false
-                                                                    << "priority"
-                                                                    << 0)
+                                                                    << "buildIndexes" << false
+                                                                    << "priority" << 0)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 3
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 3 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "buildIndexes"
-                                                                    << true
-                                                                    << "priority"
-                                                                    << 0)
+                                                                    << "buildIndexes" << true
+                                                                    << "priority" << 0)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
-    ASSERT_OK(oldConfigRefresh.initialize(BSON("_id"
-                                               << "rs0"
-                                               << "version"
-                                               << 2
-                                               << "protocolVersion"
-                                               << 1
-                                               << "members"
-                                               << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                        << "h1")
-                                                             << BSON("_id" << 2 << "host"
-                                                                           << "h2"
-                                                                           << "buildIndexes"
-                                                                           << false
-                                                                           << "priority"
-                                                                           << 0)
-                                                             << BSON("_id" << 3 << "host"
-                                                                           << "h3")))));
+    ASSERT_OK(
+        oldConfigRefresh.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 2 << "protocolVersion" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                  << "h1")
+                                                       << BSON("_id" << 2 << "host"
+                                                                     << "h2"
+                                                                     << "buildIndexes" << false
+                                                                     << "priority" << 0)
+                                                       << BSON("_id" << 3 << "host"
+                                                                     << "h3")))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -484,51 +409,37 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipArbiter
     // The third, compatible with the first.
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "arbiterOnly"
-                                                                    << false)
+                                                                    << "arbiterOnly" << false)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 3
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 3 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "arbiterOnly"
-                                                                    << true)
+                                                                    << "arbiterOnly" << true)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
-    ASSERT_OK(oldConfigRefresh.initialize(BSON("_id"
-                                               << "rs0"
-                                               << "version"
-                                               << 2
-                                               << "protocolVersion"
-                                               << 1
-                                               << "members"
-                                               << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                        << "h1")
-                                                             << BSON("_id" << 2 << "host"
-                                                                           << "h2"
-                                                                           << "arbiterOnly"
-                                                                           << false)
-                                                             << BSON("_id" << 3 << "host"
-                                                                           << "h3")))));
+    ASSERT_OK(
+        oldConfigRefresh.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 2 << "protocolVersion" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                  << "h1")
+                                                       << BSON("_id" << 2 << "host"
+                                                                     << "h2"
+                                                                     << "arbiterOnly" << false)
+                                                       << BSON("_id" << 3 << "host"
+                                                                     << "h3")))));
 
     ASSERT_OK(oldConfig.validate());
     ASSERT_OK(newConfig.validate());
@@ -562,11 +473,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
 
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
@@ -582,10 +489,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
     ASSERT_OK(
         legalNewConfigWithNewHostAndId.initialize(BSON("_id"
                                                        << "rs0"
-                                                       << "version"
-                                                       << 2
-                                                       << "protocolVersion"
-                                                       << 1
+                                                       << "version" << 2 << "protocolVersion" << 1
                                                        << "members"
                                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                 << "h1")
@@ -607,11 +511,8 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
     //
     ASSERT_OK(illegalNewConfigReusingHost.initialize(BSON("_id"
                                                           << "rs0"
-                                                          << "version"
-                                                          << 2
-                                                          << "protocolVersion"
-                                                          << 1
-                                                          << "members"
+                                                          << "version" << 2 << "protocolVersion"
+                                                          << 1 << "members"
                                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                    << "h1")
                                                                         << BSON("_id" << 4 << "host"
@@ -638,10 +539,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricte
     //
     ASSERT_OK(illegalNewConfigReusingId.initialize(BSON("_id"
                                                         << "rs0"
-                                                        << "version"
-                                                        << 2
-                                                        << "protocolVersion"
-                                                        << 1
+                                                        << "version" << 2 << "protocolVersion" << 1
                                                         << "members"
                                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                  << "h1")
@@ -662,11 +560,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_MustFindSelf) {
     ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
@@ -677,11 +571,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_MustFindSelf) {
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
@@ -738,69 +628,46 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_ArbiterPriorityValueMustBeZ
 
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "arbiterOnly"
-                                                                    << true)
+                                                                    << "arbiterOnly" << true)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
     ASSERT_OK(zeroConfig.initialize(BSON("_id"
                                          << "rs0"
-                                         << "version"
-                                         << 2
-                                         << "protocolVersion"
-                                         << 1
-                                         << "members"
+                                         << "version" << 2 << "protocolVersion" << 1 << "members"
                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                   << "h1")
                                                        << BSON("_id" << 2 << "host"
                                                                      << "h2"
-                                                                     << "priority"
-                                                                     << 0
-                                                                     << "arbiterOnly"
-                                                                     << true)
+                                                                     << "priority" << 0
+                                                                     << "arbiterOnly" << true)
                                                        << BSON("_id" << 3 << "host"
                                                                      << "h3")))));
     ASSERT_OK(oneConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "priority"
-                                                                    << 1
-                                                                    << "arbiterOnly"
-                                                                    << true)
+                                                                    << "priority" << 1
+                                                                    << "arbiterOnly" << true)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
     ASSERT_OK(twoConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "priority"
-                                                                    << 2
-                                                                    << "arbiterOnly"
-                                                                    << true)
+                                                                    << "priority" << 2
+                                                                    << "arbiterOnly" << true)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
@@ -831,11 +698,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_SelfMustEndElectable) {
     ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
@@ -846,17 +709,12 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_SelfMustEndElectable) {
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
                                                       << BSON("_id" << 2 << "host"
                                                                     << "h2"
-                                                                    << "priority"
-                                                                    << 0)
+                                                                    << "priority" << 0)
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
@@ -880,10 +738,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewConfigInvalid) {
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initializeForInitiate(BSON("_id"
                                                    << "rs0"
-                                                   << "version"
-                                                   << 2
-                                                   << "protocolVersion"
-                                                   << 1
+                                                   << "version" << 2 << "protocolVersion" << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                             << "h2")
@@ -905,22 +760,14 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigInvalid) {
     ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")))));
 
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 0 << "host"
@@ -948,22 +795,14 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigWriteConcernNotSat
     ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")))));
 
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2"))
                                         << "settings"
@@ -991,11 +830,7 @@ TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigInvalid) {
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 0 << "host"
@@ -1015,15 +850,10 @@ TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigValid) {
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2"
-                                                                 << "priority"
-                                                                 << 3)
+                                                                 << "priority" << 3)
                                                       << BSON("_id" << 1 << "host"
                                                                     << "h3")))));
 
@@ -1041,11 +871,7 @@ TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigWriteConcernNotSati
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2"))
                                         << "settings"
@@ -1065,11 +891,7 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigInvalid) 
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 0 << "host"
@@ -1089,11 +911,7 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigValid) {
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 1 << "host"
@@ -1112,11 +930,7 @@ TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigWriteConc
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 1 << "host"
@@ -1137,11 +951,7 @@ TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsValidConfig) {
     ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 1 << "host"
@@ -1151,11 +961,7 @@ TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsValidConfig) {
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 0 << "host"
@@ -1176,11 +982,7 @@ TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsSelfPresent) {
     ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 1 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
                                                       << BSON("_id" << 1 << "host"
@@ -1190,11 +992,7 @@ TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsSelfPresent) {
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "protocolVersion"
-                                        << 1
-                                        << "members"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h3")
                                                       << BSON("_id" << 2 << "host"

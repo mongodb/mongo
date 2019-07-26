@@ -121,5 +121,5 @@ bool LogManager::isDefaultBackendsAttached() const {
     return _impl->_defaultBackendsAttached;
 }
 
-}  // logv2
-}  // mongo
+}  // namespace logv2
+}  // namespace mongo

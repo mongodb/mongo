@@ -124,4 +124,4 @@ TEST(Builder, AppendUnsignedLongLong) {
 TEST(Builder, AppendShort) {
     testStringBuilderIntegral<short>();
 }
-}
+}  // namespace mongo

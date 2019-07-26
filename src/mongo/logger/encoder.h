@@ -48,4 +48,4 @@ public:
 };
 
 }  // namespace logger
-}  // nnamspace mongo
+}  // namespace mongo

@@ -11,34 +11,33 @@
  */
 
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/libs/storage_engine_utils.js");
+load("jstests/libs/storage_engine_utils.js");
 
-    const rt = new ReplSetTest({
-        name: "drop_oplog_should_fail_if_storage_engine_supports_replSetResizeOplog_command",
-        nodes: 1
-    });
+const rt = new ReplSetTest({
+    name: "drop_oplog_should_fail_if_storage_engine_supports_replSetResizeOplog_command",
+    nodes: 1
+});
 
-    // Start as a standalone node.
-    rt.start(0, {noReplSet: true});
+// Start as a standalone node.
+rt.start(0, {noReplSet: true});
 
-    let master = rt.getPrimary();
-    let localDB = master.getDB('local');
+let master = rt.getPrimary();
+let localDB = master.getDB('local');
 
-    // Standalone nodes don't start with an oplog; create one. The size of the oplog doesn't
-    // matter. We are capping the oplog because some storage engines do not allow the creation
-    // of uncapped oplog collections.
-    assert.commandWorked(localDB.runCommand({create: 'oplog.rs', capped: true, size: 1000}));
+// Standalone nodes don't start with an oplog; create one. The size of the oplog doesn't
+// matter. We are capping the oplog because some storage engines do not allow the creation
+// of uncapped oplog collections.
+assert.commandWorked(localDB.runCommand({create: 'oplog.rs', capped: true, size: 1000}));
 
-    if (storageEngineIsWiredTiger()) {
-        const ret = assert.commandFailed(localDB.runCommand({drop: 'oplog.rs'}));
-        assert.eq("can't drop oplog on storage engines that support replSetResizeOplog command",
-                  ret.errmsg);
-    } else {
-        assert.commandWorked(localDB.runCommand({drop: 'oplog.rs'}));
-    }
+if (storageEngineIsWiredTiger()) {
+    const ret = assert.commandFailed(localDB.runCommand({drop: 'oplog.rs'}));
+    assert.eq("can't drop oplog on storage engines that support replSetResizeOplog command",
+              ret.errmsg);
+} else {
+    assert.commandWorked(localDB.runCommand({drop: 'oplog.rs'}));
+}
 
-    rt.stopSet();
-
+rt.stopSet();
 }());

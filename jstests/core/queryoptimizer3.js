@@ -13,57 +13,57 @@
 // ]
 
 (function() {
-    'use strict';
+'use strict';
 
-    var coll = db.jstests_queryoptimizer3;
+var coll = db.jstests_queryoptimizer3;
 
-    var shellWaitHandle = startParallelShell(function() {
-        for (var i = 0; i < 400; ++i) {
-            sleep(50);
-            try {
-                db.jstests_queryoptimizer3.drop();
-            } catch (e) {
-                if (e.code === ErrorCodes.BackgroundOperationInProgressForNamespace) {
-                    print("Background operation temporarily in progress while attempting to drop " +
-                          "collection.");
-                    continue;
-                }
-                throw e;
-            }
-        }
-    });
-
-    for (var i = 0; i < 100; ++i) {
-        coll.drop();
-        assert.commandWorked(coll.ensureIndex({a: 1}));
-        assert.commandWorked(coll.ensureIndex({b: 1}));
-
-        var bulk = coll.initializeUnorderedBulkOp();
-        for (var j = 0; j < 100; ++j) {
-            bulk.insert({a: j, b: j});
-        }
-        assert.commandWorked(bulk.execute());
-
+var shellWaitHandle = startParallelShell(function() {
+    for (var i = 0; i < 400; ++i) {
+        sleep(50);
         try {
-            var m = i % 5;
-            if (m == 0) {
-                coll.count({a: {$gte: 0}, b: {$gte: 0}});
-            } else if (m == 1) {
-                coll.find({a: {$gte: 0}, b: {$gte: 0}}).itcount();
-            } else if (m == 2) {
-                coll.remove({a: {$gte: 0}, b: {$gte: 0}});
-            } else if (m == 3) {
-                coll.update({a: {$gte: 0}, b: {$gte: 0}}, {});
-            } else if (m == 4) {
-                coll.distinct('x', {a: {$gte: 0}, b: {$gte: 0}});
-            }
+            db.jstests_queryoptimizer3.drop();
         } catch (e) {
-            print("Op killed during yield: " + e.message);
+            if (e.code === ErrorCodes.BackgroundOperationInProgressForNamespace) {
+                print("Background operation temporarily in progress while attempting to drop " +
+                      "collection.");
+                continue;
+            }
+            throw e;
         }
     }
+});
 
-    shellWaitHandle();
+for (var i = 0; i < 100; ++i) {
+    coll.drop();
+    assert.commandWorked(coll.ensureIndex({a: 1}));
+    assert.commandWorked(coll.ensureIndex({b: 1}));
 
-    // Ensure that the server is still responding
-    assert.commandWorked(db.runCommand({isMaster: 1}));
+    var bulk = coll.initializeUnorderedBulkOp();
+    for (var j = 0; j < 100; ++j) {
+        bulk.insert({a: j, b: j});
+    }
+    assert.commandWorked(bulk.execute());
+
+    try {
+        var m = i % 5;
+        if (m == 0) {
+            coll.count({a: {$gte: 0}, b: {$gte: 0}});
+        } else if (m == 1) {
+            coll.find({a: {$gte: 0}, b: {$gte: 0}}).itcount();
+        } else if (m == 2) {
+            coll.remove({a: {$gte: 0}, b: {$gte: 0}});
+        } else if (m == 3) {
+            coll.update({a: {$gte: 0}, b: {$gte: 0}}, {});
+        } else if (m == 4) {
+            coll.distinct('x', {a: {$gte: 0}, b: {$gte: 0}});
+        }
+    } catch (e) {
+        print("Op killed during yield: " + e.message);
+    }
+}
+
+shellWaitHandle();
+
+// Ensure that the server is still responding
+assert.commandWorked(db.runCommand({isMaster: 1}));
 })();

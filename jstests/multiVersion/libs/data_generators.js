@@ -612,7 +612,7 @@ function CollectionMetadataGenerator(options) {
     for (var option in options) {
         if (options.hasOwnProperty(option)) {
             if (option === 'capped') {
-                if (typeof(options['capped']) !== 'boolean') {
+                if (typeof (options['capped']) !== 'boolean') {
                     throw Error(
                         "\"capped\" options must be boolean in CollectionMetadataGenerator");
                 }

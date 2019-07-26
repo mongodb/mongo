@@ -125,8 +125,7 @@ Status storeMongoeBenchOptions(const moe::Environment& params,
     if (!parentPath.empty() && !boost::filesystem::exists(parentPath)) {
         return {ErrorCodes::NonExistentPath,
                 str::stream() << "Directory containing output file must already exist, but "
-                              << parentPath.string()
-                              << " wasn't found"};
+                              << parentPath.string() << " wasn't found"};
     }
 
     return Status::OK();

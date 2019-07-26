@@ -41,8 +41,8 @@
 namespace {
 
 using namespace mongo;
-using std::unique_ptr;
 using std::endl;
+using std::unique_ptr;
 
 void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {
     // like a BSONObj string, but without a NUL terminator.
@@ -150,23 +150,16 @@ TEST(BSONValidate, Fuzz) {
     log() << "BSONValidate Fuzz random seed: " << seed << endl;
     PseudoRandom randomSource(seed);
 
-    BSONObj original = BSON("one" << 3 << "two" << 5 << "three" << BSONObj() << "four"
-                                  << BSON("five" << BSON("six" << 11))
-                                  << "seven"
-                                  << BSON_ARRAY("a"
-                                                << "bb"
-                                                << "ccc"
-                                                << 5)
-                                  << "eight"
-                                  << BSONDBRef("rrr", OID("01234567890123456789aaaa"))
-                                  << "_id"
-                                  << OID("deadbeefdeadbeefdeadbeef")
-                                  << "nine"
-                                  << BSONBinData("\x69\xb7", 2, BinDataGeneral)
-                                  << "ten"
-                                  << Date_t::fromMillisSinceEpoch(44)
-                                  << "eleven"
-                                  << BSONRegEx("foooooo", "i"));
+    BSONObj original =
+        BSON("one" << 3 << "two" << 5 << "three" << BSONObj() << "four"
+                   << BSON("five" << BSON("six" << 11)) << "seven"
+                   << BSON_ARRAY("a"
+                                 << "bb"
+                                 << "ccc" << 5)
+                   << "eight" << BSONDBRef("rrr", OID("01234567890123456789aaaa")) << "_id"
+                   << OID("deadbeefdeadbeefdeadbeef") << "nine"
+                   << BSONBinData("\x69\xb7", 2, BinDataGeneral) << "ten"
+                   << Date_t::fromMillisSinceEpoch(44) << "eleven" << BSONRegEx("foooooo", "i"));
 
     int32_t fuzzFrequencies[] = {2, 10, 20, 100, 1000};
     for (size_t i = 0; i < sizeof(fuzzFrequencies) / sizeof(int32_t); ++i) {
@@ -245,8 +238,9 @@ TEST(BSONValidateFast, Simple3) {
 }
 
 TEST(BSONValidateFast, NestedObject) {
-    BSONObj x = BSON("a" << 1 << "b" << BSON("c" << 2 << "d" << BSONArrayBuilder().obj() << "e"
-                                                 << BSON_ARRAY("1" << 2 << 3)));
+    BSONObj x = BSON("a" << 1 << "b"
+                         << BSON("c" << 2 << "d" << BSONArrayBuilder().obj() << "e"
+                                     << BSON_ARRAY("1" << 2 << 3)));
     ASSERT_OK(validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest));
     ASSERT_NOT_OK(validateBSON(x.objdata(), x.objsize() / 2, BSONVersion::kLatest));
 }
@@ -323,13 +317,10 @@ TEST(BSONValidateFast, StringHasSomething) {
     bb.appendStr("x", /*withNUL*/ true);
     bb.appendNum(0);
     const BSONObj x = ob.done();
-    ASSERT_EQUALS(5  // overhead
-                      +
-                      1  // type
-                      +
-                      2  // name
-                      +
-                      4  // size
+    ASSERT_EQUALS(5        // overhead
+                      + 1  // type
+                      + 2  // name
+                      + 4  // size
                   ,
                   x.objsize());
     ASSERT_NOT_OK(validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest));

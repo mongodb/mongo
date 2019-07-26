@@ -71,4 +71,4 @@ public:
 private:
     BSONElementHasher();
 };
-}
+}  // namespace mongo

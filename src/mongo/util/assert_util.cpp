@@ -241,12 +241,11 @@ Status exceptionToStatus() noexcept {
     } catch (const std::exception& ex) {
         return Status(ErrorCodes::UnknownError,
                       str::stream() << "Caught std::exception of type " << demangleName(typeid(ex))
-                                    << ": "
-                                    << ex.what());
+                                    << ": " << ex.what());
     } catch (const boost::exception& ex) {
-        return Status(
-            ErrorCodes::UnknownError,
-            str::stream() << "Caught boost::exception of type " << demangleName(typeid(ex)) << ": "
+        return Status(ErrorCodes::UnknownError,
+                      str::stream()
+                          << "Caught boost::exception of type " << demangleName(typeid(ex)) << ": "
                           << boost::diagnostic_information(ex));
 
     } catch (...) {
@@ -254,4 +253,4 @@ Status exceptionToStatus() noexcept {
         std::terminate();
     }
 }
-}
+}  // namespace mongo

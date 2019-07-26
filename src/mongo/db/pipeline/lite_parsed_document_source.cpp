@@ -61,4 +61,4 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
 
     return it->second(request, specElem);
 }
-}
+}  // namespace mongo

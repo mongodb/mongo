@@ -15,140 +15,142 @@
  * ]
  */
 (function() {
-    "use strict";
+"use strict";
 
-    load('jstests/libs/analyze_plan.js');              // For getPlanStage().
-    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-    load('jstests/libs/fixture_helpers.js');  // For getPrimaryForNodeHostingDatabase and isMongos.
+load('jstests/libs/analyze_plan.js');              // For getPlanStage().
+load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+load('jstests/libs/fixture_helpers.js');  // For getPrimaryForNodeHostingDatabase and isMongos.
 
-    const coll = db.wildcard_cached_plans;
-    coll.drop();
+const coll = db.wildcard_cached_plans;
+coll.drop();
 
-    assert.commandWorked(coll.createIndex({"b.$**": 1}));
-    assert.commandWorked(coll.createIndex({"a": 1}));
+assert.commandWorked(coll.createIndex({"b.$**": 1}));
+assert.commandWorked(coll.createIndex({"a": 1}));
 
-    // In order for the plan cache to be used, there must be more than one plan available. Insert
-    // data into the collection such that the b.$** index will be far more selective than the index
-    // on 'a' for the query {a: 1, b: 1}.
-    for (let i = 0; i < 1000; i++) {
-        assert.commandWorked(coll.insert({a: 1}));
+// In order for the plan cache to be used, there must be more than one plan available. Insert
+// data into the collection such that the b.$** index will be far more selective than the index
+// on 'a' for the query {a: 1, b: 1}.
+for (let i = 0; i < 1000; i++) {
+    assert.commandWorked(coll.insert({a: 1}));
+}
+assert.commandWorked(coll.insert({a: 1, b: 1}));
+
+function getCacheEntryForQuery(query) {
+    const aggRes = FixtureHelpers.getPrimaryForNodeHostingDatabase(db)
+                       .getCollection(coll.getFullName())
+                       .aggregate([
+                           {$planCacheStats: {}},
+                           {$match: {createdFromQuery: {query: query, sort: {}, projection: {}}}}
+                       ])
+                       .toArray();
+    assert.lte(aggRes.length, 1);
+    if (aggRes.length > 0) {
+        return aggRes[0];
     }
-    assert.commandWorked(coll.insert({a: 1, b: 1}));
+    return null;
+}
 
-    function getCacheEntryForQuery(query) {
-        const aggRes =
-            FixtureHelpers.getPrimaryForNodeHostingDatabase(db)
-                .getCollection(coll.getFullName())
-                .aggregate([
-                    {$planCacheStats: {}},
-                    {$match: {createdFromQuery: {query: query, sort: {}, projection: {}}}}
-                ])
-                .toArray();
-        assert.lte(aggRes.length, 1);
-        if (aggRes.length > 0) {
-            return aggRes[0];
-        }
-        return null;
-    }
+function getPlanCacheKeyFromExplain(explainRes) {
+    const hash = FixtureHelpers.isMongos(db)
+        ? explainRes.queryPlanner.winningPlan.shards[0].planCacheKey
+        : explainRes.queryPlanner.planCacheKey;
+    assert.eq(typeof (hash), "string");
+    return hash;
+}
 
-    function getPlanCacheKeyFromExplain(explainRes) {
-        const hash = FixtureHelpers.isMongos(db)
-            ? explainRes.queryPlanner.winningPlan.shards[0].planCacheKey
-            : explainRes.queryPlanner.planCacheKey;
-        assert.eq(typeof(hash), "string");
-        return hash;
-    }
+function getPlanCacheKey(query) {
+    return getPlanCacheKeyFromExplain(assert.commandWorked(coll.explain().find(query).finish()));
+}
 
-    function getPlanCacheKey(query) {
-        return getPlanCacheKeyFromExplain(
-            assert.commandWorked(coll.explain().find(query).finish()));
-    }
+const query = {
+    a: 1,
+    b: 1
+};
 
-    const query = {a: 1, b: 1};
+// The plan cache should be empty.
+assert.eq(getCacheEntryForQuery(query), null);
 
-    // The plan cache should be empty.
-    assert.eq(getCacheEntryForQuery(query), null);
-
-    // Run the query twice, once to create the cache entry, and again to make the cache entry
-    // active.
-    for (let i = 0; i < 2; i++) {
-        assert.eq(coll.find(query).itcount(), 1);
-    }
-
-    // The plan cache should no longer be empty. Check that the chosen plan uses the b.$** index.
-    const cacheEntry = getCacheEntryForQuery(query);
-    assert.neq(cacheEntry, null);
-    assert.eq(cacheEntry.isActive, true);
-    // Should be at least two plans: one using the {a: 1} index and the other using the b.$** index.
-    assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
-    const plan = cacheEntry.creationExecStats[0].executionStages;
-    const ixScanStage = getPlanStage(plan, "IXSCAN");
-    assert.neq(ixScanStage, null, () => tojson(plan));
-    assert.eq(ixScanStage.keyPattern, {"$_path": 1, "b": 1}, () => tojson(plan));
-
-    // Run the query again. This time it should use the cached plan. We should get the same result
-    // as earlier.
+// Run the query twice, once to create the cache entry, and again to make the cache entry
+// active.
+for (let i = 0; i < 2; i++) {
     assert.eq(coll.find(query).itcount(), 1);
+}
 
-    // Now run a query where b is null. This should have a different shape key from the previous
-    // query since $** indexes are sparse.
-    const queryWithBNull = {a: 1, b: null};
-    for (let i = 0; i < 2; i++) {
-        assert.eq(coll.find({a: 1, b: null}).itcount(), 1000);
-    }
-    assert.neq(getPlanCacheKey(queryWithBNull), getPlanCacheKey(query));
+// The plan cache should no longer be empty. Check that the chosen plan uses the b.$** index.
+const cacheEntry = getCacheEntryForQuery(query);
+assert.neq(cacheEntry, null);
+assert.eq(cacheEntry.isActive, true);
+// Should be at least two plans: one using the {a: 1} index and the other using the b.$** index.
+assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
+const plan = cacheEntry.creationExecStats[0].executionStages;
+const ixScanStage = getPlanStage(plan, "IXSCAN");
+assert.neq(ixScanStage, null, () => tojson(plan));
+assert.eq(ixScanStage.keyPattern, {"$_path": 1, "b": 1}, () => tojson(plan));
 
-    // There should only have been one solution for the above query, so it would not get cached.
-    assert.eq(getCacheEntryForQuery({a: 1, b: null}), null);
+// Run the query again. This time it should use the cached plan. We should get the same result
+// as earlier.
+assert.eq(coll.find(query).itcount(), 1);
 
-    // Check that indexability discriminators work with collations.
-    (function() {
-        // Create wildcard index with a collation.
-        assertDropAndRecreateCollection(
-            db, coll.getName(), {collation: {locale: "en_US", strength: 1}});
-        assert.commandWorked(coll.createIndex({"b.$**": 1}));
+// Now run a query where b is null. This should have a different shape key from the previous
+// query since $** indexes are sparse.
+const queryWithBNull = {
+    a: 1,
+    b: null
+};
+for (let i = 0; i < 2; i++) {
+    assert.eq(coll.find({a: 1, b: null}).itcount(), 1000);
+}
+assert.neq(getPlanCacheKey(queryWithBNull), getPlanCacheKey(query));
 
-        // Run a query which uses a different collation from that of the index, but does not use
-        // string bounds.
-        const queryWithoutStringExplain =
-            coll.explain().find({a: 5, b: 5}).collation({locale: "fr"}).finish();
-        let ixScans = getPlanStages(queryWithoutStringExplain.queryPlanner.winningPlan, "IXSCAN");
-        assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
-        assert.eq(ixScans[0].keyPattern, {$_path: 1, b: 1});
+// There should only have been one solution for the above query, so it would not get cached.
+assert.eq(getCacheEntryForQuery({a: 1, b: null}), null);
 
-        // Run a query which uses a different collation from that of the index and does have string
-        // bounds.
-        const queryWithStringExplain =
-            coll.explain().find({a: 5, b: "a string"}).collation({locale: "fr"}).finish();
-        ixScans = getPlanStages(queryWithStringExplain.queryPlanner.winningPlan, "IXSCAN");
-        assert.eq(ixScans.length, 0);
+// Check that indexability discriminators work with collations.
+(function() {
+// Create wildcard index with a collation.
+assertDropAndRecreateCollection(db, coll.getName(), {collation: {locale: "en_US", strength: 1}});
+assert.commandWorked(coll.createIndex({"b.$**": 1}));
 
-        // Check that the shapes are different since the query which matches on a string will not
-        // be eligible to use the b.$** index (since the index has a different collation).
-        assert.neq(getPlanCacheKeyFromExplain(queryWithoutStringExplain),
-                   getPlanCacheKeyFromExplain(queryWithStringExplain));
-    })();
+// Run a query which uses a different collation from that of the index, but does not use
+// string bounds.
+const queryWithoutStringExplain =
+    coll.explain().find({a: 5, b: 5}).collation({locale: "fr"}).finish();
+let ixScans = getPlanStages(queryWithoutStringExplain.queryPlanner.winningPlan, "IXSCAN");
+assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
+assert.eq(ixScans[0].keyPattern, {$_path: 1, b: 1});
 
-    // Check that indexability discriminators work with partial wildcard indexes.
-    (function() {
-        assertDropAndRecreateCollection(db, coll.getName());
-        assert.commandWorked(
-            coll.createIndex({"$**": 1}, {partialFilterExpression: {a: {$lte: 5}}}));
+// Run a query which uses a different collation from that of the index and does have string
+// bounds.
+const queryWithStringExplain =
+    coll.explain().find({a: 5, b: "a string"}).collation({locale: "fr"}).finish();
+ixScans = getPlanStages(queryWithStringExplain.queryPlanner.winningPlan, "IXSCAN");
+assert.eq(ixScans.length, 0);
 
-        // Run a query for a value included by the partial filter expression.
-        const queryIndexedExplain = coll.find({a: 4}).explain();
-        let ixScans = getPlanStages(queryIndexedExplain.queryPlanner.winningPlan, "IXSCAN");
-        assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
-        assert.eq(ixScans[0].keyPattern, {$_path: 1, a: 1});
+// Check that the shapes are different since the query which matches on a string will not
+// be eligible to use the b.$** index (since the index has a different collation).
+assert.neq(getPlanCacheKeyFromExplain(queryWithoutStringExplain),
+           getPlanCacheKeyFromExplain(queryWithStringExplain));
+})();
 
-        // Run a query which tries to get a value not included by the partial filter expression.
-        const queryUnindexedExplain = coll.find({a: 100}).explain();
-        ixScans = getPlanStages(queryUnindexedExplain.queryPlanner.winningPlan, "IXSCAN");
-        assert.eq(ixScans.length, 0);
+// Check that indexability discriminators work with partial wildcard indexes.
+(function() {
+assertDropAndRecreateCollection(db, coll.getName());
+assert.commandWorked(coll.createIndex({"$**": 1}, {partialFilterExpression: {a: {$lte: 5}}}));
 
-        // Check that the shapes are different since the query which searches for a value not
-        // included by the partial filter expression won't be eligible to use the $** index.
-        assert.neq(getPlanCacheKeyFromExplain(queryIndexedExplain),
-                   getPlanCacheKeyFromExplain(queryUnindexedExplain));
-    })();
+// Run a query for a value included by the partial filter expression.
+const queryIndexedExplain = coll.find({a: 4}).explain();
+let ixScans = getPlanStages(queryIndexedExplain.queryPlanner.winningPlan, "IXSCAN");
+assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
+assert.eq(ixScans[0].keyPattern, {$_path: 1, a: 1});
+
+// Run a query which tries to get a value not included by the partial filter expression.
+const queryUnindexedExplain = coll.find({a: 100}).explain();
+ixScans = getPlanStages(queryUnindexedExplain.queryPlanner.winningPlan, "IXSCAN");
+assert.eq(ixScans.length, 0);
+
+// Check that the shapes are different since the query which searches for a value not
+// included by the partial filter expression won't be eligible to use the $** index.
+assert.neq(getPlanCacheKeyFromExplain(queryIndexedExplain),
+           getPlanCacheKeyFromExplain(queryUnindexedExplain));
+})();
 })();

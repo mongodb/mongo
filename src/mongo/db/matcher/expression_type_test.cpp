@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/expression_type.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -314,4 +314,4 @@ TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotTraverseLeafArrays) {
 }
 
 }  // namespace
-}  // namepace mongo
+}  // namespace mongo

@@ -12,33 +12,34 @@
  * @tags: [requires_replication]
  */
 (function() {
-    "use strict";
+"use strict";
 
-    let replSet = new ReplSetTest({name: "server35317", nodes: 1});
-    replSet.startSet();
-    replSet.initiate();
+let replSet = new ReplSetTest({name: "server35317", nodes: 1});
+replSet.startSet();
+replSet.initiate();
 
-    let prim = replSet.getPrimary();
-    let beforeIndexBuild = assert.commandWorked(prim.adminCommand(
-        {configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
-         mode: "alwaysOn"}))["operationTime"];
-    assert.commandWorked(prim.getDB("test").coll.insert({c: 1}));
-    assert.commandWorked(prim.getDB("test").coll.createIndex({c: 1}));
-    assert.commandWorked(prim.adminCommand({restartCatalog: 1}));
+let prim = replSet.getPrimary();
+let beforeIndexBuild = assert.commandWorked(prim.adminCommand({
+    configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
+    mode: "alwaysOn"
+}))["operationTime"];
+assert.commandWorked(prim.getDB("test").coll.insert({c: 1}));
+assert.commandWorked(prim.getDB("test").coll.createIndex({c: 1}));
+assert.commandWorked(prim.adminCommand({restartCatalog: 1}));
 
-    let session = prim.startSession({causalConsistency: false});
-    let sessionDb = session.getDatabase("test");
-    // Prior to fixing SERVER-35317, this would crash a debug build, or return success on a
-    // non-debug build. Now it should return an error. Specifically, this fails because we're
-    // trying to read behind the minimum visible snapshot timestamp for the `test.coll`
-    // collection.
-    assert.commandFailed(sessionDb.runCommand({
-        find: "coll",
-        filter: {c: 1},
-        readConcern: {level: "snapshot", atClusterTime: beforeIndexBuild},
-        txnNumber: NumberLong(0)
-    }));
+let session = prim.startSession({causalConsistency: false});
+let sessionDb = session.getDatabase("test");
+// Prior to fixing SERVER-35317, this would crash a debug build, or return success on a
+// non-debug build. Now it should return an error. Specifically, this fails because we're
+// trying to read behind the minimum visible snapshot timestamp for the `test.coll`
+// collection.
+assert.commandFailed(sessionDb.runCommand({
+    find: "coll",
+    filter: {c: 1},
+    readConcern: {level: "snapshot", atClusterTime: beforeIndexBuild},
+    txnNumber: NumberLong(0)
+}));
 
-    session.endSession();
-    replSet.stopSet();
+session.endSession();
+replSet.stopSet();
 })();

@@ -44,7 +44,7 @@ namespace mongo {
  *  timeout).  Thus it can be implemented using OS-specific
  *  facilities in all environments (if desired).  On Windows,
  *  the implementation below is faster than boost mutex.
-*/
+ */
 #if defined(_WIN32)
 
 class SimpleMutex {

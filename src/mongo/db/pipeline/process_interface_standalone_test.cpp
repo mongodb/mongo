@@ -93,7 +93,7 @@ TEST_F(ProcessInterfaceStandaloneTest,
 
     // Test that 'targetCollectionVersion' is accepted if from mongos.
     expCtx->fromMongos = true;
-    auto[joinKey, chunkVersion] = processInterface->ensureFieldsUniqueOrResolveDocumentKey(
+    auto [joinKey, chunkVersion] = processInterface->ensureFieldsUniqueOrResolveDocumentKey(
         expCtx, {{"_id"}}, targetCollectionVersion, expCtx->ns);
     ASSERT_EQ(joinKey.size(), 1UL);
     ASSERT_EQ(joinKey.count(FieldPath("_id")), 1UL);

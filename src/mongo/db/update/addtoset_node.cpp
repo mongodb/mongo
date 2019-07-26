@@ -108,8 +108,7 @@ ModifierNode::ModifyResult AddToSetNode::updateExistingElement(
     mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
     uassert(ErrorCodes::BadValue,
             str::stream() << "Cannot apply $addToSet to non-array field. Field named '"
-                          << element->getFieldName()
-                          << "' has non-array type "
+                          << element->getFieldName() << "' has non-array type "
                           << typeName(element->getType()),
             element->getType() == BSONType::Array);
 

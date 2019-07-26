@@ -143,8 +143,8 @@ public:
              repl::ReplicationCoordinator::modeNone) &&
             (dbname == NamespaceString::kLocalDb)) {
             uasserted(ErrorCodes::IllegalOperation,
-                      str::stream() << "Cannot drop '" << dbname
-                                    << "' database while replication is active");
+                      str::stream()
+                          << "Cannot drop '" << dbname << "' database while replication is active");
         }
         BSONElement e = cmdObj.firstElement();
         int p = (int)e.number();

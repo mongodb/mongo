@@ -285,7 +285,7 @@ public:
     virtual const std::vector<BSONObj>& docsDeletedForNamespace_forTest(UUID uuid) const& {
         MONGO_UNREACHABLE;
     }
-    void docsDeletedForNamespace_forTest(UUID)&& = delete;
+    void docsDeletedForNamespace_forTest(UUID) && = delete;
 
 protected:
     /**

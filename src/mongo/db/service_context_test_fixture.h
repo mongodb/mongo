@@ -39,9 +39,9 @@ namespace mongo {
 class ScopedGlobalServiceContextForTest {
 public:
     /**
-    * Returns a service context, which is only valid for this instance of the test.
-    * Must not be called before setUp or after tearDown.
-    */
+     * Returns a service context, which is only valid for this instance of the test.
+     * Must not be called before setUp or after tearDown.
+     */
     ServiceContext* getServiceContext();
 
 protected:

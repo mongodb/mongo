@@ -108,15 +108,15 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
 
     _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 
-    TransactionParticipant::observeTransactionLifetimeLimitSeconds.addObserver([anchor = _anchor](
-        const Argument& secs) {
-        try {
-            anchor->setPeriod(getPeriod(secs));
-        } catch (const DBException& ex) {
-            log() << "Failed to update period of thread which aborts expired transactions "
-                  << ex.toStatus();
-        }
-    });
+    TransactionParticipant::observeTransactionLifetimeLimitSeconds.addObserver(
+        [anchor = _anchor](const Argument& secs) {
+            try {
+                anchor->setPeriod(getPeriod(secs));
+            } catch (const DBException& ex) {
+                log() << "Failed to update period of thread which aborts expired transactions "
+                      << ex.toStatus();
+            }
+        });
 }
 
 }  // namespace mongo

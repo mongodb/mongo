@@ -121,9 +121,9 @@ public:
     bool areAllConstraintsChecked(OperationContext* opCtx) const;
 
     /**
-      * When an index builder wants to commit, use this to retrieve any recorded multikey paths
-      * that were tracked during the build.
-      */
+     * When an index builder wants to commit, use this to retrieve any recorded multikey paths
+     * that were tracked during the build.
+     */
     boost::optional<MultikeyPaths> getMultikeyPaths() const;
 
     const std::string& getSideWritesTableIdent() const;

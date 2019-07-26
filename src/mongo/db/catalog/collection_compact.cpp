@@ -148,9 +148,7 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
                 return StatusWith<CompactStats>(
                     ErrorCodes::CannotCreateIndex,
                     str::stream() << "Cannot compact collection due to invalid index " << spec
-                                  << ": "
-                                  << keyStatus.reason()
-                                  << " For more info see"
+                                  << ": " << keyStatus.reason() << " For more info see"
                                   << " http://dochub.mongodb.org/core/index-validation");
             }
             indexSpecs.push_back(spec);

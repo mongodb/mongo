@@ -57,8 +57,8 @@ typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
 class DBClientReplicaSet : public DBClientBase {
 public:
     using DBClientBase::query;
-    using DBClientBase::update;
     using DBClientBase::remove;
+    using DBClientBase::update;
 
     /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet
      * connections. */
@@ -244,7 +244,7 @@ public:
 
 protected:
     /** Authorize.  Authorizes all nodes as needed
-    */
+     */
     void _auth(const BSONObj& params) override;
 
 private:
@@ -353,4 +353,4 @@ protected:
 
     } _lazyState;
 };
-}
+}  // namespace mongo

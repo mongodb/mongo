@@ -42,14 +42,14 @@
 
 namespace BasicTests {
 
-using std::unique_ptr;
-using std::shared_ptr;
 using std::cout;
 using std::dec;
 using std::endl;
 using std::hex;
+using std::shared_ptr;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 using std::vector;
 
 class RarelyTest {

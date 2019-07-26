@@ -50,4 +50,4 @@ long long deleteObjects(OperationContext* opCtx,
                         bool justOne,
                         bool god = false,
                         bool fromMigrate = false);
-}
+}  // namespace mongo

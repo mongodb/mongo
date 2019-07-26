@@ -930,10 +930,9 @@ Status ReplicationCoordinatorImpl::waitForMemberState(MemberState expectedState,
     auto pred = [this, expectedState]() { return _memberState == expectedState; };
     if (!_memberStateChange.wait_for(lk, timeout.toSystemDuration(), pred)) {
         return Status(ErrorCodes::ExceededTimeLimit,
-                      str::stream() << "Timed out waiting for state to become "
-                                    << expectedState.toString()
-                                    << ". Current state is "
-                                    << _memberState.toString());
+                      str::stream()
+                          << "Timed out waiting for state to become " << expectedState.toString()
+                          << ". Current state is " << _memberState.toString());
     }
     return Status::OK();
 }
@@ -1645,8 +1644,9 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
                           "'committed' optime "
                        << opTime
                        << ". There are still drop pending collections (earliest drop optime: "
-                       << *dropOpTime << ") that have to be removed from storage before we can "
-                                         "satisfy the write concern "
+                       << *dropOpTime
+                       << ") that have to be removed from storage before we can "
+                          "satisfy the write concern "
                        << writeConcern.toBSON();
                 return false;
             }

@@ -51,9 +51,9 @@
 namespace mongo {
 namespace {
 
-using std::unique_ptr;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 
 // Failpoint which causes to hang "count" cmd after acquiring the DB lock.
 MONGO_FAIL_POINT_DEFINE(hangBeforeCollectionCount);

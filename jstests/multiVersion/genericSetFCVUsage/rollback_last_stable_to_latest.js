@@ -4,9 +4,9 @@
  */
 
 (function() {
-    "use strict";
-    load("jstests/multiVersion/libs/multiversion_rollback.js");
+"use strict";
+load("jstests/multiVersion/libs/multiversion_rollback.js");
 
-    var testName = "multiversion_rollback_last_stable_to_latest";
-    testMultiversionRollback(testName, "last-stable", "latest");
+var testName = "multiversion_rollback_last_stable_to_latest";
+testMultiversionRollback(testName, "last-stable", "latest");
 })();

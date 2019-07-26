@@ -99,9 +99,7 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
         uassert(28785,
                 str::stream() << "Unrecognized configsvr mode number: " << configServerModeNumber
                               << ". Range of known configsvr mode numbers is: ["
-                              << minKnownConfigServerMode
-                              << ", "
-                              << maxKnownConfigServerMode
+                              << minKnownConfigServerMode << ", " << maxKnownConfigServerMode
                               << "]",
                 configServerModeNumber >= minKnownConfigServerMode &&
                     configServerModeNumber <= maxKnownConfigServerMode);

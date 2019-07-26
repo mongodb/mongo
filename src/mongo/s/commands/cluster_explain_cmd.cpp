@@ -148,8 +148,7 @@ BSONObj makeExplainedObj(const BSONObj& outerObj, StringData dbName) {
     if (auto innerDb = innerObj["$db"]) {
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Mismatched $db in explain command. Expected " << dbName
-                              << " but got "
-                              << innerDb.checkAndGetStringData(),
+                              << " but got " << innerDb.checkAndGetStringData(),
                 innerDb.checkAndGetStringData() == dbName);
     }
 

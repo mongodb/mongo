@@ -107,10 +107,7 @@ StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::_parseFromComma
     } else {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "\"" << kZoneName << "\" had the wrong type. Expected "
-                              << typeName(String)
-                              << " or "
-                              << typeName(jstNULL)
-                              << ", found "
+                              << typeName(String) << " or " << typeName(jstNULL) << ", found "
                               << typeName(zoneElem.type())};
     }
 

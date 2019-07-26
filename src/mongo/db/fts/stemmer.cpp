@@ -63,5 +63,5 @@ StringData Stemmer::stem(StringData word) const {
 
     return StringData((const char*)(sb_sym), sb_stemmer_length(_stemmer));
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

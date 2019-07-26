@@ -47,8 +47,7 @@ void assertMultikeyPathsAreEqual(const MultikeyPaths& actual, const MultikeyPath
     if (!match) {
         FAIL(str::stream() << "Expected: " << MultikeyPathTracker::dumpMultikeyPaths(expected)
                            << ", "
-                           << "Actual: "
-                           << MultikeyPathTracker::dumpMultikeyPaths(actual));
+                           << "Actual: " << MultikeyPathTracker::dumpMultikeyPaths(actual));
     }
     ASSERT(match);
 }

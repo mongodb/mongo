@@ -40,8 +40,8 @@ namespace repl {
 class ElectionReasonCounter : public ElectionReasonCounterBase {
 public:
     using ElectionReasonCounterBase::getCalled;
-    using ElectionReasonCounterBase::setCalled;
     using ElectionReasonCounterBase::getSuccessful;
+    using ElectionReasonCounterBase::setCalled;
     using ElectionReasonCounterBase::setSuccessful;
 
     void incrementCalled() {

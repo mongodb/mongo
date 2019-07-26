@@ -132,8 +132,7 @@ struct Cloner::Fun {
         uassert(
             ErrorCodes::NotMaster,
             str::stream() << "Not primary while cloning collection " << from_collection.ns()
-                          << " to "
-                          << to_collection.ns(),
+                          << " to " << to_collection.ns(),
             !opCtx->writesAreReplicated() ||
                 repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, to_collection));
 
@@ -162,13 +161,12 @@ struct Cloner::Fun {
                     db->userCreateNS(
                         opCtx, to_collection, collectionOptions, createDefaultIndexes, indexSpec),
                     str::stream() << "collection creation failed during clone ["
-                                  << to_collection.ns()
-                                  << "]");
+                                  << to_collection.ns() << "]");
                 wunit.commit();
                 collection = db->getCollection(opCtx, to_collection);
                 invariant(collection,
-                          str::stream() << "Missing collection during clone [" << to_collection.ns()
-                                        << "]");
+                          str::stream()
+                              << "Missing collection during clone [" << to_collection.ns() << "]");
             });
         }
 
@@ -208,8 +206,8 @@ struct Cloner::Fun {
 
                 collection = db->getCollection(opCtx, to_collection);
                 uassert(28594,
-                        str::stream() << "Collection " << to_collection.ns()
-                                      << " dropped while cloning",
+                        str::stream()
+                            << "Collection " << to_collection.ns() << " dropped while cloning",
                         collection != nullptr);
             }
 
@@ -291,7 +289,7 @@ struct Cloner::Fun {
 };
 
 /* copy the specified collection
-*/
+ */
 void Cloner::copy(OperationContext* opCtx,
                   const string& toDBName,
                   const NamespaceString& from_collection,
@@ -325,10 +323,7 @@ void Cloner::copy(OperationContext* opCtx,
 
     uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Not primary while cloning collection " << from_collection.ns()
-                          << " to "
-                          << to_collection.ns()
-                          << " with filter "
-                          << query.toString(),
+                          << " to " << to_collection.ns() << " with filter " << query.toString(),
             !opCtx->writesAreReplicated() ||
                 repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, to_collection));
 }
@@ -349,9 +344,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
 
     uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Not primary while copying indexes from " << from_collection.ns()
-                          << " to "
-                          << to_collection.ns()
-                          << " (Cloner)",
+                          << " to " << to_collection.ns() << " (Cloner)",
             !opCtx->writesAreReplicated() ||
                 repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, to_collection));
 
@@ -379,11 +372,9 @@ void Cloner::copyIndexes(OperationContext* opCtx,
                                        createDefaultIndexes,
                                        fixIndexSpec(to_collection.db().toString(),
                                                     getIdIndexSpec(from_indexes))),
-                      str::stream() << "Collection creation failed while copying indexes from "
-                                    << from_collection.ns()
-                                    << " to "
-                                    << to_collection.ns()
-                                    << " (Cloner)");
+                      str::stream()
+                          << "Collection creation failed while copying indexes from "
+                          << from_collection.ns() << " to " << to_collection.ns() << " (Cloner)");
             wunit.commit();
             collection = db->getCollection(opCtx, to_collection);
             invariant(collection,
@@ -596,8 +587,7 @@ Status Cloner::createCollectionsForDb(
                     // we're trying to create already exists.
                     return Status(ErrorCodes::NamespaceExists,
                                   str::stream() << "unsharded collection with same namespace "
-                                                << nss.ns()
-                                                << " already exists.");
+                                                << nss.ns() << " already exists.");
                 }
 
                 // If the collection is sharded and a collection with the same name already
@@ -612,13 +602,11 @@ Status Cloner::createCollectionsForDb(
                 if (clonedUUID == existingOpts.uuid)
                     return Status::OK();
 
-                return Status(
-                    ErrorCodes::InvalidOptions,
-                    str::stream() << "sharded collection with same namespace " << nss.ns()
+                return Status(ErrorCodes::InvalidOptions,
+                              str::stream()
+                                  << "sharded collection with same namespace " << nss.ns()
                                   << " already exists, but UUIDs don't match. Existing UUID is "
-                                  << existingOpts.uuid
-                                  << " and new UUID is "
-                                  << clonedUUID);
+                                  << existingOpts.uuid << " and new UUID is " << clonedUUID);
             }
 
             // If the collection does not already exist and is sharded, we create a new

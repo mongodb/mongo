@@ -272,7 +272,7 @@ private:
     std::streampos _fileStartOffset;
     std::streampos _fileEndOffset;
 };
-}
+}  // namespace mongo
 
 /**
  * #include "mongo/db/sorter/sorter.cpp" and call this in a single translation

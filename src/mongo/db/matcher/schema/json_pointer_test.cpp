@@ -49,9 +49,8 @@ void assertPointerEvaluatesTo(std::string pointerStr,
 }
 
 TEST(JSONPointerTest, ParseInterestingCharacterFields) {
-    BSONObj obj = BSON(
-        "" << 1 << "c%d" << 2 << "e^f" << 3 << "g|h" << 4 << "i\\\\j" << 5 << "k\"l" << 6 << " "
-           << 7);
+    BSONObj obj = BSON("" << 1 << "c%d" << 2 << "e^f" << 3 << "g|h" << 4 << "i\\\\j" << 5 << "k\"l"
+                          << 6 << " " << 7);
     assertPointerEvaluatesTo("/", obj, "", 1);
     assertPointerEvaluatesTo("/c%d", obj, "c%d", 2);
     assertPointerEvaluatesTo("/e^f", obj, "e^f", 3);
@@ -129,9 +128,8 @@ TEST(JSONPointerTest, ArrayTraversalTest) {
                                         << "value2")
                                 << BSON("builder3"
                                         << "value3"));
-    auto topLevel =
-        BSON("transit" << BSON("arrBottom" << arrBottom) << "arrTop" << arrTop << "toBSONArray"
-                       << bsonArray);
+    auto topLevel = BSON("transit" << BSON("arrBottom" << arrBottom) << "arrTop" << arrTop
+                                   << "toBSONArray" << bsonArray);
     assertPointerEvaluatesTo("/transit/arrBottom/0", topLevel, "0", 0);
     assertPointerEvaluatesTo("/toBSONArray/0/builder0", topLevel, "builder0", "value0");
     assertPointerEvaluatesTo("/toBSONArray/3/builder3", topLevel, "builder3", "value3");

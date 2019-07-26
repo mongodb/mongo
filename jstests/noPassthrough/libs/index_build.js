@@ -97,8 +97,8 @@ class IndexBuildTest {
         const inprog = database.currentOp({opid: opId}).inprog;
         assert.eq(1,
                   inprog.length,
-                  'unable to find opid ' + opId + ' in currentOp() result: ' +
-                      tojson(database.currentOp()));
+                  'unable to find opid ' + opId +
+                      ' in currentOp() result: ' + tojson(database.currentOp()));
         const op = inprog[0];
         assert.eq(opId, op.opid, 'db.currentOp() returned wrong index build info: ' + tojson(op));
         if (onOperationFn) {
@@ -124,16 +124,14 @@ class IndexBuildTest {
         assert.eq(0, res.cursor.id);
 
         // A map of index specs keyed by index name.
-        const indexMap = res.cursor.firstBatch.reduce(
-            (m, spec) => {
-                if (spec.hasOwnProperty('buildUUID')) {
-                    m[spec.spec.name] = spec;
-                } else {
-                    m[spec.name] = spec;
-                }
-                return m;
-            },
-            {});
+        const indexMap = res.cursor.firstBatch.reduce((m, spec) => {
+            if (spec.hasOwnProperty('buildUUID')) {
+                m[spec.spec.name] = spec;
+            } else {
+                m[spec.name] = spec;
+            }
+            return m;
+        }, {});
 
         // Check ready indexes.
         for (let name of readyIndexes) {

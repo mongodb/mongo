@@ -92,9 +92,7 @@ Status checkIdMatchesRoleName(const BSONElement& idElement, const RoleName& role
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Role document _id fields must be encoded as the string "
                                        "dbname.rolename.  Found "
-                                    << idField
-                                    << " for "
-                                    << roleName.getFullName());
+                                    << idField << " for " << roleName.getFullName());
     }
     return Status::OK();
 }
@@ -312,16 +310,13 @@ Status handleOplogCommand(RoleGraph* roleGraph, const BSONObj& cmdObj) {
     if (cmdName == "createIndexes" &&
         cmdObj.firstElement().str() == rolesCollectionNamespace.coll()) {
         UnorderedFieldsBSONObjComparator instance;
-        if (instance.evaluate(cmdObj == (BSON("createIndexes"
-                                              << "system.roles"
-                                              << "v"
-                                              << 2
-                                              << "name"
-                                              << "role_1_db_1"
-                                              << "key"
-                                              << BSON("role" << 1 << "db" << 1)
-                                              << "unique"
-                                              << true)))) {
+        if (instance.evaluate(
+                cmdObj ==
+                (BSON("createIndexes"
+                      << "system.roles"
+                      << "v" << 2 << "name"
+                      << "role_1_db_1"
+                      << "key" << BSON("role" << 1 << "db" << 1) << "unique" << true)))) {
             return Status::OK();
         }
     }

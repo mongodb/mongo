@@ -40,8 +40,8 @@
 namespace {
 
 using namespace mongo;
-using std::vector;
 using std::deque;
+using std::vector;
 
 //
 // Tests for parsing GLE responses into write errors and write concern errors for write
@@ -205,14 +205,9 @@ TEST(LegacyGLESuppress, StripCode) {
 TEST(LegacyGLESuppress, TimeoutDupError24) {
     const BSONObj gleResponse = BSON("ok" << 0.0 << "err"
                                           << "message"
-                                          << "code"
-                                          << 12345
-                                          << "err"
+                                          << "code" << 12345 << "err"
                                           << "timeout"
-                                          << "code"
-                                          << 56789
-                                          << "wtimeout"
-                                          << true);
+                                          << "code" << 56789 << "wtimeout" << true);
 
     BSONObj stripped = stripNonWCInfo(gleResponse);
     ASSERT_EQUALS(stripped.nFields(), 4);
@@ -221,4 +216,4 @@ TEST(LegacyGLESuppress, TimeoutDupError24) {
     ASSERT_EQUALS(stripped["code"].numberInt(), 56789);
     ASSERT(stripped["wtimeout"].trueValue());
 }
-}
+}  // namespace

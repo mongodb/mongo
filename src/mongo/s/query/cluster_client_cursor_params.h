@@ -157,4 +157,4 @@ struct ClusterClientCursorParams {
     boost::optional<bool> isAutoCommit;
 };
 
-}  // mongo
+}  // namespace mongo

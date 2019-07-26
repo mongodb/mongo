@@ -48,7 +48,7 @@ void _addFTSStuff(BSONObjBuilder* b) {
     b->append("_fts", INDEX_NAME);
     b->append("_ftsx", 1);
 }
-}
+}  // namespace
 
 const FTSLanguage& FTSSpec::_getLanguageToUseV1(const BSONObj& userDoc) const {
     BSONElement e = userDoc[_languageOverrideField];
@@ -240,9 +240,7 @@ StatusWith<BSONObj> FTSSpec::_fixSpecV1(const BSONObj& spec) {
             if (kv.second <= 0 || kv.second >= MAX_WORD_WEIGHT) {
                 return {ErrorCodes::CannotCreateIndex,
                         str::stream() << "text index weight must be in the exclusive interval (0,"
-                                      << MAX_WORD_WEIGHT
-                                      << ") but found: "
-                                      << kv.second};
+                                      << MAX_WORD_WEIGHT << ") but found: " << kv.second};
             }
             b.append(kv.first, kv.second);
         }
@@ -303,5 +301,5 @@ StatusWith<BSONObj> FTSSpec::_fixSpecV1(const BSONObj& spec) {
 
     return b.obj();
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

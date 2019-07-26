@@ -12,7 +12,6 @@ load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');
 load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.threadCount = 5;
     $config.iterations = 50;
 
@@ -149,10 +148,10 @@ var $config = extendWorkload($config, function($config, $super) {
                                        : " as a retryable write. ";
         logString += "The document will ";
         logString += moveAcrossChunks ? "move across chunks. " : "stay within the same chunk. \n";
-        logString += "Original document values -- id: " + idToUpdate + ", shardKey: " +
-            currentShardKey + ", counter: " + counterForId + "\n";
-        logString += "Intended new document values -- shardKey: " + newShardKey + ", counter: " +
-            (counterForId + 1);
+        logString += "Original document values -- id: " + idToUpdate +
+            ", shardKey: " + currentShardKey + ", counter: " + counterForId + "\n";
+        logString += "Intended new document values -- shardKey: " + newShardKey +
+            ", counter: " + (counterForId + 1);
         jsTestLog(logString);
     };
 
@@ -163,15 +162,15 @@ var $config = extendWorkload($config, function($config, $super) {
         logString += "Find by old shard key (should be empty): " +
             tojson(collection.find({skey: currentShardKey}).toArray()) + "\n";
         logString += "Find by _id: " + tojson(collection.find({_id: idToUpdate}).toArray()) + "\n";
-        logString += "Find by new shard key: " +
-            tojson(collection.find({skey: newShardKey}).toArray()) + "\n";
+        logString +=
+            "Find by new shard key: " + tojson(collection.find({skey: newShardKey}).toArray()) +
+            "\n";
 
         jsTestLog(logString);
     };
 
     $config.data.findAndModifyShardKey = function findAndModifyShardKey(
         db, collName, {wrapInTransaction, moveAcrossChunks} = {}) {
-
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         const shardKeyField = $config.data.shardKeyField;
 

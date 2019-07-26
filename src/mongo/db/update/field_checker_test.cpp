@@ -38,9 +38,9 @@ namespace {
 
 using mongo::ErrorCodes;
 using mongo::FieldRef;
-using mongo::fieldchecker::isUpdatable;
-using mongo::fieldchecker::isPositional;
 using mongo::Status;
+using mongo::fieldchecker::isPositional;
+using mongo::fieldchecker::isUpdatable;
 
 TEST(IsUpdatable, Basics) {
     FieldRef fieldRef("x");

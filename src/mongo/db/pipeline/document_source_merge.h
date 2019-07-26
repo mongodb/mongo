@@ -180,7 +180,7 @@ private:
         }
 
         BSONObjBuilder bob;
-        for (auto && [ name, expr ] : *_letVariables) {
+        for (auto&& [name, expr] : *_letVariables) {
             bob << name << expr->evaluate(doc, &pExpCtx->variables);
         }
         return bob.obj();

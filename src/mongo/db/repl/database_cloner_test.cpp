@@ -125,16 +125,16 @@ void DatabaseClonerTest::setUp() {
                const BSONObj& idIndexSpec,
                const std::vector<BSONObj>& secondaryIndexSpecs)
         -> StatusWith<std::unique_ptr<CollectionBulkLoaderMock>> {
-            const auto collInfo = &_collections[nss];
+        const auto collInfo = &_collections[nss];
 
-            auto localLoader = std::make_unique<CollectionBulkLoaderMock>(collInfo->stats);
-            auto status = localLoader->init(secondaryIndexSpecs);
-            if (!status.isOK())
-                return status;
-            collInfo->loader = localLoader.get();
+        auto localLoader = std::make_unique<CollectionBulkLoaderMock>(collInfo->stats);
+        auto status = localLoader->init(secondaryIndexSpecs);
+        if (!status.isOK())
+            return status;
+        collInfo->loader = localLoader.get();
 
-            return std::move(localLoader);
-        };
+        return std::move(localLoader);
+    };
 }
 
 void DatabaseClonerTest::tearDown() {
@@ -333,8 +333,7 @@ TEST_F(DatabaseClonerTest, InvalidListCollectionsFilter) {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         processNetworkResponse(BSON("ok" << 0 << "errmsg"
                                          << "unknown operator"
-                                         << "code"
-                                         << ErrorCodes::BadValue));
+                                         << "code" << ErrorCodes::BadValue));
     }
 
     ASSERT_EQUALS(ErrorCodes::BadValue, getStatus().code());
@@ -389,16 +388,13 @@ TEST_F(DatabaseClonerTest, ListCollectionsPredicate) {
 
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
-                                                   << "options"
-                                                   << _options1.toBSON()),
+                                                   << "options" << _options1.toBSON()),
                                               BSON("name"
                                                    << "b"
-                                                   << "options"
-                                                   << _options2.toBSON()),
+                                                   << "options" << _options2.toBSON()),
                                               BSON("name"
                                                    << "c"
-                                                   << "options"
-                                                   << _options3.toBSON())};
+                                                   << "options" << _options3.toBSON())};
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         processNetworkResponse(createListCollectionsResponse(
@@ -423,12 +419,10 @@ TEST_F(DatabaseClonerTest, ListCollectionsMultipleBatches) {
 
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
-                                                   << "options"
-                                                   << _options1.toBSON()),
+                                                   << "options" << _options1.toBSON()),
                                               BSON("name"
                                                    << "b"
-                                                   << "options"
-                                                   << _options2.toBSON())};
+                                                   << "options" << _options2.toBSON())};
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         processNetworkResponse(createListCollectionsResponse(1, BSON_ARRAY(sourceInfos[0])));
@@ -510,8 +504,7 @@ TEST_F(DatabaseClonerTest, CollectionInfoNameEmpty) {
             createListCollectionsResponse(0,
                                           BSON_ARRAY(BSON("name"
                                                           << ""
-                                                          << "options"
-                                                          << _options1.toBSON()))));
+                                                          << "options" << _options1.toBSON()))));
     }
 
     ASSERT_EQUALS(ErrorCodes::BadValue, getStatus().code());
@@ -532,12 +525,10 @@ TEST_F(DatabaseClonerTest, CollectionInfoNameDuplicate) {
             createListCollectionsResponse(0,
                                           BSON_ARRAY(BSON("name"
                                                           << "a"
-                                                          << "options"
-                                                          << _options1.toBSON())
+                                                          << "options" << _options1.toBSON())
                                                      << BSON("name"
                                                              << "a"
-                                                             << "options"
-                                                             << _options2.toBSON()))));
+                                                             << "options" << _options2.toBSON()))));
     }
 
     ASSERT_EQUALS(51005, getStatus().code());
@@ -573,11 +564,11 @@ TEST_F(DatabaseClonerTest, CollectionInfoOptionsNotAnObject) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createListCollectionsResponse(0,
-                                                             BSON_ARRAY(BSON("name"
-                                                                             << "a"
-                                                                             << "options"
-                                                                             << 123))));
+        processNetworkResponse(
+            createListCollectionsResponse(0,
+                                          BSON_ARRAY(BSON("name"
+                                                          << "a"
+                                                          << "options" << 123))));
     }
 
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, getStatus().code());
@@ -594,12 +585,11 @@ TEST_F(DatabaseClonerTest, InvalidCollectionOptions) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(
-            createListCollectionsResponse(0,
-                                          BSON_ARRAY(BSON("name"
-                                                          << "a"
-                                                          << "options"
-                                                          << BSON("storageEngine" << 1)))));
+        processNetworkResponse(createListCollectionsResponse(
+            0,
+            BSON_ARRAY(BSON("name"
+                            << "a"
+                            << "options" << BSON("storageEngine" << 1)))));
     }
 
     ASSERT_EQUALS(ErrorCodes::BadValue, getStatus().code());
@@ -615,11 +605,11 @@ TEST_F(DatabaseClonerTest, InvalidMissingUUID) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createListCollectionsResponse(0,
-                                                             BSON_ARRAY(BSON("name"
-                                                                             << "a"
-                                                                             << "options"
-                                                                             << BSONObj()))));
+        processNetworkResponse(
+            createListCollectionsResponse(0,
+                                          BSON_ARRAY(BSON("name"
+                                                          << "a"
+                                                          << "options" << BSONObj()))));
     }
 
     ASSERT_EQUALS(50953, getStatus().code());
@@ -668,11 +658,11 @@ TEST_F(DatabaseClonerTest, ListCollectionsReturnsEmptyCollectionName) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createListCollectionsResponse(0,
-                                                             BSON_ARRAY(BSON("name"
-                                                                             << ""
-                                                                             << "options"
-                                                                             << BSONObj()))));
+        processNetworkResponse(
+            createListCollectionsResponse(0,
+                                          BSON_ARRAY(BSON("name"
+                                                          << ""
+                                                          << "options" << BSONObj()))));
     }
 
     ASSERT_EQUALS(ErrorCodes::BadValue, getStatus().code());
@@ -698,8 +688,7 @@ TEST_F(DatabaseClonerTest, StartFirstCollectionClonerFailed) {
             createListCollectionsResponse(0,
                                           BSON_ARRAY(BSON("name"
                                                           << "a"
-                                                          << "options"
-                                                          << _options1.toBSON()))));
+                                                          << "options" << _options1.toBSON()))));
     }
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed, getStatus().code());
@@ -730,12 +719,10 @@ TEST_F(DatabaseClonerTest, StartSecondCollectionClonerFailed) {
             createListCollectionsResponse(0,
                                           BSON_ARRAY(BSON("name"
                                                           << "a"
-                                                          << "options"
-                                                          << _options1.toBSON())
+                                                          << "options" << _options1.toBSON())
                                                      << BSON("name"
                                                              << "b"
-                                                             << "options"
-                                                             << _options2.toBSON()))));
+                                                             << "options" << _options2.toBSON()))));
 
         processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
@@ -761,8 +748,7 @@ TEST_F(DatabaseClonerTest, ShutdownCancelsCollectionCloning) {
                                           0,
                                           BSON_ARRAY(BSON("name"
                                                           << "a"
-                                                          << "options"
-                                                          << _options1.toBSON())))));
+                                                          << "options" << _options1.toBSON())))));
         net->runReadyNetworkOperations();
 
         // CollectionCloner sends collection count request on startup.
@@ -795,12 +781,10 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
 
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
-                                                   << "options"
-                                                   << _options1.toBSON()),
+                                                   << "options" << _options1.toBSON()),
                                               BSON("name"
                                                    << "b"
-                                                   << "options"
-                                                   << _options2.toBSON())};
+                                                   << "options" << _options2.toBSON())};
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         processNetworkResponse(
@@ -816,8 +800,7 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
         processNetworkResponse(createCountResponse(0));
         processNetworkResponse(BSON("ok" << 0 << "errmsg"
                                          << "fake message"
-                                         << "code"
-                                         << ErrorCodes::CursorNotFound));
+                                         << "code" << ErrorCodes::CursorNotFound));
 
         processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
@@ -852,12 +835,10 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
 
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
-                                                   << "options"
-                                                   << _options1.toBSON()),
+                                                   << "options" << _options1.toBSON()),
                                               BSON("name"
                                                    << "b"
-                                                   << "options"
-                                                   << _options2.toBSON())};
+                                                   << "options" << _options2.toBSON())};
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         processNetworkResponse(

@@ -73,11 +73,11 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::endl;
 using std::list;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 using std::vector;
 
 using executor::RemoteCommandRequest;
@@ -221,23 +221,16 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
     // more helpful error message. Note that call() can itself throw a socket exception.
     uassert(ErrorCodes::HostUnreachable,
             str::stream() << "network error while attempting to run "
-                          << "command '"
-                          << request.getCommandName()
-                          << "' "
-                          << "on host '"
-                          << host
-                          << "' ",
+                          << "command '" << request.getCommandName() << "' "
+                          << "on host '" << host << "' ",
             call(requestMsg, replyMsg, false, &host));
 
     auto commandReply = parseCommandReplyMessage(host, replyMsg);
 
     uassert(ErrorCodes::RPCProtocolNegotiationFailed,
             str::stream() << "Mismatched RPC protocols - request was '"
-                          << networkOpToString(requestMsg.operation())
-                          << "' '"
-                          << " but reply was '"
-                          << networkOpToString(replyMsg.operation())
-                          << "' ",
+                          << networkOpToString(requestMsg.operation()) << "' '"
+                          << " but reply was '" << networkOpToString(replyMsg.operation()) << "' ",
             rpc::protocolForMessage(requestMsg) == commandReply->getProtocol());
 
     return {std::move(commandReply), this};
@@ -314,8 +307,7 @@ bool DBClientBase::runPseudoCommand(StringData db,
         if (status == ErrorCodes::CommandResultSchemaViolation) {
             msgasserted(28624,
                         str::stream() << "Received bad " << realCommandName
-                                      << " response from server: "
-                                      << info);
+                                      << " response from server: " << info);
         } else if (status == ErrorCodes::CommandNotFound) {
             NamespaceString pseudoCommandNss(db, pseudoCommandCol);
             // if this throws we just let it escape as that's how runCommand works.
@@ -614,10 +606,7 @@ void DBClientBase::findN(vector<BSONObj>& out,
 
     uassert(10276,
             str::stream() << "DBClientBase::findN: transport error: " << getServerAddress()
-                          << " ns: "
-                          << ns
-                          << " query: "
-                          << query.toString(),
+                          << " ns: " << ns << " query: " << query.toString(),
             c.get());
 
     if (c->hasResultFlag(ResultFlag_ShardConfigStale)) {

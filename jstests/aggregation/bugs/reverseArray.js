@@ -4,29 +4,29 @@
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
 (function() {
-    "use strict";
+"use strict";
 
-    var coll = db.reverseArray;
-    coll.drop();
+var coll = db.reverseArray;
+coll.drop();
 
-    // We need a document to flow through the pipeline, even though we don't care what fields it
-    // has.
-    coll.insert({});
+// We need a document to flow through the pipeline, even though we don't care what fields it
+// has.
+coll.insert({});
 
-    assertErrorCode(coll, [{$project: {reversed: {$reverseArray: 1}}}], 34435);
+assertErrorCode(coll, [{$project: {reversed: {$reverseArray: 1}}}], 34435);
 
-    var res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [1, 2]}}}}]);
-    var output = res.toArray();
-    assert.eq(1, output.length);
-    assert.eq(output[0].reversed, [2, 1]);
+var res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [1, 2]}}}}]);
+var output = res.toArray();
+assert.eq(1, output.length);
+assert.eq(output[0].reversed, [2, 1]);
 
-    var res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [[1, 2]]}}}}]);
-    var output = res.toArray();
-    assert.eq(1, output.length);
-    assert.eq(output[0].reversed, [[1, 2]]);
+var res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [[1, 2]]}}}}]);
+var output = res.toArray();
+assert.eq(1, output.length);
+assert.eq(output[0].reversed, [[1, 2]]);
 
-    var res = coll.aggregate([{$project: {reversed: {$reverseArray: "$notAField"}}}]);
-    var output = res.toArray();
-    assert.eq(1, output.length);
-    assert.eq(output[0].reversed, null);
+var res = coll.aggregate([{$project: {reversed: {$reverseArray: "$notAField"}}}]);
+var output = res.toArray();
+assert.eq(1, output.length);
+assert.eq(output[0].reversed, null);
 }());

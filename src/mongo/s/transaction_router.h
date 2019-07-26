@@ -215,78 +215,78 @@ public:
         }
 
         /**
-        * Starts a fresh transaction in this session or continue an existing one. Also cleans up the
-        * previous transaction state.
-        */
+         * Starts a fresh transaction in this session or continue an existing one. Also cleans up
+         * the previous transaction state.
+         */
         void beginOrContinueTxn(OperationContext* opCtx,
                                 TxnNumber txnNumber,
                                 TransactionActions action);
 
         /**
-        * Attaches the required transaction related fields for a request to be sent to the given
-        * shard.
-        *
-        * Calling this method has the following side effects:
-        * 1. Potentially selecting a coordinator.
-        * 2. Adding the shard to the list of participants.
-        * 3. Also append fields for first statements (ex. startTransaction, readConcern)
-        *    if the shard was newly added to the list of participants.
-        */
+         * Attaches the required transaction related fields for a request to be sent to the given
+         * shard.
+         *
+         * Calling this method has the following side effects:
+         * 1. Potentially selecting a coordinator.
+         * 2. Adding the shard to the list of participants.
+         * 3. Also append fields for first statements (ex. startTransaction, readConcern)
+         *    if the shard was newly added to the list of participants.
+         */
         BSONObj attachTxnFieldsIfNeeded(OperationContext* opCtx,
                                         const ShardId& shardId,
                                         const BSONObj& cmdObj);
 
         /**
-        * Processes the transaction metadata in the response from the participant if the response
-        * indicates the operation succeeded.
-        */
+         * Processes the transaction metadata in the response from the participant if the response
+         * indicates the operation succeeded.
+         */
         void processParticipantResponse(OperationContext* opCtx,
                                         const ShardId& shardId,
                                         const BSONObj& responseObj);
 
         /**
-        * Returns true if the current transaction can retry on a stale version error from a
-        * contacted shard. This is always true except for an error received by a write that is not
-        * the first overall statement in the sharded transaction. This is because the entire
-        * command will be retried, and shards that were not stale and are targeted again may
-        * incorrectly execute the command a second time.
-        *
-        * Note: Even if this method returns true, the retry attempt may still fail, e.g. if one of
-        * the shards that returned a stale version error was involved in a previously completed a
-        * statement for this transaction.
-        *
-        * TODO SERVER-37207: Change batch writes to retry only the failed writes in a batch, to
-        * allow retrying writes beyond the first overall statement.
-        */
+         * Returns true if the current transaction can retry on a stale version error from a
+         * contacted shard. This is always true except for an error received by a write that is not
+         * the first overall statement in the sharded transaction. This is because the entire
+         * command will be retried, and shards that were not stale and are targeted again may
+         * incorrectly execute the command a second time.
+         *
+         * Note: Even if this method returns true, the retry attempt may still fail, e.g. if one of
+         * the shards that returned a stale version error was involved in a previously completed a
+         * statement for this transaction.
+         *
+         * TODO SERVER-37207: Change batch writes to retry only the failed writes in a batch, to
+         * allow retrying writes beyond the first overall statement.
+         */
         bool canContinueOnStaleShardOrDbError(StringData cmdName) const;
 
         /**
-        * Updates the transaction state to allow for a retry of the current command on a stale
-        * version error. This includes sending abortTransaction to all cleared participants. Will
-        * throw if the transaction cannot be continued.
-        */
+         * Updates the transaction state to allow for a retry of the current command on a stale
+         * version error. This includes sending abortTransaction to all cleared participants. Will
+         * throw if the transaction cannot be continued.
+         */
         void onStaleShardOrDbError(OperationContext* opCtx,
                                    StringData cmdName,
                                    const Status& errorStatus);
 
         /**
-        * Returns true if the current transaction can retry on a snapshot error. This is only true
-        * on the first command recevied for a transaction.
-        */
+         * Returns true if the current transaction can retry on a snapshot error. This is only true
+         * on the first command recevied for a transaction.
+         */
         bool canContinueOnSnapshotError() const;
 
         /**
-        * Resets the transaction state to allow for a retry attempt. This includes clearing all
-        * participants, clearing the coordinator, resetting the global read timestamp, and sending
-        * abortTransaction to all cleared participants. Will throw if the transaction cannot be
-        * continued.
-        */
+         * Resets the transaction state to allow for a retry attempt. This includes clearing all
+         * participants, clearing the coordinator, resetting the global read timestamp, and sending
+         * abortTransaction to all cleared participants. Will throw if the transaction cannot be
+         * continued.
+         */
         void onSnapshotError(OperationContext* opCtx, const Status& errorStatus);
 
         /**
-        * Updates the transaction tracking state to allow for a retry attempt on a view resolution
-        * error. This includes sending abortTransaction to all cleared participants.
-        */
+         * Updates the transaction tracking state to allow for a retry attempt on a view resolution
+         * error. This includes sending abortTransaction to all cleared participants.
+         */
         void onViewResolutionError(OperationContext* opCtx, const NamespaceString& nss);
 
         /**
@@ -301,206 +301,207 @@ public:
         LogicalTime getSelectedAtClusterTime() const;
 
         /**
-        * Sets the atClusterTime for the current transaction to the latest time in the router's
-        * logical clock. Does nothing if the transaction does not have snapshot read concern or an
-        * atClusterTime has already been selected and cannot be changed.
-        */
+         * Sets the atClusterTime for the current transaction to the latest time in the router's
+         * logical clock. Does nothing if the transaction does not have snapshot read concern or an
+         * atClusterTime has already been selected and cannot be changed.
+         */
         void setDefaultAtClusterTime(OperationContext* opCtx);
 
         /**
-        * If a coordinator has been selected for the current transaction, returns its id.
-        */
+         * If a coordinator has been selected for the current transaction, returns its id.
+         */
         const boost::optional<ShardId>& getCoordinatorId() const;
 
         /**
-        * If a recovery shard has been selected for the current transaction, returns its id.
-        */
+         * If a recovery shard has been selected for the current transaction, returns its id.
+         */
         const boost::optional<ShardId>& getRecoveryShardId() const;
 
         /**
-        * Commits the transaction.
-        *
-        * For transactions that only did reads or only wrote to one shard, sends commit directly to
-        * the participants and returns the first error response or the last (success) response.
-        *
-        * For transactions that performed writes to multiple shards, hands off the participant list
-        * to the coordinator to do two-phase commit, and returns the coordinator's response.
-        */
+         * Commits the transaction.
+         *
+         * For transactions that only did reads or only wrote to one shard, sends commit directly to
+         * the participants and returns the first error response or the last (success) response.
+         *
+         * For transactions that performed writes to multiple shards, hands off the participant list
+         * to the coordinator to do two-phase commit, and returns the coordinator's response.
+         */
         BSONObj commitTransaction(OperationContext* opCtx,
                                   const boost::optional<TxnRecoveryToken>& recoveryToken);
 
         /**
-        * Sends abort to all participants.
-        *
-        * Returns the first error response or the last (success) response.
-        */
+         * Sends abort to all participants.
+         *
+         * Returns the first error response or the last (success) response.
+         */
         BSONObj abortTransaction(OperationContext* opCtx);
 
         /**
-        * Sends abort to all shards in the current participant list. Will retry on retryable errors,
-        * but ignores the responses from each shard.
-        */
+         * Sends abort to all shards in the current participant list. Will retry on retryable
+         * errors, but ignores the responses from each shard.
+         */
         void implicitlyAbortTransaction(OperationContext* opCtx, const Status& errorStatus);
 
         /**
-        * If a coordinator has been selected for this transaction already, constructs a recovery
-        * token, which can be used to resume commit or abort of the transaction from a different
-        * router.
-        */
+         * If a coordinator has been selected for this transaction already, constructs a recovery
+         * token, which can be used to resume commit or abort of the transaction from a different
+         * router.
+         */
         void appendRecoveryToken(BSONObjBuilder* builder) const;
 
         /**
-        * Returns a string with the active transaction's transaction number and logical session id
-        * (i.e. the transaction id).
-        */
+         * Returns a string with the active transaction's transaction number and logical session id
+         * (i.e. the transaction id).
+         */
         std::string txnIdToString() const;
 
         /**
-        * Returns the participant for this transaction or nullptr if the specified shard is not
-        * participant of this transaction.
-        */
+         * Returns the participant for this transaction or nullptr if the specified shard is not
+         * participant of this transaction.
+         */
         const Participant* getParticipant(const ShardId& shard);
 
         /**
-        * Returns the statement id of the latest received command for this transaction.
-        */
+         * Returns the statement id of the latest received command for this transaction.
+         */
         StmtId getLatestStmtId() const {
             return p().latestStmtId;
         }
 
         /**
-        * Returns a copy of the timing stats of the transaction router's active transaction.
-        */
+         * Returns a copy of the timing stats of the transaction router's active transaction.
+         */
         const TimingStats& getTimingStats() const {
             return o().timingStats;
         }
 
     private:
         /**
-        * Resets the router's state. Used when the router sees a new transaction for the first time.
-        * This is required because we don't create a new router object for each transaction, but
-        * instead reuse the same object across different transactions.
-        */
+         * Resets the router's state. Used when the router sees a new transaction for the first
+         * time. This is required because we don't create a new router object for each transaction,
+         * but instead reuse the same object across different transactions.
+         */
         void _resetRouterState(OperationContext* opCtx, const TxnNumber& txnNumber);
 
         /**
-        * Internal method for committing a transaction. Should only throw on failure to send commit.
-        */
+         * Internal method for committing a transaction. Should only throw on failure to send
+         * commit.
+         */
         BSONObj _commitTransaction(OperationContext* opCtx,
                                    const boost::optional<TxnRecoveryToken>& recoveryToken);
 
         /**
-        * Retrieves the transaction's outcome from the shard specified in the recovery token.
-        */
+         * Retrieves the transaction's outcome from the shard specified in the recovery token.
+         */
         BSONObj _commitWithRecoveryToken(OperationContext* opCtx,
                                          const TxnRecoveryToken& recoveryToken);
 
         /**
-        * Hands off coordinating a two-phase commit across all participants to the coordinator
-        * shard.
-        */
+         * Hands off coordinating a two-phase commit across all participants to the coordinator
+         * shard.
+         */
         BSONObj _handOffCommitToCoordinator(OperationContext* opCtx);
 
         /**
-        * Sets the given logical time as the atClusterTime for the transaction to be the greater of
-        * the given time and the user's afterClusterTime, if one was provided.
-        */
+         * Sets the given logical time as the atClusterTime for the transaction to be the greater of
+         * the given time and the user's afterClusterTime, if one was provided.
+         */
         void _setAtClusterTime(OperationContext* opCtx,
                                const boost::optional<LogicalTime>& afterClusterTime,
                                LogicalTime candidateTime);
 
         /**
-        * Throws NoSuchTransaction if the response from abortTransaction failed with a code other
-        * than NoSuchTransaction. Does not check for write concern errors.
-        */
+         * Throws NoSuchTransaction if the response from abortTransaction failed with a code other
+         * than NoSuchTransaction. Does not check for write concern errors.
+         */
         void _assertAbortStatusIsOkOrNoSuchTransaction(
             const AsyncRequestsSender::Response& response) const;
 
         /**
-        * If the transaction's read concern level is snapshot, asserts the participant's
-        * atClusterTime matches the transaction's.
-        */
+         * If the transaction's read concern level is snapshot, asserts the participant's
+         * atClusterTime matches the transaction's.
+         */
         void _verifyParticipantAtClusterTime(const Participant& participant);
 
         /**
-        * Removes all participants created during the current statement from the participant list
-        * and sends abortTransaction to each. Waits for all responses before returning.
-        */
+         * Removes all participants created during the current statement from the participant list
+         * and sends abortTransaction to each. Waits for all responses before returning.
+         */
         void _clearPendingParticipants(OperationContext* opCtx);
 
         /**
-        * Creates a new participant for the shard.
-        */
+         * Creates a new participant for the shard.
+         */
         TransactionRouter::Participant& _createParticipant(OperationContext* opCtx,
                                                            const ShardId& shard);
 
         /**
-        * Sets the new readOnly value for the current participant on the shard.
-        */
+         * Sets the new readOnly value for the current participant on the shard.
+         */
         void _setReadOnlyForParticipant(OperationContext* opCtx,
                                         const ShardId& shard,
                                         const Participant::ReadOnly readOnly);
 
         /**
-        * Updates relevant metrics when a new transaction is begun.
-        */
+         * Updates relevant metrics when a new transaction is begun.
+         */
         void _onNewTransaction(OperationContext* opCtx);
 
         /**
-        * Updates relevant metrics when a router receives commit for a higher txnNumber than it has
-        * seen so far.
-        */
+         * Updates relevant metrics when a router receives commit for a higher txnNumber than it has
+         * seen so far.
+         */
         void _onBeginRecoveringDecision(OperationContext* opCtx);
 
         /**
-        * Updates relevant metrics when the router receives an explicit abort from the client.
-        */
+         * Updates relevant metrics when the router receives an explicit abort from the client.
+         */
         void _onExplicitAbort(OperationContext* opCtx);
 
         /**
-        * Updates relevant metrics when the router begins an implicit abort after an error.
-        */
+         * Updates relevant metrics when the router begins an implicit abort after an error.
+         */
         void _onImplicitAbort(OperationContext* opCtx, const Status& errorStatus);
 
         /**
-        * Updates relevant metrics when a transaction is about to begin commit.
-        */
+         * Updates relevant metrics when a transaction is about to begin commit.
+         */
         void _onStartCommit(WithLock wl, OperationContext* opCtx);
 
         /**
-        * Updates relevant metrics when a transaction receives a successful response for commit.
-        */
+         * Updates relevant metrics when a transaction receives a successful response for commit.
+         */
         void _onSuccessfulCommit(OperationContext* opCtx);
 
         /**
-        * Updates relevant metrics when commit receives a response with a non-retryable command
-        * error per the retryable writes specification.
-        */
+         * Updates relevant metrics when commit receives a response with a non-retryable command
+         * error per the retryable writes specification.
+         */
         void _onNonRetryableCommitError(OperationContext* opCtx, Status commitStatus);
 
         /**
-        * The first time this method is called it marks the transaction as over in the router's
-        * diagnostics and will log transaction information if its duration is over the global slowMS
-        * threshold or the transaction log componenet verbosity >= 1. Only meant to be called when
-        * the router definitively knows the transaction's outcome, e.g. it should not be invoked
-        * after a network error on commit.
-        */
+         * The first time this method is called it marks the transaction as over in the router's
+         * diagnostics and will log transaction information if its duration is over the global
+         * slowMS threshold or the transaction log componenet verbosity >= 1. Only meant to be
+         * called when the router definitively knows the transaction's outcome, e.g. it should not
+         * be invoked after a network error on commit.
+         */
         void _endTransactionTrackingIfNecessary(OperationContext* opCtx,
                                                 TerminationCause terminationCause);
 
         /**
-        * Returns all participants created during the current statement.
-        */
+         * Returns all participants created during the current statement.
+         */
         std::vector<ShardId> _getPendingParticipants() const;
 
         /**
-        * Prints slow transaction information to the log.
-        */
+         * Prints slow transaction information to the log.
+         */
         void _logSlowTransaction(OperationContext* opCtx, TerminationCause terminationCause) const;
 
         /**
-        * Returns a string to be logged for slow transactions.
-        */
+         * Returns a string to be logged for slow transactions.
+         */
         std::string _transactionInfoForLog(OperationContext* opCtx,
                                            TerminationCause terminationCause) const;
 

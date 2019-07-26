@@ -134,11 +134,9 @@ Status ActiveShardCollectionRegistry::ActiveShardCollectionState::constructError
     return {ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Unable to shard collection "
                           << request.get_shardsvrShardCollection().get().ns()
-                          << " with arguments:  "
-                          << request.toBSON()
+                          << " with arguments:  " << request.toBSON()
                           << " because this shard is currently running shard collection on this "
-                          << "collection with arguments: "
-                          << activeRequest.toBSON()};
+                          << "collection with arguments: " << activeRequest.toBSON()};
 }
 
 ScopedShardCollection::ScopedShardCollection(std::string nss,

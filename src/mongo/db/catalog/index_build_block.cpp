@@ -119,14 +119,14 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
     }
 
     if (isBackgroundIndex) {
-        opCtx->recoveryUnit()->onCommit([ entry = _indexCatalogEntry, coll = collection ](
-            boost::optional<Timestamp> commitTime) {
-            // This will prevent the unfinished index from being visible on index iterators.
-            if (commitTime) {
-                entry->setMinimumVisibleSnapshot(commitTime.get());
-                coll->setMinimumVisibleSnapshot(commitTime.get());
-            }
-        });
+        opCtx->recoveryUnit()->onCommit(
+            [entry = _indexCatalogEntry, coll = collection](boost::optional<Timestamp> commitTime) {
+                // This will prevent the unfinished index from being visible on index iterators.
+                if (commitTime) {
+                    entry->setMinimumVisibleSnapshot(commitTime.get());
+                    coll->setMinimumVisibleSnapshot(commitTime.get());
+                }
+            });
     }
 
     // Register this index with the CollectionInfoCache to regenerate the cache. This way, updates
@@ -177,8 +177,8 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
 
     collection->indexBuildSuccess(opCtx, _indexCatalogEntry);
 
-    opCtx->recoveryUnit()->onCommit([ opCtx, entry = _indexCatalogEntry, coll = collection ](
-        boost::optional<Timestamp> commitTime) {
+    opCtx->recoveryUnit()->onCommit([opCtx, entry = _indexCatalogEntry, coll = collection](
+                                        boost::optional<Timestamp> commitTime) {
         // Note: this runs after the WUOW commits but before we release our X lock on the
         // collection. This means that any snapshot created after this must include the full
         // index, and no one can try to read this index before we set the visibility.

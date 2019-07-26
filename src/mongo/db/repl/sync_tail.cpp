@@ -779,8 +779,7 @@ void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
                            str::stream() << "Attempted to apply an oplog entry ("
                                          << firstOpTimeInBatch.toString()
                                          << ") which is not greater than our last applied OpTime ("
-                                         << lastAppliedOpTimeAtStartOfBatch.toString()
-                                         << ")."));
+                                         << lastAppliedOpTimeAtStartOfBatch.toString() << ")."));
         }
 
         // Don't allow the fsync+lock thread to see intermediate states of batch application.
@@ -810,8 +809,7 @@ void SyncTail::_oplogApplication(ReplicationCoordinator* replCoord,
         const auto lastAppliedOpTimeAtEndOfBatch = replCoord->getMyLastAppliedOpTime();
         invariant(lastAppliedOpTimeAtStartOfBatch == lastAppliedOpTimeAtEndOfBatch,
                   str::stream() << "the last known applied OpTime has changed from "
-                                << lastAppliedOpTimeAtStartOfBatch.toString()
-                                << " to "
+                                << lastAppliedOpTimeAtStartOfBatch.toString() << " to "
                                 << lastAppliedOpTimeAtEndOfBatch.toString()
                                 << " in the middle of batch application");
 
@@ -1282,23 +1280,23 @@ void SyncTail::_applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors
         if (writerVectors[i].empty())
             continue;
 
-        _writerPool->schedule([
-            this,
-            &writer = writerVectors.at(i),
-            &status = statusVector->at(i),
-            &workerMultikeyPathInfo = workerMultikeyPathInfo->at(i)
-        ](auto scheduleStatus) {
-            invariant(scheduleStatus);
+        _writerPool->schedule(
+            [this,
+             &writer = writerVectors.at(i),
+             &status = statusVector->at(i),
+             &workerMultikeyPathInfo = workerMultikeyPathInfo->at(i)](auto scheduleStatus) {
+                invariant(scheduleStatus);
 
-            auto opCtx = cc().makeOperationContext();
+                auto opCtx = cc().makeOperationContext();
 
-            // This code path is only executed on secondaries and initial syncing nodes, so it is
-            // safe to exclude any writes from Flow Control.
-            opCtx->setShouldParticipateInFlowControl(false);
+                // This code path is only executed on secondaries and initial syncing nodes, so it
+                // is safe to exclude any writes from Flow Control.
+                opCtx->setShouldParticipateInFlowControl(false);
 
-            status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
-                [&] { return _applyFunc(opCtx.get(), &writer, this, &workerMultikeyPathInfo); });
-        });
+                status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
+                    return _applyFunc(opCtx.get(), &writer, this, &workerMultikeyPathInfo);
+                });
+            });
     }
 }
 

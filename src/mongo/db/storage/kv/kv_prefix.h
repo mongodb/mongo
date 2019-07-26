@@ -100,4 +100,4 @@ private:
 inline std::ostream& operator<<(std::ostream& s, const KVPrefix& prefix) {
     return (s << prefix.toString());
 }
-}
+}  // namespace mongo

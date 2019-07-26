@@ -111,7 +111,7 @@ void serializeReply(OperationContext* opCtx,
     BSONSizeTracker upsertInfoSizeTracker;
     BSONSizeTracker errorsSizeTracker;
 
-    auto errorMessage = [&, errorSize = size_t(0) ](StringData rawMessage) mutable {
+    auto errorMessage = [&, errorSize = size_t(0)](StringData rawMessage) mutable {
         // Start truncating error messages once both of these limits are exceeded.
         constexpr size_t kErrorSizeTruncationMin = 1024 * 1024;
         constexpr size_t kErrorCountTruncationMin = 2;

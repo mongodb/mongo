@@ -293,11 +293,10 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     if (auto readConcernElt = cmdObj[repl::ReadConcernArgs::kReadConcernFieldName]) {
         if (readConcernElt.type() != BSONType::Object) {
             return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "\"" << repl::ReadConcernArgs::kReadConcernFieldName
-                                        << "\" had the wrong type. Expected "
-                                        << typeName(BSONType::Object)
-                                        << ", found "
-                                        << typeName(readConcernElt.type()));
+                          str::stream()
+                              << "\"" << repl::ReadConcernArgs::kReadConcernFieldName
+                              << "\" had the wrong type. Expected " << typeName(BSONType::Object)
+                              << ", found " << typeName(readConcernElt.type()));
         }
         qr->setReadConcern(readConcernElt.embeddedObject());
     }
@@ -305,11 +304,10 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     if (auto queryOptionsElt = cmdObj[QueryRequest::kUnwrappedReadPrefField]) {
         if (queryOptionsElt.type() != BSONType::Object) {
             return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "\"" << QueryRequest::kUnwrappedReadPrefField
-                                        << "\" had the wrong type. Expected "
-                                        << typeName(BSONType::Object)
-                                        << ", found "
-                                        << typeName(queryOptionsElt.type()));
+                          str::stream()
+                              << "\"" << QueryRequest::kUnwrappedReadPrefField
+                              << "\" had the wrong type. Expected " << typeName(BSONType::Object)
+                              << ", found " << typeName(queryOptionsElt.type()));
         }
         qr->setUnwrappedReadPref(queryOptionsElt.embeddedObject());
     }

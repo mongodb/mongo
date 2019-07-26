@@ -300,10 +300,8 @@ void addErrorIfUnequal(T stored, T cached, StringData name, ValidateResults* res
     if (stored != cached) {
         results->valid = false;
         results->errors.push_back(str::stream() << "stored value for " << name
-                                                << " does not match cached value: "
-                                                << stored
-                                                << " != "
-                                                << cached);
+                                                << " does not match cached value: " << stored
+                                                << " != " << cached);
     }
 }
 

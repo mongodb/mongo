@@ -332,7 +332,7 @@ void getDifferenceInternal(GeoHash cellId,
         }
     }
 }
-}
+}  // namespace
 
 void R2CellUnion::getDifference(const R2CellUnion& cellUnion) {
     std::vector<GeoHash> diffCellIds;

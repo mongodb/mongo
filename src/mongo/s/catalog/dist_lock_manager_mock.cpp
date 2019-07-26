@@ -45,12 +45,8 @@ namespace {
 
 void NoLockFuncSet(StringData name, StringData whyMessage, Milliseconds waitFor) {
     FAIL(str::stream() << "Lock not expected to be called. "
-                       << "Name: "
-                       << name
-                       << ", whyMessage: "
-                       << whyMessage
-                       << ", waitFor: "
-                       << waitFor);
+                       << "Name: " << name << ", whyMessage: " << whyMessage
+                       << ", waitFor: " << waitFor);
 }
 
 }  // namespace

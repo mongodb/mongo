@@ -64,9 +64,7 @@ bool initializeServerSecurityGlobalState(ServiceContext* service) {
         clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
         auth::setInternalUserAuthParams(
             BSON(saslCommandMechanismFieldName
-                 << "MONGODB-X509"
-                 << saslCommandUserDBFieldName
-                 << "$external"
+                 << "MONGODB-X509" << saslCommandUserDBFieldName << "$external"
                  << saslCommandUserFieldName
                  << getSSLManager()->getSSLConfiguration().clientSubjectName.toString()));
     }

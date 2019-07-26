@@ -63,5 +63,5 @@ public:
 private:
     struct sb_stemmer* _stemmer;
 };
-}
-}
+}  // namespace fts
+}  // namespace mongo

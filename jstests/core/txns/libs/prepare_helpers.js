@@ -5,7 +5,6 @@
  *
  */
 const PrepareHelpers = (function() {
-
     /**
      * Prepares the active transaction on the session. This expects the 'prepareTransaction' command
      * to succeed and return a non-null 'prepareTimestamp'.
@@ -106,7 +105,7 @@ const PrepareHelpers = (function() {
             assert.commandWorked(coll.insert({tenKB: tenKB}, {writeConcern: {w: numNodes}}));
         }
 
-        for (let [nodeName, oplog] of[["primary", primaryOplog], ["secondary", secondaryOplog]]) {
+        for (let [nodeName, oplog] of [["primary", primaryOplog], ["secondary", secondaryOplog]]) {
             assert.soon(function() {
                 const dataSize = oplog.dataSize();
                 const prepareEntryRemoved = (oplog.findOne({prepare: true}) === null);

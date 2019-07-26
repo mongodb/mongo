@@ -57,7 +57,7 @@ PeriodicRunnerImpl::PeriodicJobImpl::PeriodicJobImpl(PeriodicJob job,
     : _job(std::move(job)), _clockSource(source), _serviceContext(svc) {}
 
 void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
-    auto[startPromise, startFuture] = makePromiseFuture<void>();
+    auto [startPromise, startFuture] = makePromiseFuture<void>();
 
     {
         stdx::lock_guard lk(_mutex);
@@ -65,7 +65,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
     }
 
 
-    _thread = stdx::thread([ this, startPromise = std::move(startPromise) ]() mutable {
+    _thread = stdx::thread([this, startPromise = std::move(startPromise)]() mutable {
         auto guard = makeGuard([this] { _stopPromise.emplaceValue(); });
 
         Client::initThread(_job.name, _serviceContext, nullptr);

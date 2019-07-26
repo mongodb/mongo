@@ -3,39 +3,37 @@
  * @tags: [requires_persistence]
  */
 (function() {
-    "use strict";
+"use strict";
 
-    var st = new ShardingTest({shards: 1});
+var st = new ShardingTest({shards: 1});
 
-    // Insert a recovery doc with non-zero minOpTimeUpdaters to simulate a migration
-    // process that crashed in the middle of the critical section.
+// Insert a recovery doc with non-zero minOpTimeUpdaters to simulate a migration
+// process that crashed in the middle of the critical section.
 
-    var recoveryDoc = {
-        _id: 'minOpTimeRecovery',
-        minOpTime: {ts: Timestamp(0, 0), t: 0},
-        minOpTimeUpdaters: 2
-    };
+var recoveryDoc = {
+    _id: 'minOpTimeRecovery',
+    minOpTime: {ts: Timestamp(0, 0), t: 0},
+    minOpTimeUpdaters: 2
+};
 
-    assert.writeOK(st.shard0.getDB('admin').system.version.insert(recoveryDoc));
+assert.writeOK(st.shard0.getDB('admin').system.version.insert(recoveryDoc));
 
-    // Make sure test is setup correctly.
-    var minOpTimeRecoveryDoc =
-        st.shard0.getDB('admin').system.version.findOne({_id: 'minOpTimeRecovery'});
+// Make sure test is setup correctly.
+var minOpTimeRecoveryDoc =
+    st.shard0.getDB('admin').system.version.findOne({_id: 'minOpTimeRecovery'});
 
-    assert.neq(null, minOpTimeRecoveryDoc);
-    assert.eq(0, minOpTimeRecoveryDoc.minOpTime.ts.getTime());
-    assert.eq(2, minOpTimeRecoveryDoc.minOpTimeUpdaters);
+assert.neq(null, minOpTimeRecoveryDoc);
+assert.eq(0, minOpTimeRecoveryDoc.minOpTime.ts.getTime());
+assert.eq(2, minOpTimeRecoveryDoc.minOpTimeUpdaters);
 
-    st.restartShardRS(0);
+st.restartShardRS(0);
 
-    // After the restart, the shard should have updated the opTime and reset minOpTimeUpdaters.
-    minOpTimeRecoveryDoc =
-        st.shard0.getDB('admin').system.version.findOne({_id: 'minOpTimeRecovery'});
+// After the restart, the shard should have updated the opTime and reset minOpTimeUpdaters.
+minOpTimeRecoveryDoc = st.shard0.getDB('admin').system.version.findOne({_id: 'minOpTimeRecovery'});
 
-    assert.neq(null, minOpTimeRecoveryDoc);
-    assert.gt(minOpTimeRecoveryDoc.minOpTime.ts.getTime(), 0);
-    assert.eq(0, minOpTimeRecoveryDoc.minOpTimeUpdaters);
+assert.neq(null, minOpTimeRecoveryDoc);
+assert.gt(minOpTimeRecoveryDoc.minOpTime.ts.getTime(), 0);
+assert.eq(0, minOpTimeRecoveryDoc.minOpTimeUpdaters);
 
-    st.stop();
-
+st.stop();
 })();

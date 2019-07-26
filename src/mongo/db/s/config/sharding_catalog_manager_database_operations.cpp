@@ -91,10 +91,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
 
         uassert(ErrorCodes::DatabaseDifferCase,
                 str::stream() << "can't have 2 databases that just differ on case "
-                              << " have: "
-                              << actualDbName
-                              << " want to add: "
-                              << dbName,
+                              << " have: " << actualDbName << " want to add: " << dbName,
                 actualDbName == dbName);
 
         // We did a local read of the database entry above and found that the database already
@@ -264,8 +261,7 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
     // are holding the dist lock during the movePrimary operation.
     uassert(ErrorCodes::IncompatibleShardingMetadata,
             str::stream() << "Tried to update primary shard for database '" << dbname
-                          << " with version "
-                          << currentDatabaseVersion.getLastMod(),
+                          << " with version " << currentDatabaseVersion.getLastMod(),
             updateStatus.getValue());
 
     // Ensure the next attempt to retrieve the database or any of its collections will do a full

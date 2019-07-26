@@ -67,4 +67,4 @@ MONGO_INITIALIZER_GENERAL(CoreOptions_Store, MONGO_NO_PREREQUISITES, MONGO_NO_DE
 (InitializerContext* context) {
     return Status::OK();
 }
-}
+}  // namespace mongo

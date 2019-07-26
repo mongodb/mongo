@@ -98,10 +98,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
                 return Status(
                     ErrorCodes::CannotCreateIndex,
                     str::stream()
-                        << "Cannot rebuild index "
-                        << spec
-                        << ": "
-                        << keyStatus.reason()
+                        << "Cannot rebuild index " << spec << ": " << keyStatus.reason()
                         << " For more info see http://dochub.mongodb.org/core/index-validation");
             }
         }
@@ -126,7 +123,7 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
         return swRebuild.getStatus();
     }
 
-    auto[numRecords, dataSize] = swRebuild.getValue();
+    auto [numRecords, dataSize] = swRebuild.getValue();
 
     auto rs = collection->getRecordStore();
 

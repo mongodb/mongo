@@ -40,8 +40,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 
 using str::stream;
 
@@ -112,8 +112,8 @@ BSONObj BatchedCommandResponse::toBSON() const {
         builder.appendOID(electionId(), const_cast<OID*>(&_electionId));
 
     if (_writeErrorDetails.get()) {
-        auto errorMessage =
-            [ errorCount = size_t(0), errorSize = size_t(0) ](StringData rawMessage) mutable {
+        auto errorMessage = [errorCount = size_t(0),
+                             errorSize = size_t(0)](StringData rawMessage) mutable {
             // Start truncating error messages once both of these limits are exceeded.
             constexpr size_t kErrorSizeTruncationMin = 1024 * 1024;
             constexpr size_t kErrorCountTruncationMin = 2;

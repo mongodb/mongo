@@ -402,7 +402,7 @@ TEST_F(StitchSupportTest, CheckMatchWorksWithCollation) {
 }
 
 TEST_F(StitchSupportTest, CheckProjectionWorksWithDefaults) {
-    auto[results, needsMatch] =
+    auto [results, needsMatch] =
         checkProjection("{a: 1}", {"{_id: 1, a: 100, b: 200}", "{_id: 1, a: 200, b: 300}"});
     ASSERT_FALSE(needsMatch);
     ASSERT_EQ("{ \"_id\" : 1, \"a\" : 100 }", results[0]);
@@ -443,7 +443,7 @@ TEST_F(StitchSupportTest, CheckProjectionCollatesRespectfully) {
         lib, toBSONForAPI("{locale: 'en', strength: 2}").first, nullptr);
     ON_BLOCK_EXIT([collator] { stitch_support_v1_collator_destroy(collator); });
 
-    auto[results, needsMatch] =
+    auto [results, needsMatch] =
         checkProjection("{a: {$elemMatch: {$eq: 'MiXedcAse'}}}",
                         {"{_id: 1, a: ['lowercase', 'mixEdCaSe', 'UPPERCASE']}"},
                         nullptr,

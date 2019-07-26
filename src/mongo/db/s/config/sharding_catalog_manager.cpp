@@ -198,8 +198,7 @@ Status ShardingCatalogManager::_initConfigVersion(OperationContext* opCtx) {
     if (versionInfo.getCurrentVersion() < CURRENT_CONFIG_VERSION) {
         return {ErrorCodes::IncompatibleShardingConfigVersion,
                 str::stream() << "need to upgrade current cluster version to v"
-                              << CURRENT_CONFIG_VERSION
-                              << "; currently at v"
+                              << CURRENT_CONFIG_VERSION << "; currently at v"
                               << versionInfo.getCurrentVersion()};
     }
 

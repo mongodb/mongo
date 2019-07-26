@@ -127,8 +127,7 @@ Status DistributionStatus::addRangeToZone(const ZoneRange& range) {
 
         return {ErrorCodes::RangeOverlapConflict,
                 str::stream() << "Zone range: " << range.toString()
-                              << " is overlapping with existing: "
-                              << intersectingRange.toString()};
+                              << " is overlapping with existing: " << intersectingRange.toString()};
     }
 
     // Check for containment
@@ -138,8 +137,7 @@ Status DistributionStatus::addRangeToZone(const ZoneRange& range) {
             invariant(SimpleBSONObjComparator::kInstance.evaluate(range.max < nextRange.max));
             return {ErrorCodes::RangeOverlapConflict,
                     str::stream() << "Zone range: " << range.toString()
-                                  << " is overlapping with existing: "
-                                  << nextRange.toString()};
+                                  << " is overlapping with existing: " << nextRange.toString()};
         }
     }
 

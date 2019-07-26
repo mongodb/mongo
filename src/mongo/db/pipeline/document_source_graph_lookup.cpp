@@ -211,8 +211,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             while (auto next = pipeline->getNext()) {
                 uassert(40271,
                         str::stream()
-                            << "Documents in the '"
-                            << _from.ns()
+                            << "Documents in the '" << _from.ns()
                             << "' namespace must contain an _id for de-duplication in $graphLookup",
                         !(*next)["_id"].missing());
 
@@ -392,10 +391,8 @@ void DocumentSourceGraphLookUp::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
     // Serialize default options.
     MutableDocument spec(DOC("from" << _from.coll() << "as" << _as.fullPath() << "connectToField"
-                                    << _connectToField.fullPath()
-                                    << "connectFromField"
-                                    << _connectFromField.fullPath()
-                                    << "startWith"
+                                    << _connectToField.fullPath() << "connectFromField"
+                                    << _connectFromField.fullPath() << "startWith"
                                     << _startWith->serialize(false)));
 
     // depthField is optional; serialize it if it was specified.
@@ -414,10 +411,10 @@ void DocumentSourceGraphLookUp::serializeToArray(
     // If we are explaining, include an absorbed $unwind inside the $graphLookup specification.
     if (_unwind && explain) {
         const boost::optional<FieldPath> indexPath = (*_unwind)->indexPath();
-        spec["unwinding"] = Value(DOC("preserveNullAndEmptyArrays"
-                                      << (*_unwind)->preserveNullAndEmptyArrays()
-                                      << "includeArrayIndex"
-                                      << (indexPath ? Value((*indexPath).fullPath()) : Value())));
+        spec["unwinding"] =
+            Value(DOC("preserveNullAndEmptyArrays"
+                      << (*_unwind)->preserveNullAndEmptyArrays() << "includeArrayIndex"
+                      << (indexPath ? Value((*indexPath).fullPath()) : Value())));
     }
 
     array.push_back(Value(DOC(getSourceName() << spec.freeze())));
@@ -550,8 +547,8 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
             argName == "depthField" || argName == "connectToField") {
             // All remaining arguments to $graphLookup are expected to be strings.
             uassert(40103,
-                    str::stream() << "expected string as argument for " << argName << ", found: "
-                                  << argument.toString(false, false),
+                    str::stream() << "expected string as argument for " << argName
+                                  << ", found: " << argument.toString(false, false),
                     argument.type() == String);
         }
 
@@ -567,8 +564,8 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
             depthField = boost::optional<FieldPath>(FieldPath(argument.String()));
         } else {
             uasserted(40104,
-                      str::stream() << "Unknown argument to $graphLookup: "
-                                    << argument.fieldName());
+                      str::stream()
+                          << "Unknown argument to $graphLookup: " << argument.fieldName());
         }
     }
 

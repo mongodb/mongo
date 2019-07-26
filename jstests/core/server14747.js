@@ -3,15 +3,14 @@
 
 (function() {
 
-    "use strict";
-    var t = db.jstests_server14747;
+"use strict";
+var t = db.jstests_server14747;
 
-    t.drop();
-    t.ensureIndex({a: 1, b: 1});
-    t.ensureIndex({a: 1, c: 1});
-    t.insert({a: 1});
-    for (var i = 0; i < 10; i++) {
-        t.find({a: 1}).explain(true);
-    }
-
+t.drop();
+t.ensureIndex({a: 1, b: 1});
+t.ensureIndex({a: 1, c: 1});
+t.insert({a: 1});
+for (var i = 0; i < 10; i++) {
+    t.find({a: 1}).explain(true);
+}
 }());

@@ -146,9 +146,7 @@ private:
             invariant(!name.empty(),
                       str::stream()
                           << "Bad spec passed into ReplIndexBuildState constructor, missing '"
-                          << IndexDescriptor::kIndexNameFieldName
-                          << "' field: "
-                          << spec);
+                          << IndexDescriptor::kIndexNameFieldName << "' field: " << spec);
             indexNames.push_back(name);
         }
         return indexNames;

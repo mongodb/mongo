@@ -10,7 +10,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/yield.js');       // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     /*
      * Issue a query that will use the ID_HACK stage. This cannot be
      * batched, so issue a

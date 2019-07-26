@@ -12,80 +12,78 @@
  * @tags: [uses_speculative_majority]
  */
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/libs/write_concern_util.js");  // for [stop|restart]ServerReplication.
+load("jstests/libs/write_concern_util.js");  // for [stop|restart]ServerReplication.
 
-    const name = "change_stream_speculative_majority_latest_oplog_timestamp";
-    const replTest = new ReplSetTest({
-        name: name,
-        nodes: [{}, {rsConfig: {priority: 0}}],
-        nodeOptions: {enableMajorityReadConcern: 'false'}
-    });
-    replTest.startSet();
-    replTest.initiate();
+const name = "change_stream_speculative_majority_latest_oplog_timestamp";
+const replTest = new ReplSetTest({
+    name: name,
+    nodes: [{}, {rsConfig: {priority: 0}}],
+    nodeOptions: {enableMajorityReadConcern: 'false'}
+});
+replTest.startSet();
+replTest.initiate();
 
-    const dbName = name;
-    const collName = "coll";
-    const otherCollName = "coll_other";
+const dbName = name;
+const collName = "coll";
+const otherCollName = "coll_other";
 
-    const primary = replTest.getPrimary();
-    const secondary = replTest.getSecondary();
+const primary = replTest.getPrimary();
+const secondary = replTest.getSecondary();
 
-    const primaryDB = primary.getDB(dbName);
-    const primaryColl = primaryDB[collName];
+const primaryDB = primary.getDB(dbName);
+const primaryColl = primaryDB[collName];
 
-    assert.commandWorked(primaryColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(primaryColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
-    let res = primaryDB.runCommand(
-        {aggregate: collName, pipeline: [{$changeStream: {}}], cursor: {}, maxTimeMS: 5000});
+let res = primaryDB.runCommand(
+    {aggregate: collName, pipeline: [{$changeStream: {}}], cursor: {}, maxTimeMS: 5000});
 
-    assert.commandWorked(res);
-    let cursorId = res.cursor.id;
+assert.commandWorked(res);
+let cursorId = res.cursor.id;
 
-    // Insert a document on primary and let it majority commit.
-    assert.commandWorked(primaryColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+// Insert a document on primary and let it majority commit.
+assert.commandWorked(primaryColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
-    // Pause replication on the secondary so that further writes won't majority commit.
-    jsTestLog("Stopping replication to secondary.");
-    stopServerReplication(secondary);
+// Pause replication on the secondary so that further writes won't majority commit.
+jsTestLog("Stopping replication to secondary.");
+stopServerReplication(secondary);
 
-    // Receive the first change event.
-    res = primary.getDB(dbName).runCommand({getMore: cursorId, collection: collName});
-    let changes = res.cursor.nextBatch;
-    assert.eq(changes.length, 1);
-    assert.eq(changes[0]["fullDocument"], {_id: 1});
-    assert.eq(changes[0]["operationType"], "insert");
+// Receive the first change event.
+res = primary.getDB(dbName).runCommand({getMore: cursorId, collection: collName});
+let changes = res.cursor.nextBatch;
+assert.eq(changes.length, 1);
+assert.eq(changes[0]["fullDocument"], {_id: 1});
+assert.eq(changes[0]["operationType"], "insert");
 
-    // Extract the postBatchResumeToken from the first batch.
-    const initialPostBatchResumeToken = res.cursor.postBatchResumeToken;
-    assert.neq(initialPostBatchResumeToken, undefined);
+// Extract the postBatchResumeToken from the first batch.
+const initialPostBatchResumeToken = res.cursor.postBatchResumeToken;
+assert.neq(initialPostBatchResumeToken, undefined);
 
-    // Do a write on a collection that we are not watching changes for.
-    let otherWriteRes = primaryDB.runCommand({insert: otherCollName, documents: [{_id: 1}]});
-    let otherWriteOpTime = otherWriteRes.operationTime;
+// Do a write on a collection that we are not watching changes for.
+let otherWriteRes = primaryDB.runCommand({insert: otherCollName, documents: [{_id: 1}]});
+let otherWriteOpTime = otherWriteRes.operationTime;
 
-    // Replication to the secondary is paused, so the write to 'otherCollName' cannot majority
-    // commit. A change stream getMore is expected to return the "latest oplog timestamp" which it
-    // scanned and this timestamp must be majority committed. So, this getMore should time out
-    // waiting for the previous write to majority commit, even though it's on a collection that is
-    // not being watched.
-    res = primary.getDB(dbName).runCommand(
-        {getMore: cursorId, collection: collName, maxTimeMS: 5000});
-    assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
+// Replication to the secondary is paused, so the write to 'otherCollName' cannot majority
+// commit. A change stream getMore is expected to return the "latest oplog timestamp" which it
+// scanned and this timestamp must be majority committed. So, this getMore should time out
+// waiting for the previous write to majority commit, even though it's on a collection that is
+// not being watched.
+res = primary.getDB(dbName).runCommand({getMore: cursorId, collection: collName, maxTimeMS: 5000});
+assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
 
-    jsTestLog("Restarting replication to secondary.");
-    restartServerReplication(secondary);
-    replTest.awaitReplication();
+jsTestLog("Restarting replication to secondary.");
+restartServerReplication(secondary);
+replTest.awaitReplication();
 
-    // Now that writes can replicate again, the previous operation should have majority committed,
-    // making it safe to advance the postBatchResumeToken. Note that no further events are returned,
-    // indicating that the new PBRT is a high water mark generated at the latest oplog timestamp.
-    res = primary.getDB(dbName).runCommand(
-        {getMore: cursorId, collection: collName, maxTimeMS: 5000});
-    assert.commandWorked(res);
-    assert.eq(res.cursor.nextBatch, []);
-    assert.gt(bsonWoCompare(res.cursor.postBatchResumeToken, initialPostBatchResumeToken), 0);
+// Now that writes can replicate again, the previous operation should have majority committed,
+// making it safe to advance the postBatchResumeToken. Note that no further events are returned,
+// indicating that the new PBRT is a high water mark generated at the latest oplog timestamp.
+res = primary.getDB(dbName).runCommand({getMore: cursorId, collection: collName, maxTimeMS: 5000});
+assert.commandWorked(res);
+assert.eq(res.cursor.nextBatch, []);
+assert.gt(bsonWoCompare(res.cursor.postBatchResumeToken, initialPostBatchResumeToken), 0);
 
-    replTest.stopSet();
+replTest.stopSet();
 })();

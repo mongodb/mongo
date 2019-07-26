@@ -299,8 +299,8 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             auto resolvedView = viewCatalog->resolveView(opCtx, involvedNs);
             if (!resolvedView.isOK()) {
                 return {ErrorCodes::FailedToParse,
-                        str::stream() << "Failed to resolve view '" << involvedNs.ns() << "': "
-                                      << resolvedView.getStatus().toString()};
+                        str::stream() << "Failed to resolve view '" << involvedNs.ns()
+                                      << "': " << resolvedView.getStatus().toString()};
             }
 
             resolvedNamespaces[involvedNs.coll()] = {resolvedView.getValue().getNamespace(),

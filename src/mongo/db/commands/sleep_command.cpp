@@ -174,4 +174,4 @@ public:
 };
 
 MONGO_REGISTER_TEST_COMMAND(CmdSleep);
-}  // namespace
+}  // namespace mongo

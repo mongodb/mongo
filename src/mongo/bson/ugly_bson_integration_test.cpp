@@ -57,10 +57,7 @@ TEST_F(UglyBSONFixture, DuplicateFields) {
     assertCommandFailsOnServer("admin",
                                BSON("insert"
                                     << "test"
-                                    << "documents"
-                                    << BSONArray()
-                                    << "documents"
-                                    << BSONArray()),
+                                    << "documents" << BSONArray() << "documents" << BSONArray()),
                                ErrorCodes::duplicateCodeForTest(40413));
 }
 

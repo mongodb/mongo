@@ -465,36 +465,29 @@ Status FreeMonProcessor::validateRegistrationResponse(const FreeMonRegistrationR
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream()
                           << "Unexpected registration response protocol version, expected ("
-                          << kMinProtocolVersion
-                          << ", "
-                          << kMaxProtocolVersion
-                          << "), received '"
-                          << resp.getVersion()
-                          << "'");
+                          << kMinProtocolVersion << ", " << kMaxProtocolVersion << "), received '"
+                          << resp.getVersion() << "'");
     }
 
     if (resp.getId().size() >= kRegistrationIdMaxLength) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream() << "Id is '" << resp.getId().size()
                                     << "' bytes in length, maximum allowed length is '"
-                                    << kRegistrationIdMaxLength
-                                    << "'");
+                                    << kRegistrationIdMaxLength << "'");
     }
 
     if (resp.getInformationalURL().size() >= kInformationalURLMaxLength) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream() << "InformationURL is '" << resp.getInformationalURL().size()
                                     << "' bytes in length, maximum allowed length is '"
-                                    << kInformationalURLMaxLength
-                                    << "'");
+                                    << kInformationalURLMaxLength << "'");
     }
 
     if (resp.getMessage().size() >= kInformationalMessageMaxLength) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream() << "Message is '" << resp.getMessage().size()
                                     << "' bytes in length, maximum allowed length is '"
-                                    << kInformationalMessageMaxLength
-                                    << "'");
+                                    << kInformationalMessageMaxLength << "'");
     }
 
     if (resp.getUserReminder().is_initialized() &&
@@ -502,19 +495,15 @@ Status FreeMonProcessor::validateRegistrationResponse(const FreeMonRegistrationR
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream() << "UserReminder is '" << resp.getUserReminder().get().size()
                                     << "' bytes in length, maximum allowed length is '"
-                                    << kUserReminderMaxLength
-                                    << "'");
+                                    << kUserReminderMaxLength << "'");
     }
 
     if (resp.getReportingInterval() < kReportingIntervalSecondsMin ||
         resp.getReportingInterval() > kReportingIntervalSecondsMax) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream() << "Reporting Interval '" << resp.getReportingInterval()
-                                    << "' must be in the range ["
-                                    << kReportingIntervalSecondsMin
-                                    << ","
-                                    << kReportingIntervalSecondsMax
-                                    << "]");
+                                    << "' must be in the range [" << kReportingIntervalSecondsMin
+                                    << "," << kReportingIntervalSecondsMax << "]");
     }
 
     // Did cloud ask us to stop uploading?
@@ -540,30 +529,24 @@ Status FreeMonProcessor::validateMetricsResponse(const FreeMonMetricsResponse& r
     if (!(resp.getVersion() >= kMinProtocolVersion && resp.getVersion() <= kMaxProtocolVersion)) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream() << "Unexpected metrics response protocol version, expected ("
-                                    << kMinProtocolVersion
-                                    << ", "
-                                    << kMaxProtocolVersion
-                                    << "), received '"
-                                    << resp.getVersion()
-                                    << "'");
+                                    << kMinProtocolVersion << ", " << kMaxProtocolVersion
+                                    << "), received '" << resp.getVersion() << "'");
     }
 
     if (resp.getId().is_initialized() && resp.getId().get().size() >= kRegistrationIdMaxLength) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream() << "Id is '" << resp.getId().get().size()
                                     << "' bytes in length, maximum allowed length is '"
-                                    << kRegistrationIdMaxLength
-                                    << "'");
+                                    << kRegistrationIdMaxLength << "'");
     }
 
     if (resp.getInformationalURL().is_initialized() &&
         resp.getInformationalURL().get().size() >= kInformationalURLMaxLength) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
-                      str::stream() << "InformationURL is '"
-                                    << resp.getInformationalURL().get().size()
-                                    << "' bytes in length, maximum allowed length is '"
-                                    << kInformationalURLMaxLength
-                                    << "'");
+                      str::stream()
+                          << "InformationURL is '" << resp.getInformationalURL().get().size()
+                          << "' bytes in length, maximum allowed length is '"
+                          << kInformationalURLMaxLength << "'");
     }
 
     if (resp.getMessage().is_initialized() &&
@@ -571,8 +554,7 @@ Status FreeMonProcessor::validateMetricsResponse(const FreeMonMetricsResponse& r
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream() << "Message is '" << resp.getMessage().get().size()
                                     << "' bytes in length, maximum allowed length is '"
-                                    << kInformationalMessageMaxLength
-                                    << "'");
+                                    << kInformationalMessageMaxLength << "'");
     }
 
     if (resp.getUserReminder().is_initialized() &&
@@ -580,19 +562,15 @@ Status FreeMonProcessor::validateMetricsResponse(const FreeMonMetricsResponse& r
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream() << "UserReminder is '" << resp.getUserReminder().get().size()
                                     << "' bytes in length, maximum allowed length is '"
-                                    << kUserReminderMaxLength
-                                    << "'");
+                                    << kUserReminderMaxLength << "'");
     }
 
     if (resp.getReportingInterval() < kReportingIntervalSecondsMin ||
         resp.getReportingInterval() > kReportingIntervalSecondsMax) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream() << "Reporting Interval '" << resp.getReportingInterval()
-                                    << "' must be in the range ["
-                                    << kReportingIntervalSecondsMin
-                                    << ","
-                                    << kReportingIntervalSecondsMax
-                                    << "]");
+                                    << "' must be in the range [" << kReportingIntervalSecondsMin
+                                    << "," << kReportingIntervalSecondsMax << "]");
     }
 
     // Did cloud ask us to stop uploading?

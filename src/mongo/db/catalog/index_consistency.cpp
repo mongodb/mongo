@@ -303,8 +303,7 @@ BSONObj IndexConsistency::_generateInfo(const IndexInfo& indexInfo,
 
     if (idKey) {
         return BSON("indexName" << indexName << "recordId" << recordId.repr() << "idKey" << *idKey
-                                << "indexKey"
-                                << rehydratedKey);
+                                << "indexKey" << rehydratedKey);
     } else {
         return BSON("indexName" << indexName << "recordId" << recordId.repr() << "indexKey"
                                 << rehydratedKey);

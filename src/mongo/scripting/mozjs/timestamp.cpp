@@ -46,7 +46,8 @@ namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec TimestampInfo::methods[2] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, TimestampInfo), JS_FS_END,
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, TimestampInfo),
+    JS_FS_END,
 };
 
 const char* const TimestampInfo::className = "Timestamp";
@@ -62,9 +63,7 @@ double getTimestampArg(JSContext* cx, JS::CallArgs args, int idx, std::string na
     if (val < 0 || val > maxArgVal) {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << name << " must be non-negative and not greater than "
-                                << maxArgVal
-                                << ", got "
-                                << val);
+                                << maxArgVal << ", got " << val);
     }
     return val;
 }

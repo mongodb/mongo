@@ -40,4 +40,4 @@ TEST(MongoMutexTest, BasicSingleThread) {
     ASSERT(m.try_lock());
     m.unlock();
 }
-}
+}  // namespace mongo

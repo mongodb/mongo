@@ -37,4 +37,4 @@ void ScriptEngine::setup() {
 std::string ScriptEngine::getInterpreterVersionString() {
     return "";
 }
-}
+}  // namespace mongo

@@ -148,4 +148,4 @@ struct CollectionOptions {
     // The aggregation pipeline that defines this view.
     BSONObj pipeline;
 };
-}
+}  // namespace mongo

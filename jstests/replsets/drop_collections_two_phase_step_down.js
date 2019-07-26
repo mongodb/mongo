@@ -13,58 +13,58 @@
  */
 
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/replsets/libs/two_phase_drops.js");  // For TwoPhaseDropCollectionTest.
+load("jstests/replsets/libs/two_phase_drops.js");  // For TwoPhaseDropCollectionTest.
 
-    // Set up a two phase drop test.
-    let testName = "drop_collection_two_phase_step_down";
-    let dbName = testName;
-    let collName = "collToDrop";
-    let twoPhaseDropTest = new TwoPhaseDropCollectionTest(testName, dbName);
+// Set up a two phase drop test.
+let testName = "drop_collection_two_phase_step_down";
+let dbName = testName;
+let collName = "collToDrop";
+let twoPhaseDropTest = new TwoPhaseDropCollectionTest(testName, dbName);
 
-    // Initialize replica set.
-    let replTest = twoPhaseDropTest.initReplSet();
+// Initialize replica set.
+let replTest = twoPhaseDropTest.initReplSet();
 
-    // Check for 'system.drop' two phase drop support.
-    if (!twoPhaseDropTest.supportsDropPendingNamespaces()) {
-        jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
-        twoPhaseDropTest.stop();
-        return;
-    }
+// Check for 'system.drop' two phase drop support.
+if (!twoPhaseDropTest.supportsDropPendingNamespaces()) {
+    jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
+    twoPhaseDropTest.stop();
+    return;
+}
 
-    // Create the collection that will be dropped.
-    twoPhaseDropTest.createCollection(collName);
+// Create the collection that will be dropped.
+twoPhaseDropTest.createCollection(collName);
 
-    // PREPARE collection drop.
-    twoPhaseDropTest.prepareDropCollection(collName);
+// PREPARE collection drop.
+twoPhaseDropTest.prepareDropCollection(collName);
 
-    // Step primary down using {force: true} and wait for the same node to become primary again.
-    // We use {force: true} because the current secondary has oplog application disabled and will
-    // not be able to take over as primary.
-    try {
-        const primary = replTest.getPrimary();
-        const primaryId = replTest.getNodeId(primary);
+// Step primary down using {force: true} and wait for the same node to become primary again.
+// We use {force: true} because the current secondary has oplog application disabled and will
+// not be able to take over as primary.
+try {
+    const primary = replTest.getPrimary();
+    const primaryId = replTest.getNodeId(primary);
 
-        // Force step down primary.
-        jsTestLog('Stepping down primary ' + primary.host + ' with {force: true}.');
-        // The amount of time the node has to wait before becoming primary again.
-        const stepDownSecs = 1;
-        assert.commandWorked(primary.adminCommand({replSetStepDown: stepDownSecs, force: true}));
+    // Force step down primary.
+    jsTestLog('Stepping down primary ' + primary.host + ' with {force: true}.');
+    // The amount of time the node has to wait before becoming primary again.
+    const stepDownSecs = 1;
+    assert.commandWorked(primary.adminCommand({replSetStepDown: stepDownSecs, force: true}));
 
-        // Wait for the node that stepped down to regain PRIMARY status.
-        jsTestLog('Waiting for node ' + primary.host + ' to become primary again');
-        assert.eq(replTest.nodes[primaryId], replTest.getPrimary());
+    // Wait for the node that stepped down to regain PRIMARY status.
+    jsTestLog('Waiting for node ' + primary.host + ' to become primary again');
+    assert.eq(replTest.nodes[primaryId], replTest.getPrimary());
 
-        jsTestLog('Node ' + primary.host + ' is now PRIMARY again. Checking if drop-pending' +
-                  ' collection still exists.');
-        assert(twoPhaseDropTest.collectionIsPendingDrop(collName),
-               'After stepping down and back up again, the primary ' + primary.host +
-                   ' removed drop-pending collection unexpectedly');
+    jsTestLog('Node ' + primary.host + ' is now PRIMARY again. Checking if drop-pending' +
+              ' collection still exists.');
+    assert(twoPhaseDropTest.collectionIsPendingDrop(collName),
+           'After stepping down and back up again, the primary ' + primary.host +
+               ' removed drop-pending collection unexpectedly');
 
-        // COMMIT collection drop.
-        twoPhaseDropTest.commitDropCollection(collName);
-    } finally {
-        twoPhaseDropTest.stop();
-    }
+    // COMMIT collection drop.
+    twoPhaseDropTest.commitDropCollection(collName);
+} finally {
+    twoPhaseDropTest.stop();
+}
 }());

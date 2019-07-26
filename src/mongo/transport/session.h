@@ -124,13 +124,13 @@ public:
     virtual void cancelAsyncOperations(const BatonHandle& handle = nullptr) = 0;
 
     /**
-    * This should only be used to detect when the remote host has disappeared without
-    * notice. It does NOT work correctly for ensuring that operations complete or fail
-    * by some deadline.
-    *
-    * This timeout will only effect calls sourceMessage()/sinkMessage(). Async operations do not
-    * currently support timeouts.
-    */
+     * This should only be used to detect when the remote host has disappeared without
+     * notice. It does NOT work correctly for ensuring that operations complete or fail
+     * by some deadline.
+     *
+     * This timeout will only effect calls sourceMessage()/sinkMessage(). Async operations do not
+     * currently support timeouts.
+     */
     virtual void setTimeout(boost::optional<Milliseconds> timeout) = 0;
 
     /**

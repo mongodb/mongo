@@ -73,4 +73,4 @@ private:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 };
 
-}  // namesace mongo
+}  // namespace mongo

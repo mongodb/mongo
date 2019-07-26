@@ -3,12 +3,11 @@
 load("jstests/watchdog/lib/wd_test_common.js");
 
 (function() {
-    'use strict';
+'use strict';
 
-    let control = new CharybdefsControl("logpath_hang");
+let control = new CharybdefsControl("logpath_hang");
 
-    const logpath = control.getMountPath();
+const logpath = control.getMountPath();
 
-    testFuseAndMongoD(control, {logpath: logpath + "/foo.log"});
-
+testFuseAndMongoD(control, {logpath: logpath + "/foo.log"});
 })();

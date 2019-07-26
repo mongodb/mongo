@@ -65,9 +65,9 @@ function setupArray() {
         {_id: 13, a: new Timestamp(1 / 1000, 1), ty: "Timestamp"},
         {_id: 14, a: /regex/, ty: "RegExp"},
         {
-          _id: 15,
-          a: new DBPointer("test.s6125", new ObjectId("0102030405060708090A0B0C")),
-          ty: "DBPointer"
+            _id: 15,
+            a: new DBPointer("test.s6125", new ObjectId("0102030405060708090A0B0C")),
+            ty: "DBPointer"
         },
         {_id: 16, a: function() {}, ty: "Code"},
         // Code with Scope not implemented in JS

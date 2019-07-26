@@ -129,8 +129,9 @@ protected:
             ASSERT_EQ(request.target, target);
             ASSERT_EQ(request.dbname, nss.db());
             ASSERT_BSONOBJ_EQ(request.cmdObj,
-                              BSON("drop" << nss.coll() << "writeConcern" << BSON("w"
-                                                                                  << "majority")));
+                              BSON("drop" << nss.coll() << "writeConcern"
+                                          << BSON("w"
+                                                  << "majority")));
             ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
             return BSON("ok" << 1);
@@ -146,8 +147,7 @@ protected:
             ASSERT_BSONOBJ_EQ(request.cmdObj,
                               BSON("setFeatureCompatibilityVersion"
                                    << "4.2"
-                                   << "writeConcern"
-                                   << writeConcern));
+                                   << "writeConcern" << writeConcern));
 
             return response;
         });
@@ -315,18 +315,16 @@ protected:
      * describing the addShard request for 'addedShard'.
      */
     void assertChangeWasLogged(const ShardType& addedShard) {
-        auto response = assertGet(
-            getConfigShard()->exhaustiveFindOnConfig(operationContext(),
-                                                     ReadPreferenceSetting{
-                                                         ReadPreference::PrimaryOnly},
-                                                     repl::ReadConcernLevel::kLocalReadConcern,
-                                                     NamespaceString("config.changelog"),
-                                                     BSON("what"
-                                                          << "addShard"
-                                                          << "details.name"
-                                                          << addedShard.getName()),
-                                                     BSONObj(),
-                                                     1));
+        auto response = assertGet(getConfigShard()->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            NamespaceString("config.changelog"),
+            BSON("what"
+                 << "addShard"
+                 << "details.name" << addedShard.getName()),
+            BSONObj(),
+            1));
         ASSERT_EQ(1U, response.docs.size());
         auto logEntryBSON = response.docs.front();
         auto logEntry = assertGet(ChangeLogType::fromBSON(logEntryBSON));
@@ -347,35 +345,24 @@ protected:
 TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
     std::string shardName = "shardName";
 
-    BSONObj expectedBSON = BSON("update"
-                                << "system.version"
-                                << "bypassDocumentValidation"
-                                << false
-                                << "ordered"
-                                << true
-                                << "updates"
-                                << BSON_ARRAY(BSON(
-                                       "q"
-                                       << BSON("_id"
-                                               << "shardIdentity")
-                                       << "u"
-                                       << BSON("shardName" << shardName << "clusterId" << _clusterId
-                                                           << "configsvrConnectionString"
-                                                           << replicationCoordinator()
-                                                                  ->getConfig()
-                                                                  .getConnectionString()
-                                                                  .toString())
-                                       << "multi"
-                                       << false
-                                       << "upsert"
-                                       << true))
-                                << "writeConcern"
-                                << BSON("w"
-                                        << "majority"
-                                        << "wtimeout"
-                                        << 60000)
-                                << "allowImplicitCollectionCreation"
-                                << true);
+    BSONObj expectedBSON = BSON(
+        "update"
+        << "system.version"
+        << "bypassDocumentValidation" << false << "ordered" << true << "updates"
+        << BSON_ARRAY(BSON(
+               "q" << BSON("_id"
+                           << "shardIdentity")
+                   << "u"
+                   << BSON(
+                          "shardName"
+                          << shardName << "clusterId" << _clusterId << "configsvrConnectionString"
+                          << replicationCoordinator()->getConfig().getConnectionString().toString())
+                   << "multi" << false << "upsert" << true))
+        << "writeConcern"
+        << BSON("w"
+                << "majority"
+                << "wtimeout" << 60000)
+        << "allowImplicitCollectionCreation" << true);
     auto addShardCmd = add_shard_util::createAddShardCmd(operationContext(), shardName);
     auto actualBSON = add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
     ASSERT_BSONOBJ_EQ(expectedBSON, actualBSON);
@@ -427,8 +414,7 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
         shardTarget,
         std::vector<BSONObj>{BSON("name"
                                   << "local"
-                                  << "sizeOnDisk"
-                                  << 1000),
+                                  << "sizeOnDisk" << 1000),
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
@@ -508,8 +494,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
         shardTarget,
         std::vector<BSONObj>{BSON("name"
                                   << "local"
-                                  << "sizeOnDisk"
-                                  << 1000),
+                                  << "sizeOnDisk" << 1000),
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
@@ -648,8 +633,7 @@ TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
 
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "myOtherSet"
-                                        << "maxWireVersion"
-                                        << WireVersion::LATEST_WIRE_VERSION);
+                                        << "maxWireVersion" << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
@@ -706,8 +690,7 @@ TEST_F(AddShardTest, ReplicaSetMistmatchedReplicaSetName) {
 
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "myOtherSet"
-                                        << "maxWireVersion"
-                                        << WireVersion::LATEST_WIRE_VERSION);
+                                        << "maxWireVersion" << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
@@ -735,12 +718,10 @@ TEST_F(AddShardTest, ShardIsCSRSConfigServer) {
                                "as a shard since it is a config server");
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
-                                        << "config"
-                                        << "configsvr"
-                                        << true
-                                        << "maxWireVersion"
-                                        << WireVersion::LATEST_WIRE_VERSION);
+    BSONObj commandResponse =
+        BSON("ok" << 1 << "ismaster" << true << "setName"
+                  << "config"
+                  << "configsvr" << true << "maxWireVersion" << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
@@ -772,9 +753,7 @@ TEST_F(AddShardTest, ReplicaSetMissingHostsProvidedInSeedList) {
     hosts.append("host1:12345");
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "mySet"
-                                        << "hosts"
-                                        << hosts.arr()
-                                        << "maxWireVersion"
+                                        << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
@@ -808,9 +787,7 @@ TEST_F(AddShardTest, AddShardWithNameConfigFails) {
     hosts.append("host2:12345");
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "mySet"
-                                        << "hosts"
-                                        << hosts.arr()
-                                        << "maxWireVersion"
+                                        << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
@@ -855,9 +832,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
     hosts.append("host2:12345");
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "mySet"
-                                        << "hosts"
-                                        << hosts.arr()
-                                        << "maxWireVersion"
+                                        << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
@@ -900,9 +875,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     hosts.append("host2:12345");
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "mySet"
-                                        << "hosts"
-                                        << hosts.arr()
-                                        << "maxWireVersion"
+                                        << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
@@ -966,9 +939,7 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     hosts.append("host2:12345");
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "mySet"
-                                        << "hosts"
-                                        << hosts.arr()
-                                        << "maxWireVersion"
+                                        << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
@@ -1049,8 +1020,7 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
         shardTarget,
         std::vector<BSONObj>{BSON("name"
                                   << "local"
-                                  << "sizeOnDisk"
-                                  << 1000),
+                                  << "sizeOnDisk" << 1000),
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 

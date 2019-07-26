@@ -110,4 +110,4 @@ public:
         KVPrefix prefix = KVPrefix::kNotPrefixed;
     };
 };
-}
+}  // namespace mongo

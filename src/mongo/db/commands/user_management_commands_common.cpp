@@ -58,8 +58,8 @@ Status checkAuthorizedToGrantRoles(AuthorizationSession* authzSession,
     for (size_t i = 0; i < roles.size(); ++i) {
         if (!authzSession->isAuthorizedToGrantRole(roles[i])) {
             return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "Not authorized to grant role: "
-                                        << roles[i].getFullName());
+                          str::stream()
+                              << "Not authorized to grant role: " << roles[i].getFullName());
         }
     }
 
@@ -83,8 +83,8 @@ Status checkAuthorizedToRevokeRoles(AuthorizationSession* authzSession,
     for (size_t i = 0; i < roles.size(); ++i) {
         if (!authzSession->isAuthorizedToRevokeRole(roles[i])) {
             return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "Not authorized to revoke role: "
-                                        << roles[i].getFullName());
+                          str::stream()
+                              << "Not authorized to revoke role: " << roles[i].getFullName());
         }
     }
     return Status::OK();
@@ -129,8 +129,8 @@ Status checkAuthForCreateUserCommand(Client* client,
     if (!authzSession->isAuthorizedForActionsOnResource(
             ResourcePattern::forDatabaseName(args.userName.getDB()), ActionType::createUser)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "Not authorized to create users on db: "
-                                    << args.userName.getDB());
+                      str::stream()
+                          << "Not authorized to create users on db: " << args.userName.getDB());
     }
 
     status = checkAuthorizedToGrantRoles(authzSession, args.roles);
@@ -231,8 +231,8 @@ Status checkAuthForCreateRoleCommand(Client* client,
 
     if (!authzSession->isAuthorizedToCreateRole(args)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "Not authorized to create roles on db: "
-                                    << args.roleName.getDB());
+                      str::stream()
+                          << "Not authorized to create roles on db: " << args.roleName.getDB());
     }
 
     status = checkAuthorizedToGrantRoles(authzSession, args.roles);
@@ -365,8 +365,8 @@ Status checkAuthForDropAllUsersFromDatabaseCommand(Client* client, const std::st
     if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                         ActionType::dropUser)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "Not authorized to drop users from the " << dbname
-                                    << " database");
+                      str::stream()
+                          << "Not authorized to drop users from the " << dbname << " database");
     }
     return Status::OK();
 }
@@ -415,8 +415,8 @@ Status checkAuthForUsersInfoCommand(Client* client,
         if (!authzSession->isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(dbname), ActionType::viewUser)) {
             return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "Not authorized to view users from the " << dbname
-                                        << " database");
+                          str::stream()
+                              << "Not authorized to view users from the " << dbname << " database");
         }
     } else if (args.target == auth::UsersInfoArgs::Target::kGlobal) {
         if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
@@ -462,8 +462,8 @@ Status checkAuthForDropAllRolesFromDatabaseCommand(Client* client, const std::st
     if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                         ActionType::dropRole)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "Not authorized to drop roles from the " << dbname
-                                    << " database");
+                      str::stream()
+                          << "Not authorized to drop roles from the " << dbname << " database");
     }
     return Status::OK();
 }
@@ -482,8 +482,8 @@ Status checkAuthForRolesInfoCommand(Client* client,
         if (!authzSession->isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(dbname), ActionType::viewRole)) {
             return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "Not authorized to view roles from the " << dbname
-                                        << " database");
+                          str::stream()
+                              << "Not authorized to view roles from the " << dbname << " database");
         }
     } else {
         for (size_t i = 0; i < args.roleNames.size(); ++i) {
@@ -496,8 +496,7 @@ Status checkAuthForRolesInfoCommand(Client* client,
                     ActionType::viewRole)) {
                 return Status(ErrorCodes::Unauthorized,
                               str::stream() << "Not authorized to view roles from the "
-                                            << args.roleNames[i].getDB()
-                                            << " database");
+                                            << args.roleNames[i].getDB() << " database");
             }
         }
     }

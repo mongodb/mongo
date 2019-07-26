@@ -130,8 +130,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             if (elem.type() != BSONType::Object) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << repl::ReadConcernArgs::kReadConcernFieldName
-                                      << " must be an object, not a "
-                                      << typeName(elem.type())};
+                                      << " must be an object, not a " << typeName(elem.type())};
             }
             request.setReadConcern(elem.embeddedObject().getOwned());
         } else if (kHintName == fieldName) {
@@ -205,8 +204,8 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
         } else if (WriteConcernOptions::kWriteConcernField == fieldName) {
             if (elem.type() != BSONType::Object) {
                 return {ErrorCodes::TypeMismatch,
-                        str::stream() << fieldName << " must be an object, not a "
-                                      << typeName(elem.type())};
+                        str::stream()
+                            << fieldName << " must be an object, not a " << typeName(elem.type())};
             }
 
             WriteConcernOptions writeConcern;
@@ -246,23 +245,20 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
     if (!hasCursorElem && !hasExplainElem) {
         return {ErrorCodes::FailedToParse,
                 str::stream()
-                    << "The '"
-                    << kCursorName
+                    << "The '" << kCursorName
                     << "' option is required, except for aggregate with the explain argument"};
     }
 
     if (request.getExplain() && cmdObj[WriteConcernOptions::kWriteConcernField]) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "Aggregation explain does not support the'"
-                              << WriteConcernOptions::kWriteConcernField
-                              << "' option"};
+                              << WriteConcernOptions::kWriteConcernField << "' option"};
     }
 
     if (hasNeedsMergeElem && !hasFromMongosElem) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "Cannot specify '" << kNeedsMergeName << "' without '"
-                              << kFromMongosName
-                              << "'"};
+                              << kFromMongosName << "'"};
     }
 
     return request;

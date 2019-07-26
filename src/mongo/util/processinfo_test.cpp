@@ -36,8 +36,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/processinfo.h"
 
-using mongo::ProcessInfo;
 using boost::optional;
+using mongo::ProcessInfo;
 
 namespace mongo_test {
 TEST(ProcessInfo, SysInfoIsInitialized) {
@@ -65,4 +65,4 @@ TEST(ProcessInfo, GetNumAvailableCores) {
 TEST(ProcessInfo, GetNumCoresReturnsNonZeroNumberOfProcessors) {
     ASSERT_GREATER_THAN(ProcessInfo::getNumCores(), 0u);
 }
-}
+}  // namespace mongo_test

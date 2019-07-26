@@ -132,12 +132,12 @@ requireSSLProvider('openssl', function() {
 
     exit_code = MongoRunner.runMongoTool("mongofiles",
                                          {
-                                           db: mongofiles_ssl_dbname,
-                                           port: md.port,
-                                           ssl: "",
-                                           sslCAFile: "jstests/libs/ca.pem",
-                                           sslPEMKeyFile: "jstests/libs/password_protected.pem",
-                                           sslPEMKeyPassword: "qwerty",
+                                             db: mongofiles_ssl_dbname,
+                                             port: md.port,
+                                             ssl: "",
+                                             sslCAFile: "jstests/libs/ca.pem",
+                                             sslPEMKeyFile: "jstests/libs/password_protected.pem",
+                                             sslPEMKeyPassword: "qwerty",
                                          },
                                          "put",
                                          source_filename);
@@ -155,13 +155,13 @@ requireSSLProvider('openssl', function() {
 
     exit_code = MongoRunner.runMongoTool("mongofiles",
                                          {
-                                           db: mongofiles_ssl_dbname,
-                                           local: external_scratch_dir + filename,
-                                           port: md.port,
-                                           ssl: "",
-                                           sslCAFile: "jstests/libs/ca.pem",
-                                           sslPEMKeyFile: "jstests/libs/password_protected.pem",
-                                           sslPEMKeyPassword: "qwerty",
+                                             db: mongofiles_ssl_dbname,
+                                             local: external_scratch_dir + filename,
+                                             port: md.port,
+                                             ssl: "",
+                                             sslCAFile: "jstests/libs/ca.pem",
+                                             sslPEMKeyFile: "jstests/libs/password_protected.pem",
+                                             sslPEMKeyPassword: "qwerty",
                                          },
                                          "get",
                                          source_filename);

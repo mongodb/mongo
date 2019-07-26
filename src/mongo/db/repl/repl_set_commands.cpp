@@ -330,12 +330,12 @@ public:
             HostAndPort me = someHostAndPortForMe();
 
             auto appendMember =
-                [&members, serial = DecimalCounter<uint32_t>() ](const HostAndPort& host) mutable {
-                members.append(
-                    StringData{serial},
-                    BSON("_id" << static_cast<int>(serial) << "host" << host.toString()));
-                ++serial;
-            };
+                [&members, serial = DecimalCounter<uint32_t>()](const HostAndPort& host) mutable {
+                    members.append(
+                        StringData{serial},
+                        BSON("_id" << static_cast<int>(serial) << "host" << host.toString()));
+                    ++serial;
+                };
             appendMember(me);
             result.append("me", me.toString());
             for (const HostAndPort& seed : seeds) {

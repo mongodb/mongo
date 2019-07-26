@@ -57,7 +57,7 @@ var checkMember = function(memberInfo) {
     // make sure the result has proper values for fields with known values
     var badValues = [];  // each mistake will be saved as three entries (key, badvalue, goodvalue)
     for (field in memberInfo.goodValues) {
-        if (typeof(memberInfo.goodValues[field]) === "object") {
+        if (typeof (memberInfo.goodValues[field]) === "object") {
             // assumes nested obj is disk in tags this is currently true, but may change
             if (result[field].disk !== memberInfo.goodValues[field].disk) {
                 badValues.push("tags.disk");
@@ -92,7 +92,6 @@ config.members[3].arbiterOnly = true;
 replTest.initiate(config);
 
 var agreeOnPrimaryAndSetVersion = function(setVersion) {
-
     print("Waiting for primary and replica set version " + setVersion);
 
     var nodes = replTest.nodes;
@@ -228,8 +227,7 @@ checkMember({
         ok: 1
     },
     wantedFields: ["hosts", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
-    unwantedFields:
-        ["arbiterOnly", "passives", "passive", "slaveDelay", "hidden", "buildIndexes"]
+    unwantedFields: ["arbiterOnly", "passives", "passive", "slaveDelay", "hidden", "buildIndexes"]
 });
 
 checkMember({

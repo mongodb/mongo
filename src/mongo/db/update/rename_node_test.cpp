@@ -43,8 +43,8 @@ namespace mongo {
 namespace {
 
 using RenameNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
+using mongo::mutablebson::Element;
 
 TEST(RenameNodeTest, PositionalNotAllowedInFromField) {
     auto update = fromjson("{$rename: {'a.$': 'b'}}");
@@ -476,8 +476,7 @@ TEST_F(RenameNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFa
     ASSERT_TRUE(result.indexesAffected);
     auto updated = BSON("a" << BSON("$ref"
                                     << "c")
-                            << "b"
-                            << 0);
+                            << "b" << 0);
     ASSERT_EQUALS(updated, doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {'b': 0}, $unset: {'a.$id': true}}"), getLogDoc());

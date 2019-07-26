@@ -4,7 +4,6 @@
 //
 
 var Explainable = (function() {
-
     var parseVerbosity = function(verbosity) {
         // Truthy non-strings are interpreted as "allPlansExecution" verbosity.
         if (verbosity && (typeof verbosity !== "string")) {
@@ -19,8 +18,10 @@ var Explainable = (function() {
         // If we're here, then the verbosity is a string. We reject invalid strings.
         if (verbosity !== "queryPlanner" && verbosity !== "executionStats" &&
             verbosity !== "allPlansExecution") {
-            throw Error("explain verbosity must be one of {" + "'queryPlanner'," +
-                        "'executionStats'," + "'allPlansExecution'}");
+            throw Error("explain verbosity must be one of {" +
+                        "'queryPlanner'," +
+                        "'executionStats'," +
+                        "'allPlansExecution'}");
         }
 
         return verbosity;

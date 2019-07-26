@@ -133,8 +133,8 @@ Status RenameNode::init(BSONElement modExpr,
     // Though we could treat this as a no-op, it is illegal in the current implementation.
     if (fromFieldRef == toFieldRef) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "The source and target field for $rename must differ: "
-                                    << modExpr);
+                      str::stream()
+                          << "The source and target field for $rename must differ: " << modExpr);
     }
 
     if (fromFieldRef.isPrefixOf(toFieldRef) || toFieldRef.isPrefixOf(fromFieldRef)) {
@@ -203,12 +203,10 @@ UpdateExecutor::ApplyResult RenameNode::apply(ApplyParams applyParams,
             auto idElem = mutablebson::findFirstChildNamed(document.root(), "_id");
             uasserted(ErrorCodes::BadValue,
                       str::stream() << "The source field cannot be an array element, '"
-                                    << fromFieldRef->dottedField()
-                                    << "' in doc with "
+                                    << fromFieldRef->dottedField() << "' in doc with "
                                     << (idElem.ok() ? idElem.toString() : "no id")
                                     << " has an array field called '"
-                                    << currentElement.getFieldName()
-                                    << "'");
+                                    << currentElement.getFieldName() << "'");
         }
     }
 
@@ -225,12 +223,10 @@ UpdateExecutor::ApplyResult RenameNode::apply(ApplyParams applyParams,
             auto idElem = mutablebson::findFirstChildNamed(document.root(), "_id");
             uasserted(ErrorCodes::BadValue,
                       str::stream() << "The destination field cannot be an array element, '"
-                                    << toFieldRef.dottedField()
-                                    << "' in doc with "
+                                    << toFieldRef.dottedField() << "' in doc with "
                                     << (idElem.ok() ? idElem.toString() : "no id")
                                     << " has an array field called '"
-                                    << currentElement.getFieldName()
-                                    << "'");
+                                    << currentElement.getFieldName() << "'");
         }
     }
 

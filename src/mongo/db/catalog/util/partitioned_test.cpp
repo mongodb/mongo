@@ -237,7 +237,6 @@ TEST(PartitionedConcurrency, ShouldProtectConcurrentAccesses) {
     AtomicWord<unsigned> ready{0};
     for (size_t threadId = 1; threadId <= numThreads; ++threadId) {
         auto workerThreadBody = [&, threadId, opsPerThread]() {
-
             // Busy-wait until everybody is ready
             ready.fetchAndAdd(1);
             while (ready.load() < numThreads) {

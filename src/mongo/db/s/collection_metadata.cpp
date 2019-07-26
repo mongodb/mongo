@@ -132,8 +132,7 @@ Status CollectionMetadata::checkChunkIsValid(const ChunkType& chunk) const {
         return {ErrorCodes::StaleShardVersion,
                 str::stream() << "Unable to find chunk with the exact bounds "
                               << ChunkRange(chunk.getMin(), chunk.getMax()).toString()
-                              << " at collection version "
-                              << getCollVersion().toString()};
+                              << " at collection version " << getCollVersion().toString()};
     }
 
     return Status::OK();

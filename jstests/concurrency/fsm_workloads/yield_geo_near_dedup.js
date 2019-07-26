@@ -8,7 +8,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');      // for extendWorkl
 load('jstests/concurrency/fsm_workloads/yield_geo_near.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.states.remove = function remove(db, collName) {
         var id = Random.randInt(this.nDocs);
         var doc = db[collName].findOne({_id: id});

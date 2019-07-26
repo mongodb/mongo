@@ -15,11 +15,9 @@ runReadOnlyTest((function() {
             writableDB[collName].drop();
 
             assert.commandWorked(writableDB.runCommand({
-                applyOps: [{
-                    op: "c",
-                    ns: writableDB.getName() + ".$cmd",
-                    o: {create: collName, temp: true}
-                }]
+                applyOps: [
+                    {op: "c", ns: writableDB.getName() + ".$cmd", o: {create: collName, temp: true}}
+                ]
             }));
 
             var collectionInfos = writableDB.getCollectionInfos();

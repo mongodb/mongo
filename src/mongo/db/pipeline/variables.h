@@ -157,7 +157,7 @@ private:
     void setValue(Id id, const Value& value, bool isConstant);
 
     static auto getBuiltinVariableName(Variables::Id variable) {
-        for (auto & [ name, id ] : kBuiltinVarNameToId) {
+        for (auto& [name, id] : kBuiltinVarNameToId) {
             if (variable == id) {
                 return name;
             }

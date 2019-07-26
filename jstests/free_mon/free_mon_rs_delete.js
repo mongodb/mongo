@@ -3,59 +3,59 @@
 load("jstests/free_mon/libs/free_mon.js");
 
 (function() {
-    'use strict';
+'use strict';
 
-    let mock_web = new FreeMonWebServer();
+let mock_web = new FreeMonWebServer();
 
-    mock_web.start();
+mock_web.start();
 
-    let options = {
-        setParameter: "cloudFreeMonitoringEndpointURL=" + mock_web.getURL(),
-        enableFreeMonitoring: "on",
-        verbose: 1,
-    };
+let options = {
+    setParameter: "cloudFreeMonitoringEndpointURL=" + mock_web.getURL(),
+    enableFreeMonitoring: "on",
+    verbose: 1,
+};
 
-    const rst = new ReplSetTest({nodes: 2, nodeOptions: options});
-    rst.startSet();
-    rst.initiate();
-    rst.awaitReplication();
+const rst = new ReplSetTest({nodes: 2, nodeOptions: options});
+rst.startSet();
+rst.initiate();
+rst.awaitReplication();
 
-    WaitForRegistration(rst.getPrimary());
+WaitForRegistration(rst.getPrimary());
 
-    mock_web.waitRegisters(2);
+mock_web.waitRegisters(2);
 
-    WaitForRegistration(rst.getPrimary());
-    WaitForRegistration(rst.getSecondary());
+WaitForRegistration(rst.getPrimary());
+WaitForRegistration(rst.getSecondary());
 
-    const qs1 = mock_web.queryStats();
+const qs1 = mock_web.queryStats();
 
-    // For kicks, delete the free monitoring storage state to knock free mon offline
-    // and make sure the node does not crash
-    rst.getPrimary().getDB("admin").system.version.remove({_id: "free_monitoring"});
+// For kicks, delete the free monitoring storage state to knock free mon offline
+// and make sure the node does not crash
+rst.getPrimary().getDB("admin").system.version.remove({_id: "free_monitoring"});
 
-    sleep(20 * 1000);
+sleep(20 * 1000);
 
-    const qs2 = mock_web.queryStats();
+const qs2 = mock_web.queryStats();
 
-    // Verify free monitoring stops but tolerate one additional collection
-    assert.gte(qs1.metrics + 2, qs2.metrics);
-    assert.eq(qs1.registers, qs2.registers);
+// Verify free monitoring stops but tolerate one additional collection
+assert.gte(qs1.metrics + 2, qs2.metrics);
+assert.eq(qs1.registers, qs2.registers);
 
-    // Make sure we are back to the initial state.
-    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'undecided');
-    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'undecided');
+// Make sure we are back to the initial state.
+assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'undecided');
+assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'undecided');
 
-    // Enable it again to be sure we can resume
-    assert.commandWorked(rst.getPrimary().adminCommand({setFreeMonitoring: 1, action: "enable"}));
-    WaitForRegistration(rst.getPrimary());
-    WaitForRegistration(rst.getSecondary());
+// Enable it again to be sure we can resume
+assert.commandWorked(rst.getPrimary().adminCommand({setFreeMonitoring: 1, action: "enable"}));
+WaitForRegistration(rst.getPrimary());
+WaitForRegistration(rst.getSecondary());
 
-    sleep(20 * 1000);
+sleep(20 * 1000);
 
-    WaitForRegistration(rst.getPrimary());
-    WaitForRegistration(rst.getSecondary());
+WaitForRegistration(rst.getPrimary());
+WaitForRegistration(rst.getSecondary());
 
-    rst.stopSet();
+rst.stopSet();
 
-    mock_web.stop();
+mock_web.stop();
 })();

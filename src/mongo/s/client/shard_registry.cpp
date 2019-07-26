@@ -65,17 +65,17 @@
 
 namespace mongo {
 
-using std::shared_ptr;
 using std::set;
+using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 using std::vector;
 
 using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
+using executor::TaskExecutor;
 using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
-using executor::TaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
 using CallbackHandle = TaskExecutor::CallbackHandle;
 

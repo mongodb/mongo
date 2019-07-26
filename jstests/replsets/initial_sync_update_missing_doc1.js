@@ -12,41 +12,42 @@
  */
 
 (function() {
-    load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
-    load("jstests/libs/check_log.js");
+load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
+load("jstests/libs/check_log.js");
 
-    const name = 'initial_sync_update_missing_doc1';
-    const replSet = new ReplSetTest({
-        name: name,
-        nodes: 1,
-    });
+const name = 'initial_sync_update_missing_doc1';
+const replSet = new ReplSetTest({
+    name: name,
+    nodes: 1,
+});
 
-    replSet.startSet();
-    replSet.initiate();
-    const primary = replSet.getPrimary();
-    const dbName = 'test';
+replSet.startSet();
+replSet.initiate();
+const primary = replSet.getPrimary();
+const dbName = 'test';
 
-    var coll = primary.getDB(dbName).getCollection(name);
-    assert.commandWorked(coll.insert({_id: 0, x: 1}));
+var coll = primary.getDB(dbName).getCollection(name);
+assert.commandWorked(coll.insert({_id: 0, x: 1}));
 
-    // Add a secondary node with priority: 0 and votes: 0 so that we prevent elections while
-    // it is syncing from the primary.
-    const secondaryConfig = {rsConfig: {votes: 0, priority: 0}};
-    const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
+// Add a secondary node with priority: 0 and votes: 0 so that we prevent elections while
+// it is syncing from the primary.
+const secondaryConfig = {
+    rsConfig: {votes: 0, priority: 0}
+};
+const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
 
-    // Update and remove document on primary.
-    updateRemove(coll, {_id: 0});
+// Update and remove document on primary.
+updateRemove(coll, {_id: 0});
 
-    turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
+turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
 
-    var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-    assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
-    var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
+var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
+assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
+var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
 
-    turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 0 /* numInserted */);
+turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 0 /* numInserted */);
 
-    finishAndValidate(replSet, name, firstOplogEnd, 0 /* numInserted */, 0 /* numDocuments */);
+finishAndValidate(replSet, name, firstOplogEnd, 0 /* numInserted */, 0 /* numDocuments */);
 
-    replSet.stopSet();
-
+replSet.stopSet();
 })();

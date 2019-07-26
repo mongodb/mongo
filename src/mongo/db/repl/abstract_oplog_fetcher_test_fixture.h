@@ -97,4 +97,4 @@ protected:
     Date_t lastFetchedWall;
 };
 }  // namespace repl
-}  // namespace mango
+}  // namespace mongo

@@ -7,9 +7,7 @@
  * @tags: [requires_sharding]
  */
 var $config = (function() {
-
     var states = (function() {
-
         function init(db, collName) {
             // Dynamically load the shard names for the movePrimary thread to avoid hard-coding
             // them.
@@ -92,7 +90,6 @@ var $config = (function() {
         }
 
         return {init: init, state: state};
-
     })();
 
     var transitions = {init: {state: 1}, state: {state: 1}};
@@ -144,5 +141,4 @@ var $config = (function() {
         setup: setup,
         teardown: teardown,
     };
-
 })();

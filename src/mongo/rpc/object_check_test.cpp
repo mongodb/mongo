@@ -88,4 +88,4 @@ TEST(DataTypeValidated, BSONValidationEnabled) {
         ASSERT_OK(cdrc.readAndAdvanceNoThrow(&v));
     }
 }
-}
+}  // namespace

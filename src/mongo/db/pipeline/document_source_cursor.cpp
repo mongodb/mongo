@@ -337,4 +337,4 @@ intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
         new DocumentSourceCursor(collection, std::move(exec), pExpCtx, trackOplogTimestamp));
     return source;
 }
-}
+}  // namespace mongo

@@ -365,8 +365,8 @@ BSONObj getFileMode(const BSONObj& a, void* data) {
     auto fileStatus = boost::filesystem::status(path, ec);
     if (ec) {
         uasserted(50974,
-                  str::stream() << "Unable to get status for file \"" << pathStr << "\": "
-                                << ec.message());
+                  str::stream() << "Unable to get status for file \"" << pathStr
+                                << "\": " << ec.message());
     }
 
     return BSON("" << fileStatus.permissions());
@@ -389,5 +389,5 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("umask", changeUmask);
     scope.injectNative("getFileMode", getFileMode);
 }
-}
-}
+}  // namespace shell_utils
+}  // namespace mongo

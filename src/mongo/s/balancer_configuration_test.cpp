@@ -310,8 +310,7 @@ TEST(BalancerSettingsType, InvalidBalancingWindowTimeFormat) {
 
     ASSERT_NOT_OK(BalancerSettingsType::fromBSON(BSON("activeWindow" << BSON("start"
                                                                              << "23:00"
-                                                                             << "stop"
-                                                                             << 6LL)))
+                                                                             << "stop" << 6LL)))
                       .getStatus());
 }
 

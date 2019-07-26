@@ -15,7 +15,6 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeralForTest
 
 var $config = (function() {
-
     let data = {
         checkCommandResult: function checkCommandResult(mayFailWithDatabaseDifferCase, res) {
             if (mayFailWithDatabaseDifferCase && !res.ok)
@@ -47,7 +46,6 @@ var $config = (function() {
             this.myDB = db.getSiblingDB(this.uniqueDBName);
             this.created = false;
             this.unique = true;
-
         },
 
         useSemiUniqueDBName: function useSemiUniqueDBName(db, collName) {
@@ -138,6 +136,8 @@ var $config = (function() {
         // We only run a few iterations to reduce the amount of data cumulatively
         // written to disk.
         threadCount: 10,
-        iterations: 120, states, transitions,
+        iterations: 120,
+        states,
+        transitions,
     };
 })();

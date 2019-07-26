@@ -77,5 +77,5 @@ BSONObj createShardIdentityUpsertForAddShard(const AddShard& addShardCmd) {
     return request.toBSON();
 }
 
-}  // namespace mongo
 }  // namespace add_shard_util
+}  // namespace mongo

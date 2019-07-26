@@ -1,8 +1,10 @@
 (function() {
-    'use strict';
+'use strict';
 
-    load("jstests/replsets/libs/rename_across_dbs.js");
+load("jstests/replsets/libs/rename_across_dbs.js");
 
-    const options = {dropTarget: true};
-    new RenameAcrossDatabasesTest(options).run();
+const options = {
+    dropTarget: true
+};
+new RenameAcrossDatabasesTest(options).run();
 }());

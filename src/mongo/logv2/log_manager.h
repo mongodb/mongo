@@ -58,10 +58,10 @@ public:
     LogDomain& getGlobalDomain();
 
     /**
-    * Detaches the default log backends
-    *
-    * @note This function is not thread safe.
-    */
+     * Detaches the default log backends
+     *
+     * @note This function is not thread safe.
+     */
     void detachDefaultBackends();
 
     /**
@@ -72,8 +72,8 @@ public:
     void reattachDefaultBackends();
 
     /**
-    * Checks if the default log backends are attached
-    */
+     * Checks if the default log backends are attached
+     */
     bool isDefaultBackendsAttached() const;
 
 private:

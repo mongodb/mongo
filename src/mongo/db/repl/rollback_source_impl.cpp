@@ -107,9 +107,7 @@ StatusWith<BSONObj> RollbackSourceImpl::getCollectionInfoByUUID(const std::strin
         return StatusWith<BSONObj>(ErrorCodes::NoSuchKey,
                                    str::stream()
                                        << "No collection info found for collection with uuid: "
-                                       << uuid.toString()
-                                       << " in db: "
-                                       << db);
+                                       << uuid.toString() << " in db: " << db);
     }
     invariant(info.size() == 1U);
     return info.front();

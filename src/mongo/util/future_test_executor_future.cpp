@@ -37,36 +37,34 @@
 namespace mongo {
 namespace {
 TEST(Executor_Future, Success_getAsync) {
-    FUTURE_SUCCESS_TEST(
-        [] {},
-        [](/*Future<void>*/ auto&& fut) {
-            auto exec = InlineCountingExecutor::make();
-            auto pf = makePromiseFuture<void>();
-            ExecutorFuture<void>(exec).thenRunOn(exec).getAsync([outside = std::move(pf.promise)](
-                Status status) mutable {
-                ASSERT_OK(status);
-                outside.emplaceValue();
-            });
-            ASSERT_EQ(std::move(pf.future).getNoThrow(), Status::OK());
-            ASSERT_EQ(exec->tasksRun.load(), 1);
-        });
+    FUTURE_SUCCESS_TEST([] {},
+                        [](/*Future<void>*/ auto&& fut) {
+                            auto exec = InlineCountingExecutor::make();
+                            auto pf = makePromiseFuture<void>();
+                            ExecutorFuture<void>(exec).thenRunOn(exec).getAsync(
+                                [outside = std::move(pf.promise)](Status status) mutable {
+                                    ASSERT_OK(status);
+                                    outside.emplaceValue();
+                                });
+                            ASSERT_EQ(std::move(pf.future).getNoThrow(), Status::OK());
+                            ASSERT_EQ(exec->tasksRun.load(), 1);
+                        });
 }
 
 TEST(Executor_Future, Reject_getAsync) {
-    FUTURE_SUCCESS_TEST(
-        [] {},
-        [](/*Future<void>*/ auto&& fut) {
-            auto exec = RejectingExecutor::make();
-            auto pf = makePromiseFuture<void>();
-            std::move(fut).thenRunOn(exec).getAsync([promise = std::move(pf.promise)](
-                Status status) mutable {
-                promise.emplaceValue();  // shouldn't be run anyway.
-                FAIL("how did I run!?!?!");
-            });
+    FUTURE_SUCCESS_TEST([] {},
+                        [](/*Future<void>*/ auto&& fut) {
+                            auto exec = RejectingExecutor::make();
+                            auto pf = makePromiseFuture<void>();
+                            std::move(fut).thenRunOn(exec).getAsync(
+                                [promise = std::move(pf.promise)](Status status) mutable {
+                                    promise.emplaceValue();  // shouldn't be run anyway.
+                                    FAIL("how did I run!?!?!");
+                                });
 
-            // Promise is destroyed without calling the callback.
-            ASSERT_EQ(std::move(pf.future).getNoThrow(), ErrorCodes::BrokenPromise);
-        });
+                            // Promise is destroyed without calling the callback.
+                            ASSERT_EQ(std::move(pf.future).getNoThrow(), ErrorCodes::BrokenPromise);
+                        });
 }
 
 TEST(Executor_Future, Success_then) {

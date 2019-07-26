@@ -210,8 +210,7 @@ Status FTDCFileWriter::flush(const boost::optional<ConstDataRange>& range, Date_
     if (ec) {
         return {ErrorCodes::NonExistentPath,
                 str::stream() << "\"" << _interimFile.generic_string()
-                              << "\" could not be removed during flush: "
-                              << ec.message()};
+                              << "\" could not be removed during flush: " << ec.message()};
     }
 
     return Status::OK();

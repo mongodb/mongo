@@ -184,7 +184,7 @@ std::wstring toWideString(const char* utf8String) {
                                          -1,          // Count, -1 for NUL-terminated
                                          nullptr,     // No output buffer
                                          0            // Zero means "compute required size"
-                                         );
+    );
     if (bufferSize == 0) {
         return std::wstring();
     }
@@ -196,7 +196,7 @@ std::wstring toWideString(const char* utf8String) {
                         -1,                // Count, -1 for NUL-terminated
                         tempBuffer.get(),  // UTF-16 output buffer
                         bufferSize         // Buffer size in wide characters
-                        );
+    );
     return std::wstring(tempBuffer.get());
 }
 
@@ -214,7 +214,7 @@ bool writeUtf8ToWindowsConsole(const char* utf8String, unsigned int utf8StringSi
                                          utf8StringSize,  // Input string length
                                          nullptr,         // No output buffer
                                          0                // Zero means "compute required size"
-                                         );
+    );
     if (bufferSize == 0) {
         return true;
     }
@@ -225,7 +225,7 @@ bool writeUtf8ToWindowsConsole(const char* utf8String, unsigned int utf8StringSi
                         utf8StringSize,     // Input string length
                         utf16String.get(),  // UTF-16 output buffer
                         bufferSize          // Buffer size in wide characters
-                        );
+    );
     const wchar_t* utf16Pointer = utf16String.get();
     size_t numberOfCharactersToWrite = bufferSize;
     HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);

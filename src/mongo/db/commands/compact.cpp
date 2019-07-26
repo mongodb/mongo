@@ -115,4 +115,4 @@ public:
     }
 };
 static CompactCmd compactCmd;
-}
+}  // namespace mongo

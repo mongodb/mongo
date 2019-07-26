@@ -47,9 +47,9 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::ostringstream;
 using std::string;
+using std::unique_ptr;
 using namespace fmt::literals;
 
 #if 0
@@ -1259,7 +1259,7 @@ StatusWith<Date_t> JParse::parseDate() {
     Status parsedStatus = NumberParser::strToAny(10)(_input, &msSinceEpoch, &endptr);
     if (parsedStatus == ErrorCodes::Overflow) {
         /* Need to handle this because jsonString outputs the value of Date_t as unsigned.
-        * See SERVER-8330 and SERVER-8573 */
+         * See SERVER-8330 and SERVER-8573 */
         unsigned long long oldDate;  // Date_t used to be stored as unsigned long longs
         parsedStatus = NumberParser::strToAny(10)(_input, &oldDate, &endptr);
         if (parsedStatus == ErrorCodes::Overflow) {

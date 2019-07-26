@@ -30,11 +30,11 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-#include "mongo/logv2/log.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logv2/component_settings_filter.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain_impl.h"
 #include "mongo/logv2/text_formatter.h"
 #include "mongo/platform/basic.h"

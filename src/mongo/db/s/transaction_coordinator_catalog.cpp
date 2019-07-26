@@ -61,8 +61,8 @@ void TransactionCoordinatorCatalog::onStepDown() {
     stdx::unique_lock<stdx::mutex> ul(_mutex);
 
     std::vector<std::shared_ptr<TransactionCoordinator>> coordinatorsToCancel;
-    for (auto && [ sessionId, coordinatorsForSession ] : _coordinatorsBySession) {
-        for (auto && [ txnNumber, coordinator ] : coordinatorsForSession) {
+    for (auto&& [sessionId, coordinatorsForSession] : _coordinatorsBySession) {
+        for (auto&& [txnNumber, coordinator] : coordinatorsForSession) {
             coordinatorsToCancel.emplace_back(coordinator);
         }
     }

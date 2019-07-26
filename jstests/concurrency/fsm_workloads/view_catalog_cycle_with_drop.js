@@ -8,7 +8,6 @@
  */
 
 var $config = (function() {
-
     // Use the workload name as a prefix for the view names, since the workload name is assumed
     // to be unique.
     const prefix = 'view_catalog_cycle_with_drop_';
@@ -76,7 +75,6 @@ var $config = (function() {
             recreateViewOnCollection: recreateViewOnCollection,
             readFromView: readFromView
         };
-
     })();
 
     var transitions = {
@@ -114,5 +112,4 @@ var $config = (function() {
         transitions: transitions,
         setup: setup,
     };
-
 })();

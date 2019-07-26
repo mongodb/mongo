@@ -110,4 +110,4 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationNa
     MONGO_UNREACHABLE;
 }
 
-}  // namepspace mongo
+}  // namespace mongo

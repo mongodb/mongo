@@ -41,10 +41,10 @@
 namespace {
 
 using namespace mongo;
-using std::unique_ptr;
 using std::endl;
 using std::set;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 std::string getPathPrefix(std::string path) {
@@ -668,9 +668,9 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
             // multikey information.
             invariant(INDEX_2DSPHERE == thisIndex.type);
 
-            if (predsOverLeadingField.end() != std::find(predsOverLeadingField.begin(),
-                                                         predsOverLeadingField.end(),
-                                                         mandatoryPred)) {
+            if (predsOverLeadingField.end() !=
+                std::find(
+                    predsOverLeadingField.begin(), predsOverLeadingField.end(), mandatoryPred)) {
                 // The mandatory predicate is on the leading field of 'thisIndex'. We assign it to
                 // 'thisIndex' and skip assigning any other predicates on the leading field to
                 // 'thisIndex' because no additional predicate on the leading field will generate a
@@ -722,9 +722,9 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
             }
         } else if (thisIndex.multikey) {
             // Special handling for multikey mandatory indices.
-            if (predsOverLeadingField.end() != std::find(predsOverLeadingField.begin(),
-                                                         predsOverLeadingField.end(),
-                                                         mandatoryPred)) {
+            if (predsOverLeadingField.end() !=
+                std::find(
+                    predsOverLeadingField.begin(), predsOverLeadingField.end(), mandatoryPred)) {
                 // The mandatory predicate is over the first field of the index. Assign
                 // it now.
                 indexAssign.preds.push_back(mandatoryPred);

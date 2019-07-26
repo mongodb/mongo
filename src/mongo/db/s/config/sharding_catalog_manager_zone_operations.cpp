@@ -154,17 +154,13 @@ StatusWith<ChunkRange> includeFullShardKey(OperationContext* opCtx,
     if (!range.getMin().isFieldNamePrefixOf(shardKeyBSON)) {
         return {ErrorCodes::ShardKeyNotFound,
                 str::stream() << "min: " << range.getMin() << " is not a prefix of the shard key "
-                              << shardKeyBSON
-                              << " of ns: "
-                              << nss.ns()};
+                              << shardKeyBSON << " of ns: " << nss.ns()};
     }
 
     if (!range.getMax().isFieldNamePrefixOf(shardKeyBSON)) {
         return {ErrorCodes::ShardKeyNotFound,
                 str::stream() << "max: " << range.getMax() << " is not a prefix of the shard key "
-                              << shardKeyBSON
-                              << " of ns: "
-                              << nss.ns()};
+                              << shardKeyBSON << " of ns: " << nss.ns()};
     }
 
     return ChunkRange(shardKeyPattern.extendRangeBound(range.getMin(), false),

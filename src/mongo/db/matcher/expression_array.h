@@ -117,8 +117,8 @@ private:
 class ElemMatchValueMatchExpression : public ArrayMatchingMatchExpression {
 public:
     /**
-    * This constructor takes ownership of 'sub.'
-    */
+     * This constructor takes ownership of 'sub.'
+     */
     ElemMatchValueMatchExpression(StringData path, MatchExpression* sub);
     explicit ElemMatchValueMatchExpression(StringData path);
     virtual ~ElemMatchValueMatchExpression();
@@ -207,4 +207,4 @@ private:
 
     int _size;  // >= 0 real, < 0, nothing will match
 };
-}
+}  // namespace mongo

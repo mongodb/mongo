@@ -57,9 +57,9 @@
 
 namespace mongo {
 
-using std::shared_ptr;
 using std::numeric_limits;
 using std::set;
+using std::shared_ptr;
 using std::string;
 using std::vector;
 
@@ -254,7 +254,7 @@ void ReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy strategy)
     nextScanTime = possibleNextScanTime;
     LOG(1) << "Next replica set scan scheduled for " << nextScanTime;
     auto swHandle = executor->scheduleWorkAt(
-        nextScanTime, [ this, anchor = shared_from_this() ](const CallbackArgs& cbArgs) {
+        nextScanTime, [this, anchor = shared_from_this()](const CallbackArgs& cbArgs) {
             if (!cbArgs.status.isOK())
                 return;
 
@@ -529,7 +529,7 @@ void Refresher::scheduleNetworkRequests() {
         // ensure that the call to isMaster is scheduled at most every 500ms
         auto swHandle = _set->executor->scheduleWorkAt(
             node->nextPossibleIsMasterCall,
-            [ *this, host = ns.host ](const CallbackArgs& cbArgs) mutable {
+            [*this, host = ns.host](const CallbackArgs& cbArgs) mutable {
                 if (!cbArgs.status.isOK()) {
                     return;
                 }
@@ -584,7 +584,7 @@ void Refresher::scheduleIsMaster(const HostAndPort& host) {
         _set->executor
             ->scheduleRemoteCommand(
                 std::move(request),
-                [ copy = *this, host, timer = Timer() ](
+                [copy = *this, host, timer = Timer()](
                     const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
                     stdx::lock_guard lk(copy._set->mutex);
                     // Ignore the reply and return if we are no longer the current scan. This might
@@ -732,8 +732,7 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
         failedHost(from,
                    {ErrorCodes::InconsistentReplicaSetNames,
                     str::stream() << "Target replica set name " << reply.setName
-                                  << " does not match the monitored set name "
-                                  << _set->name});
+                                  << " does not match the monitored set name " << _set->name});
         return;
     }
 
@@ -811,12 +810,11 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
     // Reject if config version is older. This is for backwards compatibility with nodes in pv0
     // since they don't have the same ordering with pv1 electionId.
     if (reply.configVersion < _set->configVersion) {
-        return {ErrorCodes::NotMaster,
-                str::stream() << "Node " << from
-                              << " believes it is primary, but its config version "
-                              << reply.configVersion
-                              << " is older than the most recent config version "
-                              << _set->configVersion};
+        return {
+            ErrorCodes::NotMaster,
+            str::stream() << "Node " << from << " believes it is primary, but its config version "
+                          << reply.configVersion << " is older than the most recent config version "
+                          << _set->configVersion};
     }
 
     if (reply.electionId.isSet()) {
@@ -825,12 +823,11 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
         // because configVersion needs to be incremented whenever the protocol version is changed.
         if (reply.configVersion == _set->configVersion && _set->maxElectionId.isSet() &&
             _set->maxElectionId.compare(reply.electionId) > 0) {
-            return {ErrorCodes::NotMaster,
-                    str::stream() << "Node " << from
-                                  << " believes it is primary, but its election id "
-                                  << reply.electionId
-                                  << " is older than the most recent election id "
-                                  << _set->maxElectionId};
+            return {
+                ErrorCodes::NotMaster,
+                str::stream() << "Node " << from << " believes it is primary, but its election id "
+                              << reply.electionId << " is older than the most recent election id "
+                              << _set->maxElectionId};
         }
 
         _set->maxElectionId = reply.electionId;
@@ -1320,9 +1317,7 @@ void SetState::notify(bool finishedScan) {
 Status SetState::makeUnsatisfedReadPrefError(const ReadPreferenceSetting& criteria) const {
     return Status(ErrorCodes::FailedToSatisfyReadPreference,
                   str::stream() << "Could not find host matching read preference "
-                                << criteria.toString()
-                                << " for set "
-                                << name);
+                                << criteria.toString() << " for set " << name);
 }
 
 void SetState::init() {
@@ -1415,4 +1410,4 @@ void ScanState::retryAllTriedHosts(PseudoRandom& rand) {
     std::shuffle(hostsToScan.begin(), hostsToScan.end(), rand.urbg());
     triedHosts = waitingFor;
 }
-}
+}  // namespace mongo

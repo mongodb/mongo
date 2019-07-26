@@ -13,7 +13,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');                // for e
 load('jstests/concurrency/fsm_workloads/create_capped_collection.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     // Use the workload name as a prefix for the collection name,
     // since the workload name is assumed to be unique.
     $config.data.prefix = 'create_capped_collection_maxdocs';

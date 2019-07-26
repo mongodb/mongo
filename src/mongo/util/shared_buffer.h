@@ -228,4 +228,4 @@ private:
 inline void swap(ConstSharedBuffer& one, ConstSharedBuffer& two) {
     one.swap(two);
 }
-}
+}  // namespace mongo

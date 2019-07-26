@@ -128,4 +128,4 @@ public:
     }
 };
 MONGO_REGISTER_TEST_COMMAND(CmdSetCommittedSnapshot);
-}
+}  // namespace mongo

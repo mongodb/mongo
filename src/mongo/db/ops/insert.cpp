@@ -58,9 +58,9 @@ Status validateDepth(const BSONObj& obj) {
                 // We're exactly at the limit, so descending to the next level would exceed
                 // the maximum depth.
                 return {ErrorCodes::Overflow,
-                        str::stream() << "cannot insert document because it exceeds "
-                                      << BSONDepth::getMaxDepthForUserStorage()
-                                      << " levels of nesting"};
+                        str::stream()
+                            << "cannot insert document because it exceeds "
+                            << BSONDepth::getMaxDepthForUserStorage() << " levels of nesting"};
             }
             frames.emplace_back(elem.embeddedObject());
         }
@@ -78,10 +78,8 @@ StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj&
     if (doc.objsize() > BSONObjMaxUserSize)
         return StatusWith<BSONObj>(ErrorCodes::BadValue,
                                    str::stream() << "object to insert too large"
-                                                 << ". size in bytes: "
-                                                 << doc.objsize()
-                                                 << ", max size: "
-                                                 << BSONObjMaxUserSize);
+                                                 << ". size in bytes: " << doc.objsize()
+                                                 << ", max size: " << BSONObjMaxUserSize);
 
     auto depthStatus = validateDepth(doc);
     if (!depthStatus.isOK()) {
@@ -266,4 +264,4 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
 
     return Status::OK();
 }
-}
+}  // namespace mongo

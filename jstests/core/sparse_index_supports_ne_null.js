@@ -8,200 +8,193 @@
  * @tags: [assumes_unsharded_collection]
  */
 (function() {
-    "use strict";
-    load("jstests/libs/analyze_plan.js");  // For getPlanStages.
+"use strict";
+load("jstests/libs/analyze_plan.js");  // For getPlanStages.
 
-    const coll = db.sparse_index_supports_ne_null;
-    coll.drop();
+const coll = db.sparse_index_supports_ne_null;
+coll.drop();
 
-    function checkQuery({query, shouldUseIndex, nResultsExpected, indexKeyPattern}) {
-        const explain = assert.commandWorked(coll.find(query).explain());
-        const ixScans = getPlanStages(explain.queryPlanner.winningPlan, "IXSCAN");
+function checkQuery({query, shouldUseIndex, nResultsExpected, indexKeyPattern}) {
+    const explain = assert.commandWorked(coll.find(query).explain());
+    const ixScans = getPlanStages(explain.queryPlanner.winningPlan, "IXSCAN");
 
-        if (shouldUseIndex) {
-            assert.gte(ixScans.length, 1, explain);
-            assert.eq(ixScans[0].keyPattern, indexKeyPattern);
-        } else {
-            assert.eq(ixScans.length, 0, explain);
-        }
-
-        assert.eq(coll.find(query).itcount(), nResultsExpected);
+    if (shouldUseIndex) {
+        assert.gte(ixScans.length, 1, explain);
+        assert.eq(ixScans[0].keyPattern, indexKeyPattern);
+    } else {
+        assert.eq(ixScans.length, 0, explain);
     }
 
-    // Non compound case.
-    (function() {
-        const query = {a: {$ne: null}};
-        const elemMatchQuery = {a: {$elemMatch: {$ne: null}}};
-        const keyPattern = {a: 1};
+    assert.eq(coll.find(query).itcount(), nResultsExpected);
+}
 
-        assert.commandWorked(coll.insert({a: 1}));
-        assert.commandWorked(coll.insert({a: {x: 1}}));
-        assert.commandWorked(coll.insert({a: null}));
-        assert.commandWorked(coll.insert({a: undefined}));
+// Non compound case.
+(function() {
+const query = {
+    a: {$ne: null}
+};
+const elemMatchQuery = {
+    a: {$elemMatch: {$ne: null}}
+};
+const keyPattern = {
+    a: 1
+};
 
-        assert.commandWorked(coll.createIndex(keyPattern, {sparse: true}));
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: {x: 1}}));
+assert.commandWorked(coll.insert({a: null}));
+assert.commandWorked(coll.insert({a: undefined}));
 
-        // Be sure the index is used.
-        checkQuery(
-            {query: query, shouldUseIndex: true, nResultsExpected: 2, indexKeyPattern: keyPattern});
-        checkQuery({
-            query: elemMatchQuery,
-            shouldUseIndex: true,
-            nResultsExpected: 0,
-            indexKeyPattern: keyPattern
-        });
+assert.commandWorked(coll.createIndex(keyPattern, {sparse: true}));
 
-        // When the index becomes multikey, it cannot support {$ne: null} queries.
-        assert.commandWorked(coll.insert({a: [1, 2, 3]}));
-        checkQuery({
-            query: query,
-            shouldUseIndex: false,
-            nResultsExpected: 3,
-            indexKeyPattern: keyPattern
-        });
-        // But it can support queries with {$ne: null} within an $elemMatch.
-        checkQuery({
-            query: elemMatchQuery,
-            shouldUseIndex: true,
-            nResultsExpected: 1,
-            indexKeyPattern: keyPattern
-        });
-    })();
+// Be sure the index is used.
+checkQuery({query: query, shouldUseIndex: true, nResultsExpected: 2, indexKeyPattern: keyPattern});
+checkQuery({
+    query: elemMatchQuery,
+    shouldUseIndex: true,
+    nResultsExpected: 0,
+    indexKeyPattern: keyPattern
+});
 
-    // Compound case.
-    (function() {
-        const query = {a: {$ne: null}};
-        const elemMatchQuery = {a: {$elemMatch: {$ne: null}}};
-        const keyPattern = {a: 1, b: 1};
+// When the index becomes multikey, it cannot support {$ne: null} queries.
+assert.commandWorked(coll.insert({a: [1, 2, 3]}));
+checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 3, indexKeyPattern: keyPattern});
+// But it can support queries with {$ne: null} within an $elemMatch.
+checkQuery({
+    query: elemMatchQuery,
+    shouldUseIndex: true,
+    nResultsExpected: 1,
+    indexKeyPattern: keyPattern
+});
+})();
 
-        coll.drop();
-        assert.commandWorked(coll.insert({a: 1, b: 1}));
-        assert.commandWorked(coll.insert({a: {x: 1}, b: 1}));
-        assert.commandWorked(coll.insert({a: null, b: 1}));
-        assert.commandWorked(coll.insert({a: undefined, b: 1}));
+// Compound case.
+(function() {
+const query = {
+    a: {$ne: null}
+};
+const elemMatchQuery = {
+    a: {$elemMatch: {$ne: null}}
+};
+const keyPattern = {
+    a: 1,
+    b: 1
+};
 
-        assert.commandWorked(coll.createIndex(keyPattern, {sparse: true}));
+coll.drop();
+assert.commandWorked(coll.insert({a: 1, b: 1}));
+assert.commandWorked(coll.insert({a: {x: 1}, b: 1}));
+assert.commandWorked(coll.insert({a: null, b: 1}));
+assert.commandWorked(coll.insert({a: undefined, b: 1}));
 
-        // Be sure the index is used.
-        checkQuery(
-            {query: query, shouldUseIndex: true, nResultsExpected: 2, indexKeyPattern: keyPattern});
-        checkQuery({
-            query: elemMatchQuery,
-            shouldUseIndex: true,
-            nResultsExpected: 0,
-            indexKeyPattern: keyPattern
-        });
+assert.commandWorked(coll.createIndex(keyPattern, {sparse: true}));
 
-        // When the index becomes multikey on the second field, it should still be usable.
-        assert.commandWorked(coll.insert({a: 1, b: [1, 2, 3]}));
-        checkQuery(
-            {query: query, shouldUseIndex: true, nResultsExpected: 3, indexKeyPattern: keyPattern});
-        checkQuery({
-            query: elemMatchQuery,
-            shouldUseIndex: true,
-            nResultsExpected: 0,
-            indexKeyPattern: keyPattern
-        });
+// Be sure the index is used.
+checkQuery({query: query, shouldUseIndex: true, nResultsExpected: 2, indexKeyPattern: keyPattern});
+checkQuery({
+    query: elemMatchQuery,
+    shouldUseIndex: true,
+    nResultsExpected: 0,
+    indexKeyPattern: keyPattern
+});
 
-        // When the index becomes multikey on the first field, it should no longer be usable.
-        assert.commandWorked(coll.insert({a: [1, 2, 3], b: 1}));
-        checkQuery({
-            query: query,
-            shouldUseIndex: false,
-            nResultsExpected: 4,
-            indexKeyPattern: keyPattern
-        });
-        // Queries which use a $elemMatch should still be able to use the index.
-        checkQuery({
-            query: elemMatchQuery,
-            shouldUseIndex: true,
-            nResultsExpected: 1,
-            indexKeyPattern: keyPattern
-        });
-    })();
+// When the index becomes multikey on the second field, it should still be usable.
+assert.commandWorked(coll.insert({a: 1, b: [1, 2, 3]}));
+checkQuery({query: query, shouldUseIndex: true, nResultsExpected: 3, indexKeyPattern: keyPattern});
+checkQuery({
+    query: elemMatchQuery,
+    shouldUseIndex: true,
+    nResultsExpected: 0,
+    indexKeyPattern: keyPattern
+});
 
-    // Nested field multikey with $elemMatch.
-    (function() {
-        const keyPattern = {"a.b.c.d": 1};
-        coll.drop();
-        assert.commandWorked(coll.insert({a: {b: [{c: {d: 1}}]}}));
-        assert.commandWorked(coll.insert({a: {b: [{c: {d: {e: 1}}}]}}));
-        assert.commandWorked(coll.insert({a: {b: [{c: {d: null}}]}}));
-        assert.commandWorked(coll.insert({a: {b: [{c: {d: undefined}}]}}));
+// When the index becomes multikey on the first field, it should no longer be usable.
+assert.commandWorked(coll.insert({a: [1, 2, 3], b: 1}));
+checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 4, indexKeyPattern: keyPattern});
+// Queries which use a $elemMatch should still be able to use the index.
+checkQuery({
+    query: elemMatchQuery,
+    shouldUseIndex: true,
+    nResultsExpected: 1,
+    indexKeyPattern: keyPattern
+});
+})();
 
-        assert.commandWorked(coll.createIndex(keyPattern, {sparse: true}));
+// Nested field multikey with $elemMatch.
+(function() {
+const keyPattern = {
+    "a.b.c.d": 1
+};
+coll.drop();
+assert.commandWorked(coll.insert({a: {b: [{c: {d: 1}}]}}));
+assert.commandWorked(coll.insert({a: {b: [{c: {d: {e: 1}}}]}}));
+assert.commandWorked(coll.insert({a: {b: [{c: {d: null}}]}}));
+assert.commandWorked(coll.insert({a: {b: [{c: {d: undefined}}]}}));
 
-        const query = {"a.b.c.d": {$ne: null}};
-        // $elemMatch object can only use the index when none of the paths below the $elemMatch is
-        // not multikey.
-        const elemMatchObjectQuery = {"a.b": {$elemMatch: {"c.d": {$ne: null}}}};
-        // $elemMatch value can always use the index.
-        const elemMatchValueQuery = {"a.b.c.d": {$elemMatch: {$ne: null}}};
+assert.commandWorked(coll.createIndex(keyPattern, {sparse: true}));
 
-        // 'a.b' is multikey, so the index isn't used.
-        checkQuery({
-            query: query,
-            shouldUseIndex: false,
-            nResultsExpected: 2,
-            indexKeyPattern: keyPattern
-        });
-        // Since the multikey portion is above the $elemMatch, the $elemMatch query may use the
-        // index.
-        checkQuery({
-            query: elemMatchObjectQuery,
-            shouldUseIndex: true,
-            nResultsExpected: 2,
-            indexKeyPattern: keyPattern
-        });
-        checkQuery({
-            query: elemMatchValueQuery,
-            shouldUseIndex: true,
-            nResultsExpected: 0,
-            indexKeyPattern: keyPattern
-        });
+const query = {
+    "a.b.c.d": {$ne: null}
+};
+// $elemMatch object can only use the index when none of the paths below the $elemMatch is
+// not multikey.
+const elemMatchObjectQuery = {
+    "a.b": {$elemMatch: {"c.d": {$ne: null}}}
+};
+// $elemMatch value can always use the index.
+const elemMatchValueQuery = {
+    "a.b.c.d": {$elemMatch: {$ne: null}}
+};
 
-        // Make the index become multikey on 'a' (another field above the $elemMatch).
-        assert.commandWorked(coll.insert({a: [{b: [{c: {d: 1}}]}]}));
-        checkQuery({
-            query: query,
-            shouldUseIndex: false,
-            nResultsExpected: 3,
-            indexKeyPattern: keyPattern
-        });
-        // The only multikey paths are still above the $elemMatch, queries which use a $elemMatch
-        // should still be able to use the index.
-        checkQuery({
-            query: elemMatchObjectQuery,
-            shouldUseIndex: true,
-            nResultsExpected: 3,
-            indexKeyPattern: keyPattern
-        });
-        checkQuery({
-            query: elemMatchValueQuery,
-            shouldUseIndex: true,
-            nResultsExpected: 0,
-            indexKeyPattern: keyPattern
-        });
+// 'a.b' is multikey, so the index isn't used.
+checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 2, indexKeyPattern: keyPattern});
+// Since the multikey portion is above the $elemMatch, the $elemMatch query may use the
+// index.
+checkQuery({
+    query: elemMatchObjectQuery,
+    shouldUseIndex: true,
+    nResultsExpected: 2,
+    indexKeyPattern: keyPattern
+});
+checkQuery({
+    query: elemMatchValueQuery,
+    shouldUseIndex: true,
+    nResultsExpected: 0,
+    indexKeyPattern: keyPattern
+});
 
-        // Make the index multikey for 'a.b.c'. Now the $elemMatch query may not use the index.
-        assert.commandWorked(coll.insert({a: {b: [{c: [{d: 1}]}]}}));
-        checkQuery({
-            query: query,
-            shouldUseIndex: false,
-            nResultsExpected: 4,
-            indexKeyPattern: keyPattern
-        });
-        checkQuery({
-            query: elemMatchObjectQuery,
-            shouldUseIndex: false,
-            nResultsExpected: 4,
-            indexKeyPattern: keyPattern
-        });
-        checkQuery({
-            query: elemMatchValueQuery,
-            shouldUseIndex: true,
-            nResultsExpected: 0,
-            indexKeyPattern: keyPattern
-        });
-    })();
+// Make the index become multikey on 'a' (another field above the $elemMatch).
+assert.commandWorked(coll.insert({a: [{b: [{c: {d: 1}}]}]}));
+checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 3, indexKeyPattern: keyPattern});
+// The only multikey paths are still above the $elemMatch, queries which use a $elemMatch
+// should still be able to use the index.
+checkQuery({
+    query: elemMatchObjectQuery,
+    shouldUseIndex: true,
+    nResultsExpected: 3,
+    indexKeyPattern: keyPattern
+});
+checkQuery({
+    query: elemMatchValueQuery,
+    shouldUseIndex: true,
+    nResultsExpected: 0,
+    indexKeyPattern: keyPattern
+});
+
+// Make the index multikey for 'a.b.c'. Now the $elemMatch query may not use the index.
+assert.commandWorked(coll.insert({a: {b: [{c: [{d: 1}]}]}}));
+checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 4, indexKeyPattern: keyPattern});
+checkQuery({
+    query: elemMatchObjectQuery,
+    shouldUseIndex: false,
+    nResultsExpected: 4,
+    indexKeyPattern: keyPattern
+});
+checkQuery({
+    query: elemMatchValueQuery,
+    shouldUseIndex: true,
+    nResultsExpected: 0,
+    indexKeyPattern: keyPattern
+});
+})();
 })();

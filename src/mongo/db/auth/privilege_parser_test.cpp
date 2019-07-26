@@ -56,24 +56,21 @@ TEST(PrivilegeParserTest, IsValidTest) {
                                                                 << ""
                                                                 << "collection"
                                                                 << "")
-                                              << "actions"
-                                              << BSON_ARRAY("find")),
+                                              << "actions" << BSON_ARRAY("find")),
                               &errmsg);
     ASSERT_FALSE(parsedPrivilege.isValid(&errmsg));
 
     // resource can't have db without collection
     parsedPrivilege.parseBSON(BSON("resource" << BSON("db"
                                                       << "")
-                                              << "actions"
-                                              << BSON_ARRAY("find")),
+                                              << "actions" << BSON_ARRAY("find")),
                               &errmsg);
     ASSERT_FALSE(parsedPrivilege.isValid(&errmsg));
 
     // resource can't have collection without db
     parsedPrivilege.parseBSON(BSON("resource" << BSON("collection"
                                                       << "")
-                                              << "actions"
-                                              << BSON_ARRAY("find")),
+                                              << "actions" << BSON_ARRAY("find")),
                               &errmsg);
     ASSERT_FALSE(parsedPrivilege.isValid(&errmsg));
 
@@ -82,8 +79,7 @@ TEST(PrivilegeParserTest, IsValidTest) {
                                                       << ""
                                                       << "collection"
                                                       << "")
-                                              << "actions"
-                                              << BSON_ARRAY("find")),
+                                              << "actions" << BSON_ARRAY("find")),
                               &errmsg);
     ASSERT(parsedPrivilege.isValid(&errmsg));
 
@@ -92,8 +88,7 @@ TEST(PrivilegeParserTest, IsValidTest) {
                                                       << "test"
                                                       << "collection"
                                                       << "foo")
-                                              << "actions"
-                                              << BSON_ARRAY("find")),
+                                              << "actions" << BSON_ARRAY("find")),
                               &errmsg);
     ASSERT(parsedPrivilege.isValid(&errmsg));
 
@@ -116,8 +111,7 @@ TEST(PrivilegeParserTest, ConvertBetweenPrivilegeTest) {
                                                       << ""
                                                       << "collection"
                                                       << "")
-                                              << "actions"
-                                              << BSON_ARRAY("find")),
+                                              << "actions" << BSON_ARRAY("find")),
                               &errmsg);
     ASSERT(parsedPrivilege.isValid(&errmsg));
     ASSERT_OK(ParsedPrivilege::parsedPrivilegeToPrivilege(
@@ -143,8 +137,7 @@ TEST(PrivilegeParserTest, ConvertBetweenPrivilegeTest) {
                                                       << "test"
                                                       << "collection"
                                                       << "foo")
-                                              << "actions"
-                                              << BSON_ARRAY("find")),
+                                              << "actions" << BSON_ARRAY("find")),
                               &errmsg);
     ASSERT(parsedPrivilege.isValid(&errmsg));
     ASSERT_OK(ParsedPrivilege::parsedPrivilegeToPrivilege(
@@ -171,8 +164,7 @@ TEST(PrivilegeParserTest, ConvertBetweenPrivilegeTest) {
                                                       << "test"
                                                       << "collection"
                                                       << "")
-                                              << "actions"
-                                              << BSON_ARRAY("find")),
+                                              << "actions" << BSON_ARRAY("find")),
                               &errmsg);
     ASSERT(parsedPrivilege.isValid(&errmsg));
     ASSERT_OK(ParsedPrivilege::parsedPrivilegeToPrivilege(
@@ -198,8 +190,7 @@ TEST(PrivilegeParserTest, ConvertBetweenPrivilegeTest) {
                                                       << ""
                                                       << "collection"
                                                       << "foo")
-                                              << "actions"
-                                              << BSON_ARRAY("find")),
+                                              << "actions" << BSON_ARRAY("find")),
                               &errmsg);
     ASSERT(parsedPrivilege.isValid(&errmsg));
     ASSERT_OK(ParsedPrivilege::parsedPrivilegeToPrivilege(

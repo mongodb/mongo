@@ -80,8 +80,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnError) {
                                         << "$path1"
                                         << "to"
                                         << "int"
-                                        << "onError"
-                                        << 0));
+                                        << "onError" << 0));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(
@@ -100,8 +99,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnNull) {
                                         << "$path1"
                                         << "to"
                                         << "int"
-                                        << "onNull"
-                                        << 0));
+                                        << "onNull" << 0));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(
@@ -118,8 +116,7 @@ TEST_F(ExpressionConvertTest, ConvertWithoutInputFailsToParse) {
 
     auto spec = BSON("$convert" << BSON("to"
                                         << "int"
-                                        << "onError"
-                                        << 0));
+                                        << "onError" << 0));
     ASSERT_THROWS_WITH_CHECK(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -134,8 +131,7 @@ TEST_F(ExpressionConvertTest, ConvertWithoutToFailsToParse) {
 
     auto spec = BSON("$convert" << BSON("input"
                                         << "$path1"
-                                        << "onError"
-                                        << 0));
+                                        << "onError" << 0));
     ASSERT_THROWS_WITH_CHECK(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -152,8 +148,7 @@ TEST_F(ExpressionConvertTest, InvalidTypeNameFails) {
                                         << "$path1"
                                         << "to"
                                         << "dinosaur"
-                                        << "onError"
-                                        << 0));
+                                        << "onError" << 0));
 
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
@@ -170,10 +165,7 @@ TEST_F(ExpressionConvertTest, NonIntegralTypeFails) {
 
     auto spec = BSON("$convert" << BSON("input"
                                         << "$path1"
-                                        << "to"
-                                        << 3.6
-                                        << "onError"
-                                        << 0));
+                                        << "to" << 3.6 << "onError" << 0));
 
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
@@ -195,8 +187,7 @@ TEST_F(ExpressionConvertTest, NonStringNonNumericalTypeFails) {
                                         << "to"
                                         << BSON("dinosaur"
                                                 << "Tyrannosaurus rex")
-                                        << "onError"
-                                        << 0));
+                                        << "onError" << 0));
 
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
@@ -215,10 +206,7 @@ TEST_F(ExpressionConvertTest, InvalidNumericTargetTypeFails) {
 
     auto spec = BSON("$convert" << BSON("input"
                                         << "$path1"
-                                        << "to"
-                                        << 100
-                                        << "onError"
-                                        << 0));
+                                        << "to" << 100 << "onError" << 0));
 
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
@@ -238,10 +226,7 @@ TEST_F(ExpressionConvertTest, NegativeNumericTargetTypeFails) {
 
     auto spec = BSON("$convert" << BSON("input"
                                         << "$path1"
-                                        << "to"
-                                        << -2
-                                        << "onError"
-                                        << 0));
+                                        << "to" << -2 << "onError" << 0));
 
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
@@ -297,8 +282,7 @@ TEST_F(ExpressionConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvi
 
         auto spec = BSON("$convert" << BSON("input"
                                             << "$path1"
-                                            << "to"
-                                            << Value(targetTypeName)));
+                                            << "to" << Value(targetTypeName)));
 
         Document input{{"path1", inputValue}};
 
@@ -320,9 +304,7 @@ TEST_F(ExpressionConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvi
 
         auto spec = BSON("$convert" << BSON("input"
                                             << "$path1"
-                                            << "to"
-                                            << Value(targetTypeName)
-                                            << "onError"
+                                            << "to" << Value(targetTypeName) << "onError"
                                             << "X"));
 
         Document input{{"path1", inputValue}};

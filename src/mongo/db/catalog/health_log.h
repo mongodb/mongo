@@ -91,4 +91,4 @@ public:
 private:
     DeferredWriter _writer;
 };
-}
+}  // namespace mongo

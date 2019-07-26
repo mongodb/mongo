@@ -176,5 +176,5 @@ FTSTokenizer::Options FTSMatcher::_getTokenizerOptions() const {
 
     return tokenizerOptions;
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

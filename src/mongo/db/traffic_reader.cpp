@@ -93,8 +93,8 @@ bool readBytes(size_t toRead, char* buf, int fd) {
             auto pair = errnoAndDescription();
 
             uassert(ErrorCodes::FileStreamFailed,
-                    str::stream() << "failed to read bytes: errno(" << pair.first << ") : "
-                                  << pair.second,
+                    str::stream() << "failed to read bytes: errno(" << pair.first
+                                  << ") : " << pair.second,
                     pair.first == EINTR);
 
             continue;

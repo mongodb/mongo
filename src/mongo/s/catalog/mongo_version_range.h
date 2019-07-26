@@ -60,4 +60,4 @@ struct MongoVersionRange {
 };
 
 bool isInMongoVersionRanges(StringData version, const std::vector<MongoVersionRange>& ranges);
-}
+}  // namespace mongo

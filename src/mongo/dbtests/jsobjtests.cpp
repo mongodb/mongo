@@ -1163,18 +1163,13 @@ class LabelShares : public LabelBase {
     BSONObj expected() {
         return BSON("z"
                     << "q"
-                    << "a"
-                    << (BSON("$gt" << 1))
-                    << "x"
+                    << "a" << (BSON("$gt" << 1)) << "x"
                     << "p");
     }
     BSONObj actual() {
         return BSON("z"
                     << "q"
-                    << "a"
-                    << GT
-                    << 1
-                    << "x"
+                    << "a" << GT << 1 << "x"
                     << "p");
     }
 };
@@ -1202,11 +1197,7 @@ class LabelDoubleShares : public LabelBase {
     BSONObj actual() {
         return BSON("z"
                     << "q"
-                    << "a"
-                    << GT
-                    << 1
-                    << LTE
-                    << "x"
+                    << "a" << GT << 1 << LTE << "x"
                     << "x"
                     << "p");
     }
@@ -1231,27 +1222,15 @@ class LabelMulti : public LabelBase {
                     << "b"
                     << BSON("$ne" << 1 << "$ne"
                                   << "f"
-                                  << "$ne"
-                                  << 22.3)
+                                  << "$ne" << 22.3)
                     << "x"
                     << "p");
     }
     BSONObj actual() {
         return BSON("z"
                     << "q"
-                    << "a"
-                    << GT
-                    << 1
-                    << LTE
-                    << "x"
-                    << "b"
-                    << NE
-                    << 1
-                    << NE
-                    << "f"
-                    << NE
-                    << 22.3
-                    << "x"
+                    << "a" << GT << 1 << LTE << "x"
+                    << "b" << NE << 1 << NE << "f" << NE << 22.3 << "x"
                     << "p");
     }
 };
@@ -1261,8 +1240,7 @@ class LabelishOr : public LabelBase {
                                                                << "x"))
                                         << BSON("b" << BSON("$ne" << 1 << "$ne"
                                                                   << "f"
-                                                                  << "$ne"
-                                                                  << 22.3))
+                                                                  << "$ne" << 22.3))
                                         << BSON("x"
                                                 << "p")));
     }
@@ -1614,9 +1592,7 @@ struct BSONArrayBuilderTest {
         BSONObjBuilder objb;
         BSONArrayBuilder arrb;
 
-        auto fieldNameGenerator = [i = 0]() mutable {
-            return std::to_string(i++);
-        };
+        auto fieldNameGenerator = [i = 0]() mutable { return std::to_string(i++); };
 
         objb << fieldNameGenerator() << 100;
         arrb << 100;
@@ -1630,8 +1606,9 @@ struct BSONArrayBuilderTest {
         objb << fieldNameGenerator() << string("World");
         arrb << string("World");
 
-        objb << fieldNameGenerator() << BSON("a" << 1 << "b"
-                                                 << "foo");
+        objb << fieldNameGenerator()
+             << BSON("a" << 1 << "b"
+                         << "foo");
         arrb << BSON("a" << 1 << "b"
                          << "foo");
 
@@ -1685,14 +1662,13 @@ struct BSONArrayBuilderTest {
 
 struct ArrayMacroTest {
     void run() {
-        BSONArray arr = BSON_ARRAY("hello" << 1 << BSON("foo" << BSON_ARRAY("bar"
-                                                                            << "baz"
-                                                                            << "qux")));
+        BSONArray arr = BSON_ARRAY("hello" << 1
+                                           << BSON("foo" << BSON_ARRAY("bar"
+                                                                       << "baz"
+                                                                       << "qux")));
         BSONObj obj = BSON("0"
                            << "hello"
-                           << "1"
-                           << 1
-                           << "2"
+                           << "1" << 1 << "2"
                            << BSON("foo" << BSON_ARRAY("bar"
                                                        << "baz"
                                                        << "qux")));
@@ -1799,38 +1775,26 @@ public:
         // DBRef stuff -- json parser can't handle this yet
         good(BSON("a" << BSON("$ref"
                               << "coll"
-                              << "$id"
-                              << 1)));
+                              << "$id" << 1)));
         good(BSON("a" << BSON("$ref"
                               << "coll"
-                              << "$id"
-                              << 1
-                              << "$db"
+                              << "$id" << 1 << "$db"
                               << "a")));
         good(BSON("a" << BSON("$ref"
                               << "coll"
-                              << "$id"
-                              << 1
-                              << "stuff"
-                              << 1)));
+                              << "$id" << 1 << "stuff" << 1)));
         good(BSON("a" << BSON("$ref"
                               << "coll"
-                              << "$id"
-                              << 1
-                              << "$db"
+                              << "$id" << 1 << "$db"
                               << "a"
-                              << "stuff"
-                              << 1)));
+                              << "stuff" << 1)));
 
         bad(BSON("a" << BSON("$ref" << 1 << "$id" << 1)));
         bad(BSON("a" << BSON("$ref" << 1 << "$id" << 1 << "$db"
                                     << "a")));
         bad(BSON("a" << BSON("$ref"
                              << "coll"
-                             << "$id"
-                             << 1
-                             << "$db"
-                             << 1)));
+                             << "$id" << 1 << "$db" << 1)));
         bad(BSON("a" << BSON("$ref"
                              << "coll")));
         bad(BSON("a" << BSON("$ref"
@@ -1842,10 +1806,7 @@ public:
                                    << "coll")));
         bad(BSON("a" << BSON("$ref"
                              << "coll"
-                             << "$id"
-                             << 1
-                             << "$hater"
-                             << 1)));
+                             << "$id" << 1 << "$hater" << 1)));
     }
 };
 

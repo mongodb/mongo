@@ -149,15 +149,13 @@ TEST_F(EnableShardingTest, dbExistsInvalidFormat) {
     setupShards(vector<ShardType>{shard});
 
     // Set up database with bad type for primary field.
-    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    DatabaseType::ConfigNS,
-                                                    BSON("_id"
-                                                         << "db6"
-                                                         << "primary"
-                                                         << 12
-                                                         << "partitioned"
-                                                         << false),
-                                                    ShardingCatalogClient::kMajorityWriteConcern));
+    ASSERT_OK(
+        catalogClient()->insertConfigDocument(operationContext(),
+                                              DatabaseType::ConfigNS,
+                                              BSON("_id"
+                                                   << "db6"
+                                                   << "primary" << 12 << "partitioned" << false),
+                                              ShardingCatalogClient::kMajorityWriteConcern));
 
     ASSERT_THROWS_CODE(
         ShardingCatalogManager::get(operationContext())->enableSharding(operationContext(), "db6"),

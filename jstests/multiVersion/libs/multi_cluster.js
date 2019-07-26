@@ -89,7 +89,6 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
 };
 
 ShardingTest.prototype.restartMongoses = function() {
-
     var numMongoses = this._mongos.length;
 
     for (var i = 0; i < numMongoses; i++) {

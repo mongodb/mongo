@@ -137,8 +137,7 @@ Status TicketHolder::resize(int newSize) {
     if (newSize > SEM_VALUE_MAX)
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Maximum value for semaphore is " << SEM_VALUE_MAX
-                                    << "; given "
-                                    << newSize);
+                                    << "; given " << newSize);
 
     while (_outof.load() < newSize) {
         release();
@@ -254,4 +253,4 @@ bool TicketHolder::_tryAcquire() {
     return true;
 }
 #endif
-}
+}  // namespace mongo

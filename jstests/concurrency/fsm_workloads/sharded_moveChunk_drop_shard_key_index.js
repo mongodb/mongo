@@ -11,7 +11,6 @@
  */
 
 var $config = (function() {
-
     var data = {numSplitPoints: 100, shardKey: {key: 1}};
 
     var states = {
@@ -79,5 +78,4 @@ var $config = (function() {
         transitions: transitions,
         setup: setup,
     };
-
 })();

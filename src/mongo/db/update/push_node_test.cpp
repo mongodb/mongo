@@ -44,8 +44,8 @@ namespace mongo {
 namespace {
 
 using PushNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
+using mongo::mutablebson::Element;
 
 TEST(PushNodeTest, EachClauseWithNonArrayObjectFails) {
     auto update = fromjson("{$push: {x: {$each: {'0': 1}}}}");
@@ -670,12 +670,9 @@ void checkDocumentAndResult(BSONObj updateModifier,
         FAIL(str::stream() << "apply() failure for " << updateModifier << ". Expected "
                            << expectedDocument
                            << " (noop = false, indexesAffected = false) but got "
-                           << actualDocument.toString()
-                           << " (noop = "
-                           << (applyResult.noop ? "true" : "false")
-                           << ", indexesAffected = "
-                           << (applyResult.indexesAffected ? "true" : "false")
-                           << ").");
+                           << actualDocument.toString() << " (noop = "
+                           << (applyResult.noop ? "true" : "false") << ", indexesAffected = "
+                           << (applyResult.indexesAffected ? "true" : "false") << ").");
     }
 }
 
@@ -828,9 +825,7 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithSortAndSliceValues) {
         auto update =
             BSON("$push" << BSON("a" << BSON("$each" << BSON_ARRAY(BSON("a" << 2 << "b" << 1)
                                                                    << BSON("a" << 1 << "b" << 1))
-                                                     << "$slice"
-                                                     << data.sliceValue
-                                                     << "$sort"
+                                                     << "$slice" << data.sliceValue << "$sort"
                                                      << data.sortOrder)));
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         PushNode node;

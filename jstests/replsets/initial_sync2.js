@@ -19,7 +19,6 @@ load("jstests/replsets/rslib.js");
 var basename = "jstests_initsync2";
 
 var doTest = function() {
-
     jsTest.log("1. Bring up set");
     var replTest = new ReplSetTest({name: basename, nodes: [{rsConfig: {priority: 2}}, {}]});
     var conns = replTest.startSet();

@@ -2,7 +2,8 @@
 
 load('jstests/concurrency/fsm_libs/parse_config.js');  // for parseConfig
 
-/** extendWorkload usage:
+/**
+ * extendWorkload usage:
  *
  * $config = extendWorkload($config, function($config, $super) {
  *   // ... modify $config ...

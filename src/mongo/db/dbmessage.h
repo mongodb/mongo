@@ -96,7 +96,7 @@ class OperationContext;
 namespace QueryResult {
 #pragma pack(1)
 /* see http://dochub.mongodb.org/core/mongowireprotocol
-*/
+ */
 struct Layout {
     MsgData::Layout msgdata;
     int64_t cursorId;
@@ -298,7 +298,7 @@ enum QueryOptions {
     QueryOption_CursorTailable = 1 << 1,
 
     /** allow query of replica slave.  normally these return an error except for namespace "local".
-    */
+     */
     QueryOption_SlaveOk = 1 << 2,
 
     // findingStart mode is used to find the first operation of interest when
@@ -319,7 +319,7 @@ enum QueryOptions {
 
     /** Use with QueryOption_CursorTailable.  If we are at the end of the data, block for a while
      * rather than returning no data. After a timeout period, we do return as normal.
-    */
+     */
     QueryOption_AwaitData = 1 << 5,
 
     /** Stream the data down full blast in multiple "more" packages, on the assumption that the

@@ -278,5 +278,5 @@ TEST(FTSMatcher, NegativePhrasesMatchWithCase) {
     ASSERT_FALSE(docNegativePhrasesMatchWithCase("John Runs", "-\"n R\""));
     ASSERT_FALSE(docNegativePhrasesMatchWithCase("John Runs", "-\"John\" -\"Running\""));
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

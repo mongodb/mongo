@@ -37,7 +37,6 @@
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/cluster_query_knobs_gen.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/util/fail_point.h"
@@ -113,8 +112,7 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
         invariant(cmdForShards.peek()[OperationSessionInfo::kTxnNumberFieldName].missing(),
                   str::stream() << "Command for shards unexpectedly had the "
                                 << OperationSessionInfo::kTxnNumberFieldName
-                                << " field set: "
-                                << cmdForShards.peek().toString());
+                                << " field set: " << cmdForShards.peek().toString());
         cmdForShards[OperationSessionInfo::kTxnNumberFieldName] =
             Value(static_cast<long long>(*opCtx->getTxnNumber()));
     }
@@ -332,9 +330,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                         shardQuery);
         invariant(cursors.size() % shardIds.size() == 0,
                   str::stream() << "Number of cursors (" << cursors.size()
-                                << ") is not a multiple of producers ("
-                                << shardIds.size()
-                                << ")");
+                                << ") is not a multiple of producers (" << shardIds.size() << ")");
     }
 
     // Convert remote cursors into a vector of "owned" cursors.
@@ -346,9 +342,9 @@ DispatchShardPipelineResults dispatchShardPipeline(
     // Record the number of shards involved in the aggregation. If we are required to merge on
     // the primary shard, but the primary shard was not in the set of targeted shards, then we
     // must increment the number of involved shards.
-    CurOp::get(opCtx)->debug().nShards =
-        shardIds.size() + (needsPrimaryShardMerge && executionNsRoutingInfo &&
-                           !shardIds.count(executionNsRoutingInfo->db().primaryId()));
+    CurOp::get(opCtx)->debug().nShards = shardIds.size() +
+        (needsPrimaryShardMerge && executionNsRoutingInfo &&
+         !shardIds.count(executionNsRoutingInfo->db().primaryId()));
 
     return DispatchShardPipelineResults{needsPrimaryShardMerge,
                                         std::move(ownedCursors),

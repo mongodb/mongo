@@ -116,11 +116,7 @@ public:
     std::string toString() const {
         return str::stream() << "QSpec "
                              << BSON("ns" << _ns << "n2skip" << _ntoskip << "n2return" << _ntoreturn
-                                          << "options"
-                                          << _options
-                                          << "query"
-                                          << _query
-                                          << "fields"
+                                          << "options" << _options << "query" << _query << "fields"
                                           << _fields);
     }
 };

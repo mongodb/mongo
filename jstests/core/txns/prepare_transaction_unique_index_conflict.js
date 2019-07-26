@@ -9,36 +9,36 @@
  */
 
 (function() {
-    "use strict";
-    load("jstests/core/txns/libs/prepare_helpers.js");
+"use strict";
+load("jstests/core/txns/libs/prepare_helpers.js");
 
-    const dbName = "test";
-    const collName = "prepare_transaction_unique_index_conflict";
-    const testDB = db.getSiblingDB(dbName);
-    const testColl = testDB.getCollection(collName);
+const dbName = "test";
+const collName = "prepare_transaction_unique_index_conflict";
+const testDB = db.getSiblingDB(dbName);
+const testColl = testDB.getCollection(collName);
 
-    testColl.drop({writeConcern: {w: "majority"}});
-    assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
+testColl.drop({writeConcern: {w: "majority"}});
+assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
-    const session = db.getMongo().startSession();
-    const sessionDB = session.getDatabase(dbName);
-    const sessionColl = sessionDB.getCollection(collName);
+const session = db.getMongo().startSession();
+const sessionDB = session.getDatabase(dbName);
+const sessionColl = sessionDB.getCollection(collName);
 
-    assert.commandWorked(testColl.insert({_id: 1, a: 0}));
+assert.commandWorked(testColl.insert({_id: 1, a: 0}));
 
-    // Ensure that the "a" field is unique.
-    assert.commandWorked(testColl.createIndex({"a": 1}, {unique: true}));
+// Ensure that the "a" field is unique.
+assert.commandWorked(testColl.createIndex({"a": 1}, {unique: true}));
 
-    session.startTransaction();
-    assert.commandWorked(sessionColl.insert({_id: 2, a: 1}));
-    assert.commandWorked(sessionColl.update({_id: 2}, {$unset: {a: 1}}));
-    const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
+session.startTransaction();
+assert.commandWorked(sessionColl.insert({_id: 2, a: 1}));
+assert.commandWorked(sessionColl.update({_id: 2}, {$unset: {a: 1}}));
+const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-    // While trying to insert this document, the node will have to perform reads to check if it
-    // violates the unique index, which should cause a prepare conflict.
-    assert.commandFailedWithCode(
-        testDB.runCommand({insert: collName, documents: [{_id: 3, a: 1}], maxTimeMS: 5000}),
-        ErrorCodes.MaxTimeMSExpired);
+// While trying to insert this document, the node will have to perform reads to check if it
+// violates the unique index, which should cause a prepare conflict.
+assert.commandFailedWithCode(
+    testDB.runCommand({insert: collName, documents: [{_id: 3, a: 1}], maxTimeMS: 5000}),
+    ErrorCodes.MaxTimeMSExpired);
 
-    assert.commandWorked(session.abortTransaction_forTesting());
+assert.commandWorked(session.abortTransaction_forTesting());
 })();

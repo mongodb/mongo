@@ -397,8 +397,8 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         // other writes making up this operation are given. When index builds can cope with
         // replication rollbacks, side table writes associated with a CUD operation should
         // remain/rollback along with the corresponding oplog entry.
-        toInsert.emplace_back(BSON(
-            "op" << (op == Op::kInsert ? "i" : "d") << "key" << key << "recordId" << loc.repr()));
+        toInsert.emplace_back(BSON("op" << (op == Op::kInsert ? "i" : "d") << "key" << key
+                                        << "recordId" << loc.repr()));
     }
 
     if (op == Op::kInsert) {
@@ -408,9 +408,7 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         for (const auto& key : multikeyMetadataKeys) {
             toInsert.emplace_back(BSON("op"
                                        << "i"
-                                       << "key"
-                                       << key
-                                       << "recordId"
+                                       << "key" << key << "recordId"
                                        << static_cast<int64_t>(
                                               RecordId::ReservedId::kWildcardMultikeyMetadataId)));
         }
@@ -421,7 +419,7 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     // operations outside this table and in the same transaction are rolled back, this counter also
     // needs to be rolled back.
     opCtx->recoveryUnit()->onRollback(
-        [ this, size = toInsert.size() ] { _sideWritesCounter.fetchAndSubtract(size); });
+        [this, size = toInsert.size()] { _sideWritesCounter.fetchAndSubtract(size); });
 
     std::vector<Record> records;
     for (auto& doc : toInsert) {

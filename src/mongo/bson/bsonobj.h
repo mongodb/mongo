@@ -131,7 +131,7 @@ public:
 
     /** Construct a BSONObj from data in the proper format.
      *  Use this constructor when something else owns bsonData's buffer
-    */
+     */
     template <typename Traits = DefaultSizeTrait>
     explicit BSONObj(const char* bsonData, Traits t = Traits{}) {
         init<Traits>(bsonData);
@@ -142,8 +142,8 @@ public:
           _ownedBuffer(std::move(ownedBuffer)) {}
 
     /** Move construct a BSONObj */
-    BSONObj(BSONObj&& other) noexcept : _objdata(std::move(other._objdata)),
-                                        _ownedBuffer(std::move(other._ownedBuffer)) {
+    BSONObj(BSONObj&& other) noexcept
+        : _objdata(std::move(other._objdata)), _ownedBuffer(std::move(other._ownedBuffer)) {
         other._objdata = BSONObj()._objdata;  // To return to an empty state.
         dassert(!other.isOwned());
     }
@@ -367,7 +367,7 @@ public:
      *    this.extractFieldsUnDotted({a : 1 , c : 1}) -> {"" : 4 , "" : 6 }
      *    this.extractFieldsUnDotted({b : "blah"}) -> {"" : 5}
      *
-    */
+     */
     BSONObj extractFieldsUnDotted(const BSONObj& pattern) const;
 
     BSONObj filterFieldsUndotted(const BSONObj& filter, bool inFilter) const;
@@ -696,7 +696,7 @@ private:
 class BSONObjIterator {
 public:
     /** Create an iterator for a BSON object.
-    */
+     */
     explicit BSONObjIterator(const BSONObj& jso) {
         int sz = jso.objsize();
         if (MONGO_unlikely(sz == 0)) {
@@ -789,7 +789,7 @@ protected:
 
 private:
     const int _nfields;
-    const std::unique_ptr<const char* []> _fields;
+    const std::unique_ptr<const char*[]> _fields;
     int _cur;
 };
 

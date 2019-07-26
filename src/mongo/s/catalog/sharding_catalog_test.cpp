@@ -67,8 +67,8 @@ using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using executor::TaskExecutor;
-using rpc::ReplSetMetadata;
 using repl::OpTime;
+using rpc::ReplSetMetadata;
 using std::vector;
 using unittest::assertGet;
 
@@ -101,7 +101,6 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
 
     onFindWithMetadataCommand(
         [this, &expectedColl, newOpTime](const RemoteCommandRequest& request) {
-
             ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
@@ -599,10 +598,8 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandSuccess) {
                                << "writeConcern"
                                << BSON("w"
                                        << "majority"
-                                       << "wtimeout"
-                                       << 0)
-                               << "maxTimeMS"
-                               << 30000),
+                                       << "wtimeout" << 0)
+                               << "maxTimeMS" << 30000),
                           request.cmdObj);
 
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
@@ -622,14 +619,14 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandInvalidWriteConce
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONObjBuilder responseBuilder;
-    bool ok = catalogClient()->runUserManagementWriteCommand(operationContext(),
-                                                             "dropUser",
-                                                             "test",
-                                                             BSON("dropUser"
-                                                                  << "test"
-                                                                  << "writeConcern"
-                                                                  << BSON("w" << 2)),
-                                                             &responseBuilder);
+    bool ok =
+        catalogClient()->runUserManagementWriteCommand(operationContext(),
+                                                       "dropUser",
+                                                       "test",
+                                                       BSON("dropUser"
+                                                            << "test"
+                                                            << "writeConcern" << BSON("w" << 2)),
+                                                       &responseBuilder);
     ASSERT_FALSE(ok);
 
     Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
@@ -648,22 +645,23 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConce
         },
         Status::OK());
 
-    auto future = launchAsync([this] {
-        BSONObjBuilder responseBuilder;
-        bool ok = catalogClient()->runUserManagementWriteCommand(operationContext(),
-                                                                 "dropUser",
-                                                                 "test",
-                                                                 BSON("dropUser"
-                                                                      << "test"
-                                                                      << "writeConcern"
-                                                                      << BSON("w" << 1 << "wtimeout"
-                                                                                  << 30)),
-                                                                 &responseBuilder);
-        ASSERT_FALSE(ok);
+    auto future =
+        launchAsync([this] {
+            BSONObjBuilder responseBuilder;
+            bool ok =
+                catalogClient()->runUserManagementWriteCommand(
+                    operationContext(),
+                    "dropUser",
+                    "test",
+                    BSON("dropUser"
+                         << "test"
+                         << "writeConcern" << BSON("w" << 1 << "wtimeout" << 30)),
+                    &responseBuilder);
+            ASSERT_FALSE(ok);
 
-        Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
-        ASSERT_EQUALS(ErrorCodes::UserNotFound, commandStatus);
-    });
+            Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
+            ASSERT_EQUALS(ErrorCodes::UserNotFound, commandStatus);
+        });
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("test", request.dbname);
@@ -672,10 +670,8 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConce
                                << "writeConcern"
                                << BSON("w"
                                        << "majority"
-                                       << "wtimeout"
-                                       << 30)
-                               << "maxTimeMS"
-                               << 30000),
+                                       << "wtimeout" << 30)
+                               << "maxTimeMS" << 30000),
                           request.cmdObj);
 
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
@@ -763,10 +759,8 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMasterRetrySuc
                                << "writeConcern"
                                << BSON("w"
                                        << "majority"
-                                       << "wtimeout"
-                                       << 0)
-                               << "maxTimeMS"
-                               << 30000),
+                                       << "wtimeout" << 0)
+                               << "maxTimeMS" << 30000),
                           request.cmdObj);
 
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
@@ -801,7 +795,6 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
     auto future = launchAsync([this, newOpTime] {
-
         OpTime opTime;
         const auto& collections =
             assertGet(catalogClient()->getCollections(operationContext(), nullptr, &opTime));
@@ -1202,8 +1195,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessful) {
         ASSERT_EQUALS("config", request.dbname);
         ASSERT_BSONOBJ_EQ(BSON("w"
                                << "majority"
-                               << "wtimeout"
-                               << 60000),
+                               << "wtimeout" << 60000),
                           request.cmdObj["writeConcern"].Obj());
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));

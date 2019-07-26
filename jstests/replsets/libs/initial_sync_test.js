@@ -173,7 +173,6 @@ function InitialSyncTest(name = "InitialSyncTest", replSet, timeout) {
                 return true;
             }
             return hasCompletedInitialSync();
-
         }, "initial sync did not pause or complete");
     }
 

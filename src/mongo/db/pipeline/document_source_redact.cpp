@@ -161,8 +161,7 @@ boost::optional<Document> DocumentSourceRedact::redactObject(const Document& roo
         uasserted(17053,
                   str::stream() << "$redact's expression should not return anything "
                                 << "aside from the variables $$KEEP, $$DESCEND, and "
-                                << "$$PRUNE, but returned "
-                                << expressionResult.toString());
+                                << "$$PRUNE, but returned " << expressionResult.toString());
     }
 }
 
@@ -196,4 +195,4 @@ intrusive_ptr<DocumentSource> DocumentSourceRedact::createFromBson(
 
     return source;
 }
-}
+}  // namespace mongo

@@ -112,12 +112,12 @@ TEST(AlarmRunner, BasicTest) {
 
     AtomicWord<bool> future2Filled{false};
     auto pf = makePromiseFuture<void>();
-    std::move(alarm2.future).getAsync([&future2Filled,
-                                       promise = std::move(pf.promise) ](Status status) mutable {
-        ASSERT_OK(status);
-        future2Filled.store(true);
-        promise.emplaceValue();
-    });
+    std::move(alarm2.future)
+        .getAsync([&future2Filled, promise = std::move(pf.promise)](Status status) mutable {
+            ASSERT_OK(status);
+            future2Filled.store(true);
+            promise.emplaceValue();
+        });
 
     clockSource->advance(Milliseconds(11));
 

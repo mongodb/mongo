@@ -75,9 +75,9 @@
 namespace mongo {
 
 using CollectionUUID = UUID;
+using std::set;
 using std::string;
 using std::vector;
-using std::set;
 
 namespace {
 
@@ -113,8 +113,8 @@ boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
     // TODO: SERVER-33048 check idIndex field
 
     uassert(ErrorCodes::NamespaceExists,
-            str::stream() << "ns: " << ns.ns() << " already exists with different options: "
-                          << actualOptions.toBSON(),
+            str::stream() << "ns: " << ns.ns()
+                          << " already exists with different options: " << actualOptions.toBSON(),
             options.matchesStorageOptions(
                 actualOptions, CollatorFactoryInterface::get(opCtx->getServiceContext())));
 
@@ -170,8 +170,7 @@ void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss)
             str::stream() << "A previous attempt to shard collection " << nss.ns()
                           << " failed after writing some initial chunks to config.chunks. Please "
                              "manually delete the partially written chunks for collection "
-                          << nss.ns()
-                          << " from config.chunks",
+                          << nss.ns() << " from config.chunks",
             numChunks == 0);
 }
 
@@ -432,7 +431,7 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                                                            optimizationType,
                                                            treatAsEmpty,
                                                            1  // numContiguousChunksPerShard
-                                                           );
+            );
     } else {
         initialChunks = InitialSplitPolicy::createFirstChunksUnoptimized(
             opCtx, nss, fieldsAndOrder, dbPrimaryShardId);

@@ -247,10 +247,8 @@ TEST_F(DocumentSourceGraphLookUpTest,
         ASSERT(next.isEOF());
     } else {
         FAIL(str::stream() << "Expected either [ " << to0from1.toString() << " ] or [ "
-                           << to0from2.toString()
-                           << " ] but found [ "
-                           << next.getDocument().toString()
-                           << " ]");
+                           << to0from2.toString() << " ] but found [ "
+                           << next.getDocument().toString() << " ]");
     }
 }
 

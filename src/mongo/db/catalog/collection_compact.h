@@ -35,9 +35,9 @@
 namespace mongo {
 
 /**
-  * Compacts collection.
-  * See record_store.h for CompactStats and CompactOptions definitions.
-  */
+ * Compacts collection.
+ * See record_store.h for CompactStats and CompactOptions definitions.
+ */
 StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
                                            const NamespaceString& collectionNss,
                                            const CompactOptions* options);

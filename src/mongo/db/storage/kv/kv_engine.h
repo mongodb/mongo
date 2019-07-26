@@ -438,4 +438,4 @@ protected:
      */
     const int64_t kDefaultCappedSizeBytes = 4096;
 };
-}
+}  // namespace mongo

@@ -90,12 +90,10 @@ TEST(ExtractBSON, ExtractStringFieldWithDefault) {
 TEST(ExtractBSON, ExtractBooleanFieldWithDefault) {
     BSONObj obj1 = BSON("a" << 1 << "b"
                             << "hello"
-                            << "c"
-                            << true);
+                            << "c" << true);
     BSONObj obj2 = BSON("a" << 0 << "b"
                             << "hello"
-                            << "c"
-                            << false);
+                            << "c" << false);
     bool b;
     b = false;
     ASSERT_OK(bsonExtractBooleanFieldWithDefault(obj1, "a", false, &b));

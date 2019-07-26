@@ -25,7 +25,6 @@ load('jstests/concurrency/fsm_workloads/secondary_reads.js');  // for $config
  * @tags: [creates_background_indexes, requires_replication, uses_write_concern]
  */
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.states.buildIndex = function buildIndex(db, collName) {
         if (this.isWriterThread(this.tid)) {
             this.insertDocuments(db, this.collName);

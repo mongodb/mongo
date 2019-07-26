@@ -19,31 +19,31 @@
  * @tags: [requires_persistence]
  */
 (function() {
-    'use strict';
-    load("jstests/replsets/rslib.js");
+'use strict';
+load("jstests/replsets/rslib.js");
 
-    var st = new ShardingTest({shards: 1, rs: {oplogSize: 10}});
-    var replTest = st.rs0;
+var st = new ShardingTest({shards: 1, rs: {oplogSize: 10}});
+var replTest = st.rs0;
 
-    assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
-    assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
+assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
 
-    // The cluster now has the shard information. Then kill the replica set so when mongos restarts
-    // and tries to create a ReplSetMonitor for that shard, it will not be able to connect to any of
-    // the seed servers.
-    // Don't clear the data directory so that the shardIdentity is not deleted.
-    replTest.stopSet(undefined /* send default signal */, true /* don't clear data directory */);
+// The cluster now has the shard information. Then kill the replica set so when mongos restarts
+// and tries to create a ReplSetMonitor for that shard, it will not be able to connect to any of
+// the seed servers.
+// Don't clear the data directory so that the shardIdentity is not deleted.
+replTest.stopSet(undefined /* send default signal */, true /* don't clear data directory */);
 
-    st.restartMongos(0);
+st.restartMongos(0);
 
-    replTest.startSet({restart: true, noCleanData: true});
-    replTest.awaitSecondaryNodes();
+replTest.startSet({restart: true, noCleanData: true});
+replTest.awaitSecondaryNodes();
 
-    // Verify that the replSetMonitor can reach the restarted set
-    awaitRSClientHosts(st.s0, replTest.nodes, {ok: true});
-    replTest.awaitNodesAgreeOnPrimary();
+// Verify that the replSetMonitor can reach the restarted set
+awaitRSClientHosts(st.s0, replTest.nodes, {ok: true});
+replTest.awaitNodesAgreeOnPrimary();
 
-    assert.writeOK(st.s0.getDB('test').user.insert({x: 1}));
+assert.writeOK(st.s0.getDB('test').user.insert({x: 1}));
 
-    st.stop();
+st.stop();
 })();

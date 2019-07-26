@@ -93,7 +93,7 @@ void PeriodicThreadToDecreaseSnapshotHistoryCachePressure::_init(ServiceContext*
     _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 
     SnapshotWindowParams::observeCheckCachePressurePeriodSeconds.addObserver([anchor = _anchor](
-        const auto& secs) {
+                                                                                 const auto& secs) {
         try {
             anchor->setPeriod(Seconds(secs));
         } catch (const DBException& ex) {

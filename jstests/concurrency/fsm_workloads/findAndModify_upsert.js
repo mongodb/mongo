@@ -9,11 +9,9 @@
  * $push operator.
  */
 var $config = (function() {
-
     var data = {sort: false, shardKey: {tid: 1}};
 
     var states = (function() {
-
         // Returns true if the specified array is sorted in ascending order,
         // and false otherwise.
         function isSorted(arr) {
@@ -101,7 +99,6 @@ var $config = (function() {
         }
 
         return {init: init, upsert: upsert, update: update};
-
     })();
 
     var transitions = {
@@ -111,5 +108,4 @@ var $config = (function() {
     };
 
     return {threadCount: 20, iterations: 20, data: data, states: states, transitions: transitions};
-
 })();

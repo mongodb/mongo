@@ -55,10 +55,10 @@ using namespace mongo::repl;
 
 namespace ReplTests {
 
-using std::unique_ptr;
 using std::endl;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 using std::vector;
 
 /**

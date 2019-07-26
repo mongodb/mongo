@@ -90,4 +90,4 @@ TEST(MaxConnsOverride, UNIXPaths) {
 #endif
 
 }  // namespace
-}  // namespace
+}  // namespace mongo

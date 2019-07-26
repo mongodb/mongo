@@ -46,16 +46,13 @@ namespace mongo {
 namespace logv2 {
 
 // Custom logging source that automatically add our set of attributes
-class LogSource
-    : public boost::log::sources::basic_logger<char,
-                                               LogSource,
-                                               boost::log::sources::single_thread_model> {
+class LogSource : public boost::log::sources::
+                      basic_logger<char, LogSource, boost::log::sources::single_thread_model> {
 private:
 private:
-    typedef boost::log::sources::basic_logger<char,
-                                              LogSource,
-                                              boost::log::sources::single_thread_model>
-        base_type;
+    typedef boost::log::sources::
+        basic_logger<char, LogSource, boost::log::sources::single_thread_model>
+            base_type;
 
 public:
     LogSource() : LogSource(boost::log::core::get()) {}

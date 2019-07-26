@@ -42,10 +42,10 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 
-using std::unique_ptr;
+using mongo::unittest::assertGet;
 using std::list;
 using std::string;
-using mongo::unittest::assertGet;
+using std::unique_ptr;
 
 namespace RollbackTests {
 

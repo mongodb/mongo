@@ -66,9 +66,9 @@
 
 namespace QueryStageUpdate {
 
+using std::make_unique;
 using std::unique_ptr;
 using std::vector;
-using std::make_unique;
 
 static const NamespaceString nss("unittests.QueryStageUpdate");
 

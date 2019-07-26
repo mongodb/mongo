@@ -35,8 +35,8 @@
 namespace mongo {
 
 /**
-* Free Moniting Command line choices
-*/
+ * Free Moniting Command line choices
+ */
 enum class EnableCloudStateEnum : std::int32_t {
     kOn,
     kOff,

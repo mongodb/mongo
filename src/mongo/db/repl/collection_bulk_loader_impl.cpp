@@ -76,42 +76,41 @@ CollectionBulkLoaderImpl::~CollectionBulkLoaderImpl() {
 }
 
 Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndexSpecs) {
-    return _runTaskReleaseResourcesOnFailure(
-        [ coll = _autoColl->getCollection(), &secondaryIndexSpecs, this ]()->Status {
-            // All writes in CollectionBulkLoaderImpl should be unreplicated.
-            // The opCtx is accessed indirectly through _secondaryIndexesBlock.
-            UnreplicatedWritesBlock uwb(_opCtx.get());
-            // This enforces the buildIndexes setting in the replica set configuration.
-            auto indexCatalog = coll->getIndexCatalog();
-            auto specs =
-                indexCatalog->removeExistingIndexesNoChecks(_opCtx.get(), secondaryIndexSpecs);
-            if (specs.size()) {
-                _secondaryIndexesBlock->ignoreUniqueConstraint();
-                auto status =
-                    _secondaryIndexesBlock
-                        ->init(_opCtx.get(), _collection, specs, MultiIndexBlock::kNoopOnInitFn)
-                        .getStatus();
-                if (!status.isOK()) {
-                    return status;
-                }
-            } else {
-                _secondaryIndexesBlock.reset();
+    return _runTaskReleaseResourcesOnFailure([coll = _autoColl->getCollection(),
+                                              &secondaryIndexSpecs,
+                                              this]() -> Status {
+        // All writes in CollectionBulkLoaderImpl should be unreplicated.
+        // The opCtx is accessed indirectly through _secondaryIndexesBlock.
+        UnreplicatedWritesBlock uwb(_opCtx.get());
+        // This enforces the buildIndexes setting in the replica set configuration.
+        auto indexCatalog = coll->getIndexCatalog();
+        auto specs = indexCatalog->removeExistingIndexesNoChecks(_opCtx.get(), secondaryIndexSpecs);
+        if (specs.size()) {
+            _secondaryIndexesBlock->ignoreUniqueConstraint();
+            auto status =
+                _secondaryIndexesBlock
+                    ->init(_opCtx.get(), _collection, specs, MultiIndexBlock::kNoopOnInitFn)
+                    .getStatus();
+            if (!status.isOK()) {
+                return status;
             }
-            if (!_idIndexSpec.isEmpty()) {
-                auto status =
-                    _idIndexBlock
-                        ->init(
-                            _opCtx.get(), _collection, _idIndexSpec, MultiIndexBlock::kNoopOnInitFn)
-                        .getStatus();
-                if (!status.isOK()) {
-                    return status;
-                }
-            } else {
-                _idIndexBlock.reset();
+        } else {
+            _secondaryIndexesBlock.reset();
+        }
+        if (!_idIndexSpec.isEmpty()) {
+            auto status =
+                _idIndexBlock
+                    ->init(_opCtx.get(), _collection, _idIndexSpec, MultiIndexBlock::kNoopOnInitFn)
+                    .getStatus();
+            if (!status.isOK()) {
+                return status;
             }
+        } else {
+            _idIndexBlock.reset();
+        }
 
-            return Status::OK();
-        });
+        return Status::OK();
+    });
 }
 
 Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(

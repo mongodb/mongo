@@ -121,7 +121,7 @@ public:
     DiagnosticInfo::StackFrame getFrame(void* instructionPtr) const {
         auto it = --_map.upper_bound(instructionPtr);
 
-        auto & [ objectPtr, frame ] = *it;
+        auto& [objectPtr, frame] = *it;
         ptrdiff_t instructionOffset =
             static_cast<char*>(instructionPtr) - static_cast<char*>(objectPtr);
         return DiagnosticInfo::StackFrame{

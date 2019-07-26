@@ -58,4 +58,4 @@ Status userAllowedWriteNS(const NamespaceString& ns);
  * operations.  If not, returns an error Status.
  */
 Status userAllowedCreateNS(StringData db, StringData coll);
-}
+}  // namespace mongo

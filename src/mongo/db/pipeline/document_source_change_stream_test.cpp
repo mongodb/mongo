@@ -62,8 +62,8 @@ namespace mongo {
 namespace {
 
 using boost::intrusive_ptr;
-using repl::OpTypeEnum;
 using repl::OplogEntry;
+using repl::OpTypeEnum;
 using std::list;
 using std::string;
 using std::vector;
@@ -423,8 +423,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfter
             BSON(DSChangeStream::kStageName
                  << BSON("resumeAfter"
                          << makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1))
-                         << "startAtOperationTime"
-                         << kDefaultTs))
+                         << "startAtOperationTime" << kDefaultTs))
                 .firstElement(),
             expCtx),
         AssertionException,
@@ -467,8 +466,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndStartAfterO
             BSON(DSChangeStream::kStageName
                  << BSON("startAfter"
                          << makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1))
-                         << "startAtOperationTime"
-                         << kDefaultTs))
+                         << "startAtOperationTime" << kDefaultTs))
                 .firstElement(),
             expCtx),
         AssertionException,
@@ -629,7 +627,8 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
         {
-            "updateDescription", D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
+            "updateDescription",
+            D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
         },
     };
     checkTransformation(updateField, expectedUpdateField);
@@ -655,7 +654,8 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFieldsLegacyNoId) {
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"x", 1}, {"y", 1}}},
         {
-            "updateDescription", D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
+            "updateDescription",
+            D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
         },
     };
     checkTransformation(updateField, expectedUpdateField);
@@ -679,7 +679,8 @@ TEST_F(ChangeStreamStageTest, TransformRemoveFields) {
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{{"_id", 1}, {"x", 2}}}},
         {
-            "updateDescription", D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("y"_sd)}}},
+            "updateDescription",
+            D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("y"_sd)}}},
         }};
     checkTransformation(removeField, expectedRemoveField);
 }
@@ -1374,7 +1375,8 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
         {
-            "updateDescription", D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
+            "updateDescription",
+            D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
         },
     };
     checkTransformation(updateField, expectedUpdateField);
@@ -1659,9 +1661,9 @@ TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
                         ResumeTokenData::FromInvalidate::kFromInvalidate);
 
     ASSERT_THROWS_CODE(DSChangeStream::createFromBson(
-                           BSON(DSChangeStream::kStageName << BSON(
-                                    "resumeAfter" << resumeTokenInvalidate << "startAtOperationTime"
-                                                  << kDefaultTs))
+                           BSON(DSChangeStream::kStageName
+                                << BSON("resumeAfter" << resumeTokenInvalidate
+                                                      << "startAtOperationTime" << kDefaultTs))
                                .firstElement(),
                            expCtx),
                        AssertionException,
@@ -1826,7 +1828,8 @@ TEST_F(ChangeStreamStageDBTest, TransformRemoveFields) {
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{{"_id", 1}, {"x", 2}}}},
         {
-            "updateDescription", D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("y"_sd)}}},
+            "updateDescription",
+            D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("y"_sd)}}},
         }};
     checkTransformation(removeField, expectedRemoveField);
 }

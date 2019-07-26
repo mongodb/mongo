@@ -149,8 +149,8 @@ public:
             } catch (const std::exception& e) {
                 scopedMigration.signalComplete(
                     {ErrorCodes::InternalError,
-                     str::stream() << "Severe error occurred while running moveChunk command: "
-                                   << e.what()});
+                     str::stream()
+                         << "Severe error occurred while running moveChunk command: " << e.what()});
                 throw;
             }
 

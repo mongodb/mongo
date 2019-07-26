@@ -342,8 +342,7 @@ void _logOpsInner(OperationContext* opCtx,
                 // are logging within one WriteUnitOfWork.
                 invariant(finalOpTime.getTimestamp() <= *commitTime,
                           str::stream() << "Final OpTime: " << finalOpTime.toString()
-                                        << ". Commit Time: "
-                                        << commitTime->toString());
+                                        << ". Commit Time: " << commitTime->toString());
             }
 
             // Optionally hang before advancing lastApplied.
@@ -397,7 +396,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     // again. For example, if the WUOW gets aborted within a writeConflictRetry loop, we need to
     // reset the OpTime to null so a new OpTime will be assigned on retry.
     OplogSlot slot = oplogEntry->getOpTime();
-    auto resetOpTimeGuard = makeGuard([&, resetOpTimeOnExit = bool(slot.isNull()) ] {
+    auto resetOpTimeGuard = makeGuard([&, resetOpTimeOnExit = bool(slot.isNull())] {
         if (resetOpTimeOnExit)
             oplogEntry->setOpTime(OplogSlot());
     });
@@ -540,7 +539,7 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
         LOG(3) << "32bit system; choosing " << sz << " bytes oplog";
         return sz;
     }
-// First choose a minimum size.
+    // First choose a minimum size.
 
 #if defined(__APPLE__)
     // typically these are desktops (dev machines), so keep it smallish
@@ -670,8 +669,7 @@ std::pair<OptionalCollectionUUID, NamespaceString> parseCollModUUIDAndNss(Operat
     const auto nsByUUID = catalog.lookupNSSByUUID(uuid);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to apply operation due to missing collection (" << uuid
-                          << "): "
-                          << redact(cmd.toString()),
+                          << "): " << redact(cmd.toString()),
             nsByUUID);
     return std::pair<OptionalCollectionUUID, NamespaceString>(uuid, *nsByUUID);
 }
@@ -1225,8 +1223,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         collection = catalog.lookupCollectionByUUID(uuid);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply operation due to missing collection (" << uuid
-                              << "): "
-                              << redact(op.toString()),
+                              << "): " << redact(op.toString()),
                 collection);
         requestNss = collection->ns();
         dassert(opCtx->lockState()->isCollectionLockedForMode(

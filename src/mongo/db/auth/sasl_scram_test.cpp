@@ -63,16 +63,10 @@ BSONObj generateSCRAMUserDocument(StringData username, StringData password) {
     const auto sha256Cred =
         scram::Secrets<SHA256Block>::generateCredentials(password.toString(), 15000);
     return BSON("_id" << (str::stream() << database << "." << username).operator StringData()
-                      << AuthorizationManager::USER_NAME_FIELD_NAME
-                      << username
-                      << AuthorizationManager::USER_DB_FIELD_NAME
-                      << database
-                      << "credentials"
-                      << BSON("SCRAM-SHA-1" << sha1Cred << "SCRAM-SHA-256" << sha256Cred)
-                      << "roles"
-                      << BSONArray()
-                      << "privileges"
-                      << BSONArray());
+                      << AuthorizationManager::USER_NAME_FIELD_NAME << username
+                      << AuthorizationManager::USER_DB_FIELD_NAME << database << "credentials"
+                      << BSON("SCRAM-SHA-1" << sha1Cred << "SCRAM-SHA-256" << sha256Cred) << "roles"
+                      << BSONArray() << "privileges" << BSONArray());
 }
 
 std::string corruptEncodedPayload(const std::string& message,
@@ -303,7 +297,6 @@ TEST_F(SCRAMFixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
         std::string::iterator nonceBegin = serverMessage.begin() + serverMessage.find("r=");
         std::string::iterator nonceEnd = std::find(nonceBegin, serverMessage.end(), ',');
         serverMessage = serverMessage.replace(nonceBegin, nonceEnd, "r=");
-
     });
     ASSERT_EQ(
         SCRAMStepsResult(SaslTestState(SaslTestState::kClient, 2),
@@ -349,7 +342,6 @@ TEST_F(SCRAMFixture, testClientStep2GivesBadProof) {
         std::string::iterator proofEnd = std::find(proofBegin, clientMessage.end(), ',');
         clientMessage = clientMessage.replace(
             proofBegin, proofEnd, corruptEncodedPayload(clientMessage, proofBegin, proofEnd));
-
     });
 
     ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 2),
@@ -379,7 +371,6 @@ TEST_F(SCRAMFixture, testServerStep2GivesBadVerifier) {
             encodedVerifier = corruptEncodedPayload(serverMessage, verifierBegin, verifierEnd);
 
             serverMessage = serverMessage.replace(verifierBegin, verifierEnd, encodedVerifier);
-
         });
 
     auto result = runSteps(mutator);

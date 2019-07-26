@@ -94,4 +94,4 @@ private:
  * Captures the diagnostic information based on the caller's context.
  */
 DiagnosticInfo takeDiagnosticInfo(const StringData& captureName);
-}  // namespace monogo
+}  // namespace mongo

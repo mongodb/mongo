@@ -155,4 +155,4 @@ TEST(UnownedPtr, Equality) {
     ASSERT_NE(unowned_ptr<int>(), unowned_ptr<int>(&i));    // NULL != non-NULL
     ASSERT_NE(unowned_ptr<int>(&i), unowned_ptr<int>(&j));  // two distinct non-NULLs
 }
-}
+}  // namespace mongo

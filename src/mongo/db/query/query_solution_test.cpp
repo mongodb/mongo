@@ -728,8 +728,7 @@ auto createMatchExprAndParsedProjection(const BSONObj& query, const BSONObj& pro
         ParsedProjection::make(opCtx.get(), projObj, queryMatchExpr.getValue().get(), &out);
     if (!status.isOK()) {
         FAIL(str::stream() << "failed to parse projection " << projObj << " (query: " << query
-                           << "): "
-                           << status.toString());
+                           << "): " << status.toString());
     }
     ASSERT(out);
     return std::make_pair(std::move(queryMatchExpr.getValue()),

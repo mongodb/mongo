@@ -48,78 +48,74 @@ assert.commandFailed(
 
 // Set multiple component log levels at once.
 (function() {
-    assert.commandWorked(db.adminCommand({
-        "setParameter": 1,
-        logComponentVerbosity: {
-            verbosity: 2,
-            accessControl: {verbosity: 0},
-            storage: {verbosity: 3, journal: {verbosity: 5}}
-        }
-    }));
+assert.commandWorked(db.adminCommand({
+    "setParameter": 1,
+    logComponentVerbosity: {
+        verbosity: 2,
+        accessControl: {verbosity: 0},
+        storage: {verbosity: 3, journal: {verbosity: 5}}
+    }
+}));
 
-    var result =
-        assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
-            .logComponentVerbosity;
+var result = assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
+                 .logComponentVerbosity;
 
-    assert.eq(2, result.verbosity);
-    assert.eq(0, result.accessControl.verbosity);
-    assert.eq(3, result.storage.verbosity);
-    assert.eq(5, result.storage.journal.verbosity);
+assert.eq(2, result.verbosity);
+assert.eq(0, result.accessControl.verbosity);
+assert.eq(3, result.storage.verbosity);
+assert.eq(5, result.storage.journal.verbosity);
 })();
 
 // Set multiple component log levels at once.
 // Unrecognized field names not mapping to a log component shall be rejected
 // No changes shall apply.
 (function() {
-    assert.commandFailed(db.adminCommand({
-        "setParameter": 1,
-        logComponentVerbosity: {
-            verbosity: 6,
-            accessControl: {verbosity: 5},
-            storage: {verbosity: 4, journal: {verbosity: 6}},
-            NoSuchComponent: {verbosity: 2},
-            extraField: 123
-        }
-    }));
+assert.commandFailed(db.adminCommand({
+    "setParameter": 1,
+    logComponentVerbosity: {
+        verbosity: 6,
+        accessControl: {verbosity: 5},
+        storage: {verbosity: 4, journal: {verbosity: 6}},
+        NoSuchComponent: {verbosity: 2},
+        extraField: 123
+    }
+}));
 
-    var result =
-        assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
-            .logComponentVerbosity;
+var result = assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
+                 .logComponentVerbosity;
 
-    assert.eq(2, result.verbosity);
-    assert.eq(0, result.accessControl.verbosity);
-    assert.eq(3, result.storage.verbosity);
-    assert.eq(5, result.storage.journal.verbosity);
+assert.eq(2, result.verbosity);
+assert.eq(0, result.accessControl.verbosity);
+assert.eq(3, result.storage.verbosity);
+assert.eq(5, result.storage.journal.verbosity);
 })();
 
 // Clear verbosity for default and journal.
 (function() {
-    assert.commandWorked(db.adminCommand({
-        "setParameter": 1,
-        logComponentVerbosity: {verbosity: -1, storage: {journal: {verbosity: -1}}}
-    }));
+assert.commandWorked(db.adminCommand({
+    "setParameter": 1,
+    logComponentVerbosity: {verbosity: -1, storage: {journal: {verbosity: -1}}}
+}));
 
-    var result =
-        assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
-            .logComponentVerbosity;
+var result = assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
+                 .logComponentVerbosity;
 
-    assert.eq(0, result.verbosity);
-    assert.eq(0, result.accessControl.verbosity);
-    assert.eq(3, result.storage.verbosity);
-    assert.eq(-1, result.storage.journal.verbosity);
+assert.eq(0, result.verbosity);
+assert.eq(0, result.accessControl.verbosity);
+assert.eq(3, result.storage.verbosity);
+assert.eq(-1, result.storage.journal.verbosity);
 })();
 
 // Set accessControl verbosity using numerical level instead of
 // subdocument with 'verbosity' field.
 (function() {
-    assert.commandWorked(
-        db.adminCommand({"setParameter": 1, logComponentVerbosity: {accessControl: 5}}));
+assert.commandWorked(
+    db.adminCommand({"setParameter": 1, logComponentVerbosity: {accessControl: 5}}));
 
-    var result =
-        assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
-            .logComponentVerbosity;
+var result = assert.commandWorked(db.adminCommand({"getParameter": 1, logComponentVerbosity: 1}))
+                 .logComponentVerbosity;
 
-    assert.eq(5, result.accessControl.verbosity);
+assert.eq(5, result.accessControl.verbosity);
 })();
 
 // Restore old verbosity values.

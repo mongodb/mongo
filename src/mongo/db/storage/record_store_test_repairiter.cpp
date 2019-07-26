@@ -40,10 +40,10 @@
 namespace mongo {
 namespace {
 
-using std::unique_ptr;
 using std::set;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 
 // Create an iterator for repairing an empty record store.
 TEST(RecordStoreTestHarness, GetIteratorForRepairEmpty) {

@@ -49,9 +49,9 @@
 
 namespace mongo {
 
-using std::shared_ptr;
 using std::map;
 using std::set;
+using std::shared_ptr;
 using std::string;
 using std::vector;
 
@@ -566,10 +566,11 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
                         // shard or if we keep better track of chunks, we can actually add the skip
                         // value into the cursor and/or make some assumptions about the return value
                         // size ( (batch size + skip amount) / num_servers ).
-                        _qSpec.ntoreturn() == 0 ? 0 : (_qSpec.ntoreturn() > 0
-                                                           ? _qSpec.ntoreturn() + _qSpec.ntoskip()
-                                                           : _qSpec.ntoreturn() -
-                                                               _qSpec.ntoskip())));  // batchSize
+                        _qSpec.ntoreturn() == 0
+                            ? 0
+                            : (_qSpec.ntoreturn() > 0
+                                   ? _qSpec.ntoreturn() + _qSpec.ntoskip()
+                                   : _qSpec.ntoreturn() - _qSpec.ntoskip())));  // batchSize
                 } else {
                     // Single shard query
 
@@ -598,9 +599,9 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
 
                 // Without full initialization, throw an exception
                 uassert(15987,
-                        str::stream() << "could not fully initialize cursor on shard " << shardId
-                                      << ", current connection state is "
-                                      << mdata.toBSON().toString(),
+                        str::stream()
+                            << "could not fully initialize cursor on shard " << shardId
+                            << ", current connection state is " << mdata.toBSON().toString(),
                         success);
 
                 mdata.retryNext = false;
@@ -993,8 +994,7 @@ void ParallelSortClusteredCursor::_oldInit(OperationContext* opCtx) {
 
                 // Version is zero b/c this is deprecated codepath
                 staleConfigExs.push_back(str::stream() << "stale config detected for " << _ns
-                                                       << " in ParallelCursor::_init "
-                                                       << errLoc);
+                                                       << " in ParallelCursor::_init " << errLoc);
                 break;
             }
 
@@ -1056,8 +1056,8 @@ void ParallelSortClusteredCursor::_oldInit(OperationContext* opCtx) {
                     _cursors[i].reset(nullptr, nullptr);
 
                     if (!retry) {
-                        socketExs.push_back(str::stream() << "error querying server: "
-                                                          << servers[i]);
+                        socketExs.push_back(str::stream()
+                                            << "error querying server: " << servers[i]);
                         conns[i]->done();
                     } else {
                         retryQueries.insert(i);
@@ -1277,12 +1277,7 @@ void ParallelConnectionMetadata::cleanup(bool full) {
 
 BSONObj ParallelConnectionMetadata::toBSON() const {
     return BSON("state" << (pcState ? pcState->toBSON() : BSONObj()) << "retryNext" << retryNext
-                        << "init"
-                        << initialized
-                        << "finish"
-                        << finished
-                        << "errored"
-                        << errored);
+                        << "init" << initialized << "finish" << finished << "errored" << errored);
 }
 
 std::string ParallelConnectionState::toString() const {

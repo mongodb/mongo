@@ -77,16 +77,16 @@ TEST(Future, Success_semi_get) {
 }
 
 TEST(Future, Success_getAsync) {
-    FUTURE_SUCCESS_TEST(
-        [] { return 1; },
-        [](/*Future<int>*/ auto&& fut) {
-            auto pf = makePromiseFuture<int>();
-            std::move(fut).getAsync([outside = std::move(pf.promise)](StatusWith<int> sw) mutable {
-                ASSERT_OK(sw);
-                outside.emplaceValue(sw.getValue());
-            });
-            ASSERT_EQ(std::move(pf.future).get(), 1);
-        });
+    FUTURE_SUCCESS_TEST([] { return 1; },
+                        [](/*Future<int>*/ auto&& fut) {
+                            auto pf = makePromiseFuture<int>();
+                            std::move(fut).getAsync(
+                                [outside = std::move(pf.promise)](StatusWith<int> sw) mutable {
+                                    ASSERT_OK(sw);
+                                    outside.emplaceValue(sw.getValue());
+                                });
+                            ASSERT_EQ(std::move(pf.future).get(), 1);
+                        });
 }
 
 TEST(Future, Fail_getLvalue) {
@@ -144,7 +144,6 @@ TEST(Future, Success_isReady) {
                                 ASSERT_EQ(stdx::this_thread::get_id(), id);
                                 ASSERT_EQ(status, 1);
                             });
-
                         });
 }
 
@@ -157,7 +156,6 @@ TEST(Future, Fail_isReady) {
             ASSERT_EQ(stdx::this_thread::get_id(), id);
             ASSERT_NOT_OK(status);
         });
-
     });
 }
 

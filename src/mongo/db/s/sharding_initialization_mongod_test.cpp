@@ -183,18 +183,19 @@ TEST_F(ShardingInitializationMongoDTest, InitWhilePreviouslyInErrorStateWillStay
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(OID::gen());
 
-    shardingInitialization()->setGlobalInitMethodForTest([](
-        OperationContext* opCtx, const ShardIdentity& shardIdentity, StringData distLockProcessId) {
+    shardingInitialization()->setGlobalInitMethodForTest([](OperationContext* opCtx,
+                                                            const ShardIdentity& shardIdentity,
+                                                            StringData distLockProcessId) {
         uasserted(ErrorCodes::ShutdownInProgress, "Not an actual shutdown");
     });
 
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity);
 
     // ShardingState is now in error state, attempting to call it again will still result in error.
-    shardingInitialization()->setGlobalInitMethodForTest([](
-        OperationContext* opCtx, const ShardIdentity& shardIdentity, StringData distLockProcessId) {
-        FAIL("Should not be invoked!");
-    });
+    shardingInitialization()->setGlobalInitMethodForTest(
+        [](OperationContext* opCtx,
+           const ShardIdentity& shardIdentity,
+           StringData distLockProcessId) { FAIL("Should not be invoked!"); });
 
     ASSERT_THROWS_CODE(
         shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity),
@@ -223,10 +224,10 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingShardIdentit
     shardIdentity2.setShardName(kShardName);
     shardIdentity2.setClusterId(clusterID);
 
-    shardingInitialization()->setGlobalInitMethodForTest([](
-        OperationContext* opCtx, const ShardIdentity& shardIdentity, StringData distLockProcessId) {
-        FAIL("Should not be invoked!");
-    });
+    shardingInitialization()->setGlobalInitMethodForTest(
+        [](OperationContext* opCtx,
+           const ShardIdentity& shardIdentity,
+           StringData distLockProcessId) { FAIL("Should not be invoked!"); });
 
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity2);
 
@@ -256,10 +257,10 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingReplSetNameS
     shardIdentity2.setShardName(kShardName);
     shardIdentity2.setClusterId(clusterID);
 
-    shardingInitialization()->setGlobalInitMethodForTest([](
-        OperationContext* opCtx, const ShardIdentity& shardIdentity, StringData distLockProcessId) {
-        FAIL("Should not be invoked!");
-    });
+    shardingInitialization()->setGlobalInitMethodForTest(
+        [](OperationContext* opCtx,
+           const ShardIdentity& shardIdentity,
+           StringData distLockProcessId) { FAIL("Should not be invoked!"); });
 
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity2);
 
@@ -291,13 +292,9 @@ TEST_F(ShardingInitializationMongoDTest,
     storageGlobalParams.readOnly = true;
     serverGlobalParams.overrideShardIdentity =
         BSON("_id"
-             << "shardIdentity"
-             << ShardIdentity::kShardNameFieldName
-             << kShardName
-             << ShardIdentity::kClusterIdFieldName
-             << OID::gen()
-             << ShardIdentity::kConfigsvrConnectionStringFieldName
-             << "invalid");
+             << "shardIdentity" << ShardIdentity::kShardNameFieldName << kShardName
+             << ShardIdentity::kClusterIdFieldName << OID::gen()
+             << ShardIdentity::kConfigsvrConnectionStringFieldName << "invalid");
 
     ASSERT_THROWS_CODE(
         shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()),
@@ -436,10 +433,8 @@ TEST_F(ShardingInitializationMongoDTest,
         ScopedSetStandaloneMode standalone(getServiceContext());
 
         BSONObj invalidShardIdentity = BSON("_id"
-                                            << "shardIdentity"
-                                            << ShardIdentity::kShardNameFieldName
-                                            << kShardName
-                                            << ShardIdentity::kClusterIdFieldName
+                                            << "shardIdentity" << ShardIdentity::kShardNameFieldName
+                                            << kShardName << ShardIdentity::kClusterIdFieldName
                                             << OID::gen()
                                             << ShardIdentity::kConfigsvrConnectionStringFieldName
                                             << "invalid");

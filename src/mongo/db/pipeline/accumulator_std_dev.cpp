@@ -118,4 +118,4 @@ void AccumulatorStdDev::reset() {
     _mean = 0;
     _m2 = 0;
 }
-}
+}  // namespace mongo

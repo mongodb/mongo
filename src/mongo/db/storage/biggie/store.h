@@ -153,10 +153,10 @@ public:
             : _root(root), _current(current) {}
 
         /**
-        * This function traverses the tree to find the next left-most node with data. Modifies
-        * '_current' to point to this node. It uses a pre-order traversal ('visit' the current
-        * node itself then 'visit' the child subtrees from left to right).
-        */
+         * This function traverses the tree to find the next left-most node with data. Modifies
+         * '_current' to point to this node. It uses a pre-order traversal ('visit' the current
+         * node itself then 'visit' the child subtrees from left to right).
+         */
         void _findNext() {
             // If 'current' is a nullptr there is no next node to go to.
             if (_current == nullptr)

@@ -72,7 +72,7 @@ private:
         BSONObjBuilder bob;
         {
             BSONObjBuilder subBuilder(bob.subobjStart(""));
-            for (const auto[bitOperator, operand] : _opList) {
+            for (const auto [bitOperator, operand] : _opList) {
                 operand.toBSON(
                     [](SafeNum (SafeNum::*bitOperator)(const SafeNum&) const) {
                         if (bitOperator == &SafeNum::bitAnd)

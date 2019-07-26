@@ -74,4 +74,4 @@ intrusive_ptr<Accumulator> AccumulatorFirst::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return new AccumulatorFirst(expCtx);
 }
-}
+}  // namespace mongo

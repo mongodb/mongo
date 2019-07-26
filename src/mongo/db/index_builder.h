@@ -114,4 +114,4 @@ private:
     std::string _name;  // name of this builder, not related to the index
     static AtomicWord<unsigned> _indexBuildCount;
 };
-}
+}  // namespace mongo

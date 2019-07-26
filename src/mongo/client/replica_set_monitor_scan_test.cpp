@@ -60,16 +60,12 @@ TEST_F(CoreScanTest, CheckAllSeedsSerial) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
+                                        << "ismaster" << primary << "secondary" << !primary
                                         << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
                                                       << "c")
-                                        << "ok"
-                                        << true));
+                                        << "ok" << true));
     }
 
     NextStep ns = refresher.getNextStep();
@@ -116,16 +112,12 @@ TEST_F(CoreScanTest, CheckAllSeedsParallel) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
+                                        << "ismaster" << primary << "secondary" << !primary
                                         << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
                                                       << "c")
-                                        << "ok"
-                                        << true));
+                                        << "ok" << true));
     }
 
     // Now all hosts have returned data
@@ -163,16 +155,11 @@ TEST_F(CoreScanTest, NoMasterInitAllUp) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << false
-                                        << "secondary"
-                                        << true
-                                        << "hosts"
+                                        << "ismaster" << false << "secondary" << true << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
                                                       << "c")
-                                        << "ok"
-                                        << true));
+                                        << "ok" << true));
     }
 
     NextStep ns = refresher.getNextStep();
@@ -209,17 +196,12 @@ TEST_F(CoreScanTest, MasterNotInSeeds_NoPrimaryInIsMaster) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << false
-                                        << "secondary"
-                                        << true
-                                        << "hosts"
+                                        << "ismaster" << false << "secondary" << true << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
                                                       << "c"
                                                       << "d")
-                                        << "ok"
-                                        << true));
+                                        << "ok" << true));
     }
 
     // Only look at "d" after exhausting all other hosts
@@ -230,17 +212,12 @@ TEST_F(CoreScanTest, MasterNotInSeeds_NoPrimaryInIsMaster) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster"
-                                    << true
-                                    << "secondary"
-                                    << false
-                                    << "hosts"
+                                    << "ismaster" << true << "secondary" << false << "hosts"
                                     << BSON_ARRAY("a"
                                                   << "b"
                                                   << "c"
                                                   << "d")
-                                    << "ok"
-                                    << true));
+                                    << "ok" << true));
 
 
     ns = refresher.getNextStep();
@@ -289,10 +266,7 @@ TEST_F(CoreScanTest, MasterNotInSeeds_PrimaryInIsMaster) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
+                                        << "ismaster" << primary << "secondary" << !primary
                                         << "primary"
                                         << "d"
                                         << "hosts"
@@ -300,8 +274,7 @@ TEST_F(CoreScanTest, MasterNotInSeeds_PrimaryInIsMaster) {
                                                       << "b"
                                                       << "c"
                                                       << "d")
-                                        << "ok"
-                                        << true));
+                                        << "ok" << true));
     }
 
     NextStep ns = refresher.getNextStep();
@@ -346,14 +319,8 @@ TEST_F(CoreScanTest, SlavesUsableEvenIfNoMaster) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster"
-                                    << false
-                                    << "secondary"
-                                    << true
-                                    << "hosts"
-                                    << BSON_ARRAY("a")
-                                    << "ok"
-                                    << true));
+                                    << "ismaster" << false << "secondary" << true << "hosts"
+                                    << BSON_ARRAY("a") << "ok" << true));
 
     // Check intended conditions for entry to getNextStep().
     ASSERT(state->currentScan->hostsToScan.empty());
@@ -398,16 +365,11 @@ TEST_F(CoreScanTest, MultipleMasterLastNodeWins) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << true
-                                        << "secondary"
-                                        << false
-                                        << "hosts"
+                                        << "ismaster" << true << "secondary" << false << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
                                                       << "c")
-                                        << "ok"
-                                        << true));
+                                        << "ok" << true));
 
         // Ensure the set primary is the host we just got a reply from
         HostAndPort currentPrimary = state->getMatchingHost(primaryOnly);
@@ -451,14 +413,9 @@ TEST_F(CoreScanTest, MasterIsSourceOfTruth) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
-                                        << "hosts"
-                                        << (primary ? primaryHosts : secondaryHosts)
-                                        << "ok"
-                                        << true));
+                                        << "ismaster" << primary << "secondary" << !primary
+                                        << "hosts" << (primary ? primaryHosts : secondaryHosts)
+                                        << "ok" << true));
 
         ns = refresher.getNextStep();
     }
@@ -505,14 +462,8 @@ TEST_F(CoreScanTest, MultipleMastersDisagree) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << true
-                                        << "secondary"
-                                        << false
-                                        << "hosts"
-                                        << hostsForSeed[i % 2]
-                                        << "ok"
-                                        << true));
+                                        << "ismaster" << true << "secondary" << false << "hosts"
+                                        << hostsForSeed[i % 2] << "ok" << true));
 
         // Ensure the primary is the host we just got a reply from
         HostAndPort currentPrimary = state->getMatchingHost(primaryOnly);
@@ -541,14 +492,8 @@ TEST_F(CoreScanTest, MultipleMastersDisagree) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster"
-                                    << false
-                                    << "secondary"
-                                    << true
-                                    << "hosts"
-                                    << hostsForSeed[0]
-                                    << "ok"
-                                    << true));
+                                    << "ismaster" << false << "secondary" << true << "hosts"
+                                    << hostsForSeed[0] << "ok" << true));
 
     // scan should be complete
     ns = refresher.getNextStep();
@@ -595,16 +540,12 @@ TEST_F(CoreScanTest, GetMatchingDuringScan) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
+                                        << "ismaster" << primary << "secondary" << !primary
                                         << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
                                                       << "c")
-                                        << "ok"
-                                        << true));
+                                        << "ok" << true));
 
         bool hasPrimary = !(state->getMatchingHost(primaryOnly).empty());
         bool hasSecondary = !(state->getMatchingHost(secondaryOnly).empty());
@@ -641,16 +582,12 @@ TEST_F(CoreScanTest, OutOfBandFailedHost) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
+                                        << "ismaster" << primary << "secondary" << !primary
                                         << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
                                                       << "c")
-                                        << "ok"
-                                        << true));
+                                        << "ok" << true));
 
         if (i >= 1) {
             HostAndPort a("a");
@@ -698,18 +635,13 @@ TEST_F(CoreScanTest, NewPrimaryWithMaxElectionId) {
                                    BSON(
                                        "setName"
                                        << "name"
-                                       << "ismaster"
-                                       << true
-                                       << "secondary"
-                                       << false
-                                       << "hosts"
+                                       << "ismaster" << true << "secondary" << false << "hosts"
                                        << BSON_ARRAY("a"
                                                      << "b"
                                                      << "c")
                                        << "electionId"
                                        << OID::fromTerm(i)  // electionId must increase every cycle.
-                                       << "ok"
-                                       << true));
+                                       << "ok" << true));
 
         // Ensure the set primary is the host we just got a reply from
         HostAndPort currentPrimary = state->getMatchingHost(primaryOnly);
@@ -756,18 +688,13 @@ TEST_F(CoreScanTest, IgnoreElectionIdFromSecondaries) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
+                                        << "ismaster" << primary << "secondary" << !primary
                                         << "electionId"
-                                        << (primary ? primaryElectionId : OID::gen())
-                                        << "hosts"
+                                        << (primary ? primaryElectionId : OID::gen()) << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
                                                       << "c")
-                                        << "ok"
-                                        << true));
+                                        << "ok" << true));
     }
 
     // check that the SetState's maxElectionId == primary's electionId
@@ -801,20 +728,13 @@ TEST_F(CoreScanTest, StalePrimaryWithObsoleteElectionId) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << true
-                                        << "secondary"
-                                        << false
-                                        << "setVersion"
-                                        << 1
-                                        << "electionId"
-                                        << secondElectionId
+                                        << "ismaster" << true << "secondary" << false
+                                        << "setVersion" << 1 << "electionId" << secondElectionId
                                         << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
                                                       << "c")
-                                        << "ok"
-                                        << true));
+                                        << "ok" << true));
 
         auto node = state->findNode(ns.host);
         ASSERT(node);
@@ -834,18 +754,12 @@ TEST_F(CoreScanTest, StalePrimaryWithObsoleteElectionId) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << true
-                                        << "secondary"
-                                        << false
-                                        << "electionId"
-                                        << firstElectionId
-                                        << "hosts"
+                                        << "ismaster" << true << "secondary" << false
+                                        << "electionId" << firstElectionId << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
                                                       << "c")
-                                        << "ok"
-                                        << true));
+                                        << "ok" << true));
 
         auto node = state->findNode(ns.host);
         ASSERT(node);
@@ -867,16 +781,11 @@ TEST_F(CoreScanTest, StalePrimaryWithObsoleteElectionId) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << false
-                                        << "secondary"
-                                        << true
-                                        << "hosts"
+                                        << "ismaster" << false << "secondary" << true << "hosts"
                                         << BSON_ARRAY("a"
                                                       << "b"
                                                       << "c")
-                                        << "ok"
-                                        << true));
+                                        << "ok" << true));
 
         auto node = state->findNode(ns.host);
         ASSERT(node);
@@ -919,20 +828,13 @@ TEST_F(CoreScanTest, TwoPrimaries2ndHasNewerConfigVersion) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster"
-                                    << true
-                                    << "secondary"
-                                    << false
-                                    << "setVersion"
-                                    << 1
-                                    << "electionId"
-                                    << OID("7fffffff0000000000000001")
+                                    << "ismaster" << true << "secondary" << false << "setVersion"
+                                    << 1 << "electionId" << OID("7fffffff0000000000000001")
                                     << "hosts"
                                     << BSON_ARRAY("a"
                                                   << "b"
                                                   << "c")
-                                    << "ok"
-                                    << true));
+                                    << "ok" << true));
 
     // check that the SetState's maxElectionId == primary's electionId
     ASSERT_EQUALS(state->maxElectionId, OID("7fffffff0000000000000001"));
@@ -945,20 +847,12 @@ TEST_F(CoreScanTest, TwoPrimaries2ndHasNewerConfigVersion) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster"
-                                    << true
-                                    << "secondary"
-                                    << false
-                                    << "setVersion"
-                                    << 2
-                                    << "electionId"
-                                    << primaryElectionId
-                                    << "hosts"
+                                    << "ismaster" << true << "secondary" << false << "setVersion"
+                                    << 2 << "electionId" << primaryElectionId << "hosts"
                                     << BSON_ARRAY("a"
                                                   << "b"
                                                   << "c")
-                                    << "ok"
-                                    << true));
+                                    << "ok" << true));
 
     ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
     ASSERT_EQUALS(state->configVersion, 2);
@@ -980,20 +874,12 @@ TEST_F(CoreScanTest, TwoPrimaries2ndHasOlderConfigVersion) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster"
-                                    << true
-                                    << "secondary"
-                                    << false
-                                    << "electionId"
-                                    << primaryElectionId
-                                    << "setVersion"
-                                    << 2
-                                    << "hosts"
+                                    << "ismaster" << true << "secondary" << false << "electionId"
+                                    << primaryElectionId << "setVersion" << 2 << "hosts"
                                     << BSON_ARRAY("a"
                                                   << "b"
                                                   << "c")
-                                    << "ok"
-                                    << true));
+                                    << "ok" << true));
 
     ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
     ASSERT_EQUALS(state->configVersion, 2);
@@ -1003,20 +889,13 @@ TEST_F(CoreScanTest, TwoPrimaries2ndHasOlderConfigVersion) {
                                -1,
                                BSON("setName"
                                     << "name"
-                                    << "ismaster"
-                                    << true
-                                    << "secondary"
-                                    << false
-                                    << "setVersion"
-                                    << 1
-                                    << "electionId"
-                                    << OID("7fffffff0000000000000001")
+                                    << "ismaster" << true << "secondary" << false << "setVersion"
+                                    << 1 << "electionId" << OID("7fffffff0000000000000001")
                                     << "hosts"
                                     << BSON_ARRAY("a"
                                                   << "b"
                                                   << "c")
-                                    << "ok"
-                                    << true));
+                                    << "ok" << true));
 
     ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
     ASSERT_EQUALS(state->configVersion, 2);
@@ -1049,19 +928,12 @@ TEST_F(MaxStalenessMSTest, MaxStalenessMSMatch) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
-                                        << "hosts"
-                                        << hosts
-                                        << "lastWrite"
+                                        << "ismaster" << primary << "secondary" << !primary
+                                        << "hosts" << hosts << "lastWrite"
                                         << BSON("lastWriteDate" << (nonStale ? lastWriteDateNonStale
                                                                              : lastWriteDateStale)
-                                                                << "opTime"
-                                                                << opTime)
-                                        << "ok"
-                                        << true));
+                                                                << "opTime" << opTime)
+                                        << "ok" << true));
         ns = refresher.getNextStep();
     }
 
@@ -1099,19 +971,12 @@ TEST_F(MaxStalenessMSTest, MaxStalenessMSNoMatch) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
-                                        << "hosts"
-                                        << hosts
-                                        << "lastWrite"
+                                        << "ismaster" << primary << "secondary" << !primary
+                                        << "hosts" << hosts << "lastWrite"
                                         << BSON("lastWriteDate" << (primary ? lastWriteDateNonStale
                                                                             : lastWriteDateStale)
-                                                                << "opTime"
-                                                                << opTime)
-                                        << "ok"
-                                        << true));
+                                                                << "opTime" << opTime)
+                                        << "ok" << true));
 
         ns = refresher.getNextStep();
     }
@@ -1150,20 +1015,13 @@ TEST_F(MaxStalenessMSTest, MaxStalenessMSNoPrimaryMatch) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << false
-                                        << "secondary"
-                                        << true
-                                        << "hosts"
-                                        << hosts
-                                        << "lastWrite"
+                                        << "ismaster" << false << "secondary" << true << "hosts"
+                                        << hosts << "lastWrite"
                                         << BSON("lastWriteDate"
                                                 << (isNonStale ? lastWriteDateNonStale
                                                                : lastWriteDateStale)
-                                                << "opTime"
-                                                << opTime)
-                                        << "ok"
-                                        << true));
+                                                << "opTime" << opTime)
+                                        << "ok" << true));
 
         ns = refresher.getNextStep();
     }
@@ -1204,20 +1062,13 @@ TEST_F(MaxStalenessMSTest, MaxStalenessMSAllFailed) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << false
-                                        << "secondary"
-                                        << true
-                                        << "hosts"
-                                        << hosts
-                                        << "lastWrite"
+                                        << "ismaster" << false << "secondary" << true << "hosts"
+                                        << hosts << "lastWrite"
                                         << BSON("lastWriteDate"
                                                 << (isNonStale ? lastWriteDateNonStale
                                                                : lastWriteDateStale)
-                                                << "opTime"
-                                                << opTime)
-                                        << "ok"
-                                        << true));
+                                                << "opTime" << opTime)
+                                        << "ok" << true));
 
         ns = refresher.getNextStep();
     }
@@ -1257,19 +1108,12 @@ TEST_F(MaxStalenessMSTest, MaxStalenessMSAllButPrimaryFailed) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
-                                        << "hosts"
-                                        << hosts
-                                        << "lastWrite"
+                                        << "ismaster" << primary << "secondary" << !primary
+                                        << "hosts" << hosts << "lastWrite"
                                         << BSON("lastWriteDate" << (primary ? lastWriteDateNonStale
                                                                             : lastWriteDateStale)
-                                                                << "opTime"
-                                                                << opTime)
-                                        << "ok"
-                                        << true));
+                                                                << "opTime" << opTime)
+                                        << "ok" << true));
         ns = refresher.getNextStep();
     }
 
@@ -1309,19 +1153,12 @@ TEST_F(MaxStalenessMSTest, MaxStalenessMSOneSecondaryFailed) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
-                                        << "hosts"
-                                        << hosts
-                                        << "lastWrite"
+                                        << "ismaster" << primary << "secondary" << !primary
+                                        << "hosts" << hosts << "lastWrite"
                                         << BSON("lastWriteDate" << (primary ? lastWriteDateNonStale
                                                                             : lastWriteDateStale)
-                                                                << "opTime"
-                                                                << opTime)
-                                        << "ok"
-                                        << true));
+                                                                << "opTime" << opTime)
+                                        << "ok" << true));
         ns = refresher.getNextStep();
     }
 
@@ -1361,20 +1198,13 @@ TEST_F(MaxStalenessMSTest, MaxStalenessMSNonStaleSecondaryMatched) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
-                                        << "hosts"
-                                        << hosts
-                                        << "lastWrite"
+                                        << "ismaster" << primary << "secondary" << !primary
+                                        << "hosts" << hosts << "lastWrite"
                                         << BSON("lastWriteDate"
                                                 << (isNonStale ? lastWriteDateNonStale
                                                                : lastWriteDateStale)
-                                                << "opTime"
-                                                << opTime)
-                                        << "ok"
-                                        << true));
+                                                << "opTime" << opTime)
+                                        << "ok" << true));
         ns = refresher.getNextStep();
     }
 
@@ -1409,14 +1239,8 @@ TEST_F(MaxStalenessMSTest, MaxStalenessMSNoLastWrite) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
-                                        << "hosts"
-                                        << hosts
-                                        << "ok"
-                                        << true));
+                                        << "ismaster" << primary << "secondary" << !primary
+                                        << "hosts" << hosts << "ok" << true));
         ns = refresher.getNextStep();
     }
 
@@ -1450,14 +1274,8 @@ TEST_F(MaxStalenessMSTest, MaxStalenessMSZeroNoLastWrite) {
                                    -1,
                                    BSON("setName"
                                         << "name"
-                                        << "ismaster"
-                                        << primary
-                                        << "secondary"
-                                        << !primary
-                                        << "hosts"
-                                        << hosts
-                                        << "ok"
-                                        << true));
+                                        << "ismaster" << primary << "secondary" << !primary
+                                        << "hosts" << hosts << "ok" << true));
         ns = refresher.getNextStep();
     }
 
@@ -1496,17 +1314,11 @@ TEST_F(MinOpTimeTest, MinOpTimeMatched) {
         bool isNonStale = ns.host.host() == "b";
         BSONObj bson = BSON("setName"
                             << "name"
-                            << "ismaster"
-                            << primary
-                            << "secondary"
-                            << !primary
-                            << "hosts"
-                            << hosts
+                            << "ismaster" << primary << "secondary" << !primary << "hosts" << hosts
                             << "lastWrite"
                             << BSON("opTime" << (isNonStale ? opTimeNonStale.toBSON()
                                                             : opTimeStale.toBSON()))
-                            << "ok"
-                            << true);
+                            << "ok" << true);
         refresher.receivedIsMaster(ns.host, -1, bson);
         ns = refresher.getNextStep();
     }
@@ -1541,17 +1353,11 @@ TEST_F(MinOpTimeTest, MinOpTimeNotMatched) {
         bool isNonStale = ns.host.host() == "a";
         BSONObj bson = BSON("setName"
                             << "name"
-                            << "ismaster"
-                            << primary
-                            << "secondary"
-                            << !primary
-                            << "hosts"
-                            << hosts
+                            << "ismaster" << primary << "secondary" << !primary << "hosts" << hosts
                             << "lastWrite"
                             << BSON("opTime" << (isNonStale ? opTimeNonStale.toBSON()
                                                             : opTimeStale.toBSON()))
-                            << "ok"
-                            << true);
+                            << "ok" << true);
         refresher.receivedIsMaster(ns.host, -1, bson);
         ns = refresher.getNextStep();
     }
@@ -1588,20 +1394,13 @@ TEST_F(MinOpTimeTest, MinOpTimeIgnored) {
         bool isNonStale = ns.host.host() == "c";
         BSONObj bson = BSON("setName"
                             << "name"
-                            << "ismaster"
-                            << primary
-                            << "secondary"
-                            << !primary
-                            << "hosts"
-                            << hosts
+                            << "ismaster" << primary << "secondary" << !primary << "hosts" << hosts
                             << "lastWrite"
                             << BSON("lastWriteDate"
                                     << (isNonStale || primary ? lastWriteDateNonStale
                                                               : lastWriteDateStale)
-                                    << "opTime"
-                                    << opTimeStale.toBSON())
-                            << "ok"
-                            << true);
+                                    << "opTime" << opTimeStale.toBSON())
+                            << "ok" << true);
         refresher.receivedIsMaster(ns.host, -1, bson);
         ns = refresher.getNextStep();
     }
@@ -1674,7 +1473,7 @@ public:
         std::set<HostAndPort> members;
 
         BSONArrayBuilder arrayBuilder;
-        for (const auto & [ host, nodeState ] : replicaSet) {
+        for (const auto& [host, nodeState] : replicaSet) {
             if (nodeState == NodeState::kStandalone) {
                 continue;
             }
@@ -1690,15 +1489,11 @@ public:
         auto bsonHosts = arrayBuilder.arr();
 
         auto markIsMaster = [&](auto host, bool isMaster) {
-            refresher.receivedIsMaster(
-                host,
-                -1,
-                BSON("setName" << kSetName << "ismaster" << isMaster << "secondary" << !isMaster
-                               << "hosts"
-                               << bsonHosts
-                               << "ok"
-                               << true));
-
+            refresher.receivedIsMaster(host,
+                                       -1,
+                                       BSON("setName" << kSetName << "ismaster" << isMaster
+                                                      << "secondary" << !isMaster << "hosts"
+                                                      << bsonHosts << "ok" << true));
         };
 
         auto markFailed = [&](auto host) {
@@ -1769,13 +1564,16 @@ TEST_F(ChangeNotifierTest, NotifyNominal) {
     // 'a' claims to be primary. Signal: Confirmed
     updateSet({
         {
-            HostAndPort("a"), NodeState::kPrimary,
+            HostAndPort("a"),
+            NodeState::kPrimary,
         },
         {
-            HostAndPort("b"), NodeState::kSecondary,
+            HostAndPort("b"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("c"), NodeState::kSecondary,
+            HostAndPort("c"),
+            NodeState::kSecondary,
         },
     });
     ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
@@ -1783,13 +1581,16 @@ TEST_F(ChangeNotifierTest, NotifyNominal) {
     // Getting another scan with the same details. Signal: null
     updateSet({
         {
-            HostAndPort("a"), NodeState::kPrimary,
+            HostAndPort("a"),
+            NodeState::kPrimary,
         },
         {
-            HostAndPort("b"), NodeState::kSecondary,
+            HostAndPort("b"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("c"), NodeState::kSecondary,
+            HostAndPort("c"),
+            NodeState::kSecondary,
         },
     });
     ASSERT_EQ(listener().eventId, currentId);
@@ -1812,13 +1613,16 @@ TEST_F(ChangeNotifierTest, NotifyElections) {
     // 'a' claims to be primary. Signal: ConfirmedSet
     updateSet({
         {
-            HostAndPort("a"), NodeState::kPrimary,
+            HostAndPort("a"),
+            NodeState::kPrimary,
         },
         {
-            HostAndPort("b"), NodeState::kSecondary,
+            HostAndPort("b"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("c"), NodeState::kSecondary,
+            HostAndPort("c"),
+            NodeState::kSecondary,
         },
     });
     ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
@@ -1826,13 +1630,16 @@ TEST_F(ChangeNotifierTest, NotifyElections) {
     // 'b' claims to be primary. Signal: ConfirmedSet
     updateSet({
         {
-            HostAndPort("a"), NodeState::kSecondary,
+            HostAndPort("a"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("b"), NodeState::kPrimary,
+            HostAndPort("b"),
+            NodeState::kPrimary,
         },
         {
-            HostAndPort("c"), NodeState::kSecondary,
+            HostAndPort("c"),
+            NodeState::kSecondary,
         },
     });
     ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
@@ -1840,13 +1647,16 @@ TEST_F(ChangeNotifierTest, NotifyElections) {
     // All hosts tell us that they are not primary. Signal: null
     updateSet({
         {
-            HostAndPort("a"), NodeState::kSecondary,
+            HostAndPort("a"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("b"), NodeState::kSecondary,
+            HostAndPort("b"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("c"), NodeState::kSecondary,
+            HostAndPort("c"),
+            NodeState::kSecondary,
         },
     });
     ASSERT_EQ(listener().eventId, currentId);
@@ -1854,13 +1664,16 @@ TEST_F(ChangeNotifierTest, NotifyElections) {
     // 'a' claims to be primary again. Signal: ConfirmedSet
     updateSet({
         {
-            HostAndPort("a"), NodeState::kPrimary,
+            HostAndPort("a"),
+            NodeState::kPrimary,
         },
         {
-            HostAndPort("b"), NodeState::kSecondary,
+            HostAndPort("b"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("c"), NodeState::kSecondary,
+            HostAndPort("c"),
+            NodeState::kSecondary,
         },
     });
     ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
@@ -1883,13 +1696,16 @@ TEST_F(ChangeNotifierTest, NotifyReconfig) {
     // Update the set with a full scan showing no primary. Signal: PossibleSet
     updateSet({
         {
-            HostAndPort("a"), NodeState::kSecondary,
+            HostAndPort("a"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("b"), NodeState::kSecondary,
+            HostAndPort("b"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("c"), NodeState::kSecondary,
+            HostAndPort("c"),
+            NodeState::kSecondary,
         },
     });
     ASSERT_EQ(listener().eventId, ++currentId);
@@ -1897,13 +1713,16 @@ TEST_F(ChangeNotifierTest, NotifyReconfig) {
     // Mark 'a' as removed. Signal: null
     updateSet({
         {
-            HostAndPort("a"), NodeState::kStandalone,
+            HostAndPort("a"),
+            NodeState::kStandalone,
         },
         {
-            HostAndPort("b"), NodeState::kSecondary,
+            HostAndPort("b"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("c"), NodeState::kSecondary,
+            HostAndPort("c"),
+            NodeState::kSecondary,
         },
     });
     ASSERT_EQ(listener().eventId, currentId);
@@ -1911,16 +1730,20 @@ TEST_F(ChangeNotifierTest, NotifyReconfig) {
     // Discover 'd' as secondary. Signal: PossibleSet
     updateSet({
         {
-            HostAndPort("a"), NodeState::kSecondary,
+            HostAndPort("a"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("b"), NodeState::kSecondary,
+            HostAndPort("b"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("c"), NodeState::kSecondary,
+            HostAndPort("c"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("d"), NodeState::kSecondary,
+            HostAndPort("d"),
+            NodeState::kSecondary,
         },
     });
     ASSERT_EQ(listener().lastPossibleSetId, ++currentId);
@@ -1928,16 +1751,20 @@ TEST_F(ChangeNotifierTest, NotifyReconfig) {
     // Mark 'b' as primary, no 'd'. Signal: ConfirmedSet
     updateSet({
         {
-            HostAndPort("a"), NodeState::kSecondary,
+            HostAndPort("a"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("b"), NodeState::kPrimary,
+            HostAndPort("b"),
+            NodeState::kPrimary,
         },
         {
-            HostAndPort("c"), NodeState::kSecondary,
+            HostAndPort("c"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("d"), NodeState::kStandalone,
+            HostAndPort("d"),
+            NodeState::kStandalone,
         },
     });
     ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
@@ -1945,13 +1772,16 @@ TEST_F(ChangeNotifierTest, NotifyReconfig) {
     // Mark 'a' as removed. Signal: ConfirmedSet
     updateSet({
         {
-            HostAndPort("a"), NodeState::kStandalone,
+            HostAndPort("a"),
+            NodeState::kStandalone,
         },
         {
-            HostAndPort("b"), NodeState::kPrimary,
+            HostAndPort("b"),
+            NodeState::kPrimary,
         },
         {
-            HostAndPort("c"), NodeState::kSecondary,
+            HostAndPort("c"),
+            NodeState::kSecondary,
         },
     });
     ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
@@ -1959,13 +1789,16 @@ TEST_F(ChangeNotifierTest, NotifyReconfig) {
     // Mark 'a' as secondary again. Signal: ConfirmedSet
     updateSet({
         {
-            HostAndPort("b"), NodeState::kPrimary,
+            HostAndPort("b"),
+            NodeState::kPrimary,
         },
         {
-            HostAndPort("c"), NodeState::kSecondary,
+            HostAndPort("c"),
+            NodeState::kSecondary,
         },
         {
-            HostAndPort("a"), NodeState::kSecondary,
+            HostAndPort("a"),
+            NodeState::kSecondary,
         },
     });
     ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);

@@ -337,8 +337,7 @@ Message getMore(OperationContext* opCtx,
     // cursor.
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Requested getMore on namespace " << ns << ", but cursor " << cursorid
-                          << " belongs to namespace "
-                          << cursorPin->nss().ns(),
+                          << " belongs to namespace " << cursorPin->nss().ns(),
             nss == cursorPin->nss());
 
     // A user can only call getMore on their own cursor. If there were multiple users authenticated

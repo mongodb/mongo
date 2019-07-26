@@ -38,8 +38,8 @@
 namespace mongo {
 namespace {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 
 TEST(RecordStoreTestHarness, Simple1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());

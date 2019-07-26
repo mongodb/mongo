@@ -68,7 +68,7 @@ public:
             return _cbHandles;
         }();
 
-        for (auto & [ id, handle ] : handles) {
+        for (auto& [id, handle] : handles) {
             // If we don't have a handle yet, it means there's a scheduling thread that's
             // dropped the lock but hasn't yet stashed it (or failed to schedule it on the
             // underlying executor).
@@ -223,7 +223,7 @@ private:
 
         // State 2 - Indeterminate state.  We don't know yet if the task will get scheduled.
         auto swCbHandle = std::forward<ScheduleCall>(schedule)(
-            [ id, work = std::forward<Work>(work), self = shared_from_this() ](const auto& cargs) {
+            [id, work = std::forward<Work>(work), self = shared_from_this()](const auto& cargs) {
                 using ArgsT = std::decay_t<decltype(cargs)>;
 
                 stdx::unique_lock<stdx::mutex> lk(self->_mutex);

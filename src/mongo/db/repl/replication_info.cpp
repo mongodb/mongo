@@ -67,10 +67,10 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(waitInIsMaster);
 
-using std::unique_ptr;
 using std::list;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 
 namespace repl {
 namespace {
@@ -330,8 +330,7 @@ public:
                 } else {
                     uasserted(ErrorCodes::BadValue,
                               str::stream() << "Unrecognized field of 'internalClient': '"
-                                            << fieldName
-                                            << "'");
+                                            << fieldName << "'");
                 }
             }
 

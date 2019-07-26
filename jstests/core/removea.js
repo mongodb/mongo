@@ -2,31 +2,31 @@
 
 // Test removal of a substantial proportion of inserted documents.
 (function() {
-    "use strict";
+"use strict";
 
-    const t = db.jstests_removea;
+const t = db.jstests_removea;
 
-    Random.setRandomSeed();
+Random.setRandomSeed();
 
-    for (let v = 0; v < 2; ++v) {  // Try each index version.
-        t.drop();
-        t.ensureIndex({a: 1}, {v: v});
-        const S = 100;
-        const B = 100;
-        for (let x = 0; x < S; x++) {
-            let batch = [];
-            for (let y = 0; y < B; y++) {
-                let i = y + (B * x);
-                batch.push({a: i});
-            }
-            assert.writeOK(t.insert(batch));
+for (let v = 0; v < 2; ++v) {  // Try each index version.
+    t.drop();
+    t.ensureIndex({a: 1}, {v: v});
+    const S = 100;
+    const B = 100;
+    for (let x = 0; x < S; x++) {
+        let batch = [];
+        for (let y = 0; y < B; y++) {
+            let i = y + (B * x);
+            batch.push({a: i});
         }
-        assert.eq(t.count(), S * B);
-
-        let toDrop = [];
-        for (let i = 0; i < S * B; ++i) {
-            toDrop.push(Random.randInt(10000));  // Dups in the query will be ignored.
-        }
-        assert.writeOK(t.remove({a: {$in: toDrop}}));
+        assert.writeOK(t.insert(batch));
     }
+    assert.eq(t.count(), S * B);
+
+    let toDrop = [];
+    for (let i = 0; i < S * B; ++i) {
+        toDrop.push(Random.randInt(10000));  // Dups in the query will be ignored.
+    }
+    assert.writeOK(t.remove({a: {$in: toDrop}}));
+}
 })();

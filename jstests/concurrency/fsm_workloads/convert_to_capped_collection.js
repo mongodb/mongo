@@ -17,7 +17,6 @@ var $config = (function() {
     var data = {prefix: 'convert_to_capped_collection'};
 
     var states = (function() {
-
         function uniqueCollectionName(prefix, tid) {
             return prefix + '_' + tid;
         }
@@ -79,5 +78,4 @@ var $config = (function() {
         transitions: transitions,
         setup: setup,
     };
-
 })();

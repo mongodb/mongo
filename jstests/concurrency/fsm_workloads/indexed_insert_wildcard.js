@@ -23,8 +23,7 @@ var $config = extendWorkload($config, function($config, $super) {
             threadIdInArray: [this.tid],
             nestedThreadId: {threadId: this.tid},
             arrayField: [this.tid, "a string", [1, 2, 3]],
-            fieldWithNestedObject:
-                {nestedDoc: {subNestedDoc: {leaf: "a string"}}, leaf: "a string"}
+            fieldWithNestedObject: {nestedDoc: {subNestedDoc: {leaf: "a string"}}, leaf: "a string"}
         };
     };
 

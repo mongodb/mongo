@@ -58,17 +58,13 @@ TEST(BatchedCommandResponse, Basic) {
     BSONObj writeConcernError(
         BSON("code" << 8 << "codeName" << ErrorCodes::errorString(ErrorCodes::Error(8)) << "errmsg"
                     << "norepl"
-                    << "errInfo"
-                    << BSON("a" << 1)));
+                    << "errInfo" << BSON("a" << 1)));
 
     BSONObj origResponseObj =
-        BSON(BatchedCommandResponse::n(0) << "opTime" << mongo::Timestamp(1ULL)
-                                          << BatchedCommandResponse::writeErrors()
-                                          << writeErrorsArray
-                                          << BatchedCommandResponse::writeConcernError()
-                                          << writeConcernError
-                                          << "ok"
-                                          << 1.0);
+        BSON(BatchedCommandResponse::n(0)
+             << "opTime" << mongo::Timestamp(1ULL) << BatchedCommandResponse::writeErrors()
+             << writeErrorsArray << BatchedCommandResponse::writeConcernError() << writeConcernError
+             << "ok" << 1.0);
 
     string errMsg;
     BatchedCommandResponse response;

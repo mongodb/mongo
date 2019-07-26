@@ -29,7 +29,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
-#include "mongo/db/read_concern.h"
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -37,6 +36,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_concern.h"
 #include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -168,10 +168,9 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
                     opCtx,
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                     "admin",
-                    BSON("appendOplogNote" << 1 << "maxClusterTime" << clusterTime.asTimestamp()
-                                           << "data"
-                                           << BSON("noop write for afterClusterTime read concern"
-                                                   << 1)),
+                    BSON("appendOplogNote"
+                         << 1 << "maxClusterTime" << clusterTime.asTimestamp() << "data"
+                         << BSON("noop write for afterClusterTime read concern" << 1)),
                     Shard::RetryPolicy::kIdempotent);
                 status = swRes.getStatus();
                 std::get<1>(myWriteRequest)->set(status);
@@ -295,8 +294,7 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
                                       << " value must not be greater than the current clusterTime. "
                                          "Requested clusterTime: "
                                       << targetClusterTime->toString()
-                                      << "; current clusterTime: "
-                                      << currentTime.toString()};
+                                      << "; current clusterTime: " << currentTime.toString()};
             }
 
             auto status = makeNoopWriteIfNeeded(opCtx, *targetClusterTime);

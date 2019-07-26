@@ -116,4 +116,4 @@ TEST(MatchExpressionParserLeafTest, NotRegex1) {
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "AC")));
 }
-}
+}  // namespace mongo

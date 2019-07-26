@@ -28,8 +28,8 @@
  */
 
 
-#include "mongo/db/logical_time.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/platform/basic.h"
@@ -119,10 +119,10 @@ TEST(LogicalTime, appendAsOperationTime) {
 }
 
 TEST(LogicalTime, fromOperationTime) {
-    const auto actualTime = LogicalTime::fromOperationTime(BSON("someOtherCommandParameter"
-                                                                << "Value"
-                                                                << "operationTime"
-                                                                << Timestamp(1)));
+    const auto actualTime =
+        LogicalTime::fromOperationTime(BSON("someOtherCommandParameter"
+                                            << "Value"
+                                            << "operationTime" << Timestamp(1)));
     ASSERT_EQ(LogicalTime(Timestamp(1)), actualTime);
 }
 

@@ -59,8 +59,9 @@ bool isStandaloneOrPrimary(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     const bool isReplSet =
         replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-    return !isReplSet || (repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
-                          repl::MemberState::RS_PRIMARY);
+    return !isReplSet ||
+        (repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
+         repl::MemberState::RS_PRIMARY);
 }
 
 /**

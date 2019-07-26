@@ -4,7 +4,6 @@ var ssl_name;
 load("jstests/replsets/rslib.js");
 load('jstests/replsets/libs/election_metrics.js');
 var doTest = function(signal) {
-
     // Test basic replica set functionality.
     // -- Replication
     // -- Failover

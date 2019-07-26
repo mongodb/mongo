@@ -240,9 +240,9 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
         if (MONGO_FAIL_POINT(mr_killop_test_fp)) {
 
             /* This thread sleep makes the interrupts in the test come in at a time
-            *  where the js misses the interrupt and throw an exception instead of
-            *  being interrupted
-            */
+             *  where the js misses the interrupt and throw an exception instead of
+             *  being interrupted
+             */
             stdx::this_thread::sleep_for(stdx::chrono::seconds(1));
         }
 
@@ -309,7 +309,7 @@ extern const JSFile utils_sh;
 extern const JSFile utils_auth;
 extern const JSFile bulk_api;
 extern const JSFile error_codes;
-}
+}  // namespace JSFiles
 
 void Scope::execCoreFiles() {
     execSetup(JSFiles::utils);

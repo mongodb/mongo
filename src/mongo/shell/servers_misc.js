@@ -78,28 +78,28 @@ var allocatePort;
 var resetAllocatedPorts;
 
 (function() {
-    // Defer initializing these variables until the first call, as TestData attributes may be
-    // initialized as part of the --eval argument (e.g. by resmoke.py), which will not be evaluated
-    // until after this has loaded.
-    var maxPort;
-    var nextPort;
+// Defer initializing these variables until the first call, as TestData attributes may be
+// initialized as part of the --eval argument (e.g. by resmoke.py), which will not be evaluated
+// until after this has loaded.
+var maxPort;
+var nextPort;
 
-    allocatePort = function() {
-        // The default port was chosen in an attempt to have a large number of unassigned ports that
-        // are also outside the ephemeral port range.
-        nextPort = nextPort || jsTestOptions().minPort || 20000;
-        maxPort = maxPort || jsTestOptions().maxPort || Math.pow(2, 16) - 1;
+allocatePort = function() {
+    // The default port was chosen in an attempt to have a large number of unassigned ports that
+    // are also outside the ephemeral port range.
+    nextPort = nextPort || jsTestOptions().minPort || 20000;
+    maxPort = maxPort || jsTestOptions().maxPort || Math.pow(2, 16) - 1;
 
-        if (nextPort === maxPort) {
-            throw new Error("Exceeded maximum port range in allocatePort()");
-        }
-        return nextPort++;
-    };
+    if (nextPort === maxPort) {
+        throw new Error("Exceeded maximum port range in allocatePort()");
+    }
+    return nextPort++;
+};
 
-    resetAllocatedPorts = function() {
-        jsTest.log("Resetting the range of allocated ports");
-        maxPort = nextPort = undefined;
-    };
+resetAllocatedPorts = function() {
+    jsTest.log("Resetting the range of allocated ports");
+    maxPort = nextPort = undefined;
+};
 })();
 
 /**
@@ -142,9 +142,9 @@ function startParallelShell(jsCode, port, noConnect) {
     }
 
     // Convert function into call-string
-    if (typeof(jsCode) == "function") {
+    if (typeof (jsCode) == "function") {
         jsCode = "(" + jsCode.toString() + ")();";
-    } else if (typeof(jsCode) == "string") {
+    } else if (typeof (jsCode) == "string") {
     }
     // do nothing
     else {
@@ -153,7 +153,7 @@ function startParallelShell(jsCode, port, noConnect) {
 
     if (noConnect) {
         args.push("--nodb");
-    } else if (typeof(db) == "object") {
+    } else if (typeof (db) == "object") {
         jsCode = "db = db.getSiblingDB('" + db.getName() + "');" + jsCode;
     }
 

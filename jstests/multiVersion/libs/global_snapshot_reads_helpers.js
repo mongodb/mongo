@@ -41,11 +41,11 @@ function runCommandAndVerifyResponse(sessionDb, txnNumber, cmdObj, expectSuccess
             return true;
         });
     } else {
-        assert.commandFailedWithCode(sessionDb.runCommand(cmdObj),
-                                     expectedCode,
-                                     "command did not fail with expected error code, cmd: " +
-                                         tojson(cmdObj) + ", expectedCode: " +
-                                         tojson(expectedCode));
+        assert.commandFailedWithCode(
+            sessionDb.runCommand(cmdObj),
+            expectedCode,
+            "command did not fail with expected error code, cmd: " + tojson(cmdObj) +
+                ", expectedCode: " + tojson(expectedCode));
     }
     return txnNumber;
 }
@@ -73,10 +73,10 @@ function verifyGlobalSnapshotReads(conn, expectSuccess, expectedCode) {
     txnNumber = runCommandAndVerifyResponse(shardedDb,
                                             txnNumber,
                                             {
-                                              find: "sharded",
-                                              filter: {x: 1},
-                                              readConcern: {level: "snapshot"},
-                                              txnNumber: NumberLong(txnNumber)
+                                                find: "sharded",
+                                                filter: {x: 1},
+                                                readConcern: {level: "snapshot"},
+                                                txnNumber: NumberLong(txnNumber)
                                             },
                                             expectSuccess,
                                             expectedCode);

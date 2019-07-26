@@ -36,8 +36,8 @@
 
 namespace mongo {
 
-using std::vector;
 using std::string;
+using std::vector;
 
 namespace {
 
@@ -52,7 +52,7 @@ StringData safeFirstPart(const FieldRef* fieldRef) {
         return fieldRef->getPart(0);
     }
 }
-}
+}  // namespace
 
 bool FieldRefSet::FieldRefPtrLessThan::operator()(const FieldRef* l, const FieldRef* r) const {
     return *l < *r;

@@ -153,12 +153,12 @@ Value DocumentSourceSequentialDocumentCache::serialize(
             {kStageName,
              Document{{"maxSizeBytes"_sd, Value(static_cast<long long>(_cache->maxSizeBytes()))},
                       {"status"_sd,
-                       _cache->isBuilding() ? "kBuilding"_sd : _cache->isServing()
-                               ? "kServing"_sd
-                               : "kAbandoned"_sd}}}});
+                       _cache->isBuilding()
+                           ? "kBuilding"_sd
+                           : _cache->isServing() ? "kServing"_sd : "kAbandoned"_sd}}}});
     }
 
     return Value();
 }
 
-}  // namesace mongo
+}  // namespace mongo

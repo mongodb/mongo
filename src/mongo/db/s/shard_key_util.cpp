@@ -113,9 +113,7 @@ void validateShardKeyAgainstExistingIndexes(OperationContext* opCtx,
         bool isUnique = idx["unique"].trueValue();
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "can't shard collection '" << nss.ns() << "' with unique index on "
-                              << currentKey
-                              << " and proposed shard key "
-                              << proposedKey
+                              << currentKey << " and proposed shard key " << proposedKey
                               << ". Uniqueness can't be maintained unless shard key is a prefix",
                 !isUnique || shardKeyPattern.isUniqueIndexCompatible(currentKey));
     }
@@ -133,8 +131,7 @@ void validateShardKeyAgainstExistingIndexes(OperationContext* opCtx,
             // per field per collection.
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "can't shard collection " << nss.ns()
-                                  << " with hashed shard key "
-                                  << proposedKey
+                                  << " with hashed shard key " << proposedKey
                                   << " because the hashed index uses a non-default seed of "
                                   << idx["seed"].numberInt(),
                     !shardKeyPattern.isHashedPattern() || idx["seed"].eoo() ||

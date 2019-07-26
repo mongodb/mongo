@@ -275,11 +275,13 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
     _port = -1;
 
     string prefix("mongod-");
-    bool isMongodProgram = isMongo && (string("mongod") == programName ||
-                                       programName.string().compare(0, prefix.size(), prefix) == 0);
+    bool isMongodProgram = isMongo &&
+        (string("mongod") == programName ||
+         programName.string().compare(0, prefix.size(), prefix) == 0);
     prefix = "mongos-";
-    bool isMongosProgram = isMongo && (string("mongos") == programName ||
-                                       programName.string().compare(0, prefix.size(), prefix) == 0);
+    bool isMongosProgram = isMongo &&
+        (string("mongos") == programName ||
+         programName.string().compare(0, prefix.size(), prefix) == 0);
 
     if (!isMongo) {
         _name = "sh";

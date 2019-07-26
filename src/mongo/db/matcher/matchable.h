@@ -48,7 +48,7 @@ public:
      * The neewly returned ElementIterator is allowed to keep a pointer to path.
      * So the caller of this function should make sure path is in scope until
      * the ElementIterator is deallocated
-    */
+     */
     virtual ElementIterator* allocateIterator(const ElementPath* path) const = 0;
 
     virtual void releaseIterator(ElementIterator* iterator) const = 0;
@@ -148,4 +148,4 @@ private:
     mutable BSONElementIterator _iterator;
     mutable bool _iteratorUsed;
 };
-}
+}  // namespace mongo

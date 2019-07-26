@@ -32,9 +32,14 @@ assert.writeOK(bulk.execute());
 var specs = [];
 var multikey = [];
 
-var setupDBStr = "var conn = null;" + "assert.soon(function() {" + "  try {" +
-    "    conn = new Mongo(\"" + db.getMongo().host + "\");" + "    return conn;" +
-    "  } catch (x) {" + "    return false;" + "  }" +
+var setupDBStr = "var conn = null;" +
+    "assert.soon(function() {" +
+    "  try {" +
+    "    conn = new Mongo(\"" + db.getMongo().host + "\");" +
+    "    return conn;" +
+    "  } catch (x) {" +
+    "    return false;" +
+    "  }" +
     "}, 'Timed out waiting for temporary connection to connect', 30000, 5000);" +
     "var db = conn.getDB('" + db.getName() + "');";
 
@@ -47,7 +52,8 @@ for (var i = 90; i < 93; i++) {
     spec["field" + (i + 2)] = 1;
     indexJobs.push(startParallelShell(
         setupDBStr + "printjson(db.index_multi.createIndex(" + tojson(spec) + "," +
-            "{ background: true }));" + "db.results.insert(Object.extend(" +
+            "{ background: true }));" +
+            "db.results.insert(Object.extend(" +
             "db.runCommand({ getlasterror: 1 }), " + tojson(spec) + ") );",
         null,    // port
         true));  // noconnect
@@ -62,7 +68,8 @@ for (var i = 30; i < 90; i += 2) {
     spec["field" + (i + 1)] = 1;
     indexJobs.push(startParallelShell(
         setupDBStr + "printjson(db.index_multi.createIndex(" + tojson(spec) + ", " +
-            "{ background: true }));" + "db.results.insert(Object.extend(" +
+            "{ background: true }));" +
+            "db.results.insert(Object.extend(" +
             "db.runCommand({ getlasterror: 1 }), " + tojson(spec) + ") );",
         null,    // port
         true));  // noconnect
@@ -76,7 +83,8 @@ for (var i = 0; i < 30; i++) {
     spec["field" + i] = 1;
     indexJobs.push(startParallelShell(
         setupDBStr + "printjson(db.index_multi.createIndex(" + tojson(spec) + ", " +
-            "{ background: true }));" + "db.results.insert(Object.extend(" +
+            "{ background: true }));" +
+            "db.results.insert(Object.extend(" +
             "db.runCommand({ getlasterror: 1 }), " + tojson(spec) + ") );",
         null,    // port
         true));  // noconnect

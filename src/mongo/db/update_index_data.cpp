@@ -112,4 +112,4 @@ FieldRef UpdateIndexData::getCanonicalIndexField(const FieldRef& path) {
 
     return buf;
 }
-}
+}  // namespace mongo

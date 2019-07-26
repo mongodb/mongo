@@ -56,8 +56,8 @@ public:
         bool useMajority) = 0;
 
     /**
-    * Directly inserts a key document to the storage
-    */
+     * Directly inserts a key document to the storage
+     */
     virtual Status insertNewKey(OperationContext* opCtx, const BSONObj& doc) = 0;
 
     /**

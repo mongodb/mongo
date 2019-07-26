@@ -356,4 +356,4 @@ int crtDebugCallback(int, char* originalMessage, int*) {
     log() << "*** C runtime error: " << message.substr(0, message.find('\n')) << ", terminating";
     fassertFailed(17006);
 }
-}
+}  // namespace mongo

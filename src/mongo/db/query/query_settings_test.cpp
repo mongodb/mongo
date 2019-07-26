@@ -42,9 +42,9 @@
 
 using mongo::AllowedIndicesFilter;
 using mongo::BSONObj;
+using mongo::fromjson;
 using mongo::IndexEntry;
 using mongo::SimpleBSONObjComparator;
-using mongo::fromjson;
 
 namespace {
 TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByName) {
@@ -113,4 +113,4 @@ TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByKeyPattern) {
     ASSERT_TRUE(filter.allows(a_idx));
     ASSERT_FALSE(filter.allows(ab_idx));
 }
-}
+}  // namespace

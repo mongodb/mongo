@@ -45,4 +45,4 @@ void bsonArrToNumVector(BSONElement el, std::vector<T>& results) {
         results.push_back((T)el.Number());
     }
 }
-}
+}  // namespace mongo

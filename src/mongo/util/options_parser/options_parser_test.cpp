@@ -5096,7 +5096,8 @@ TEST(YAMLConfigFile, canonicalize) {
     moe::OptionsParser parser;
     moe::Environment env;
     std::vector<std::string> argv = {
-        "binary", "--bind_ip_all",
+        "binary",
+        "--bind_ip_all",
     };
     std::map<std::string, std::string> env_map;
     ASSERT_OK(parser.run(opts, argv, env_map, &env));

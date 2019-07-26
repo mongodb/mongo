@@ -43,8 +43,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 
 StatusWith<bool> SaslSCRAMClientConversation::step(StringData inputData, std::string* outputData) {
     _step++;
@@ -58,8 +58,8 @@ StatusWith<bool> SaslSCRAMClientConversation::step(StringData inputData, std::st
             return _thirdStep(inputData, outputData);
         default:
             return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
-                                    str::stream() << "Invalid SCRAM authentication step: "
-                                                  << _step);
+                                    str::stream()
+                                        << "Invalid SCRAM authentication step: " << _step);
     }
 }
 
@@ -126,8 +126,7 @@ StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "Incorrect number of arguments for first SCRAM server message, got "
-                          << input.size()
-                          << " expected at least 3");
+                          << input.size() << " expected at least 3");
     }
 
     if (!str::startsWith(input[0], "r=") || input[0].size() < 3) {

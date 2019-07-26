@@ -159,7 +159,7 @@ struct Type2 : Base {
         ASSERT_EQUALS(string("5eb63bbbe01eeed093cb22bb8f5acdc3"), result["md5"].valuestr());
     }
 };
-}
+}  // namespace FileMD5
 
 namespace SymbolArgument {
 // SERVER-16260
@@ -318,12 +318,10 @@ public:
             cmd.append("indexes",
                        BSON_ARRAY(BSON("key" << BSON("loc"
                                                      << "geoHaystack"
-                                                     << "z"
-                                                     << 1.0)
+                                                     << "z" << 1.0)
                                              << "name"
                                              << "loc_geoHaystack_z_1"
-                                             << "bucketSize"
-                                             << static_cast<double>(0.7))));
+                                             << "bucketSize" << static_cast<double>(0.7))));
 
             BSONObj result;
             ASSERT(db.runCommand(nsDb(), cmd.obj(), result));
@@ -403,4 +401,4 @@ public:
 };
 
 SuiteInstance<All> all;
-}
+}  // namespace CommandTests

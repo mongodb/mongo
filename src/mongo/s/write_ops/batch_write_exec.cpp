@@ -428,14 +428,9 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
             batchOp.abortBatch(errorFromStatus(
                 {ErrorCodes::NoProgressMade,
                  str::stream() << "no progress was made executing batch write op in "
-                               << clientRequest.getNS().ns()
-                               << " after "
-                               << kMaxRoundsWithoutProgress
-                               << " rounds ("
-                               << numCompletedOps
-                               << " ops completed in "
-                               << rounds
-                               << " rounds total)"}));
+                               << clientRequest.getNS().ns() << " after "
+                               << kMaxRoundsWithoutProgress << " rounds (" << numCompletedOps
+                               << " ops completed in " << rounds << " rounds total)"}));
             break;
         }
     }
@@ -469,4 +464,4 @@ const HostOpTimeMap& BatchWriteExecStats::getWriteOpTimes() const {
     return _writeOpTimes;
 }
 
-}  // namespace
+}  // namespace mongo

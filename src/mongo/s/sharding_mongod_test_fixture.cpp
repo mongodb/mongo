@@ -115,9 +115,8 @@ void ShardingMongodTestFixture::setUp() {
         serversBob.append(BSON("host" << _servers[i].toString() << "_id" << static_cast<int>(i)));
     }
     repl::ReplSetConfig replSetConfig;
-    ASSERT_OK(replSetConfig.initialize(
-        BSON("_id" << _setName << "protocolVersion" << 1 << "version" << 3 << "members"
-                   << serversBob.arr())));
+    ASSERT_OK(replSetConfig.initialize(BSON("_id" << _setName << "protocolVersion" << 1 << "version"
+                                                  << 3 << "members" << serversBob.arr())));
     replCoordPtr->setGetConfigReturnValue(replSetConfig);
 
     repl::ReplicationCoordinator::set(service, std::move(replCoordPtr));
@@ -194,12 +193,14 @@ std::unique_ptr<ShardRegistry> ShardingMongodTestFixture::makeShardRegistry(
     _targeterFactory = targeterFactoryPtr;
 
     ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr](
-        const ShardId& shardId, const ConnectionString& connStr) {
+                                                   const ShardId& shardId,
+                                                   const ConnectionString& connStr) {
         return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
     };
 
     ShardFactory::BuilderCallable masterBuilder = [targeterFactoryPtr](
-        const ShardId& shardId, const ConnectionString& connStr) {
+                                                      const ShardId& shardId,
+                                                      const ConnectionString& connStr) {
         return std::make_unique<ShardRemote>(shardId, connStr, targeterFactoryPtr->create(connStr));
     };
 

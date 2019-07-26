@@ -51,42 +51,42 @@ extern const std::string& defaultInitializerName();
 class GlobalInitializerRegisterer {
 public:
     /**
-    * Constructor parameters:
-    *
-    *     - std::string name
-    *
-    *     - InitializerFunction initFn
-    *         Must be nonnull.
-    *         Example expression:
-    *
-    *            [](InitializerContext* context) {
-    *                // initialization code
-    *                return Status::OK();
-    *            }
-    *
-    *     - DeinitializerFunction deinitFn
-    *         A deinitialization that will execute in reverse order from initialization and
-    *         support re-initialization. If not specified, defaults to the `nullptr` function.
-    *         Example expression:
-    *
-    *            [](DeinitializerContext* context) {
-    *                // deinitialization code
-    *                return Status::OK();
-    *            }
-    *
-    *     - std::vector<std::string> prerequisites
-    *         If not specified, defaults to {"default"}.
-    *
-    *     - std::vector<std::string> dependents
-    *         If not specified, defaults to {} (no dependents).
-    *
-    *
-    * At run time, the full set of prerequisites for `name` will be computed as the union of the
-    * `prerequisites` (which can be defaulted) and all other mongo initializers that list `name` in
-    * their `dependents`.
-    *
-    * A non-null `deinitFn` will tag the initializer as supporting re-initialization.
-    */
+     * Constructor parameters:
+     *
+     *     - std::string name
+     *
+     *     - InitializerFunction initFn
+     *         Must be nonnull.
+     *         Example expression:
+     *
+     *            [](InitializerContext* context) {
+     *                // initialization code
+     *                return Status::OK();
+     *            }
+     *
+     *     - DeinitializerFunction deinitFn
+     *         A deinitialization that will execute in reverse order from initialization and
+     *         support re-initialization. If not specified, defaults to the `nullptr` function.
+     *         Example expression:
+     *
+     *            [](DeinitializerContext* context) {
+     *                // deinitialization code
+     *                return Status::OK();
+     *            }
+     *
+     *     - std::vector<std::string> prerequisites
+     *         If not specified, defaults to {"default"}.
+     *
+     *     - std::vector<std::string> dependents
+     *         If not specified, defaults to {} (no dependents).
+     *
+     *
+     * At run time, the full set of prerequisites for `name` will be computed as the union of the
+     * `prerequisites` (which can be defaulted) and all other mongo initializers that list `name` in
+     * their `dependents`.
+     *
+     * A non-null `deinitFn` will tag the initializer as supporting re-initialization.
+     */
     GlobalInitializerRegisterer(std::string name,
                                 InitializerFunction initFn,
                                 DeinitializerFunction deinitFn = nullptr,

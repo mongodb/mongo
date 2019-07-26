@@ -108,7 +108,7 @@ namespace {
 /**
  * Sets the profiling level, logging/profiling threshold, and logging/profiling sample rate for the
  * given database.
-*/
+ */
 class CmdProfile : public ProfileCmdBase {
 public:
     CmdProfile() = default;
@@ -205,8 +205,7 @@ public:
                 uassert(50847,
                         str::stream() << "The element that calls binDataClean() must be type of "
                                          "BinData, but type of "
-                                      << typeName(stateElem.type())
-                                      << " found.",
+                                      << typeName(stateElem.type()) << " found.",
                         (stateElem.type() == BSONType::BinData));
 
                 int len;
@@ -293,8 +292,7 @@ public:
                 uassert(50849,
                         str::stream() << "The element that calls binDataClean() must be type "
                                          "of BinData, but type of "
-                                      << owned["data"].type()
-                                      << " found.",
+                                      << owned["data"].type() << " found.",
                         owned["data"].type() == BSONType::BinData);
 
                 exec->saveState();

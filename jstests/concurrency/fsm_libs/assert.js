@@ -12,7 +12,6 @@
  */
 
 var AssertLevel = (function() {
-
     function AssertLevel(level) {
         this.level = level;
 
@@ -34,7 +33,6 @@ var AssertLevel = (function() {
         OWN_DB: new AssertLevel(2),
         isAssertLevel: isAssertLevel
     };
-
 })();
 
 if (typeof globalAssertLevel === 'undefined') {

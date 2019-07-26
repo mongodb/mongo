@@ -57,7 +57,7 @@ KeyString::Builder makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey
             multikeyMetadataOrd,
             multikeyMetadataRecordId};
 }
-}
+}  // namespace
 
 Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                                             const RecordData& record,
@@ -107,9 +107,9 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                 {documentKeySet.begin(), documentKeySet.end()},
                 {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
                 multikeyPaths)) {
-            std::string msg = str::stream() << "Index " << descriptor->indexName()
-                                            << " is not multi-key but has more than one"
-                                            << " key in document " << recordId;
+            std::string msg = str::stream()
+                << "Index " << descriptor->indexName() << " is not multi-key but has more than one"
+                << " key in document " << recordId;
             ValidateResults& curRecordResults = (*_indexNsResultsMap)[descriptor->indexName()];
             curRecordResults.errors.push_back(msg);
             curRecordResults.valid = false;
@@ -183,9 +183,9 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
     }
 
     if (results && _indexConsistency->getMultikeyMetadataPathCount(indexInfo) > 0) {
-        results->errors.push_back(
-            str::stream() << "Index '" << descriptor->indexName()
-                          << "' has one or more missing multikey metadata index keys");
+        results->errors.push_back(str::stream()
+                                  << "Index '" << descriptor->indexName()
+                                  << "' has one or more missing multikey metadata index keys");
         results->valid = false;
     }
 
@@ -258,9 +258,9 @@ void RecordStoreValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* id
 
     if (idx->isIdIndex() && numTotalKeys != numRecs) {
         hasTooFewKeys = numTotalKeys < numRecs ? true : hasTooFewKeys;
-        std::string msg = str::stream() << "number of _id index entries (" << numTotalKeys
-                                        << ") does not match the number of documents in the index ("
-                                        << numRecs << ")";
+        std::string msg = str::stream()
+            << "number of _id index entries (" << numTotalKeys
+            << ") does not match the number of documents in the index (" << numRecs << ")";
         if (noErrorOnTooFewKeys && (numTotalKeys < numRecs)) {
             results.warnings.push_back(msg);
         } else {

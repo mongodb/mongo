@@ -86,17 +86,14 @@ void validateLSID(OperationContext* opCtx, const GetMoreRequest& request, Client
 
     uassert(50737,
             str::stream() << "Cannot run getMore on cursor " << request.cursorid
-                          << ", which was created in session "
-                          << *cursor->getSessionId()
+                          << ", which was created in session " << *cursor->getSessionId()
                           << ", without an lsid",
             opCtx->getLogicalSessionId() || !cursor->getSessionId());
 
     uassert(50738,
             str::stream() << "Cannot run getMore on cursor " << request.cursorid
-                          << ", which was created in session "
-                          << *cursor->getSessionId()
-                          << ", in session "
-                          << *opCtx->getLogicalSessionId(),
+                          << ", which was created in session " << *cursor->getSessionId()
+                          << ", in session " << *opCtx->getLogicalSessionId(),
             !opCtx->getLogicalSessionId() || !cursor->getSessionId() ||
                 (opCtx->getLogicalSessionId() == cursor->getSessionId()));
 }
@@ -116,17 +113,14 @@ void validateTxnNumber(OperationContext* opCtx,
 
     uassert(50740,
             str::stream() << "Cannot run getMore on cursor " << request.cursorid
-                          << ", which was created in transaction "
-                          << *cursor->getTxnNumber()
+                          << ", which was created in transaction " << *cursor->getTxnNumber()
                           << ", without a txnNumber",
             opCtx->getTxnNumber() || !cursor->getTxnNumber());
 
     uassert(50741,
             str::stream() << "Cannot run getMore on cursor " << request.cursorid
-                          << ", which was created in transaction "
-                          << *cursor->getTxnNumber()
-                          << ", in transaction "
-                          << *opCtx->getTxnNumber(),
+                          << ", which was created in transaction " << *cursor->getTxnNumber()
+                          << ", in transaction " << *opCtx->getTxnNumber(),
             !opCtx->getTxnNumber() || !cursor->getTxnNumber() ||
                 (*opCtx->getTxnNumber() == *cursor->getTxnNumber()));
 }
@@ -434,8 +428,8 @@ public:
             // Ensure that the client still has the privileges to run the originating command.
             if (!authzSession->isAuthorizedForPrivileges(cursorPin->getOriginatingPrivileges())) {
                 uasserted(ErrorCodes::Unauthorized,
-                          str::stream() << "not authorized for getMore with cursor id "
-                                        << _request.cursorid);
+                          str::stream()
+                              << "not authorized for getMore with cursor id " << _request.cursorid);
             }
 
             if (_request.nss != cursorPin->nss()) {

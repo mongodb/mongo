@@ -101,8 +101,7 @@ BSONArray roleSetToBSONArray(const stdx::unordered_set<RoleName>& roles) {
          ++it) {
         const RoleName& role = *it;
         rolesArrayBuilder.append(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                      << role.getRole()
-                                      << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                      << role.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME
                                       << role.getDB()));
     }
     return rolesArrayBuilder.arr();
@@ -113,8 +112,7 @@ BSONArray rolesVectorToBSONArray(const std::vector<RoleName>& roles) {
     for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
         const RoleName& role = *it;
         rolesArrayBuilder.append(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                      << role.getRole()
-                                      << AuthorizationManager::ROLE_DB_FIELD_NAME
+                                      << role.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME
                                       << role.getDB()));
     }
     return rolesArrayBuilder.arr();
@@ -174,14 +172,14 @@ Status checkOkayToGrantRolesToRole(OperationContext* opCtx,
         const RoleName& roleToAdd = *it;
         if (roleToAdd == role) {
             return Status(ErrorCodes::InvalidRoleModification,
-                          str::stream() << "Cannot grant role " << role.getFullName()
-                                        << " to itself.");
+                          str::stream()
+                              << "Cannot grant role " << role.getFullName() << " to itself.");
         }
 
         if (role.getDB() != "admin" && roleToAdd.getDB() != role.getDB()) {
-            return Status(
-                ErrorCodes::InvalidRoleModification,
-                str::stream() << "Roles on the \'" << role.getDB()
+            return Status(ErrorCodes::InvalidRoleModification,
+                          str::stream()
+                              << "Roles on the \'" << role.getDB()
                               << "\' database cannot be granted roles from other databases");
         }
 
@@ -431,14 +429,13 @@ Status insertRoleDocument(OperationContext* opCtx, const BSONObj& roleObj) {
  * Updates the given role object with the given update modifier.
  */
 Status updateRoleDocument(OperationContext* opCtx, const RoleName& role, const BSONObj& updateObj) {
-    Status status = updateOneAuthzDocument(opCtx,
-                                           AuthorizationManager::rolesCollectionNamespace,
-                                           BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                                << role.getRole()
-                                                << AuthorizationManager::ROLE_DB_FIELD_NAME
-                                                << role.getDB()),
-                                           updateObj,
-                                           false);
+    Status status = updateOneAuthzDocument(
+        opCtx,
+        AuthorizationManager::rolesCollectionNamespace,
+        BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
+             << role.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME << role.getDB()),
+        updateObj,
+        false);
     if (status.isOK()) {
         return status;
     }
@@ -516,13 +513,12 @@ Status updatePrivilegeDocument(OperationContext* opCtx,
 Status updatePrivilegeDocument(OperationContext* opCtx,
                                const UserName& user,
                                const BSONObj& updateObj) {
-    const auto status = updatePrivilegeDocument(opCtx,
-                                                user,
-                                                BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                                     << user.getUser()
-                                                     << AuthorizationManager::USER_DB_FIELD_NAME
-                                                     << user.getDB()),
-                                                updateObj);
+    const auto status = updatePrivilegeDocument(
+        opCtx,
+        user,
+        BSON(AuthorizationManager::USER_NAME_FIELD_NAME
+             << user.getUser() << AuthorizationManager::USER_DB_FIELD_NAME << user.getDB()),
+        updateObj);
     return status;
 }
 
@@ -621,8 +617,7 @@ StatusWith<AuthzLockGuard> requireWritableAuthSchema28SCRAM(OperationContext* op
                       str::stream()
                           << "User and role management commands require auth data to have "
                           << "at least schema version "
-                          << AuthorizationManager::schemaVersion28SCRAM
-                          << " but found "
+                          << AuthorizationManager::schemaVersion28SCRAM << " but found "
                           << foundSchemaVersion);
     }
     status = writeAuthSchemaVersionIfNeeded(opCtx, authzManager, foundSchemaVersion);
@@ -658,8 +653,7 @@ StatusWith<AuthzLockGuard> requireReadableAuthSchema26Upgrade(OperationContext* 
         return Status(ErrorCodes::AuthSchemaIncompatible,
                       str::stream() << "The usersInfo and rolesInfo commands require auth data to "
                                     << "have at least schema version "
-                                    << AuthorizationManager::schemaVersion26Upgrade
-                                    << " but found "
+                                    << AuthorizationManager::schemaVersion26Upgrade << " but found "
                                     << foundSchemaVersion);
     }
 
@@ -2022,9 +2016,9 @@ public:
             &nMatched);
         if (!status.isOK()) {
             uassertStatusOK(useDefaultCode(status, ErrorCodes::UserModificationFailed)
-                                .withContext(str::stream() << "Failed to remove role "
-                                                           << roleName.getFullName()
-                                                           << " from all users"));
+                                .withContext(str::stream()
+                                             << "Failed to remove role " << roleName.getFullName()
+                                             << " from all users"));
         }
 
         // Remove this role from all other roles
@@ -2045,9 +2039,9 @@ public:
         if (!status.isOK()) {
             uassertStatusOK(
                 useDefaultCode(status, ErrorCodes::RoleModificationFailed)
-                    .withContext(
-                        str::stream() << "Removed role " << roleName.getFullName()
-                                      << " from all users but failed to remove from all roles"));
+                    .withContext(str::stream()
+                                 << "Removed role " << roleName.getFullName()
+                                 << " from all users but failed to remove from all roles"));
         }
 
         audit::logDropRole(Client::getCurrent(), roleName);
@@ -2139,13 +2133,12 @@ public:
         if (!status.isOK()) {
             uassertStatusOK(useDefaultCode(status, ErrorCodes::UserModificationFailed)
                                 .withContext(str::stream() << "Failed to remove roles from \""
-                                                           << dbname
-                                                           << "\" db from all users"));
+                                                           << dbname << "\" db from all users"));
         }
 
         // Remove these roles from all other roles
-        std::string sourceFieldName = str::stream() << "roles."
-                                                    << AuthorizationManager::ROLE_DB_FIELD_NAME;
+        std::string sourceFieldName = str::stream()
+            << "roles." << AuthorizationManager::ROLE_DB_FIELD_NAME;
         status = updateAuthzDocuments(
             opCtx,
             AuthorizationManager::rolesCollectionNamespace,
@@ -2158,8 +2151,7 @@ public:
         if (!status.isOK()) {
             uassertStatusOK(useDefaultCode(status, ErrorCodes::RoleModificationFailed)
                                 .withContext(str::stream() << "Failed to remove roles from \""
-                                                           << dbname
-                                                           << "\" db from all roles"));
+                                                           << dbname << "\" db from all roles"));
         }
 
         audit::logDropAllRolesFromDatabase(Client::getCurrent(), dbname);
@@ -2580,9 +2572,7 @@ public:
             BSONObj query =
                 db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db);
             BSONObj fields = BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                  << 1
-                                  << AuthorizationManager::USER_DB_FIELD_NAME
-                                  << 1);
+                                  << 1 << AuthorizationManager::USER_DB_FIELD_NAME << 1);
 
             Status status =
                 queryAuthzDocument(opCtx,
@@ -2653,9 +2643,7 @@ public:
             BSONObj query =
                 db.empty() ? BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db);
             BSONObj fields = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                  << 1
-                                  << AuthorizationManager::ROLE_DB_FIELD_NAME
-                                  << 1);
+                                  << 1 << AuthorizationManager::ROLE_DB_FIELD_NAME << 1);
 
             Status status =
                 queryAuthzDocument(opCtx,

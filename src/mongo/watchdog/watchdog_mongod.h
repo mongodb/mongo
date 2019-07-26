@@ -34,8 +34,8 @@
 namespace mongo {
 
 /**
-* Start the watchdog.
-*/
+ * Start the watchdog.
+ */
 void startWatchdog();
 
 /**

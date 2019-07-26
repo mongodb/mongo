@@ -67,9 +67,9 @@ StatusWith<ServerGlobalParams::ClusterAuthModes> clusterAuthModeParse(StringData
     } else if (strMode == "x509") {
         return ServerGlobalParams::ClusterAuthMode_x509;
     } else {
-        return Status(
-            ErrorCodes::BadValue,
-            str::stream() << "Invalid clusterAuthMode '" << strMode
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "Invalid clusterAuthMode '" << strMode
                           << "', expected one of: 'keyFile', 'sendKeyFile', 'sendX509', or 'x509'");
     }
 }
@@ -99,18 +99,16 @@ Status ClusterAuthModeServerParameter::setFromString(const std::string& strMode)
                     "connections"};
         }
         serverGlobalParams.clusterAuthMode.store(mode);
-        auth::setInternalUserAuthParams(
-            BSON(saslCommandMechanismFieldName << "MONGODB-X509" << saslCommandUserDBFieldName
-                                               << "$external"));
+        auth::setInternalUserAuthParams(BSON(saslCommandMechanismFieldName
+                                             << "MONGODB-X509" << saslCommandUserDBFieldName
+                                             << "$external"));
     } else if ((mode == ServerGlobalParams::ClusterAuthMode_x509) &&
                (oldMode == ServerGlobalParams::ClusterAuthMode_sendX509)) {
         serverGlobalParams.clusterAuthMode.store(mode);
     } else {
         return {ErrorCodes::BadValue,
                 str::stream() << "Illegal state transition for clusterAuthMode, change from "
-                              << clusterAuthModeFormat()
-                              << " to "
-                              << strMode};
+                              << clusterAuthModeFormat() << " to " << strMode};
     }
 
     return Status::OK();

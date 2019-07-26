@@ -220,4 +220,4 @@ private:
     GetServerInfoFunc _getServerInfoChecker;
     StatusWith<DistLockCatalog::ServerInfo> _getServerInfoReturnValue;
 };
-}
+}  // namespace mongo

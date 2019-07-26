@@ -78,4 +78,4 @@ Status validateMongosOptions(const moe::Environment& params);
 Status canonicalizeMongosOptions(moe::Environment* params);
 
 Status storeMongosOptions(const moe::Environment& params);
-}
+}  // namespace mongo

@@ -336,14 +336,12 @@ TEST_F(ReplaceRootSpec, CreationRequiresObjectSpecification) {
 TEST_F(ReplaceRootSpec, OnlyValidOptionInObjectSpecIsNewRoot) {
     ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSON("newRoot"
                                                          << "$a"
-                                                         << "root"
-                                                         << 2))),
+                                                         << "root" << 2))),
                        AssertionException,
                        40415);
     ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSON("newRoot"
                                                          << "$a"
-                                                         << "path"
-                                                         << 2))),
+                                                         << "path" << 2))),
                        AssertionException,
                        40415);
     ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSON("path"

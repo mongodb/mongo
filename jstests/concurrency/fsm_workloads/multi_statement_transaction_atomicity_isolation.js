@@ -53,7 +53,6 @@ load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 load("jstests/aggregation/extras/utils.js");
 
 var $config = (function() {
-
     function checkTransactionCommitOrder(documents) {
         const graph = new Graph();
 
@@ -95,9 +94,7 @@ var $config = (function() {
             }
         }
 
-        for (let {
-                 op, actual
-             } of updateCounts.values()) {
+        for (let {op, actual} of updateCounts.values()) {
             assert.eq(op.numUpdated, actual, () => {
                 return 'transaction ' + tojson(op) + ' should have updated ' + op.numUpdated +
                     ' documents, but ' + actual + ' were updated: ' + tojson(updateCounts.values());
@@ -174,8 +171,8 @@ var $config = (function() {
         assertWhenOwnColl.eq(allDocuments.length, numDocs * this.collections.length, () => {
             if (this.session) {
                 return "txnNumber: " + tojson(this.session.getTxnNumber_forTesting()) +
-                    ", session id: " + tojson(this.session.getSessionId()) + ", all documents: " +
-                    tojson(allDocuments);
+                    ", session id: " + tojson(this.session.getSessionId()) +
+                    ", all documents: " + tojson(allDocuments);
             }
             return "all documents: " + tojson(allDocuments);
         });
@@ -192,7 +189,6 @@ var $config = (function() {
     }
 
     const states = (function() {
-
         return {
             init: function init(db, collName) {
                 this.iteration = 0;
@@ -367,5 +363,4 @@ var $config = (function() {
         setup: setup,
         teardown: teardown,
     };
-
 })();

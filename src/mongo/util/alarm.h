@@ -192,4 +192,4 @@ private:
     AlarmMap _alarms;
 };
 
-}  // namespace
+}  // namespace mongo

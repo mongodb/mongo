@@ -61,8 +61,7 @@ void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
     // a rename has happened during yield.
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "collection renamed from '" << _nss << "' to '" << *newNss
-                          << "'. UUID "
-                          << _collectionUUID,
+                          << "'. UUID " << _collectionUUID,
             *newNss == _nss);
 
     // At this point we know that the collection name has not changed, and therefore we have

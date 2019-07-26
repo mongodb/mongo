@@ -85,4 +85,4 @@ private:
     HostTypeRequirement _mergeType = HostTypeRequirement::kNone;
 };
 
-}  // namesace mongo
+}  // namespace mongo

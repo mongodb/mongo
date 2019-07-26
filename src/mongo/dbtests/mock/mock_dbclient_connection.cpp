@@ -182,4 +182,4 @@ void MockDBClientConnection::checkConnection() {
         _remoteServerInstanceID = _remoteServer->getInstanceID();
     }
 }
-}
+}  // namespace mongo

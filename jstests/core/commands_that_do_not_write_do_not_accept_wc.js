@@ -10,52 +10,52 @@
  */
 
 (function() {
-    "use strict";
-    var collName = 'leaves';
+"use strict";
+var collName = 'leaves';
 
-    var commands = [];
+var commands = [];
 
-    commands.push({find: collName, query: {_id: 1}});
+commands.push({find: collName, query: {_id: 1}});
 
-    commands.push({distinct: collName, key: "_id"});
+commands.push({distinct: collName, key: "_id"});
 
-    commands.push({count: collName, query: {type: 'oak'}});
+commands.push({count: collName, query: {type: 'oak'}});
 
-    commands.push({
-        mapReduce: collName,
-        map: function() {
-            this.tags.forEach(function(z) {
-                emit(z, 1);
-            });
-        },
-        reduce: function(key, values) {
-            return {count: values.length};
-        },
-        out: {inline: 1}
-    });
-
-    function assertWriteConcernNotSupportedError(res) {
-        assert.commandFailed(res);
-        assert.eq(res.code, ErrorCodes.InvalidOptions);
-        assert(!res.writeConcernError);
-    }
-
-    // Test a variety of valid and invalid writeConcerns to confirm that they still all get
-    // the correct error.
-    var writeConcerns = [{w: 'invalid'}, {w: 1}];
-
-    function testUnsupportedWriteConcern(wc, cmd) {
-        cmd.writeConcern = wc;
-        jsTest.log("Testing " + tojson(cmd));
-
-        var res = db.runCommand(cmd);
-        assertWriteConcernNotSupportedError(res);
-    }
-
-    // Verify that each command gets a writeConcernNotSupported error.
-    commands.forEach(function(cmd) {
-        writeConcerns.forEach(function(wc) {
-            testUnsupportedWriteConcern(wc, cmd);
+commands.push({
+    mapReduce: collName,
+    map: function() {
+        this.tags.forEach(function(z) {
+            emit(z, 1);
         });
+    },
+    reduce: function(key, values) {
+        return {count: values.length};
+    },
+    out: {inline: 1}
+});
+
+function assertWriteConcernNotSupportedError(res) {
+    assert.commandFailed(res);
+    assert.eq(res.code, ErrorCodes.InvalidOptions);
+    assert(!res.writeConcernError);
+}
+
+// Test a variety of valid and invalid writeConcerns to confirm that they still all get
+// the correct error.
+var writeConcerns = [{w: 'invalid'}, {w: 1}];
+
+function testUnsupportedWriteConcern(wc, cmd) {
+    cmd.writeConcern = wc;
+    jsTest.log("Testing " + tojson(cmd));
+
+    var res = db.runCommand(cmd);
+    assertWriteConcernNotSupportedError(res);
+}
+
+// Verify that each command gets a writeConcernNotSupported error.
+commands.forEach(function(cmd) {
+    writeConcerns.forEach(function(wc) {
+        testUnsupportedWriteConcern(wc, cmd);
     });
+});
 })();

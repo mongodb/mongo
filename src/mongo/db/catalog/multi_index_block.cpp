@@ -135,8 +135,8 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
                     replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
                     opCtx->getServiceContext()->getOpObserver()->onOpMessage(
                         opCtx,
-                        BSON("msg" << std::string(str::stream() << "Failing index builds. Coll: "
-                                                                << nss)));
+                        BSON("msg" << std::string(str::stream()
+                                                  << "Failing index builds. Coll: " << nss)));
                 } else {
                     // Simply get a timestamp to write with here; we can't write to the oplog.
                     repl::UnreplicatedWritesBlock uwb(opCtx);
@@ -182,7 +182,7 @@ MultiIndexBlock::OnInitFn MultiIndexBlock::kNoopOnInitFn =
 
 MultiIndexBlock::OnInitFn MultiIndexBlock::makeTimestampedIndexOnInitFn(OperationContext* opCtx,
                                                                         const Collection* coll) {
-    return [ opCtx, ns = coll->ns() ](std::vector<BSONObj> & specs)->Status {
+    return [opCtx, ns = coll->ns()](std::vector<BSONObj>& specs) -> Status {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (opCtx->recoveryUnit()->getCommitTimestamp().isNull() &&
             replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
@@ -213,12 +213,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
-                              << ". Cannot initialize index builder: "
-                              << collection->ns()
-                              << " ("
-                              << collection->uuid()
-                              << "): "
-                              << indexSpecs.size()
+                              << ". Cannot initialize index builder: " << collection->ns() << " ("
+                              << collection->uuid() << "): " << indexSpecs.size()
                               << " provided. First index spec: "
                               << (indexSpecs.empty() ? BSONObj() : indexSpecs[0])};
     }
@@ -725,8 +721,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         return {
             ErrorCodes::IndexBuildAborted,
             str::stream() << "Index build aborted: " << _abortReason
-                          << ". Cannot commit index builder: "
-                          << collection->ns()
+                          << ". Cannot commit index builder: " << collection->ns()
                           << (_collectionUUID ? (" (" + _collectionUUID->toString() + ")") : "")};
     }
 

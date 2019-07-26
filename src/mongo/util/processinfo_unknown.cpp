@@ -78,4 +78,4 @@ bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<
 boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
     return boost::none;
 }
-}
+}  // namespace mongo

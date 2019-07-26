@@ -83,7 +83,7 @@ constexpr auto kPipelineDiscardMode = MergeMode{WhenMatched::kPipeline, WhenNotM
  */
 MergeStrategy makeUpdateStrategy(bool upsert, BatchTransform transform) {
     return [upsert, transform](
-        const auto& expCtx, const auto& ns, const auto& wc, auto epoch, auto&& batch) {
+               const auto& expCtx, const auto& ns, const auto& wc, auto epoch, auto&& batch) {
         if (transform) {
             transform(batch);
         }
@@ -104,7 +104,7 @@ MergeStrategy makeUpdateStrategy(bool upsert, BatchTransform transform) {
  */
 MergeStrategy makeStrictUpdateStrategy(bool upsert, BatchTransform transform) {
     return [upsert, transform](
-        const auto& expCtx, const auto& ns, const auto& wc, auto epoch, auto&& batch) {
+               const auto& expCtx, const auto& ns, const auto& wc, auto epoch, auto&& batch) {
         if (transform) {
             transform(batch);
         }
@@ -408,7 +408,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
         mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->mode : kDefaultWhenMatched;
     auto whenNotMatched = mergeSpec.getWhenNotMatched().value_or(kDefaultWhenNotMatched);
     auto pipeline = mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->pipeline : boost::none;
-    auto[mergeOnFields, targetCollectionVersion] =
+    auto [mergeOnFields, targetCollectionVersion] =
         expCtx->mongoProcessInterface->ensureFieldsUniqueOrResolveDocumentKey(
             expCtx, mergeSpec.getOn(), mergeSpec.getTargetCollectionVersion(), targetNss);
 
@@ -431,7 +431,7 @@ Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> 
         }
 
         BSONObjBuilder bob;
-        for (auto && [ name, expr ] : *_letVariables) {
+        for (auto&& [name, expr] : *_letVariables) {
             bob << name << expr->serialize(static_cast<bool>(explain));
         }
         return bob.obj();

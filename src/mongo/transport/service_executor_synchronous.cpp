@@ -115,7 +115,7 @@ Status ServiceExecutorSynchronous::schedule(Task task,
     // into the thread local job queue.
     LOG(3) << "Starting new executor thread in passthrough mode";
 
-    Status status = launchServiceWorkerThread([ this, task = std::move(task) ] {
+    Status status = launchServiceWorkerThread([this, task = std::move(task)] {
         _numRunningWorkerThreads.addAndFetch(1);
 
         _localWorkQueue.emplace_back(std::move(task));

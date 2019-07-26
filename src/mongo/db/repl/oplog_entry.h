@@ -147,14 +147,15 @@ public:
 class OplogEntry : private MutableOplogEntry {
 public:
     // Make field names accessible.
-    using MutableOplogEntry::kDurableReplOperationFieldName;
-    using MutableOplogEntry::kOperationSessionInfoFieldName;
     using MutableOplogEntry::k_idFieldName;
+    using MutableOplogEntry::kDurableReplOperationFieldName;
     using MutableOplogEntry::kFromMigrateFieldName;
     using MutableOplogEntry::kHashFieldName;
     using MutableOplogEntry::kNssFieldName;
-    using MutableOplogEntry::kObjectFieldName;
     using MutableOplogEntry::kObject2FieldName;
+    using MutableOplogEntry::kObjectFieldName;
+    using MutableOplogEntry::kOperationSessionInfoFieldName;
+    using MutableOplogEntry::kOplogVersion;
     using MutableOplogEntry::kOpTypeFieldName;
     using MutableOplogEntry::kPostImageOpTimeFieldName;
     using MutableOplogEntry::kPreImageOpTimeFieldName;
@@ -168,38 +169,37 @@ public:
     using MutableOplogEntry::kUuidFieldName;
     using MutableOplogEntry::kVersionFieldName;
     using MutableOplogEntry::kWallClockTimeFieldName;
-    using MutableOplogEntry::kOplogVersion;
 
     // Make serialize(), toBSON() and getters accessible.
-    using MutableOplogEntry::serialize;
-    using MutableOplogEntry::toBSON;
-    using MutableOplogEntry::getOperationSessionInfo;
-    using MutableOplogEntry::getSessionId;
-    using MutableOplogEntry::getTxnNumber;
+    using MutableOplogEntry::get_id;
     using MutableOplogEntry::getDurableReplOperation;
-    using MutableOplogEntry::getOpType;
+    using MutableOplogEntry::getFromMigrate;
+    using MutableOplogEntry::getHash;
     using MutableOplogEntry::getNss;
-    using MutableOplogEntry::getUuid;
     using MutableOplogEntry::getObject;
     using MutableOplogEntry::getObject2;
-    using MutableOplogEntry::getUpsert;
-    using MutableOplogEntry::getTimestamp;
-    using MutableOplogEntry::getTerm;
-    using MutableOplogEntry::getHash;
-    using MutableOplogEntry::getVersion;
-    using MutableOplogEntry::getFromMigrate;
-    using MutableOplogEntry::get_id;
-    using MutableOplogEntry::getWallClockTime;
-    using MutableOplogEntry::getStatementId;
-    using MutableOplogEntry::getPrevWriteOpTimeInTransaction;
-    using MutableOplogEntry::getPreImageOpTime;
+    using MutableOplogEntry::getOperationSessionInfo;
+    using MutableOplogEntry::getOpType;
     using MutableOplogEntry::getPostImageOpTime;
+    using MutableOplogEntry::getPreImageOpTime;
+    using MutableOplogEntry::getPrevWriteOpTimeInTransaction;
+    using MutableOplogEntry::getSessionId;
+    using MutableOplogEntry::getStatementId;
+    using MutableOplogEntry::getTerm;
+    using MutableOplogEntry::getTimestamp;
+    using MutableOplogEntry::getTxnNumber;
+    using MutableOplogEntry::getUpsert;
+    using MutableOplogEntry::getUuid;
+    using MutableOplogEntry::getVersion;
+    using MutableOplogEntry::getWallClockTime;
+    using MutableOplogEntry::serialize;
+    using MutableOplogEntry::toBSON;
 
     // Make helper functions accessible.
     using MutableOplogEntry::getOpTime;
+    using MutableOplogEntry::makeDeleteOperation;
     using MutableOplogEntry::makeInsertOperation;
     using MutableOplogEntry::makeUpdateOperation;
-    using MutableOplogEntry::makeDeleteOperation;
 
     enum class CommandType {
         kNotCommand,
