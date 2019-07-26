@@ -377,7 +377,7 @@ variables:
   - enterprise-rhel-67-s390x
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-70-64-bit-kitchen-sink
-  - enterprise-rhel-70-64-bit-debug-libunwind
+  - enterprise-rhel-70-64-bit-libunwind
   - enterprise-rhel-71-ppc64le
   - enterprise-rhel-71-ppc64le-inmem
   - enterprise-rhel-72-s390x
@@ -10929,14 +10929,14 @@ buildvariants:
   - name: noPassthrough_gen
 
 - <<: *enterprise-rhel-70-64-bit-template
-  name: enterprise-rhel-70-64-bit-debug-libunwind
-  display_name: "~ Enterprise RHEL 7.0 DEBUG (libunwind)"
+  name: enterprise-rhel-70-64-bit-libunwind
+  display_name: "~ Enterprise RHEL 7.0 (libunwind)"
   batchtime: 1440 # 1 day
   runs_on:
   - rhel70
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-libunwind
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-libunwind
     has_packages: false
     mh_target: ""
 
