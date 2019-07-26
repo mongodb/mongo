@@ -383,19 +383,21 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
 
     int wtRet;
     if (commit) {
+        StringBuilder conf;
         if (!_commitTimestamp.isNull()) {
             // There is currently no scenario where it is intentional to commit before the current
             // read timestamp.
             invariant(_readAtTimestamp.isNull() || _commitTimestamp >= _readAtTimestamp);
 
-            const std::string conf = "commit_timestamp=" + integerToHex(_commitTimestamp.asULL());
-            invariantWTOK(s->timestamp_transaction(s, conf.c_str()));
+            conf << "commit_timestamp=" << integerToHex(_commitTimestamp.asULL()) << ",";
             _isTimestamped = true;
         }
 
-        const std::string conf = _durableTimestamp.isNull() ? "" : "durable_timestamp=" +
-                integerToHex(_durableTimestamp.asULL());
-        wtRet = s->commit_transaction(s, conf.c_str());
+        if (!_durableTimestamp.isNull()) {
+            conf << "durable_timestamp=" << integerToHex(_durableTimestamp.asULL());
+        }
+
+        wtRet = s->commit_transaction(s, conf.str().c_str());
         LOG(3) << "WT commit_transaction for snapshot id " << _mySnapshotId;
     } else {
         wtRet = s->rollback_transaction(s, nullptr);
