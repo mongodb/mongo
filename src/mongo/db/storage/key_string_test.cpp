@@ -458,6 +458,26 @@ TEST_F(KeyStringTest, DecimalNumbers) {
     ROUNDTRIP(V1, BSON("" << BSONNULL << "" << BSON("a" << Decimal128::kPositiveInfinity)));
 }
 
+TEST_F(KeyStringTest, DoubleInvalidIntegerPartV0) {
+    // Test that an illegally encoded double throws an error.
+    const char* data =
+        // kNumericPositive7ByteInt
+        "\x31"
+        // Encode a 1 bit at the lowest end to indicate that this number has a fractional part.
+        // Then add the value 1 << 53 left-shifted by 1. 1 << 53 is too large to have been encoded
+        // as a  double, and will cause the call to toBsonSafe to fail.
+        "\x40\x00\x00\x00\x00\x00\x01";  // ((1 << 53) << 1) + 1
+    const size_t size = 8;
+
+    mongo::KeyString::TypeBits tb(mongo::KeyString::Version::V0);
+    tb.appendNumberDouble();
+
+    ASSERT_THROWS_CODE(
+        mongo::KeyString::toBsonSafe(data, size, mongo::Ordering::make(mongo::BSONObj()), tb),
+        AssertionException,
+        31209);
+}
+
 TEST_F(KeyStringTest, LotsOfNumbers1) {
     for (int i = 0; i < 64; i++) {
         int64_t x = 1LL << i;
