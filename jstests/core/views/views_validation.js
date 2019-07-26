@@ -129,4 +129,10 @@ makeView("a",
          "b",
          [{"$lookup": {from: "a", localField: "b", foreignField: "c"}}],
          ErrorCodes.FailedToParse);
+
+const invalidDb = db.getSiblingDB("$gt");
+assert.commandFailedWithCode(invalidDb.createView('testView', 'testColl', []),
+                             ErrorCodes.InvalidViewDefinition);
+// Delete the invalid view (by dropping the database) so that the validate hook succeeds.
+assert.commandWorked(invalidDb.dropDatabase());
 }());
