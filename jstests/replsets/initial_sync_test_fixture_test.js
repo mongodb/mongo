@@ -30,8 +30,10 @@
         }
 
         if (contains) {
+            print("checkLog for '" + msg + "' on " + node.host);
             assert(checkLog.checkContainsOnce(node, msg));
         } else {
+            print("checkLog to not see '" + msg + "' on " + node.host);
             assert(!checkLog.checkContainsOnce(node, msg));
         }
     }
@@ -49,6 +51,19 @@
         assert(checkLog.checkContainsOnce(node, msg));
     }
 
+    /**
+     * Rearranges the order of the databases that the test assumes the server will clone to match
+     * reality. Initial sync clones the 'admin' database first, and does so by swapping it with the
+     * first database that 'listDatabases' returns.
+     */
+    function setAdminAsFirst(databases) {
+        assert.gt(databases.length, 0);
+        const adminIdx = databases.findIndex((elem) => elem.name === "admin");
+        assert.gte(adminIdx, 0);
+        databases[adminIdx] = databases[0];
+        databases[0] = {name: "admin"};
+    }
+
     // Set up Initial Sync Test.
     const initialSyncTest = new InitialSyncTest();
     const primary = initialSyncTest.getPrimary();
@@ -60,8 +75,11 @@
     assert.commandWorked(db.bar.insert({b: 1}));
 
     // Do same listDatabases command as CollectionCloner.
-    const databases =
+    let databases =
         assert.commandWorked(primary.adminCommand({listDatabases: 1, nameOnly: true})).databases;
+    print("listDatabases: " + tojsononeline(databases));
+    setAdminAsFirst(databases);
+    print("rearranged databases: " + tojsononeline(databases));
 
     // This step call restarts the secondary and causes it to go into initial sync.
     assert(!initialSyncTest.step());
@@ -83,6 +101,7 @@
     // that we can check the log messages to make sure initial sync is paused as expected.
     for (let dbObj of databases) {
         const dbname = dbObj.name;
+        print("Test cloning " + dbname);
 
         // We skip the local db during the collection cloning phase of initial sync.
         if (dbname === "local") {
@@ -113,6 +132,13 @@
         checkLogForCollectionClonerMsg(secondary, "listIndexes", "admin", false);
 
         for (let collectionObj of collectionsCursor.firstBatch) {
+            print("Test cloning " + tojson(collectionObj));
+
+            if (collectionObj.name === 'system.indexes') {
+                print("Skipping cloning 'system.indexes' collection, like initial sync");
+                continue;
+            }
+
             assert(collectionObj.info, collectionObj);
             const collUUID = collectionObj.info.uuid;
 
