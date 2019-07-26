@@ -30,6 +30,7 @@
 #pragma once
 
 #include <type_traits>
+#include <utility>
 
 #include "mongo/platform/compiler.h"
 
@@ -38,21 +39,18 @@ namespace mongo {
 template <typename F>
 class[[nodiscard]] ScopeGuard {
 public:
-    explicit ScopeGuard(const F& f) : _func(f) {}
-    explicit ScopeGuard(F && f) : _func(std::move(f)) {}
+    template <typename FuncArg>
+    explicit ScopeGuard(FuncArg && f) : _func(std::forward<FuncArg>(f)) {}
 
-    // Can only be move-constructed, to support being returned from a function.
+    // Remove all move and copy, MCE (mandatory copy elision) covers us here.
     ScopeGuard(const ScopeGuard&) = delete;
-    ScopeGuard(ScopeGuard && o) : _func(std::move(o._func)), _dismissed(o._dismissed) {
-        o._dismissed = true;
-    }
+    ScopeGuard(ScopeGuard &&) = delete;
     ScopeGuard& operator=(const ScopeGuard&) = delete;
     ScopeGuard& operator=(ScopeGuard&&) = delete;
 
-    ~ScopeGuard() {
-        if (_dismissed)
-            return;
-        _func();
+    ~ScopeGuard() noexcept {
+        if (!_dismissed)
+            _func();
     }
 
     void dismiss() noexcept {
