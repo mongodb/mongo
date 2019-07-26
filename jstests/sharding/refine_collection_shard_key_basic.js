@@ -52,6 +52,12 @@ function validateConfigCollections(keyDoc, oldEpoch) {
     assert.neq(oldEpoch, collArr[0].lastmodEpoch);
 }
 
+function validateConfigCollectionsUnique(unique) {
+    const collArr = mongos.getCollection(kConfigCollections).find({_id: kNsName}).toArray();
+    assert.eq(1, collArr.length);
+    assert.eq(unique, collArr[0].unique);
+}
+
 // 1. Assume oldKeyDoc = {a: 1, b: 1} when validating operations before
 //    'refineCollectionShardKey'.
 // 2. Assume newKeyDoc = {a: 1, b: 1, c: 1, d: 1} when validating operations after
@@ -447,6 +453,26 @@ oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).last
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {a: 1, 'b.c': 1}}));
 validateConfigCollections({a: 1, 'b.c': 1}, oldEpoch);
+
+assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
+
+jsTestLog('********** UNIQUENESS PROPERTY TESTS **********');
+
+enableShardingAndShardColl({_id: 1});
+assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1}));
+
+// Verify that refineCollectionShardKey cannot modify a unique=false sharded collection.
+assert.commandWorked(
+    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}));
+validateConfigCollectionsUnique(false);
+
+// Verify that refineCollectionShardKey cannot modify a unique=true sharded collection.
+dropAndReshardCollUnique({_id: 1});
+assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1}));
+
+assert.commandWorked(
+    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}));
+validateConfigCollectionsUnique(true);
 
 assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
