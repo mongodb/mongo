@@ -49,7 +49,7 @@ public:
     struct SortPatternPart {
         bool isAscending = true;
         boost::optional<FieldPath> fieldPath;
-        boost::intrusive_ptr<Expression> expression;
+        boost::intrusive_ptr<ExpressionMeta> expression;
     };
 
     SortPattern(const BSONObj&, const boost::intrusive_ptr<ExpressionContext>&);

@@ -36,40 +36,23 @@
 
 namespace mongo {
 
-SortKeyGenerator::SortKeyGenerator(const BSONObj& sortSpec, const CollatorInterface* collator)
-    : _collator(collator) {
+SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterface* collator)
+    : _collator(collator), _sortPattern(std::move(sortPattern)) {
     BSONObjBuilder btreeBob;
+    size_t nFields = 0;
 
-    for (auto&& elt : sortSpec) {
-        if (elt.isNumber()) {
-            btreeBob.append(elt);
-            _patternPartTypes.push_back(SortPatternPartType::kFieldPath);
-        } else {
-            // If this field of the sort pattern is non-numeric, we expect it to be a text-score
-            // meta sort.
-            invariant(elt.type() == BSONType::Object);
-            invariant(elt.embeddedObject().nFields() == 1);
-            auto metaElem = elt.embeddedObject().firstElement();
-            invariant(metaElem.fieldNameStringData() == "$meta"_sd);
-            if (metaElem.valueStringData() == "textScore"_sd) {
-                _patternPartTypes.push_back(SortPatternPartType::kMetaTextScore);
-            } else if (metaElem.valueStringData() == "randVal"_sd) {
-                _patternPartTypes.push_back(SortPatternPartType::kMetaRandVal);
-            } else if (metaElem.valueStringData() == "searchScore"_sd) {
-                uasserted(31218, "$meta sort by 'searchScore' metadata is not supported");
-            } else if (metaElem.valueStringData() == "searchHighlights"_sd) {
-                uasserted(31219, "$meta sort by 'searchHighlights' metadata is not supported");
-            } else {
-                uasserted(31138, "Illegal $meta sort: " + metaElem.valueStringData());
-            }
-            _sortHasMeta = true;
+    for (auto&& part : _sortPattern) {
+        if (part.fieldPath) {
+            btreeBob.append(part.fieldPath->fullPath(), part.isAscending ? 1 : -1);
+            ++nFields;
         }
     }
 
     // The fake index key pattern used to generate Btree keys.
     _sortSpecWithoutMeta = btreeBob.obj();
+    _sortHasMeta = nFields < _sortPattern.size();
 
-    // If we're just sorting by meta, don't bother with all the key stuff.
+    // If we're just sorting by meta, don't bother creating an index key generator.
     if (_sortSpecWithoutMeta.isEmpty()) {
         return;
     }
@@ -77,11 +60,11 @@ SortKeyGenerator::SortKeyGenerator(const BSONObj& sortSpec, const CollatorInterf
     // We'll need to treat arrays as if we were to create an index over them. that is, we may need
     // to unnest the first level and consider each array element to decide the sort order. In order
     // to do this, we make a BtreeKeyGenerator.
+    std::vector<BSONElement> fixed(nFields);
     std::vector<const char*> fieldNames;
-    std::vector<BSONElement> fixed;
-    for (auto&& patternElt : _sortSpecWithoutMeta) {
-        fieldNames.push_back(patternElt.fieldName());
-        fixed.push_back(BSONElement());
+    fieldNames.reserve(fixed.size());
+    for (auto&& elem : _sortSpecWithoutMeta) {
+        fieldNames.push_back(elem.fieldName());
     }
 
     constexpr bool isSparse = false;
@@ -105,10 +88,10 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromIndexKey(const WorkingSetMem
     invariant(!_sortHasMeta);
 
     BSONObjBuilder objBuilder;
-    for (BSONElement specElt : _sortSpecWithoutMeta) {
-        invariant(specElt.isNumber());
+    for (auto&& elem : _sortSpecWithoutMeta) {
         BSONElement sortKeyElt;
-        invariant(member.getFieldDotted(specElt.fieldName(), &sortKeyElt));
+        invariant(elem.isNumber());
+        invariant(member.getFieldDotted(elem.fieldName(), &sortKeyElt));
         // If we were to call 'collationAwareIndexKeyAppend' with a non-simple collation and a
         // 'sortKeyElt' representing a collated index key we would incorrectly encode for the
         // collation twice. This is not currently possible as the query planner will ensure that
@@ -139,18 +122,19 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromDocument(const BSONObj& obj,
 
     // Merge metadata into the key.
     BSONObjIterator sortKeyIt(sortKeyNoMetadata.getValue());
-    for (auto type : _patternPartTypes) {
-        switch (type) {
-            case SortPatternPartType::kFieldPath: {
-                invariant(sortKeyIt.more());
-                mergedKeyBob.append(sortKeyIt.next());
-                continue;
-            }
-            case SortPatternPartType::kMetaTextScore: {
+    for (auto& part : _sortPattern) {
+        if (part.fieldPath) {
+            invariant(sortKeyIt.more());
+            mergedKeyBob.append(sortKeyIt.next());
+            continue;
+        }
+        invariant(part.expression);
+        switch (part.expression->getMetaType()) {
+            case ExpressionMeta::MetaType::TEXT_SCORE: {
                 mergedKeyBob.append("", metadata->textScore);
                 continue;
             }
-            case SortPatternPartType::kMetaRandVal: {
+            case ExpressionMeta::MetaType::RAND_VAL: {
                 mergedKeyBob.append("", metadata->randVal);
                 continue;
             }

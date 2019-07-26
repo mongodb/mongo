@@ -51,7 +51,22 @@ SortPattern::SortPattern(const BSONObj& obj,
                     metaDoc.nFields() == 1);
 
             VariablesParseState vps = pExpCtx->variablesParseState;
-            patternPart.expression = ExpressionMeta::parse(pExpCtx, metaDoc.firstElement(), vps);
+            BSONElement metaElem = metaDoc.firstElement();
+
+            if (metaElem.valueStringData() == "textScore"_sd) {
+                // Valid meta sort. Just fall through.
+            } else if (metaElem.valueStringData() == "randVal"_sd) {
+                // Valid meta sort. Just fall through.
+            } else if (metaElem.valueStringData() == "searchScore"_sd) {
+                uasserted(31218, "$meta sort by 'searchScore' metadata is not supported");
+            } else if (metaElem.valueStringData() == "searchHighlights"_sd) {
+                uasserted(31219, "$meta sort by 'searchHighlights' metadata is not supported");
+            } else {
+                uasserted(31138,
+                          str::stream() << "Illegal $meta sort: " << metaElem.valueStringData());
+            }
+            patternPart.expression =
+                static_cast<ExpressionMeta*>(ExpressionMeta::parse(pExpCtx, metaElem, vps).get());
 
             // If sorting by textScore, sort highest scores first. If sorting by randVal, order
             // doesn't matter, so just always use descending.

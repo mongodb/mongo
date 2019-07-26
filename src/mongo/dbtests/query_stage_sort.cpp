@@ -120,7 +120,7 @@ public:
         params.limit = limit();
 
         auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
-            &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, nullptr);
+            _pExpCtx, queuedDataStage.release(), ws.get(), params.pattern);
 
         auto ss = std::make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
 
@@ -158,7 +158,7 @@ public:
         params.limit = limit();
 
         auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
-            &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, nullptr);
+            _pExpCtx, queuedDataStage.release(), ws.get(), params.pattern);
 
         auto sortStage =
             std::make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
@@ -227,6 +227,7 @@ public:
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
+    boost::intrusive_ptr<ExpressionContext> _pExpCtx = new ExpressionContext(&_opCtx, nullptr);
     DBDirectClient _client;
 };
 
@@ -558,7 +559,7 @@ public:
         params.pattern = BSON("b" << -1 << "c" << 1 << "a" << 1);
 
         auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
-            &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, nullptr);
+            _pExpCtx, queuedDataStage.release(), ws.get(), params.pattern);
 
         auto sortStage =
             std::make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());

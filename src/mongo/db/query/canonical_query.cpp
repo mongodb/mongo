@@ -205,7 +205,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
     Status initStatus = cq->init(opCtx,
-                                 nullptr,  // no expression context
+                                 baseQuery.getExpCtx(),
                                  std::move(qr),
                                  baseQuery.canHaveNoopMatchNodes(),
                                  root->shallowClone(),
@@ -261,6 +261,9 @@ void CanonicalQuery::setCollator(std::unique_ptr<CollatorInterface> collator) {
     // the object owned by '_collator'. We must associate the match expression tree with the new
     // value of '_collator'.
     _root->setCollator(_collator.get());
+
+    // In a similar vein, we must give the ExpressionContext the same collator.
+    _expCtx->setCollator(_collator.get());
 }
 
 // static

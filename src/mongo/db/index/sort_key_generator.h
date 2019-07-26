@@ -34,6 +34,7 @@
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
 
@@ -50,11 +51,11 @@ public:
     };
 
     /**
-     * Constructs a sort key generator which will generate keys for sort pattern 'sortSpec'. The
+     * Constructs a sort key generator which will generate keys for sort pattern 'sortPattern'. The
      * keys will incorporate the collation given by 'collator', and thus when actually compared to
      * one another should use the simple collation.
      */
-    SortKeyGenerator(const BSONObj& sortSpec, const CollatorInterface* collator);
+    SortKeyGenerator(SortPattern sortPattern, const CollatorInterface* collator);
 
     /**
      * Returns the key which should be used to sort the WorkingSetMember, or a non-OK status if no
@@ -77,14 +78,6 @@ public:
     StatusWith<BSONObj> getSortKeyFromDocument(const BSONObj& obj, const Metadata*) const;
 
 private:
-    // Describes whether a component of the sort pattern is a field path (e.g. sort by "a.b"), or
-    // else describes the type of $meta sort.
-    enum class SortPatternPartType {
-        kFieldPath,
-        kMetaTextScore,
-        kMetaRandVal,
-    };
-
     // Extracts the sort key from a WorkingSetMember which represents an index key. It is illegal to
     // call this if the working set member is not in RID_AND_IDX state. It is also illegal to call
     // this if the sort pattern has any $meta components.
@@ -97,13 +90,11 @@ private:
 
     const CollatorInterface* _collator = nullptr;
 
+    SortPattern _sortPattern;
+
     // The sort pattern with any $meta sort components stripped out, since the underlying index key
     // generator does not understand $meta sort.
     BSONObj _sortSpecWithoutMeta;
-
-    // For each element of the raw sort spec, describes whether the element is sorting by a field
-    // path or by a particular meta-sort.
-    std::vector<SortPatternPartType> _patternPartTypes;
 
     // If we're not sorting with a $meta value we can short-cut some work.
     bool _sortHasMeta = false;

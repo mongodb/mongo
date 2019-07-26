@@ -49,12 +49,13 @@ namespace mongo {
 
 const char* SortKeyGeneratorStage::kStageType = "SORT_KEY_GENERATOR";
 
-SortKeyGeneratorStage::SortKeyGeneratorStage(OperationContext* opCtx,
+SortKeyGeneratorStage::SortKeyGeneratorStage(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                              PlanStage* child,
                                              WorkingSet* ws,
-                                             const BSONObj& sortSpecObj,
-                                             const CollatorInterface* collator)
-    : PlanStage(kStageType, opCtx), _ws(ws), _sortKeyGen(sortSpecObj, collator) {
+                                             const BSONObj& sortSpecObj)
+    : PlanStage(kStageType, pExpCtx->opCtx),
+      _ws(ws),
+      _sortKeyGen({{sortSpecObj, pExpCtx}, pExpCtx->getCollator()}) {
     _children.emplace_back(child);
 }
 

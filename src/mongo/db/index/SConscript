@@ -53,6 +53,7 @@ env.Library(
             '$BUILD_DIR/mongo/db/mongohasher',
             '$BUILD_DIR/mongo/db/projection_exec_agg',
             '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+            '$BUILD_DIR/mongo/db/query/sort_pattern',
             '$BUILD_DIR/third_party/s2/s2',
             'expression_params',
             'index_descriptor',
@@ -163,5 +164,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/matcher/expressions",
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
     ],
 )

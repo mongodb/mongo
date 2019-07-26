@@ -181,6 +181,10 @@ public:
         return _canHaveNoopMatchNodes;
     }
 
+    const boost::intrusive_ptr<ExpressionContext>& getExpCtx() const {
+        return _expCtx;
+    }
+
 private:
     // You must go through canonicalize to create a CanonicalQuery.
     CanonicalQuery() {}

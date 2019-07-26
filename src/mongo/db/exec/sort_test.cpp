@@ -103,8 +103,12 @@ public:
         params.pattern = fromjson(patternStr);
         params.limit = limit;
 
+        // Create an ExpressionContext for the SortKeyGeneratorStage.
+        boost::intrusive_ptr<ExpressionContext> pExpCtx(
+            new ExpressionContext(getOpCtx(), collator));
+
         auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
-            getOpCtx(), queuedDataStage.release(), &ws, params.pattern, collator);
+            pExpCtx, queuedDataStage.release(), &ws, params.pattern);
 
         SortStage sort(getOpCtx(), params, &ws, sortKeyGen.release());
 
@@ -158,10 +162,13 @@ private:
 TEST_F(SortStageTest, SortEmptyWorkingSet) {
     WorkingSet ws;
 
+    // Create an ExpressionContext for the SortKeyGeneratorStage.
+    boost::intrusive_ptr<ExpressionContext> pExpCtx(new ExpressionContext(getOpCtx(), nullptr));
+
     // QueuedDataStage will be owned by SortStage.
     auto queuedDataStage = std::make_unique<QueuedDataStage>(getOpCtx(), &ws);
-    auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
-        getOpCtx(), queuedDataStage.release(), &ws, BSONObj(), nullptr);
+    auto sortKeyGen =
+        std::make_unique<SortKeyGeneratorStage>(pExpCtx, queuedDataStage.release(), &ws, BSONObj());
     SortStageParams params;
     SortStage sort(getOpCtx(), params, &ws, sortKeyGen.release());
 

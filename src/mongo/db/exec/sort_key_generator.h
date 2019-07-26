@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/index/sort_key_generator.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/stage_types.h"
 
@@ -49,11 +50,10 @@ class WorkingSetMember;
  */
 class SortKeyGeneratorStage final : public PlanStage {
 public:
-    SortKeyGeneratorStage(OperationContext* opCtx,
+    SortKeyGeneratorStage(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                           PlanStage* child,
                           WorkingSet* ws,
-                          const BSONObj& sortSpecObj,
-                          const CollatorInterface* collator);
+                          const BSONObj& sortSpecObj);
 
     bool isEOF() final;
 

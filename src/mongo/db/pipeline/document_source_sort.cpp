@@ -112,7 +112,7 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
                      pExpCtx->allowDiskUse}),
       // The SortKeyGenerator expects the expressions to be serialized in order to detect a sort
       // by a metadata field.
-      _sortKeyGen({sortOrder, pExpCtx->getCollator()}) {
+      _sortKeyGen({{sortOrder, pExpCtx}, pExpCtx->getCollator()}) {
     uassert(15976,
             "$sort stage must have at least one sort key",
             !_sortExecutor->sortPattern().empty());

@@ -78,10 +78,15 @@ public:
             queuedDataStage->pushBack(id);
         }
 
+        // Create a mock ExpressionContext.
+        boost::intrusive_ptr<ExpressionContext> pExpCtx(
+            new ExpressionContext(opCtx.get(), collator));
+        pExpCtx->setCollator(collator);
+
         // Initialization.
         BSONObj pattern = fromjson(patternStr);
         auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
-            opCtx.get(), queuedDataStage.release(), &ws, pattern, collator);
+            pExpCtx, queuedDataStage.release(), &ws, pattern);
         EnsureSortedStage ess(opCtx.get(), pattern, &ws, sortKeyGen.release());
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = PlanStage::NEED_TIME;
@@ -115,10 +120,13 @@ protected:
 TEST_F(QueryStageEnsureSortedTest, EnsureSortedEmptyWorkingSet) {
     auto opCtx = _serviceContext.makeOperationContext();
 
+    // Create a mock ExpressionContext.
+    boost::intrusive_ptr<ExpressionContext> pExpCtx(new ExpressionContext(opCtx.get(), nullptr));
+
     WorkingSet ws;
     auto queuedDataStage = std::make_unique<QueuedDataStage>(opCtx.get(), &ws);
-    auto sortKeyGen = std::make_unique<SortKeyGeneratorStage>(
-        opCtx.get(), queuedDataStage.release(), &ws, BSONObj(), nullptr);
+    auto sortKeyGen =
+        std::make_unique<SortKeyGeneratorStage>(pExpCtx, queuedDataStage.release(), &ws, BSONObj());
     EnsureSortedStage ess(opCtx.get(), BSONObj(), &ws, sortKeyGen.release());
 
     WorkingSetID id = WorkingSet::INVALID_ID;

@@ -65,6 +65,7 @@ BSONObj extractKeyFromKeyGenStage(SortKeyGeneratorStage* sortKeyGen, WorkingSet*
 BSONObj extractSortKey(const char* sortSpec, const char* doc, const CollatorInterface* collator) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
+    boost::intrusive_ptr<ExpressionContext> pExpCtx(new ExpressionContext(opCtx.get(), collator));
 
     WorkingSet workingSet;
 
@@ -77,7 +78,7 @@ BSONObj extractSortKey(const char* sortSpec, const char* doc, const CollatorInte
 
     BSONObj sortPattern = fromjson(sortSpec);
     SortKeyGeneratorStage sortKeyGen{
-        opCtx.get(), mockStage.release(), &workingSet, std::move(sortPattern), collator};
+        pExpCtx, mockStage.release(), &workingSet, std::move(sortPattern)};
     return extractKeyFromKeyGenStage(&sortKeyGen, &workingSet);
 }
 
@@ -93,6 +94,7 @@ BSONObj extractSortKeyCovered(const char* sortSpec,
                               const CollatorInterface* collator) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
+    boost::intrusive_ptr<ExpressionContext> pExpCtx(new ExpressionContext(opCtx.get(), collator));
 
     WorkingSet workingSet;
 
@@ -105,7 +107,7 @@ BSONObj extractSortKeyCovered(const char* sortSpec,
 
     BSONObj sortPattern = fromjson(sortSpec);
     SortKeyGeneratorStage sortKeyGen{
-        opCtx.get(), mockStage.release(), &workingSet, std::move(sortPattern), collator};
+        pExpCtx, mockStage.release(), &workingSet, std::move(sortPattern)};
     return extractKeyFromKeyGenStage(&sortKeyGen, &workingSet);
 }
 
