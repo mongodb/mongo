@@ -85,6 +85,10 @@
                 "insert", {documents: [{_id: "clusterTimeAfterPrepare"}]}))
             .operationTime;
 
+    // Make sure the insert gets replicated to the old primary (current secondary) so that its
+    // clusterTime advances before we try to do an afterClusterTime read at the time of the insert.
+    rst.awaitReplication();
+
     jsTestLog("Do a read that hits a prepare conflict on the old primary");
     assert.commandWorked(
         primary.adminCommand({configureFailPoint: "WTPrintPrepareConflictLog", mode: "alwaysOn"}));
