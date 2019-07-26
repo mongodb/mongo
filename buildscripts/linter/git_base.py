@@ -25,6 +25,10 @@ class Repository(object):  # pylint: disable=too-many-public-methods
         """Run a git commit command."""
         return self._callgito("commit", args)
 
+    def git_checkout(self, args):
+        """Run a git checkout command."""
+        return self._callgito("checkout", args)
+
     def git_diff(self, args):
         """Run a git diff command."""
         return self._callgito("diff", args)
