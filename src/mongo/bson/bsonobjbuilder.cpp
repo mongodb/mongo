@@ -239,7 +239,7 @@ BSONObjBuilder::~BSONObjBuilder() {
 }
 
 template <typename Alloc>
-void _BufBuilder<Alloc>::grow_reallocate(int minSize) {
+void BasicBufBuilder<Alloc>::grow_reallocate(int minSize) {
     if (minSize > BufferMaxSize) {
         std::stringstream ss;
         ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the 64MB limit.";
@@ -254,8 +254,8 @@ void _BufBuilder<Alloc>::grow_reallocate(int minSize) {
     size = a;
 }
 
-template class _BufBuilder<SharedBufferAllocator>;
-template class _BufBuilder<StackAllocator>;
+template class BasicBufBuilder<SharedBufferAllocator>;
+template class BasicBufBuilder<StackAllocator>;
 template class StringBuilderImpl<SharedBufferAllocator>;
 template class StringBuilderImpl<StackAllocator>;
 

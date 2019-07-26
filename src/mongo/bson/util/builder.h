@@ -36,6 +36,7 @@
 #include <cstring>
 #include <sstream>
 #include <string>
+#include <type_traits>
 
 #include <boost/optional.hpp>
 
@@ -155,9 +156,9 @@ private:
 };
 
 template <class BufferAllocator>
-class _BufBuilder {
+class BasicBufBuilder {
 public:
-    _BufBuilder(int initsize = 512) : size(initsize) {
+    BasicBufBuilder(int initsize = 512) : size(initsize) {
         if (size > 0) {
             _buf.malloc(size);
         }
@@ -350,8 +351,8 @@ private:
     friend class StringBuilderImpl<BufferAllocator>;
 };
 
-typedef _BufBuilder<SharedBufferAllocator> BufBuilder;
-MONGO_STATIC_ASSERT(std::is_move_constructible<BufBuilder>::value);
+using BufBuilder = BasicBufBuilder<SharedBufferAllocator>;
+MONGO_STATIC_ASSERT(std::is_move_constructible_v<BufBuilder>);
 
 /** The StackBufBuilder builds smaller datasets on the stack instead of using malloc.
       this can be significantly faster for small bufs.  However, you can not release() the
@@ -360,9 +361,9 @@ MONGO_STATIC_ASSERT(std::is_move_constructible<BufBuilder>::value);
       nothing bad would happen.  In fact in some circumstances this might make sense, say,
       embedded in some other object.
 */
-class StackBufBuilder : public _BufBuilder<StackAllocator> {
+class StackBufBuilder : public BasicBufBuilder<StackAllocator> {
 public:
-    StackBufBuilder() : _BufBuilder<StackAllocator>(StackAllocator::SZ) {}
+    StackBufBuilder() : BasicBufBuilder<StackAllocator>(StackAllocator::SZ) {}
     void release() = delete;  // not allowed. not implemented.
 };
 MONGO_STATIC_ASSERT(!std::is_move_constructible<StackBufBuilder>::value);
@@ -495,7 +496,6 @@ public:
     }
 
 private:
-    _BufBuilder<Allocator> _buf;
     template <typename T>
     StringBuilderImpl& appendIntegral(T val, int maxSize) {
         MONGO_STATIC_ASSERT(!std::is_same<T, char>());  // char shouldn't append as number.
@@ -520,13 +520,15 @@ private:
         _buf.l = prev + z;
         return *this;
     }
+
+    BasicBufBuilder<Allocator> _buf;
 };
 
-typedef StringBuilderImpl<SharedBufferAllocator> StringBuilder;
-typedef StringBuilderImpl<StackAllocator> StackStringBuilder;
+using StringBuilder = StringBuilderImpl<SharedBufferAllocator>;
+using StackStringBuilder = StringBuilderImpl<StackAllocator>;
 
-extern template class _BufBuilder<SharedBufferAllocator>;
-extern template class _BufBuilder<StackAllocator>;
+extern template class BasicBufBuilder<SharedBufferAllocator>;
+extern template class BasicBufBuilder<StackAllocator>;
 extern template class StringBuilderImpl<SharedBufferAllocator>;
 extern template class StringBuilderImpl<StackAllocator>;
 
