@@ -69,37 +69,21 @@ std::string kGenericUUIDStr = "b4c66a44-c1ca-4d86-8d25-12e82fa2de5b";
 BSONObj makeInsertOplogEntry(long long time, BSONObj obj, StringData ns, UUID uuid) {
     return BSON("ts" << Timestamp(time, time) << "t" << time << "op"
                      << "i"
-                     << "o"
-                     << obj
-                     << "ns"
-                     << ns
-                     << "ui"
-                     << uuid);
+                     << "o" << obj << "ns" << ns << "ui" << uuid);
 }
 
 BSONObj makeUpdateOplogEntry(
     long long time, BSONObj query, BSONObj update, StringData ns, UUID uuid) {
     return BSON("ts" << Timestamp(time, time) << "t" << time << "op"
                      << "u"
-                     << "ns"
-                     << ns
-                     << "ui"
-                     << uuid
-                     << "o2"
-                     << query
-                     << "o"
+                     << "ns" << ns << "ui" << uuid << "o2" << query << "o"
                      << BSON("$set" << update));
 }
 
 BSONObj makeDeleteOplogEntry(long long time, BSONObj id, StringData ns, UUID uuid) {
     return BSON("ts" << Timestamp(time, time) << "t" << time << "op"
                      << "d"
-                     << "ns"
-                     << ns
-                     << "ui"
-                     << uuid
-                     << "o"
-                     << id);
+                     << "ns" << ns << "ui" << uuid << "o" << id);
 }
 
 class RollbackImplForTest final : public RollbackImpl {
@@ -380,12 +364,7 @@ BSONObj makeOp(OpTime time) {
     auto kGenericUUID = unittest::assertGet(UUID::parse(kGenericUUIDStr));
     return BSON("ts" << time.getTimestamp() << "t" << time.getTerm() << "op"
                      << "n"
-                     << "o"
-                     << BSONObj()
-                     << "ns"
-                     << nss.ns()
-                     << "ui"
-                     << kGenericUUID);
+                     << "o" << BSONObj() << "ns" << nss.ns() << "ui" << kGenericUUID);
 }
 
 BSONObj makeOp(int count) {
@@ -400,13 +379,9 @@ auto makeOpWithWallClockTime(long count, long wallClockMillis) {
     auto kGenericUUID = unittest::assertGet(UUID::parse(kGenericUUIDStr));
     return BSON("ts" << Timestamp(count, count) << "t" << (long long)count << "op"
                      << "n"
-                     << "o"
-                     << BSONObj()
-                     << "ns"
+                     << "o" << BSONObj() << "ns"
                      << "top"
-                     << "ui"
-                     << kGenericUUID
-                     << "wall"
+                     << "ui" << kGenericUUID << "wall"
                      << Date_t::fromMillisSinceEpoch(wallClockMillis));
 };
 
@@ -955,14 +930,10 @@ TEST_F(RollbackImplTest, RollbackDoesNotWriteRollbackFilesIfNoInsertsOrUpdatesAf
     const auto uuid = UUID::gen();
     const auto nss = NamespaceString("db.coll");
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
-    const auto oplogEntry = BSON("ts" << Timestamp(3, 3) << "t" << 3LL << "op"
-                                      << "c"
-                                      << "o"
-                                      << BSON("create" << nss.coll())
-                                      << "ns"
-                                      << nss.ns()
-                                      << "ui"
-                                      << uuid);
+    const auto oplogEntry =
+        BSON("ts" << Timestamp(3, 3) << "t" << 3LL << "op"
+                  << "c"
+                  << "o" << BSON("create" << nss.coll()) << "ns" << nss.ns() << "ui" << uuid);
     ASSERT_OK(_insertOplogEntry(oplogEntry));
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
@@ -1183,12 +1154,7 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenInsertsAndDropOfCollectio
     const auto oplogEntry =
         BSON("ts" << dropOpTime.getTimestamp() << "t" << dropOpTime.getTerm() << "op"
                   << "c"
-                  << "o"
-                  << BSON("drop" << nss.coll())
-                  << "ns"
-                  << nss.ns()
-                  << "ui"
-                  << uuid);
+                  << "o" << BSON("drop" << nss.coll()) << "ns" << nss.ns() << "ui" << uuid);
     ASSERT_OK(_insertOplogEntry(oplogEntry));
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
@@ -1213,14 +1179,10 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenCreateCollAndInsertsAreRo
     const auto nss = NamespaceString("db.people");
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
-    const auto oplogEntry = BSON("ts" << Timestamp(3, 3) << "t" << 3LL << "op"
-                                      << "c"
-                                      << "o"
-                                      << BSON("create" << nss.coll())
-                                      << "ns"
-                                      << nss.ns()
-                                      << "ui"
-                                      << uuid);
+    const auto oplogEntry =
+        BSON("ts" << Timestamp(3, 3) << "t" << 3LL << "op"
+                  << "c"
+                  << "o" << BSON("create" << nss.coll()) << "ns" << nss.ns() << "ui" << uuid);
     ASSERT_OK(_insertOplogEntry(oplogEntry));
 
     // Insert documents into the collection.
@@ -1584,14 +1546,14 @@ public:
     void assertRollbackInfoContainsObjectForUUID(UUID uuid, BSONObj bson) {
         const auto& uuidToIdMap = _rbInfo.rollbackDeletedIdsMap;
         auto search = uuidToIdMap.find(uuid);
-        ASSERT(search != uuidToIdMap.end()) << "map is unexpectedly missing an entry for uuid "
-                                            << uuid.toString() << " containing object "
-                                            << bson.jsonString();
+        ASSERT(search != uuidToIdMap.end())
+            << "map is unexpectedly missing an entry for uuid " << uuid.toString()
+            << " containing object " << bson.jsonString();
         const auto& idObjSet = search->second;
         const auto iter = idObjSet.find(bson);
-        ASSERT(iter != idObjSet.end()) << "_id object set is unexpectedly missing object "
-                                       << bson.jsonString() << " in namespace with uuid "
-                                       << uuid.toString();
+        ASSERT(iter != idObjSet.end())
+            << "_id object set is unexpectedly missing object " << bson.jsonString()
+            << " in namespace with uuid " << uuid.toString();
     }
 
 
@@ -1675,12 +1637,12 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDropColl
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfCreateIndexOplogEntry) {
     auto nss = NamespaceString("test", "coll");
-    auto indexObj = BSON("createIndexes" << nss.coll() << "ns" << nss.toString() << "v"
-                                         << static_cast<int>(IndexDescriptor::IndexVersion::kV2)
-                                         << "key"
-                                         << "x"
-                                         << "name"
-                                         << "x_1");
+    auto indexObj =
+        BSON("createIndexes" << nss.coll() << "ns" << nss.toString() << "v"
+                             << static_cast<int>(IndexDescriptor::IndexVersion::kV2) << "key"
+                             << "x"
+                             << "name"
+                             << "x_1");
     auto cmdOp =
         makeCommandOp(Timestamp(2, 2), UUID::gen(), nss.getCommandNS().toString(), indexObj, 2);
 

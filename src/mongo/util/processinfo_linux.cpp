@@ -132,7 +132,7 @@ public:
                              &_exit_signal, &_processor,
                              &_rtprio, &_sched
                            */
-                           );
+        );
         if (found == 0) {
             std::cout << "system error: reading proc info" << std::endl;
         }
@@ -248,8 +248,8 @@ public:
 class LinuxSysHelper {
 public:
     /**
-    * Read the first 1023 bytes from a file
-    */
+     * Read the first 1023 bytes from a file
+     */
     static std::string readLineFromFile(const char* fname) {
         FILE* f;
         char fstr[1024] = {0};
@@ -264,8 +264,8 @@ public:
     }
 
     /**
-    * Get some details about the CPU
-    */
+     * Get some details about the CPU
+     */
     static void getCpuInfo(int& procCount, std::string& freq, std::string& features) {
         FILE* f;
         char fstr[1024] = {0};
@@ -290,8 +290,8 @@ public:
     }
 
     /**
-    * Determine linux distro and version
-    */
+     * Determine linux distro and version
+     */
     static void getLinuxDistro(std::string& name, std::string& version) {
         char buf[4096] = {0};
 
@@ -387,8 +387,8 @@ public:
     }
 
     /**
-    * Get system memory total
-    */
+     * Get system memory total
+     */
     static unsigned long long getSystemMemorySize() {
         std::string meminfo = readLineFromFile("/proc/meminfo");
         size_t lineOff = 0;
@@ -413,11 +413,11 @@ public:
     }
 
     /**
-    * Get memory limit for the process.
-    * If memory is being limited by the applied control group and it's less
-    * than the OS system memory (default cgroup limit is ulonglong max) let's
-    * return the actual memory we'll have available to the process.
-    */
+     * Get memory limit for the process.
+     * If memory is being limited by the applied control group and it's less
+     * than the OS system memory (default cgroup limit is ulonglong max) let's
+     * return the actual memory we'll have available to the process.
+     */
     static unsigned long long getMemorySizeLimit() {
         unsigned long long systemMemBytes = getSystemMemorySize();
         unsigned long long cgroupMemBytes = 0;
@@ -509,8 +509,8 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
 }
 
 /**
-* Save a BSON obj representing the host system's details
-*/
+ * Save a BSON obj representing the host system's details
+ */
 void ProcessInfo::SystemInfo::collectSystemInfo() {
     utsname unameData;
     std::string distroName, distroVersion;
@@ -564,8 +564,8 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
 }
 
 /**
-* Determine if the process is running with (cc)NUMA
-*/
+ * Determine if the process is running with (cc)NUMA
+ */
 bool ProcessInfo::checkNumaEnabled() {
     bool hasMultipleNodes = false;
     bool hasNumaMaps = false;
@@ -620,4 +620,4 @@ bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<
     }
     return true;
 }
-}
+}  // namespace mongo

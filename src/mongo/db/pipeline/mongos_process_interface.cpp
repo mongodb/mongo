@@ -227,15 +227,12 @@ boost::optional<Document> MongoSInterface::lookupSingleDocument(
     uassert(ErrorCodes::InternalError,
             str::stream() << "Shard cursor was unexpectedly open after lookup: "
                           << shardResult.front().getHostAndPort()
-                          << ", id: "
-                          << cursor.getCursorId(),
+                          << ", id: " << cursor.getCursorId(),
             cursor.getCursorId() == 0);
     uassert(ErrorCodes::TooManyMatchingDocuments,
             str::stream() << "found more than one document matching " << filter.toString() << " ["
-                          << batch.begin()->toString()
-                          << ", "
-                          << std::next(batch.begin())->toString()
-                          << "]",
+                          << batch.begin()->toString() << ", "
+                          << std::next(batch.begin())->toString() << "]",
             batch.size() <= 1u);
 
     return (!batch.empty() ? Document(batch.front()) : boost::optional<Document>{});

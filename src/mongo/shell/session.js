@@ -5,7 +5,11 @@
  * https://github.com/mongodb/specifications/blob/master/source/sessions/driver-sessions.rst#abstract
  */
 var {
-    DriverSession, SessionOptions, _DummyDriverSession, _DelegatingDriverSession, _ServerSession,
+    DriverSession,
+    SessionOptions,
+    _DummyDriverSession,
+    _DelegatingDriverSession,
+    _ServerSession,
 } = (function() {
     "use strict";
 
@@ -416,10 +420,10 @@ var {
 
                         if (writeError !== undefined) {
                             if (jsTest.options().logRetryAttempts) {
-                                jsTest.log("Retrying " + cmdName +
-                                           " due to retryable write error (code=" +
-                                           writeError.code + "), subsequent retries remaining: " +
-                                           numRetries);
+                                jsTest.log(
+                                    "Retrying " + cmdName +
+                                    " due to retryable write error (code=" + writeError.code +
+                                    "), subsequent retries remaining: " + numRetries);
                             }
                             if (client.isReplicaSetConnection()) {
                                 client._markNodeAsFailed(
@@ -1035,54 +1039,54 @@ var {
     const DummyDriverSession =
         makeDriverSessionConstructor(  // Force clang-format to break this line.
             {
-              createServerSession: function createServerSession(client) {
-                  return {
-                      injectSessionId: function injectSessionId(cmdObj) {
-                          return cmdObj;
-                      },
+                createServerSession: function createServerSession(client) {
+                    return {
+                        injectSessionId: function injectSessionId(cmdObj) {
+                            return cmdObj;
+                        },
 
-                      assignTransactionNumber: function assignTransactionNumber(cmdObj) {
-                          return cmdObj;
-                      },
+                        assignTransactionNumber: function assignTransactionNumber(cmdObj) {
+                            return cmdObj;
+                        },
 
-                      canRetryWrites: function canRetryWrites(cmdObj) {
-                          return false;
-                      },
+                        canRetryWrites: function canRetryWrites(cmdObj) {
+                            return false;
+                        },
 
-                      assignTxnInfo: function assignTxnInfo(cmdObj) {
-                          return cmdObj;
-                      },
+                        assignTxnInfo: function assignTxnInfo(cmdObj) {
+                            return cmdObj;
+                        },
 
-                      isTxnActive: function isTxnActive() {
-                          return false;
-                      },
+                        isTxnActive: function isTxnActive() {
+                            return false;
+                        },
 
-                      isFirstStatement: function isFirstStatement() {
-                          return false;
-                      },
+                        isFirstStatement: function isFirstStatement() {
+                            return false;
+                        },
 
-                      getTxnOptions: function getTxnOptions() {
-                          return {};
-                      },
+                        getTxnOptions: function getTxnOptions() {
+                            return {};
+                        },
 
-                      startTransaction: function startTransaction() {
-                          throw new Error("Must call startSession() on the Mongo connection " +
-                                          "object before starting a transaction.");
-                      },
+                        startTransaction: function startTransaction() {
+                            throw new Error("Must call startSession() on the Mongo connection " +
+                                            "object before starting a transaction.");
+                        },
 
-                      commitTransaction: function commitTransaction() {
-                          throw new Error("Must call startSession() on the Mongo connection " +
-                                          "object before committing a transaction.");
-                      },
+                        commitTransaction: function commitTransaction() {
+                            throw new Error("Must call startSession() on the Mongo connection " +
+                                            "object before committing a transaction.");
+                        },
 
-                      abortTransaction: function abortTransaction() {
-                          throw new Error("Must call startSession() on the Mongo connection " +
-                                          "object before aborting a transaction.");
-                      },
-                  };
-              },
+                        abortTransaction: function abortTransaction() {
+                            throw new Error("Must call startSession() on the Mongo connection " +
+                                            "object before aborting a transaction.");
+                        },
+                    };
+                },
 
-              endSession: function endSession(serverSession) {},
+                endSession: function endSession(serverSession) {},
             },
             {causalConsistency: false, retryWrites: false});
 

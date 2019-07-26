@@ -228,18 +228,14 @@ public:
             wunit.commit();
         }
 
-        auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll->ns().ns(),
-                                                   BSON("name"
-                                                        << "a"
-                                                        << "ns"
-                                                        << coll->ns().ns()
-                                                        << "key"
-                                                        << BSON("a" << 1)
-                                                        << "v"
-                                                        << static_cast<int>(kIndexVersion)
-                                                        << "background"
-                                                        << false));
+        auto status =
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll->ns().ns(),
+                                         BSON("name"
+                                              << "a"
+                                              << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
+                                              << "v" << static_cast<int>(kIndexVersion)
+                                              << "background" << false));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -304,18 +300,14 @@ public:
             wunit.commit();
         }
 
-        auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll->ns().ns(),
-                                                   BSON("name"
-                                                        << "a"
-                                                        << "ns"
-                                                        << coll->ns().ns()
-                                                        << "key"
-                                                        << BSON("a" << 1)
-                                                        << "v"
-                                                        << static_cast<int>(kIndexVersion)
-                                                        << "background"
-                                                        << false));
+        auto status =
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll->ns().ns(),
+                                         BSON("name"
+                                              << "a"
+                                              << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
+                                              << "v" << static_cast<int>(kIndexVersion)
+                                              << "background" << false));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -466,14 +458,10 @@ public:
                                                    coll->ns().ns(),
                                                    BSON("name"
                                                         << "multikey_index"
-                                                        << "ns"
-                                                        << coll->ns().ns()
-                                                        << "key"
-                                                        << BSON("a.b" << 1)
-                                                        << "v"
+                                                        << "ns" << coll->ns().ns() << "key"
+                                                        << BSON("a.b" << 1) << "v"
                                                         << static_cast<int>(kIndexVersion)
-                                                        << "background"
-                                                        << false));
+                                                        << "background" << false));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -540,20 +528,14 @@ public:
         }
 
         // Create a sparse index.
-        auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll->ns().ns(),
-                                                   BSON("name"
-                                                        << "sparse_index"
-                                                        << "ns"
-                                                        << coll->ns().ns()
-                                                        << "key"
-                                                        << BSON("a" << 1)
-                                                        << "v"
-                                                        << static_cast<int>(kIndexVersion)
-                                                        << "background"
-                                                        << false
-                                                        << "sparse"
-                                                        << true));
+        auto status =
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll->ns().ns(),
+                                         BSON("name"
+                                              << "sparse_index"
+                                              << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
+                                              << "v" << static_cast<int>(kIndexVersion)
+                                              << "background" << false << "sparse" << true));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -613,20 +595,15 @@ public:
         }
 
         // Create a partial index.
-        auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll->ns().ns(),
-                                                   BSON("name"
-                                                        << "partial_index"
-                                                        << "ns"
-                                                        << coll->ns().ns()
-                                                        << "key"
-                                                        << BSON("a" << 1)
-                                                        << "v"
-                                                        << static_cast<int>(kIndexVersion)
-                                                        << "background"
-                                                        << false
-                                                        << "partialFilterExpression"
-                                                        << BSON("a" << BSON("$gt" << 1))));
+        auto status =
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll->ns().ns(),
+                                         BSON("name"
+                                              << "partial_index"
+                                              << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
+                                              << "v" << static_cast<int>(kIndexVersion)
+                                              << "background" << false << "partialFilterExpression"
+                                              << BSON("a" << BSON("$gt" << 1))));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -679,38 +656,30 @@ public:
         }
 
         // Create a partial geo index that indexes the document. This should return an error.
-        ASSERT_NOT_OK(dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll->ns().ns(),
-                                                   BSON("name"
-                                                        << "partial_index"
-                                                        << "ns"
-                                                        << coll->ns().ns()
-                                                        << "key"
-                                                        << BSON("x"
-                                                                << "2dsphere")
-                                                        << "v"
-                                                        << static_cast<int>(kIndexVersion)
-                                                        << "background"
-                                                        << false
-                                                        << "partialFilterExpression"
-                                                        << BSON("a" << BSON("$eq" << 2)))));
+        ASSERT_NOT_OK(
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll->ns().ns(),
+                                         BSON("name"
+                                              << "partial_index"
+                                              << "ns" << coll->ns().ns() << "key"
+                                              << BSON("x"
+                                                      << "2dsphere")
+                                              << "v" << static_cast<int>(kIndexVersion)
+                                              << "background" << false << "partialFilterExpression"
+                                              << BSON("a" << BSON("$eq" << 2)))));
 
         // Create a partial geo index that does not index the document.
-        auto status = dbtests::createIndexFromSpec(&_opCtx,
-                                                   coll->ns().ns(),
-                                                   BSON("name"
-                                                        << "partial_index"
-                                                        << "ns"
-                                                        << coll->ns().ns()
-                                                        << "key"
-                                                        << BSON("x"
-                                                                << "2dsphere")
-                                                        << "v"
-                                                        << static_cast<int>(kIndexVersion)
-                                                        << "background"
-                                                        << false
-                                                        << "partialFilterExpression"
-                                                        << BSON("a" << BSON("$eq" << 1))));
+        auto status =
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll->ns().ns(),
+                                         BSON("name"
+                                              << "partial_index"
+                                              << "ns" << coll->ns().ns() << "key"
+                                              << BSON("x"
+                                                      << "2dsphere")
+                                              << "v" << static_cast<int>(kIndexVersion)
+                                              << "background" << false << "partialFilterExpression"
+                                              << BSON("a" << BSON("$eq" << 1))));
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
         releaseDb();
@@ -765,28 +734,20 @@ public:
                                                    coll->ns().ns(),
                                                    BSON("name"
                                                         << "compound_index_1"
-                                                        << "ns"
-                                                        << coll->ns().ns()
-                                                        << "key"
-                                                        << BSON("a" << 1 << "b" << -1)
-                                                        << "v"
+                                                        << "ns" << coll->ns().ns() << "key"
+                                                        << BSON("a" << 1 << "b" << -1) << "v"
                                                         << static_cast<int>(kIndexVersion)
-                                                        << "background"
-                                                        << false));
+                                                        << "background" << false));
         ASSERT_OK(status);
 
         status = dbtests::createIndexFromSpec(&_opCtx,
                                               coll->ns().ns(),
                                               BSON("name"
                                                    << "compound_index_2"
-                                                   << "ns"
-                                                   << coll->ns().ns()
-                                                   << "key"
-                                                   << BSON("a" << -1 << "b" << 1)
-                                                   << "v"
+                                                   << "ns" << coll->ns().ns() << "key"
+                                                   << BSON("a" << -1 << "b" << 1) << "v"
                                                    << static_cast<int>(kIndexVersion)
-                                                   << "background"
-                                                   << false));
+                                                   << "background" << false));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -845,9 +806,7 @@ public:
             &_opCtx,
             coll->ns().ns(),
             BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << BSON("a" << 1) << "v"
-                        << static_cast<int>(kIndexVersion)
-                        << "background"
-                        << false));
+                        << static_cast<int>(kIndexVersion) << "background" << false));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -929,9 +888,7 @@ public:
             &_opCtx,
             coll->ns().ns(),
             BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << BSON("a" << 1) << "v"
-                        << static_cast<int>(kIndexVersion)
-                        << "background"
-                        << false));
+                        << static_cast<int>(kIndexVersion) << "background" << false));
 
         ASSERT_OK(status);
         ASSERT_TRUE(checkValid());
@@ -978,9 +935,7 @@ public:
             &_opCtx,
             coll->ns().ns(),
             BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << indexKey << "v"
-                        << static_cast<int>(kIndexVersion)
-                        << "background"
-                        << false));
+                        << static_cast<int>(kIndexVersion) << "background" << false));
         ASSERT_OK(status);
 
         // Insert non-multikey documents.
@@ -1089,9 +1044,7 @@ public:
             &_opCtx,
             coll->ns().ns(),
             BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << indexKey << "v"
-                        << static_cast<int>(kIndexVersion)
-                        << "background"
-                        << false));
+                        << static_cast<int>(kIndexVersion) << "background" << false));
         ASSERT_OK(status);
 
         // Insert documents with indexed and not-indexed paths.
@@ -1182,9 +1135,7 @@ public:
             &_opCtx,
             coll->ns().ns(),
             BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << indexKey << "v"
-                        << static_cast<int>(kIndexVersion)
-                        << "background"
-                        << false));
+                        << static_cast<int>(kIndexVersion) << "background" << false));
         ASSERT_OK(status);
 
         // Insert documents.
@@ -1267,9 +1218,7 @@ public:
             &_opCtx,
             coll->ns().ns(),
             BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << indexKey << "v"
-                        << static_cast<int>(kIndexVersion)
-                        << "background"
-                        << false));
+                        << static_cast<int>(kIndexVersion) << "background" << false));
         ASSERT_OK(status);
 
         // Insert documents.
@@ -1371,9 +1320,7 @@ public:
             &_opCtx,
             coll->ns().ns(),
             BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << indexKey << "v"
-                        << static_cast<int>(kIndexVersion)
-                        << "background"
-                        << false));
+                        << static_cast<int>(kIndexVersion) << "background" << false));
         ASSERT_OK(status);
 
         // Insert documents.

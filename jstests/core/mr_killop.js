@@ -60,17 +60,17 @@ function op(childLoop) {
 }
 
 /**
-* Run one map reduce with the specified parameters in a parallel shell, kill the
-* map reduce op or its child op with killOp, and wait for the map reduce op to
-* terminate.
-* @param childLoop - if true, a distinct $where op is killed rather than the map reduce op.
-* This is necessay for a child distinct $where of a map reduce op because child
-* ops currently mask parent ops in currentOp.
-*/
+ * Run one map reduce with the specified parameters in a parallel shell, kill the
+ * map reduce op or its child op with killOp, and wait for the map reduce op to
+ * terminate.
+ * @param childLoop - if true, a distinct $where op is killed rather than the map reduce op.
+ * This is necessay for a child distinct $where of a map reduce op because child
+ * ops currently mask parent ops in currentOp.
+ */
 function testOne(map, reduce, finalize, scope, childLoop, wait) {
-    debug("testOne - map = " + tojson(map) + "; reduce = " + tojson(reduce) + "; finalize = " +
-          tojson(finalize) + "; scope = " + tojson(scope) + "; childLoop = " + childLoop +
-          "; wait = " + wait);
+    debug("testOne - map = " + tojson(map) + "; reduce = " + tojson(reduce) +
+          "; finalize = " + tojson(finalize) + "; scope = " + tojson(scope) +
+          "; childLoop = " + childLoop + "; wait = " + wait);
 
     t.drop();
     t2.drop();

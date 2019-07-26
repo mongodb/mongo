@@ -43,9 +43,9 @@
 #include "mongo/util/log.h"
 
 using namespace mongo;
-using std::unique_ptr;
 using std::cout;
 using std::endl;
+using std::unique_ptr;
 using std::vector;
 
 namespace {

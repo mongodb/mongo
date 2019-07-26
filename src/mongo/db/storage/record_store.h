@@ -623,4 +623,4 @@ public:
                             const RecordData& recordData,
                             size_t* dataSize) = 0;
 };
-}
+}  // namespace mongo

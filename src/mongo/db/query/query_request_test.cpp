@@ -1485,5 +1485,5 @@ TEST_F(QueryRequestTest, ParseFromUUID) {
     ASSERT_EQ(nss, qr.nss());
 }
 
-}  // namespace mongo
 }  // namespace
+}  // namespace mongo

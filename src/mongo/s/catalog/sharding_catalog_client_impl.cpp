@@ -259,14 +259,14 @@ StatusWith<repl::OpTimeWith<std::vector<DatabaseType>>> ShardingCatalogClientImp
     for (const BSONObj& doc : findStatus.getValue().value) {
         auto dbRes = DatabaseType::fromBSON(doc);
         if (!dbRes.isOK()) {
-            return dbRes.getStatus().withContext(stream() << "Failed to parse database document "
-                                                          << doc);
+            return dbRes.getStatus().withContext(stream()
+                                                 << "Failed to parse database document " << doc);
         }
 
         Status validateStatus = dbRes.getValue().validate();
         if (!validateStatus.isOK()) {
-            return validateStatus.withContext(stream() << "Failed to validate database document "
-                                                       << doc);
+            return validateStatus.withContext(stream()
+                                              << "Failed to validate database document " << doc);
         }
 
         databases.push_back(dbRes.getValue());
@@ -376,9 +376,7 @@ StatusWith<std::vector<CollectionType>> ShardingCatalogClientImpl::getCollection
         if (!collectionResult.isOK()) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "error while parsing " << CollectionType::ConfigNS.ns()
-                                  << " document: "
-                                  << obj
-                                  << " : "
+                                  << " document: " << obj << " : "
                                   << collectionResult.getStatus().toString()};
         }
 
@@ -590,14 +588,14 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::
     for (const BSONObj& doc : findStatus.getValue().value) {
         auto shardRes = ShardType::fromBSON(doc);
         if (!shardRes.isOK()) {
-            return shardRes.getStatus().withContext(stream() << "Failed to parse shard document "
-                                                             << doc);
+            return shardRes.getStatus().withContext(stream()
+                                                    << "Failed to parse shard document " << doc);
         }
 
         Status validateStatus = shardRes.getValue().validate();
         if (!validateStatus.isOK()) {
-            return validateStatus.withContext(stream() << "Failed to validate shard document "
-                                                       << doc);
+            return validateStatus.withContext(stream()
+                                              << "Failed to validate shard document " << doc);
         }
 
         shards.push_back(shardRes.getValue());
@@ -713,9 +711,9 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
               (readConcern == repl::ReadConcernLevel::kMajorityReadConcern &&
                writeConcern.wMode == WriteConcernOptions::kMajority));
-    BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition
-                                  << WriteConcernOptions::kWriteConcernField
-                                  << writeConcern.toBSON());
+    BSONObj cmd =
+        BSON("applyOps" << updateOps << "preCondition" << preCondition
+                        << WriteConcernOptions::kWriteConcernField << writeConcern.toBSON());
 
     auto response =
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
@@ -772,11 +770,11 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
         const auto& newestChunk = chunkWithStatus.getValue();
 
         if (newestChunk.empty()) {
-            errMsg = str::stream() << "chunk operation commit failed: version "
-                                   << lastChunkVersion.toString()
-                                   << " doesn't exist in namespace: " << nss.ns()
-                                   << ". Unable to save chunk ops. Command: " << cmd
-                                   << ". Result: " << response.getValue().response;
+            errMsg = str::stream()
+                << "chunk operation commit failed: version " << lastChunkVersion.toString()
+                << " doesn't exist in namespace: " << nss.ns()
+                << ". Unable to save chunk ops. Command: " << cmd
+                << ". Result: " << response.getValue().response;
             return status.withContext(errMsg);
         };
 

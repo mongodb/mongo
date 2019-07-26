@@ -69,4 +69,4 @@ MONGO_STARTUP_OPTIONS_STORE(MongoBridgeOptions)(InitializerContext* context) {
 
     return Status::OK();
 }
-}
+}  // namespace mongo

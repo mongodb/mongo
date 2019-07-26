@@ -8,98 +8,98 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 (function() {
-    "use strict";
+"use strict";
 
-    load('jstests/replsets/rslib.js');
+load('jstests/replsets/rslib.js');
 
-    var st = new ShardingTest({shards: {rs0: {nodes: 2}}});
+var st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
-    var shardPri = st.rs0.getPrimary();
+var shardPri = st.rs0.getPrimary();
 
-    // Note: Adding new replica set member by hand because of SERVER-24011.
+// Note: Adding new replica set member by hand because of SERVER-24011.
 
-    var newNode = MongoRunner.runMongod(
-        {configsvr: '', replSet: st.configRS.name, storageEngine: 'wiredTiger'});
+var newNode =
+    MongoRunner.runMongod({configsvr: '', replSet: st.configRS.name, storageEngine: 'wiredTiger'});
 
-    var replConfig = st.configRS.getReplSetConfigFromNode();
-    replConfig.version += 1;
-    replConfig.members.push({_id: 3, host: newNode.host});
+var replConfig = st.configRS.getReplSetConfigFromNode();
+replConfig.version += 1;
+replConfig.members.push({_id: 3, host: newNode.host});
 
-    reconfig(st.configRS, replConfig);
+reconfig(st.configRS, replConfig);
 
-    /**
-     * Returns true if the shardIdentity document has all the replica set member nodes in the
-     * expectedConfigStr.
-     */
-    var checkConfigStrUpdated = function(conn, expectedConfigStr) {
-        var shardIdentity = conn.getDB('admin').system.version.findOne({_id: 'shardIdentity'});
+/**
+ * Returns true if the shardIdentity document has all the replica set member nodes in the
+ * expectedConfigStr.
+ */
+var checkConfigStrUpdated = function(conn, expectedConfigStr) {
+    var shardIdentity = conn.getDB('admin').system.version.findOne({_id: 'shardIdentity'});
 
-        var shardConfigsvrStr = shardIdentity.configsvrConnectionString;
-        var shardConfigReplName = shardConfigsvrStr.split('/')[0];
-        var expectedReplName = expectedConfigStr.split('/')[0];
+    var shardConfigsvrStr = shardIdentity.configsvrConnectionString;
+    var shardConfigReplName = shardConfigsvrStr.split('/')[0];
+    var expectedReplName = expectedConfigStr.split('/')[0];
 
-        assert.eq(expectedReplName, shardConfigReplName);
+    assert.eq(expectedReplName, shardConfigReplName);
 
-        var expectedHostList = expectedConfigStr.split('/')[1].split(',');
-        var shardConfigHostList = shardConfigsvrStr.split('/')[1].split(',');
+    var expectedHostList = expectedConfigStr.split('/')[1].split(',');
+    var shardConfigHostList = shardConfigsvrStr.split('/')[1].split(',');
 
-        if (expectedHostList.length != shardConfigHostList.length) {
+    if (expectedHostList.length != shardConfigHostList.length) {
+        return false;
+    }
+
+    for (var x = 0; x < expectedHostList.length; x++) {
+        if (shardConfigsvrStr.indexOf(expectedHostList[x]) == -1) {
             return false;
         }
+    }
 
-        for (var x = 0; x < expectedHostList.length; x++) {
-            if (shardConfigsvrStr.indexOf(expectedHostList[x]) == -1) {
-                return false;
-            }
-        }
+    return true;
+};
 
-        return true;
-    };
+var origConfigConnStr = st.configRS.getURL();
+var expectedConfigStr = origConfigConnStr + ',' + newNode.host;
+assert.soon(function() {
+    return checkConfigStrUpdated(st.rs0.getPrimary(), expectedConfigStr);
+});
 
-    var origConfigConnStr = st.configRS.getURL();
-    var expectedConfigStr = origConfigConnStr + ',' + newNode.host;
-    assert.soon(function() {
-        return checkConfigStrUpdated(st.rs0.getPrimary(), expectedConfigStr);
-    });
+var secConn = st.rs0.getSecondary();
+secConn.setSlaveOk(true);
+assert.soon(function() {
+    return checkConfigStrUpdated(secConn, expectedConfigStr);
+});
 
-    var secConn = st.rs0.getSecondary();
-    secConn.setSlaveOk(true);
-    assert.soon(function() {
-        return checkConfigStrUpdated(secConn, expectedConfigStr);
-    });
+//
+// Remove the newly added member from the config replSet while the shards are down.
+// Check that the shard identity document will be updated with the new replSet connection
+// string when they come back up.
+//
 
-    //
-    // Remove the newly added member from the config replSet while the shards are down.
-    // Check that the shard identity document will be updated with the new replSet connection
-    // string when they come back up.
-    //
+st.rs0.stop(0);
+st.rs0.stop(1);
 
-    st.rs0.stop(0);
-    st.rs0.stop(1);
+MongoRunner.stopMongod(newNode);
 
-    MongoRunner.stopMongod(newNode);
+replConfig = st.configRS.getReplSetConfigFromNode();
+replConfig.version += 1;
+replConfig.members.pop();
 
-    replConfig = st.configRS.getReplSetConfigFromNode();
-    replConfig.version += 1;
-    replConfig.members.pop();
+reconfig(st.configRS, replConfig);
 
-    reconfig(st.configRS, replConfig);
+st.rs0.restart(0, {shardsvr: ''});
+st.rs0.restart(1, {shardsvr: ''});
 
-    st.rs0.restart(0, {shardsvr: ''});
-    st.rs0.restart(1, {shardsvr: ''});
+st.rs0.waitForMaster();
+st.rs0.awaitSecondaryNodes();
 
-    st.rs0.waitForMaster();
-    st.rs0.awaitSecondaryNodes();
+assert.soon(function() {
+    return checkConfigStrUpdated(st.rs0.getPrimary(), origConfigConnStr);
+});
 
-    assert.soon(function() {
-        return checkConfigStrUpdated(st.rs0.getPrimary(), origConfigConnStr);
-    });
+secConn = st.rs0.getSecondary();
+secConn.setSlaveOk(true);
+assert.soon(function() {
+    return checkConfigStrUpdated(secConn, origConfigConnStr);
+});
 
-    secConn = st.rs0.getSecondary();
-    secConn.setSlaveOk(true);
-    assert.soon(function() {
-        return checkConfigStrUpdated(secConn, origConfigConnStr);
-    });
-
-    st.stop();
+st.stop();
 })();

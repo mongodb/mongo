@@ -40,11 +40,11 @@ function optimesAndWallTimesAreEqual(replTest, isPersistent) {
         if (timestampCompare(prevOptime, currOptime) != 0 ||
             wallTimeCompare(prevAppliedWallTime, currAppliedWallTime) != 0 ||
             (isPersistent && wallTimeCompare(prevDurableWallTime, currDurableWallTime) != 0)) {
-            jsTest.log("optimesAndWallTimesAreEqual returning false match, prevOptime: " +
-                       prevOptime + " latestOptime: " + currOptime + " prevAppliedWallTime: " +
-                       prevAppliedWallTime + " latestWallTime: " + currAppliedWallTime +
-                       " prevDurableWallTime: " + prevDurableWallTime + " latestDurableWallTime: " +
-                       currDurableWallTime);
+            jsTest.log(
+                "optimesAndWallTimesAreEqual returning false match, prevOptime: " + prevOptime +
+                " latestOptime: " + currOptime + " prevAppliedWallTime: " + prevAppliedWallTime +
+                " latestWallTime: " + currAppliedWallTime + " prevDurableWallTime: " +
+                prevDurableWallTime + " latestDurableWallTime: " + currDurableWallTime);
             replTest.dumpOplog(replTest.nodes[i], {}, 20);
             replTest.dumpOplog(replTest.nodes[i - 1], {}, 20);
             return false;

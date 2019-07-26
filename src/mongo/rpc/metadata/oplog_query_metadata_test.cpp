@@ -52,19 +52,12 @@ TEST(ReplResponseMetadataTest, OplogQueryMetadataRoundtrip) {
     BSONObjBuilder builder;
     metadata.writeToMetadata(&builder).transitional_ignore();
 
-    BSONObj expectedObj(BSON(kOplogQueryMetadataFieldName << BSON(
-                                 "lastOpCommitted"
-                                 << BSON("ts" << opTime1.getTimestamp() << "t" << opTime1.getTerm())
-                                 << "lastCommittedWall"
-                                 << committedWall
-                                 << "lastOpApplied"
-                                 << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
-                                 << "rbid"
-                                 << 6
-                                 << "primaryIndex"
-                                 << 12
-                                 << "syncSourceIndex"
-                                 << -1)));
+    BSONObj expectedObj(BSON(
+        kOplogQueryMetadataFieldName << BSON(
+            "lastOpCommitted" << BSON("ts" << opTime1.getTimestamp() << "t" << opTime1.getTerm())
+                              << "lastCommittedWall" << committedWall << "lastOpApplied"
+                              << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
+                              << "rbid" << 6 << "primaryIndex" << 12 << "syncSourceIndex" << -1)));
 
     BSONObj serializedObj = builder.obj();
     ASSERT_BSONOBJ_EQ(expectedObj, serializedObj);

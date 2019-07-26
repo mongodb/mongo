@@ -83,23 +83,18 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                        << "spencer"
                                                        << "pwd"
                                                        << "a"
-                                                       << "roles"
-                                                       << BSON_ARRAY("read"))));
+                                                       << "roles" << BSON_ARRAY("read"))));
 
     // Need name field
     ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("db"
                                                        << "test"
-                                                       << "credentials"
-                                                       << credentials
-                                                       << "roles"
+                                                       << "credentials" << credentials << "roles"
                                                        << emptyArray)));
 
     // Need source field
     ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
                                                        << "spencer"
-                                                       << "credentials"
-                                                       << credentials
-                                                       << "roles"
+                                                       << "credentials" << credentials << "roles"
                                                        << emptyArray)));
 
     // Need credentials field
@@ -107,16 +102,14 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                        << "spencer"
                                                        << "db"
                                                        << "test"
-                                                       << "roles"
-                                                       << emptyArray)));
+                                                       << "roles" << emptyArray)));
 
     // Need roles field
     ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
                                                        << "spencer"
                                                        << "db"
                                                        << "test"
-                                                       << "credentials"
-                                                       << credentials)));
+                                                       << "credentials" << credentials)));
 
     // authenticationRestricitons must be an array if it exists
     ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
@@ -131,11 +124,8 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                    << "spencer"
                                                    << "db"
                                                    << "test"
-                                                   << "credentials"
-                                                   << credentials
-                                                   << "roles"
-                                                   << emptyArray
-                                                   << "authenticationRestrictions"
+                                                   << "credentials" << credentials << "roles"
+                                                   << emptyArray << "authenticationRestrictions"
                                                    << emptyArray)));
 
     // Empty roles arrays are OK
@@ -143,9 +133,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                    << "spencer"
                                                    << "db"
                                                    << "test"
-                                                   << "credentials"
-                                                   << credentials
-                                                   << "roles"
+                                                   << "credentials" << credentials << "roles"
                                                    << emptyArray)));
 
     // Need credentials of {external: true} if user's db is $external
@@ -153,19 +141,15 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                    << "spencer"
                                                    << "db"
                                                    << "$external"
-                                                   << "credentials"
-                                                   << BSON("external" << true)
-                                                   << "roles"
-                                                   << emptyArray)));
+                                                   << "credentials" << BSON("external" << true)
+                                                   << "roles" << emptyArray)));
 
     // Roles must be objects
     ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
                                                        << "spencer"
                                                        << "db"
                                                        << "test"
-                                                       << "credentials"
-                                                       << credentials
-                                                       << "roles"
+                                                       << "credentials" << credentials << "roles"
                                                        << BSON_ARRAY("read"))));
 
     // Role needs name
@@ -173,9 +157,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                        << "spencer"
                                                        << "db"
                                                        << "test"
-                                                       << "credentials"
-                                                       << credentials
-                                                       << "roles"
+                                                       << "credentials" << credentials << "roles"
                                                        << BSON_ARRAY(BSON("db"
                                                                           << "dbA")))));
 
@@ -184,9 +166,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                        << "spencer"
                                                        << "db"
                                                        << "test"
-                                                       << "credentials"
-                                                       << credentials
-                                                       << "roles"
+                                                       << "credentials" << credentials << "roles"
                                                        << BSON_ARRAY(BSON("role"
                                                                           << "roleA")))));
 
@@ -196,9 +176,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                    << "spencer"
                                                    << "db"
                                                    << "test"
-                                                   << "credentials"
-                                                   << credentials
-                                                   << "roles"
+                                                   << "credentials" << credentials << "roles"
                                                    << BSON_ARRAY(BSON("role"
                                                                       << "roleA"
                                                                       << "db"
@@ -209,9 +187,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                    << "spencer"
                                                    << "db"
                                                    << "test"
-                                                   << "credentials"
-                                                   << credentials
-                                                   << "roles"
+                                                   << "credentials" << credentials << "roles"
                                                    << BSON_ARRAY(BSON("role"
                                                                       << "roleA"
                                                                       << "db"
@@ -227,9 +203,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
              << "spencer"
              << "db"
              << "test"
-             << "credentials"
-             << credentials
-             << "authenticationRestrictions"
+             << "credentials" << credentials << "authenticationRestrictions"
              << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("127.0.0.1/8") << "serverAddress"
                                                << BSON_ARRAY("127.0.0.1/8")))
              << "roles"
@@ -243,9 +217,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                    << "spencer"
                                                    << "db"
                                                    << "test"
-                                                   << "credentials"
-                                                   << credentials
-                                                   << "extraData"
+                                                   << "credentials" << credentials << "extraData"
                                                    << BSON("foo"
                                                            << "bar")
                                                    << "roles"
@@ -318,13 +290,13 @@ TEST_F(V2UserDocumentParsing, V2CredentialExtraction) {
     ASSERT(!user->getCredentials().isExternal);
 
     // Make sure extracting valid combined credentials works
-    ASSERT_OK(v2parser.initializeUserCredentialsFromUserDocument(user.get(),
-                                                                 BSON("user"
-                                                                      << "spencer"
-                                                                      << "db"
-                                                                      << "test"
-                                                                      << "credentials"
-                                                                      << credentials)));
+    ASSERT_OK(
+        v2parser.initializeUserCredentialsFromUserDocument(user.get(),
+                                                           BSON("user"
+                                                                << "spencer"
+                                                                << "db"
+                                                                << "test"
+                                                                << "credentials" << credentials)));
     ASSERT(user->getCredentials().scram_sha1.isValid());
     ASSERT(user->getCredentials().scram_sha256.isValid());
     ASSERT(!user->getCredentials().isExternal);
@@ -350,18 +322,18 @@ TEST_F(V2UserDocumentParsing, V2RoleExtraction) {
                                                                user.get()));
 
     // V1-style roles arrays no longer work
-    ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(BSON("user"
-                                                                    << "spencer"
-                                                                    << "roles"
-                                                                    << BSON_ARRAY("read")),
-                                                               user.get()));
+    ASSERT_NOT_OK(
+        v2parser.initializeUserRolesFromUserDocument(BSON("user"
+                                                          << "spencer"
+                                                          << "roles" << BSON_ARRAY("read")),
+                                                     user.get()));
 
     // Roles must have "db" field
-    ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(BSON("user"
-                                                                    << "spencer"
-                                                                    << "roles"
-                                                                    << BSON_ARRAY(BSONObj())),
-                                                               user.get()));
+    ASSERT_NOT_OK(
+        v2parser.initializeUserRolesFromUserDocument(BSON("user"
+                                                          << "spencer"
+                                                          << "roles" << BSON_ARRAY(BSONObj())),
+                                                     user.get()));
 
     ASSERT_NOT_OK(
         v2parser.initializeUserRolesFromUserDocument(BSON("user"
@@ -428,16 +400,14 @@ TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtraction) {
     ASSERT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
         BSON("user"
              << "spencer"
-             << "authenticationRestrictions"
-             << emptyArray),
+             << "authenticationRestrictions" << emptyArray),
         user.get()));
 
     // authenticationRestrictions must have at least one of "clientSource"/"serverAdddress" fields
     ASSERT_NOT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
         BSON("user"
              << "spencer"
-             << "authenticationRestrictions"
-             << BSON_ARRAY(emptyObj)),
+             << "authenticationRestrictions" << BSON_ARRAY(emptyObj)),
         user.get()));
 
     // authenticationRestrictions must not have unexpected elements

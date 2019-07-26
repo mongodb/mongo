@@ -45,10 +45,10 @@ namespace mongo {
 namespace {
 
 using std::map;
-using std::vector;
 using std::set;
 using std::string;
 using std::unique_ptr;
+using std::vector;
 using unittest::assertGet;
 
 MONGO_INITIALIZER(DisableReplicaSetMonitorRefreshRetries)(InitializerContext*) {
@@ -216,22 +216,24 @@ protected:
             const string host(_replSet->getPrimary());
             const mongo::repl::MemberConfig* member =
                 oldConfig.findMemberByHostAndPort(HostAndPort(host));
-            membersBuilder.append(BSON(
-                "_id" << member->getId().getData() << "host" << host << "tags" << BSON("dc"
-                                                                                       << "ny"
-                                                                                       << "num"
-                                                                                       << "1")));
+            membersBuilder.append(BSON("_id" << member->getId().getData() << "host" << host
+                                             << "tags"
+                                             << BSON("dc"
+                                                     << "ny"
+                                                     << "num"
+                                                     << "1")));
         }
 
         {
             const string host(_replSet->getSecondaries().front());
             const mongo::repl::MemberConfig* member =
                 oldConfig.findMemberByHostAndPort(HostAndPort(host));
-            membersBuilder.append(BSON(
-                "_id" << member->getId().getData() << "host" << host << "tags" << BSON("dc"
-                                                                                       << "ny"
-                                                                                       << "num"
-                                                                                       << "2")));
+            membersBuilder.append(BSON("_id" << member->getId().getData() << "host" << host
+                                             << "tags"
+                                             << BSON("dc"
+                                                     << "ny"
+                                                     << "num"
+                                                     << "2")));
         }
 
         membersBuilder.done();

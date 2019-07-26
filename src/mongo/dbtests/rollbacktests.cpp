@@ -42,9 +42,9 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 
-using std::unique_ptr;
 using std::list;
 using std::string;
+using std::unique_ptr;
 
 namespace RollbackTests {
 

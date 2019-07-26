@@ -9,7 +9,6 @@
  */
 
 var $config = (function() {
-
     var data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
@@ -17,7 +16,6 @@ var $config = (function() {
     };
 
     var states = (function() {
-
         function uniqueCollectionName(prefix, tid, num) {
             return prefix + tid + '_' + num;
         }
@@ -64,7 +62,6 @@ var $config = (function() {
         }
 
         return {init: init, rename: rename};
-
     })();
 
     var transitions = {init: {rename: 1}, rename: {rename: 1}};
@@ -76,5 +73,4 @@ var $config = (function() {
         states: states,
         transitions: transitions,
     };
-
 })();

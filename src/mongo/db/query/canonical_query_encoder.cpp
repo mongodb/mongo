@@ -427,10 +427,10 @@ void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) {
 }
 
 /**
-* Encodes sort order into cache key.
-* Sort order is normalized because it provided by
-* QueryRequest.
-*/
+ * Encodes sort order into cache key.
+ * Sort order is normalized because it provided by
+ * QueryRequest.
+ */
 void encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuilder) {
     if (sortObj.isEmpty()) {
         return;
@@ -463,12 +463,12 @@ void encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuilder) {
 }
 
 /**
-* Encodes parsed projection into cache key.
-* Does a simple toString() on each projected field
-* in the BSON object.
-* Orders the encoded elements in the projection by field name.
-* This handles all the special projection types ($meta, $elemMatch, etc.)
-*/
+ * Encodes parsed projection into cache key.
+ * Does a simple toString() on each projected field
+ * in the BSON object.
+ * Orders the encoded elements in the projection by field name.
+ * This handles all the special projection types ($meta, $elemMatch, etc.)
+ */
 void encodeKeyForProj(const BSONObj& projObj, StringBuilder* keyBuilder) {
     // Sorts the BSON elements by field name using a map.
     std::map<StringData, BSONElement> elements;

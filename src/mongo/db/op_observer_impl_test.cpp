@@ -120,12 +120,10 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
 
     BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
                                << "x_1"
-                               << "v"
-                               << 2);
+                               << "v" << 2);
     BSONObj specA = BSON("key" << BSON("a" << 1) << "name"
                                << "a_1"
-                               << "v"
-                               << 2);
+                               << "v" << 2);
     std::vector<BSONObj> specs = {specX, specA};
 
     // Write to the oplog.
@@ -162,12 +160,10 @@ TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
 
     BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
                                << "x_1"
-                               << "v"
-                               << 2);
+                               << "v" << 2);
     BSONObj specA = BSON("key" << BSON("a" << 1) << "name"
                                << "a_1"
-                               << "v"
-                               << 2);
+                               << "v" << 2);
     std::vector<BSONObj> specs = {specX, specA};
 
     // Write to the oplog.
@@ -204,12 +200,10 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
 
     BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
                                << "x_1"
-                               << "v"
-                               << 2);
+                               << "v" << 2);
     BSONObj specA = BSON("key" << BSON("a" << 1) << "name"
                                << "a_1"
-                               << "v"
-                               << 2);
+                               << "v" << 2);
     std::vector<BSONObj> specs = {specX, specA};
 
     // Write to the oplog.
@@ -289,8 +283,7 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
         BSON("collectionOptions_old"
              << BSON("validationLevel" << oldCollOpts.validationLevel << "validationAction"
                                        << oldCollOpts.validationAction)
-             << "expireAfterSeconds_old"
-             << durationCount<Seconds>(ttlInfo.oldExpireAfterSeconds));
+             << "expireAfterSeconds_old" << durationCount<Seconds>(ttlInfo.oldExpireAfterSeconds));
 
     ASSERT_BSONOBJ_EQ(o2Expected, o2);
 }
@@ -392,10 +385,9 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
     // Ensure that renameCollection fields were properly added to oplog entry.
     ASSERT_EQUALS(uuid, unittest::assertGet(UUID::parse(oplogEntry["ui"])));
     auto o = oplogEntry.getObjectField("o");
-    auto oExpected = BSON(
-        "renameCollection" << sourceNss.ns() << "to" << targetNss.ns() << "stayTemp" << stayTemp
-                           << "dropTarget"
-                           << dropTargetUuid);
+    auto oExpected =
+        BSON("renameCollection" << sourceNss.ns() << "to" << targetNss.ns() << "stayTemp"
+                                << stayTemp << "dropTarget" << dropTargetUuid);
     ASSERT_BSONOBJ_EQ(oExpected, o);
 
     // Ensure that the rename optime returned is the same as the last optime in the ReplClientInfo.
@@ -424,8 +416,8 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
     // Ensure that renameCollection fields were properly added to oplog entry.
     ASSERT_EQUALS(uuid, unittest::assertGet(UUID::parse(oplogEntry["ui"])));
     auto o = oplogEntry.getObjectField("o");
-    auto oExpected = BSON(
-        "renameCollection" << sourceNss.ns() << "to" << targetNss.ns() << "stayTemp" << stayTemp);
+    auto oExpected = BSON("renameCollection" << sourceNss.ns() << "to" << targetNss.ns()
+                                             << "stayTemp" << stayTemp);
     ASSERT_BSONOBJ_EQ(oExpected, o);
 }
 
@@ -734,45 +726,28 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     checkCommonFields(oplogEntryObj);
     OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
     auto o = oplogEntry.getObject();
-    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                        << "i"
-                                                        << "ns"
-                                                        << nss1.toString()
-                                                        << "ui"
-                                                        << uuid1
-                                                        << "o"
-                                                        << BSON("_id" << 0 << "data"
-                                                                      << "x"))
-                                                   << BSON("op"
-                                                           << "i"
-                                                           << "ns"
-                                                           << nss1.toString()
-                                                           << "ui"
-                                                           << uuid1
-                                                           << "o"
-                                                           << BSON("_id" << 1 << "data"
-                                                                         << "y"))
-                                                   << BSON("op"
-                                                           << "u"
-                                                           << "ns"
-                                                           << nss2.toString()
-                                                           << "ui"
-                                                           << uuid2
-                                                           << "o"
-                                                           << BSON("$set" << BSON("data"
-                                                                                  << "y"))
-                                                           << "o2"
-                                                           << BSON("_id" << 0))
-                                                   << BSON("op"
-                                                           << "d"
-                                                           << "ns"
-                                                           << nss1.toString()
-                                                           << "ui"
-                                                           << uuid1
-                                                           << "o"
-                                                           << BSON("_id" << 0)))
-                                     << "prepare"
-                                     << true);
+    auto oExpected =
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "i"
+                                           << "ns" << nss1.toString() << "ui" << uuid1 << "o"
+                                           << BSON("_id" << 0 << "data"
+                                                         << "x"))
+                                      << BSON("op"
+                                              << "i"
+                                              << "ns" << nss1.toString() << "ui" << uuid1 << "o"
+                                              << BSON("_id" << 1 << "data"
+                                                            << "y"))
+                                      << BSON("op"
+                                              << "u"
+                                              << "ns" << nss2.toString() << "ui" << uuid2 << "o"
+                                              << BSON("$set" << BSON("data"
+                                                                     << "y"))
+                                              << "o2" << BSON("_id" << 0))
+                                      << BSON("op"
+                                              << "d"
+                                              << "ns" << nss1.toString() << "ui" << uuid1 << "o"
+                                              << BSON("_id" << 0)))
+                        << "prepare" << true);
     ASSERT_BSONOBJ_EQ(oExpected, o);
     ASSERT(oplogEntry.shouldPrepare());
     ASSERT_EQ(oplogEntry.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
@@ -837,16 +812,11 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
         checkCommonFields(oplogEntryObj);
         OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
         auto o = oplogEntry.getObject();
-        auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                            << "i"
-                                                            << "ns"
-                                                            << nss.toString()
-                                                            << "ui"
-                                                            << uuid
-                                                            << "o"
-                                                            << doc))
-                                         << "prepare"
-                                         << true);
+        auto oExpected = BSON(
+            "applyOps" << BSON_ARRAY(BSON("op"
+                                          << "i"
+                                          << "ns" << nss.toString() << "ui" << uuid << "o" << doc))
+                       << "prepare" << true);
         ASSERT_BSONOBJ_EQ(oExpected, o);
         ASSERT(oplogEntry.shouldPrepare());
     }
@@ -905,16 +875,11 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
         checkCommonFields(oplogEntryObj);
         OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
         auto o = oplogEntry.getObject();
-        auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                            << "i"
-                                                            << "ns"
-                                                            << nss.toString()
-                                                            << "ui"
-                                                            << uuid
-                                                            << "o"
-                                                            << doc))
-                                         << "prepare"
-                                         << true);
+        auto oExpected = BSON(
+            "applyOps" << BSON_ARRAY(BSON("op"
+                                          << "i"
+                                          << "ns" << nss.toString() << "ui" << uuid << "o" << doc))
+                       << "prepare" << true);
         ASSERT_BSONOBJ_EQ(oExpected, o);
         ASSERT(oplogEntry.shouldPrepare());
     }
@@ -1159,42 +1124,27 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
     checkCommonFields(oplogEntryObj);
     OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
     auto o = oplogEntry.getObject();
-    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                        << "i"
-                                                        << "ns"
-                                                        << nss1.toString()
-                                                        << "ui"
-                                                        << uuid1
-                                                        << "o"
-                                                        << BSON("_id" << 0 << "data"
-                                                                      << "x"))
-                                                   << BSON("op"
-                                                           << "i"
-                                                           << "ns"
-                                                           << nss1.toString()
-                                                           << "ui"
-                                                           << uuid1
-                                                           << "o"
-                                                           << BSON("_id" << 1 << "data"
-                                                                         << "y"))
-                                                   << BSON("op"
-                                                           << "i"
-                                                           << "ns"
-                                                           << nss2.toString()
-                                                           << "ui"
-                                                           << uuid2
-                                                           << "o"
-                                                           << BSON("_id" << 2 << "data"
-                                                                         << "z"))
-                                                   << BSON("op"
-                                                           << "i"
-                                                           << "ns"
-                                                           << nss2.toString()
-                                                           << "ui"
-                                                           << uuid2
-                                                           << "o"
-                                                           << BSON("_id" << 3 << "data"
-                                                                         << "w"))));
+    auto oExpected =
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "i"
+                                           << "ns" << nss1.toString() << "ui" << uuid1 << "o"
+                                           << BSON("_id" << 0 << "data"
+                                                         << "x"))
+                                      << BSON("op"
+                                              << "i"
+                                              << "ns" << nss1.toString() << "ui" << uuid1 << "o"
+                                              << BSON("_id" << 1 << "data"
+                                                            << "y"))
+                                      << BSON("op"
+                                              << "i"
+                                              << "ns" << nss2.toString() << "ui" << uuid2 << "o"
+                                              << BSON("_id" << 2 << "data"
+                                                            << "z"))
+                                      << BSON("op"
+                                              << "i"
+                                              << "ns" << nss2.toString() << "ui" << uuid2 << "o"
+                                              << BSON("_id" << 3 << "data"
+                                                            << "w"))));
     ASSERT_BSONOBJ_EQ(oExpected, o);
     ASSERT(!oplogEntry.shouldPrepare());
     ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
@@ -1236,28 +1186,19 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     auto oplogEntry = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntry);
     auto o = oplogEntry.getObjectField("o");
-    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                        << "u"
-                                                        << "ns"
-                                                        << nss1.toString()
-                                                        << "ui"
-                                                        << uuid1
-                                                        << "o"
-                                                        << BSON("$set" << BSON("data"
-                                                                               << "x"))
-                                                        << "o2"
-                                                        << BSON("_id" << 0))
-                                                   << BSON("op"
-                                                           << "u"
-                                                           << "ns"
-                                                           << nss2.toString()
-                                                           << "ui"
-                                                           << uuid2
-                                                           << "o"
-                                                           << BSON("$set" << BSON("data"
-                                                                                  << "y"))
-                                                           << "o2"
-                                                           << BSON("_id" << 1))));
+    auto oExpected =
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "u"
+                                           << "ns" << nss1.toString() << "ui" << uuid1 << "o"
+                                           << BSON("$set" << BSON("data"
+                                                                  << "x"))
+                                           << "o2" << BSON("_id" << 0))
+                                      << BSON("op"
+                                              << "u"
+                                              << "ns" << nss2.toString() << "ui" << uuid2 << "o"
+                                              << BSON("$set" << BSON("data"
+                                                                     << "y"))
+                                              << "o2" << BSON("_id" << 1))));
     ASSERT_BSONOBJ_EQ(oExpected, o);
     ASSERT_FALSE(oplogEntry.hasField("prepare"));
     ASSERT_FALSE(oplogEntry.getBoolField("prepare"));
@@ -1292,20 +1233,12 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
     auto o = oplogEntry.getObjectField("o");
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "d"
-                                                        << "ns"
-                                                        << nss1.toString()
-                                                        << "ui"
-                                                        << uuid1
-                                                        << "o"
-                                                        << BSON("_id" << 0))
+                                                        << "ns" << nss1.toString() << "ui" << uuid1
+                                                        << "o" << BSON("_id" << 0))
                                                    << BSON("op"
                                                            << "d"
-                                                           << "ns"
-                                                           << nss2.toString()
-                                                           << "ui"
-                                                           << uuid2
-                                                           << "o"
-                                                           << BSON("_id" << 1))));
+                                                           << "ns" << nss2.toString() << "ui"
+                                                           << uuid2 << "o" << BSON("_id" << 1))));
     ASSERT_BSONOBJ_EQ(oExpected, o);
     ASSERT_FALSE(oplogEntry.hasField("prepare"));
     ASSERT_FALSE(oplogEntry.getBoolField("prepare"));
@@ -1350,12 +1283,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionSingleStatementTest) {
     // The implicit commit oplog entry.
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "i"
-                                                        << "ns"
-                                                        << nss.toString()
-                                                        << "ui"
-                                                        << uuid
-                                                        << "o"
-                                                        << BSON("_id" << 0))));
+                                                        << "ns" << nss.toString() << "ui" << uuid
+                                                        << "o" << BSON("_id" << 0))));
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntry.getObject());
 }
 
@@ -1394,52 +1323,32 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
     }
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "i"
-                                                        << "ns"
-                                                        << nss1.toString()
-                                                        << "ui"
-                                                        << uuid1
-                                                        << "o"
-                                                        << BSON("_id" << 0)))
-                                     << "partialTxn"
-                                     << true);
+                                                        << "ns" << nss1.toString() << "ui" << uuid1
+                                                        << "o" << BSON("_id" << 0)))
+                                     << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
     oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                    << "i"
-                                                   << "ns"
-                                                   << nss1.toString()
-                                                   << "ui"
-                                                   << uuid1
-                                                   << "o"
-                                                   << BSON("_id" << 1)))
-                                << "partialTxn"
-                                << true);
+                                                   << "ns" << nss1.toString() << "ui" << uuid1
+                                                   << "o" << BSON("_id" << 1)))
+                                << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
 
     oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                    << "i"
-                                                   << "ns"
-                                                   << nss2.toString()
-                                                   << "ui"
-                                                   << uuid2
-                                                   << "o"
-                                                   << BSON("_id" << 2)))
-                                << "partialTxn"
-                                << true);
+                                                   << "ns" << nss2.toString() << "ui" << uuid2
+                                                   << "o" << BSON("_id" << 2)))
+                                << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
 
     // This should be the implicit commit oplog entry, indicated by the absence of the 'partialTxn'
     // field.
     oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                    << "i"
-                                                   << "ns"
-                                                   << nss2.toString()
-                                                   << "ui"
-                                                   << uuid2
-                                                   << "o"
-                                                   << BSON("_id" << 3)))
-                                << "count"
-                                << 4);
+                                                   << "ns" << nss2.toString() << "ui" << uuid2
+                                                   << "o" << BSON("_id" << 3)))
+                                << "count" << 4);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[3].getObject());
 }
 
@@ -1490,36 +1399,26 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
     }
 
-    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                        << "u"
-                                                        << "ns"
-                                                        << nss1.toString()
-                                                        << "ui"
-                                                        << uuid1
-                                                        << "o"
-                                                        << BSON("$set" << BSON("data"
-                                                                               << "x"))
-                                                        << "o2"
-                                                        << BSON("_id" << 0)))
-                                     << "partialTxn"
-                                     << true);
+    auto oExpected =
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "u"
+                                           << "ns" << nss1.toString() << "ui" << uuid1 << "o"
+                                           << BSON("$set" << BSON("data"
+                                                                  << "x"))
+                                           << "o2" << BSON("_id" << 0)))
+                        << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
     // This should be the implicit commit oplog entry, indicated by the absence of the 'partialTxn'
     // field.
-    oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                   << "u"
-                                                   << "ns"
-                                                   << nss2.toString()
-                                                   << "ui"
-                                                   << uuid2
-                                                   << "o"
-                                                   << BSON("$set" << BSON("data"
-                                                                          << "y"))
-                                                   << "o2"
-                                                   << BSON("_id" << 1)))
-                                << "count"
-                                << 2);
+    oExpected =
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "u"
+                                           << "ns" << nss2.toString() << "ui" << uuid2 << "o"
+                                           << BSON("$set" << BSON("data"
+                                                                  << "y"))
+                                           << "o2" << BSON("_id" << 1)))
+                        << "count" << 2);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
 }
 
@@ -1563,28 +1462,18 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
 
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "d"
-                                                        << "ns"
-                                                        << nss1.toString()
-                                                        << "ui"
-                                                        << uuid1
-                                                        << "o"
-                                                        << BSON("_id" << 0)))
-                                     << "partialTxn"
-                                     << true);
+                                                        << "ns" << nss1.toString() << "ui" << uuid1
+                                                        << "o" << BSON("_id" << 0)))
+                                     << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
     // This should be the implicit commit oplog entry, indicated by the absence of the 'partialTxn'
     // field.
     oExpected = oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                                << "d"
-                                                               << "ns"
-                                                               << nss2.toString()
-                                                               << "ui"
-                                                               << uuid2
-                                                               << "o"
-                                                               << BSON("_id" << 1)))
-                                            << "count"
-                                            << 2);
+                                                               << "ns" << nss2.toString() << "ui"
+                                                               << uuid2 << "o" << BSON("_id" << 1)))
+                                            << "count" << 2);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
 }
 
@@ -1634,52 +1523,30 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertPrepareTest) {
 
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "i"
-                                                        << "ns"
-                                                        << nss1.toString()
-                                                        << "ui"
-                                                        << uuid1
-                                                        << "o"
-                                                        << BSON("_id" << 0)))
-                                     << "partialTxn"
-                                     << true);
+                                                        << "ns" << nss1.toString() << "ui" << uuid1
+                                                        << "o" << BSON("_id" << 0)))
+                                     << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
     oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                    << "i"
-                                                   << "ns"
-                                                   << nss1.toString()
-                                                   << "ui"
-                                                   << uuid1
-                                                   << "o"
-                                                   << BSON("_id" << 1)))
-                                << "partialTxn"
-                                << true);
+                                                   << "ns" << nss1.toString() << "ui" << uuid1
+                                                   << "o" << BSON("_id" << 1)))
+                                << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
 
     oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                    << "i"
-                                                   << "ns"
-                                                   << nss2.toString()
-                                                   << "ui"
-                                                   << uuid2
-                                                   << "o"
-                                                   << BSON("_id" << 2)))
-                                << "partialTxn"
-                                << true);
+                                                   << "ns" << nss2.toString() << "ui" << uuid2
+                                                   << "o" << BSON("_id" << 2)))
+                                << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[2].getObject());
 
     oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                    << "i"
-                                                   << "ns"
-                                                   << nss2.toString()
-                                                   << "ui"
-                                                   << uuid2
-                                                   << "o"
-                                                   << BSON("_id" << 3)))
-                                << "prepare"
-                                << true
-                                << "count"
-                                << 4);
+                                                   << "ns" << nss2.toString() << "ui" << uuid2
+                                                   << "o" << BSON("_id" << 3)))
+                                << "prepare" << true << "count" << 4);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[3].getObject());
 
     ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
@@ -1742,36 +1609,24 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
         expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
     }
 
-    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                        << "u"
-                                                        << "ns"
-                                                        << nss1.toString()
-                                                        << "ui"
-                                                        << uuid1
-                                                        << "o"
-                                                        << BSON("$set" << BSON("data"
-                                                                               << "x"))
-                                                        << "o2"
-                                                        << BSON("_id" << 0)))
-                                     << "partialTxn"
-                                     << true);
+    auto oExpected =
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "u"
+                                           << "ns" << nss1.toString() << "ui" << uuid1 << "o"
+                                           << BSON("$set" << BSON("data"
+                                                                  << "x"))
+                                           << "o2" << BSON("_id" << 0)))
+                        << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
-    oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                   << "u"
-                                                   << "ns"
-                                                   << nss2.toString()
-                                                   << "ui"
-                                                   << uuid2
-                                                   << "o"
-                                                   << BSON("$set" << BSON("data"
-                                                                          << "y"))
-                                                   << "o2"
-                                                   << BSON("_id" << 1)))
-                                << "prepare"
-                                << true
-                                << "count"
-                                << 2);
+    oExpected =
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "u"
+                                           << "ns" << nss2.toString() << "ui" << uuid2 << "o"
+                                           << BSON("$set" << BSON("data"
+                                                                  << "y"))
+                                           << "o2" << BSON("_id" << 1)))
+                        << "prepare" << true << "count" << 2);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
 
     ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
@@ -1831,28 +1686,16 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeletePrepareTest) {
 
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "d"
-                                                        << "ns"
-                                                        << nss1.toString()
-                                                        << "ui"
-                                                        << uuid1
-                                                        << "o"
-                                                        << BSON("_id" << 0)))
-                                     << "partialTxn"
-                                     << true);
+                                                        << "ns" << nss1.toString() << "ui" << uuid1
+                                                        << "o" << BSON("_id" << 0)))
+                                     << "partialTxn" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 
     oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                    << "d"
-                                                   << "ns"
-                                                   << nss2.toString()
-                                                   << "ui"
-                                                   << uuid2
-                                                   << "o"
-                                                   << BSON("_id" << 1)))
-                                << "prepare"
-                                << true
-                                << "count"
-                                << 2);
+                                                   << "ns" << nss2.toString() << "ui" << uuid2
+                                                   << "o" << BSON("_id" << 1)))
+                                << "prepare" << true << "count" << 2);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
 
     ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
@@ -2060,36 +1903,20 @@ TEST_F(OpObserverMultiEntryTransactionTest, UnpreparedTransactionPackingTest) {
     }
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "i"
-                                                        << "ns"
-                                                        << nss1.toString()
-                                                        << "ui"
-                                                        << uuid1
-                                                        << "o"
-                                                        << BSON("_id" << 0))
+                                                        << "ns" << nss1.toString() << "ui" << uuid1
+                                                        << "o" << BSON("_id" << 0))
                                                    << BSON("op"
                                                            << "i"
-                                                           << "ns"
-                                                           << nss1.toString()
-                                                           << "ui"
-                                                           << uuid1
-                                                           << "o"
-                                                           << BSON("_id" << 1))
+                                                           << "ns" << nss1.toString() << "ui"
+                                                           << uuid1 << "o" << BSON("_id" << 1))
                                                    << BSON("op"
                                                            << "i"
-                                                           << "ns"
-                                                           << nss2.toString()
-                                                           << "ui"
-                                                           << uuid2
-                                                           << "o"
-                                                           << BSON("_id" << 2))
+                                                           << "ns" << nss2.toString() << "ui"
+                                                           << uuid2 << "o" << BSON("_id" << 2))
                                                    << BSON("op"
                                                            << "i"
-                                                           << "ns"
-                                                           << nss2.toString()
-                                                           << "ui"
-                                                           << uuid2
-                                                           << "o"
-                                                           << BSON("_id" << 3))));
+                                                           << "ns" << nss2.toString() << "ui"
+                                                           << uuid2 << "o" << BSON("_id" << 3))));
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 }
 
@@ -2133,38 +1960,21 @@ TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPackingTest) {
     expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "i"
-                                                        << "ns"
-                                                        << nss1.toString()
-                                                        << "ui"
-                                                        << uuid1
-                                                        << "o"
-                                                        << BSON("_id" << 0))
+                                                        << "ns" << nss1.toString() << "ui" << uuid1
+                                                        << "o" << BSON("_id" << 0))
                                                    << BSON("op"
                                                            << "i"
-                                                           << "ns"
-                                                           << nss1.toString()
-                                                           << "ui"
-                                                           << uuid1
-                                                           << "o"
-                                                           << BSON("_id" << 1))
+                                                           << "ns" << nss1.toString() << "ui"
+                                                           << uuid1 << "o" << BSON("_id" << 1))
                                                    << BSON("op"
                                                            << "i"
-                                                           << "ns"
-                                                           << nss2.toString()
-                                                           << "ui"
-                                                           << uuid2
-                                                           << "o"
-                                                           << BSON("_id" << 2))
+                                                           << "ns" << nss2.toString() << "ui"
+                                                           << uuid2 << "o" << BSON("_id" << 2))
                                                    << BSON("op"
                                                            << "i"
-                                                           << "ns"
-                                                           << nss2.toString()
-                                                           << "ui"
-                                                           << uuid2
-                                                           << "o"
-                                                           << BSON("_id" << 3)))
-                                     << "prepare"
-                                     << true);
+                                                           << "ns" << nss2.toString() << "ui"
+                                                           << uuid2 << "o" << BSON("_id" << 3)))
+                                     << "prepare" << true);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[0].getObject());
 }
 

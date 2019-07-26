@@ -111,8 +111,7 @@ TEST_F(NoChunkFixture, IsValidKey) {
     ASSERT(makeCollectionMetadata()->isValidKey(BSON("a" << 3)));
     ASSERT(!makeCollectionMetadata()->isValidKey(BSON("a"
                                                       << "abcde"
-                                                      << "b"
-                                                      << 1)));
+                                                      << "b" << 1)));
     ASSERT(!makeCollectionMetadata()->isValidKey(BSON("c"
                                                       << "abcde")));
 }

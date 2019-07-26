@@ -3,17 +3,16 @@
 
 (function() {
 
-    "use strict";
-    var t = db.jstests_server14753;
+"use strict";
+var t = db.jstests_server14753;
 
-    t.drop();
-    t.ensureIndex({a: 1});
-    t.ensureIndex({b: 1});
-    for (var i = 0; i < 20; i++) {
-        t.insert({b: i});
-    }
-    for (var i = 0; i < 20; i++) {
-        t.find({b: 1}).sort({a: 1}).next();
-    }
-
+t.drop();
+t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
+for (var i = 0; i < 20; i++) {
+    t.insert({b: i});
+}
+for (var i = 0; i < 20; i++) {
+    t.find({b: 1}).sort({a: 1}).next();
+}
 }());

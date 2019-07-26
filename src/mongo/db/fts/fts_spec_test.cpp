@@ -184,8 +184,7 @@ TEST(FTSSpec, ScoreSingleField1) {
                                       << "text"
                                       << "text"
                                       << "text")
-                              << "weights"
-                              << BSON("title" << 10));
+                              << "weights" << BSON("title" << 10));
 
     FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
@@ -204,8 +203,7 @@ TEST(FTSSpec, ScoreMultipleField1) {
                                       << "text"
                                       << "text"
                                       << "text")
-                              << "weights"
-                              << BSON("title" << 10));
+                              << "weights" << BSON("title" << 10));
 
     FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
@@ -247,8 +245,7 @@ TEST(FTSSpec, ScoreRepeatWord) {
                                       << "text"
                                       << "text"
                                       << "text")
-                              << "weights"
-                              << BSON("title" << 10));
+                              << "weights" << BSON("title" << 10));
 
     FTSSpec spec(assertGet(FTSSpec::fixSpec(user)));
 
@@ -273,8 +270,7 @@ TEST(FTSSpec, Extra1) {
 TEST(FTSSpec, Extra2) {
     BSONObj user = BSON("key" << BSON("data"
                                       << "text"
-                                      << "x"
-                                      << 1));
+                                      << "x" << 1));
     BSONObj fixed = assertGet(FTSSpec::fixSpec(user));
     FTSSpec spec(fixed);
     ASSERT_EQUALS(0U, spec.numExtraBefore());
@@ -292,8 +288,7 @@ TEST(FTSSpec, Extra3) {
 
     ASSERT_BSONOBJ_EQ(BSON("x" << 1 << "_fts"
                                << "text"
-                               << "_ftsx"
-                               << 1),
+                               << "_ftsx" << 1),
                       fixed["key"].Obj());
     ASSERT_BSONOBJ_EQ(BSON("data" << 1), fixed["weights"].Obj());
 
@@ -520,8 +515,7 @@ TEST(FTSSpec, NestedLanguages_Wildcard) {
 TEST(FTSSpec, NestedLanguages_WildcardOverride) {
     BSONObj indexSpec = BSON("key" << BSON("$**"
                                            << "text")
-                                   << "weights"
-                                   << BSON("d.e.f" << 20));
+                                   << "weights" << BSON("d.e.f" << 20));
     FTSSpec spec(assertGet(FTSSpec::fixSpec(indexSpec)));
     TermFrequencyMap tfm;
 
@@ -598,5 +592,5 @@ TEST(FTSSpec, TextIndexLegacyLanguageRecognition) {
         ASSERT_EQUALS(tfm.size(), 0U);  // "the" recognized as stopword
     }
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

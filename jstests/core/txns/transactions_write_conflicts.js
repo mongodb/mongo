@@ -32,164 +32,232 @@
  *  @tags: [uses_transactions]
  */
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/core/txns/libs/write_conflicts.js");  // for 'WriteConflictHelpers'.
+load("jstests/core/txns/libs/write_conflicts.js");  // for 'WriteConflictHelpers'.
 
-    const dbName = "test";
-    const collName = "transactions_write_conflicts";
+const dbName = "test";
+const collName = "transactions_write_conflicts";
 
-    const testDB = db.getSiblingDB(dbName);
-    const coll = testDB[collName];
+const testDB = db.getSiblingDB(dbName);
+const coll = testDB[collName];
 
-    // Clean up and create test collection.
-    testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
-    testDB.runCommand({create: coll.getName(), writeConcern: {w: "majority"}});
+// Clean up and create test collection.
+testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
+testDB.runCommand({create: coll.getName(), writeConcern: {w: "majority"}});
 
-    /***********************************************************************************************
-     * Single document write conflicts.
-     **********************************************************************************************/
+/***********************************************************************************************
+ * Single document write conflicts.
+ **********************************************************************************************/
 
-    jsTestLog("Test single document write conflicts.");
+jsTestLog("Test single document write conflicts.");
 
-    print("insert-insert conflict.");
-    let t1Op = {insert: collName, documents: [{_id: 1, t1: 1}]};
-    let t2Op = {insert: collName, documents: [{_id: 1, t2: 1}]};
-    let expectedDocs1 = [{_id: 1, t1: 1}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins);
-    let expectedDocs2 = [{_id: 1, t2: 1}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins);
+print("insert-insert conflict.");
+let t1Op = {insert: collName, documents: [{_id: 1, t1: 1}]};
+let t2Op = {insert: collName, documents: [{_id: 1, t2: 1}]};
+let expectedDocs1 = [{_id: 1, t1: 1}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins);
+let expectedDocs2 = [{_id: 1, t2: 1}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins);
 
-    print("update-update conflict");
-    let initOp = {insert: collName, documents: [{_id: 1}]};  // the document to update.
-    t1Op = {update: collName, updates: [{q: {_id: 1}, u: {$set: {t1: 1}}}]};
-    t2Op = {update: collName, updates: [{q: {_id: 1}, u: {$set: {t2: 1}}}]};
-    expectedDocs1 = [{_id: 1, t1: 1}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
-    expectedDocs2 = [{_id: 1, t2: 1}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
+print("update-update conflict");
+let initOp = {insert: collName, documents: [{_id: 1}]};  // the document to update.
+t1Op = {
+    update: collName,
+    updates: [{q: {_id: 1}, u: {$set: {t1: 1}}}]
+};
+t2Op = {
+    update: collName,
+    updates: [{q: {_id: 1}, u: {$set: {t2: 1}}}]
+};
+expectedDocs1 = [{_id: 1, t1: 1}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
+expectedDocs2 = [{_id: 1, t2: 1}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
 
-    print("upsert-upsert conflict");
-    t1Op = {update: collName, updates: [{q: {_id: 1}, u: {$set: {t1: 1}}, upsert: true}]};
-    t2Op = {update: collName, updates: [{q: {_id: 1}, u: {$set: {t2: 1}}, upsert: true}]};
-    expectedDocs1 = [{_id: 1, t1: 1}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
-    expectedDocs2 = [{_id: 1, t2: 1}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
+print("upsert-upsert conflict");
+t1Op = {
+    update: collName,
+    updates: [{q: {_id: 1}, u: {$set: {t1: 1}}, upsert: true}]
+};
+t2Op = {
+    update: collName,
+    updates: [{q: {_id: 1}, u: {$set: {t2: 1}}, upsert: true}]
+};
+expectedDocs1 = [{_id: 1, t1: 1}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
+expectedDocs2 = [{_id: 1, t2: 1}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
 
-    print("delete-delete conflict");
-    initOp = {insert: collName, documents: [{_id: 1}]};  // the document to delete.
-    t1Op = {delete: collName, deletes: [{q: {_id: 1}, limit: 1}]};
-    t2Op = {delete: collName, deletes: [{q: {_id: 1}, limit: 1}]};
-    expectedDocs1 = [];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
-    expectedDocs2 = [];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
+print("delete-delete conflict");
+initOp = {
+    insert: collName,
+    documents: [{_id: 1}]
+};  // the document to delete.
+t1Op = {
+    delete: collName,
+    deletes: [{q: {_id: 1}, limit: 1}]
+};
+t2Op = {
+    delete: collName,
+    deletes: [{q: {_id: 1}, limit: 1}]
+};
+expectedDocs1 = [];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
+expectedDocs2 = [];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
 
-    print("update-delete conflict");
-    initOp = {insert: collName, documents: [{_id: 1}]};  // the document to delete/update.
-    t1Op = {update: collName, updates: [{q: {_id: 1}, u: {$set: {t1: 1}}}]};
-    t2Op = {delete: collName, deletes: [{q: {_id: 1}, limit: 1}]};
-    expectedDocs1 = [{_id: 1, t1: 1}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
-    expectedDocs2 = [];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
+print("update-delete conflict");
+initOp = {
+    insert: collName,
+    documents: [{_id: 1}]
+};  // the document to delete/update.
+t1Op = {
+    update: collName,
+    updates: [{q: {_id: 1}, u: {$set: {t1: 1}}}]
+};
+t2Op = {
+    delete: collName,
+    deletes: [{q: {_id: 1}, limit: 1}]
+};
+expectedDocs1 = [{_id: 1, t1: 1}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
+expectedDocs2 = [];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
 
-    print("delete-update conflict");
-    initOp = {insert: collName, documents: [{_id: 1}]};  // the document to delete/update.
-    t1Op = {delete: collName, deletes: [{q: {_id: 1}, limit: 1}]};
-    t2Op = {update: collName, updates: [{q: {_id: 1}, u: {$set: {t2: 1}}}]};
-    expectedDocs1 = [];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
-    expectedDocs2 = [{_id: 1, t2: 1}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
+print("delete-update conflict");
+initOp = {
+    insert: collName,
+    documents: [{_id: 1}]
+};  // the document to delete/update.
+t1Op = {
+    delete: collName,
+    deletes: [{q: {_id: 1}, limit: 1}]
+};
+t2Op = {
+    update: collName,
+    updates: [{q: {_id: 1}, u: {$set: {t2: 1}}}]
+};
+expectedDocs1 = [];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
+expectedDocs2 = [{_id: 1, t2: 1}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
 
-    /***********************************************************************************************
-     * Multi-document and predicate based write conflicts.
-     **********************************************************************************************/
+/***********************************************************************************************
+ * Multi-document and predicate based write conflicts.
+ **********************************************************************************************/
 
-    jsTestLog("Test multi-document and predicate based write conflicts.");
+jsTestLog("Test multi-document and predicate based write conflicts.");
 
-    print("batch insert-batch insert conflict");
-    t1Op = {insert: collName, documents: [{_id: 1}, {_id: 2}, {_id: 3}]};
-    t2Op = {insert: collName, documents: [{_id: 2}, {_id: 3}, {_id: 4}]};
-    expectedDocs1 = [{_id: 1}, {_id: 2}, {_id: 3}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins);
-    expectedDocs2 = [{_id: 2}, {_id: 3}, {_id: 4}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins);
+print("batch insert-batch insert conflict");
+t1Op = {
+    insert: collName,
+    documents: [{_id: 1}, {_id: 2}, {_id: 3}]
+};
+t2Op = {
+    insert: collName,
+    documents: [{_id: 2}, {_id: 3}, {_id: 4}]
+};
+expectedDocs1 = [{_id: 1}, {_id: 2}, {_id: 3}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins);
+expectedDocs2 = [{_id: 2}, {_id: 3}, {_id: 4}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins);
 
-    print("multiupdate-multiupdate conflict");
-    initOp = {
-        insert: collName,
-        documents: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]  // the documents to update/delete.
-    };
-    // Predicate intersection: [{_id: 2}, {_id: 3}]
-    t1Op = {update: collName, updates: [{q: {_id: {$lte: 3}}, u: {$set: {t1: 1}}, multi: true}]};
-    t2Op = {update: collName, updates: [{q: {_id: {$gte: 2}}, u: {$set: {t2: 1}}, multi: true}]};
-    expectedDocs1 = [{_id: 1, t1: 1}, {_id: 2, t1: 1}, {_id: 3, t1: 1}, {_id: 4}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
-    expectedDocs2 = [{_id: 1}, {_id: 2, t2: 1}, {_id: 3, t2: 1}, {_id: 4, t2: 1}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
+print("multiupdate-multiupdate conflict");
+initOp = {
+    insert: collName,
+    documents: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]  // the documents to update/delete.
+};
+// Predicate intersection: [{_id: 2}, {_id: 3}]
+t1Op = {
+    update: collName,
+    updates: [{q: {_id: {$lte: 3}}, u: {$set: {t1: 1}}, multi: true}]
+};
+t2Op = {
+    update: collName,
+    updates: [{q: {_id: {$gte: 2}}, u: {$set: {t2: 1}}, multi: true}]
+};
+expectedDocs1 = [{_id: 1, t1: 1}, {_id: 2, t1: 1}, {_id: 3, t1: 1}, {_id: 4}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
+expectedDocs2 = [{_id: 1}, {_id: 2, t2: 1}, {_id: 3, t2: 1}, {_id: 4, t2: 1}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
 
-    print("multiupdate-multidelete conflict");
-    initOp = {
-        insert: collName,
-        documents: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]  // the documents to update/delete.
-    };
-    // Predicate intersection: [{_id: 2}, {_id: 3}]
-    t1Op = {update: collName, updates: [{q: {_id: {$lte: 3}}, u: {$set: {t1: 1}}, multi: true}]};
-    t2Op = {delete: collName, deletes: [{q: {_id: {$gte: 2}}, limit: 0}]};
-    expectedDocs1 = [{_id: 1, t1: 1}, {_id: 2, t1: 1}, {_id: 3, t1: 1}, {_id: 4}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
-    expectedDocs2 = [{_id: 1}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
+print("multiupdate-multidelete conflict");
+initOp = {
+    insert: collName,
+    documents: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]  // the documents to update/delete.
+};
+// Predicate intersection: [{_id: 2}, {_id: 3}]
+t1Op = {
+    update: collName,
+    updates: [{q: {_id: {$lte: 3}}, u: {$set: {t1: 1}}, multi: true}]
+};
+t2Op = {
+    delete: collName,
+    deletes: [{q: {_id: {$gte: 2}}, limit: 0}]
+};
+expectedDocs1 = [{_id: 1, t1: 1}, {_id: 2, t1: 1}, {_id: 3, t1: 1}, {_id: 4}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
+expectedDocs2 = [{_id: 1}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
 
-    print("multidelete-multiupdate conflict");
-    initOp = {
-        insert: collName,
-        documents: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]  // the documents to update/delete.
-    };
-    // Predicate intersection: [{_id: 2}, {_id: 3}]
-    t1Op = {delete: collName, deletes: [{q: {_id: {$lte: 3}}, limit: 0}]};
-    t2Op = {update: collName, updates: [{q: {_id: {$gte: 2}}, u: {$set: {t2: 1}}, multi: true}]};
-    expectedDocs1 = [{_id: 4}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
-    expectedDocs2 = [{_id: 1}, {_id: 2, t2: 1}, {_id: 3, t2: 1}, {_id: 4, t2: 1}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
+print("multidelete-multiupdate conflict");
+initOp = {
+    insert: collName,
+    documents: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]  // the documents to update/delete.
+};
+// Predicate intersection: [{_id: 2}, {_id: 3}]
+t1Op = {
+    delete: collName,
+    deletes: [{q: {_id: {$lte: 3}}, limit: 0}]
+};
+t2Op = {
+    update: collName,
+    updates: [{q: {_id: {$gte: 2}}, u: {$set: {t2: 1}}, multi: true}]
+};
+expectedDocs1 = [{_id: 4}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
+expectedDocs2 = [{_id: 1}, {_id: 2, t2: 1}, {_id: 3, t2: 1}, {_id: 4, t2: 1}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
 
-    print("multidelete-multidelete conflict");
-    initOp = {
-        insert: collName,
-        documents: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]  // the documents to delete.
-    };
-    // Predicate intersection: [{_id: 2}, {_id: 3}]
-    t1Op = {delete: collName, deletes: [{q: {_id: {$lte: 3}}, limit: 0}]};
-    t2Op = {delete: collName, deletes: [{q: {_id: {$gte: 2}}, limit: 0}]};
-    expectedDocs1 = [{_id: 4}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
-    expectedDocs2 = [{_id: 1}];
-    WriteConflictHelpers.writeConflictTest(
-        coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
-
+print("multidelete-multidelete conflict");
+initOp = {
+    insert: collName,
+    documents: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]  // the documents to delete.
+};
+// Predicate intersection: [{_id: 2}, {_id: 3}]
+t1Op = {
+    delete: collName,
+    deletes: [{q: {_id: {$lte: 3}}, limit: 0}]
+};
+t2Op = {
+    delete: collName,
+    deletes: [{q: {_id: {$gte: 2}}, limit: 0}]
+};
+expectedDocs1 = [{_id: 4}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs1, WriteConflictHelpers.T1StartsFirstAndWins, initOp);
+expectedDocs2 = [{_id: 1}];
+WriteConflictHelpers.writeConflictTest(
+    coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
 }());

@@ -2,32 +2,31 @@
 // check that operation is not visible immediately, but is visible after the transaction commits.
 
 (function() {
-    'use strict';
+'use strict';
 
-    const testName = jsTest.name();
+const testName = jsTest.name();
 
-    // Use a unique db for every test so burn_in_tests can run this test multiple times.
-    db = db.getSiblingDB('txn_self_test' + Random.srand());
+// Use a unique db for every test so burn_in_tests can run this test multiple times.
+db = db.getSiblingDB('txn_self_test' + Random.srand());
 
-    // Profile all commands.
-    db.setProfilingLevel(2);
+// Profile all commands.
+db.setProfilingLevel(2);
 
-    const coll = db[testName];
+const coll = db[testName];
 
-    assert.commandWorked(coll.insert({x: 1}));
-    let commands = db.system.profile.find().toArray();
-    // Check that the insert is not visible because the txn has not committed.
-    assert.eq(commands.length, 1);
-    assert.eq(commands[0].command.create, testName);
+assert.commandWorked(coll.insert({x: 1}));
+let commands = db.system.profile.find().toArray();
+// Check that the insert is not visible because the txn has not committed.
+assert.eq(commands.length, 1);
+assert.eq(commands[0].command.create, testName);
 
-    // Use a dummy, unrelated operation to signal the txn runner to commit the transaction.
-    assert.commandWorked(db.runCommand({ping: 1}));
+// Use a dummy, unrelated operation to signal the txn runner to commit the transaction.
+assert.commandWorked(db.runCommand({ping: 1}));
 
-    commands = db.system.profile.find().toArray();
-    // Assert the insert is now visible.
-    assert.eq(commands.length, 3);
-    assert.eq(commands[0].command.create, testName);
-    assert.eq(commands[1].command.insert, testName);
-    assert.eq(commands[2].command.find, 'system.profile');
-
+commands = db.system.profile.find().toArray();
+// Assert the insert is now visible.
+assert.eq(commands.length, 3);
+assert.eq(commands[0].command.create, testName);
+assert.eq(commands[1].command.insert, testName);
+assert.eq(commands[2].command.find, 'system.profile');
 })();

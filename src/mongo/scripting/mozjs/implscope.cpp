@@ -61,7 +61,7 @@ namespace mongo {
 namespace JSFiles {
 extern const JSFile types;
 extern const JSFile assert;
-}  // namespace
+}  // namespace JSFiles
 
 namespace mozjs {
 

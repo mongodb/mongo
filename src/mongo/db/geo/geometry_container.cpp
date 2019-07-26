@@ -46,8 +46,9 @@ bool GeometryContainer::isPoint() const {
 
 bool GeometryContainer::supportsContains() const {
     return NULL != _polygon || NULL != _box || NULL != _cap || NULL != _multiPolygon ||
-        (NULL != _geometryCollection && (_geometryCollection->polygons.vector().size() > 0 ||
-                                         _geometryCollection->multiPolygons.vector().size() > 0));
+        (NULL != _geometryCollection &&
+         (_geometryCollection->polygons.vector().size() > 0 ||
+          _geometryCollection->multiPolygons.vector().size() > 0));
 }
 
 bool GeometryContainer::hasS2Region() const {

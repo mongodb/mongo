@@ -137,15 +137,14 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     //
     // TODO(SERVER-25086): Remove distLock acquisition from split chunk
     //
-    const std::string whyMessage(
-        str::stream() << "splitting chunk " << chunkRange.toString() << " in " << nss.toString());
+    const std::string whyMessage(str::stream() << "splitting chunk " << chunkRange.toString()
+                                               << " in " << nss.toString());
     auto scopedDistLock = Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
         opCtx, nss.ns(), whyMessage, DistLockManager::kDefaultLockTimeout);
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus().withContext(
             str::stream() << "could not acquire collection lock for " << nss.toString()
-                          << " to split chunk "
-                          << chunkRange.toString());
+                          << " to split chunk " << chunkRange.toString());
     }
 
     // If the shard key is hashed, then we must make sure that the split points are of type
@@ -157,12 +156,11 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
                 BSONElement splitKeyElement = it.next();
                 if (splitKeyElement.type() != NumberLong) {
                     return {ErrorCodes::CannotSplit,
-                            str::stream() << "splitChunk cannot split chunk "
-                                          << chunkRange.toString()
-                                          << ", split point "
-                                          << splitKeyElement.toString()
-                                          << " must be of type "
-                                             "NumberLong for hashed shard key patterns"};
+                            str::stream()
+                                << "splitChunk cannot split chunk " << chunkRange.toString()
+                                << ", split point " << splitKeyElement.toString()
+                                << " must be of type "
+                                   "NumberLong for hashed shard key patterns"};
                 }
             }
         }

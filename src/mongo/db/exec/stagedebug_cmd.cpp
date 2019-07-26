@@ -65,8 +65,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
 
@@ -283,11 +283,9 @@ public:
                         str::stream() << "Can't find index: " << keyPatternObj,
                         !indexes.empty());
                 uassert(ErrorCodes::AmbiguousIndexKeyPattern,
-                        str::stream() << indexes.size() << " matching indexes for key pattern: "
-                                      << keyPatternObj
-                                      << ". Conflicting indexes: "
-                                      << indexes[0]->infoObj()
-                                      << ", "
+                        str::stream() << indexes.size()
+                                      << " matching indexes for key pattern: " << keyPatternObj
+                                      << ". Conflicting indexes: " << indexes[0]->infoObj() << ", "
                                       << indexes[1]->infoObj(),
                         indexes.size() == 1);
                 desc = indexes[0];

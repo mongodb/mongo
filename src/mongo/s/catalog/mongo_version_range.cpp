@@ -148,4 +148,4 @@ bool isInMongoVersionRanges(StringData version, const vector<MongoVersionRange>&
 
     return false;
 }
-}
+}  // namespace mongo

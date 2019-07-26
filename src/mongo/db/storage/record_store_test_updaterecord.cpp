@@ -38,9 +38,9 @@
 namespace mongo {
 namespace {
 
-using std::unique_ptr;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 
 // Insert a record and try to update it.
 TEST(RecordStoreTestHarness, UpdateRecord) {

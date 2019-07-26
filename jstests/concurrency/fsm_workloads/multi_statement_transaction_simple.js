@@ -12,13 +12,11 @@
 load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 
 var $config = (function() {
-
     function computeTotalOfAllBalances(documents) {
         return documents.reduce((total, account) => total + account.balance, 0);
     }
 
     var states = (function() {
-
         function getAllDocuments(session, collection, numDocs, txnHelperOptions) {
             let documents;
             withTxnAndAutoRetry(session, () => {
@@ -119,5 +117,4 @@ var $config = (function() {
         setup: setup,
         teardown: teardown
     };
-
 })();

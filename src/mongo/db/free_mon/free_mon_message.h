@@ -67,8 +67,8 @@ enum class FreeMonMessageType {
     AsyncRegisterFail,
 
     /**
-    * Unregister server from server command.
-    */
+     * Unregister server from server command.
+     */
     UnregisterCommand,
 
     /**
@@ -117,24 +117,24 @@ enum class FreeMonMessageType {
  */
 enum class RegistrationType {
     /**
-    * Do not register on start because it was not configured via commandline/config file.
-    */
+     * Do not register on start because it was not configured via commandline/config file.
+     */
     DoNotRegister,
 
     /**
-    * Register immediately on start since we are a standalone.
-    */
+     * Register immediately on start since we are a standalone.
+     */
     RegisterOnStart,
 
     /**
-    * Register after transition to becoming primary because we are in a replica set,
-    * and Free Monitoring has been explicitly enabled.
-    */
+     * Register after transition to becoming primary because we are in a replica set,
+     * and Free Monitoring has been explicitly enabled.
+     */
     RegisterAfterOnTransitionToPrimary,
 
     /**
-    * As above, but only if we have been runtime enabled.
-    */
+     * As above, but only if we have been runtime enabled.
+     */
     RegisterAfterOnTransitionToPrimaryIfEnabled,
 };
 
@@ -334,7 +334,7 @@ private:
 /**
  * For the messages that the caller needs to wait on, this provides a mechanism to wait on messages
  * to be processed.
-*/
+ */
 template <FreeMonMessageType typeT>
 struct FreeMonWaitablePayloadForMessage {
     using payload_type = void;

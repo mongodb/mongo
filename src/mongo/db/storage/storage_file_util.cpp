@@ -72,8 +72,8 @@ Status fsyncParentDirectory(const boost::filesystem::path& file) {
     int fd = ::open(dir.string().c_str(), O_RDONLY);
     if (fd < 0) {
         return {ErrorCodes::FileOpenFailed,
-                str::stream() << "Failed to open directory " << dir.string() << " for flushing: "
-                              << errnoWithDescription()};
+                str::stream() << "Failed to open directory " << dir.string()
+                              << " for flushing: " << errnoWithDescription()};
     }
     if (fsync(fd) != 0) {
         int e = errno;
@@ -82,8 +82,8 @@ Status fsyncParentDirectory(const boost::filesystem::path& file) {
         } else {
             close(fd);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to fsync directory '" << dir.string() << "': "
-                                  << errnoWithDescription(e)};
+                    str::stream() << "Failed to fsync directory '" << dir.string()
+                                  << "': " << errnoWithDescription(e)};
         }
     }
     close(fd);
@@ -102,9 +102,7 @@ Status fsyncRename(const boost::filesystem::path& source, const boost::filesyste
     if (ec) {
         return {ErrorCodes::FileRenameFailed,
                 str::stream() << "Error renaming data file from " << source.string() << " to "
-                              << dest.string()
-                              << ": "
-                              << ec.message()};
+                              << dest.string() << ": " << ec.message()};
     }
     auto status = fsyncFile(dest);
     if (!status.isOK()) {

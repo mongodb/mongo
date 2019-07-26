@@ -152,8 +152,8 @@ var BackupRestoreTest = function(options) {
         assert(options.backup, "Backup option not supplied");
         assert.contains(options.backup,
                         allowedBackupKeys,
-                        'invalid option: ' + tojson(options.backup) + '; valid options are: ' +
-                            tojson(allowedBackupKeys));
+                        'invalid option: ' + tojson(options.backup) +
+                            '; valid options are: ' + tojson(allowedBackupKeys));
 
         // Number of nodes in initial replica set (default 3)
         var numNodes = options.nodes || 3;

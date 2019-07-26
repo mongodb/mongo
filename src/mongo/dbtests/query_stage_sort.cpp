@@ -596,4 +596,4 @@ public:
 
 SuiteInstance<All> queryStageSortTest;
 
-}  // namespace
+}  // namespace QueryStageSortTests

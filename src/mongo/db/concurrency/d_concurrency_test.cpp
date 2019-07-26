@@ -2094,7 +2094,7 @@ public:
 
     bool activeTransaction = true;
 };
-}
+}  // namespace
 
 TEST_F(DConcurrencyTestFixture, TestGlobalLockAbandonsSnapshotWhenNotInWriteUnitOfWork) {
     auto clients = makeKClientsWithLockers(1);

@@ -481,4 +481,4 @@ private:
     // Defined in document.cpp
     static const DocumentStorage kEmptyDoc;
 };
-}
+}  // namespace mongo

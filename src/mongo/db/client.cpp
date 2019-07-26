@@ -55,9 +55,7 @@ thread_local ServiceContext::UniqueClient currentClient;
 void invariantNoCurrentClient() {
     invariant(!haveClient(),
               str::stream() << "Already have client on this thread: "  //
-                            << '"'
-                            << Client::getCurrent()->desc()
-                            << '"');
+                            << '"' << Client::getCurrent()->desc() << '"');
 }
 }  // namespace
 

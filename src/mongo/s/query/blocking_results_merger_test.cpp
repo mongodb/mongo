@@ -169,7 +169,6 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReadyWithDe
             operationContext(), RouterExecStage::ExecContext::kGetMoreNoResultsYet));
         ASSERT_FALSE(next.isEOF());
         ASSERT_BSONOBJ_EQ(*next.getResult(), BSON("x" << 1));
-
     });
 
     // Schedule the response to the getMore which will return the next result and mark the cursor as

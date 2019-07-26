@@ -17,11 +17,11 @@ const ENABLE_FAULTS = "enable_faults";
 
 class FreeMonWebServer {
     /**
-    * Create a new webserver.
-    *
-    * @param {string} fault_type
-    * @param {bool} disableFaultsOnStartup optionally disable fault on startup
-    */
+     * Create a new webserver.
+     *
+     * @param {string} fault_type
+     * @param {bool} disableFaultsOnStartup optionally disable fault on startup
+     */
     constructor(fault_type, disableFaultsOnStartup) {
         this.python = "python3";
         this.disableFaultsOnStartup = disableFaultsOnStartup || false;

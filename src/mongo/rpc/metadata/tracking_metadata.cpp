@@ -99,9 +99,7 @@ StatusWith<TrackingMetadata> TrackingMetadata::readFromMetadata(const BSONElemen
     } else if (metadataElem.type() != mongo::Object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "TrackingMetadata element has incorrect type: expected"
-                              << mongo::Object
-                              << " but got "
-                              << metadataElem.type()};
+                              << mongo::Object << " but got " << metadataElem.type()};
     }
 
     BSONObj metadataObj = metadataElem.Obj();

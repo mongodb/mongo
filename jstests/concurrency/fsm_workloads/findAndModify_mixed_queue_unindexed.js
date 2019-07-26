@@ -22,7 +22,6 @@ load('jstests/concurrency/fsm_workloads/findAndModify_remove_queue.js');  // for
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = extendWorkload($config, function($config, $super) {
-
     // Use the workload name as the database name, since the workload name is assumed to be
     // unique.
     $config.data.uniqueDBName = 'findAndModify_mixed_queue_unindexed';
@@ -81,7 +80,6 @@ var $config = extendWorkload($config, function($config, $super) {
             remove: remove,
             update: update,
         };
-
     })();
 
     $config.transitions = {

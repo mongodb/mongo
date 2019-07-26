@@ -517,7 +517,7 @@ void MigrationManager::_schedule(WithLock lock,
     StatusWith<executor::TaskExecutor::CallbackHandle> callbackHandleWithStatus =
         executor->scheduleRemoteCommand(
             remoteRequest,
-            [ this, service = opCtx->getServiceContext(), itMigration ](
+            [this, service = opCtx->getServiceContext(), itMigration](
                 const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
                 ThreadClient tc(getThreadName(), service);
                 auto opCtx = cc().makeOperationContext();
@@ -614,8 +614,7 @@ Status MigrationManager::_processRemoteCommandResponse(
         scopedMigrationRequest->keepDocumentOnDestruct();
         return {ErrorCodes::BalancerInterrupted,
                 stream() << "Migration interrupted because the balancer is stopping."
-                         << " Command status: "
-                         << remoteCommandResponse.status.toString()};
+                         << " Command status: " << remoteCommandResponse.status.toString()};
     }
 
     if (!remoteCommandResponse.isOK()) {

@@ -51,10 +51,10 @@
 
 namespace mongo {
 namespace {
-using std::deque;
-using std::vector;
-using std::string;
 using boost::intrusive_ptr;
+using std::deque;
+using std::string;
+using std::vector;
 
 class BucketAutoTests : public AggregationContextFixture {
 public:

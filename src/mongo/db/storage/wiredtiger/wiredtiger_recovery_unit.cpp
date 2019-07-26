@@ -420,8 +420,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
               str::stream() << "Cannot have both a _lastTimestampSet and a "
                                "_commitTimestamp. _lastTimestampSet: "
                             << _lastTimestampSet->toString()
-                            << ". _commitTimestamp: "
-                            << _commitTimestamp.toString());
+                            << ". _commitTimestamp: " << _commitTimestamp.toString());
 
     // We reset the _lastTimestampSet between transactions. Since it is legal for one
     // transaction on a RecoveryUnit to call setTimestamp() and another to call
@@ -658,8 +657,7 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
     invariant(_prepareTimestamp.isNull());
     invariant(_commitTimestamp.isNull(),
               str::stream() << "Commit timestamp set to " << _commitTimestamp.toString()
-                            << " and trying to set WUOW timestamp to "
-                            << timestamp.toString());
+                            << " and trying to set WUOW timestamp to " << timestamp.toString());
     invariant(_readAtTimestamp.isNull() || timestamp >= _readAtTimestamp,
               str::stream() << "future commit timestamp " << timestamp.toString()
                             << " cannot be older than read timestamp "
@@ -686,12 +684,10 @@ void WiredTigerRecoveryUnit::setCommitTimestamp(Timestamp timestamp) {
     invariant(!_inUnitOfWork() || !_prepareTimestamp.isNull(), toString(_state));
     invariant(_commitTimestamp.isNull(),
               str::stream() << "Commit timestamp set to " << _commitTimestamp.toString()
-                            << " and trying to set it to "
-                            << timestamp.toString());
+                            << " and trying to set it to " << timestamp.toString());
     invariant(!_lastTimestampSet,
               str::stream() << "Last timestamp set is " << _lastTimestampSet->toString()
-                            << " and trying to set commit timestamp to "
-                            << timestamp.toString());
+                            << " and trying to set commit timestamp to " << timestamp.toString());
     invariant(!_isTimestamped);
 
     _commitTimestamp = timestamp;
@@ -705,9 +701,7 @@ void WiredTigerRecoveryUnit::setDurableTimestamp(Timestamp timestamp) {
     invariant(
         _durableTimestamp.isNull(),
         str::stream() << "Trying to reset durable timestamp when it was already set. wasSetTo: "
-                      << _durableTimestamp.toString()
-                      << " setTo: "
-                      << timestamp.toString());
+                      << _durableTimestamp.toString() << " setTo: " << timestamp.toString());
 
     _durableTimestamp = timestamp;
 }
@@ -731,16 +725,13 @@ void WiredTigerRecoveryUnit::setPrepareTimestamp(Timestamp timestamp) {
     invariant(_inUnitOfWork(), toString(_state));
     invariant(_prepareTimestamp.isNull(),
               str::stream() << "Trying to set prepare timestamp to " << timestamp.toString()
-                            << ". It's already set to "
-                            << _prepareTimestamp.toString());
+                            << ". It's already set to " << _prepareTimestamp.toString());
     invariant(_commitTimestamp.isNull(),
               str::stream() << "Commit timestamp is " << _commitTimestamp.toString()
-                            << " and trying to set prepare timestamp to "
-                            << timestamp.toString());
+                            << " and trying to set prepare timestamp to " << timestamp.toString());
     invariant(!_lastTimestampSet,
               str::stream() << "Last timestamp set is " << _lastTimestampSet->toString()
-                            << " and trying to set prepare timestamp to "
-                            << timestamp.toString());
+                            << " and trying to set prepare timestamp to " << timestamp.toString());
 
     _prepareTimestamp = timestamp;
 }
@@ -780,8 +771,7 @@ void WiredTigerRecoveryUnit::setRoundUpPreparedTimestamps(bool value) {
     // This cannot be called after WiredTigerRecoveryUnit::_txnOpen.
     invariant(!_isActive(),
               str::stream() << "Can't change round up prepared timestamps flag "
-                            << "when current state is "
-                            << toString(_state));
+                            << "when current state is " << toString(_state));
     _roundUpPreparedTimestamps =
         (value) ? RoundUpPreparedTimestamps::kRound : RoundUpPreparedTimestamps::kNoRound;
 }
@@ -794,8 +784,7 @@ void WiredTigerRecoveryUnit::setTimestampReadSource(ReadSource readSource,
     invariant(!_isActive() || _timestampReadSource == readSource,
               str::stream() << "Current state: " << toString(_state)
                             << ". Invalid internal state while setting timestamp read source: "
-                            << static_cast<int>(readSource)
-                            << ", provided timestamp: "
+                            << static_cast<int>(readSource) << ", provided timestamp: "
                             << (provided ? provided->toString() : "none"));
     invariant(!provided == (readSource != ReadSource::kProvided));
     invariant(!(provided && provided->isNull()));

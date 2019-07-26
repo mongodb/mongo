@@ -7,11 +7,9 @@
  * the findAndModify command to remove it.
  */
 var $config = (function() {
-
     var data = {shardKey: {tid: 1}};
 
     var states = (function() {
-
         function init(db, collName) {
             this.iter = 0;
         }
@@ -41,11 +39,9 @@ var $config = (function() {
         }
 
         return {init: init, insertAndRemove: insertAndRemove};
-
     })();
 
     var transitions = {init: {insertAndRemove: 1}, insertAndRemove: {insertAndRemove: 1}};
 
     return {threadCount: 20, iterations: 20, data: data, states: states, transitions: transitions};
-
 })();

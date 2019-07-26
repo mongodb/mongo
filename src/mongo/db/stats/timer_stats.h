@@ -88,4 +88,4 @@ private:
     bool _recorded;
     Timer _t;
 };
-}
+}  // namespace mongo

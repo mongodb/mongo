@@ -920,8 +920,9 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
     }
 
     // We use the address of the context as the session id context.
-    if (0 == ::SSL_CTX_set_session_id_context(
-                 context, reinterpret_cast<unsigned char*>(&context), sizeof(context))) {
+    if (0 ==
+        ::SSL_CTX_set_session_id_context(
+            context, reinterpret_cast<unsigned char*>(&context), sizeof(context))) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       str::stream() << "Can not store ssl session id context: "
                                     << getSSLErrorMessage(ERR_get_error()));
@@ -1306,14 +1307,11 @@ Status SSLManagerOpenSSL::_setupSystemCA(SSL_CTX* context) {
     // On non-Windows/non-Apple platforms, the OpenSSL libraries should have been configured
     // with default locations for CA certificates.
     if (SSL_CTX_set_default_verify_paths(context) != 1) {
-        return {ErrorCodes::InvalidSSLConfiguration,
-                str::stream() << "error loading system CA certificates "
-                              << "(default certificate file: "
-                              << X509_get_default_cert_file()
-                              << ", "
-                              << "default certificate path: "
-                              << X509_get_default_cert_dir()
-                              << ")"};
+        return {
+            ErrorCodes::InvalidSSLConfiguration,
+            str::stream() << "error loading system CA certificates "
+                          << "(default certificate file: " << X509_get_default_cert_file() << ", "
+                          << "default certificate path: " << X509_get_default_cert_dir() << ")"};
     }
 #else
 
@@ -1357,17 +1355,17 @@ bool SSLManagerOpenSSL::_setupCRL(SSL_CTX* context, const std::string& crlFile) 
 }
 
 /*
-* The interface layer between network and BIO-pair. The BIO-pair buffers
-* the data to/from the TLS layer.
-*/
+ * The interface layer between network and BIO-pair. The BIO-pair buffers
+ * the data to/from the TLS layer.
+ */
 void SSLManagerOpenSSL::_flushNetworkBIO(SSLConnectionOpenSSL* conn) {
     char buffer[BUFFER_SIZE];
     int wantWrite;
 
     /*
-    * Write the complete contents of the buffer. Leaving the buffer
-    * unflushed could cause a deadlock.
-    */
+     * Write the complete contents of the buffer. Leaving the buffer
+     * unflushed could cause a deadlock.
+     */
     while ((wantWrite = BIO_ctrl_pending(conn->networkBIO)) > 0) {
         if (wantWrite > BUFFER_SIZE) {
             wantWrite = BUFFER_SIZE;

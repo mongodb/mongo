@@ -126,9 +126,7 @@ Status _doTxn(OperationContext* opCtx,
             uasserted(ErrorCodes::NamespaceNotFound,
                       str::stream() << "cannot apply insert, delete, or update operation on a "
                                        "non-existent namespace "
-                                    << nss->ns()
-                                    << ": "
-                                    << mongo::redact(opObj));
+                                    << nss->ns() << ": " << mongo::redact(opObj));
         }
 
         if (opObj.hasField("ui")) {
@@ -155,9 +153,7 @@ Status _doTxn(OperationContext* opCtx,
         if (!collection) {
             uasserted(ErrorCodes::NamespaceNotFound,
                       str::stream() << "cannot apply operation on a non-existent namespace "
-                                    << nss->ns()
-                                    << " with doTxn: "
-                                    << redact(opObj));
+                                    << nss->ns() << " with doTxn: " << redact(opObj));
         }
 
         // Setting alwaysUpsert to true makes sense only during oplog replay, and doTxn commands

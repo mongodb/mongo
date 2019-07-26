@@ -57,9 +57,8 @@ Status cursorNotFoundStatus(const NamespaceString& nss, CursorId cursorId) {
 
 Status cursorInUseStatus(const NamespaceString& nss, CursorId cursorId) {
     return {ErrorCodes::CursorInUse,
-            str::stream() << "Cursor already in use (namespace: '" << nss.ns() << "', id: "
-                          << cursorId
-                          << ")."};
+            str::stream() << "Cursor already in use (namespace: '" << nss.ns()
+                          << "', id: " << cursorId << ")."};
 }
 
 //
@@ -349,9 +348,9 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     // Check if the user is coauthorized to access this cursor.
     auto authCheckStatus = authChecker(entry->getAuthenticatedUsers());
     if (!authCheckStatus.isOK()) {
-        return authCheckStatus.withContext(
-            str::stream() << "cursor id " << cursorId
-                          << " was not created by the authenticated user");
+        return authCheckStatus.withContext(str::stream()
+                                           << "cursor id " << cursorId
+                                           << " was not created by the authenticated user");
     }
 
     if (checkSessionAuth == kCheckSession) {

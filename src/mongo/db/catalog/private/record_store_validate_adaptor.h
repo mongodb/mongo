@@ -101,4 +101,4 @@ private:
     IndexCatalog* _indexCatalog;             // Not owned.
     ValidateResultsMap* _indexNsResultsMap;  // Not owned.
 };
-}  // namespace
+}  // namespace mongo

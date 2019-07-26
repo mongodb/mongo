@@ -37,7 +37,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -92,8 +91,8 @@ void killSessionTokens(OperationContext* opCtx,
         return;
 
     getThreadPool(opCtx)->schedule(
-        [ service = opCtx->getServiceContext(),
-          sessionKillTokens = std::move(sessionKillTokens) ](auto status) mutable {
+        [service = opCtx->getServiceContext(),
+         sessionKillTokens = std::move(sessionKillTokens)](auto status) mutable {
             invariant(status);
 
             ThreadClient tc("Kill-Sessions", service);
@@ -185,11 +184,10 @@ void createTransactionTable(OperationContext* opCtx) {
         return;
     }
 
-    uassertStatusOKWithContext(status,
-                               str::stream()
-                                   << "Failed to create the "
-                                   << NamespaceString::kSessionTransactionsTableNamespace.ns()
-                                   << " collection");
+    uassertStatusOKWithContext(
+        status,
+        str::stream() << "Failed to create the "
+                      << NamespaceString::kSessionTransactionsTableNamespace.ns() << " collection");
 }
 
 void abortInProgressTransactions(OperationContext* opCtx) {

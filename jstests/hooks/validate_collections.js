@@ -73,8 +73,8 @@ function CollectionValidator() {
                     continue;
                 }
                 const host = db.getMongo().host;
-                print('Collection validation failed on host ' + host + ' with response: ' +
-                      tojson(res));
+                print('Collection validation failed on host ' + host +
+                      ' with response: ' + tojson(res));
                 dumpCollection(coll, 100);
                 full_res.failed_res.push(res);
                 full_res.ok = 0;

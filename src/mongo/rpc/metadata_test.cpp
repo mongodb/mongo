@@ -72,8 +72,9 @@ TEST(Metadata, UpconvertValidMetadata) {
                                  << BSON("mode"
                                          << "secondary")),
                    mongo::QueryOption_SlaveOk,
-                   BSON("ping" << 1 << "$readPreference" << BSON("mode"
-                                                                 << "secondary")));
+                   BSON("ping" << 1 << "$readPreference"
+                               << BSON("mode"
+                                       << "secondary")));
 
     // Wrapped in 'query', with readPref.
     checkUpconvert(BSON("query" << BSON("pong" << 1 << "foo"
@@ -121,16 +122,14 @@ TEST(Metadata, UpconvertInvalidMetadata) {
     ASSERT_THROWS_CODE(upconvertRequest("db",
                                         BSON("query" << BSON("foo"
                                                              << "bar")
-                                                     << "$maxTimeMS"
-                                                     << 200),
+                                                     << "$maxTimeMS" << 200),
                                         0),
                        AssertionException,
                        ErrorCodes::InvalidOptions);
     ASSERT_THROWS_CODE(upconvertRequest("db",
                                         BSON("$query" << BSON("foo"
                                                               << "bar")
-                                                      << "$maxTimeMS"
-                                                      << 200),
+                                                      << "$maxTimeMS" << 200),
                                         0),
                        AssertionException,
                        ErrorCodes::InvalidOptions);

@@ -24,7 +24,6 @@
 load('jstests/concurrency/fsm_workload_helpers/chunks.js');  // for chunk helpers
 
 var $config = (function() {
-
     var data = {
         partitionSize: 1,
         // We use a non-hashed shard key of { _id: 1 } so that documents reside on their expected
@@ -82,8 +81,8 @@ var $config = (function() {
             return coll
                 .aggregate([
                     {
-                      $match:
-                          {ns: this.partition.ns, [maxField]: {$lte: this.partition.chunkUpper}}
+                        $match:
+                            {ns: this.partition.ns, [maxField]: {$lte: this.partition.chunkUpper}}
                     },
                     {$sample: {size: 1}}
                 ])
@@ -92,8 +91,8 @@ var $config = (function() {
             return coll
                 .aggregate([
                     {
-                      $match:
-                          {ns: this.partition.ns, [minField]: {$gte: this.partition.chunkLower}}
+                        $match:
+                            {ns: this.partition.ns, [minField]: {$gte: this.partition.chunkLower}}
                     },
                     {$sample: {size: 1}}
                 ])
@@ -102,11 +101,11 @@ var $config = (function() {
             return coll
                 .aggregate([
                     {
-                      $match: {
-                          ns: this.partition.ns,
-                          [minField]: {$gte: this.partition.chunkLower},
-                          [maxField]: {$lte: this.partition.chunkUpper}
-                      }
+                        $match: {
+                            ns: this.partition.ns,
+                            [minField]: {$gte: this.partition.chunkLower},
+                            [maxField]: {$lte: this.partition.chunkUpper}
+                        }
                     },
                     {$sample: {size: 1}}
                 ])
@@ -115,8 +114,8 @@ var $config = (function() {
     };
 
     // This is used by the extended workloads to perform additional setup for more splitPoints.
-    data.setupAdditionalSplitPoints = function setupAdditionalSplitPoints(db, collName, partition) {
-    };
+    data.setupAdditionalSplitPoints = function setupAdditionalSplitPoints(
+        db, collName, partition) {};
 
     var states = (function() {
         // Inform this thread about its partition,
@@ -185,7 +184,6 @@ var $config = (function() {
 
             this.setupAdditionalSplitPoints(db, collName, partition);
         }
-
     };
 
     return {

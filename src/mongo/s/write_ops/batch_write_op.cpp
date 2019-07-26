@@ -42,9 +42,9 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::set;
 using std::stringstream;
+using std::unique_ptr;
 using std::vector;
 
 namespace {
@@ -171,9 +171,9 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
         static const auto boolSize = 1;
 
         // Add the size of the 'collation' field, if present.
-        estSize +=
-            !item.getUpdate().getCollation() ? 0 : (UpdateOpEntry::kCollationFieldName.size() +
-                                                    item.getUpdate().getCollation()->objsize());
+        estSize += !item.getUpdate().getCollation() ? 0
+                                                    : (UpdateOpEntry::kCollationFieldName.size() +
+                                                       item.getUpdate().getCollation()->objsize());
 
         // Add the size of the 'arrayFilters' field, if present.
         estSize += !item.getUpdate().getArrayFilters() ? 0 : ([&item]() {
@@ -209,9 +209,9 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
         static const auto intSize = 4;
 
         // Add the size of the 'collation' field, if present.
-        estSize +=
-            !item.getDelete().getCollation() ? 0 : (DeleteOpEntry::kCollationFieldName.size() +
-                                                    item.getDelete().getCollation()->objsize());
+        estSize += !item.getDelete().getCollation() ? 0
+                                                    : (DeleteOpEntry::kCollationFieldName.size() +
+                                                       item.getDelete().getCollation()->objsize());
 
         // Add the size of the 'limit' field.
         estSize += DeleteOpEntry::kMultiFieldName.size() + intSize;
@@ -592,7 +592,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
     vector<WriteErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
     int index = 0;
     WriteErrorDetail* lastError = NULL;
-    for (vector<TargetedWrite *>::const_iterator it = targetedBatch.getWrites().begin();
+    for (vector<TargetedWrite*>::const_iterator it = targetedBatch.getWrites().begin();
          it != targetedBatch.getWrites().end();
          ++it, ++index) {
         const TargetedWrite* write = *it;
@@ -766,9 +766,9 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
         // Generate the multi-error message below
         if (_wcErrors.size() == 1) {
             auto status = _wcErrors.front().error.toStatus();
-            error->setStatus(
-                status.withReason(str::stream() << status.reason() << " at "
-                                                << _wcErrors.front().endpoint.shardName));
+            error->setStatus(status.withReason(str::stream()
+                                               << status.reason() << " at "
+                                               << _wcErrors.front().endpoint.shardName));
         } else {
             StringBuilder msg;
             msg << "multiple errors reported : ";

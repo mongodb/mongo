@@ -100,10 +100,9 @@ function runTest(conn) {
         testDB.updateUser('testUser', {customData: {zipCode: 10036}});
     });
     assert.eq(null, testDB.getUser('testUser').customData);
-    testUserAdmin.grantPrivilegesToRole('testRole1',
-                                        [{
-                                           resource: {db: 'test', collection: ''},
-                                           actions: ['changeOwnPassword', 'changeOwnCustomData']
+    testUserAdmin.grantPrivilegesToRole('testRole1', [{
+                                            resource: {db: 'test', collection: ''},
+                                            actions: ['changeOwnPassword', 'changeOwnCustomData']
                                         }]);
     testDB.changeUserPassword('testUser', 'password');
     assert(!testDB.auth('testUser', 'pwd'));

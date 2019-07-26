@@ -359,4 +359,4 @@ ElementIterator::Context BSONElementIterator::next() {
     _next.reset();
     return x;
 }
-}
+}  // namespace mongo

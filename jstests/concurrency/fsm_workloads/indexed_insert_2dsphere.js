@@ -11,7 +11,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWo
 load('jstests/concurrency/fsm_workloads/indexed_insert_2d.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.data.indexedField = 'indexed_insert_2dsphere';
 
     $config.data.getIndexSpec = function getIndexSpec() {

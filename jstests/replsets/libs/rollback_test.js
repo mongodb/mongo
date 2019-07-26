@@ -222,7 +222,6 @@ function RollbackTest(name = "RollbackTest", replSet) {
                            `RBID is too large. current RBID: ${rbid}, last RBID: ${lastRBID}`);
 
                 return rbid === lastRBID + 1;
-
             }, "Timed out waiting for RBID to increment on " + curSecondary.host);
         } else {
             log(`Skipping RBID check on ${curSecondary.host} because shutdowns ` +

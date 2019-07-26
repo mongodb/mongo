@@ -83,8 +83,8 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
         // rather than going through the host targeting below. This ensures that the state changes
         // for the participant and coordinator occur sequentially on a single branch of replica set
         // history. See SERVER-38142 for details.
-        return scheduleWork([ this, shardId, commandObj = commandObj.getOwned() ](OperationContext *
-                                                                                  opCtx) {
+        return scheduleWork([this, shardId, commandObj = commandObj.getOwned()](
+                                OperationContext* opCtx) {
             // Note: This internal authorization is tied to the lifetime of the client, which will
             // be destroyed by 'scheduleWork' immediately after this lambda ends
             AuthorizationSession::get(opCtx->getClient())
@@ -114,8 +114,8 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
     }
 
     return _targetHostAsync(shardId, readPref)
-        .then([ this, shardId, commandObj = commandObj.getOwned(), readPref ](
-            HostAndShard hostAndShard) mutable {
+        .then([this, shardId, commandObj = commandObj.getOwned(), readPref](
+                  HostAndShard hostAndShard) mutable {
             executor::RemoteCommandRequest request(hostAndShard.hostTargeted,
                                                    NamespaceString::kAdminDb.toString(),
                                                    commandObj,
@@ -166,7 +166,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
             ul.unlock();
 
             return std::move(pf.future).tapAll(
-                [ this, it = std::move(it) ](StatusWith<ResponseStatus> s) {
+                [this, it = std::move(it)](StatusWith<ResponseStatus> s) {
                     stdx::lock_guard<stdx::mutex> lg(_mutex);
                     _activeHandles.erase(it);
                     _notifyAllTasksComplete(lg);

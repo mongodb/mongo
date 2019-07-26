@@ -132,14 +132,14 @@ for (var i = 0; i < badValues.length; i++) {
 
 // parsing
 assert.throws.automsg(function() {
-    new NumberLong("");
-});
+                 new NumberLong("");
+             });
 assert.throws.automsg(function() {
-    new NumberLong("y");
-});
+                 new NumberLong("y");
+             });
 assert.throws.automsg(function() {
-    new NumberLong("11111111111111111111");
-});
+                 new NumberLong("11111111111111111111");
+             });
 
 // create NumberLong from NumberInt (SERVER-9973)
 assert.doesNotThrow.automsg(function() {

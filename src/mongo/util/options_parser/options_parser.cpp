@@ -416,9 +416,7 @@ public:
 
         uassert(ErrorCodes::BadValue,
                 str::stream()
-                    << nodeName
-                    << " expansion block must contain only '"
-                    << getExpansionName()
+                    << nodeName << " expansion block must contain only '" << getExpansionName()
                     << "', and optionally 'type', 'trim', and/or 'digest'/'digest_key' fields",
                 node.size() == numVisitedFields);
 
@@ -472,8 +470,7 @@ public:
                                      &computed);
             uassert(ErrorCodes::BadValue,
                     str::stream() << "SHA256HMAC of config expansion " << computed.toString()
-                                  << " does not match expected digest: "
-                                  << _digest->toString(),
+                                  << " does not match expected digest: " << _digest->toString(),
                     computed == *_digest);
         }
 
@@ -487,8 +484,7 @@ public:
         if (!status.isOK()) {
             uasserted(status.code(),
                       str::stream() << "Failed processing output of " << getExpansionName()
-                                    << " block for config file: "
-                                    << status.reason());
+                                    << " block for config file: " << status.reason());
         }
 
         return newNode;
@@ -719,8 +715,7 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
             if (stringMap.count(elemKey) > 0) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "String Map Option: " << key
-                                            << " has duplicate keys in YAML Config: "
-                                            << elemKey);
+                                            << " has duplicate keys in YAML Config: " << elemKey);
             }
 
             stringMap[std::move(elemKey)] = elemVal.Scalar();
@@ -1028,10 +1023,10 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
 }
 
 /**
-* For all options that we registered as composable, combine the values from source and dest
-* and set the result in dest.  Note that this only works for options that are registered as
-* vectors of strings.
-*/
+ * For all options that we registered as composable, combine the values from source and dest
+ * and set the result in dest.  Note that this only works for options that are registered as
+ * vectors of strings.
+ */
 Status addCompositions(const OptionSection& options, const Environment& source, Environment* dest) {
     std::vector<OptionDescription> options_vector;
     Status ret = options.getAllOptions(&options_vector);
@@ -1126,9 +1121,9 @@ Status addCompositions(const OptionSection& options, const Environment& source, 
 }
 
 /**
-* For all options that have constraints, add those constraints to our environment so that
-* they run when the environment gets validated.
-*/
+ * For all options that have constraints, add those constraints to our environment so that
+ * they run when the environment gets validated.
+ */
 Status addConstraints(const OptionSection& options, Environment* dest) {
     std::vector<std::shared_ptr<Constraint>> constraints_vector;
 

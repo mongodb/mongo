@@ -291,11 +291,10 @@ public:
             Presecrets<HashBlock>(password, salt, iterationCount));
         const auto encodedSalt =
             base64::encode(reinterpret_cast<const char*>(salt.data()), salt.size());
-        return BSON(kIterationCountFieldName << iterationCount << kSaltFieldName << encodedSalt
-                                             << kStoredKeyFieldName
-                                             << secrets.storedKey().toString()
-                                             << kServerKeyFieldName
-                                             << secrets.serverKey().toString());
+        return BSON(kIterationCountFieldName
+                    << iterationCount << kSaltFieldName << encodedSalt << kStoredKeyFieldName
+                    << secrets.storedKey().toString() << kServerKeyFieldName
+                    << secrets.serverKey().toString());
     }
 
     const HashBlock& clientKey() const {

@@ -213,8 +213,8 @@ MONGO_INITIALIZER_GENERAL(
     ("default"))
 (InitializerContext*) {
     using logger::LogManager;
-    using logger::MessageEventEphemeral;
     using logger::MessageEventDetailsEncoder;
+    using logger::MessageEventEphemeral;
     using logger::MessageEventWithContextEncoder;
     using logger::MessageLogDomain;
     using logger::RotatableFileAppender;
@@ -254,8 +254,8 @@ MONGO_INITIALIZER_GENERAL(
             exists = boost::filesystem::exists(absoluteLogpath);
         } catch (boost::filesystem::filesystem_error& e) {
             return Status(ErrorCodes::FileNotOpen,
-                          str::stream() << "Failed probe for \"" << absoluteLogpath << "\": "
-                                        << e.code().message());
+                          str::stream() << "Failed probe for \"" << absoluteLogpath
+                                        << "\": " << e.code().message());
         }
 
         if (exists) {
@@ -276,9 +276,7 @@ MONGO_INITIALIZER_GENERAL(
                     return Status(ErrorCodes::FileRenameFailed,
                                   str::stream()
                                       << "Could not rename preexisting log file \""
-                                      << absoluteLogpath
-                                      << "\" to \""
-                                      << renameTarget
+                                      << absoluteLogpath << "\" to \"" << renameTarget
                                       << "\"; run with --logappend or manually remove file: "
                                       << ec.message());
                 }

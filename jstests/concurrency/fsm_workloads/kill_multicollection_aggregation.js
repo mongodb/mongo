@@ -16,7 +16,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extend
 load('jstests/concurrency/fsm_workloads/invalidated_cursors.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     /**
      * Runs the specified aggregation pipeline and stores the resulting cursor (if the command
      * is successful) in 'this.cursor'.

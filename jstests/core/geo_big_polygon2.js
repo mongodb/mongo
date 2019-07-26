@@ -36,386 +36,387 @@ var objects = [
     {name: "just north of equator", geo: {type: "Point", coordinates: [-97.9, 0.1]}},
     {name: "just south of equator", geo: {type: "Point", coordinates: [-97.9, -0.1]}},
     {
-      name: "north pole - crs84CRS",
-      geo: {type: "Point", coordinates: [-97.9, 90.0], crs: crs84CRS}
+        name: "north pole - crs84CRS",
+        geo: {type: "Point", coordinates: [-97.9, 90.0], crs: crs84CRS}
     },
     {
-      name: "south pole - epsg4326CRS",
-      geo: {type: "Point", coordinates: [-97.9, -90.0], crs: epsg4326CRS}
+        name: "south pole - epsg4326CRS",
+        geo: {type: "Point", coordinates: [-97.9, -90.0], crs: epsg4326CRS}
     },
     {
-      name: "short line string: PA, LA, 4corners, ATX, Mansfield, FL, Reston, NYC",
-      geo: {
-          type: "LineString",
-          coordinates: [
-              [-122.1611953, 37.4420407],
-              [-118.283638, 34.028517],
-              [-109.045223, 36.9990835],
-              [-97.850404, 30.3921555],
-              [-97.904187, 30.395457],
-              [-86.600836, 30.398147],
-              [-77.357837, 38.9589935],
-              [-73.987723, 40.7575074]
-          ]
-      }
+        name: "short line string: PA, LA, 4corners, ATX, Mansfield, FL, Reston, NYC",
+        geo: {
+            type: "LineString",
+            coordinates: [
+                [-122.1611953, 37.4420407],
+                [-118.283638, 34.028517],
+                [-109.045223, 36.9990835],
+                [-97.850404, 30.3921555],
+                [-97.904187, 30.395457],
+                [-86.600836, 30.398147],
+                [-77.357837, 38.9589935],
+                [-73.987723, 40.7575074]
+            ]
+        }
     },
     {
-      name: "1024 point long line string from south pole to north pole",
-      geo: {type: "LineString", coordinates: genLonLine(2.349902, -90.0, 90.0, 180.0 / 1024)}
+        name: "1024 point long line string from south pole to north pole",
+        geo: {type: "LineString", coordinates: genLonLine(2.349902, -90.0, 90.0, 180.0 / 1024)}
     },
     {
-      name: "line crossing equator - epsg4326CRS",
-      geo: {
-          type: "LineString",
-          coordinates: [[-77.0451853, -12.0553442], [-76.7784557, 18.0098528]],
-          crs: epsg4326CRS
-      }
+        name: "line crossing equator - epsg4326CRS",
+        geo: {
+            type: "LineString",
+            coordinates: [[-77.0451853, -12.0553442], [-76.7784557, 18.0098528]],
+            crs: epsg4326CRS
+        }
     },
     {
-      name: "GeoJson polygon",
-      geo: {
-          type: "Polygon",
-          coordinates:
-              [[[-80.0, 30.0], [-40.0, 30.0], [-40.0, 60.0], [-80.0, 60.0], [-80.0, 30.0]]]
-      }
+        name: "GeoJson polygon",
+        geo: {
+            type: "Polygon",
+            coordinates:
+                [[[-80.0, 30.0], [-40.0, 30.0], [-40.0, 60.0], [-80.0, 60.0], [-80.0, 30.0]]]
+        }
     },
     {
-      name: "polygon w/ hole",
-      geo: {
-          type: "Polygon",
-          coordinates: [
-              [[-80.0, 30.0], [-40.0, 30.0], [-40.0, 60.0], [-80.0, 60.0], [-80.0, 30.0]],
-              [[-70.0, 40.0], [-60.0, 40.0], [-60.0, 50.0], [-70.0, 50.0], [-70.0, 40.0]]
-          ]
-      }
+        name: "polygon w/ hole",
+        geo: {
+            type: "Polygon",
+            coordinates: [
+                [[-80.0, 30.0], [-40.0, 30.0], [-40.0, 60.0], [-80.0, 60.0], [-80.0, 30.0]],
+                [[-70.0, 40.0], [-60.0, 40.0], [-60.0, 50.0], [-70.0, 50.0], [-70.0, 40.0]]
+            ]
+        }
     },
     {
-      name: "polygon w/ two holes",
-      geo: {
-          type: "Polygon",
-          coordinates: [
-              [[-80.0, 30.0], [-40.0, 30.0], [-40.0, 60.0], [-80.0, 60.0], [-80.0, 30.0]],
-              [[-70.0, 40.0], [-60.0, 40.0], [-60.0, 50.0], [-70.0, 50.0], [-70.0, 40.0]],
-              [[-55.0, 40.0], [-45.0, 40.0], [-45.0, 50.0], [-55.0, 50.0], [-55.0, 40.0]]
-          ]
-      }
+        name: "polygon w/ two holes",
+        geo: {
+            type: "Polygon",
+            coordinates: [
+                [[-80.0, 30.0], [-40.0, 30.0], [-40.0, 60.0], [-80.0, 60.0], [-80.0, 30.0]],
+                [[-70.0, 40.0], [-60.0, 40.0], [-60.0, 50.0], [-70.0, 50.0], [-70.0, 40.0]],
+                [[-55.0, 40.0], [-45.0, 40.0], [-45.0, 50.0], [-55.0, 50.0], [-55.0, 40.0]]
+            ]
+        }
     },
     {
-      name: "polygon covering North pole",
-      geo: {
-          type: "Polygon",
-          coordinates: [[[-120.0, 89.0], [0.0, 89.0], [120.0, 89.0], [-120.0, 89.0]]]
-      }
+        name: "polygon covering North pole",
+        geo: {
+            type: "Polygon",
+            coordinates: [[[-120.0, 89.0], [0.0, 89.0], [120.0, 89.0], [-120.0, 89.0]]]
+        }
     },
     {
-      name: "polygon covering South pole",
-      geo: {
-          type: "Polygon",
-          coordinates: [[[-120.0, -89.0], [0.0, -89.0], [120.0, -89.0], [-120.0, -89.0]]]
-      }
+        name: "polygon covering South pole",
+        geo: {
+            type: "Polygon",
+            coordinates: [[[-120.0, -89.0], [0.0, -89.0], [120.0, -89.0], [-120.0, -89.0]]]
+        }
     },
     {
-      name: "big polygon/rectangle covering both poles",
-      geo: {
-          type: "Polygon",
-          coordinates:
-              [[[-130.0, 89.0], [-120.0, 89.0], [-120.0, -89.0], [-130.0, -89.0], [-130.0, 89.0]]],
-          crs: strictCRS
-      }
+        name: "big polygon/rectangle covering both poles",
+        geo: {
+            type: "Polygon",
+            coordinates: [
+                [[-130.0, 89.0], [-120.0, 89.0], [-120.0, -89.0], [-130.0, -89.0], [-130.0, 89.0]]
+            ],
+            crs: strictCRS
+        }
     },
     {
-      name: "polygon (triangle) w/ hole at North pole",
-      geo: {
-          type: "Polygon",
-          coordinates: [
-              [[-120.0, 80.0], [0.0, 80.0], [120.0, 80.0], [-120.0, 80.0]],
-              [[-120.0, 88.0], [0.0, 88.0], [120.0, 88.0], [-120.0, 88.0]]
-          ]
-      }
+        name: "polygon (triangle) w/ hole at North pole",
+        geo: {
+            type: "Polygon",
+            coordinates: [
+                [[-120.0, 80.0], [0.0, 80.0], [120.0, 80.0], [-120.0, 80.0]],
+                [[-120.0, 88.0], [0.0, 88.0], [120.0, 88.0], [-120.0, 88.0]]
+            ]
+        }
     },
     {
-      name: "polygon with edge on equator",
-      geo: {
-          type: "Polygon",
-          coordinates: [[[-120.0, 0.0], [120.0, 0.0], [0.0, 90.0], [-120.0, 0.0]]]
-      }
+        name: "polygon with edge on equator",
+        geo: {
+            type: "Polygon",
+            coordinates: [[[-120.0, 0.0], [120.0, 0.0], [0.0, 90.0], [-120.0, 0.0]]]
+        }
     },
     {
-      name: "polygon just inside single hemisphere (Northern) - China, California, Europe",
-      geo: {
-          type: "Polygon",
-          coordinates:
-              [[[120.0, 0.000001], [-120.0, 0.000001], [0.0, 0.000001], [120.0, 0.000001]]]
-      }
+        name: "polygon just inside single hemisphere (Northern) - China, California, Europe",
+        geo: {
+            type: "Polygon",
+            coordinates:
+                [[[120.0, 0.000001], [-120.0, 0.000001], [0.0, 0.000001], [120.0, 0.000001]]]
+        }
     },
     {
-      name: "polygon inside Northern hemisphere",
-      geo: {
-          type: "Polygon",
-          coordinates: [[[120.0, 80.0], [-120.0, 80.0], [0.0, 80.0], [120.0, 80.0]]]
-      }
+        name: "polygon inside Northern hemisphere",
+        geo: {
+            type: "Polygon",
+            coordinates: [[[120.0, 80.0], [-120.0, 80.0], [0.0, 80.0], [120.0, 80.0]]]
+        }
     },
     {
-      name: "polygon just inside a single hemisphere (Southern) - Pacific, Indonesia, Africa",
-      geo: {
-          type: "Polygon",
-          coordinates:
-              [[[-120.0, -0.000001], [120.0, -0.000001], [0.0, -0.000001], [-120.0, -0.000001]]]
-      }
+        name: "polygon just inside a single hemisphere (Southern) - Pacific, Indonesia, Africa",
+        geo: {
+            type: "Polygon",
+            coordinates:
+                [[[-120.0, -0.000001], [120.0, -0.000001], [0.0, -0.000001], [-120.0, -0.000001]]]
+        }
     },
     {
-      name: "polygon inside Southern hemisphere",
-      geo: {
-          type: "Polygon",
-          coordinates: [[[-120.0, -80.0], [120.0, -80.0], [0.0, -80.0], [-120.0, -80.0]]]
-      }
+        name: "polygon inside Southern hemisphere",
+        geo: {
+            type: "Polygon",
+            coordinates: [[[-120.0, -80.0], [120.0, -80.0], [0.0, -80.0], [-120.0, -80.0]]]
+        }
     },
     {
-      name: "single point (MultiPoint): Palo Alto",
-      geo: {type: "MultiPoint", coordinates: [[-122.1611953, 37.4420407]]}
+        name: "single point (MultiPoint): Palo Alto",
+        geo: {type: "MultiPoint", coordinates: [[-122.1611953, 37.4420407]]}
     },
     {
-      name: "multiple points(MultiPoint): PA, LA, 4corners, ATX, Mansfield, FL, Reston, NYC",
-      geo: {
-          type: "MultiPoint",
-          coordinates: [
-              [-122.1611953, 37.4420407],
-              [-118.283638, 34.028517],
-              [-109.045223, 36.9990835],
-              [-97.850404, 30.3921555],
-              [-97.904187, 30.395457],
-              [-86.600836, 30.398147],
-              [-77.357837, 38.9589935],
-              [-73.987723, 40.7575074]
-          ]
-      }
+        name: "multiple points(MultiPoint): PA, LA, 4corners, ATX, Mansfield, FL, Reston, NYC",
+        geo: {
+            type: "MultiPoint",
+            coordinates: [
+                [-122.1611953, 37.4420407],
+                [-118.283638, 34.028517],
+                [-109.045223, 36.9990835],
+                [-97.850404, 30.3921555],
+                [-97.904187, 30.395457],
+                [-86.600836, 30.398147],
+                [-77.357837, 38.9589935],
+                [-73.987723, 40.7575074]
+            ]
+        }
     },
     {
-      name: "two points (MultiPoint): Shenzhen, Guangdong, China",
-      geo: {type: "MultiPoint", coordinates: [[114.0538788, 22.5551603], [114.022837, 22.44395]]}
+        name: "two points (MultiPoint): Shenzhen, Guangdong, China",
+        geo: {type: "MultiPoint", coordinates: [[114.0538788, 22.5551603], [114.022837, 22.44395]]}
     },
     {
-      name: "two points (MultiPoint) but only one in: Shenzhen, Guangdong, China",
-      geo: {type: "MultiPoint", coordinates: [[114.0538788, 22.5551603], [113.743858, 23.025815]]}
+        name: "two points (MultiPoint) but only one in: Shenzhen, Guangdong, China",
+        geo: {type: "MultiPoint", coordinates: [[114.0538788, 22.5551603], [113.743858, 23.025815]]}
     },
     {
-      name: "multi line string: new zealand bays",
-      geo: {
-          type: "MultiLineString",
-          coordinates: [
-              [
-                [172.803869, -43.592789],
-                [172.659335, -43.620348],
-                [172.684038, -43.636528],
-                [172.820922, -43.605325]
-              ],
-              [
-                [172.830497, -43.607768],
-                [172.813263, -43.656319],
-                [172.823096, -43.660996],
-                [172.850943, -43.607609]
-              ],
-              [
-                [172.912056, -43.623148],
-                [172.887696, -43.670897],
-                [172.900469, -43.676178],
-                [172.931735, -43.622839]
-              ]
-          ]
-      }
+        name: "multi line string: new zealand bays",
+        geo: {
+            type: "MultiLineString",
+            coordinates: [
+                [
+                    [172.803869, -43.592789],
+                    [172.659335, -43.620348],
+                    [172.684038, -43.636528],
+                    [172.820922, -43.605325]
+                ],
+                [
+                    [172.830497, -43.607768],
+                    [172.813263, -43.656319],
+                    [172.823096, -43.660996],
+                    [172.850943, -43.607609]
+                ],
+                [
+                    [172.912056, -43.623148],
+                    [172.887696, -43.670897],
+                    [172.900469, -43.676178],
+                    [172.931735, -43.622839]
+                ]
+            ]
+        }
     },
     {
-      name: "multi polygon: new zealand north and south islands",
-      geo: {
-          type: "MultiPolygon",
-          coordinates: [
-              [[
-                 [165.773255, -45.902933],
-                 [169.398419, -47.261538],
-                 [174.672744, -41.767722],
-                 [172.288845, -39.897992],
-                 [165.773255, -45.902933]
-              ]],
-              [[
-                 [173.166448, -39.778262],
-                 [175.342744, -42.677333],
-                 [179.913373, -37.224362],
-                 [171.475953, -32.688871],
-                 [173.166448, -39.778262]
-              ]]
-          ]
-      }
-    },
-    {
-      name: "geometry collection: point in Australia and triangle around Australia",
-      geo: {
-          type: "GeometryCollection",
-          geometries: [
-              {name: "center of Australia", type: "Point", coordinates: [133.985885, -27.240790]},
-              {
-                name: "Triangle around Australia",
-                type: "Polygon",
-                coordinates: [[
-                    [97.423178, -44.735405],
-                    [169.845050, -38.432287],
-                    [143.824366, 15.966509],
-                    [97.423178, -44.735405]
+        name: "multi polygon: new zealand north and south islands",
+        geo: {
+            type: "MultiPolygon",
+            coordinates: [
+                [[
+                    [165.773255, -45.902933],
+                    [169.398419, -47.261538],
+                    [174.672744, -41.767722],
+                    [172.288845, -39.897992],
+                    [165.773255, -45.902933]
+                ]],
+                [[
+                    [173.166448, -39.778262],
+                    [175.342744, -42.677333],
+                    [179.913373, -37.224362],
+                    [171.475953, -32.688871],
+                    [173.166448, -39.778262]
                 ]]
-              }
-          ]
-      }
+            ]
+        }
+    },
+    {
+        name: "geometry collection: point in Australia and triangle around Australia",
+        geo: {
+            type: "GeometryCollection",
+            geometries: [
+                {name: "center of Australia", type: "Point", coordinates: [133.985885, -27.240790]},
+                {
+                    name: "Triangle around Australia",
+                    type: "Polygon",
+                    coordinates: [[
+                        [97.423178, -44.735405],
+                        [169.845050, -38.432287],
+                        [143.824366, 15.966509],
+                        [97.423178, -44.735405]
+                    ]]
+                }
+            ]
+        }
     }
 ];
 
 // Test various polygons which are not queryable
 var badPolys = [
     {
-      name: "Polygon with bad CRS",
-      type: "Polygon",
-      coordinates: [[
-          [114.0834046, 22.6648202],
-          [113.8293457, 22.3819359],
-          [114.2736054, 22.4047911],
-          [114.0834046, 22.6648202]
-      ]],
-      crs: badCRS
+        name: "Polygon with bad CRS",
+        type: "Polygon",
+        coordinates: [[
+            [114.0834046, 22.6648202],
+            [113.8293457, 22.3819359],
+            [114.2736054, 22.4047911],
+            [114.0834046, 22.6648202]
+        ]],
+        crs: badCRS
     },
     {
-      name: "Open polygon < 3 sides",
-      type: "Polygon",
-      coordinates: [[[114.0834046, 22.6648202], [113.8293457, 22.3819359]]],
-      crs: strictCRS
+        name: "Open polygon < 3 sides",
+        type: "Polygon",
+        coordinates: [[[114.0834046, 22.6648202], [113.8293457, 22.3819359]]],
+        crs: strictCRS
     },
     {
-      name: "Open polygon > 3 sides",
-      type: "Polygon",
-      coordinates: [[
-          [114.0834046, 22.6648202],
-          [113.8293457, 22.3819359],
-          [114.2736054, 22.4047911],
-          [114.1, 22.5]
-      ]],
-      crs: strictCRS
+        name: "Open polygon > 3 sides",
+        type: "Polygon",
+        coordinates: [[
+            [114.0834046, 22.6648202],
+            [113.8293457, 22.3819359],
+            [114.2736054, 22.4047911],
+            [114.1, 22.5]
+        ]],
+        crs: strictCRS
     },
     {
-      name: "duplicate non-adjacent points",
-      type: "Polygon",
-      coordinates: [[
-          [114.0834046, 22.6648202],
-          [113.8293457, 22.3819359],
-          [114.2736054, 22.4047911],
-          [113.8293457, 22.3819359],
-          [-65.9165954, 22.6648202],
-          [114.0834046, 22.6648202]
-      ]],
-      crs: strictCRS
+        name: "duplicate non-adjacent points",
+        type: "Polygon",
+        coordinates: [[
+            [114.0834046, 22.6648202],
+            [113.8293457, 22.3819359],
+            [114.2736054, 22.4047911],
+            [113.8293457, 22.3819359],
+            [-65.9165954, 22.6648202],
+            [114.0834046, 22.6648202]
+        ]],
+        crs: strictCRS
     },
     {
-      name: "One hole in polygon",
-      type: "Polygon",
-      coordinates: [
-          [[-80.0, 30.0], [-40.0, 30.0], [-40.0, 60.0], [-80.0, 60.0], [-80.0, 30.0]],
-          [[-70.0, 40.0], [-60.0, 40.0], [-60.0, 50.0], [-70.0, 50.0], [-70.0, 40.0]]
-      ],
-      crs: strictCRS
+        name: "One hole in polygon",
+        type: "Polygon",
+        coordinates: [
+            [[-80.0, 30.0], [-40.0, 30.0], [-40.0, 60.0], [-80.0, 60.0], [-80.0, 30.0]],
+            [[-70.0, 40.0], [-60.0, 40.0], [-60.0, 50.0], [-70.0, 50.0], [-70.0, 40.0]]
+        ],
+        crs: strictCRS
     },
     {
-      name: "2 holes in polygon",
-      type: "Polygon",
-      coordinates: [
-          [[-80.0, 30.0], [-40.0, 30.0], [-40.0, 60.0], [-80.0, 60.0], [-80.0, 30.0]],
-          [[-70.0, 40.0], [-60.0, 40.0], [-60.0, 50.0], [-70.0, 50.0], [-70.0, 40.0]],
-          [[-55.0, 40.0], [-45.0, 40.0], [-45.0, 50.0], [-55.0, 50.0], [-55.0, 40.0]]
-      ],
-      crs: strictCRS
+        name: "2 holes in polygon",
+        type: "Polygon",
+        coordinates: [
+            [[-80.0, 30.0], [-40.0, 30.0], [-40.0, 60.0], [-80.0, 60.0], [-80.0, 30.0]],
+            [[-70.0, 40.0], [-60.0, 40.0], [-60.0, 50.0], [-70.0, 50.0], [-70.0, 40.0]],
+            [[-55.0, 40.0], [-45.0, 40.0], [-45.0, 50.0], [-55.0, 50.0], [-55.0, 40.0]]
+        ],
+        crs: strictCRS
     },
     {
-      name: "complex polygon (edges cross)",
-      type: "Polygon",
-      coordinates: [[[10.0, 10.0], [20.0, 10.0], [10.0, 20.0], [20.0, 20.0], [10.0, 10.0]]],
-      crs: strictCRS
+        name: "complex polygon (edges cross)",
+        type: "Polygon",
+        coordinates: [[[10.0, 10.0], [20.0, 10.0], [10.0, 20.0], [20.0, 20.0], [10.0, 10.0]]],
+        crs: strictCRS
     }
 ];
 
 // Closed polygons used in query (3, 4, 5, 6-sided)
 var polys = [
     {
-      name: "3 sided closed polygon",
-      type: "Polygon",  // triangle
-      coordinates: [[[10.0, 10.0], [20.0, 10.0], [15.0, 17.0], [10.0, 10.0]]],
-      crs: strictCRS,
-      nW: 0,
-      nI: 1
+        name: "3 sided closed polygon",
+        type: "Polygon",  // triangle
+        coordinates: [[[10.0, 10.0], [20.0, 10.0], [15.0, 17.0], [10.0, 10.0]]],
+        crs: strictCRS,
+        nW: 0,
+        nI: 1
     },
     {
-      name: "3 sided closed polygon (non-big)",
-      type: "Polygon",  // triangle
-      coordinates: [[[10.0, 10.0], [20.0, 10.0], [15.0, 17.0], [10.0, 10.0]]],
-      nW: 0,
-      nI: 1
+        name: "3 sided closed polygon (non-big)",
+        type: "Polygon",  // triangle
+        coordinates: [[[10.0, 10.0], [20.0, 10.0], [15.0, 17.0], [10.0, 10.0]]],
+        nW: 0,
+        nI: 1
     },
     {
-      name: "4 sided closed polygon",
-      type: "Polygon",  // rectangle
-      coordinates: [[[10.0, 10.0], [20.0, 10.0], [20.0, 20.0], [10.0, 20.0], [10.0, 10.0]]],
-      crs: strictCRS,
-      nW: 0,
-      nI: 1
+        name: "4 sided closed polygon",
+        type: "Polygon",  // rectangle
+        coordinates: [[[10.0, 10.0], [20.0, 10.0], [20.0, 20.0], [10.0, 20.0], [10.0, 10.0]]],
+        crs: strictCRS,
+        nW: 0,
+        nI: 1
     },
     {
-      name: "4 sided closed polygon (non-big)",
-      type: "Polygon",  // rectangle
-      coordinates: [[[10.0, 10.0], [20.0, 10.0], [20.0, 20.0], [10.0, 20.0], [10.0, 10.0]]],
-      nW: 0,
-      nI: 1
+        name: "4 sided closed polygon (non-big)",
+        type: "Polygon",  // rectangle
+        coordinates: [[[10.0, 10.0], [20.0, 10.0], [20.0, 20.0], [10.0, 20.0], [10.0, 10.0]]],
+        nW: 0,
+        nI: 1
     },
     {
-      name: "5 sided closed polygon",
-      type: "Polygon",  // pentagon
-      coordinates:
-          [[[10.0, 10.0], [20.0, 10.0], [25.0, 18.0], [15.0, 25.0], [5.0, 18.0], [10.0, 10.0]]],
-      crs: strictCRS,
-      nW: 0,
-      nI: 1
+        name: "5 sided closed polygon",
+        type: "Polygon",  // pentagon
+        coordinates:
+            [[[10.0, 10.0], [20.0, 10.0], [25.0, 18.0], [15.0, 25.0], [5.0, 18.0], [10.0, 10.0]]],
+        crs: strictCRS,
+        nW: 0,
+        nI: 1
     },
     {
-      name: "5 sided closed polygon (non-big)",
-      type: "Polygon",  // pentagon
-      coordinates:
-          [[[10.0, 10.0], [20.0, 10.0], [25.0, 18.0], [15.0, 25.0], [5.0, 18.0], [10.0, 10.0]]],
-      nW: 0,
-      nI: 1
+        name: "5 sided closed polygon (non-big)",
+        type: "Polygon",  // pentagon
+        coordinates:
+            [[[10.0, 10.0], [20.0, 10.0], [25.0, 18.0], [15.0, 25.0], [5.0, 18.0], [10.0, 10.0]]],
+        nW: 0,
+        nI: 1
     },
     {
-      name: "6 sided closed polygon",
-      type: "Polygon",  // hexagon
-      coordinates: [[
-          [10.0, 10.0],
-          [15.0, 10.0],
-          [22.0, 15.0],
-          [15.0, 20.0],
-          [10.0, 20.0],
-          [7.0, 15.0],
-          [10.0, 10.0]
-      ]],
-      crs: strictCRS,
-      nW: 0,
-      nI: 1
+        name: "6 sided closed polygon",
+        type: "Polygon",  // hexagon
+        coordinates: [[
+            [10.0, 10.0],
+            [15.0, 10.0],
+            [22.0, 15.0],
+            [15.0, 20.0],
+            [10.0, 20.0],
+            [7.0, 15.0],
+            [10.0, 10.0]
+        ]],
+        crs: strictCRS,
+        nW: 0,
+        nI: 1
     },
     {
-      name: "6 sided closed polygon (non-big)",
-      type: "Polygon",  // hexagon
-      coordinates: [[
-          [10.0, 10.0],
-          [15.0, 10.0],
-          [22.0, 15.0],
-          [15.0, 20.0],
-          [10.0, 20.0],
-          [7.0, 15.0],
-          [10.0, 10.0]
-      ]],
-      nW: 0,
-      nI: 1
+        name: "6 sided closed polygon (non-big)",
+        type: "Polygon",  // hexagon
+        coordinates: [[
+            [10.0, 10.0],
+            [15.0, 10.0],
+            [22.0, 15.0],
+            [15.0, 20.0],
+            [10.0, 20.0],
+            [7.0, 15.0],
+            [10.0, 10.0]
+        ]],
+        nW: 0,
+        nI: 1
     }
 ];
 
@@ -477,67 +478,67 @@ var totalObjects = getNumberOfValidObjects(objects);
 var nsidedPolys = [
     // Big Polygon centered on 0, 0
     {
-      name: "4 sided polygon centered on 0, 0",
-      type: "Polygon",
-      coordinates: [nGonGenerator(4, 30, true, 0, 0)],
-      crs: strictCRS,
-      nW: totalObjects - 3,
-      nI: totalObjects
+        name: "4 sided polygon centered on 0, 0",
+        type: "Polygon",
+        coordinates: [nGonGenerator(4, 30, true, 0, 0)],
+        crs: strictCRS,
+        nW: totalObjects - 3,
+        nI: totalObjects
     },
     // Non-big polygons have counterclockwise coordinates
     {
-      name: "4 sided polygon centered on 0, 0 (non-big)",
-      type: "Polygon",
-      coordinates: [nGonGenerator(4, 30, false, 0, 0)],
-      nW: 0,
-      nI: 3
+        name: "4 sided polygon centered on 0, 0 (non-big)",
+        type: "Polygon",
+        coordinates: [nGonGenerator(4, 30, false, 0, 0)],
+        nW: 0,
+        nI: 3
     },
     {
-      name: "100 sided polygon centered on 0, 0",
-      type: "Polygon",
-      coordinates: [nGonGenerator(100, 20, true, 0, 0)],
-      crs: strictCRS,
-      nW: totalObjects - 3,
-      nI: totalObjects
+        name: "100 sided polygon centered on 0, 0",
+        type: "Polygon",
+        coordinates: [nGonGenerator(100, 20, true, 0, 0)],
+        crs: strictCRS,
+        nW: totalObjects - 3,
+        nI: totalObjects
     },
     {
-      name: "100 sided polygon centered on 0, 0 (non-big)",
-      type: "Polygon",
-      coordinates: [nGonGenerator(100, 20, false, 0, 0)],
-      nW: 0,
-      nI: 3
+        name: "100 sided polygon centered on 0, 0 (non-big)",
+        type: "Polygon",
+        coordinates: [nGonGenerator(100, 20, false, 0, 0)],
+        nW: 0,
+        nI: 3
     },
     {
-      name: "5000 sided polygon centered on 0, 0 (non-big)",
-      type: "Polygon",
-      coordinates: [nGonGenerator(5000, 89.99, false, 0, 0)],
-      nW: 0,
-      nI: 3
+        name: "5000 sided polygon centered on 0, 0 (non-big)",
+        type: "Polygon",
+        coordinates: [nGonGenerator(5000, 89.99, false, 0, 0)],
+        nW: 0,
+        nI: 3
     },
     {
-      name: "25000 sided polygon centered on 0, 0",
-      type: "Polygon",
-      coordinates: [nGonGenerator(25000, 89.99, true, 0, 0)],
-      crs: strictCRS,
-      nW: totalObjects - 3,
-      nI: totalObjects
+        name: "25000 sided polygon centered on 0, 0",
+        type: "Polygon",
+        coordinates: [nGonGenerator(25000, 89.99, true, 0, 0)],
+        crs: strictCRS,
+        nW: totalObjects - 3,
+        nI: totalObjects
     },
     // Big polygon centered on Shenzen
     {
-      name: "4 sided polygon centered on Shenzen",
-      type: "Polygon",
-      coordinates: [nGonGenerator(4, 5, true, 114.1, 22.55)],
-      crs: strictCRS,
-      nW: totalObjects - 3,
-      nI: totalObjects - 2
+        name: "4 sided polygon centered on Shenzen",
+        type: "Polygon",
+        coordinates: [nGonGenerator(4, 5, true, 114.1, 22.55)],
+        crs: strictCRS,
+        nW: totalObjects - 3,
+        nI: totalObjects - 2
     },
     {
-      name: "4 sided polygon centered on Shenzen (non-big)",
-      type: "Polygon",
-      coordinates: [nGonGenerator(4, 5, false, 114.1, 22.55)],
-      crs: strictCRS,
-      nW: 2,
-      nI: 3
+        name: "4 sided polygon centered on Shenzen (non-big)",
+        type: "Polygon",
+        coordinates: [nGonGenerator(4, 5, false, 114.1, 22.55)],
+        crs: strictCRS,
+        nW: 2,
+        nI: 3
     }
 ];
 
@@ -567,7 +568,6 @@ totalObjects = coll.count();
 var indexes = ["none", "2dsphere"];
 
 indexes.forEach(function(index) {
-
     // Reset indexes on collection
     assert.commandWorked(coll.dropIndexes(), "drop indexes");
 
@@ -578,7 +578,6 @@ indexes.forEach(function(index) {
 
     // These polygons should not be queryable
     badPolys.forEach(function(p) {
-
         // within
         assert.throws(function() {
             coll.count({geo: {$geoWithin: {$geometry: p}}});
@@ -592,7 +591,6 @@ indexes.forEach(function(index) {
 
     // Tests for closed polygons
     polys.forEach(function(p) {
-
         // geoWithin query
         var docArray = [];
         var q = {geo: {$geoWithin: {$geometry: p}}};
@@ -622,19 +620,15 @@ indexes.forEach(function(index) {
             bulk.insert(doc);
         });
         assert.eq(docArray.length, bulk.execute().nInserted, "reinsert " + p.name);
-
     });
 
     // test the n-sided closed polygons
     nsidedPolys.forEach(function(p) {
-
         // within
         assert.eq(p.nW, coll.count({geo: {$geoWithin: {$geometry: p}}}), "within " + p.name);
 
         // intersects
         assert.eq(
             p.nI, coll.count({geo: {$geoIntersects: {$geometry: p}}}), "intersection " + p.name);
-
     });
-
 });

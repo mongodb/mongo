@@ -238,4 +238,4 @@ bool SizeMatchExpression::equivalent(const MatchExpression* other) const {
 
 
 // ------------------
-}
+}  // namespace mongo

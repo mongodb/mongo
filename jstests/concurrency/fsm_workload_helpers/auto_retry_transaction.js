@@ -1,7 +1,6 @@
 'use strict';
 
 var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
-
     /**
      * Calls 'func' with the print() function overridden to be a no-op.
      *
@@ -71,9 +70,9 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
             // is a retryable write.
             if (!commitRes.ok && retryOnKilledSession && isKilledSessionCode(commitRes.code)) {
                 print("-=-=-=- Retrying commit after killed session code, sessionId: " +
-                      tojsononeline(session.getSessionId()) + ", txnNumber: " +
-                      tojsononeline(session.getTxnNumber_forTesting()) + ", res: " +
-                      tojsononeline(commitRes));
+                      tojsononeline(session.getSessionId()) +
+                      ", txnNumber: " + tojsononeline(session.getTxnNumber_forTesting()) +
+                      ", res: " + tojsononeline(commitRes));
                 continue;
             }
 

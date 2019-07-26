@@ -286,4 +286,4 @@ intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
     string pathString(Expression::removeFieldPrefix(prefixedPathString));
     return DocumentSourceUnwind::create(pExpCtx, pathString, preserveNullAndEmptyArrays, indexPath);
 }
-}
+}  // namespace mongo

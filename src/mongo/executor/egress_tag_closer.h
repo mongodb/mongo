@@ -49,9 +49,10 @@ public:
 
     virtual void dropConnections(const HostAndPort& hostAndPort) = 0;
 
-    virtual void mutateTags(const HostAndPort& hostAndPort,
-                            const stdx::function<transport::Session::TagMask(
-                                transport::Session::TagMask)>& mutateFunc) = 0;
+    virtual void mutateTags(
+        const HostAndPort& hostAndPort,
+        const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>&
+            mutateFunc) = 0;
 
 protected:
     EgressTagCloser() {}

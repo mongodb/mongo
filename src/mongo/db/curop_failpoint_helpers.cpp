@@ -85,4 +85,4 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
         updateCurOpMsg(opCtx, origCurOpMsg);
     }
 }
-}
+}  // namespace mongo

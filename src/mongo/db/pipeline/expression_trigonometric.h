@@ -135,12 +135,8 @@ public:
     void assertBounds(T input) const {
         uassert(50989,
                 str::stream() << "cannot apply " << getOpName() << " to " << toString(input)
-                              << ", value must in "
-                              << BoundType::leftBracket()
-                              << getLowerBound()
-                              << ","
-                              << getUpperBound()
-                              << BoundType::rightBracket(),
+                              << ", value must in " << BoundType::leftBracket() << getLowerBound()
+                              << "," << getUpperBound() << BoundType::rightBracket(),
                 checkBounds(input));
     }
 

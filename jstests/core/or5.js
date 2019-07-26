@@ -36,8 +36,8 @@ for (i = 2; i <= 7; ++i) {
 t.ensureIndex({z: "2d"});
 
 assert.throws.automsg(function() {
-    return t.find({$or: [{z: {$near: [50, 50]}}, {a: 2}]}).toArray();
-});
+                 return t.find({$or: [{z: {$near: [50, 50]}}, {a: 2}]}).toArray();
+             });
 
 function reset() {
     t.drop();

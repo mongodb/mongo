@@ -67,4 +67,4 @@ struct Checksum {
         return words[0] != rhs.words[0] || words[1] != rhs.words[1];
     }
 };
-}
+}  // namespace mongo

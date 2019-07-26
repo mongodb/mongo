@@ -122,4 +122,4 @@ void setupSIGTRAPforGDB() {
 #else
 void setupSIGTRAPforGDB() {}
 #endif
-}
+}  // namespace mongo

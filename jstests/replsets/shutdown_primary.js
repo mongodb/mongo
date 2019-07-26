@@ -12,56 +12,56 @@
  *
  */
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries,
-                                                 // restartReplicationOnSecondaries
-    var name = "shutdown_primary";
+load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries,
+                                             // restartReplicationOnSecondaries
+var name = "shutdown_primary";
 
-    var replTest = new ReplSetTest({name: name, nodes: 3});
-    replTest.startSet();
-    replTest.initiate();
+var replTest = new ReplSetTest({name: name, nodes: 3});
+replTest.startSet();
+replTest.initiate();
 
-    var primary = replTest.getPrimary();
-    var testDB = primary.getDB(name);
-    var timeout = ReplSetTest.kDefaultTimeoutMS;
-    assert.writeOK(testDB.foo.insert({x: 1}, {writeConcern: {w: 3, wtimeout: timeout}}));
+var primary = replTest.getPrimary();
+var testDB = primary.getDB(name);
+var timeout = ReplSetTest.kDefaultTimeoutMS;
+assert.writeOK(testDB.foo.insert({x: 1}, {writeConcern: {w: 3, wtimeout: timeout}}));
 
-    jsTestLog("Blocking replication to secondaries.");
-    stopReplicationOnSecondaries(replTest);
+jsTestLog("Blocking replication to secondaries.");
+stopReplicationOnSecondaries(replTest);
 
-    jsTestLog("Executing write to primary.");
-    assert.writeOK(testDB.foo.insert({x: 2}));
+jsTestLog("Executing write to primary.");
+assert.writeOK(testDB.foo.insert({x: 2}));
 
-    jsTestLog("Attempting to shut down primary.");
-    assert.commandFailedWithCode(primary.adminCommand({shutdown: 1}),
-                                 ErrorCodes.ExceededTimeLimit,
-                                 "shut down did not fail with 'ExceededTimeLimit'");
+jsTestLog("Attempting to shut down primary.");
+assert.commandFailedWithCode(primary.adminCommand({shutdown: 1}),
+                             ErrorCodes.ExceededTimeLimit,
+                             "shut down did not fail with 'ExceededTimeLimit'");
 
-    jsTestLog("Verifying primary did not shut down.");
-    assert.writeOK(testDB.foo.insert({x: 3}));
+jsTestLog("Verifying primary did not shut down.");
+assert.writeOK(testDB.foo.insert({x: 3}));
 
-    jsTestLog("Shutting down primary in a parallel shell");
-    var awaitShell = startParallelShell(function() {
-        db.adminCommand({shutdown: 1, timeoutSecs: 60});
-    }, primary.port);
+jsTestLog("Shutting down primary in a parallel shell");
+var awaitShell = startParallelShell(function() {
+    db.adminCommand({shutdown: 1, timeoutSecs: 60});
+}, primary.port);
 
-    jsTestLog("Resuming replication.");
-    restartReplicationOnSecondaries(replTest);
+jsTestLog("Resuming replication.");
+restartReplicationOnSecondaries(replTest);
 
-    jsTestLog("Verifying primary shut down and cannot be connected to.");
-    // Successfully starting shutdown throws a network error.
-    var exitCode = awaitShell({checkExitSuccess: false});
-    assert.neq(0, exitCode, "expected shutdown to close the shell's connection");
-    assert.soonNoExcept(function() {
-        // The parallel shell exits while shutdown is in progress, and if this happens early enough,
-        // the primary can still accept connections despite successfully starting to shutdown.
-        // So, retry connecting until connections cannot be established and an error is thrown.
-        assert.throws(function() {
-            new Mongo(primary.host);
-        });
-        return true;
-    }, "expected primary node to shut down and not be connectable");
+jsTestLog("Verifying primary shut down and cannot be connected to.");
+// Successfully starting shutdown throws a network error.
+var exitCode = awaitShell({checkExitSuccess: false});
+assert.neq(0, exitCode, "expected shutdown to close the shell's connection");
+assert.soonNoExcept(function() {
+    // The parallel shell exits while shutdown is in progress, and if this happens early enough,
+    // the primary can still accept connections despite successfully starting to shutdown.
+    // So, retry connecting until connections cannot be established and an error is thrown.
+    assert.throws(function() {
+        new Mongo(primary.host);
+    });
+    return true;
+}, "expected primary node to shut down and not be connectable");
 
-    replTest.stopSet();
+replTest.stopSet();
 })();

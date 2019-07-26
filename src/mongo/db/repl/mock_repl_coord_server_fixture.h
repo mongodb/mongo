@@ -39,7 +39,7 @@ class OperationContext;
 namespace repl {
 class OplogEntry;
 class StorageInterfaceMock;
-}
+}  // namespace repl
 
 /**
  * This is a basic fixture that is backed by an ephemeral storage engine and a mock replication

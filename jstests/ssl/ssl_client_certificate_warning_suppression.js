@@ -10,56 +10,56 @@
 load('jstests/ssl/libs/ssl_helpers.js');
 
 (function() {
-    'use strict';
+'use strict';
 
-    function test(suppress) {
-        const opts = {
-            sslMode: 'requireSSL',
-            sslPEMKeyFile: "jstests/libs/server.pem",
-            sslCAFile: "jstests/libs/ca.pem",
-            waitForConnect: false,
-            sslAllowConnectionsWithoutCertificates: "",
-            setParameter: {suppressNoTLSPeerCertificateWarning: suppress}
-        };
-        clearRawMongoProgramOutput();
-        const mongod = MongoRunner.runMongod(opts);
+function test(suppress) {
+    const opts = {
+        sslMode: 'requireSSL',
+        sslPEMKeyFile: "jstests/libs/server.pem",
+        sslCAFile: "jstests/libs/ca.pem",
+        waitForConnect: false,
+        sslAllowConnectionsWithoutCertificates: "",
+        setParameter: {suppressNoTLSPeerCertificateWarning: suppress}
+    };
+    clearRawMongoProgramOutput();
+    const mongod = MongoRunner.runMongod(opts);
 
-        assert.soon(function() {
-            return runMongoProgram('mongo',
-                                   '--ssl',
-                                   '--sslAllowInvalidHostnames',
-                                   '--sslCAFile',
-                                   CA_CERT,
-                                   '--port',
-                                   mongod.port,
-                                   '--eval',
-                                   'quit()') === 0;
-        }, "mongo did not initialize properly");
+    assert.soon(function() {
+        return runMongoProgram('mongo',
+                               '--ssl',
+                               '--sslAllowInvalidHostnames',
+                               '--sslCAFile',
+                               CA_CERT,
+                               '--port',
+                               mongod.port,
+                               '--eval',
+                               'quit()') === 0;
+    }, "mongo did not initialize properly");
 
-        // Keep checking the log file until client metadata is logged since the SSL warning is
-        // logged before it.
-        assert.soon(
-            () => {
-                const log = rawMongoProgramOutput();
-                return log.search('client metadata') !== -1;
-            },
-            "logfile should contain 'client metadata'.\n" +
-                "Log File Contents\n==============================\n" + rawMongoProgramOutput() +
-                "\n==============================\n");
+    // Keep checking the log file until client metadata is logged since the SSL warning is
+    // logged before it.
+    assert.soon(
+        () => {
+            const log = rawMongoProgramOutput();
+            return log.search('client metadata') !== -1;
+        },
+        "logfile should contain 'client metadata'.\n" +
+            "Log File Contents\n==============================\n" + rawMongoProgramOutput() +
+            "\n==============================\n");
 
-        // Now check for the message
-        const log = rawMongoProgramOutput();
-        assert.eq(suppress, log.search('no SSL certificate provided by peer') === -1);
+    // Now check for the message
+    const log = rawMongoProgramOutput();
+    assert.eq(suppress, log.search('no SSL certificate provided by peer') === -1);
 
-        try {
-            MongoRunner.stopMongod(mongod);
-        } catch (e) {
-            // Depending on timing, exitCode might be 0, 1, or -9.
-            // All that matters is that it dies, resmoke will tell us if that failed.
-            // So just let it go, the exit code never bothered us anyway.
-        }
+    try {
+        MongoRunner.stopMongod(mongod);
+    } catch (e) {
+        // Depending on timing, exitCode might be 0, 1, or -9.
+        // All that matters is that it dies, resmoke will tell us if that failed.
+        // So just let it go, the exit code never bothered us anyway.
     }
+}
 
-    test(true);
-    test(false);
+test(true);
+test(false);
 })();

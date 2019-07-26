@@ -134,4 +134,4 @@ private:
     // Notified when we write as everything is considered "journalled" since repl depends on it.
     JournalListener* _journalListener = &NoOpJournalListener::instance;
 };
-}
+}  // namespace mongo

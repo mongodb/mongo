@@ -9,7 +9,6 @@
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
 
 var $config = (function() {
-
     var data = {
         // Use the workload name as a prefix for the role name,
         // since the workload name is assumed to be unique.
@@ -17,7 +16,6 @@ var $config = (function() {
     };
 
     var states = (function() {
-
         function uniqueRoleName(prefix, tid, num) {
             return prefix + tid + '_' + num;
         }
@@ -45,11 +43,9 @@ var $config = (function() {
         }
 
         return {init: init, createAndDropRole: createAndDropRole};
-
     })();
 
     var transitions = {init: {createAndDropRole: 1}, createAndDropRole: {createAndDropRole: 1}};
 
     return {threadCount: 10, iterations: 20, data: data, states: states, transitions: transitions};
-
 })();

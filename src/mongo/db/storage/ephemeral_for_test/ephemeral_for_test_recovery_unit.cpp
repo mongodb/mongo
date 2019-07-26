@@ -71,4 +71,4 @@ void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
 Status EphemeralForTestRecoveryUnit::obtainMajorityCommittedSnapshot() {
     return Status::OK();
 }
-}
+}  // namespace mongo

@@ -24,7 +24,6 @@ GeoNearRandomTest.prototype.mkPt = function mkPt(scale, indexBounds) {
             (Random.rand() * (range - eps) + eps) + indexBounds.min
         ];
     }
-
 };
 
 GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds, scale) {
@@ -74,7 +73,7 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
     let last = runQuery(1);
     for (var i = 2; i <= opts.nToTest; i++) {
         let ret = runQuery(i);
-        this.assertIsPrefix(last, ret, `Unexpected result when comparing ${i-1} and ${i}`);
+        this.assertIsPrefix(last, ret, `Unexpected result when comparing ${i - 1} and ${i}`);
 
         // Make sure distances are in increasing order.
         assert.gte(ret[ret.length - 1].dis, last[last.length - 1].dis);

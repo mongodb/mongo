@@ -37,4 +37,4 @@ namespace mongo {
 // Generate windows event name for shutdown signal
 std::string getShutdownSignalName(int processId);
 #endif
-}
+}  // namespace mongo

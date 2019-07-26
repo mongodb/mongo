@@ -59,4 +59,4 @@ MONGO_STARTUP_OPTIONS_STORE(MongoShellOptions)(InitializerContext* context) {
     }
     return Status::OK();
 }
-}
+}  // namespace mongo

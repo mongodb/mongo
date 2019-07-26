@@ -432,8 +432,7 @@ Status AuthorizationManagerImpl::_initializeUserFromPrivilegeDocument(User* user
         return Status(ErrorCodes::BadValue,
                       str::stream() << "User name from privilege document \"" << userName
                                     << "\" doesn't match name of provided User \""
-                                    << user->getName().getUser()
-                                    << "\"");
+                                    << user->getName().getUser() << "\"");
     }
 
     user->setID(parser.extractUserIDFromUserDocument(privDoc));

@@ -178,9 +178,9 @@ MemberConfig::MemberConfig(const BSONObj& mcfg, ReplSetTagConfig* tagConfig) {
         for (auto&& tag : tagsElement.Obj()) {
             if (tag.type() != String) {
                 uasserted(ErrorCodes::TypeMismatch,
-                          str::stream() << "tags." << tag.fieldName()
-                                        << " field has non-string value of type "
-                                        << typeName(tag.type()));
+                          str::stream()
+                              << "tags." << tag.fieldName()
+                              << " field has non-string value of type " << typeName(tag.type()));
             }
             _tags.push_back(tagConfig->makeTag(tag.fieldNameStringData(), tag.valueStringData()));
         }
@@ -240,9 +240,9 @@ Status MemberConfig::validate() const {
     }
     if (_slaveDelay < Seconds(0) || _slaveDelay > kMaxSlaveDelay) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << kSlaveDelayFieldName << " field value of "
-                                    << durationCount<Seconds>(_slaveDelay)
-                                    << " seconds is out of range");
+                      str::stream()
+                          << kSlaveDelayFieldName << " field value of "
+                          << durationCount<Seconds>(_slaveDelay) << " seconds is out of range");
     }
     // Check for additional electable requirements, when priority is non zero
     if (_priority != 0) {

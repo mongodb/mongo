@@ -52,10 +52,10 @@
 
 namespace mongo {
 
-using std::unique_ptr;
+using std::endl;
 using std::string;
 using std::stringstream;
-using std::endl;
+using std::unique_ptr;
 
 /**
  * The cloneCollection command is deprecated.

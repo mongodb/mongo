@@ -191,10 +191,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "cannot move chunk " << _args.toString()
                           << " because collection may have been dropped. "
-                          << "current epoch: "
-                          << collectionVersion.epoch()
-                          << ", cmd epoch: "
-                          << _args.getVersionEpoch(),
+                          << "current epoch: " << collectionVersion.epoch()
+                          << ", cmd epoch: " << _args.getVersionEpoch(),
             _args.getVersionEpoch() == collectionVersion.epoch());
 
     ChunkType chunkToMove;
@@ -229,9 +227,7 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         "moveChunk.start",
         getNss().ns(),
         BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
-                   << _args.getFromShardId()
-                   << "to"
-                   << _args.getToShardId()),
+                   << _args.getFromShardId() << "to" << _args.getToShardId()),
         ShardingCatalogClient::kMajorityWriteConcern);
     if (logStatus != Status::OK()) {
         return logStatus;
@@ -455,9 +451,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
             "moveChunk.validating",
             getNss().ns(),
             BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
-                       << _args.getFromShardId()
-                       << "to"
-                       << _args.getToShardId()),
+                       << _args.getFromShardId() << "to" << _args.getToShardId()),
             ShardingCatalogClient::kMajorityWriteConcern);
 
         if ((ErrorCodes::isInterruption(status.code()) ||
@@ -490,12 +484,11 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         }
 
         fassert(40137,
-                status.withContext(
-                    str::stream() << "Failed to commit migration for chunk " << _args.toString()
-                                  << " due to "
-                                  << redact(migrationCommitStatus)
-                                  << ". Updating the optime with a write before refreshing the "
-                                  << "metadata also failed"));
+                status.withContext(str::stream()
+                                   << "Failed to commit migration for chunk " << _args.toString()
+                                   << " due to " << redact(migrationCommitStatus)
+                                   << ". Updating the optime with a write before refreshing the "
+                                   << "metadata also failed"));
     }
 
     // Do a best effort attempt to incrementally refresh the metadata before leaving the critical
@@ -527,8 +520,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         return migrationCommitStatus.withContext(
             str::stream() << "Orphaned range not cleaned up. Failed to refresh metadata after"
                              " migration commit due to '"
-                          << refreshStatus.toString()
-                          << "' after commit failed");
+                          << refreshStatus.toString() << "' after commit failed");
     }
 
     const auto refreshedMetadata = _getCurrentMetadataAndCheckEpoch(opCtx);
@@ -572,10 +564,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         "moveChunk.commit",
         getNss().ns(),
         BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
-                   << _args.getFromShardId()
-                   << "to"
-                   << _args.getToShardId()
-                   << "counts"
+                   << _args.getFromShardId() << "to" << _args.getToShardId() << "counts"
                    << _recipientCloneCounts),
         ShardingCatalogClient::kMajorityWriteConcern);
 
@@ -635,9 +624,7 @@ void MigrationSourceManager::cleanupOnError(OperationContext* opCtx) {
         "moveChunk.error",
         getNss().ns(),
         BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
-                   << _args.getFromShardId()
-                   << "to"
-                   << _args.getToShardId()),
+                   << _args.getFromShardId() << "to" << _args.getToShardId()),
         ShardingCatalogClient::kMajorityWriteConcern);
 
     try {
@@ -664,8 +651,7 @@ ScopedCollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoc
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "The collection was dropped or recreated since the migration began. "
-                          << "Expected collection epoch: "
-                          << _collectionEpoch.toString()
+                          << "Expected collection epoch: " << _collectionEpoch.toString()
                           << ", but found: "
                           << (metadata->isSharded() ? metadata->getCollVersion().epoch().toString()
                                                     : "unsharded collection."),
@@ -687,9 +673,7 @@ void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(
     // The message expected by change streams
     const auto o2Message = BSON("type"
                                 << "migrateChunkToNewShard"
-                                << "from"
-                                << _args.getFromShardId()
-                                << "to"
+                                << "from" << _args.getFromShardId() << "to"
                                 << _args.getToShardId());
 
     auto const serviceContext = opCtx->getClient()->getServiceContext();

@@ -6,7 +6,6 @@
  * Repeatedly remove a document from the collection.
  */
 var $config = (function() {
-
     var states = {
         remove: function remove(db, collName) {
             // try removing a random document
@@ -53,5 +52,4 @@ var $config = (function() {
         },
         startState: 'remove'
     };
-
 })();

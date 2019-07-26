@@ -91,4 +91,4 @@ private:
     explicit BSONKey(const BSONElement& elem);
     BSONObj _obj;
 };
-}
+}  // namespace mongo

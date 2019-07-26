@@ -115,4 +115,4 @@ private:
     mutable std::unique_ptr<S2Polyline> _borderLine;
     mutable std::unique_ptr<S2Polygon> _borderPoly;
 };
-}
+}  // namespace mongo

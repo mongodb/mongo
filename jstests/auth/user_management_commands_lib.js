@@ -118,11 +118,11 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
 
         testUserAdmin.grantRolesToUser('spencer',
                                        [
-                                         'readWrite',
-                                         'dbAdmin',
-                                         {role: 'readWrite', db: 'test'},
-                                         {role: 'testRole', db: 'test'},
-                                         'readWrite'
+                                           'readWrite',
+                                           'dbAdmin',
+                                           {role: 'readWrite', db: 'test'},
+                                           {role: 'testRole', db: 'test'},
+                                           'readWrite'
                                        ],
                                        writeConcern);
 
@@ -142,9 +142,9 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
         testUserAdmin.revokeRolesFromUser(
             'spencer',
             [
-              'readWrite',
-              {role: 'dbAdmin', db: 'test2'},  // role user doesnt have
-              "testRole"
+                'readWrite',
+                {role: 'dbAdmin', db: 'test2'},  // role user doesnt have
+                "testRole"
             ],
             writeConcern);
 
@@ -169,7 +169,6 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
             db.getRole('testRole');
         });
         assert.commandFailedWithCode(db.adminCommand('connPoolSync'), ErrorCodes.Unauthorized);
-
     })();
 
     (function testUsersInfo() {

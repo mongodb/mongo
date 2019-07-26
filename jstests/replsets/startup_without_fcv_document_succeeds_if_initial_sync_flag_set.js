@@ -4,40 +4,40 @@
  */
 
 (function() {
-    load("jstests/libs/check_log.js");
-    load("jstests/libs/feature_compatibility_version.js");
+load("jstests/libs/check_log.js");
+load("jstests/libs/feature_compatibility_version.js");
 
-    rst = new ReplSetTest({nodes: 1});
-    rst.startSet();
-    rst.initiate();
+rst = new ReplSetTest({nodes: 1});
+rst.startSet();
+rst.initiate();
 
-    jsTestLog("Adding a second node to the replica set.");
+jsTestLog("Adding a second node to the replica set.");
 
-    const adminDbName = "admin";
-    const versionCollName = "system.version";
-    const nss = adminDbName + "." + versionCollName;
+const adminDbName = "admin";
+const versionCollName = "system.version";
+const nss = adminDbName + "." + versionCollName;
 
-    // Hang initial sync before cloning the FCV document.
-    let secondary = rst.add({rsConfig: {priority: 0}});
-    assert.commandWorked(secondary.getDB('admin').runCommand({
-        configureFailPoint: 'initialSyncHangBeforeCollectionClone',
-        mode: 'alwaysOn',
-        data: {namespace: nss}
-    }));
-    rst.reInitiate();
-    checkLog.contains(secondary, "initialSyncHangBeforeCollectionClone fail point enabled.");
+// Hang initial sync before cloning the FCV document.
+let secondary = rst.add({rsConfig: {priority: 0}});
+assert.commandWorked(secondary.getDB('admin').runCommand({
+    configureFailPoint: 'initialSyncHangBeforeCollectionClone',
+    mode: 'alwaysOn',
+    data: {namespace: nss}
+}));
+rst.reInitiate();
+checkLog.contains(secondary, "initialSyncHangBeforeCollectionClone fail point enabled.");
 
-    jsTestLog("Restarting secondary in the early stages of initial sync.");
-    rst.restart(secondary);
+jsTestLog("Restarting secondary in the early stages of initial sync.");
+rst.restart(secondary);
 
-    rst.awaitSecondaryNodes();
+rst.awaitSecondaryNodes();
 
-    // Get the new secondary connection.
-    secondary = rst.getSecondary();
-    secondary.setSlaveOk(true);
+// Get the new secondary connection.
+secondary = rst.getSecondary();
+secondary.setSlaveOk(true);
 
-    const secondaryAdminDb = secondary.getDB("admin");
-    // Assert that the FCV document was cloned through initial sync on the secondary.
-    checkFCV(secondaryAdminDb, latestFCV);
-    rst.stopSet();
+const secondaryAdminDb = secondary.getDB("admin");
+// Assert that the FCV document was cloned through initial sync on the secondary.
+checkFCV(secondaryAdminDb, latestFCV);
+rst.stopSet();
 }());

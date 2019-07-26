@@ -51,8 +51,8 @@ namespace {
 
 constexpr CollatorInterface* kSimpleCollator = nullptr;
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 /**
@@ -1131,8 +1131,7 @@ TEST(QueryPlannerIXSelectTest, InternalExprEqCanUseHashedIndex) {
 TEST(QueryPlannerIXSelectTest, InternalExprEqCannotUseTextIndexPrefix) {
     auto entry = buildSimpleIndexEntry(BSON("a" << 1 << "_fts"
                                                 << "text"
-                                                << "_ftsx"
-                                                << 1));
+                                                << "_ftsx" << 1));
     std::vector<IndexEntry> indices;
     indices.push_back(entry);
     std::set<size_t> expectedIndices;
@@ -1143,10 +1142,7 @@ TEST(QueryPlannerIXSelectTest, InternalExprEqCannotUseTextIndexPrefix) {
 TEST(QueryPlannerIXSelectTest, InternalExprEqCanUseTextIndexSuffix) {
     auto entry = buildSimpleIndexEntry(BSON("_fts"
                                             << "text"
-                                            << "_ftsx"
-                                            << 1
-                                            << "a"
-                                            << 1));
+                                            << "_ftsx" << 1 << "a" << 1));
     std::vector<IndexEntry> indices;
     indices.push_back(entry);
     std::set<size_t> expectedIndices = {0};

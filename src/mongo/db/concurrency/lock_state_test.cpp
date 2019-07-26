@@ -939,11 +939,12 @@ namespace {
 bool lockerInfoContainsLock(const Locker::LockerInfo& lockerInfo,
                             const ResourceId& resourceId,
                             const LockMode& mode) {
-    return (1U == std::count_if(lockerInfo.locks.begin(),
-                                lockerInfo.locks.end(),
-                                [&resourceId, &mode](const Locker::OneLock& lock) {
-                                    return lock.resourceId == resourceId && lock.mode == mode;
-                                }));
+    return (1U ==
+            std::count_if(lockerInfo.locks.begin(),
+                          lockerInfo.locks.end(),
+                          [&resourceId, &mode](const Locker::OneLock& lock) {
+                              return lock.resourceId == resourceId && lock.mode == mode;
+                          }));
 }
 }  // namespace
 

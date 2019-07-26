@@ -13,159 +13,158 @@ load('./jstests/libs/chunk_manipulation_util.js');
  * 4. Retry writes and confirm that writes are not duplicated.
  */
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/libs/retryable_writes_util.js");
+load("jstests/libs/retryable_writes_util.js");
 
-    if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
-        jsTestLog("Retryable writes are not supported, skipping test");
-        return;
-    }
+if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
+    jsTestLog("Retryable writes are not supported, skipping test");
+    return;
+}
 
-    var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
-    var st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}}});
-    st.adminCommand({enableSharding: 'test'});
-    st.ensurePrimaryShard('test', st.shard0.shardName);
-    st.adminCommand({shardCollection: 'test.user', key: {x: 1}});
-    assert.commandWorked(st.s.adminCommand({split: 'test.user', middle: {x: 0}}));
+var st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}}});
+st.adminCommand({enableSharding: 'test'});
+st.ensurePrimaryShard('test', st.shard0.shardName);
+st.adminCommand({shardCollection: 'test.user', key: {x: 1}});
+assert.commandWorked(st.s.adminCommand({split: 'test.user', middle: {x: 0}}));
 
-    pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
-    var joinMoveChunk =
-        moveChunkParallel(staticMongod, st.s.host, {x: 0}, null, 'test.user', st.shard1.shardName);
+pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
+var joinMoveChunk =
+    moveChunkParallel(staticMongod, st.s.host, {x: 0}, null, 'test.user', st.shard1.shardName);
 
-    waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
+waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
-    const insertCmd = {
-        insert: 'user',
-        documents: [
-            // For findAndModify not touching chunk being migrated.
-            {x: -30},
-            // For changing doc to become owned by chunk being migrated.
-            {x: -20},
-            {x: -20},
-            // For basic insert.
-            {x: 10},
-            // For changing doc to become owned by another chunk not being migrated.
-            {x: 20},
-            {x: 20},
-            // For basic findAndModify.
-            {x: 30}
-        ],
-        ordered: false,
-        lsid: {id: UUID()},
-        txnNumber: NumberLong(34),
-    };
+const insertCmd = {
+    insert: 'user',
+    documents: [
+        // For findAndModify not touching chunk being migrated.
+        {x: -30},
+        // For changing doc to become owned by chunk being migrated.
+        {x: -20},
+        {x: -20},
+        // For basic insert.
+        {x: 10},
+        // For changing doc to become owned by another chunk not being migrated.
+        {x: 20},
+        {x: 20},
+        // For basic findAndModify.
+        {x: 30}
+    ],
+    ordered: false,
+    lsid: {id: UUID()},
+    txnNumber: NumberLong(34),
+};
 
-    var testDB = st.getDB('test');
-    const insertResult = assert.commandWorked(testDB.runCommand(insertCmd));
+var testDB = st.getDB('test');
+const insertResult = assert.commandWorked(testDB.runCommand(insertCmd));
 
-    const findAndModCmd = {
-        findAndModify: 'user',
-        query: {x: 30},
-        update: {$inc: {y: 1}},
-        new: true,
-        upsert: true,
-        lsid: {id: UUID()},
-        txnNumber: NumberLong(37),
-    };
+const findAndModCmd = {
+    findAndModify: 'user',
+    query: {x: 30},
+    update: {$inc: {y: 1}},
+    new: true,
+    upsert: true,
+    lsid: {id: UUID()},
+    txnNumber: NumberLong(37),
+};
 
-    const findAndModifyResult = assert.commandWorked(testDB.runCommand(findAndModCmd));
+const findAndModifyResult = assert.commandWorked(testDB.runCommand(findAndModCmd));
 
-    const changeDocToChunkNotMigrated = {
-        findAndModify: 'user',
-        query: {x: 20},
-        update: {$set: {x: -120}, $inc: {y: 1}},
-        new: false,
-        upsert: true,
-        lsid: {id: UUID()},
-        txnNumber: NumberLong(37),
-    };
+const changeDocToChunkNotMigrated = {
+    findAndModify: 'user',
+    query: {x: 20},
+    update: {$set: {x: -120}, $inc: {y: 1}},
+    new: false,
+    upsert: true,
+    lsid: {id: UUID()},
+    txnNumber: NumberLong(37),
+};
 
-    const changeDocToNotMigratedResult =
-        assert.commandWorked(testDB.runCommand(changeDocToChunkNotMigrated));
+const changeDocToNotMigratedResult =
+    assert.commandWorked(testDB.runCommand(changeDocToChunkNotMigrated));
 
-    const changeDocToChunkMigrated = {
-        findAndModify: 'user',
-        query: {x: -20},
-        update: {$set: {x: 120}, $inc: {y: 1}},
-        new: false,
-        upsert: true,
-        lsid: {id: UUID()},
-        txnNumber: NumberLong(37),
-    };
+const changeDocToChunkMigrated = {
+    findAndModify: 'user',
+    query: {x: -20},
+    update: {$set: {x: 120}, $inc: {y: 1}},
+    new: false,
+    upsert: true,
+    lsid: {id: UUID()},
+    txnNumber: NumberLong(37),
+};
 
-    const changeDocToMigratedResult =
-        assert.commandWorked(testDB.runCommand(changeDocToChunkMigrated));
+const changeDocToMigratedResult = assert.commandWorked(testDB.runCommand(changeDocToChunkMigrated));
 
-    const findAndModifyNotMigrated = {
-        findAndModify: 'user',
-        query: {x: -30},
-        update: {$inc: {y: 1}},
-        new: false,
-        upsert: true,
-        lsid: {id: UUID()},
-        txnNumber: NumberLong(37),
-    };
+const findAndModifyNotMigrated = {
+    findAndModify: 'user',
+    query: {x: -30},
+    update: {$inc: {y: 1}},
+    new: false,
+    upsert: true,
+    lsid: {id: UUID()},
+    txnNumber: NumberLong(37),
+};
 
-    const findAndModifyNotMigratedResult =
-        assert.commandWorked(testDB.runCommand(findAndModifyNotMigrated));
+const findAndModifyNotMigratedResult =
+    assert.commandWorked(testDB.runCommand(findAndModifyNotMigrated));
 
-    unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
-    joinMoveChunk();
+unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
+joinMoveChunk();
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    // Retry phase
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Retry phase
 
-    var insertRetryResult = assert.commandWorked(testDB.runCommand(insertCmd));
+var insertRetryResult = assert.commandWorked(testDB.runCommand(insertCmd));
 
-    assert.eq(insertResult.ok, insertRetryResult.ok);
-    assert.eq(insertResult.n, insertRetryResult.n);
-    assert.eq(insertResult.writeErrors, insertRetryResult.writeErrors);
-    assert.eq(insertResult.writeConcernErrors, insertRetryResult.writeConcernErrors);
+assert.eq(insertResult.ok, insertRetryResult.ok);
+assert.eq(insertResult.n, insertRetryResult.n);
+assert.eq(insertResult.writeErrors, insertRetryResult.writeErrors);
+assert.eq(insertResult.writeConcernErrors, insertRetryResult.writeConcernErrors);
 
-    assert.eq(1, testDB.user.find({x: 10}).itcount());
-    assert.eq(1, testDB.user.find({x: 30}).itcount());
+assert.eq(1, testDB.user.find({x: 10}).itcount());
+assert.eq(1, testDB.user.find({x: 30}).itcount());
 
-    var findAndModifyRetryResult = assert.commandWorked(testDB.runCommand(findAndModCmd));
+var findAndModifyRetryResult = assert.commandWorked(testDB.runCommand(findAndModCmd));
 
-    assert.eq(findAndModifyResult.ok, findAndModifyRetryResult.ok);
-    assert.eq(findAndModifyResult.value, findAndModifyRetryResult.value);
-    assert.eq(findAndModifyResult.lastErrorObject, findAndModifyRetryResult.lastErrorObject);
+assert.eq(findAndModifyResult.ok, findAndModifyRetryResult.ok);
+assert.eq(findAndModifyResult.value, findAndModifyRetryResult.value);
+assert.eq(findAndModifyResult.lastErrorObject, findAndModifyRetryResult.lastErrorObject);
 
-    assert.eq(1, testDB.user.findOne({x: 30}).y);
+assert.eq(1, testDB.user.findOne({x: 30}).y);
 
-    let changeDocToNotMigratedRetryResult =
-        assert.commandWorked(testDB.runCommand(changeDocToChunkNotMigrated));
+let changeDocToNotMigratedRetryResult =
+    assert.commandWorked(testDB.runCommand(changeDocToChunkNotMigrated));
 
-    assert.eq(changeDocToNotMigratedResult.ok, changeDocToNotMigratedRetryResult.ok);
-    assert.eq(changeDocToNotMigratedResult.value, changeDocToNotMigratedRetryResult.value);
-    assert.eq(changeDocToNotMigratedResult.lastErrorObject,
-              changeDocToNotMigratedRetryResult.lastErrorObject);
+assert.eq(changeDocToNotMigratedResult.ok, changeDocToNotMigratedRetryResult.ok);
+assert.eq(changeDocToNotMigratedResult.value, changeDocToNotMigratedRetryResult.value);
+assert.eq(changeDocToNotMigratedResult.lastErrorObject,
+          changeDocToNotMigratedRetryResult.lastErrorObject);
 
-    assert.eq(1, testDB.user.find({x: -120}).itcount());
+assert.eq(1, testDB.user.find({x: -120}).itcount());
 
-    let changeDocToMigratedRetryResult =
-        assert.commandWorked(testDB.runCommand(changeDocToChunkMigrated));
+let changeDocToMigratedRetryResult =
+    assert.commandWorked(testDB.runCommand(changeDocToChunkMigrated));
 
-    assert.eq(changeDocToMigratedResult.ok, changeDocToMigratedRetryResult.ok);
-    assert.eq(changeDocToMigratedResult.value, changeDocToMigratedRetryResult.value);
-    assert.eq(changeDocToMigratedResult.lastErrorObject,
-              changeDocToMigratedRetryResult.lastErrorObject);
+assert.eq(changeDocToMigratedResult.ok, changeDocToMigratedRetryResult.ok);
+assert.eq(changeDocToMigratedResult.value, changeDocToMigratedRetryResult.value);
+assert.eq(changeDocToMigratedResult.lastErrorObject,
+          changeDocToMigratedRetryResult.lastErrorObject);
 
-    assert.eq(1, testDB.user.find({x: 120}).itcount());
+assert.eq(1, testDB.user.find({x: 120}).itcount());
 
-    let findAndModifyNotMigratedRetryResult =
-        assert.commandWorked(testDB.runCommand(findAndModifyNotMigrated));
+let findAndModifyNotMigratedRetryResult =
+    assert.commandWorked(testDB.runCommand(findAndModifyNotMigrated));
 
-    assert.eq(findAndModifyNotMigratedResult.ok, findAndModifyNotMigratedRetryResult.ok);
-    assert.eq(findAndModifyNotMigratedResult.value, findAndModifyNotMigratedRetryResult.value);
-    assert.eq(findAndModifyNotMigratedResult.lastErrorObject,
-              findAndModifyNotMigratedRetryResult.lastErrorObject);
+assert.eq(findAndModifyNotMigratedResult.ok, findAndModifyNotMigratedRetryResult.ok);
+assert.eq(findAndModifyNotMigratedResult.value, findAndModifyNotMigratedRetryResult.value);
+assert.eq(findAndModifyNotMigratedResult.lastErrorObject,
+          findAndModifyNotMigratedRetryResult.lastErrorObject);
 
-    assert.eq(1, testDB.user.findOne({x: -30}).y);
+assert.eq(1, testDB.user.findOne({x: -30}).y);
 
-    st.stop();
+st.stop();
 
-    MongoRunner.stopMongod(staticMongod);
+MongoRunner.stopMongod(staticMongod);
 })();

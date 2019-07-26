@@ -10,7 +10,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');        // for extendWor
 load('jstests/concurrency/fsm_workloads/yield_sort_merge.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     /*
      * Execute a query that will use the SORT stage.
      */

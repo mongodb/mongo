@@ -148,7 +148,7 @@ bool isArrayOfObjects(BSONElement array) {
 
     return true;
 }
-}
+}  // namespace
 
 OpMsgRequest upconvertRequest(StringData db, BSONObj cmdObj, int queryFlags) {
     cmdObj = cmdObj.getOwned();  // Usually this is a no-op since it is already owned.

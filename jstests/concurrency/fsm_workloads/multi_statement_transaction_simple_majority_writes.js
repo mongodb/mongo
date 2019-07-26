@@ -13,7 +13,6 @@ load('jstests/concurrency/fsm_workloads/multi_statement_transaction_simple.js');
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');                 // for isMongos
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.data.majorityWriteCollName = 'majority_writes';
     $config.data.counter = 0;
 

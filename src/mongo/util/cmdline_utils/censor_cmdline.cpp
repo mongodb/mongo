@@ -233,4 +233,4 @@ void censorArgvArray(int argc, char** argv) {
     }
 }
 }  // namespace cmdline_utils
-}
+}  // namespace mongo

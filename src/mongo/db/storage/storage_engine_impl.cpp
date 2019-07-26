@@ -92,8 +92,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
 
         if (status.code() == ErrorCodes::DataModifiedByRepair) {
             warning() << "Catalog data modified by repair: " << status.reason();
-            repairObserver->onModification(str::stream() << "DurableCatalog repaired: "
-                                                         << status.reason());
+            repairObserver->onModification(str::stream()
+                                           << "DurableCatalog repaired: " << status.reason());
         } else {
             fassertNoTrace(50926, status);
         }
@@ -209,8 +209,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
 
                     if (_options.forRepair) {
                         StorageRepairObserver::get(getGlobalServiceContext())
-                            ->onModification(str::stream() << "Collection " << nss << " dropped: "
-                                                           << status.reason());
+                            ->onModification(str::stream() << "Collection " << nss
+                                                           << " dropped: " << status.reason());
                     }
                     wuow.commit();
                     continue;
@@ -298,8 +298,8 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
     }
     if (dataModified) {
         StorageRepairObserver::get(getGlobalServiceContext())
-            ->onModification(str::stream() << "Collection " << collectionName << " recovered: "
-                                           << status.reason());
+            ->onModification(str::stream() << "Collection " << collectionName
+                                           << " recovered: " << status.reason());
     }
     wuow.commit();
     return Status::OK();
@@ -397,8 +397,7 @@ StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
             if (engineIdents.find(identForColl) == engineIdents.end()) {
                 return {ErrorCodes::UnrecoverableRollbackError,
                         str::stream() << "Expected collection does not exist. Collection: " << coll
-                                      << " Ident: "
-                                      << identForColl};
+                                      << " Ident: " << identForColl};
             }
         }
     }
@@ -494,8 +493,8 @@ StorageEngineImpl::reconcileCatalogAndIdents(OperationContext* opCtx) {
 
         for (auto&& indexName : indexesToDrop) {
             invariant(metaData.eraseIndex(indexName),
-                      str::stream() << "Index is missing. Collection: " << coll << " Index: "
-                                    << indexName);
+                      str::stream()
+                          << "Index is missing. Collection: " << coll << " Index: " << indexName);
         }
         if (indexesToDrop.size() > 0) {
             WriteUnitOfWork wuow(opCtx);
@@ -683,8 +682,8 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx, const Names
     }
 
     if (dataModified) {
-        repairObserver->onModification(str::stream() << "Collection " << nss << ": "
-                                                     << status.reason());
+        repairObserver->onModification(str::stream()
+                                       << "Collection " << nss << ": " << status.reason());
     }
 
     // After repairing, re-initialize the collection with a valid RecordStore.
@@ -819,8 +818,8 @@ void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
     while (rec) {
         // This should only be called by a parent that's done an appropriate `shouldLog` check. Do
         // not duplicate the log level policy.
-        LOG_FOR_RECOVERY(kCatalogLogLevel) << "\tId: " << rec->id
-                                           << " Value: " << rec->data.toBson();
+        LOG_FOR_RECOVERY(kCatalogLogLevel)
+            << "\tId: " << rec->id << " Value: " << rec->data.toBson();
         rec = cursor->next();
     }
     opCtx->recoveryUnit()->abandonSnapshot();

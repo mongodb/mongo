@@ -46,18 +46,18 @@ class OperationContext;
 class SessionsCollectionConfigServer : public SessionsCollectionSharded {
 public:
     /**
-    * Ensures that the sessions collection has been set up for this cluster,
-    * sharded, and with the proper indexes.
-    *
-    * This method may safely be called multiple times.
-    *
-    * If there are no shards in this cluster, this method will do nothing.
-    */
+     * Ensures that the sessions collection has been set up for this cluster,
+     * sharded, and with the proper indexes.
+     *
+     * This method may safely be called multiple times.
+     *
+     * If there are no shards in this cluster, this method will do nothing.
+     */
     Status setupSessionsCollection(OperationContext* opCtx) override;
 
     /**
-    * Checks if the sessions collection exists.
-    */
+     * Checks if the sessions collection exists.
+     */
     Status checkSessionsCollectionExists(OperationContext* opCtx) override;
 
 private:

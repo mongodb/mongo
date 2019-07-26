@@ -38,7 +38,8 @@ assert.eq(
     "D");  // SERVER-371
 
 assert.eq.automsg("2",
-                  "t.find( { age:30, rating:{ $gte:4, $lte:5} } )" + ".explain('executionStats')" +
+                  "t.find( { age:30, rating:{ $gte:4, $lte:5} } )" +
+                      ".explain('executionStats')" +
                       ".executionStats.totalKeysExamined");
 
 t.drop();

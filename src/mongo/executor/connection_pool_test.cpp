@@ -77,14 +77,14 @@ protected:
     template <typename... Args>
     auto getFromPool(Args&&... args) {
         return ExecutorFuture(_executor)
-            .then([ pool = _pool, args... ]() { return pool->get(args...); })
+            .then([pool = _pool, args...]() { return pool->get(args...); })
             .semi();
     }
 
     void doneWith(ConnectionPool::ConnectionHandle& conn) {
         dynamic_cast<ConnectionImpl*>(conn.get())->indicateSuccess();
 
-        ExecutorFuture(_executor).getAsync([conn = std::move(conn)](auto){});
+        ExecutorFuture(_executor).getAsync([conn = std::move(conn)](auto) {});
     }
 
     using StatusWithConn = StatusWith<ConnectionPool::ConnectionHandle>;

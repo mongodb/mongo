@@ -153,9 +153,7 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {
             if (fieldName == kOpIdFieldName) {
                 uassert(ErrorCodes::TypeMismatch,
                         str::stream() << "expected numeric opid for $currentOp response from '"
-                                      << _shardName
-                                      << "' but got: "
-                                      << typeName(elt.type()),
+                                      << _shardName << "' but got: " << typeName(elt.type()),
                         elt.isNumber());
 
                 std::string shardOpID = (str::stream() << _shardName << ":" << elt.numberInt());
@@ -247,8 +245,8 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                 (elem.boolean() ? CursorMode::kIncludeCursors : CursorMode::kExcludeCursors);
         } else {
             uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "Unrecognized option '" << fieldName
-                                    << "' in $currentOp stage.");
+                      str::stream()
+                          << "Unrecognized option '" << fieldName << "' in $currentOp stage.");
         }
     }
 

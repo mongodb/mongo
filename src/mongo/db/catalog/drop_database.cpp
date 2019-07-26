@@ -275,12 +275,11 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         }
 
         if (!result.status.isOK()) {
-            return result.status.withContext(
-                str::stream() << "dropDatabase " << dbName << " failed waiting for "
-                              << numCollectionsToDrop
-                              << " collection drop(s) (most recent drop optime: "
-                              << awaitOpTime.toString()
-                              << ") to replicate.");
+            return result.status.withContext(str::stream()
+                                             << "dropDatabase " << dbName << " failed waiting for "
+                                             << numCollectionsToDrop
+                                             << " collection drop(s) (most recent drop optime: "
+                                             << awaitOpTime.toString() << ") to replicate.");
         }
 
         log() << "dropDatabase " << dbName << " - successfully dropped " << numCollectionsToDrop
@@ -301,8 +300,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "Could not drop database " << dbName
                                     << " because it does not exist after dropping "
-                                    << numCollectionsToDrop
-                                    << " collection(s).");
+                                    << numCollectionsToDrop << " collection(s).");
     }
 
     bool userInitiatedWritesAndNotPrimary =
@@ -310,12 +308,11 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::PrimarySteppedDown,
-                      str::stream() << "Could not drop database " << dbName
-                                    << " because we transitioned from PRIMARY to "
-                                    << replCoord->getMemberState().toString()
-                                    << " while waiting for "
-                                    << numCollectionsToDrop
-                                    << " pending collection drop(s).");
+                      str::stream()
+                          << "Could not drop database " << dbName
+                          << " because we transitioned from PRIMARY to "
+                          << replCoord->getMemberState().toString() << " while waiting for "
+                          << numCollectionsToDrop << " pending collection drop(s).");
     }
 
     // _finishDropDatabase creates its own scope guard to ensure drop-pending is unset.

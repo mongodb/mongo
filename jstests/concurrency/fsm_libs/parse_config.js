@@ -61,8 +61,8 @@ function parseConfig(config) {
         assert.gt(Object.keys(config.transitions[fromState]).length, 0);
         Object.keys(config.transitions[fromState]).forEach(function(toState) {
             assert(config.states.hasOwnProperty(toState),
-                   'config.transitions.' + fromState + ' contains a state not in config.states: ' +
-                       toState);
+                   'config.transitions.' + fromState +
+                       ' contains a state not in config.states: ' + toState);
             assert.eq('number',
                       typeof config.transitions[fromState][toState],
                       'transitions.' + fromState + '.' + toState + ' should be a number');

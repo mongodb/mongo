@@ -180,9 +180,7 @@ void TimeZoneDatabase::loadTimeZoneInfo(
                 40475,
                 {ErrorCodes::FailedToParse,
                  str::stream() << "failed to parse time zone file for time zone identifier \""
-                               << entry.id
-                               << "\": "
-                               << timelib_get_error_message(errorCode)});
+                               << entry.id << "\": " << timelib_get_error_message(errorCode)});
         }
 
         invariant(errorCode == TIMELIB_ERROR_NO_ERROR);
@@ -276,8 +274,7 @@ Date_t TimeZoneDatabase::fromString(StringData dateString,
         uasserted(ErrorCodes::ConversionFailure,
                   str::stream()
                       << "an incomplete date/time string has been found, with elements missing: \""
-                      << dateString
-                      << "\"");
+                      << dateString << "\"");
     }
 
     if (!tz.isUtcZone()) {
@@ -295,8 +292,7 @@ Date_t TimeZoneDatabase::fromString(StringData dateString,
                     ErrorCodes::ConversionFailure,
                     str::stream()
                         << "you cannot pass in a date/time string with time zone information ('"
-                        << parsedTime.get()->tz_abbr
-                        << "') together with a timezone argument");
+                        << parsedTime.get()->tz_abbr << "') together with a timezone argument");
                 break;
             default:  // should technically not be possible to reach
                 uasserted(ErrorCodes::ConversionFailure,

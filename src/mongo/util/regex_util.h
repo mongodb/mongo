@@ -42,5 +42,5 @@ namespace regex_util {
 pcrecpp::RE_Options flagsToPcreOptions(StringData optionFlags,
                                        bool ignoreInvalidOptions,
                                        StringData opName = "");
-}
-}
+}  // namespace regex_util
+}  // namespace mongo

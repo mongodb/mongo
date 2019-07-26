@@ -1861,4 +1861,4 @@ TEST(BitTestMatchExpression, DoesNotMatchBinaryWithBitMask) {
     ASSERT(banyc.matchesSingleElement(match1["a"]));
     ASSERT(banyc.matchesSingleElement(match2["a"]));
 }
-}
+}  // namespace mongo

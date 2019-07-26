@@ -71,7 +71,12 @@ namespace {
 
 // Explicitly unsupported JSON Schema keywords.
 const std::set<StringData> unsupportedKeywords{
-    "$ref"_sd, "$schema"_sd, "default"_sd, "definitions"_sd, "format"_sd, "id"_sd,
+    "$ref"_sd,
+    "$schema"_sd,
+    "default"_sd,
+    "definitions"_sd,
+    "format"_sd,
+    "id"_sd,
 };
 
 constexpr StringData kNamePlaceholder = "i"_sd;
@@ -173,9 +178,9 @@ StatusWithMatchExpression parseMaximum(StringData path,
                                        bool isExclusiveMaximum) {
     if (!maximum.isNumber()) {
         return {Status(ErrorCodes::TypeMismatch,
-                       str::stream() << "$jsonSchema keyword '"
-                                     << JSONSchemaParser::kSchemaMaximumKeyword
-                                     << "' must be a number")};
+                       str::stream()
+                           << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaMaximumKeyword
+                           << "' must be a number")};
     }
 
     if (path.empty()) {
@@ -201,9 +206,9 @@ StatusWithMatchExpression parseMinimum(StringData path,
                                        bool isExclusiveMinimum) {
     if (!minimum.isNumber()) {
         return {Status(ErrorCodes::TypeMismatch,
-                       str::stream() << "$jsonSchema keyword '"
-                                     << JSONSchemaParser::kSchemaMinimumKeyword
-                                     << "' must be a number")};
+                       str::stream()
+                           << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaMinimumKeyword
+                           << "' must be a number")};
     }
 
     if (path.empty()) {
@@ -249,9 +254,9 @@ StatusWithMatchExpression parsePattern(StringData path,
                                        InternalSchemaTypeExpression* typeExpr) {
     if (pattern.type() != BSONType::String) {
         return {Status(ErrorCodes::TypeMismatch,
-                       str::stream() << "$jsonSchema keyword '"
-                                     << JSONSchemaParser::kSchemaPatternKeyword
-                                     << "' must be a string")};
+                       str::stream()
+                           << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaPatternKeyword
+                           << "' must be a string")};
     }
 
     if (path.empty()) {
@@ -271,16 +276,16 @@ StatusWithMatchExpression parseMultipleOf(StringData path,
                                           InternalSchemaTypeExpression* typeExpr) {
     if (!multipleOf.isNumber()) {
         return {Status(ErrorCodes::TypeMismatch,
-                       str::stream() << "$jsonSchema keyword '"
-                                     << JSONSchemaParser::kSchemaMultipleOfKeyword
-                                     << "' must be a number")};
+                       str::stream()
+                           << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaMultipleOfKeyword
+                           << "' must be a number")};
     }
 
     if (multipleOf.numberDecimal().isNegative() || multipleOf.numberDecimal().isZero()) {
         return {Status(ErrorCodes::FailedToParse,
-                       str::stream() << "$jsonSchema keyword '"
-                                     << JSONSchemaParser::kSchemaMultipleOfKeyword
-                                     << "' must have a positive value")};
+                       str::stream()
+                           << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaMultipleOfKeyword
+                           << "' must have a positive value")};
     }
     if (path.empty()) {
         return {stdx::make_unique<AlwaysTrueMatchExpression>()};
@@ -405,7 +410,7 @@ StatusWith<StringDataSet> parseRequired(BSONElement requiredElt) {
                                   << propertyName.type()};
         }
 
-        const auto[it, didInsert] = properties.insert(propertyName.valueStringData());
+        const auto [it, didInsert] = properties.insert(propertyName.valueStringData());
         if (!didInsert) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "$jsonSchema keyword '"
@@ -458,9 +463,9 @@ StatusWithMatchExpression parseProperties(const boost::intrusive_ptr<ExpressionC
                                           bool ignoreUnknownKeywords) {
     if (propertiesElt.type() != BSONType::Object) {
         return {Status(ErrorCodes::TypeMismatch,
-                       str::stream() << "$jsonSchema keyword '"
-                                     << JSONSchemaParser::kSchemaPropertiesKeyword
-                                     << "' must be an object")};
+                       str::stream()
+                           << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaPropertiesKeyword
+                           << "' must be an object")};
     }
     auto propertiesObj = propertiesElt.embeddedObject();
 
@@ -469,8 +474,7 @@ StatusWithMatchExpression parseProperties(const boost::intrusive_ptr<ExpressionC
         if (property.type() != BSONType::Object) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "Nested schema for $jsonSchema property '"
-                                  << property.fieldNameStringData()
-                                  << "' must be an object"};
+                                  << property.fieldNameStringData() << "' must be an object"};
         }
 
         auto nestedSchemaMatch = _parse(expCtx,
@@ -532,11 +536,11 @@ StatusWith<std::vector<PatternSchema>> parsePatternProperties(
     for (auto&& patternSchema : patternPropertiesElt.embeddedObject()) {
         if (patternSchema.type() != BSONType::Object) {
             return {Status(ErrorCodes::TypeMismatch,
-                           str::stream() << "$jsonSchema keyword '"
-                                         << JSONSchemaParser::kSchemaPatternPropertiesKeyword
-                                         << "' has property '"
-                                         << patternSchema.fieldNameStringData()
-                                         << "' which is not an object")};
+                           str::stream()
+                               << "$jsonSchema keyword '"
+                               << JSONSchemaParser::kSchemaPatternPropertiesKeyword
+                               << "' has property '" << patternSchema.fieldNameStringData()
+                               << "' which is not an object")};
         }
 
         // Parse the nested schema using a placeholder as the path, since we intend on using the
@@ -840,11 +844,11 @@ StatusWith<boost::optional<long long>> parseItems(
         for (auto subschema : itemsElt.embeddedObject()) {
             if (subschema.type() != BSONType::Object) {
                 return {ErrorCodes::TypeMismatch,
-                        str::stream() << "$jsonSchema keyword '"
-                                      << JSONSchemaParser::kSchemaItemsKeyword
-                                      << "' requires that each element of the array is an "
-                                         "object, but found a "
-                                      << subschema.type()};
+                        str::stream()
+                            << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaItemsKeyword
+                            << "' requires that each element of the array is an "
+                               "object, but found a "
+                            << subschema.type()};
             }
 
             // We want to make an ExpressionWithPlaceholder for $_internalSchemaMatchArrayIndex,
@@ -895,8 +899,7 @@ StatusWith<boost::optional<long long>> parseItems(
     } else {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaItemsKeyword
-                              << "' must be an array or an object, not "
-                              << itemsElt.type()};
+                              << "' must be an array or an object, not " << itemsElt.type()};
     }
 
     return startIndexForAdditionalItems;
@@ -1267,8 +1270,7 @@ Status translateScalarKeywords(StringMap<BSONElement>& keywordMap,
         return {ErrorCodes::FailedToParse,
                 str::stream() << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaMaximumKeyword
                               << "' must be a present if "
-                              << JSONSchemaParser::kSchemaExclusiveMaximumKeyword
-                              << " is present"};
+                              << JSONSchemaParser::kSchemaExclusiveMaximumKeyword << " is present"};
     }
 
     if (auto minimumElt = keywordMap[JSONSchemaParser::kSchemaMinimumKeyword]) {
@@ -1294,8 +1296,7 @@ Status translateScalarKeywords(StringMap<BSONElement>& keywordMap,
         return {ErrorCodes::FailedToParse,
                 str::stream() << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaMinimumKeyword
                               << "' must be a present if "
-                              << JSONSchemaParser::kSchemaExclusiveMinimumKeyword
-                              << " is present"};
+                              << JSONSchemaParser::kSchemaExclusiveMinimumKeyword << " is present"};
     }
 
     return Status::OK();
@@ -1316,19 +1317,17 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
         expCtx->maxFeatureCompatibilityVersion <
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
         return Status(ErrorCodes::QueryFeatureNotAllowed,
-                      str::stream() << "The featureCompatiblityVersion must be 4.2 to use "
-                                       "encryption keywords in $jsonSchema. See "
-                                    << feature_compatibility_version_documentation::kUpgradeLink
-                                    << ".");
+                      str::stream()
+                          << "The featureCompatiblityVersion must be 4.2 to use "
+                             "encryption keywords in $jsonSchema. See "
+                          << feature_compatibility_version_documentation::kUpgradeLink << ".");
     }
 
     if (encryptElt && encryptMetadataElt) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Cannot specify both $jsonSchema keywords '"
-                                    << JSONSchemaParser::kSchemaEncryptKeyword
-                                    << "' and '"
-                                    << JSONSchemaParser::kSchemaEncryptMetadataKeyword
-                                    << "'");
+                                    << JSONSchemaParser::kSchemaEncryptKeyword << "' and '"
+                                    << JSONSchemaParser::kSchemaEncryptMetadataKeyword << "'");
     }
 
     if (encryptMetadataElt) {
@@ -1398,9 +1397,9 @@ Status validateMetadataKeywords(StringMap<BSONElement>& keywordMap) {
     if (auto titleElem = keywordMap[JSONSchemaParser::kSchemaTitleKeyword]) {
         if (titleElem.type() != BSONType::String) {
             return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "$jsonSchema keyword '"
-                                        << JSONSchemaParser::kSchemaTitleKeyword
-                                        << "' must be of type string");
+                          str::stream()
+                              << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaTitleKeyword
+                              << "' must be of type string");
         }
     }
     return Status::OK();
@@ -1455,16 +1454,16 @@ StatusWithMatchExpression _parse(const boost::intrusive_ptr<ExpressionContext>& 
                                             << "' is not currently supported");
             } else if (!ignoreUnknownKeywords) {
                 return Status(ErrorCodes::FailedToParse,
-                              str::stream() << "Unknown $jsonSchema keyword: "
-                                            << elt.fieldNameStringData());
+                              str::stream()
+                                  << "Unknown $jsonSchema keyword: " << elt.fieldNameStringData());
             }
             continue;
         }
 
         if (it->second) {
             return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Duplicate $jsonSchema keyword: "
-                                        << elt.fieldNameStringData());
+                          str::stream()
+                              << "Duplicate $jsonSchema keyword: " << elt.fieldNameStringData());
         }
 
         keywordMap[elt.fieldNameStringData()] = elt;
@@ -1481,28 +1480,24 @@ StatusWithMatchExpression _parse(const boost::intrusive_ptr<ExpressionContext>& 
     if (typeElem && bsonTypeElem) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Cannot specify both $jsonSchema keywords '"
-                                    << JSONSchemaParser::kSchemaTypeKeyword
-                                    << "' and '"
-                                    << JSONSchemaParser::kSchemaBsonTypeKeyword
-                                    << "'");
+                                    << JSONSchemaParser::kSchemaTypeKeyword << "' and '"
+                                    << JSONSchemaParser::kSchemaBsonTypeKeyword << "'");
     } else if (typeElem && encryptElem) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "$jsonSchema keyword '"
-                                    << JSONSchemaParser::kSchemaEncryptKeyword
-                                    << "' cannot be used in conjunction with '"
-                                    << JSONSchemaParser::kSchemaTypeKeyword
-                                    << "', '"
-                                    << JSONSchemaParser::kSchemaEncryptKeyword
-                                    << "' implies type 'bsonType::BinData'");
+                      str::stream()
+                          << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaEncryptKeyword
+                          << "' cannot be used in conjunction with '"
+                          << JSONSchemaParser::kSchemaTypeKeyword << "', '"
+                          << JSONSchemaParser::kSchemaEncryptKeyword
+                          << "' implies type 'bsonType::BinData'");
     } else if (bsonTypeElem && encryptElem) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "$jsonSchema keyword '"
-                                    << JSONSchemaParser::kSchemaEncryptKeyword
-                                    << "' cannot be used in conjunction with '"
-                                    << JSONSchemaParser::kSchemaBsonTypeKeyword
-                                    << "', '"
-                                    << JSONSchemaParser::kSchemaEncryptKeyword
-                                    << "' implies type 'bsonType::BinData'");
+                      str::stream()
+                          << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaEncryptKeyword
+                          << "' cannot be used in conjunction with '"
+                          << JSONSchemaParser::kSchemaBsonTypeKeyword << "', '"
+                          << JSONSchemaParser::kSchemaEncryptKeyword
+                          << "' implies type 'bsonType::BinData'");
     }
 
     std::unique_ptr<InternalSchemaTypeExpression> typeExpr;
@@ -1593,25 +1588,25 @@ StatusWith<MatcherTypeSet> JSONSchemaParser::parseTypeSet(BSONElement typeElt,
         for (auto&& typeArrayEntry : typeElt.embeddedObject()) {
             if (typeArrayEntry.type() != BSONType::String) {
                 return {Status(ErrorCodes::TypeMismatch,
-                               str::stream() << "$jsonSchema keyword '"
-                                             << typeElt.fieldNameStringData()
-                                             << "' array elements must be strings")};
+                               str::stream()
+                                   << "$jsonSchema keyword '" << typeElt.fieldNameStringData()
+                                   << "' array elements must be strings")};
             }
 
             if (typeArrayEntry.valueStringData() == JSONSchemaParser::kSchemaTypeInteger) {
                 return {ErrorCodes::FailedToParse,
-                        str::stream() << "$jsonSchema type '"
-                                      << JSONSchemaParser::kSchemaTypeInteger
-                                      << "' is not currently supported."};
+                        str::stream()
+                            << "$jsonSchema type '" << JSONSchemaParser::kSchemaTypeInteger
+                            << "' is not currently supported."};
             }
 
             auto insertionResult = aliases.insert(typeArrayEntry.valueStringData());
             if (!insertionResult.second) {
-                return {Status(ErrorCodes::FailedToParse,
-                               str::stream() << "$jsonSchema keyword '"
-                                             << typeElt.fieldNameStringData()
-                                             << "' has duplicate value: "
-                                             << typeArrayEntry.valueStringData())};
+                return {
+                    Status(ErrorCodes::FailedToParse,
+                           str::stream()
+                               << "$jsonSchema keyword '" << typeElt.fieldNameStringData()
+                               << "' has duplicate value: " << typeArrayEntry.valueStringData())};
             }
         }
     }

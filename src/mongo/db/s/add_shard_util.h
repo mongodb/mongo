@@ -60,5 +60,5 @@ AddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName);
  */
 BSONObj createShardIdentityUpsertForAddShard(const AddShard& addShardCmd);
 
-}  // namespace mongo
 }  // namespace add_shard_util
+}  // namespace mongo

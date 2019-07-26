@@ -219,4 +219,4 @@ TEST(RandomTest, Secure1) {
         ASSERT_NOT_EQUALS(a->nextInt64(), b->nextInt64());
     }
 }
-}
+}  // namespace mongo

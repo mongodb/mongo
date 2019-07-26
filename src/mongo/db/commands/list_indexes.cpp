@@ -127,8 +127,8 @@ public:
         }
 
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "Not authorized to list indexes on collection: "
-                                    << nss.ns());
+                      str::stream()
+                          << "Not authorized to list indexes on collection: " << nss.ns());
     }
 
     bool run(OperationContext* opCtx,

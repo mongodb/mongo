@@ -149,15 +149,13 @@ TEST(ParsedAggregationProjectionErrors, ShouldRejectPathConflictsWithNonAlphaNum
 
     // Then assert that we throw when we introduce a prefixed field.
     ASSERT_THROWS(
-        makeProjectionWithDefaultPolicies(
-            BSON("a.b-c" << true << "a.b" << true << "a.b?c" << true << "a.b c" << true << "a.b.d"
-                         << true)),
+        makeProjectionWithDefaultPolicies(BSON("a.b-c" << true << "a.b" << true << "a.b?c" << true
+                                                       << "a.b c" << true << "a.b.d" << true)),
         AssertionException);
-    ASSERT_THROWS(
-        makeProjectionWithDefaultPolicies(BSON(
-            "a.b.d" << false << "a.b c" << false << "a.b?c" << false << "a.b" << false << "a.b-c"
-                    << false)),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a.b.d" << false << "a.b c" << false
+                                                                 << "a.b?c" << false << "a.b"
+                                                                 << false << "a.b-c" << false)),
+                  AssertionException);
 
     // Adding the same field twice.
     ASSERT_THROWS(makeProjectionWithDefaultPolicies(
@@ -168,34 +166,24 @@ TEST(ParsedAggregationProjectionErrors, ShouldRejectPathConflictsWithNonAlphaNum
                   AssertionException);
 
     // Mix of include/exclude and adding a shared prefix.
-    ASSERT_THROWS(
-        makeProjectionWithDefaultPolicies(
-            BSON("a.b-c" << true << "a.b" << wrapInLiteral(1) << "a.b?c" << true << "a.b c" << true
-                         << "a.b.d"
-                         << true)),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a.b-c" << true << "a.b" << wrapInLiteral(1) << "a.b?c" << true
+                                   << "a.b c" << true << "a.b.d" << true)),
+                  AssertionException);
     ASSERT_THROWS(makeProjectionWithDefaultPolicies(
                       BSON("a.b.d" << false << "a.b c" << false << "a.b?c" << false << "a.b"
-                                   << wrapInLiteral(0)
-                                   << "a.b-c"
-                                   << false)),
+                                   << wrapInLiteral(0) << "a.b-c" << false)),
                   AssertionException);
 
     // Adding a shared prefix twice.
     ASSERT_THROWS(makeProjectionWithDefaultPolicies(
                       BSON("a.b-c" << wrapInLiteral(1) << "a.b" << wrapInLiteral(1) << "a.b?c"
-                                   << wrapInLiteral(1)
-                                   << "a.b c"
-                                   << wrapInLiteral(1)
-                                   << "a.b.d"
+                                   << wrapInLiteral(1) << "a.b c" << wrapInLiteral(1) << "a.b.d"
                                    << wrapInLiteral(0))),
                   AssertionException);
     ASSERT_THROWS(makeProjectionWithDefaultPolicies(
                       BSON("a.b.d" << wrapInLiteral(1) << "a.b c" << wrapInLiteral(1) << "a.b?c"
-                                   << wrapInLiteral(1)
-                                   << "a.b"
-                                   << wrapInLiteral(0)
-                                   << "a.b-c"
+                                   << wrapInLiteral(1) << "a.b" << wrapInLiteral(0) << "a.b-c"
                                    << wrapInLiteral(1))),
                   AssertionException);
 }

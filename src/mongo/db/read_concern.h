@@ -42,7 +42,7 @@ enum class PrepareConflictBehavior;
 namespace repl {
 class ReadConcernArgs;
 class SpeculativeMajorityReadInfo;
-}
+}  // namespace repl
 
 /**
  * Given the specified read concern arguments, performs checks that the read concern can actually be

@@ -46,8 +46,8 @@ namespace mongo {
  */
 struct FTDCVarInt {
     /**
-    * Maximum number of bytes an integer can compress to
-    */
+     * Maximum number of bytes an integer can compress to
+     */
     static const std::size_t kMaxSizeBytes64 = 10;
 
     FTDCVarInt() = default;

@@ -131,14 +131,15 @@ template <typename Func, typename Result = std::result_of_t<Func && ()>>
 Future<Result> async(Func&& func) {
     auto pf = makePromiseFuture<Result>();
 
-    stdx::thread([ promise = std::move(pf.promise), func = std::forward<Func>(func) ]() mutable {
+    stdx::thread([promise = std::move(pf.promise), func = std::forward<Func>(func)]() mutable {
         sleepIfShould();
         try {
             completePromise(&promise, func);
         } catch (const DBException& ex) {
             promise.setError(ex.toStatus());
         }
-    }).detach();
+    })
+        .detach();
 
     return std::move(pf.future);
 }

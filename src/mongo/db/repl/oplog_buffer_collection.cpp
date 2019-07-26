@@ -66,17 +66,16 @@ std::tuple<BSONObj, Timestamp, std::size_t> OplogBufferCollection::addIdToDocume
     const BSONObj& orig, const Timestamp& lastTimestamp, std::size_t sentinelCount) {
     if (orig.isEmpty()) {
         return std::make_tuple(
-            BSON(kIdFieldName << BSON(
-                     kTimestampFieldName << lastTimestamp << kSentinelFieldName
-                                         << static_cast<long long>(sentinelCount + 1))),
+            BSON(kIdFieldName << BSON(kTimestampFieldName
+                                      << lastTimestamp << kSentinelFieldName
+                                      << static_cast<long long>(sentinelCount + 1))),
             lastTimestamp,
             sentinelCount + 1);
     }
     const auto ts = orig[kTimestampFieldName].timestamp();
     invariant(!ts.isNull());
     auto doc = BSON(kIdFieldName << BSON(kTimestampFieldName << ts << kSentinelFieldName << 0)
-                                 << kOplogEntryFieldName
-                                 << orig);
+                                 << kOplogEntryFieldName << orig);
     return std::make_tuple(doc, ts, 0);
 }
 

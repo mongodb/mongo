@@ -239,4 +239,4 @@ void MockRemoteDBServer::checkIfUp(InstanceID id) const {
         throwSocketError(mongo::SocketErrorKind::CLOSED, _hostAndPort);
     }
 }
-}
+}  // namespace mongo

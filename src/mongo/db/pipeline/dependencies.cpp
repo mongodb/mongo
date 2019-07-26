@@ -282,4 +282,4 @@ Document documentHelper(const BSONObj& bson, const Document& neededFields, int n
 Document ParsedDeps::extractFields(const BSONObj& input) const {
     return documentHelper(input, _fields, _nFields);
 }
-}
+}  // namespace mongo

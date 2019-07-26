@@ -100,4 +100,4 @@ std::string ProgressMeter::toString() const {
 
     return buf.str();
 }
-}
+}  // namespace mongo

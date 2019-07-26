@@ -19,65 +19,65 @@
  * @tags: [requires_fsync, requires_document_locking]
  */
 (function() {
-    'use strict';
+'use strict';
 
-    const conn = MongoRunner.runMongod();
-    const db = conn.getDB('test');
-    const coll = db.books;
-    const blockedMillis = 2000;
-    assert.commandWorked(coll.insert({title: 'Adventures of Huckleberry'}));
-    assert.commandWorked(coll.insert({title: '1984'}));
-    assert.commandWorked(coll.insert({title: 'Animal Farm'}));
-    // Create the output collection beforehand so that $out will execute a code path which triggers
-    // the index creation sub-operation.
-    db['favorite'].createIndex({foo: 1});
+const conn = MongoRunner.runMongod();
+const db = conn.getDB('test');
+const coll = db.books;
+const blockedMillis = 2000;
+assert.commandWorked(coll.insert({title: 'Adventures of Huckleberry'}));
+assert.commandWorked(coll.insert({title: '1984'}));
+assert.commandWorked(coll.insert({title: 'Animal Farm'}));
+// Create the output collection beforehand so that $out will execute a code path which triggers
+// the index creation sub-operation.
+db['favorite'].createIndex({foo: 1});
 
-    db.setProfilingLevel(0, -1);
+db.setProfilingLevel(0, -1);
 
-    // Lock the database, and then start an operation that needs the lock, so it blocks.
-    assert.commandWorked(db.fsyncLock());
+// Lock the database, and then start an operation that needs the lock, so it blocks.
+assert.commandWorked(db.fsyncLock());
 
-    // Turn 'hangAfterStartingIndexBuildUnlocked' failpoint on, which blocks any index builds.
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'alwaysOn'}));
+// Turn 'hangAfterStartingIndexBuildUnlocked' failpoint on, which blocks any index builds.
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'alwaysOn'}));
 
-    // Aggregation with $out which will block on creating the temporary collection due to the
-    // FsyncLock.
-    const dollarOutAggregationShell = startParallelShell(function() {
-        // Simple aggregation which copies a document to the output collection.
-        assert.commandWorked(db.runCommand({
-            aggregate: 'books',
-            pipeline: [{$match: {title: '1984'}}, {$out: 'favorite'}],
-            cursor: {}
-        }));
-    }, conn.port);
+// Aggregation with $out which will block on creating the temporary collection due to the
+// FsyncLock.
+const dollarOutAggregationShell = startParallelShell(function() {
+    // Simple aggregation which copies a document to the output collection.
+    assert.commandWorked(db.runCommand({
+        aggregate: 'books',
+        pipeline: [{$match: {title: '1984'}}, {$out: 'favorite'}],
+        cursor: {}
+    }));
+}, conn.port);
 
-    // Wait for sub-operation createCollection to get blocked.
-    assert.soon(function() {
-        let res = db.currentOp({"command.create": {$exists: true}, waitingForLock: true});
-        return res.inprog.length == 1;
-    });
+// Wait for sub-operation createCollection to get blocked.
+assert.soon(function() {
+    let res = db.currentOp({"command.create": {$exists: true}, waitingForLock: true});
+    return res.inprog.length == 1;
+});
 
-    sleep(blockedMillis);
+sleep(blockedMillis);
 
-    // Unlock the database. Sub-operation createCollection can proceed.
-    db.fsyncUnlock();
+// Unlock the database. Sub-operation createCollection can proceed.
+db.fsyncUnlock();
 
-    // Wait for sub-operation createIndex to get blocked after acquiring all the locks.
-    let res;
-    assert.soon(function() {
-        res = db.currentOp(
-            {"command.createIndexes": {$exists: true}, "lockStats.Global": {$exists: true}});
-        return res.inprog.length == 1;
-    });
-    jsTestLog(tojson(res.inprog[0]));
-    // Assert that sub-operation 'createIndex' has 0 lock wait time. Before SERVER-26854, it
-    // erroneously reported `blockedMillis` as it counted the lock wait time for the previous
-    // sub-operation.
-    assert(!('timeAcquiringMicros' in res.inprog[0].lockStats.Global));
+// Wait for sub-operation createIndex to get blocked after acquiring all the locks.
+let res;
+assert.soon(function() {
+    res = db.currentOp(
+        {"command.createIndexes": {$exists: true}, "lockStats.Global": {$exists: true}});
+    return res.inprog.length == 1;
+});
+jsTestLog(tojson(res.inprog[0]));
+// Assert that sub-operation 'createIndex' has 0 lock wait time. Before SERVER-26854, it
+// erroneously reported `blockedMillis` as it counted the lock wait time for the previous
+// sub-operation.
+assert(!('timeAcquiringMicros' in res.inprog[0].lockStats.Global));
 
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
-    dollarOutAggregationShell();
-    MongoRunner.stopMongod(conn);
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
+dollarOutAggregationShell();
+MongoRunner.stopMongod(conn);
 })();

@@ -254,4 +254,4 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
 
     prefix = KVPrefix::fromBSONElement(obj["prefix"]);
 }
-}
+}  // namespace mongo

@@ -26,7 +26,7 @@ function clientEvalConstructorTest(constructorList) {
         try {
             eval(constructor);
         } catch (e) {
-            throw("valid constructor: " + constructor + " failed in eval context: " + e);
+            throw ("valid constructor: " + constructor + " failed in eval context: " + e);
         }
     });
     constructorList.invalid.forEach(function(constructor) {
@@ -56,7 +56,7 @@ function mapReduceConstructorTest(constructorList) {
 
             res = t.mapReduce(m, r, {out: "mr_constructors_out", scope: {xx: 1}});
         } catch (e) {
-            throw("valid constructor: " + constructor + " failed in mapReduce context: " + e);
+            throw ("valid constructor: " + constructor + " failed in mapReduce context: " + e);
         }
     });
     constructorList.invalid.forEach(function(constructor) {
@@ -83,7 +83,7 @@ function whereConstructorTest(constructorList) {
         try {
             t.findOne({$where: constructor});
         } catch (e) {
-            throw("valid constructor: " + constructor + " failed in $where query: " + e);
+            throw ("valid constructor: " + constructor + " failed in $where query: " + e);
         }
     });
     constructorList.invalid.forEach(function(constructor) {

@@ -42,4 +42,4 @@ DistLockPingInfo::DistLockPingInfo(
       configLocalTime(remoteArg),
       lockSessionId(std::move(tsArg)),
       electionId(std::move(electionIdArg)) {}
-}
+}  // namespace mongo

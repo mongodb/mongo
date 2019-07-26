@@ -75,18 +75,16 @@ StatusWith<size_t> validateTCMallocValue(StringData name, const BSONElement& new
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "Expected server parameter " << name
                               << " to have numeric type, but found "
-                              << newValueElement.toString(false)
-                              << " of type "
+                              << newValueElement.toString(false) << " of type "
                               << typeName(newValueElement.type())};
     }
     long long valueAsLongLong = newValueElement.safeNumberLong();
     if (valueAsLongLong < 0 ||
         static_cast<unsigned long long>(valueAsLongLong) > std::numeric_limits<size_t>::max()) {
-        return Status(
-            ErrorCodes::BadValue,
-            str::stream() << "Value " << newValueElement.toString(false) << " is out of range for "
-                          << name
-                          << "; expected a value between 0 and "
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "Value " << newValueElement.toString(false) << " is out of range for "
+                          << name << "; expected a value between 0 and "
                           << std::min<unsigned long long>(std::numeric_limits<size_t>::max(),
                                                           std::numeric_limits<long long>::max()));
     }

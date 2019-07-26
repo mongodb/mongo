@@ -365,4 +365,4 @@ private:
     MatchType _matchType;
     std::unique_ptr<TagData> _tagData;
 };
-}
+}  // namespace mongo

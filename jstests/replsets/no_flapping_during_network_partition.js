@@ -11,45 +11,47 @@
  */
 
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/libs/check_log.js");
+load("jstests/libs/check_log.js");
 
-    var name = "no_flapping_during_network_partition";
+var name = "no_flapping_during_network_partition";
 
-    var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
-    var nodes = replTest.startSet();
-    var config = replTest.getReplSetConfig();
-    config.members[0].priority = 5;
-    config.members[2].arbiterOnly = true;
-    config.settings = {electionTimeoutMillis: 2000};
-    replTest.initiate(config);
+var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
+var nodes = replTest.startSet();
+var config = replTest.getReplSetConfig();
+config.members[0].priority = 5;
+config.members[2].arbiterOnly = true;
+config.settings = {
+    electionTimeoutMillis: 2000
+};
+replTest.initiate(config);
 
-    function getTerm(node) {
-        return node.adminCommand({replSetGetStatus: 1}).term;
-    }
+function getTerm(node) {
+    return node.adminCommand({replSetGetStatus: 1}).term;
+}
 
-    replTest.waitForState(nodes[0], ReplSetTest.State.PRIMARY);
+replTest.waitForState(nodes[0], ReplSetTest.State.PRIMARY);
 
-    var primary = replTest.getPrimary();
-    var secondary = replTest.getSecondary();
-    var initialTerm = getTerm(primary);
+var primary = replTest.getPrimary();
+var secondary = replTest.getSecondary();
+var initialTerm = getTerm(primary);
 
-    jsTestLog("Create a network partition between the primary and secondary.");
-    primary.disconnect(secondary);
+jsTestLog("Create a network partition between the primary and secondary.");
+primary.disconnect(secondary);
 
-    jsTestLog("Wait long enough for the secondary to call for an election.");
-    checkLog.contains(secondary, "can see a healthy primary");
-    checkLog.contains(secondary, "not running for primary");
+jsTestLog("Wait long enough for the secondary to call for an election.");
+checkLog.contains(secondary, "can see a healthy primary");
+checkLog.contains(secondary, "not running for primary");
 
-    jsTestLog("Verify the primary and secondary do not change during the partition.");
-    assert.eq(primary, replTest.getPrimary());
-    assert.eq(secondary, replTest.getSecondary());
+jsTestLog("Verify the primary and secondary do not change during the partition.");
+assert.eq(primary, replTest.getPrimary());
+assert.eq(secondary, replTest.getSecondary());
 
-    checkLog.contains(secondary, "not running for primary");
+checkLog.contains(secondary, "not running for primary");
 
-    jsTestLog("Heal the partition.");
-    primary.reconnect(secondary);
+jsTestLog("Heal the partition.");
+primary.reconnect(secondary);
 
-    replTest.stopSet();
+replTest.stopSet();
 })();

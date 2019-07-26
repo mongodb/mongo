@@ -248,4 +248,4 @@ private:
 
     std::unique_ptr<MatchExpression> _exp;
 };
-}
+}  // namespace mongo

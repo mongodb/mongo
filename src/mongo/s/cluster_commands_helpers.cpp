@@ -218,15 +218,13 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
             if (ErrorCodes::isStaleShardVersionError(status.code())) {
                 uassertStatusOK(status.withContext(str::stream()
                                                    << "got stale shardVersion response from shard "
-                                                   << response.shardId
-                                                   << " at host "
+                                                   << response.shardId << " at host "
                                                    << response.shardHostAndPort->toString()));
             }
             if (ErrorCodes::StaleDbVersion == status) {
                 uassertStatusOK(status.withContext(
                     str::stream() << "got stale databaseVersion response from shard "
-                                  << response.shardId
-                                  << " at host "
+                                  << response.shardId << " at host "
                                   << response.shardHostAndPort->toString()));
             }
 
@@ -527,8 +525,8 @@ void createShardDatabase(OperationContext* opCtx, StringData dbName) {
 
         if (createDbResponse.commandStatus != ErrorCodes::NamespaceExists) {
             uassertStatusOKWithContext(createDbResponse.commandStatus,
-                                       str::stream() << "Database " << dbName
-                                                     << " could not be created");
+                                       str::stream()
+                                           << "Database " << dbName << " could not be created");
         }
 
         dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);

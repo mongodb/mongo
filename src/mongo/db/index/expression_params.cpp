@@ -193,14 +193,8 @@ void ExpressionParams::initialize2dsphereParams(const BSONObj& infoObj,
 
     massert(17395,
             stream() << "unsupported geo index version { " << kIndexVersionFieldName << " : "
-                     << out->indexVersion
-                     << " }, only support versions: ["
-                     << S2_INDEX_VERSION_1
-                     << ","
-                     << S2_INDEX_VERSION_2
-                     << ","
-                     << S2_INDEX_VERSION_3
-                     << "]",
+                     << out->indexVersion << " }, only support versions: [" << S2_INDEX_VERSION_1
+                     << "," << S2_INDEX_VERSION_2 << "," << S2_INDEX_VERSION_3 << "]",
             out->indexVersion == S2_INDEX_VERSION_3 || out->indexVersion == S2_INDEX_VERSION_2 ||
                 out->indexVersion == S2_INDEX_VERSION_1);
 }

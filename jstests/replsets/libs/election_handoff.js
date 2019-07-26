@@ -5,7 +5,6 @@
  */
 
 var ElectionHandoffTest = (function() {
-
     load("jstests/libs/check_log.js");
     load("jstests/replsets/rslib.js");
 
@@ -76,10 +75,10 @@ var ElectionHandoffTest = (function() {
         // If there are only two nodes in the set, verify that the old primary voted "yes".
         if (numNodes === 2) {
             checkLog.contains(expectedCandidate,
-                              `skipping dry run and running for election in term ${term+1}`);
+                              `skipping dry run and running for election in term ${term + 1}`);
             checkLog.contains(
                 expectedCandidate,
-                `VoteRequester(term ${term+1}) received a yes vote from ${primary.host}`);
+                `VoteRequester(term ${term + 1}) received a yes vote from ${primary.host}`);
         }
 
         rst.awaitNodesAgreeOnPrimary();
@@ -87,5 +86,4 @@ var ElectionHandoffTest = (function() {
     }
 
     return {testElectionHandoff: testElectionHandoff, stepDownPeriodSecs: kStepDownPeriodSecs};
-
 })();

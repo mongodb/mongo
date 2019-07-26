@@ -129,11 +129,10 @@ TEST(ClockSourceMockTest, AlarmScheudlesExpiredAlarmWhenSignaled) {
     ClockSourceMock cs;
     const auto beginning = cs.now();
     int alarmFiredCount = 0;
-    ASSERT_OK(cs.setAlarm(beginning + Seconds{1},
-                          [&] {
-                              ++alarmFiredCount;
-                              ASSERT_OK(cs.setAlarm(beginning, [&] { ++alarmFiredCount; }));
-                          }));
+    ASSERT_OK(cs.setAlarm(beginning + Seconds{1}, [&] {
+        ++alarmFiredCount;
+        ASSERT_OK(cs.setAlarm(beginning, [&] { ++alarmFiredCount; }));
+    }));
     ASSERT_EQ(0, alarmFiredCount);
     cs.advance(Seconds{1});
     ASSERT_EQ(2, alarmFiredCount);
@@ -154,17 +153,15 @@ TEST(ClockSourceMockTest, AlarmScheudlesAlarmWhenSignaled) {
     ClockSourceMock cs;
     const auto beginning = cs.now();
     int alarmFiredCount = 0;
-    ASSERT_OK(cs.setAlarm(beginning + Seconds{1},
-                          [&] {
-                              ++alarmFiredCount;
-                              ASSERT_OK(
-                                  cs.setAlarm(beginning + Seconds{2}, [&] { ++alarmFiredCount; }));
-                          }));
+    ASSERT_OK(cs.setAlarm(beginning + Seconds{1}, [&] {
+        ++alarmFiredCount;
+        ASSERT_OK(cs.setAlarm(beginning + Seconds{2}, [&] { ++alarmFiredCount; }));
+    }));
     ASSERT_EQ(0, alarmFiredCount);
     cs.advance(Seconds{1});
     ASSERT_EQ(1, alarmFiredCount);
     cs.advance(Seconds{1});
     ASSERT_EQ(2, alarmFiredCount);
 }
-}
+}  // namespace
 }  // namespace mongo

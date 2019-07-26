@@ -218,18 +218,10 @@ BSONObj makeInsertOperation(const NamespaceString& nss,
                             const BSONObj& documentToInsert) {
     return uuid ? BSON("op"
                        << "i"
-                       << "ns"
-                       << nss.ns()
-                       << "o"
-                       << documentToInsert
-                       << "ui"
-                       << *uuid)
+                       << "ns" << nss.ns() << "o" << documentToInsert << "ui" << *uuid)
                 : BSON("op"
                        << "i"
-                       << "ns"
-                       << nss.ns()
-                       << "o"
-                       << documentToInsert);
+                       << "ns" << nss.ns() << "o" << documentToInsert);
 }
 
 /**

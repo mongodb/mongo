@@ -143,7 +143,7 @@ public:
  * Each wrapped PeriodicRunner::ControllableJob function on this object throws
  * if the underlying job is gone (e.g. in shutdown).
  */
-class[[nodiscard]] PeriodicJobAnchor {
+class [[nodiscard]] PeriodicJobAnchor {
 public:
     using Job = PeriodicRunner::ControllableJob;
 

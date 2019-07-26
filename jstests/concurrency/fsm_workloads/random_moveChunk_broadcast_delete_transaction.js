@@ -12,7 +12,6 @@ load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');
 load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.threadCount = 5;
     $config.iterations = 50;
 
@@ -122,8 +121,8 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.verifyDocuments = function verifyDocuments(db, collName, connCache) {
         const docs = db[collName].find({tid: this.tid}).toArray();
         assertWhenOwnColl.eq(this.expectedDocuments.length, docs.length, () => {
-            return 'unexpected number of documents, docs: ' + tojson(docs) + ', expected docs: ' +
-                tojson(this.expectedDocuments);
+            return 'unexpected number of documents, docs: ' + tojson(docs) +
+                ', expected docs: ' + tojson(this.expectedDocuments);
         });
 
         // Verify only the documents we haven't tried to delete were found.

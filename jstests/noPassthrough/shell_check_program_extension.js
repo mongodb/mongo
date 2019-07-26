@@ -3,15 +3,15 @@
  */
 
 (function() {
-    'use strict';
+'use strict';
 
-    if (_isWindows()) {
-        const filename = 'jstests/noPassthrough/libs/testWindowsExtension.bat';
+if (_isWindows()) {
+    const filename = 'jstests/noPassthrough/libs/testWindowsExtension.bat';
 
-        clearRawMongoProgramOutput();
-        const result = runMongoProgram(filename);
-        assert.eq(result, 42);
-    } else {
-        jsTestLog("This test is only relevant for Windows environments.");
-    }
+    clearRawMongoProgramOutput();
+    const result = runMongoProgram(filename);
+    assert.eq(result, 42);
+} else {
+    jsTestLog("This test is only relevant for Windows environments.");
+}
 })();

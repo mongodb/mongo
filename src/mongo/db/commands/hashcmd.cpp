@@ -101,4 +101,4 @@ public:
     }
 };
 MONGO_REGISTER_TEST_COMMAND(CmdHashElt);
-}
+}  // namespace mongo

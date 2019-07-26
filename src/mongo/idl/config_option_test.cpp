@@ -501,8 +501,7 @@ TEST(RedactionBSON, Strings) {
                        << "also not a password"
                        << "test.config.opt16depr2"
                        << "this password should also be censored"
-                       << "lastarg"
-                       << false);
+                       << "lastarg" << false);
 
     BSONObj res = BSON("firstarg"
                        << "not a password"
@@ -514,8 +513,7 @@ TEST(RedactionBSON, Strings) {
                        << "also not a password"
                        << "test.config.opt16depr2"
                        << "<password>"
-                       << "lastarg"
-                       << false);
+                       << "lastarg" << false);
 
     cmdline_utils::censorBSONObj(&obj);
     ASSERT_BSONOBJ_EQ(res, obj);
@@ -535,8 +533,7 @@ TEST(RedactionBSON, Arrays) {
                        << "test.config.opt16depr2"
                        << BSON_ARRAY("first censored password"
                                      << "next censored password")
-                       << "lastarg"
-                       << false);
+                       << "lastarg" << false);
 
     BSONObj res = BSON("firstarg"
                        << "not a password"
@@ -551,8 +548,7 @@ TEST(RedactionBSON, Arrays) {
                        << "test.config.opt16depr2"
                        << BSON_ARRAY("<password>"
                                      << "<password>")
-                       << "lastarg"
-                       << false);
+                       << "lastarg" << false);
 
     cmdline_utils::censorBSONObj(&obj);
     ASSERT_BSONOBJ_EQ(res, obj);
@@ -571,8 +567,7 @@ TEST(RedactionBSON, SubObjects) {
                                                                       << "next censored password")
                                                         << "opt16depr"
                                                         << "should be censored too"))
-                       << "lastarg"
-                       << false);
+                       << "lastarg" << false);
 
     BSONObj res = BSON("firstarg"
                        << "not a password"
@@ -586,8 +581,7 @@ TEST(RedactionBSON, SubObjects) {
                                                                       << "<password>")
                                                         << "opt16depr"
                                                         << "<password>"))
-                       << "lastarg"
-                       << false);
+                       << "lastarg" << false);
 
     cmdline_utils::censorBSONObj(&obj);
     ASSERT_BSONOBJ_EQ(res, obj);
@@ -620,7 +614,9 @@ TEST(ConfigOptionNoInit, Opt1) {
     ASSERT_OK(addIDLTestConfigs(&options));
 
     const std::vector<std::string> argv({
-        "mongod", "--testConfigNoInitOpt1", "Hello",
+        "mongod",
+        "--testConfigNoInitOpt1",
+        "Hello",
     });
     moe::Environment parsed;
     ASSERT_OK(moe::OptionsParser().run(options, argv, {}, &parsed));

@@ -13,7 +13,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');                // for e
 load('jstests/concurrency/fsm_workloads/sharded_base_partitioned.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.iterations = 5;
     $config.threadCount = 5;
 
@@ -112,8 +111,8 @@ var $config = extendWorkload($config, function($config, $super) {
                 // shard with the toShard. If the operation failed, verify that the config kept
                 // the chunk's shard as the fromShard.
                 var chunkAfter = conn.getDB('config').chunks.findOne({_id: chunk._id});
-                var msg = msgBase + '\nchunkBefore: ' + tojson(chunk) + '\nchunkAfter: ' +
-                    tojson(chunkAfter);
+                var msg = msgBase + '\nchunkBefore: ' + tojson(chunk) +
+                    '\nchunkAfter: ' + tojson(chunkAfter);
                 if (moveChunkRes.ok) {
                     msg = "moveChunk succeeded but chunk's shard was not new shard.\n" + msg;
                     assertWhenOwnColl.eq(chunkAfter.shard, toShard, msg);

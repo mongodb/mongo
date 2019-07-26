@@ -64,9 +64,9 @@
 namespace mongo {
 namespace {
 
-using std::unique_ptr;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 
 class WiredTigerHarnessHelper final : public RecordStoreHarnessHelper {
 public:

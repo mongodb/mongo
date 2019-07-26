@@ -116,4 +116,4 @@ intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
 
     return DocumentSourceSkip::create(pExpCtx, nToSkip);
 }
-}
+}  // namespace mongo

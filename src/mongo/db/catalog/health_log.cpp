@@ -48,7 +48,7 @@ CollectionOptions getOptions(void) {
     options.cappedSize = kDefaultHealthlogSize;
     return options;
 }
-}
+}  // namespace
 
 HealthLog::HealthLog() : _writer(nss, getOptions(), kMaxBufferSize) {}
 
@@ -78,4 +78,4 @@ bool HealthLog::log(const HealthLogEntry& entry) {
 }
 
 const NamespaceString HealthLog::nss("local", "system.healthlog");
-}
+}  // namespace mongo

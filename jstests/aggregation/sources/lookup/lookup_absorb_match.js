@@ -7,22 +7,22 @@
  * @tags: [assumes_unsharded_collection]
  */
 (function() {
-    "use strict";
+"use strict";
 
-    let testDB = db.getSiblingDB("lookup_absorb_match");
-    testDB.dropDatabase();
+let testDB = db.getSiblingDB("lookup_absorb_match");
+testDB.dropDatabase();
 
-    let locations = testDB.getCollection("locations");
-    assert.writeOK(locations.insert({_id: "doghouse", coordinates: [25.0, 60.0]}));
-    assert.writeOK(locations.insert({_id: "bullpen", coordinates: [-25.0, -60.0]}));
+let locations = testDB.getCollection("locations");
+assert.writeOK(locations.insert({_id: "doghouse", coordinates: [25.0, 60.0]}));
+assert.writeOK(locations.insert({_id: "bullpen", coordinates: [-25.0, -60.0]}));
 
-    let animals = testDB.getCollection("animals");
-    assert.writeOK(animals.insert({_id: "dog", locationId: "doghouse"}));
-    assert.writeOK(animals.insert({_id: "bull", locationId: "bullpen"}));
+let animals = testDB.getCollection("animals");
+assert.writeOK(animals.insert({_id: "dog", locationId: "doghouse"}));
+assert.writeOK(animals.insert({_id: "bull", locationId: "bullpen"}));
 
-    // Test that a $match with $geoWithin works properly when performed directly on an absorbed
-    // lookup field.
-    let result = testDB.animals
+// Test that a $match with $geoWithin works properly when performed directly on an absorbed
+// lookup field.
+let result = testDB.animals
                      .aggregate([
                          {
                            $lookup: {
@@ -53,15 +53,12 @@
                          }
                      ])
                      .toArray();
-    let expected = [{
-        _id: "dog",
-        locationId: "doghouse",
-        location: {_id: "doghouse", coordinates: [25.0, 60.0]}
-    }];
-    assert.eq(result, expected);
+let expected =
+    [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
+assert.eq(result, expected);
 
-    // Test that a $match with $geoIntersects works as expected when absorbed by a $lookup.
-    result = testDB.animals
+// Test that a $match with $geoIntersects works as expected when absorbed by a $lookup.
+result = testDB.animals
                  .aggregate([
                      {
                        $lookup: {
@@ -92,10 +89,7 @@
                      }
                  ])
                  .toArray();
-    expected = [{
-        _id: "bull",
-        locationId: "bullpen",
-        location: {_id: "bullpen", coordinates: [-25.0, -60.0]}
-    }];
-    assert.eq(result, expected);
+expected =
+    [{_id: "bull", locationId: "bullpen", location: {_id: "bullpen", coordinates: [-25.0, -60.0]}}];
+assert.eq(result, expected);
 }());

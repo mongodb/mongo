@@ -15,7 +15,6 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
-
     var states = {
         init: function init(db, collName) {
             this.fieldName = 't' + this.tid;
@@ -82,5 +81,4 @@ var $config = (function() {
         setup: setup,
         data: {docCount: 15}
     };
-
 })();

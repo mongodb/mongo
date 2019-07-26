@@ -74,4 +74,4 @@ BSONObj Timestamp::toBSON() const {
     bldr.append("", *this);
     return bldr.obj();
 }
-}
+}  // namespace mongo

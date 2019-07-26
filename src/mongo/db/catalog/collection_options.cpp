@@ -256,9 +256,9 @@ Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
             idIndex = std::move(tempIdIndex);
         } else if (!createdOn24OrEarlier && !mongo::isGenericArgument(fieldName)) {
             return Status(ErrorCodes::InvalidOptions,
-                          str::stream() << "The field '" << fieldName
-                                        << "' is not a valid collection option. Options: "
-                                        << options);
+                          str::stream()
+                              << "The field '" << fieldName
+                              << "' is not a valid collection option. Options: " << options);
         }
     }
 
@@ -414,4 +414,4 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
 
     return true;
 }
-}
+}  // namespace mongo

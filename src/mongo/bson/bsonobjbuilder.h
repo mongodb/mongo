@@ -659,7 +659,7 @@ public:
      * destructive
      * The returned BSONObj will free the buffer when it is finished.
      * @return owned BSONObj
-    */
+     */
     template <typename BSONTraits = BSONObj::DefaultSizeTrait>
     BSONObj obj() {
         massert(10335, "builder does not own memory", owned());

@@ -221,4 +221,4 @@ MONGO_INITIALIZER(RamLogCatalog)(InitializerContext*) {
 
     return Status::OK();
 }
-}
+}  // namespace mongo

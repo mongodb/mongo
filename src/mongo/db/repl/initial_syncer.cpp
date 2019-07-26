@@ -483,8 +483,7 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
     auto status = _checkForShutdownAndConvertStatus_inlock(
         callbackArgs,
         str::stream() << "error while starting initial sync attempt " << (initialSyncAttempt + 1)
-                      << " of "
-                      << initialSyncMaxAttempts);
+                      << " of " << initialSyncMaxAttempts);
     if (!status.isOK()) {
         _finishInitialSyncAttempt(status);
         return;
@@ -748,11 +747,8 @@ void InitialSyncer::_getBeginFetchingOpTimeCallback(
             Status(ErrorCodes::TooManyMatchingDocuments,
                    str::stream() << "Expected to receive one document for the oldest active "
                                     "transaction entry, but received: "
-                                 << docs.size()
-                                 << ". First: "
-                                 << redact(docs.front())
-                                 << ". Last: "
-                                 << redact(docs.back())));
+                                 << docs.size() << ". First: " << redact(docs.front())
+                                 << ". Last: " << redact(docs.back())));
         return;
     }
 
@@ -859,11 +855,8 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
             Status(ErrorCodes::TooManyMatchingDocuments,
                    str::stream() << "Expected to receive one feature compatibility version "
                                     "document, but received: "
-                                 << docs.size()
-                                 << ". First: "
-                                 << redact(docs.front())
-                                 << ". Last: "
-                                 << redact(docs.back())));
+                                 << docs.size() << ". First: " << redact(docs.front())
+                                 << ". Last: " << redact(docs.back())));
         return;
     }
     const auto hasDoc = docs.begin() != docs.end();
@@ -1528,8 +1521,8 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
 }
 
 Status InitialSyncer::_scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn callback) {
-    BSONObj query = BSON(
-        "find" << _opts.remoteOplogNS.coll() << "sort" << BSON("$natural" << -1) << "limit" << 1);
+    BSONObj query = BSON("find" << _opts.remoteOplogNS.coll() << "sort" << BSON("$natural" << -1)
+                                << "limit" << 1);
 
     _lastOplogEntryFetcher =
         stdx::make_unique<Fetcher>(_exec,
@@ -1680,13 +1673,12 @@ Status InitialSyncer::_scheduleWorkAtAndSaveHandle_inlock(
     if (_isShuttingDown_inlock()) {
         return Status(ErrorCodes::CallbackCanceled,
                       str::stream() << "failed to schedule work " << name << " at "
-                                    << when.toString()
-                                    << ": initial syncer is shutting down");
+                                    << when.toString() << ": initial syncer is shutting down");
     }
     auto result = _exec->scheduleWorkAt(when, std::move(work));
     if (!result.isOK()) {
-        return result.getStatus().withContext(
-            str::stream() << "failed to schedule work " << name << " at " << when.toString());
+        return result.getStatus().withContext(str::stream() << "failed to schedule work " << name
+                                                            << " at " << when.toString());
     }
     *handle = result.getValue();
     return Status::OK();

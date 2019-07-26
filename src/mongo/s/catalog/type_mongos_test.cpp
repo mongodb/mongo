@@ -41,10 +41,8 @@ using namespace mongo;
 
 TEST(Validity, MissingName) {
     BSONObj obj = BSON(MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::mongoVersion("x.x.x")
-                       << MongosType::configVersion(0)
+                       << MongosType::uptime(100) << MongosType::waiting(false)
+                       << MongosType::mongoVersion("x.x.x") << MongosType::configVersion(0)
                        << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
     auto mongosTypeResult = MongosType::fromBSON(obj);
@@ -53,10 +51,8 @@ TEST(Validity, MissingName) {
 
 TEST(Validity, MissingPing) {
     BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::mongoVersion("x.x.x")
-                       << MongosType::configVersion(0)
+                       << MongosType::uptime(100) << MongosType::waiting(false)
+                       << MongosType::mongoVersion("x.x.x") << MongosType::configVersion(0)
                        << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
     auto mongosTypeResult = MongosType::fromBSON(obj);
@@ -64,36 +60,33 @@ TEST(Validity, MissingPing) {
 }
 
 TEST(Validity, MissingUp) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::waiting(false)
-                       << MongosType::mongoVersion("x.x.x")
-                       << MongosType::configVersion(0)
-                       << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
+    BSONObj obj =
+        BSON(MongosType::name("localhost:27017")
+             << MongosType::ping(Date_t::fromMillisSinceEpoch(1)) << MongosType::waiting(false)
+             << MongosType::mongoVersion("x.x.x") << MongosType::configVersion(0)
+             << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
     auto mongosTypeResult = MongosType::fromBSON(obj);
     ASSERT_EQ(ErrorCodes::NoSuchKey, mongosTypeResult.getStatus());
 }
 
 TEST(Validity, MissingWaiting) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::mongoVersion("x.x.x")
-                       << MongosType::configVersion(0)
-                       << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
+    BSONObj obj =
+        BSON(MongosType::name("localhost:27017")
+             << MongosType::ping(Date_t::fromMillisSinceEpoch(1)) << MongosType::uptime(100)
+             << MongosType::mongoVersion("x.x.x") << MongosType::configVersion(0)
+             << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
     auto mongosTypeResult = MongosType::fromBSON(obj);
     ASSERT_EQ(ErrorCodes::NoSuchKey, mongosTypeResult.getStatus());
 }
 
 TEST(Validity, MissingMongoVersion) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::configVersion(0)
-                       << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
+    BSONObj obj =
+        BSON(MongosType::name("localhost:27017")
+             << MongosType::ping(Date_t::fromMillisSinceEpoch(1)) << MongosType::uptime(100)
+             << MongosType::waiting(false) << MongosType::configVersion(0)
+             << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
     auto mongosTypeResult = MongosType::fromBSON(obj);
     ASSERT_OK(mongosTypeResult.getStatus());
@@ -107,12 +100,11 @@ TEST(Validity, MissingMongoVersion) {
 }
 
 TEST(Validity, MissingConfigVersion) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::mongoVersion("x.x.x")
-                       << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
+    BSONObj obj =
+        BSON(MongosType::name("localhost:27017")
+             << MongosType::ping(Date_t::fromMillisSinceEpoch(1)) << MongosType::uptime(100)
+             << MongosType::waiting(false) << MongosType::mongoVersion("x.x.x")
+             << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
     auto mongosTypeResult = MongosType::fromBSON(obj);
     ASSERT_OK(mongosTypeResult.getStatus());
@@ -128,10 +120,8 @@ TEST(Validity, MissingConfigVersion) {
 TEST(Validity, MissingAdvisoryHostFQDNs) {
     BSONObj obj = BSON(MongosType::name("localhost:27017")
                        << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::mongoVersion("x.x.x")
-                       << MongosType::configVersion(0));
+                       << MongosType::uptime(100) << MongosType::waiting(false)
+                       << MongosType::mongoVersion("x.x.x") << MongosType::configVersion(0));
 
     auto mongosTypeResult = MongosType::fromBSON(obj);
     ASSERT_OK(mongosTypeResult.getStatus());
@@ -144,10 +134,8 @@ TEST(Validity, MissingAdvisoryHostFQDNs) {
 TEST(Validity, EmptyAdvisoryHostFQDNs) {
     BSONObj obj = BSON(MongosType::name("localhost:27017")
                        << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::mongoVersion("x.x.x")
-                       << MongosType::configVersion(0)
+                       << MongosType::uptime(100) << MongosType::waiting(false)
+                       << MongosType::mongoVersion("x.x.x") << MongosType::configVersion(0)
                        << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
     auto mongosTypeResult = MongosType::fromBSON(obj);
@@ -162,10 +150,8 @@ TEST(Validity, EmptyAdvisoryHostFQDNs) {
 TEST(Validity, BadTypeAdvisoryHostFQDNs) {
     BSONObj obj = BSON(MongosType::name("localhost:27017")
                        << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::mongoVersion("x.x.x")
-                       << MongosType::configVersion(0)
+                       << MongosType::uptime(100) << MongosType::waiting(false)
+                       << MongosType::mongoVersion("x.x.x") << MongosType::configVersion(0)
                        << MongosType::advisoryHostFQDNs(BSON_ARRAY("foo" << 0 << "baz")));
 
     auto mongosTypeResult = MongosType::fromBSON(obj);
@@ -175,10 +161,8 @@ TEST(Validity, BadTypeAdvisoryHostFQDNs) {
 TEST(Validity, Valid) {
     BSONObj obj = BSON(MongosType::name("localhost:27017")
                        << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::mongoVersion("x.x.x")
-                       << MongosType::configVersion(0)
+                       << MongosType::uptime(100) << MongosType::waiting(false)
+                       << MongosType::mongoVersion("x.x.x") << MongosType::configVersion(0)
                        << MongosType::advisoryHostFQDNs(BSON_ARRAY("foo"
                                                                    << "bar"
                                                                    << "baz")));

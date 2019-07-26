@@ -7,56 +7,56 @@
 
 (function() {
 
-    load('jstests/disk/libs/wt_file_helper.js');
+load('jstests/disk/libs/wt_file_helper.js');
 
-    const exitBeforeRepairParameter = "exitBeforeDataRepair";
-    const exitBeforeRepairInvalidatesConfigParameter = "exitBeforeRepairInvalidatesConfig";
+const exitBeforeRepairParameter = "exitBeforeDataRepair";
+const exitBeforeRepairInvalidatesConfigParameter = "exitBeforeRepairInvalidatesConfig";
 
-    const baseName = "repair_failure_is_recoverable";
-    const dbName = "repair_failure_is_recoverable";
-    const collName = "test";
+const baseName = "repair_failure_is_recoverable";
+const dbName = "repair_failure_is_recoverable";
+const collName = "test";
 
-    const dbpath = MongoRunner.dataPath + baseName + "/";
-    resetDbpath(dbpath);
+const dbpath = MongoRunner.dataPath + baseName + "/";
+resetDbpath(dbpath);
 
-    let mongod = MongoRunner.runMongod({dbpath: dbpath});
-    const port = mongod.port;
+let mongod = MongoRunner.runMongod({dbpath: dbpath});
+const port = mongod.port;
 
-    let testColl = mongod.getDB(dbName)[collName];
+let testColl = mongod.getDB(dbName)[collName];
 
-    assert.commandWorked(testColl.insert({_id: 0, foo: "bar"}));
+assert.commandWorked(testColl.insert({_id: 0, foo: "bar"}));
 
-    MongoRunner.stopMongod(mongod);
+MongoRunner.stopMongod(mongod);
 
-    /**
-     * Test 1. Cause an exit before repairing data. MongoDB should not be able to restart without
-     * --repair.
-     */
-    assertRepairFailsWithFailpoint(dbpath, port, exitBeforeRepairParameter);
+/**
+ * Test 1. Cause an exit before repairing data. MongoDB should not be able to restart without
+ * --repair.
+ */
+assertRepairFailsWithFailpoint(dbpath, port, exitBeforeRepairParameter);
 
-    assertErrorOnStartupAfterIncompleteRepair(dbpath, port);
+assertErrorOnStartupAfterIncompleteRepair(dbpath, port);
 
-    assertRepairSucceeds(dbpath, port);
+assertRepairSucceeds(dbpath, port);
 
-    assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function(node) {
-        let nodeDB = node.getDB(dbName);
-        assert(nodeDB[collName].exists());
-        assert.eq(nodeDB[collName].find().itcount(), 1);
-    });
+assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function(node) {
+    let nodeDB = node.getDB(dbName);
+    assert(nodeDB[collName].exists());
+    assert.eq(nodeDB[collName].find().itcount(), 1);
+});
 
-    /**
-     * Test 2. Fail after repairing data, before invalidating the replica set config. MongoDB should
-     * not be able to restart without --repair.
-     */
-    assertRepairFailsWithFailpoint(dbpath, port, exitBeforeRepairInvalidatesConfigParameter);
+/**
+ * Test 2. Fail after repairing data, before invalidating the replica set config. MongoDB should
+ * not be able to restart without --repair.
+ */
+assertRepairFailsWithFailpoint(dbpath, port, exitBeforeRepairInvalidatesConfigParameter);
 
-    assertErrorOnStartupAfterIncompleteRepair(dbpath, port);
+assertErrorOnStartupAfterIncompleteRepair(dbpath, port);
 
-    assertRepairSucceeds(dbpath, port);
+assertRepairSucceeds(dbpath, port);
 
-    assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function(node) {
-        let nodeDB = node.getDB(dbName);
-        assert(nodeDB[collName].exists());
-        assert.eq(nodeDB[collName].find().itcount(), 1);
-    });
+assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function(node) {
+    let nodeDB = node.getDB(dbName);
+    assert(nodeDB[collName].exists());
+    assert.eq(nodeDB[collName].find().itcount(), 1);
+});
 })();

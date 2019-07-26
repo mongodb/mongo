@@ -64,8 +64,8 @@ static const char* const version = "2002-04-13";
 /* modified: not static, renamed */
 /* Run the self-test. */
 /*static*/ int
-    // do_test(void)
-    do_md5_test(void) {
+// do_test(void)
+do_md5_test(void) {
     static const char* const test[7 * 2] = {
         "",
         "d41d8cd98f00b204e9800998ecf8427e",

@@ -134,16 +134,9 @@ public:
 
         const BSONObj spec = BSON("name"
                                   << "a"
-                                  << "ns"
-                                  << coll->ns().ns()
-                                  << "key"
-                                  << BSON("a" << 1)
-                                  << "v"
-                                  << static_cast<int>(kIndexVersion)
-                                  << "unique"
-                                  << true
-                                  << "background"
-                                  << background);
+                                  << "ns" << coll->ns().ns() << "key" << BSON("a" << 1) << "v"
+                                  << static_cast<int>(kIndexVersion) << "unique" << true
+                                  << "background" << background);
 
         ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(&_opCtx, coll); });
 
@@ -188,16 +181,9 @@ public:
 
         const BSONObj spec = BSON("name"
                                   << "a"
-                                  << "ns"
-                                  << coll->ns().ns()
-                                  << "key"
-                                  << BSON("a" << 1)
-                                  << "v"
-                                  << static_cast<int>(kIndexVersion)
-                                  << "unique"
-                                  << true
-                                  << "background"
-                                  << background);
+                                  << "ns" << coll->ns().ns() << "key" << BSON("a" << 1) << "v"
+                                  << static_cast<int>(kIndexVersion) << "unique" << true
+                                  << "background" << background);
 
         ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(&_opCtx, coll); });
 
@@ -241,8 +227,7 @@ public:
         getGlobalServiceContext()->setKillAllOperations();
         BSONObj indexInfo = BSON("key" << BSON("a" << 1) << "ns" << _ns << "name"
                                        << "a_1"
-                                       << "v"
-                                       << static_cast<int>(kIndexVersion));
+                                       << "v" << static_cast<int>(kIndexVersion));
         // The call is interrupted because mayInterrupt == true.
         ASSERT_TRUE(buildIndexInterrupted(indexInfo));
         // only want to interrupt the index build
@@ -285,8 +270,7 @@ public:
         getGlobalServiceContext()->setKillAllOperations();
         BSONObj indexInfo = BSON("key" << BSON("_id" << 1) << "ns" << _ns << "name"
                                        << "_id_"
-                                       << "v"
-                                       << static_cast<int>(kIndexVersion));
+                                       << "v" << static_cast<int>(kIndexVersion));
         ASSERT_TRUE(buildIndexInterrupted(indexInfo));
         // only want to interrupt the index build
         getGlobalServiceContext()->unsetKillAllOperations();
@@ -328,11 +312,7 @@ public:
         ASSERT_OK(createIndex("unittest",
                               BSON("name"
                                    << "x"
-                                   << "ns"
-                                   << _ns
-                                   << "key"
-                                   << BSON("x" << 1 << "y" << 1)
-                                   << "v"
+                                   << "ns" << _ns << "key" << BSON("x" << 1 << "y" << 1) << "v"
                                    << static_cast<int>(kIndexVersion))));
     }
 };
@@ -345,13 +325,8 @@ public:
                       createIndex("unittest",
                                   BSON("name"
                                        << "x"
-                                       << "ns"
-                                       << _ns
-                                       << "unique"
-                                       << true
-                                       << "key"
-                                       << BSON("x" << 1 << "y" << 1)
-                                       << "v"
+                                       << "ns" << _ns << "unique" << true << "key"
+                                       << BSON("x" << 1 << "y" << 1) << "v"
                                        << static_cast<int>(kIndexVersion))));
     }
 };
@@ -362,11 +337,7 @@ public:
         ASSERT_OK(createIndex("unittest",
                               BSON("name"
                                    << "x"
-                                   << "ns"
-                                   << _ns
-                                   << "key"
-                                   << BSON("x" << 1 << "y" << 1)
-                                   << "v"
+                                   << "ns" << _ns << "key" << BSON("x" << 1 << "y" << 1) << "v"
                                    << static_cast<int>(kIndexVersion))));
     }
 };
@@ -379,11 +350,7 @@ public:
                       createIndex("unittest",
                                   BSON("name"
                                        << "x"
-                                       << "ns"
-                                       << _ns
-                                       << "key"
-                                       << BSON("y" << 1 << "x" << 1)
-                                       << "v"
+                                       << "ns" << _ns << "key" << BSON("y" << 1 << "x" << 1) << "v"
                                        << static_cast<int>(kIndexVersion))));
     }
 };
@@ -397,19 +364,11 @@ public:
         ASSERT_OK(createIndex("unittests",
                               BSON("name"
                                    << "super"
-                                   << "ns"
-                                   << _ns
-                                   << "unique"
-                                   << 1
-                                   << "sparse"
-                                   << true
-                                   << "expireAfterSeconds"
-                                   << 3600
-                                   << "key"
+                                   << "ns" << _ns << "unique" << 1 << "sparse" << true
+                                   << "expireAfterSeconds" << 3600 << "key"
                                    << BSON("superIdx"
                                            << "2d")
-                                   << "v"
-                                   << static_cast<int>(kIndexVersion))));
+                                   << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -423,19 +382,11 @@ public:
                       createIndex("unittests",
                                   BSON("name"
                                        << "super2"
-                                       << "ns"
-                                       << _ns
-                                       << "expireAfterSeconds"
-                                       << 3600
-                                       << "sparse"
-                                       << true
-                                       << "unique"
-                                       << 1
-                                       << "key"
+                                       << "ns" << _ns << "expireAfterSeconds" << 3600 << "sparse"
+                                       << true << "unique" << 1 << "key"
                                        << BSON("superIdx"
                                                << "2d")
-                                       << "v"
-                                       << static_cast<int>(kIndexVersion))));
+                                       << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -447,19 +398,11 @@ public:
         ASSERT_OK(createIndex("unittests",
                               BSON("name"
                                    << "super"
-                                   << "ns"
-                                   << _ns
-                                   << "expireAfterSeconds"
-                                   << 3600
-                                   << "sparse"
-                                   << true
-                                   << "unique"
-                                   << 1
-                                   << "key"
+                                   << "ns" << _ns << "expireAfterSeconds" << 3600 << "sparse"
+                                   << true << "unique" << 1 << "key"
                                    << BSON("superIdx"
                                            << "2d")
-                                   << "v"
-                                   << static_cast<int>(kIndexVersion))));
+                                   << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -473,44 +416,27 @@ public:
                       createIndex("unittest",
                                   BSON("name"
                                        << "super2"
-                                       << "ns"
-                                       << _ns
-                                       << "unique"
-                                       << false
-                                       << "sparse"
-                                       << true
-                                       << "expireAfterSeconds"
-                                       << 3600
-                                       << "key"
+                                       << "ns" << _ns << "unique" << false << "sparse" << true
+                                       << "expireAfterSeconds" << 3600 << "key"
                                        << BSON("superIdx"
                                                << "2d")
-                                       << "v"
-                                       << static_cast<int>(kIndexVersion))));
+                                       << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
 class SameSpecDifferentSparse : public ComplexIndex {
 public:
     void run() {
-        ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
-                      createIndex("unittest",
-                                  BSON("name"
-                                       << "super2"
-                                       << "ns"
-                                       << _ns
-                                       << "unique"
-                                       << 1
-                                       << "sparse"
-                                       << false
-                                       << "background"
-                                       << true
-                                       << "expireAfterSeconds"
-                                       << 3600
-                                       << "key"
-                                       << BSON("superIdx"
-                                               << "2d")
-                                       << "v"
-                                       << static_cast<int>(kIndexVersion))));
+        ASSERT_EQUALS(
+            ErrorCodes::IndexOptionsConflict,
+            createIndex("unittest",
+                        BSON("name"
+                             << "super2"
+                             << "ns" << _ns << "unique" << 1 << "sparse" << false << "background"
+                             << true << "expireAfterSeconds" << 3600 << "key"
+                             << BSON("superIdx"
+                                     << "2d")
+                             << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -521,19 +447,11 @@ public:
                       createIndex("unittest",
                                   BSON("name"
                                        << "super2"
-                                       << "ns"
-                                       << _ns
-                                       << "unique"
-                                       << 1
-                                       << "sparse"
-                                       << true
-                                       << "expireAfterSeconds"
-                                       << 2400
-                                       << "key"
+                                       << "ns" << _ns << "unique" << 1 << "sparse" << true
+                                       << "expireAfterSeconds" << 2400 << "key"
                                        << BSON("superIdx"
                                                << "2d")
-                                       << "v"
-                                       << static_cast<int>(kIndexVersion))));
+                                       << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -580,14 +498,8 @@ protected:
     BSONObj _createSpec(T storageEngineValue) {
         return BSON("name"
                     << "super2"
-                    << "ns"
-                    << _ns
-                    << "key"
-                    << BSON("a" << 1)
-                    << "v"
-                    << static_cast<int>(kIndexVersion)
-                    << "storageEngine"
-                    << storageEngineValue);
+                    << "ns" << _ns << "key" << BSON("a" << 1) << "v"
+                    << static_cast<int>(kIndexVersion) << "storageEngine" << storageEngineValue);
     }
 };
 

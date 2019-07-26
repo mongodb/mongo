@@ -43,8 +43,8 @@ namespace mongo {
 namespace {
 
 using BitNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
+using mongo::mutablebson::Element;
 
 TEST(BitNodeTest, InitWithDoubleFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -292,4 +292,4 @@ TEST_F(BitNodeTest, ApplyRepeatedBitOps) {
 }
 
 }  // namespace
-}  // namepace mongo
+}  // namespace mongo

@@ -478,5 +478,5 @@ TEST(FTSQueryImpl, CloneParsedQuery) {
     ASSERT(castedClone->getNegatedPhr() == q.getNegatedPhr());
     ASSERT(castedClone->getTermsForBounds() == q.getTermsForBounds());
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

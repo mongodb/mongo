@@ -66,7 +66,7 @@ auto kCaseSensitive = String::kCaseSensitive;
 
 auto kTurkish = CaseFoldMode::kTurkish;
 auto kNormal = CaseFoldMode::kNormal;
-}
+}  // namespace
 
 
 // Macro to preserve line numbers and arguments in error messages.

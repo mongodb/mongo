@@ -5,58 +5,57 @@
  * @tags: [requires_majority_read_concern]
  */
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
+load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 
-    function assertCorrectOperationTime(operationTime, expectedTimestamp, opTimeType) {
-        assert.eq(0,
-                  timestampCmp(operationTime, expectedTimestamp),
-                  "operationTime in command response, " + operationTime +
-                      ", does not equal the last " + opTimeType + " timestamp, " +
-                      expectedTimestamp);
-    }
+function assertCorrectOperationTime(operationTime, expectedTimestamp, opTimeType) {
+    assert.eq(0,
+              timestampCmp(operationTime, expectedTimestamp),
+              "operationTime in command response, " + operationTime + ", does not equal the last " +
+                  opTimeType + " timestamp, " + expectedTimestamp);
+}
 
-    var name = "command_response_operation_time";
+var name = "command_response_operation_time";
 
-    var replTest = new ReplSetTest(
-        {name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ""}, waitForKeys: true});
+var replTest = new ReplSetTest(
+    {name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ""}, waitForKeys: true});
 
-    if (!startSetIfSupportsReadMajority(replTest)) {
-        jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-        replTest.stopSet();
-        return;
-    }
-    replTest.initiate();
-
-    var res, statusRes;
-    var testDB = replTest.getPrimary().getDB(name);
-
-    jsTestLog("Executing majority write.");
-    res = assert.commandWorked(
-        testDB.runCommand({insert: "foo", documents: [{x: 1}], writeConcern: {w: "majority"}}));
-    statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
-    assertCorrectOperationTime(
-        res.operationTime, statusRes.optimes.lastCommittedOpTime.ts, "committed");
-
-    jsTestLog("Executing local write.");
-    res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 2}]}));
-    statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
-    assertCorrectOperationTime(res.operationTime, statusRes.optimes.appliedOpTime.ts, "applied");
-
-    replTest.awaitLastOpCommitted();
-
-    jsTestLog("Executing majority read.");
-    res = assert.commandWorked(
-        testDB.runCommand({find: "foo", filter: {x: 1}, readConcern: {level: "majority"}}));
-    statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
-    assertCorrectOperationTime(
-        res.operationTime, statusRes.optimes.lastCommittedOpTime.ts, "committed");
-
-    jsTestLog("Executing local read.");
-    res = assert.commandWorked(testDB.runCommand({find: "foo", filter: {x: 1}}));
-    statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
-    assertCorrectOperationTime(res.operationTime, statusRes.optimes.appliedOpTime.ts, "applied");
-
+if (!startSetIfSupportsReadMajority(replTest)) {
+    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
     replTest.stopSet();
+    return;
+}
+replTest.initiate();
+
+var res, statusRes;
+var testDB = replTest.getPrimary().getDB(name);
+
+jsTestLog("Executing majority write.");
+res = assert.commandWorked(
+    testDB.runCommand({insert: "foo", documents: [{x: 1}], writeConcern: {w: "majority"}}));
+statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
+assertCorrectOperationTime(
+    res.operationTime, statusRes.optimes.lastCommittedOpTime.ts, "committed");
+
+jsTestLog("Executing local write.");
+res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 2}]}));
+statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
+assertCorrectOperationTime(res.operationTime, statusRes.optimes.appliedOpTime.ts, "applied");
+
+replTest.awaitLastOpCommitted();
+
+jsTestLog("Executing majority read.");
+res = assert.commandWorked(
+    testDB.runCommand({find: "foo", filter: {x: 1}, readConcern: {level: "majority"}}));
+statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
+assertCorrectOperationTime(
+    res.operationTime, statusRes.optimes.lastCommittedOpTime.ts, "committed");
+
+jsTestLog("Executing local read.");
+res = assert.commandWorked(testDB.runCommand({find: "foo", filter: {x: 1}}));
+statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
+assertCorrectOperationTime(res.operationTime, statusRes.optimes.appliedOpTime.ts, "applied");
+
+replTest.stopSet();
 })();

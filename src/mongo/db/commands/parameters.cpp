@@ -306,8 +306,8 @@ public:
 
             // Make sure we are allowed to change this parameter
             if (!foundParameter->second->allowedToChangeAtRuntime()) {
-                errmsg = str::stream() << "not allowed to change [" << parameterName
-                                       << "] at runtime";
+                errmsg = str::stream()
+                    << "not allowed to change [" << parameterName << "] at runtime";
                 return false;
             }
 
@@ -365,9 +365,8 @@ public:
 
             log() << "successfully set parameter " << parameterName << " to "
                   << redact(parameter.toString(false))
-                  << (oldValue ? std::string(str::stream() << " (was "
-                                                           << redact(oldValue.toString(false))
-                                                           << ")")
+                  << (oldValue ? std::string(str::stream()
+                                             << " (was " << redact(oldValue.toString(false)) << ")")
                                : "");
 
             numSet++;
@@ -422,8 +421,8 @@ void LogComponentVerbosityServerParameter::append(OperationContext*,
 Status LogComponentVerbosityServerParameter::set(const BSONElement& newValueElement) {
     if (!newValueElement.isABSONObj()) {
         return Status(ErrorCodes::TypeMismatch,
-                      str::stream() << "log component verbosity is not a BSON object: "
-                                    << newValueElement);
+                      str::stream()
+                          << "log component verbosity is not a BSON object: " << newValueElement);
     }
     return setLogComponentVerbosity(newValueElement.Obj());
 }
@@ -456,9 +455,7 @@ Status AutomationServiceDescriptorServerParameter::setFromString(const std::stri
     if (str.size() > kMaxSize)
         return {ErrorCodes::Overflow,
                 str::stream() << "Value for parameter automationServiceDescriptor"
-                              << " must be no more than "
-                              << kMaxSize
-                              << " bytes"};
+                              << " must be no more than " << kMaxSize << " bytes"};
 
     {
         const stdx::lock_guard<stdx::mutex> lock(autoServiceDescriptorMutex);

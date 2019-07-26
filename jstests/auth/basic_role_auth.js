@@ -231,215 +231,215 @@ var testOps = function(db, allowedActions) {
 // }
 var TESTS = [
     {
-      name: 'Test multiple user login separate connection',
-      test: function(conn) {
-          var testDB = conn.getDB('test');
-          assert.eq(1, testDB.auth('ro', AUTH_INFO.test.ro.pwd));
+        name: 'Test multiple user login separate connection',
+        test: function(conn) {
+            var testDB = conn.getDB('test');
+            assert.eq(1, testDB.auth('ro', AUTH_INFO.test.ro.pwd));
 
-          var conn2 = new Mongo(conn.host);
-          var testDB2 = conn2.getDB('test');
-          assert.eq(1, testDB2.auth('uadmin', AUTH_INFO.test.uadmin.pwd));
+            var conn2 = new Mongo(conn.host);
+            var testDB2 = conn2.getDB('test');
+            assert.eq(1, testDB2.auth('uadmin', AUTH_INFO.test.uadmin.pwd));
 
-          testOps(testDB, READ_PERM);
-          testOps(testDB2, UADMIN_PERM);
-      }
+            testOps(testDB, READ_PERM);
+            testOps(testDB2, UADMIN_PERM);
+        }
     },
     {
-      name: 'Test user with no role',
-      test: function(conn) {
-          var testDB = conn.getDB('test');
-          assert.eq(1, testDB.auth('none', AUTH_INFO.test.none.pwd));
+        name: 'Test user with no role',
+        test: function(conn) {
+            var testDB = conn.getDB('test');
+            assert.eq(1, testDB.auth('none', AUTH_INFO.test.none.pwd));
 
-          testOps(testDB, {});
-      }
+            testOps(testDB, {});
+        }
     },
     {
-      name: 'Test read only user',
-      test: function(conn) {
-          var testDB = conn.getDB('test');
-          assert.eq(1, testDB.auth('ro', AUTH_INFO.test.ro.pwd));
+        name: 'Test read only user',
+        test: function(conn) {
+            var testDB = conn.getDB('test');
+            assert.eq(1, testDB.auth('ro', AUTH_INFO.test.ro.pwd));
 
-          testOps(testDB, READ_PERM);
-      }
+            testOps(testDB, READ_PERM);
+        }
     },
     {
-      name: 'Test read/write user',
-      test: function(conn) {
-          var testDB = conn.getDB('test');
-          assert.eq(1, testDB.auth('rw', AUTH_INFO.test.rw.pwd));
+        name: 'Test read/write user',
+        test: function(conn) {
+            var testDB = conn.getDB('test');
+            assert.eq(1, testDB.auth('rw', AUTH_INFO.test.rw.pwd));
 
-          testOps(testDB, READ_WRITE_PERM);
-      }
+            testOps(testDB, READ_WRITE_PERM);
+        }
     },
     {
-      name: 'Test read + dbAdmin user',
-      test: function(conn) {
-          var testDB = conn.getDB('test');
-          assert.eq(1, testDB.auth('roadmin', AUTH_INFO.test.roadmin.pwd));
+        name: 'Test read + dbAdmin user',
+        test: function(conn) {
+            var testDB = conn.getDB('test');
+            assert.eq(1, testDB.auth('roadmin', AUTH_INFO.test.roadmin.pwd));
 
-          var combinedPerm = Object.extend({}, READ_PERM);
-          combinedPerm = Object.extend(combinedPerm, ADMIN_PERM);
-          testOps(testDB, combinedPerm);
-      }
+            var combinedPerm = Object.extend({}, READ_PERM);
+            combinedPerm = Object.extend(combinedPerm, ADMIN_PERM);
+            testOps(testDB, combinedPerm);
+        }
     },
     {
-      name: 'Test dbAdmin user',
-      test: function(conn) {
-          var testDB = conn.getDB('test');
-          assert.eq(1, testDB.auth('admin', AUTH_INFO.test.admin.pwd));
+        name: 'Test dbAdmin user',
+        test: function(conn) {
+            var testDB = conn.getDB('test');
+            assert.eq(1, testDB.auth('admin', AUTH_INFO.test.admin.pwd));
 
-          testOps(testDB, ADMIN_PERM);
-      }
+            testOps(testDB, ADMIN_PERM);
+        }
     },
     {
-      name: 'Test userAdmin user',
-      test: function(conn) {
-          var testDB = conn.getDB('test');
-          assert.eq(1, testDB.auth('uadmin', AUTH_INFO.test.uadmin.pwd));
+        name: 'Test userAdmin user',
+        test: function(conn) {
+            var testDB = conn.getDB('test');
+            assert.eq(1, testDB.auth('uadmin', AUTH_INFO.test.uadmin.pwd));
 
-          testOps(testDB, UADMIN_PERM);
-      }
+            testOps(testDB, UADMIN_PERM);
+        }
     },
     {
-      name: 'Test cluster user',
-      test: function(conn) {
-          var adminDB = conn.getDB('admin');
-          assert.eq(1, adminDB.auth('cluster', AUTH_INFO.admin.cluster.pwd));
+        name: 'Test cluster user',
+        test: function(conn) {
+            var adminDB = conn.getDB('admin');
+            assert.eq(1, adminDB.auth('cluster', AUTH_INFO.admin.cluster.pwd));
 
-          testOps(conn.getDB('test'), CLUSTER_PERM);
-      }
+            testOps(conn.getDB('test'), CLUSTER_PERM);
+        }
     },
     {
-      name: 'Test admin user with no role',
-      test: function(conn) {
-          var adminDB = conn.getDB('admin');
-          assert.eq(1, adminDB.auth('anone', AUTH_INFO.admin.anone.pwd));
+        name: 'Test admin user with no role',
+        test: function(conn) {
+            var adminDB = conn.getDB('admin');
+            assert.eq(1, adminDB.auth('anone', AUTH_INFO.admin.anone.pwd));
 
-          testOps(adminDB, {});
-          testOps(conn.getDB('test'), {});
-      }
+            testOps(adminDB, {});
+            testOps(conn.getDB('test'), {});
+        }
     },
     {
-      name: 'Test read only admin user',
-      test: function(conn) {
-          var adminDB = conn.getDB('admin');
-          assert.eq(1, adminDB.auth('aro', AUTH_INFO.admin.aro.pwd));
+        name: 'Test read only admin user',
+        test: function(conn) {
+            var adminDB = conn.getDB('admin');
+            assert.eq(1, adminDB.auth('aro', AUTH_INFO.admin.aro.pwd));
 
-          testOps(adminDB, READ_PERM);
-          testOps(conn.getDB('test'), {});
-      }
+            testOps(adminDB, READ_PERM);
+            testOps(conn.getDB('test'), {});
+        }
     },
     {
-      name: 'Test read/write admin user',
-      test: function(conn) {
-          var adminDB = conn.getDB('admin');
-          assert.eq(1, adminDB.auth('arw', AUTH_INFO.admin.arw.pwd));
+        name: 'Test read/write admin user',
+        test: function(conn) {
+            var adminDB = conn.getDB('admin');
+            assert.eq(1, adminDB.auth('arw', AUTH_INFO.admin.arw.pwd));
 
-          testOps(adminDB, READ_WRITE_PERM);
-          testOps(conn.getDB('test'), {});
-      }
+            testOps(adminDB, READ_WRITE_PERM);
+            testOps(conn.getDB('test'), {});
+        }
     },
     {
-      name: 'Test dbAdmin admin user',
-      test: function(conn) {
-          var adminDB = conn.getDB('admin');
-          assert.eq(1, adminDB.auth('aadmin', AUTH_INFO.admin.aadmin.pwd));
+        name: 'Test dbAdmin admin user',
+        test: function(conn) {
+            var adminDB = conn.getDB('admin');
+            assert.eq(1, adminDB.auth('aadmin', AUTH_INFO.admin.aadmin.pwd));
 
-          testOps(adminDB, ADMIN_PERM);
-          testOps(conn.getDB('test'), {});
-      }
+            testOps(adminDB, ADMIN_PERM);
+            testOps(conn.getDB('test'), {});
+        }
     },
     {
-      name: 'Test userAdmin admin user',
-      test: function(conn) {
-          var adminDB = conn.getDB('admin');
-          assert.eq(1, adminDB.auth('auadmin', AUTH_INFO.admin.auadmin.pwd));
+        name: 'Test userAdmin admin user',
+        test: function(conn) {
+            var adminDB = conn.getDB('admin');
+            assert.eq(1, adminDB.auth('auadmin', AUTH_INFO.admin.auadmin.pwd));
 
-          testOps(adminDB, UADMIN_PERM);
-          testOps(conn.getDB('test'), {});
-      }
+            testOps(adminDB, UADMIN_PERM);
+            testOps(conn.getDB('test'), {});
+        }
     },
     {
-      name: 'Test read only any db user',
-      test: function(conn) {
-          var adminDB = conn.getDB('admin');
-          assert.eq(1, adminDB.auth('any_ro', AUTH_INFO.admin.any_ro.pwd));
+        name: 'Test read only any db user',
+        test: function(conn) {
+            var adminDB = conn.getDB('admin');
+            assert.eq(1, adminDB.auth('any_ro', AUTH_INFO.admin.any_ro.pwd));
 
-          testOps(adminDB, READ_PERM);
-          testOps(conn.getDB('test'), READ_PERM);
-      }
+            testOps(adminDB, READ_PERM);
+            testOps(conn.getDB('test'), READ_PERM);
+        }
     },
     {
-      name: 'Test read/write any db user',
-      test: function(conn) {
-          var adminDB = conn.getDB('admin');
-          assert.eq(1, adminDB.auth('any_rw', AUTH_INFO.admin.any_rw.pwd));
+        name: 'Test read/write any db user',
+        test: function(conn) {
+            var adminDB = conn.getDB('admin');
+            assert.eq(1, adminDB.auth('any_rw', AUTH_INFO.admin.any_rw.pwd));
 
-          testOps(adminDB, READ_WRITE_PERM);
-          testOps(conn.getDB('test'), READ_WRITE_PERM);
-      }
+            testOps(adminDB, READ_WRITE_PERM);
+            testOps(conn.getDB('test'), READ_WRITE_PERM);
+        }
     },
     {
-      name: 'Test dbAdmin any db user',
-      test: function(conn) {
-          var adminDB = conn.getDB('admin');
-          assert.eq(1, adminDB.auth('any_admin', AUTH_INFO.admin.any_admin.pwd));
+        name: 'Test dbAdmin any db user',
+        test: function(conn) {
+            var adminDB = conn.getDB('admin');
+            assert.eq(1, adminDB.auth('any_admin', AUTH_INFO.admin.any_admin.pwd));
 
-          testOps(adminDB, ADMIN_PERM);
-          testOps(conn.getDB('test'), ADMIN_PERM);
-      }
+            testOps(adminDB, ADMIN_PERM);
+            testOps(conn.getDB('test'), ADMIN_PERM);
+        }
     },
     {
-      name: 'Test userAdmin any db user',
-      test: function(conn) {
-          var adminDB = conn.getDB('admin');
-          assert.eq(1, adminDB.auth('any_uadmin', AUTH_INFO.admin.any_uadmin.pwd));
+        name: 'Test userAdmin any db user',
+        test: function(conn) {
+            var adminDB = conn.getDB('admin');
+            assert.eq(1, adminDB.auth('any_uadmin', AUTH_INFO.admin.any_uadmin.pwd));
 
-          testOps(adminDB, UADMIN_PERM);
-          testOps(conn.getDB('test'), UADMIN_PERM);
-      }
-    },
-
-    {
-      name: 'Test change role',
-      test: function(conn) {
-          var testDB = conn.getDB('test');
-          assert.eq(1, testDB.auth('rw', AUTH_INFO.test.rw.pwd));
-
-          var newConn = new Mongo(conn.host);
-          assert.eq(1, newConn.getDB('admin').auth('any_uadmin', AUTH_INFO.admin.any_uadmin.pwd));
-          newConn.getDB('test').updateUser('rw', {roles: ['read']});
-          var origSpec = newConn.getDB("test").getUser("rw");
-
-          // role change should affect users already authenticated.
-          testOps(testDB, READ_PERM);
-
-          // role change should affect active connections.
-          testDB.runCommand({logout: 1});
-          assert.eq(1, testDB.auth('rw', AUTH_INFO.test.rw.pwd));
-          testOps(testDB, READ_PERM);
-
-          // role change should also affect new connections.
-          var newConn3 = new Mongo(conn.host);
-          var testDB3 = newConn3.getDB('test');
-          assert.eq(1, testDB3.auth('rw', AUTH_INFO.test.rw.pwd));
-          testOps(testDB3, READ_PERM);
-
-          newConn.getDB('test').updateUser('rw', {roles: origSpec.roles});
-      }
+            testOps(adminDB, UADMIN_PERM);
+            testOps(conn.getDB('test'), UADMIN_PERM);
+        }
     },
 
     {
-      name: 'Test override user',
-      test: function(conn) {
-          var testDB = conn.getDB('test');
-          assert.eq(1, testDB.auth('rw', AUTH_INFO.test.rw.pwd));
-          assert.eq(1, testDB.auth('ro', AUTH_INFO.test.ro.pwd));
-          testOps(testDB, READ_PERM);
+        name: 'Test change role',
+        test: function(conn) {
+            var testDB = conn.getDB('test');
+            assert.eq(1, testDB.auth('rw', AUTH_INFO.test.rw.pwd));
 
-          testDB.runCommand({logout: 1});
-          testOps(testDB, {});
-      }
+            var newConn = new Mongo(conn.host);
+            assert.eq(1, newConn.getDB('admin').auth('any_uadmin', AUTH_INFO.admin.any_uadmin.pwd));
+            newConn.getDB('test').updateUser('rw', {roles: ['read']});
+            var origSpec = newConn.getDB("test").getUser("rw");
+
+            // role change should affect users already authenticated.
+            testOps(testDB, READ_PERM);
+
+            // role change should affect active connections.
+            testDB.runCommand({logout: 1});
+            assert.eq(1, testDB.auth('rw', AUTH_INFO.test.rw.pwd));
+            testOps(testDB, READ_PERM);
+
+            // role change should also affect new connections.
+            var newConn3 = new Mongo(conn.host);
+            var testDB3 = newConn3.getDB('test');
+            assert.eq(1, testDB3.auth('rw', AUTH_INFO.test.rw.pwd));
+            testOps(testDB3, READ_PERM);
+
+            newConn.getDB('test').updateUser('rw', {roles: origSpec.roles});
+        }
+    },
+
+    {
+        name: 'Test override user',
+        test: function(conn) {
+            var testDB = conn.getDB('test');
+            assert.eq(1, testDB.auth('rw', AUTH_INFO.test.rw.pwd));
+            assert.eq(1, testDB.auth('ro', AUTH_INFO.test.ro.pwd));
+            testOps(testDB, READ_PERM);
+
+            testDB.runCommand({logout: 1});
+            testOps(testDB, {});
+        }
     }
 ];
 

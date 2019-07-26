@@ -150,10 +150,9 @@ auto makeSetStatusOnRemoteCommandCompletionClosure(const RemoteCommandRequest* e
                 return str::stream() << "Request(" << request.target.toString() << ", "
                                      << request.dbname << ", " << request.cmdObj << ')';
             };
-            *outStatus =
-                Status(ErrorCodes::BadValue,
-                       str::stream() << "Actual request: " << desc(cbData.request) << "; expected: "
-                                     << desc(*expectedRequest));
+            *outStatus = Status(ErrorCodes::BadValue,
+                                str::stream() << "Actual request: " << desc(cbData.request)
+                                              << "; expected: " << desc(*expectedRequest));
             return;
         }
         *outStatus = cbData.response.status;

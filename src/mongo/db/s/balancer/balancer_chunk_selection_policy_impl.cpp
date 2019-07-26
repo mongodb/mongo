@@ -441,12 +441,10 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
         if (chunkAtZoneMin.getMin().woCompare(tagRange.min)) {
             return {ErrorCodes::IllegalOperation,
                     str::stream()
-                        << "Tag boundaries "
-                        << tagRange.toString()
+                        << "Tag boundaries " << tagRange.toString()
                         << " fall in the middle of an existing chunk "
                         << ChunkRange(chunkAtZoneMin.getMin(), chunkAtZoneMin.getMax()).toString()
-                        << ". Balancing for collection "
-                        << nss.ns()
+                        << ". Balancing for collection " << nss.ns()
                         << " will be postponed until the chunk is split appropriately."};
         }
 
@@ -462,12 +460,10 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
             chunkAtZoneMax.getMax().woCompare(tagRange.max)) {
             return {ErrorCodes::IllegalOperation,
                     str::stream()
-                        << "Tag boundaries "
-                        << tagRange.toString()
+                        << "Tag boundaries " << tagRange.toString()
                         << " fall in the middle of an existing chunk "
                         << ChunkRange(chunkAtZoneMax.getMin(), chunkAtZoneMax.getMax()).toString()
-                        << ". Balancing for collection "
-                        << nss.ns()
+                        << ". Balancing for collection " << nss.ns()
                         << " will be postponed until the chunk is split appropriately."};
         }
     }

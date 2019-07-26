@@ -89,11 +89,8 @@ Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(OperationCo
                           str::stream()
                               << "Could not determine schema version of authorization data.  "
                                  "Bad (non-numeric) type "
-                              << typeName(versionElement.type())
-                              << " ("
-                              << versionElement.type()
-                              << ") for "
-                              << AuthorizationManager::schemaVersionFieldName
+                              << typeName(versionElement.type()) << " (" << versionElement.type()
+                              << ") for " << AuthorizationManager::schemaVersionFieldName
                               << " field in version document");
         }
     } else if (status == ErrorCodes::NoMatchingDocument) {
@@ -132,8 +129,7 @@ void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privileges
                         "",
                         std::string(str::stream() << "Skipped privileges on resource "
                                                   << privileges[i].getResourcePattern().toString()
-                                                  << ". Reason: "
-                                                  << errmsg)));
+                                                  << ". Reason: " << errmsg)));
         }
     }
 }
@@ -179,11 +175,8 @@ Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* opCt
             userRoles << BSON("role" << role.getRole() << "db" << role.getDB());
         }
         *result = BSON("_id" << userName.getUser() << "user" << userName.getUser() << "db"
-                             << userName.getDB()
-                             << "credentials"
-                             << BSON("external" << true)
-                             << "roles"
-                             << userRoles.arr());
+                             << userName.getDB() << "credentials" << BSON("external" << true)
+                             << "roles" << userRoles.arr());
     }
 
     BSONElement directRolesElement;
@@ -285,17 +278,14 @@ Status AuthzManagerExternalStateLocal::_getUserDocument(OperationContext* opCtx,
     Status status = findOne(opCtx,
                             AuthorizationManager::usersCollectionNamespace,
                             BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                 << userName.getUser()
-                                 << AuthorizationManager::USER_DB_FIELD_NAME
+                                 << userName.getUser() << AuthorizationManager::USER_DB_FIELD_NAME
                                  << userName.getDB()),
                             userDoc);
 
     if (status == ErrorCodes::NoMatchingDocument) {
-        status =
-            Status(ErrorCodes::UserNotFound,
-                   str::stream() << "Could not find user \"" << userName.getUser() << "\" for db \""
-                                 << userName.getDB()
-                                 << "\"");
+        status = Status(ErrorCodes::UserNotFound,
+                        str::stream() << "Could not find user \"" << userName.getUser()
+                                      << "\" for db \"" << userName.getDB() << "\"");
     }
     return status;
 }

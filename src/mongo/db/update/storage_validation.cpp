@@ -104,8 +104,7 @@ void validateDollarPrefixElement(mutablebson::ConstElement elem) {
         // Not an okay, $ prefixed field name.
         uasserted(ErrorCodes::DollarPrefixedFieldName,
                   str::stream() << "The dollar ($) prefixed field '" << elem.getFieldName()
-                                << "' in '"
-                                << mutablebson::getFullName(elem)
+                                << "' in '" << mutablebson::getFullName(elem)
                                 << "' is not valid for storage.");
     }
 }

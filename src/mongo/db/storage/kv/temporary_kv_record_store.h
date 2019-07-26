@@ -53,8 +53,7 @@ public:
 
     // Move constructor.
     TemporaryKVRecordStore(TemporaryKVRecordStore&& other) noexcept
-        : TemporaryRecordStore(std::move(other._rs)),
-          _kvEngine(other._kvEngine) {}
+        : TemporaryRecordStore(std::move(other._rs)), _kvEngine(other._kvEngine) {}
 
     ~TemporaryKVRecordStore();
 

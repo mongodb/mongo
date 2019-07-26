@@ -193,7 +193,7 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::getNext() {
         waitWhileFailPointEnabled();
 
         auto doc = nextInput.releaseDocument();
-        auto[obj, objSize] = makeBatchObject(std::move(doc));
+        auto [obj, objSize] = makeBatchObject(std::move(doc));
 
         bufferedBytes += objSize;
         if (!batch.empty() &&

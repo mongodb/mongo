@@ -883,4 +883,4 @@ public:
 
 SuiteInstance<All> queryStageMergeSortTest;
 
-}  // namespace
+}  // namespace QueryStageMergeSortTests

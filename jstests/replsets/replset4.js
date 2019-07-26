@@ -1,5 +1,4 @@
 doTest = function(signal) {
-
     // Test orphaned master steps down
     var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
 

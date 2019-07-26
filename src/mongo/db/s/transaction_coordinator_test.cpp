@@ -192,8 +192,7 @@ auto makeDummyPrepareCommand(const LogicalSessionId& lsid, const TxnNumber& txnN
     prepareCmd.setDbName(NamespaceString::kAdminDb);
     auto prepareObj = prepareCmd.toBSON(
         BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
-                    << WriteConcernOptions::kWriteConcernField
-                    << WriteConcernOptions::Majority));
+                    << WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
 
 
     return prepareObj;
@@ -546,17 +545,23 @@ protected:
                                       TxnNumber txnNumber,
                                       const std::vector<ShardId>& participants,
                                       const boost::optional<Timestamp>& commitTimestamp) {
-        txn::persistDecision(*_aws, lsid, txnNumber, participants, [&] {
-            txn::CoordinatorCommitDecision decision;
-            if (commitTimestamp) {
-                decision.setDecision(txn::CommitDecision::kCommit);
-                decision.setCommitTimestamp(commitTimestamp);
-            } else {
-                decision.setDecision(txn::CommitDecision::kAbort);
-                decision.setAbortStatus(Status(ErrorCodes::NoSuchTransaction, "Test abort status"));
-            }
-            return decision;
-        }()).get();
+        txn::persistDecision(*_aws,
+                             lsid,
+                             txnNumber,
+                             participants,
+                             [&] {
+                                 txn::CoordinatorCommitDecision decision;
+                                 if (commitTimestamp) {
+                                     decision.setDecision(txn::CommitDecision::kCommit);
+                                     decision.setCommitTimestamp(commitTimestamp);
+                                 } else {
+                                     decision.setDecision(txn::CommitDecision::kAbort);
+                                     decision.setAbortStatus(Status(ErrorCodes::NoSuchTransaction,
+                                                                    "Test abort status"));
+                                 }
+                                 return decision;
+                             }())
+            .get();
 
         auto allCoordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
         ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(1));
@@ -733,11 +738,17 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 
     // Delete the document for the first transaction and check that only the second transaction's
     // document still exists.
-    txn::persistDecision(*_aws, _lsid, txnNumber1, _participants, [&] {
-        txn::CoordinatorCommitDecision decision(txn::CommitDecision::kAbort);
-        decision.setAbortStatus(Status(ErrorCodes::NoSuchTransaction, "Test abort error"));
-        return decision;
-    }()).get();
+    txn::persistDecision(*_aws,
+                         _lsid,
+                         txnNumber1,
+                         _participants,
+                         [&] {
+                             txn::CoordinatorCommitDecision decision(txn::CommitDecision::kAbort);
+                             decision.setAbortStatus(
+                                 Status(ErrorCodes::NoSuchTransaction, "Test abort error"));
+                             return decision;
+                         }())
+        .get();
     txn::deleteCoordinatorDoc(*_aws, _lsid, txnNumber1).get();
 
     allCoordinatorDocs = txn::readAllCoordinatorDocs(operationContext());
@@ -1466,8 +1477,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     setGlobalFailPoint("hangBeforeWaitingForParticipantListWriteConcern",
                        BSON("mode"
                             << "alwaysOn"
-                            << "data"
-                            << BSON("useUninterruptibleSleep" << 1)));
+                            << "data" << BSON("useUninterruptibleSleep" << 1)));
     coordinator.runCommit(kTwoShardIdList);
     waitUntilCoordinatorDocIsPresent();
 
@@ -1511,8 +1521,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     setGlobalFailPoint("hangBeforeWaitingForDecisionWriteConcern",
                        BSON("mode"
                             << "alwaysOn"
-                            << "data"
-                            << BSON("useUninterruptibleSleep" << 1)));
+                            << "data" << BSON("useUninterruptibleSleep" << 1)));
     // Respond to the second prepare request in a separate thread, because the coordinator will
     // hijack that thread to run its continuation.
     assertPrepareSentAndRespondWithSuccess();
@@ -1562,8 +1571,7 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     setGlobalFailPoint("hangAfterDeletingCoordinatorDoc",
                        BSON("mode"
                             << "alwaysOn"
-                            << "data"
-                            << BSON("useUninterruptibleSleep" << 1)));
+                            << "data" << BSON("useUninterruptibleSleep" << 1)));
     // Respond to the second commit request in a separate thread, because the coordinator will
     // hijack that thread to run its continuation.
     assertCommitSentAndRespondWithSuccess();
@@ -2122,11 +2130,10 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTransactionParamete
     runSimpleTwoPhaseCommitWithCommitDecisionAndCaptureLogLines();
     BSONObjBuilder lsidBob;
     _lsid.serialize(&lsidBob);
-    ASSERT_EQUALS(
-        1,
-        countLogLinesContaining(str::stream() << "parameters:{ lsid: " << lsidBob.done().toString()
-                                              << ", txnNumber: "
-                                              << _txnNumber));
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining(str::stream()
+                                          << "parameters:{ lsid: " << lsidBob.done().toString()
+                                          << ", txnNumber: " << _txnNumber));
 }
 
 TEST_F(TransactionCoordinatorMetricsTest,

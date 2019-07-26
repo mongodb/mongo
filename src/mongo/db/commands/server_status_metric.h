@@ -88,4 +88,4 @@ public:
 private:
     const T* _t;
 };
-}
+}  // namespace mongo

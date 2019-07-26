@@ -79,4 +79,4 @@ public:
     // multiple operations
     bool operator==(const std::string& s) const;
 };
-}
+}  // namespace mongo

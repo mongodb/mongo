@@ -81,10 +81,10 @@ StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSO
         if (elem.fieldNameStringData() == "verbosity") {
             if (!elem.isNumber()) {
                 return StatusWith<Result>(ErrorCodes::BadValue,
-                                          str::stream() << "Expected "
-                                                        << parentComponent.getDottedName()
-                                                        << ".verbosity to be a number, but found "
-                                                        << typeName(elem.type()));
+                                          str::stream()
+                                              << "Expected " << parentComponent.getDottedName()
+                                              << ".verbosity to be a number, but found "
+                                              << typeName(elem.type()));
             }
             levelsToSet.push_back((LogComponentSetting(parentComponent, elem.numberInt())));
             continue;
@@ -93,22 +93,20 @@ StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSO
         const LogComponent curr = _getComponentForShortName(shortName);
 
         if (curr == LogComponent::kNumLogComponents || curr.parent() != parentComponent) {
-            return StatusWith<Result>(
-                ErrorCodes::BadValue,
-                str::stream() << "Invalid component name " << parentComponent.getDottedName() << "."
-                              << shortName);
+            return StatusWith<Result>(ErrorCodes::BadValue,
+                                      str::stream()
+                                          << "Invalid component name "
+                                          << parentComponent.getDottedName() << "." << shortName);
         }
         if (elem.isNumber()) {
             levelsToSet.push_back(LogComponentSetting(curr, elem.numberInt()));
             continue;
         }
         if (elem.type() != Object) {
-            return StatusWith<Result>(ErrorCodes::BadValue,
-                                      str::stream() << "Invalid type " << typeName(elem.type())
-                                                    << "for component "
-                                                    << parentComponent.getDottedName()
-                                                    << "."
-                                                    << shortName);
+            return StatusWith<Result>(
+                ErrorCodes::BadValue,
+                str::stream() << "Invalid type " << typeName(elem.type()) << "for component "
+                              << parentComponent.getDottedName() << "." << shortName);
         }
         iterators.push_back(iter);
         parentComponent = curr;

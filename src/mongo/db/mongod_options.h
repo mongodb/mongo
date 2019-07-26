@@ -84,4 +84,4 @@ Status storeMongodOptions(const moe::Environment& params);
  * Help test user for storage.dbPath config option.
  */
 std::string storageDBPathDescription();
-}
+}  // namespace mongo

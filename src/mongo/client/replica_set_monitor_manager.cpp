@@ -51,15 +51,15 @@
 
 namespace mongo {
 
-using std::shared_ptr;
 using std::set;
+using std::shared_ptr;
 using std::string;
 using std::vector;
 
 using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
-using executor::TaskExecutorPool;
 using executor::TaskExecutor;
+using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
 
 ReplicaSetMonitorManager::ReplicaSetMonitorManager() {}
@@ -100,7 +100,7 @@ namespace {
 void uassertNotMixingSSL(transport::ConnectSSLMode a, transport::ConnectSSLMode b) {
     uassert(51042, "Mixing ssl modes with a single replica set is disallowed", a == b);
 }
-}
+}  // namespace
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
     const ConnectionString& connStr) {

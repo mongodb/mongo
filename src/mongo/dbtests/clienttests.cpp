@@ -40,8 +40,8 @@
 
 namespace ClientTests {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 class Base {
@@ -407,4 +407,4 @@ public:
 };
 
 SuiteInstance<All> all;
-}
+}  // namespace ClientTests

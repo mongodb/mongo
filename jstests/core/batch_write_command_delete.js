@@ -30,7 +30,7 @@ function resultOK(result) {
 }
 
 function resultNOK(result) {
-    return !result.ok && typeof(result.code) == 'number' && typeof(result.errmsg) == 'string';
+    return !result.ok && typeof (result.code) == 'number' && typeof (result.errmsg) == 'string';
 }
 
 function countEventually(collection, n) {

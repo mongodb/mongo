@@ -632,4 +632,4 @@ public:
 
 SuiteInstance<All> planRankingAll;
 
-}  // namespace PlanRankingTest
+}  // namespace PlanRankingTests

@@ -99,4 +99,4 @@ private:
     bool _hasOptimizedPos = false;
 };
 
-}  // namesace mongo
+}  // namespace mongo

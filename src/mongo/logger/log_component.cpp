@@ -245,5 +245,5 @@ std::ostream& operator<<(std::ostream& os, LogComponent component) {
     return os << component.getNameForLog();
 }
 
-}  // logger
-}  // mongo
+}  // namespace logger
+}  // namespace mongo

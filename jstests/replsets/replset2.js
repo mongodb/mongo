@@ -1,7 +1,6 @@
 load("jstests/replsets/rslib.js");
 
 doTest = function(signal) {
-
     // Test replication with write concern.
 
     // Replica set testing API

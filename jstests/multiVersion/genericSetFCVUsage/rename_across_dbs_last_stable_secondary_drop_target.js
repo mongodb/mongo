@@ -1,15 +1,15 @@
 (function() {
-    'use strict';
+'use strict';
 
-    load("jstests/libs/feature_compatibility_version.js");
-    load("jstests/replsets/libs/rename_across_dbs.js");
+load("jstests/libs/feature_compatibility_version.js");
+load("jstests/replsets/libs/rename_across_dbs.js");
 
-    const nodes = [{binVersion: 'latest'}, {binVersion: 'last-stable'}, {}];
-    const options = {
-        nodes: nodes,
-        setFeatureCompatibilityVersion: lastStableFCV,
-        dropTarget: true,
-    };
+const nodes = [{binVersion: 'latest'}, {binVersion: 'last-stable'}, {}];
+const options = {
+    nodes: nodes,
+    setFeatureCompatibilityVersion: lastStableFCV,
+    dropTarget: true,
+};
 
-    new RenameAcrossDatabasesTest(options).run();
+new RenameAcrossDatabasesTest(options).run();
 }());

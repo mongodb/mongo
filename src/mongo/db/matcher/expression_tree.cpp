@@ -419,4 +419,4 @@ MatchExpression::ExpressionOptimizerFunc NotMatchExpression::getOptimizer() cons
         return expression;
     };
 }
-}
+}  // namespace mongo

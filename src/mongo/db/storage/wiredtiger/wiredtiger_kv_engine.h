@@ -473,4 +473,4 @@ private:
     // timestamp. Provided by replication layer because WT does not persist timestamps.
     AtomicWord<std::uint64_t> _initialDataTimestamp;
 };
-}
+}  // namespace mongo

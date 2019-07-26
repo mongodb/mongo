@@ -185,23 +185,13 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesDefaults) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel"
-                               << false
-                               << "caseFirst"
+                               << "caseLevel" << false << "caseFirst"
                                << "off"
-                               << "strength"
-                               << 3
-                               << "numericOrdering"
-                               << false
-                               << "alternate"
+                               << "strength" << 3 << "numericOrdering" << false << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization"
-                               << false
-                               << "backwards"
-                               << false
-                               << "version"
+                               << "normalization" << false << "backwards" << false << "version"
                                << "myVersion");
 
     ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
@@ -215,23 +205,13 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesCaseFirstUpper) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel"
-                               << false
-                               << "caseFirst"
+                               << "caseLevel" << false << "caseFirst"
                                << "upper"
-                               << "strength"
-                               << 3
-                               << "numericOrdering"
-                               << false
-                               << "alternate"
+                               << "strength" << 3 << "numericOrdering" << false << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization"
-                               << false
-                               << "backwards"
-                               << false
-                               << "version"
+                               << "normalization" << false << "backwards" << false << "version"
                                << "myVersion");
 
     ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
@@ -245,23 +225,13 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesCaseFirstLower) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel"
-                               << false
-                               << "caseFirst"
+                               << "caseLevel" << false << "caseFirst"
                                << "lower"
-                               << "strength"
-                               << 3
-                               << "numericOrdering"
-                               << false
-                               << "alternate"
+                               << "strength" << 3 << "numericOrdering" << false << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization"
-                               << false
-                               << "backwards"
-                               << false
-                               << "version"
+                               << "normalization" << false << "backwards" << false << "version"
                                << "myVersion");
 
     ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
@@ -275,23 +245,13 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesPrimaryStrength) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel"
-                               << false
-                               << "caseFirst"
+                               << "caseLevel" << false << "caseFirst"
                                << "off"
-                               << "strength"
-                               << 1
-                               << "numericOrdering"
-                               << false
-                               << "alternate"
+                               << "strength" << 1 << "numericOrdering" << false << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization"
-                               << false
-                               << "backwards"
-                               << false
-                               << "version"
+                               << "normalization" << false << "backwards" << false << "version"
                                << "myVersion");
 
     ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
@@ -305,23 +265,13 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesSecondaryStrength) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel"
-                               << false
-                               << "caseFirst"
+                               << "caseLevel" << false << "caseFirst"
                                << "off"
-                               << "strength"
-                               << 2
-                               << "numericOrdering"
-                               << false
-                               << "alternate"
+                               << "strength" << 2 << "numericOrdering" << false << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization"
-                               << false
-                               << "backwards"
-                               << false
-                               << "version"
+                               << "normalization" << false << "backwards" << false << "version"
                                << "myVersion");
 
     ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
@@ -335,23 +285,13 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesQuaternaryStrength) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel"
-                               << false
-                               << "caseFirst"
+                               << "caseLevel" << false << "caseFirst"
                                << "off"
-                               << "strength"
-                               << 4
-                               << "numericOrdering"
-                               << false
-                               << "alternate"
+                               << "strength" << 4 << "numericOrdering" << false << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization"
-                               << false
-                               << "backwards"
-                               << false
-                               << "version"
+                               << "normalization" << false << "backwards" << false << "version"
                                << "myVersion");
 
     ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
@@ -365,23 +305,13 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesIdenticalStrength) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel"
-                               << false
-                               << "caseFirst"
+                               << "caseLevel" << false << "caseFirst"
                                << "off"
-                               << "strength"
-                               << 5
-                               << "numericOrdering"
-                               << false
-                               << "alternate"
+                               << "strength" << 5 << "numericOrdering" << false << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "punct"
-                               << "normalization"
-                               << false
-                               << "backwards"
-                               << false
-                               << "version"
+                               << "normalization" << false << "backwards" << false << "version"
                                << "myVersion");
 
     ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
@@ -395,23 +325,13 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesAlternateShifted) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel"
-                               << false
-                               << "caseFirst"
+                               << "caseLevel" << false << "caseFirst"
                                << "off"
-                               << "strength"
-                               << 3
-                               << "numericOrdering"
-                               << false
-                               << "alternate"
+                               << "strength" << 3 << "numericOrdering" << false << "alternate"
                                << "shifted"
                                << "maxVariable"
                                << "punct"
-                               << "normalization"
-                               << false
-                               << "backwards"
-                               << false
-                               << "version"
+                               << "normalization" << false << "backwards" << false << "version"
                                << "myVersion");
 
     ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
@@ -425,23 +345,13 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesMaxVariableSpace) {
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale"
-                               << "caseLevel"
-                               << false
-                               << "caseFirst"
+                               << "caseLevel" << false << "caseFirst"
                                << "off"
-                               << "strength"
-                               << 3
-                               << "numericOrdering"
-                               << false
-                               << "alternate"
+                               << "strength" << 3 << "numericOrdering" << false << "alternate"
                                << "non-ignorable"
                                << "maxVariable"
                                << "space"
-                               << "normalization"
-                               << false
-                               << "backwards"
-                               << false
-                               << "version"
+                               << "normalization" << false << "backwards" << false << "version"
                                << "myVersion");
 
     ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());

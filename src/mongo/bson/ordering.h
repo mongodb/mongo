@@ -88,4 +88,4 @@ public:
         return Ordering(b);
     }
 };
-}
+}  // namespace mongo

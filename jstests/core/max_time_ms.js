@@ -230,14 +230,14 @@ assert.eq(1, t.getDB().runCommand({ping: 1, maxTimeMS: NumberInt(0)}).ok);
 assert.eq(1, t.getDB().runCommand({ping: 1, maxTimeMS: NumberLong(0)}).ok);
 
 assert.throws.automsg(function() {
-    t.find().maxTimeMS(-1).itcount();
-});
+                 t.find().maxTimeMS(-1).itcount();
+             });
 assert.throws.automsg(function() {
-    t.find().maxTimeMS(NumberInt(-1)).itcount();
-});
+                 t.find().maxTimeMS(NumberInt(-1)).itcount();
+             });
 assert.throws.automsg(function() {
-    t.find().maxTimeMS(NumberLong(-1)).itcount();
-});
+                 t.find().maxTimeMS(NumberLong(-1)).itcount();
+             });
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: -1}).ok);
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: NumberInt(-1)}).ok);
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: NumberLong(-1)}).ok);
@@ -260,37 +260,37 @@ assert.eq(1, t.getDB().runCommand({ping: 1, maxTimeMS: NumberInt(maxValue)}).ok)
 assert.eq(1, t.getDB().runCommand({ping: 1, maxTimeMS: NumberLong(maxValue)}).ok);
 
 assert.throws.automsg(function() {
-    t.find().maxTimeMS(maxValue + 1).itcount();
-});
+                 t.find().maxTimeMS(maxValue + 1).itcount();
+             });
 assert.throws.automsg(function() {
-    t.find().maxTimeMS(NumberInt(maxValue + 1)).itcount();
-});
+                 t.find().maxTimeMS(NumberInt(maxValue + 1)).itcount();
+             });
 assert.throws.automsg(function() {
-    t.find().maxTimeMS(NumberLong(maxValue + 1)).itcount();
-});
+                 t.find().maxTimeMS(NumberLong(maxValue + 1)).itcount();
+             });
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: maxValue + 1}).ok);
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: NumberInt(maxValue + 1)}).ok);
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: NumberLong(maxValue + 1)}).ok);
 
 // Verify invalid values are rejected.
 assert.throws.automsg(function() {
-    t.find().maxTimeMS(0.1).itcount();
-});
+                 t.find().maxTimeMS(0.1).itcount();
+             });
 assert.throws.automsg(function() {
-    t.find().maxTimeMS(-0.1).itcount();
-});
+                 t.find().maxTimeMS(-0.1).itcount();
+             });
 assert.throws.automsg(function() {
-    t.find().maxTimeMS().itcount();
-});
+                 t.find().maxTimeMS().itcount();
+             });
 assert.throws.automsg(function() {
-    t.find().maxTimeMS("").itcount();
-});
+                 t.find().maxTimeMS("").itcount();
+             });
 assert.throws.automsg(function() {
-    t.find().maxTimeMS(true).itcount();
-});
+                 t.find().maxTimeMS(true).itcount();
+             });
 assert.throws.automsg(function() {
-    t.find().maxTimeMS({}).itcount();
-});
+                 t.find().maxTimeMS({}).itcount();
+             });
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: 0.1}).ok);
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: -0.1}).ok);
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: undefined}).ok);
@@ -323,8 +323,8 @@ assert.eq(
     1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}).ok);
 res = t.getDB().runCommand({ping: 1, maxTimeMS: 10 * 1000});
 assert(res.ok == 0 && res.code == ErrorCodes.MaxTimeMSExpired,
-       "expected command to trigger maxTimeAlwaysTimeOut fail point, ok=" + res.ok + ", code=" +
-           res.code);
+       "expected command to trigger maxTimeAlwaysTimeOut fail point, ok=" + res.ok +
+           ", code=" + res.code);
 assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}).ok);
 
 // maxTimeNeverTimeOut positive test for command.
@@ -333,8 +333,8 @@ assert.eq(1,
           t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}).ok);
 res = t.getDB().adminCommand({sleep: 1, millis: 300, maxTimeMS: 100});
 assert(res.ok == 1,
-       "expected command to trigger maxTimeNeverTimeOut fail point, ok=" + res.ok + ", code=" +
-           res.code);
+       "expected command to trigger maxTimeNeverTimeOut fail point, ok=" + res.ok +
+           ", code=" + res.code);
 assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}).ok);
 
 // maxTimeAlwaysTimeOut positive test for query.

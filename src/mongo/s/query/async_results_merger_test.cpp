@@ -42,7 +42,6 @@
 #include "mongo/s/query/results_merger_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -1323,8 +1322,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
     // The next getMore request should include the maxTimeMS.
     expectedCmdObj = BSON("getMore" << CursorId(123) << "collection"
                                     << "testcoll"
-                                    << "maxTimeMS"
-                                    << 789);
+                                    << "maxTimeMS" << 789);
     ASSERT_BSONOBJ_EQ(getNthPendingRequest(0).cmdObj, expectedCmdObj);
 
     // Clean up.
@@ -1345,11 +1343,10 @@ DEATH_TEST_F(AsyncResultsMergerTest,
     // Create one cursor whose initial response has a postBatchResumeToken.
     auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 5));
     auto firstDocSortKey = makeResumeToken(Timestamp(1, 4), uuid, BSON("_id" << 1));
-    auto firstCursorResponse = fromjson(
-        str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': '"
-                      << firstDocSortKey.firstElement().String()
-                      << "'}}");
+    auto firstCursorResponse =
+        fromjson(str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '"
+                               << uuid.toString() << "', documentKey: {_id: 1}}, $sortKey: {'': '"
+                               << firstDocSortKey.firstElement().String() << "'}}");
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[0],
         kTestShardHosts[0],
@@ -1380,11 +1377,10 @@ DEATH_TEST_F(AsyncResultsMergerTest,
     std::vector<RemoteCursor> cursors;
     BSONObj pbrtFirstCursor;
     auto firstDocSortKey = makeResumeToken(Timestamp(1, 4), uuid, BSON("_id" << 1));
-    auto firstCursorResponse = fromjson(
-        str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': '"
-                      << firstDocSortKey.firstElement().String()
-                      << "'}}");
+    auto firstCursorResponse =
+        fromjson(str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '"
+                               << uuid.toString() << "', documentKey: {_id: 1}}, $sortKey: {'': '"
+                               << firstDocSortKey.firstElement().String() << "'}}");
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[0],
         kTestShardHosts[0],
@@ -1410,11 +1406,10 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfRemoteHasLowerPostB
     std::vector<RemoteCursor> cursors;
     auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 5));
     auto firstDocSortKey = makeResumeToken(Timestamp(1, 4), uuid, BSON("_id" << 1));
-    auto firstCursorResponse = fromjson(
-        str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': '"
-                      << firstDocSortKey.firstElement().String()
-                      << "'}}");
+    auto firstCursorResponse =
+        fromjson(str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '"
+                               << uuid.toString() << "', documentKey: {_id: 1}}, $sortKey: {'': '"
+                               << firstDocSortKey.firstElement().String() << "'}}");
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[0],
         kTestShardHosts[0],
@@ -1451,11 +1446,10 @@ DEATH_TEST_F(AsyncResultsMergerTest,
     UUID uuid = UUID::gen();
     std::vector<RemoteCursor> cursors;
     auto firstDocSortKey = makeResumeToken(Timestamp(1, 4), uuid, BSON("_id" << 1));
-    auto firstCursorResponse = fromjson(
-        str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': '"
-                      << firstDocSortKey.firstElement().String()
-                      << "'}}");
+    auto firstCursorResponse =
+        fromjson(str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '"
+                               << uuid.toString() << "', documentKey: {_id: 1}}, $sortKey: {'': '"
+                               << firstDocSortKey.firstElement().String() << "'}}");
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[0],
         kTestShardHosts[0],
@@ -1483,11 +1477,10 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorIgnoresOplogTimestamp) {
     auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 5));
     auto firstDocSortKey = makeResumeToken(Timestamp(1, 4), uuid, BSON("_id" << 1));
     // Set the first cursor to have both a PBRT and a matching oplog timestamp.
-    auto firstCursorResponse = fromjson(
-        str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': '"
-                      << firstDocSortKey.firstElement().String()
-                      << "'}}");
+    auto firstCursorResponse =
+        fromjson(str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '"
+                               << uuid.toString() << "', documentKey: {_id: 1}}, $sortKey: {'': '"
+                               << firstDocSortKey.firstElement().String() << "'}}");
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[0],
         kTestShardHosts[0],
@@ -1541,11 +1534,10 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting)
     std::vector<CursorResponse> responses;
     auto firstDocSortKey = makeResumeToken(Timestamp(1, 4), uuid, BSON("_id" << 1));
     auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 6));
-    auto firstCursorResponse = fromjson(
-        str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': '"
-                      << firstDocSortKey.firstElement().String()
-                      << "'}}");
+    auto firstCursorResponse =
+        fromjson(str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '"
+                               << uuid.toString() << "', documentKey: {_id: 1}}, $sortKey: {'': '"
+                               << firstDocSortKey.firstElement().String() << "'}}");
     std::vector<BSONObj> batch1 = {firstCursorResponse};
     auto firstDoc = batch1.front();
     responses.emplace_back(
@@ -1572,11 +1564,10 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting)
     responses.clear();
     auto secondDocSortKey = makeResumeToken(Timestamp(1, 5), uuid, BSON("_id" << 2));
     auto pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 6));
-    auto secondCursorResponse = fromjson(
-        str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 5)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 2}}, $sortKey: {'': '"
-                      << secondDocSortKey.firstElement().String()
-                      << "'}}");
+    auto secondCursorResponse =
+        fromjson(str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 5)}, uuid: '"
+                               << uuid.toString() << "', documentKey: {_id: 2}}, $sortKey: {'': '"
+                               << secondDocSortKey.firstElement().String() << "'}}");
     std::vector<BSONObj> batch2 = {secondCursorResponse};
     auto secondDoc = batch2.front();
     responses.emplace_back(
@@ -1623,11 +1614,10 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting
     std::vector<CursorResponse> responses;
     auto firstDocSortKey = makeResumeToken(Timestamp(1, 4), uuid, BSON("_id" << 1));
     auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 5));
-    auto firstCursorResponse = fromjson(
-        str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': '"
-                      << firstDocSortKey.firstElement().String()
-                      << "'}}");
+    auto firstCursorResponse =
+        fromjson(str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '"
+                               << uuid.toString() << "', documentKey: {_id: 1}}, $sortKey: {'': '"
+                               << firstDocSortKey.firstElement().String() << "'}}");
     std::vector<BSONObj> batch1 = {firstCursorResponse};
     responses.emplace_back(
         kTestNss, CursorId(123), batch1, boost::none, boost::none, pbrtFirstCursor);
@@ -1653,11 +1643,10 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting
     responses.clear();
     auto secondDocSortKey = makeResumeToken(Timestamp(1, 3), uuid, BSON("_id" << 2));
     auto pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 5));
-    auto secondCursorResponse = fromjson(
-        str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 3)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 2}}, $sortKey: {'': '"
-                      << secondDocSortKey.firstElement().String()
-                      << "'}}");
+    auto secondCursorResponse =
+        fromjson(str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 3)}, uuid: '"
+                               << uuid.toString() << "', documentKey: {_id: 2}}, $sortKey: {'': '"
+                               << secondDocSortKey.firstElement().String() << "'}}");
     std::vector<BSONObj> batch2 = {secondCursorResponse};
     // The last observed time should still be later than the first shard, so we can get the data
     // from it.

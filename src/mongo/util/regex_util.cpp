@@ -56,13 +56,13 @@ pcrecpp::RE_Options flagsToPcreOptions(StringData optionFlags,
                 continue;
             default:
                 if (!ignoreInvalidFlags) {
-                    uasserted(
-                        51108,
-                        str::stream() << opName << " invalid flag in regex options: " << flag);
+                    uasserted(51108,
+                              str::stream()
+                                  << opName << " invalid flag in regex options: " << flag);
                 }
         }
     }
     return opt;
 }
-}
-}
+}  // namespace regex_util
+}  // namespace mongo

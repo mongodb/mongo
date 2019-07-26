@@ -6,7 +6,6 @@
  * Repeatedly creates and drops a collection.
  */
 var $config = (function() {
-
     var data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
@@ -14,7 +13,6 @@ var $config = (function() {
     };
 
     var states = (function() {
-
         function uniqueCollectionName(prefix, tid, num) {
             return prefix + tid + '_' + num;
         }
@@ -31,7 +29,6 @@ var $config = (function() {
         }
 
         return {init: init, createAndDrop: createAndDrop};
-
     })();
 
     var transitions = {init: {createAndDrop: 1}, createAndDrop: {createAndDrop: 1}};
@@ -45,5 +42,4 @@ var $config = (function() {
     // The threadCount and iterations can be increased once PM-697 ("Remove all usages of
     // distributed lock") is complete.
     return {threadCount: 5, iterations: 5, data: data, states: states, transitions: transitions};
-
 })();

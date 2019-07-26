@@ -291,4 +291,4 @@ public:
                   bool dupsAllowed) override;
 };
 
-}  // namespace
+}  // namespace mongo

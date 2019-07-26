@@ -276,14 +276,13 @@ void ReplCoordTest::simulateSuccessfulDryRun(
         if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
             ASSERT_TRUE(request.cmdObj.getBoolField("dryRun"));
             onDryRunRequest(request);
-            net->scheduleResponse(noi,
-                                  net->now(),
-                                  makeResponseStatus(BSON("ok" << 1 << "reason"
-                                                               << ""
-                                                               << "term"
-                                                               << request.cmdObj["term"].Long()
-                                                               << "voteGranted"
-                                                               << true)));
+            net->scheduleResponse(
+                noi,
+                net->now(),
+                makeResponseStatus(BSON("ok" << 1 << "reason"
+                                             << ""
+                                             << "term" << request.cmdObj["term"].Long()
+                                             << "voteGranted" << true)));
             voteRequests++;
         } else if (consumeHeartbeatV1(noi)) {
             // The heartbeat has been consumed.
@@ -345,14 +344,13 @@ void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t e
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
         } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
-            net->scheduleResponse(noi,
-                                  net->now(),
-                                  makeResponseStatus(BSON("ok" << 1 << "reason"
-                                                               << ""
-                                                               << "term"
-                                                               << request.cmdObj["term"].Long()
-                                                               << "voteGranted"
-                                                               << true)));
+            net->scheduleResponse(
+                noi,
+                net->now(),
+                makeResponseStatus(BSON("ok" << 1 << "reason"
+                                             << ""
+                                             << "term" << request.cmdObj["term"].Long()
+                                             << "voteGranted" << true)));
         } else {
             error() << "Black holing unexpected request to " << request.target << ": "
                     << request.cmdObj;

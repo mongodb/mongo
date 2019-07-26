@@ -17,7 +17,6 @@
  * ]
  */
 var $config = (function() {
-
     var data = {
         mapper: function mapper() {
             emit(this.key, 1);
@@ -31,7 +30,6 @@ var $config = (function() {
     };
 
     var states = (function() {
-
         function dropColl(db, collName) {
             var mapReduceDb = db.getSiblingDB(this.mapReduceDBName);
 
@@ -78,7 +76,6 @@ var $config = (function() {
         }
 
         return {dropColl: dropColl, dropDB: dropDB, mapReduce: mapReduce};
-
     })();
 
     var transitions = {
@@ -100,5 +97,4 @@ var $config = (function() {
         startState: 'mapReduce',
         transitions: transitions,
     };
-
 })();

@@ -6,35 +6,35 @@
 // Socialite schema example available here: https://github.com/mongodb-labs/socialite
 
 (function() {
-    "use strict";
+"use strict";
 
-    var follower = db.followers;
-    var users = db.users;
+var follower = db.followers;
+var users = db.users;
 
-    follower.drop();
-    users.drop();
+follower.drop();
+users.drop();
 
-    var userDocs = [
-        {_id: "djw", fullname: "Darren", country: "Australia"},
-        {_id: "bmw", fullname: "Bob", country: "Germany"},
-        {_id: "jsr", fullname: "Jared", country: "USA"},
-        {_id: "ftr", fullname: "Frank", country: "Canada"}
-    ];
+var userDocs = [
+    {_id: "djw", fullname: "Darren", country: "Australia"},
+    {_id: "bmw", fullname: "Bob", country: "Germany"},
+    {_id: "jsr", fullname: "Jared", country: "USA"},
+    {_id: "ftr", fullname: "Frank", country: "Canada"}
+];
 
-    userDocs.forEach(function(userDoc) {
-        assert.writeOK(users.insert(userDoc));
-    });
+userDocs.forEach(function(userDoc) {
+    assert.writeOK(users.insert(userDoc));
+});
 
-    var followers = [{_f: "djw", _t: "jsr"}, {_f: "jsr", _t: "bmw"}, {_f: "ftr", _t: "bmw"}];
+var followers = [{_f: "djw", _t: "jsr"}, {_f: "jsr", _t: "bmw"}, {_f: "ftr", _t: "bmw"}];
 
-    followers.forEach(function(f) {
-        assert.writeOK(follower.insert(f));
-    });
+followers.forEach(function(f) {
+    assert.writeOK(follower.insert(f));
+});
 
-    // Find the social network of "Darren", that is, people Darren follows, and people who are
-    // followed by someone Darren follows, etc.
+// Find the social network of "Darren", that is, people Darren follows, and people who are
+// followed by someone Darren follows, etc.
 
-    var res = users
+var res = users
                   .aggregate({$match: {fullname: "Darren"}},
                              {
                                $graphLookup: {
@@ -49,6 +49,6 @@
                              {$project: {_id: "$network._t"}})
                   .toArray();
 
-    // "djw" is followed, directly or indirectly, by "jsr" and "bmw".
-    assert.eq(res.length, 2);
+// "djw" is followed, directly or indirectly, by "jsr" and "bmw".
+assert.eq(res.length, 2);
 }());

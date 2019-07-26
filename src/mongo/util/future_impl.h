@@ -1029,8 +1029,7 @@ public:
 
         // TODO in C++17 with constexpr if this can be done cleaner and more efficiently by not
         // throwing.
-        return std::move(*this).onError([func =
-                                             std::forward<Func>(func)](Status && status) mutable {
+        return std::move(*this).onError([func = std::forward<Func>(func)](Status&& status) mutable {
             if (status != code)
                 uassertStatusOK(status);
             return throwingCall(func, std::move(status));
@@ -1047,8 +1046,7 @@ public:
         if (_immediate || (isReady() && _shared->status.isOK()))
             return std::move(*this);
 
-        return std::move(*this).onError([func =
-                                             std::forward<Func>(func)](Status && status) mutable {
+        return std::move(*this).onError([func = std::forward<Func>(func)](Status&& status) mutable {
             if (!ErrorCodes::isA<category>(status.code()))
                 uassertStatusOK(status);
             return throwingCall(func, std::move(status));
@@ -1070,9 +1068,8 @@ public:
         static_assert(std::is_void<decltype(call(func, std::declval<const Status&>()))>::value,
                       "func passed to tapError must return void");
 
-        return tapImpl(std::forward<Func>(func),
-                       [](Func && func, const T& val) noexcept {},
-                       [](Func && func, const Status& status) noexcept { call(func, status); });
+        return tapImpl(std::forward<Func>(func), [](Func && func, const T& val) noexcept {}, [
+        ](Func && func, const Status& status) noexcept { call(func, status); });
     }
 
     template <typename Func>

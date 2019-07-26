@@ -236,4 +236,4 @@ TEST_F(QueryStageNearTest, EmptyResults) {
     ASSERT_EQUALS(results.size(), 3u);
     assertAscendingAndValid(results);
 }
-}
+}  // namespace

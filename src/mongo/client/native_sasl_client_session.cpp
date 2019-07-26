@@ -98,4 +98,4 @@ Status NativeSaslClientSession::step(StringData inputData, std::string* outputDa
     }
     return status.getStatus();
 }
-}  // namespace
+}  // namespace mongo

@@ -7,7 +7,6 @@
  */
 load('jstests/concurrency/fsm_workload_helpers/cleanup_txns.js');
 var $config = (function() {
-
     function quietly(func) {
         const printOriginal = print;
         try {
@@ -216,5 +215,4 @@ var $config = (function() {
         setup: setup,
         teardown: teardown
     };
-
 })();

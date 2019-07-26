@@ -27,7 +27,6 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.data.extendDocument = function extendDocument(originalDoc) {
-
         // Be sure we're not overwriting an existing field.
         assertAlways.eq(originalDoc.hasOwnProperty(fieldName), false);
 

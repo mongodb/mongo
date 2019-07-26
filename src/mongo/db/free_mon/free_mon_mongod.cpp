@@ -105,7 +105,6 @@ public:
             reqObj.objdata(), reqObj.objdata() + reqObj.objsize());
 
         return post("/register", data).then([](DataBuilder&& blob) {
-
             if (!blob.size()) {
                 uasserted(ErrorCodes::FreeMonHttpTemporaryFailure, "Empty response received");
             }
@@ -128,7 +127,6 @@ public:
             reqObj.objdata(), reqObj.objdata() + reqObj.objsize());
 
         return post("/metrics", data).then([](DataBuilder&& blob) {
-
             if (!blob.size()) {
                 uasserted(ErrorCodes::FreeMonHttpTemporaryFailure, "Empty response received");
             }
@@ -152,7 +150,7 @@ private:
         std::string url(FreeMonEndpointURL + path.toString());
 
         auto status = _executor->scheduleWork(
-            [ promise = std::move(pf.promise), url = std::move(url), data = std::move(data), this ](
+            [promise = std::move(pf.promise), url = std::move(url), data = std::move(data), this](
                 const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
                 ConstDataRange cdr(data->data(), data->size());
                 try {
@@ -202,28 +200,11 @@ public:
               // Try to filter server status to make it cheaper to collect. Harmless if we gather
               // extra
               BSON("serverStatus" << 1 << "storageEngine" << true << "extra_info" << false
-                                  << "opLatencies"
-                                  << false
-                                  << "opcountersRepl"
-                                  << false
-                                  << "opcounters"
-                                  << false
-                                  << "transactions"
-                                  << false
-                                  << "connections"
-                                  << false
-                                  << "network"
-                                  << false
-                                  << "tcMalloc"
-                                  << false
-                                  << "network"
-                                  << false
-                                  << "wiredTiger"
-                                  << false
-                                  << "sharding"
-                                  << false
-                                  << "metrics"
-                                  << false)) {}
+                                  << "opLatencies" << false << "opcountersRepl" << false
+                                  << "opcounters" << false << "transactions" << false
+                                  << "connections" << false << "network" << false << "tcMalloc"
+                                  << false << "network" << false << "wiredTiger" << false
+                                  << "sharding" << false << "metrics" << false)) {}
 
     std::string name() const final {
         return "storageEngine";

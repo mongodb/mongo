@@ -359,7 +359,7 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledBlockingWorkSucceeds) {
     unittest::Barrier barrier(2);
     auto pf = makePromiseFuture<int>();
     auto future =
-        async.scheduleWork([&barrier, future = std::move(pf.future) ](OperationContext * opCtx) {
+        async.scheduleWork([&barrier, future = std::move(pf.future)](OperationContext* opCtx) {
             barrier.countDownAndWait();
             return future.get(opCtx);
         });
@@ -377,7 +377,7 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledBlockingWorkThrowsException) {
     unittest::Barrier barrier(2);
     auto pf = makePromiseFuture<int>();
     auto future =
-        async.scheduleWork([&barrier, future = std::move(pf.future) ](OperationContext * opCtx) {
+        async.scheduleWork([&barrier, future = std::move(pf.future)](OperationContext* opCtx) {
             barrier.countDownAndWait();
             future.get(opCtx);
             uasserted(ErrorCodes::InternalError, "Test error");
@@ -396,7 +396,7 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledBlockingWorkInSucceeds) {
     auto pf = makePromiseFuture<int>();
     auto future = async.scheduleWorkIn(
         Milliseconds{10},
-        [future = std::move(pf.future)](OperationContext * opCtx) { return future.get(opCtx); });
+        [future = std::move(pf.future)](OperationContext* opCtx) { return future.get(opCtx); });
 
     pf.promise.emplaceValue(5);
     ASSERT(!future.isReady());

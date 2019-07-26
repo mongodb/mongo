@@ -292,10 +292,8 @@ ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "The field '" << elementPath->dottedField() << "'"
                                 << " must be an array but is of type "
-                                << typeName(element->getType())
-                                << " in document {"
-                                << (idElem.ok() ? idElem.toString() : "no id")
-                                << "}");
+                                << typeName(element->getType()) << " in document {"
+                                << (idElem.ok() ? idElem.toString() : "no id") << "}");
     }
 
     auto result = insertElementsWithPosition(element, _position, _valuesToPush);

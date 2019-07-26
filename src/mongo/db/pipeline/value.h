@@ -146,7 +146,7 @@ public:
      *  Used when preforming arithmetic operations with int where the
      *  result may be too large and need to be stored as long. The Value
      *  will be an int if value fits, otherwise it will be a long.
-    */
+     */
     static Value createIntOrLong(long long value);
 
     /** A "missing" value indicates the lack of a Value.
@@ -396,7 +396,7 @@ public:
         return Value(values);
     }
 };
-}
+}  // namespace mongo
 
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 

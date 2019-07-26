@@ -529,4 +529,4 @@ MONGO_FAIL_POINT_DECLARE(WTWriteConflictExceptionForReads);
 // will not be considered durable until deactivated. It is unspecified whether writes that commit
 // before activation will become visible while active.
 MONGO_FAIL_POINT_DECLARE(WTPausePrimaryOplogDurabilityLoop);
-}
+}  // namespace mongo

@@ -85,5 +85,4 @@ var $config = (function() {
         transitions: transitions,
         setup: setup
     };
-
 })();

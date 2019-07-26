@@ -96,30 +96,18 @@ StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
     if (!indexVersionElt.isNumber()) {
         return {ErrorCodes::CannotCreateIndex,
                 str::stream() << "Invalid type for geo index version { " << kIndexVersionFieldName
-                              << " : "
-                              << indexVersionElt
-                              << " }, only versions: ["
-                              << S2_INDEX_VERSION_1
-                              << ","
-                              << S2_INDEX_VERSION_2
-                              << ","
-                              << S2_INDEX_VERSION_3
-                              << "] are supported"};
+                              << " : " << indexVersionElt << " }, only versions: ["
+                              << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2 << ","
+                              << S2_INDEX_VERSION_3 << "] are supported"};
     }
 
     if (indexVersionElt.type() == BSONType::NumberDouble &&
         !std::isnormal(indexVersionElt.numberDouble())) {
         return {ErrorCodes::CannotCreateIndex,
                 str::stream() << "Invalid value for geo index version { " << kIndexVersionFieldName
-                              << " : "
-                              << indexVersionElt
-                              << " }, only versions: ["
-                              << S2_INDEX_VERSION_1
-                              << ","
-                              << S2_INDEX_VERSION_2
-                              << ","
-                              << S2_INDEX_VERSION_3
-                              << "] are supported"};
+                              << " : " << indexVersionElt << " }, only versions: ["
+                              << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2 << ","
+                              << S2_INDEX_VERSION_3 << "] are supported"};
     }
 
     const auto indexVersion = indexVersionElt.numberLong();
@@ -127,15 +115,9 @@ StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
         indexVersion != S2_INDEX_VERSION_3) {
         return {ErrorCodes::CannotCreateIndex,
                 str::stream() << "unsupported geo index version { " << kIndexVersionFieldName
-                              << " : "
-                              << indexVersionElt
-                              << " }, only versions: ["
-                              << S2_INDEX_VERSION_1
-                              << ","
-                              << S2_INDEX_VERSION_2
-                              << ","
-                              << S2_INDEX_VERSION_3
-                              << "] are supported"};
+                              << " : " << indexVersionElt << " }, only versions: ["
+                              << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2 << ","
+                              << S2_INDEX_VERSION_3 << "] are supported"};
     }
 
     return specObj;

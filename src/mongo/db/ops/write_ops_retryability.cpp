@@ -56,11 +56,8 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
             40606,
             str::stream() << "findAndModify retry request: " << redact(request.toBSON({}))
                           << " is not compatible with previous write in the transaction of type: "
-                          << OpType_serializer(oplogEntry.getOpType())
-                          << ", oplogTs: "
-                          << ts.toString()
-                          << ", oplog: "
-                          << redact(oplogEntry.toBSON()),
+                          << OpType_serializer(oplogEntry.getOpType()) << ", oplogTs: "
+                          << ts.toString() << ", oplog: " << redact(oplogEntry.toBSON()),
             request.isRemove());
         uassert(40607,
                 str::stream() << "No pre-image available for findAndModify retry request:"
@@ -71,22 +68,16 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
             40608,
             str::stream() << "findAndModify retry request: " << redact(request.toBSON({}))
                           << " is not compatible with previous write in the transaction of type: "
-                          << OpType_serializer(oplogEntry.getOpType())
-                          << ", oplogTs: "
-                          << ts.toString()
-                          << ", oplog: "
-                          << redact(oplogEntry.toBSON()),
+                          << OpType_serializer(oplogEntry.getOpType()) << ", oplogTs: "
+                          << ts.toString() << ", oplog: " << redact(oplogEntry.toBSON()),
             request.isUpsert());
     } else {
         uassert(
             40609,
             str::stream() << "findAndModify retry request: " << redact(request.toBSON({}))
                           << " is not compatible with previous write in the transaction of type: "
-                          << OpType_serializer(oplogEntry.getOpType())
-                          << ", oplogTs: "
-                          << ts.toString()
-                          << ", oplog: "
-                          << redact(oplogEntry.toBSON()),
+                          << OpType_serializer(oplogEntry.getOpType()) << ", oplogTs: "
+                          << ts.toString() << ", oplog: " << redact(oplogEntry.toBSON()),
             opType == repl::OpTypeEnum::kUpdate);
 
         if (request.shouldReturnNew()) {
@@ -94,18 +85,14 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                     str::stream() << "findAndModify retry request: " << redact(request.toBSON({}))
                                   << " wants the document after update returned, but only before "
                                      "update document is stored, oplogTs: "
-                                  << ts.toString()
-                                  << ", oplog: "
-                                  << redact(oplogEntry.toBSON()),
+                                  << ts.toString() << ", oplog: " << redact(oplogEntry.toBSON()),
                     oplogWithCorrectLinks.getPostImageOpTime());
         } else {
             uassert(40612,
                     str::stream() << "findAndModify retry request: " << redact(request.toBSON({}))
                                   << " wants the document before update returned, but only after "
                                      "update document is stored, oplogTs: "
-                                  << ts.toString()
-                                  << ", oplog: "
-                                  << redact(oplogEntry.toBSON()),
+                                  << ts.toString() << ", oplog: " << redact(oplogEntry.toBSON()),
                     oplogWithCorrectLinks.getPreImageOpTime());
         }
     }
@@ -129,8 +116,7 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
     uassert(40613,
             str::stream() << "oplog no longer contains the complete write history of this "
                              "transaction, log with opTime "
-                          << opTime.toString()
-                          << " cannot be found",
+                          << opTime.toString() << " cannot be found",
             !oplogDoc.isEmpty());
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogDoc));
@@ -172,8 +158,7 @@ repl::OplogEntry getInnerNestedOplogEntry(const repl::OplogEntry& entry) {
     uassert(40635,
             str::stream() << "expected nested oplog entry with ts: "
                           << entry.getTimestamp().toString()
-                          << " to have o2 field: "
-                          << redact(entry.toBSON()),
+                          << " to have o2 field: " << redact(entry.toBSON()),
             entry.getObject2());
     return uassertStatusOK(repl::OplogEntry::parse(*entry.getObject2()));
 }
@@ -200,10 +185,8 @@ SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
                   str::stream() << "update retry request is not compatible with previous write in "
                                    "the transaction of type: "
                                 << OpType_serializer(entry.getOpType())
-                                << ", oplogTs: "
-                                << entry.getTimestamp().toString()
-                                << ", oplog: "
-                                << redact(entry.toBSON()));
+                                << ", oplogTs: " << entry.getTimestamp().toString()
+                                << ", oplog: " << redact(entry.toBSON()));
     }
 
     return res;

@@ -182,8 +182,8 @@ class TwoPhaseDropCollectionTest {
             TwoPhaseDropCollectionTest.listCollections(db, {includePendingDrops: true});
 
         TwoPhaseDropCollectionTest._testLog("Checking presence of drop-pending collection for " +
-                                            collName + " in the collection list: " +
-                                            tojson(collections));
+                                            collName +
+                                            " in the collection list: " + tojson(collections));
 
         let pendingDropRegex = TwoPhaseDropCollectionTest.pendingDropRegex(collName);
         return collections.find(c => pendingDropRegex.test(c.name));

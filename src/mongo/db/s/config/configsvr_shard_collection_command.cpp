@@ -158,8 +158,7 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
         uassert(ErrorCodes::BadValue,
                 str::stream() << "The collation for shardCollection must be {locale: 'simple'}, "
-                              << "but found: "
-                              << collation,
+                              << "but found: " << collation,
                 !collator);
         simpleCollationSpecified = true;
     }
@@ -173,8 +172,7 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
     int numChunks = request->getNumInitialChunks();
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "numInitialChunks cannot be more than either: "
-                          << maxNumInitialChunksForShards
-                          << ", 8192 * number of shards; or "
+                          << maxNumInitialChunksForShards << ", 8192 * number of shards; or "
                           << maxNumInitialChunksTotal,
             numChunks >= 0 && numChunks <= maxNumInitialChunksForShards &&
                 numChunks <= maxNumInitialChunksTotal);
@@ -303,9 +301,7 @@ void validateShardKeyAgainstExistingIndexes(OperationContext* opCtx,
         bool isUnique = idx["unique"].trueValue();
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "can't shard collection '" << nss.ns() << "' with unique index on "
-                              << currentKey
-                              << " and proposed shard key "
-                              << proposedKey
+                              << currentKey << " and proposed shard key " << proposedKey
                               << ". Uniqueness can't be maintained unless shard key is a prefix",
                 !isUnique || shardKeyPattern.isUniqueIndexCompatible(currentKey));
     }
@@ -323,8 +319,7 @@ void validateShardKeyAgainstExistingIndexes(OperationContext* opCtx,
             // per field per collection.
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "can't shard collection " << nss.ns()
-                                  << " with hashed shard key "
-                                  << proposedKey
+                                  << " with hashed shard key " << proposedKey
                                   << " because the hashed index uses a non-default seed of "
                                   << idx["seed"].numberInt(),
                     !shardKeyPattern.isHashedPattern() || idx["seed"].eoo() ||
@@ -438,9 +433,7 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
     auto chunkManager = routingInfo.cm();
 
     // Move and commit each "big chunk" to a different shard.
-    auto nextShardId = [&, indx = 0 ]() mutable {
-        return shardIds[indx++ % shardIds.size()];
-    };
+    auto nextShardId = [&, indx = 0]() mutable { return shardIds[indx++ % shardIds.size()]; };
 
     for (auto chunk : chunkManager->chunks()) {
         const auto shardId = nextShardId();
@@ -553,10 +546,7 @@ boost::optional<UUID> getUUIDFromPrimaryShard(OperationContext* opCtx,
 
     uassert(ErrorCodes::InternalError,
             str::stream() << "expected the primary shard host " << primaryShard->getConnString()
-                          << " for database "
-                          << nss.db()
-                          << " to return an entry for "
-                          << nss.ns()
+                          << " for database " << nss.db() << " to return an entry for " << nss.ns()
                           << " in its listCollections response, but it did not",
             !res.isEmpty());
 
@@ -568,15 +558,12 @@ boost::optional<UUID> getUUIDFromPrimaryShard(OperationContext* opCtx,
     uassert(ErrorCodes::InternalError,
             str::stream() << "expected primary shard to return 'info' field as part of "
                              "listCollections for "
-                          << nss.ns()
-                          << ", but got "
-                          << res,
+                          << nss.ns() << ", but got " << res,
             !collectionInfo.isEmpty());
 
     uassert(ErrorCodes::InternalError,
             str::stream() << "expected primary shard to return a UUID for collection " << nss.ns()
-                          << " as part of 'info' field but got "
-                          << res,
+                          << " as part of 'info' field but got " << res,
             collectionInfo.hasField("uuid"));
 
     return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
@@ -806,8 +793,7 @@ public:
             if (fromMapReduce) {
                 uassert(ErrorCodes::ConflictingOperationInProgress,
                         str::stream() << "Map reduce with sharded output to a new collection found "
-                                      << nss.ns()
-                                      << " to be non-empty which is not supported.",
+                                      << nss.ns() << " to be non-empty which is not supported.",
                         isEmpty);
             }
 

@@ -27,86 +27,86 @@
  */
 
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/replsets/libs/secondary_reads_test.js");
+load("jstests/replsets/libs/secondary_reads_test.js");
 
-    const name = "secondaryReadsUniqueIndexes";
-    const collName = "testColl";
-    let secondaryReadsTest = new SecondaryReadsTest(name);
+const name = "secondaryReadsUniqueIndexes";
+const collName = "testColl";
+let secondaryReadsTest = new SecondaryReadsTest(name);
 
-    let primaryDB = secondaryReadsTest.getPrimaryDB();
-    let secondaryDB = secondaryReadsTest.getSecondaryDB();
+let primaryDB = secondaryReadsTest.getPrimaryDB();
+let secondaryDB = secondaryReadsTest.getSecondaryDB();
 
-    // Setup collection.
-    primaryDB.runCommand({drop: collName});
-    assert.commandWorked(primaryDB.runCommand({create: collName}));
+// Setup collection.
+primaryDB.runCommand({drop: collName});
+assert.commandWorked(primaryDB.runCommand({create: collName}));
 
-    // Create a unique index on the collection in the foreground.
-    assert.commandWorked(primaryDB.runCommand(
-        {createIndexes: collName, indexes: [{key: {x: 1}, name: "x_1", unique: true}]}));
+// Create a unique index on the collection in the foreground.
+assert.commandWorked(primaryDB.runCommand(
+    {createIndexes: collName, indexes: [{key: {x: 1}, name: "x_1", unique: true}]}));
 
-    let replSet = secondaryReadsTest.getReplset();
-    replSet.awaitReplication();
+let replSet = secondaryReadsTest.getReplset();
+replSet.awaitReplication();
 
-    // We want to do updates with at least as many different documents as there are parallel batch
-    // writer threads (16). Each iteration increments and decrements a uniquely indexed value, 'x'.
-    // The goal is that a reader on a secondary might find a case where the unique index constraint
-    // is ignored, and an index on x maps to two different records.
-    const nOps = 16;
-    const nIterations = 50;
-    const nReaders = 16;
+// We want to do updates with at least as many different documents as there are parallel batch
+// writer threads (16). Each iteration increments and decrements a uniquely indexed value, 'x'.
+// The goal is that a reader on a secondary might find a case where the unique index constraint
+// is ignored, and an index on x maps to two different records.
+const nOps = 16;
+const nIterations = 50;
+const nReaders = 16;
 
-    // Do a bunch of reads using the 'x' index on the secondary.
-    // No errors should be encountered on the secondary.
-    let readFn = function() {
-        for (let x = 0; x < TestData.nOps; x++) {
-            assert.commandWorked(db.runCommand({
-                find: TestData.collName,
-                filter: {x: x},
-                projection: {x: 1},
-                readConcern: {level: "local"},
-            }));
-            // Sleep a bit to make these reader threads less CPU intensive.
-            sleep(60);
-        }
-    };
-    TestData.nOps = nOps;
-    TestData.collName = collName;
-    secondaryReadsTest.startSecondaryReaders(nReaders, readFn);
+// Do a bunch of reads using the 'x' index on the secondary.
+// No errors should be encountered on the secondary.
+let readFn = function() {
+    for (let x = 0; x < TestData.nOps; x++) {
+        assert.commandWorked(db.runCommand({
+            find: TestData.collName,
+            filter: {x: x},
+            projection: {x: 1},
+            readConcern: {level: "local"},
+        }));
+        // Sleep a bit to make these reader threads less CPU intensive.
+        sleep(60);
+    }
+};
+TestData.nOps = nOps;
+TestData.collName = collName;
+secondaryReadsTest.startSecondaryReaders(nReaders, readFn);
 
-    // Write the initial documents. Ensure they have been replicated.
+// Write the initial documents. Ensure they have been replicated.
+for (let i = 0; i < nOps; i++) {
+    assert.commandWorked(
+        primaryDB.runCommand({insert: collName, documents: [{_id: i, x: i, iter: 0}]}));
+}
+replSet.awaitReplication();
+
+// Cycle the value of x in the document {_id: i, x: i} between i and i+1 each iteration.
+for (let iteration = 0; iteration < nIterations; iteration++) {
+    let updates = [];
+    // Reset each document.
     for (let i = 0; i < nOps; i++) {
-        assert.commandWorked(
-            primaryDB.runCommand({insert: collName, documents: [{_id: i, x: i, iter: 0}]}));
-    }
-    replSet.awaitReplication();
-
-    // Cycle the value of x in the document {_id: i, x: i} between i and i+1 each iteration.
-    for (let iteration = 0; iteration < nIterations; iteration++) {
-        let updates = [];
-        // Reset each document.
-        for (let i = 0; i < nOps; i++) {
-            updates[i] = {q: {_id: i}, u: {x: i, iter: iteration}};
-        }
-
-        assert.commandWorked(primaryDB.runCommand({update: collName, updates: updates}));
-        updates = [];
-
-        // Generate updates that increment x on each document backwards by _id to avoid conficts
-        // when applied in-order. When these updates get applied to the secondary, they may get
-        // applied out of order by different threads and temporarily violate unique index
-        // constraints.
-        for (let i = 0; i < nOps; i++) {
-            // Start at the end and increment x by 1.
-            let end = nOps - i - 1;
-            let nextX = end + 1;
-            updates[i] = {q: {_id: end}, u: {x: nextX, iter: iteration}};
-        }
-        print("iteration " + iteration);
-        assert.commandWorked(primaryDB.runCommand({update: collName, updates: updates}));
+        updates[i] = {q: {_id: i}, u: {x: i, iter: iteration}};
     }
 
-    replSet.awaitReplication();
-    secondaryReadsTest.stop();
+    assert.commandWorked(primaryDB.runCommand({update: collName, updates: updates}));
+    updates = [];
+
+    // Generate updates that increment x on each document backwards by _id to avoid conficts
+    // when applied in-order. When these updates get applied to the secondary, they may get
+    // applied out of order by different threads and temporarily violate unique index
+    // constraints.
+    for (let i = 0; i < nOps; i++) {
+        // Start at the end and increment x by 1.
+        let end = nOps - i - 1;
+        let nextX = end + 1;
+        updates[i] = {q: {_id: end}, u: {x: nextX, iter: iteration}};
+    }
+    print("iteration " + iteration);
+    assert.commandWorked(primaryDB.runCommand({update: collName, updates: updates}));
+}
+
+replSet.awaitReplication();
+secondaryReadsTest.stop();
 })();

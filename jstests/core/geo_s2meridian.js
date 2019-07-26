@@ -45,8 +45,7 @@ t.insert(pointOnPositiveSideOfMeridian);
 
 meridianCrossingPoly = {
     type: "Polygon",
-    coordinates:
-        [[[-178.0, 10.0], [178.0, 10.0], [178.0, -10.0], [-178.0, -10.0], [-178.0, 10.0]]]
+    coordinates: [[[-178.0, 10.0], [178.0, 10.0], [178.0, -10.0], [-178.0, -10.0], [-178.0, 10.0]]]
 };
 
 result = t.find({geo: {$geoWithin: {$geometry: meridianCrossingPoly}}});

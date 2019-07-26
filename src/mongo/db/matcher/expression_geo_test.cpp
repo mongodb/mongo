@@ -181,4 +181,4 @@ TEST(ExpressionGeoTest, GeoNearNotEquivalent) {
         gne2(makeGeoNearMatchExpression(query2));
     ASSERT(!gne1->equivalent(gne2.get()));
 }
-}
+}  // namespace mongo

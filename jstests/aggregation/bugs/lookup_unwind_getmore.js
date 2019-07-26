@@ -8,45 +8,47 @@
  * ]
  */
 (function() {
-    'use strict';
+'use strict';
 
-    const options = {setParameter: 'internalDocumentSourceCursorBatchSizeBytes=1'};
-    const conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
+const options = {
+    setParameter: 'internalDocumentSourceCursorBatchSizeBytes=1'
+};
+const conn = MongoRunner.runMongod(options);
+assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
 
-    const testDB = conn.getDB('test');
+const testDB = conn.getDB('test');
 
-    /**
-     * Executes an aggregrate with 'options.pipeline' and confirms that 'options.numResults' were
-     * returned.
-     */
-    function runTest(options) {
-        // The batchSize must be smaller than the number of documents returned by the $lookup. This
-        // ensures that the mongo shell will issue a getMore when unwinding the $lookup results for
-        // the same document in the 'source' collection, under a different OperationContext.
-        const batchSize = 2;
+/**
+ * Executes an aggregrate with 'options.pipeline' and confirms that 'options.numResults' were
+ * returned.
+ */
+function runTest(options) {
+    // The batchSize must be smaller than the number of documents returned by the $lookup. This
+    // ensures that the mongo shell will issue a getMore when unwinding the $lookup results for
+    // the same document in the 'source' collection, under a different OperationContext.
+    const batchSize = 2;
 
-        testDB.source.drop();
-        assert.writeOK(testDB.source.insert({x: 1}));
+    testDB.source.drop();
+    assert.writeOK(testDB.source.insert({x: 1}));
 
-        testDB.dest.drop();
-        for (let i = 0; i < 5; ++i) {
-            assert.writeOK(testDB.dest.insert({x: 1}));
-        }
-
-        const res = assert.commandWorked(testDB.runCommand({
-            aggregate: 'source',
-            pipeline: options.pipeline,
-            cursor: {
-                batchSize: batchSize,
-            },
-        }));
-
-        const cursor = new DBCommandCursor(testDB, res, batchSize);
-        assert.eq(options.numResults, cursor.itcount());
+    testDB.dest.drop();
+    for (let i = 0; i < 5; ++i) {
+        assert.writeOK(testDB.dest.insert({x: 1}));
     }
 
-    runTest({
+    const res = assert.commandWorked(testDB.runCommand({
+        aggregate: 'source',
+        pipeline: options.pipeline,
+        cursor: {
+            batchSize: batchSize,
+        },
+    }));
+
+    const cursor = new DBCommandCursor(testDB, res, batchSize);
+    assert.eq(options.numResults, cursor.itcount());
+}
+
+runTest({
         pipeline: [
             {
               $lookup: {
@@ -65,7 +67,7 @@
         numResults: 5
     });
 
-    runTest({
+runTest({
         pipeline: [
             {
               $lookup: {
@@ -99,5 +101,5 @@
         numResults: 25
     });
 
-    MongoRunner.stopMongod(conn);
+MongoRunner.stopMongod(conn);
 })();

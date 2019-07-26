@@ -117,8 +117,8 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
                               _dbname,
                               createListCollectionsCommandObject(_listCollectionsFilter),
                               [=](const StatusWith<Fetcher::QueryResponse>& result,
-                                  Fetcher::NextAction * nextAction,
-                                  BSONObjBuilder * getMoreBob) {
+                                  Fetcher::NextAction* nextAction,
+                                  BSONObjBuilder* getMoreBob) {
                                   _listCollectionsCallback(result, nextAction, getMoreBob);
                               },
                               ReadPreferenceSetting::secondaryPreferredMetadata(),
@@ -263,9 +263,8 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
                                               BSONObjBuilder* getMoreBob) {
     if (!result.isOK()) {
         _finishCallback(result.getStatus().withContext(
-            str::stream() << "Error issuing listCollections on db '" << _dbname << "' (host:"
-                          << _source.toString()
-                          << ")"));
+            str::stream() << "Error issuing listCollections on db '" << _dbname
+                          << "' (host:" << _source.toString() << ")"));
         return;
     }
 
@@ -311,12 +310,11 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
     for (auto&& info : _collectionInfos) {
         BSONElement nameElement = info.getField(kNameFieldName);
         if (nameElement.eoo()) {
-            _finishCallback_inlock(
-                lk,
-                {ErrorCodes::FailedToParse,
-                 str::stream() << "collection info must contain '" << kNameFieldName << "' "
-                               << "field : "
-                               << info});
+            _finishCallback_inlock(lk,
+                                   {ErrorCodes::FailedToParse,
+                                    str::stream() << "collection info must contain '"
+                                                  << kNameFieldName << "' "
+                                                  << "field : " << info});
             return;
         }
         if (nameElement.type() != mongo::String) {
@@ -332,29 +330,24 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
                                    {ErrorCodes::Error(51005),
                                     str::stream()
                                         << "collection info contains duplicate collection name "
-                                        << "'"
-                                        << collectionName
-                                        << "': "
-                                        << info});
+                                        << "'" << collectionName << "': " << info});
             return;
         }
 
         BSONElement optionsElement = info.getField(kOptionsFieldName);
         if (optionsElement.eoo()) {
-            _finishCallback_inlock(
-                lk,
-                {ErrorCodes::FailedToParse,
-                 str::stream() << "collection info must contain '" << kOptionsFieldName << "' "
-                               << "field : "
-                               << info});
+            _finishCallback_inlock(lk,
+                                   {ErrorCodes::FailedToParse,
+                                    str::stream() << "collection info must contain '"
+                                                  << kOptionsFieldName << "' "
+                                                  << "field : " << info});
             return;
         }
         if (!optionsElement.isABSONObj()) {
             _finishCallback_inlock(lk,
                                    Status(ErrorCodes::TypeMismatch,
                                           str::stream() << "'" << kOptionsFieldName
-                                                        << "' field must be an object: "
-                                                        << info));
+                                                        << "' field must be an object: " << info));
             return;
         }
         const BSONObj optionsObj = optionsElement.Obj();
@@ -426,8 +419,8 @@ void DatabaseCloner::_collectionClonerCallback(const Status& status, const Names
 
     // Record failure, but do not return just yet, in case we want to do some logging.
     if (!status.isOK()) {
-        collStatus = status.withContext(
-            str::stream() << "Error cloning collection '" << nss.toString() << "'");
+        collStatus = status.withContext(str::stream()
+                                        << "Error cloning collection '" << nss.toString() << "'");
     }
 
     // Forward collection cloner result to caller.

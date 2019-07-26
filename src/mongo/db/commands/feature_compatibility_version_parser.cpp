@@ -61,37 +61,26 @@ FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVers
             continue;
         } else if (fieldName == kVersionField || fieldName == kTargetVersionField) {
             if (elem.type() != BSONType::String) {
-                return Status(
-                    ErrorCodes::TypeMismatch,
-                    str::stream() << fieldName << " must be of type String, but was of type "
-                                  << typeName(elem.type())
-                                  << ". Contents of "
-                                  << kParameterName
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream()
+                                  << fieldName << " must be of type String, but was of type "
+                                  << typeName(elem.type()) << ". Contents of " << kParameterName
                                   << " document in "
                                   << NamespaceString::kServerConfigurationNamespace.toString()
-                                  << ": "
-                                  << featureCompatibilityVersionDoc
-                                  << ". See "
+                                  << ": " << featureCompatibilityVersionDoc << ". See "
                                   << feature_compatibility_version_documentation::kCompatibilityLink
                                   << ".");
             }
 
             if (elem.String() != kVersion42 && elem.String() != kVersion40) {
-                return Status(
-                    ErrorCodes::BadValue,
-                    str::stream() << "Invalid value for " << fieldName << ", found "
-                                  << elem.String()
-                                  << ", expected '"
-                                  << kVersion42
-                                  << "' or '"
-                                  << kVersion40
-                                  << "'. Contents of "
-                                  << kParameterName
+                return Status(ErrorCodes::BadValue,
+                              str::stream()
+                                  << "Invalid value for " << fieldName << ", found "
+                                  << elem.String() << ", expected '" << kVersion42 << "' or '"
+                                  << kVersion40 << "'. Contents of " << kParameterName
                                   << " document in "
                                   << NamespaceString::kServerConfigurationNamespace.toString()
-                                  << ": "
-                                  << featureCompatibilityVersionDoc
-                                  << ". See "
+                                  << ": " << featureCompatibilityVersionDoc << ". See "
                                   << feature_compatibility_version_documentation::kCompatibilityLink
                                   << ".");
             }
@@ -102,15 +91,12 @@ FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVers
                 targetVersionString = elem.String();
             }
         } else {
-            return Status(
-                ErrorCodes::BadValue,
-                str::stream() << "Unrecognized field '" << fieldName << "'. Contents of "
-                              << kParameterName
-                              << " document in "
-                              << NamespaceString::kServerConfigurationNamespace.toString()
-                              << ": "
-                              << featureCompatibilityVersionDoc
-                              << ". See "
+            return Status(ErrorCodes::BadValue,
+                          str::stream()
+                              << "Unrecognized field '" << fieldName << "'. Contents of "
+                              << kParameterName << " document in "
+                              << NamespaceString::kServerConfigurationNamespace.toString() << ": "
+                              << featureCompatibilityVersionDoc << ". See "
                               << feature_compatibility_version_documentation::kCompatibilityLink
                               << ".");
         }
@@ -126,28 +112,23 @@ FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVers
         }
     } else if (versionString == kVersion42) {
         if (targetVersionString == kVersion42 || targetVersionString == kVersion40) {
-            return Status(
-                ErrorCodes::BadValue,
-                str::stream() << "Invalid state for " << kParameterName << " document in "
-                              << NamespaceString::kServerConfigurationNamespace.toString()
-                              << ": "
-                              << featureCompatibilityVersionDoc
-                              << ". See "
+            return Status(ErrorCodes::BadValue,
+                          str::stream()
+                              << "Invalid state for " << kParameterName << " document in "
+                              << NamespaceString::kServerConfigurationNamespace.toString() << ": "
+                              << featureCompatibilityVersionDoc << ". See "
                               << feature_compatibility_version_documentation::kCompatibilityLink
                               << ".");
         } else {
             version = ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
         }
     } else {
-        return Status(
-            ErrorCodes::BadValue,
-            str::stream() << "Missing required field '" << kVersionField << "''. Contents of "
-                          << kParameterName
-                          << " document in "
-                          << NamespaceString::kServerConfigurationNamespace.toString()
-                          << ": "
-                          << featureCompatibilityVersionDoc
-                          << ". See "
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "Missing required field '" << kVersionField << "''. Contents of "
+                          << kParameterName << " document in "
+                          << NamespaceString::kServerConfigurationNamespace.toString() << ": "
+                          << featureCompatibilityVersionDoc << ". See "
                           << feature_compatibility_version_documentation::kCompatibilityLink
                           << ".");
     }

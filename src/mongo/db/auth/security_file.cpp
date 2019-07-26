@@ -74,8 +74,8 @@ StatusWith<std::vector<std::string>> readSecurityFile(const std::string& filenam
     // check obvious file errors
     if (stat(filename.c_str(), &stats) == -1) {
         return Status(ErrorCodes::InvalidPath,
-                      str::stream() << "Error reading file " << filename << ": "
-                                    << strerror(errno));
+                      str::stream()
+                          << "Error reading file " << filename << ": " << strerror(errno));
     }
 
 #if !defined(_WIN32)

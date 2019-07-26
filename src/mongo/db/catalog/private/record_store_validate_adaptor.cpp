@@ -60,7 +60,7 @@ KeyString makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey) {
     const RecordId multikeyMetadataRecordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
     return {KeyString::kLatestVersion, indexKey, multikeyMetadataOrd, multikeyMetadataRecordId};
 }
-}
+}  // namespace
 
 Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                                             const RecordData& record,
@@ -117,9 +117,9 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                 {documentKeySet.begin(), documentKeySet.end()},
                 {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
                 multikeyPaths)) {
-            std::string msg = str::stream() << "Index " << descriptor->indexName()
-                                            << " is not multi-key, but a multikey path "
-                                            << " is present in document " << recordId;
+            std::string msg = str::stream()
+                << "Index " << descriptor->indexName() << " is not multi-key, but a multikey path "
+                << " is present in document " << recordId;
             curRecordResults.errors.push_back(msg);
             curRecordResults.valid = false;
         }
@@ -203,9 +203,9 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
     }
 
     if (results && _indexConsistency->getMultikeyMetadataPathCount(indexNumber) > 0) {
-        results->errors.push_back(
-            str::stream() << "Index '" << descriptor->indexName()
-                          << "' has one or more missing multikey metadata index keys");
+        results->errors.push_back(str::stream()
+                                  << "Index '" << descriptor->indexName()
+                                  << "' has one or more missing multikey metadata index keys");
         results->valid = false;
     }
 

@@ -1,7 +1,6 @@
 load('jstests/concurrency/fsm_libs/fsm.js');
 
 var composer = (function() {
-
     function runCombinedFSM(workloads, configs, mixProb) {
         // TODO: what if a workload depends on iterations?
         var iterations = 100;
@@ -70,5 +69,4 @@ var composer = (function() {
     }
 
     return {run: runCombinedFSM};
-
 })();

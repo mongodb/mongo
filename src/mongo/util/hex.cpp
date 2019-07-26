@@ -107,4 +107,4 @@ std::string hexdump(const char* data, unsigned len) {
     std::string s = ss.str();
     return s;
 }
-}
+}  // namespace mongo

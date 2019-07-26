@@ -6,7 +6,6 @@
  * upsert generates an insert, which then fails due to another operation inserting first.
  */
 var $config = (function() {
-
     const data = {
         numDocs: 4,
         getDocValue: function() {

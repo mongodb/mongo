@@ -13,4 +13,4 @@ assert.eq(res[0].x, 0);
 // Make sure having an undefined doesn't break pipelines that do use the field
 res = t.aggregate({$project: {undef: 1}}).toArray();
 assert.eq(res[0].undef, undefined);
-assert.eq(typeof(res[0].undef), "undefined");
+assert.eq(typeof (res[0].undef), "undefined");

@@ -44,7 +44,6 @@ namespace {
 
 ServiceContext::ConstructorActionRegisterer registerEgressTransportLayer{
     "ConfigureEgressTransportLayer", [](ServiceContext* sc) {
-
         invariant(!sc->getTransportLayer());
         transport::TransportLayerASIO::Options opts;
         opts.mode = transport::TransportLayerASIO::Options::kEgress;

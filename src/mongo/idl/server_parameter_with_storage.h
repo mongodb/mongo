@@ -293,15 +293,12 @@ public:
      */
     template <class predicate>
     void addBound(const element_type& bound) {
-        addValidator([ bound, spname = name() ](const element_type& value) {
+        addValidator([bound, spname = name()](const element_type& value) {
             if (!predicate::evaluate(value, bound)) {
                 return Status(ErrorCodes::BadValue,
-                              str::stream() << "Invalid value for parameter " << spname << ": "
-                                            << value
-                                            << " is not "
-                                            << predicate::description
-                                            << " "
-                                            << bound);
+                              str::stream()
+                                  << "Invalid value for parameter " << spname << ": " << value
+                                  << " is not " << predicate::description << " " << bound);
             }
             return Status::OK();
         });

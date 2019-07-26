@@ -160,7 +160,7 @@ void User::addPrivileges(const PrivilegeVector& privileges) {
     }
 }
 
-void User::setRestrictions(RestrictionDocuments restrictions)& {
+void User::setRestrictions(RestrictionDocuments restrictions) & {
     _restrictions = std::move(restrictions);
 }
 

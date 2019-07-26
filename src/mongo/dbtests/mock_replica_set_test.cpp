@@ -424,4 +424,4 @@ TEST(MockReplicaSetTest, KillMultipleNode) {
     const string priHostName(replSet.getPrimary());
     ASSERT(replSet.getNode(priHostName)->isRunning());
 }
-}
+}  // namespace mongo_test

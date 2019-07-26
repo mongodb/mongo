@@ -92,10 +92,8 @@ repl::OplogLink extractPrePostImageTs(const ProcessOplogResult& lastResult,
     if (!lastResult.isPrePostImage) {
         uassert(40628,
                 str::stream() << "expected oplog with ts: " << entry.getTimestamp().toString()
-                              << " to not have "
-                              << repl::OplogEntryBase::kPreImageOpTimeFieldName
-                              << " or "
-                              << repl::OplogEntryBase::kPostImageOpTimeFieldName,
+                              << " to not have " << repl::OplogEntryBase::kPreImageOpTimeFieldName
+                              << " or " << repl::OplogEntryBase::kPostImageOpTimeFieldName,
                 !entry.getPreImageOpTime() && !entry.getPostImageOpTime());
 
         return oplogLink;
@@ -109,15 +107,11 @@ repl::OplogLink extractPrePostImageTs(const ProcessOplogResult& lastResult,
 
     uassert(40629,
             str::stream() << "expected oplog with ts: " << entry.getTimestamp().toString() << ": "
-                          << redact(entry.toBSON())
-                          << " to have session: "
-                          << lastResult.sessionId,
+                          << redact(entry.toBSON()) << " to have session: " << lastResult.sessionId,
             lastResult.sessionId == sessionId);
     uassert(40630,
             str::stream() << "expected oplog with ts: " << entry.getTimestamp().toString() << ": "
-                          << redact(entry.toBSON())
-                          << " to have txnNumber: "
-                          << lastResult.txnNum,
+                          << redact(entry.toBSON()) << " to have txnNumber: " << lastResult.txnNum,
             lastResult.txnNum == txnNum);
 
     if (entry.getPreImageOpTime()) {
@@ -127,11 +121,8 @@ repl::OplogLink extractPrePostImageTs(const ProcessOplogResult& lastResult,
     } else {
         uasserted(40631,
                   str::stream() << "expected oplog with opTime: " << entry.getOpTime().toString()
-                                << ": "
-                                << redact(entry.toBSON())
-                                << " to have either "
-                                << repl::OplogEntryBase::kPreImageOpTimeFieldName
-                                << " or "
+                                << ": " << redact(entry.toBSON()) << " to have either "
+                                << repl::OplogEntryBase::kPreImageOpTimeFieldName << " or "
                                 << repl::OplogEntryBase::kPostImageOpTimeFieldName);
     }
 
@@ -152,20 +143,17 @@ repl::OplogEntry parseOplog(const BSONObj& oplogBSON) {
 
     uassert(ErrorCodes::UnsupportedFormat,
             str::stream() << "oplog with opTime " << oplogEntry.getTimestamp().toString()
-                          << " does not have sessionId: "
-                          << redact(oplogBSON),
+                          << " does not have sessionId: " << redact(oplogBSON),
             sessionInfo.getSessionId());
 
     uassert(ErrorCodes::UnsupportedFormat,
             str::stream() << "oplog with opTime " << oplogEntry.getTimestamp().toString()
-                          << " does not have txnNumber: "
-                          << redact(oplogBSON),
+                          << " does not have txnNumber: " << redact(oplogBSON),
             sessionInfo.getTxnNumber());
 
     uassert(ErrorCodes::UnsupportedFormat,
             str::stream() << "oplog with opTime " << oplogEntry.getTimestamp().toString()
-                          << " does not have stmtId: "
-                          << redact(oplogBSON),
+                          << " does not have stmtId: " << redact(oplogBSON),
             oplogEntry.getStatementId());
 
     return oplogEntry;
@@ -234,9 +222,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
             uassert(40632,
                     str::stream() << "Can't handle 2 pre/post image oplog in a row. Prevoius oplog "
                                   << lastResult.oplogTime.getTimestamp().toString()
-                                  << ", oplog ts: "
-                                  << oplogEntry.getTimestamp().toString()
-                                  << ": "
+                                  << ", oplog ts: " << oplogEntry.getTimestamp().toString() << ": "
                                   << oplogBSON,
                     !lastResult.isPrePostImage);
         }
@@ -310,9 +296,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
             const auto& oplogOpTime = result.oplogTime;
             uassert(40633,
                     str::stream() << "Failed to create new oplog entry for oplog with opTime: "
-                                  << oplogEntry.getOpTime().toString()
-                                  << ": "
-                                  << redact(oplogBSON),
+                                  << oplogEntry.getOpTime().toString() << ": " << redact(oplogBSON),
                     !oplogOpTime.isNull());
 
             // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post image, because the

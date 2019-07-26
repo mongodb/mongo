@@ -96,8 +96,7 @@ public:
         const bool match = (expectedMultikeyPaths == actualMultikeyPaths);
         if (!match) {
             FAIL(str::stream() << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
-                               << ", Actual: "
-                               << dumpMultikeyPaths(actualMultikeyPaths));
+                               << ", Actual: " << dumpMultikeyPaths(actualMultikeyPaths));
         }
         ASSERT_TRUE(match);
     }
@@ -143,11 +142,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreation) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns"
-                     << _nss.ns()
-                     << "key"
-                     << keyPattern
-                     << "v"
+                     << "ns" << _nss.ns() << "key" << keyPattern << "v"
                      << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
@@ -177,11 +172,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreationWithMultipleDocuments) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns"
-                     << _nss.ns()
-                     << "key"
-                     << keyPattern
-                     << "v"
+                     << "ns" << _nss.ns() << "key" << keyPattern << "v"
                      << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
@@ -197,11 +188,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns"
-                     << _nss.ns()
-                     << "key"
-                     << keyPattern
-                     << "v"
+                     << "ns" << _nss.ns() << "key" << keyPattern << "v"
                      << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
@@ -239,11 +226,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns"
-                     << _nss.ns()
-                     << "key"
-                     << keyPattern
-                     << "v"
+                     << "ns" << _nss.ns() << "key" << keyPattern << "v"
                      << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
@@ -292,11 +275,7 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns"
-                     << _nss.ns()
-                     << "key"
-                     << keyPattern
-                     << "v"
+                     << "ns" << _nss.ns() << "key" << keyPattern << "v"
                      << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
@@ -337,11 +316,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_b_1"
-                     << "ns"
-                     << _nss.ns()
-                     << "key"
-                     << keyPatternAB
-                     << "v"
+                     << "ns" << _nss.ns() << "key" << keyPatternAB << "v"
                      << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
@@ -349,11 +324,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
     createIndex(collection,
                 BSON("name"
                      << "a_1_c_1"
-                     << "ns"
-                     << _nss.ns()
-                     << "key"
-                     << keyPatternAC
-                     << "v"
+                     << "ns" << _nss.ns() << "key" << keyPatternAC << "v"
                      << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
     {

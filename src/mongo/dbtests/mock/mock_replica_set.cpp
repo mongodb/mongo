@@ -350,4 +350,4 @@ void MockReplicaSet::mockReplSetGetStatusCmd() {
         node->setCommandReply("replSetGetStatus", fullStatBuilder.done());
     }
 }
-}
+}  // namespace mongo

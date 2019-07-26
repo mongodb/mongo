@@ -5,59 +5,58 @@
  */
 
 (function() {
-    "use strict";
+"use strict";
 
-    // Gets the value of metrics.repl.apply.batches.totalMillis.
-    function getTotalMillis(node) {
-        return assert.commandWorked(node.adminCommand({serverStatus: 1}))
-            .metrics.repl.apply.batches.totalMillis;
+// Gets the value of metrics.repl.apply.batches.totalMillis.
+function getTotalMillis(node) {
+    return assert.commandWorked(node.adminCommand({serverStatus: 1}))
+        .metrics.repl.apply.batches.totalMillis;
+}
+
+// Do a bulk insert of documents as: {{key: 0}, {key: 1}, {key: 2}, ... , {key: num-1}}
+function performBulkInsert(coll, key, num) {
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < num; i++) {
+        let doc = {};
+        doc[key] = i;
+        bulk.insert(doc);
     }
-
-    // Do a bulk insert of documents as: {{key: 0}, {key: 1}, {key: 2}, ... , {key: num-1}}
-    function performBulkInsert(coll, key, num) {
-        let bulk = coll.initializeUnorderedBulkOp();
-        for (let i = 0; i < num; i++) {
-            let doc = {};
-            doc[key] = i;
-            bulk.insert(doc);
-        }
-        assert.writeOK(bulk.execute());
-        rst.awaitReplication();
-    }
-
-    let name = "apply_batches_totalMillis";
-    let rst = new ReplSetTest({name: name, nodes: 2});
-    rst.startSet();
-    rst.initiate();
-
-    let primary = rst.getPrimary();
-    let secondary = rst.getSecondary();
-    let coll = primary.getDB(name)["foo"];
-
-    // Perform an initial write on the system and ensure steady state.
-    assert.writeOK(coll.insert({init: 0}));
+    assert.writeOK(bulk.execute());
     rst.awaitReplication();
-    let baseTime = getTotalMillis(secondary);
+}
 
-    // Introduce a small load and wait for it to be replicated.
-    performBulkInsert(coll, "small", 1000);
+let name = "apply_batches_totalMillis";
+let rst = new ReplSetTest({name: name, nodes: 2});
+rst.startSet();
+rst.initiate();
 
-    // Record the time spent applying the small load.
-    let timeAfterSmall = getTotalMillis(secondary);
-    let deltaSmall = timeAfterSmall - baseTime;
+let primary = rst.getPrimary();
+let secondary = rst.getSecondary();
+let coll = primary.getDB(name)["foo"];
 
-    // Insert a significantly larger load.
-    performBulkInsert(coll, "large", 20000);
+// Perform an initial write on the system and ensure steady state.
+assert.writeOK(coll.insert({init: 0}));
+rst.awaitReplication();
+let baseTime = getTotalMillis(secondary);
 
-    // Record the time spent applying the large load.
-    let timeAfterLarge = getTotalMillis(secondary);
-    let deltaLarge = timeAfterLarge - timeAfterSmall;
+// Introduce a small load and wait for it to be replicated.
+performBulkInsert(coll, "small", 1000);
 
-    jsTestLog(`Recorded deltas: {small: ${deltaSmall}ms, large: ${deltaLarge}ms}.`);
+// Record the time spent applying the small load.
+let timeAfterSmall = getTotalMillis(secondary);
+let deltaSmall = timeAfterSmall - baseTime;
 
-    // We should have recorded at least as much time on the second load as we did on the first.
-    // This is a crude comparison that is only taken to check that the timer is used correctly.
-    assert(deltaLarge >= deltaSmall, "Expected a higher net totalMillis for the larger load.");
-    rst.stopSet();
+// Insert a significantly larger load.
+performBulkInsert(coll, "large", 20000);
 
+// Record the time spent applying the large load.
+let timeAfterLarge = getTotalMillis(secondary);
+let deltaLarge = timeAfterLarge - timeAfterSmall;
+
+jsTestLog(`Recorded deltas: {small: ${deltaSmall}ms, large: ${deltaLarge}ms}.`);
+
+// We should have recorded at least as much time on the second load as we did on the first.
+// This is a crude comparison that is only taken to check that the timer is used correctly.
+assert(deltaLarge >= deltaSmall, "Expected a higher net totalMillis for the larger load.");
+rst.stopSet();
 })();

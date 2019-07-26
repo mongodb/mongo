@@ -110,8 +110,7 @@ Status ViewGraph::insertAndValidate(const ViewDefinition& view,
         return {ErrorCodes::ViewPipelineMaxSizeExceeded,
                 str::stream() << "Operation would result in a resolved view pipeline that exceeds "
                                  "the maximum size of "
-                              << kMaxViewPipelineSizeBytes
-                              << " bytes"};
+                              << kMaxViewPipelineSizeBytes << " bytes"};
     }
 
     guard.dismiss();
@@ -217,8 +216,7 @@ Status ViewGraph::_validateParents(uint64_t currentId, int currentDepth, StatsMa
     if (size > kMaxViewPipelineSizeBytes) {
         return {ErrorCodes::ViewPipelineMaxSizeExceeded,
                 str::stream() << "View pipeline is too large and exceeds the maximum size of "
-                              << ViewGraph::kMaxViewPipelineSizeBytes
-                              << " bytes"};
+                              << ViewGraph::kMaxViewPipelineSizeBytes << " bytes"};
     }
 
     return Status::OK();

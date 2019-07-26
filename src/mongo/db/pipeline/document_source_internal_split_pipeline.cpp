@@ -69,14 +69,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
             } else {
                 uasserted(ErrorCodes::BadValue,
                           str::stream() << "unrecognized field while parsing mergeType: '"
-                                        << elt.fieldNameStringData()
-                                        << "'");
+                                        << elt.fieldNameStringData() << "'");
             }
         } else {
             uasserted(ErrorCodes::BadValue,
                       str::stream() << "unrecognized field while parsing $_internalSplitPipeline: '"
-                                    << elt.fieldNameStringData()
-                                    << "'");
+                                    << elt.fieldNameStringData() << "'");
         }
     }
 
@@ -120,4 +118,4 @@ Value DocumentSourceInternalSplitPipeline::serialize(
                                   mergeTypeString.empty() ? Value() : Value(mergeTypeString)}}}}});
 }
 
-}  // namesace mongo
+}  // namespace mongo

@@ -516,9 +516,9 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
         (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage());
 
     auto attachExecutorCallback = [deps, queryObj, sortObj, projForQuery, trackOplogTS](
-        Collection* collection,
-        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-        Pipeline* pipeline) {
+                                      Collection* collection,
+                                      std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+                                      Pipeline* pipeline) {
         auto cursor = DocumentSourceCursor::create(
             collection, std::move(exec), pipeline->getContext(), trackOplogTS);
         addCursorSource(
@@ -575,15 +575,14 @@ PipelineD::buildInnerQueryExecutorGeoNear(Collection* collection,
               str::stream() << "Unexpectedly got the following sort from the query system: "
                             << sortFromQuerySystem.jsonString());
 
-    auto attachExecutorCallback =
-        [
-          deps,
-          distanceField = geoNearStage->getDistanceField(),
-          locationField = geoNearStage->getLocationField(),
-          distanceMultiplier = geoNearStage->getDistanceMultiplier().value_or(1.0)
-        ](Collection * collection,
-          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-          Pipeline * pipeline) {
+    auto attachExecutorCallback = [deps,
+                                   distanceField = geoNearStage->getDistanceField(),
+                                   locationField = geoNearStage->getLocationField(),
+                                   distanceMultiplier =
+                                       geoNearStage->getDistanceMultiplier().value_or(1.0)](
+                                      Collection* collection,
+                                      std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+                                      Pipeline* pipeline) {
         auto cursor = DocumentSourceGeoNearCursor::create(collection,
                                                           std::move(exec),
                                                           pipeline->getContext(),

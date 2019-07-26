@@ -40,7 +40,6 @@
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_options.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -199,8 +198,8 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
     Status hbStatus = hbResp.initialize(resBSON, 0, /*requireWallTime*/ false);
 
     if (hbStatus.code() == ErrorCodes::InconsistentReplicaSetNames) {
-        std::string message = str::stream() << "Our set name did not match that of "
-                                            << request.target.toString();
+        std::string message = str::stream()
+            << "Our set name did not match that of " << request.target.toString();
         _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
         warning() << message;
         return;

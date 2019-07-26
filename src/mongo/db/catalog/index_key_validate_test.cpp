@@ -127,8 +127,7 @@ TEST(IndexKeyValidateTest, KeyElementBooleanValueFailsForV2Indexes) {
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
               validateKeyPattern(BSON("a"
                                       << "2dsphere"
-                                      << "b"
-                                      << true),
+                                      << "b" << true),
                                  IndexVersion::kV2));
 }
 
@@ -137,8 +136,7 @@ TEST(IndexKeyValidateTest, KeyElementBooleanValueSucceedsForV1Indexes) {
     ASSERT_OK(validateKeyPattern(BSON("x" << false), IndexVersion::kV1));
     ASSERT_OK(validateKeyPattern(BSON("a"
                                       << "2dsphere"
-                                      << "b"
-                                      << true),
+                                      << "b" << true),
                                  IndexVersion::kV1));
 }
 

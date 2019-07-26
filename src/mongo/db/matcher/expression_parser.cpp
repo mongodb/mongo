@@ -255,8 +255,8 @@ StatusWithMatchExpression parse(const BSONObj& obj,
 
             if (!parseExpressionMatchFunction) {
                 return {Status(ErrorCodes::BadValue,
-                               str::stream() << "unknown top level operator: "
-                                             << e.fieldNameStringData())};
+                               str::stream()
+                                   << "unknown top level operator: " << e.fieldNameStringData())};
             }
 
             auto parsedExpression = parseExpressionMatchFunction(
@@ -569,8 +569,7 @@ StatusWith<std::vector<uint32_t>> parseBitPositionsArray(const BSONObj& theArray
                 return Status(
                     ErrorCodes::BadValue,
                     str::stream()
-                        << "bit positions cannot be represented as a 32-bit signed integer: "
-                        << e);
+                        << "bit positions cannot be represented as a 32-bit signed integer: " << e);
             }
 
             // This checks if e is integral.
@@ -589,8 +588,7 @@ StatusWith<std::vector<uint32_t>> parseBitPositionsArray(const BSONObj& theArray
                 return Status(
                     ErrorCodes::BadValue,
                     str::stream()
-                        << "bit positions cannot be represented as a 32-bit signed integer: "
-                        << e);
+                        << "bit positions cannot be represented as a 32-bit signed integer: " << e);
             }
         }
 
@@ -635,9 +633,9 @@ StatusWithMatchExpression parseBitTest(StringData name, BSONElement e) {
         auto eBinary = e.binData(eBinaryLen);
         bitTestMatchExpression = stdx::make_unique<T>(name, eBinary, eBinaryLen);
     } else {
-        return Status(
-            ErrorCodes::BadValue,
-            str::stream() << name << " takes an Array, a number, or a BinData but received: " << e);
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << name << " takes an Array, a number, or a BinData but received: " << e);
     }
 
     return {std::move(bitTestMatchExpression)};
@@ -692,8 +690,7 @@ StatusWithMatchExpression parseInternalSchemaRootDocEq(
     if (elem.type() != BSONType::Object) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream() << InternalSchemaRootDocEqMatchExpression::kName
-                                     << " must be an object, found type "
-                                     << elem.type())};
+                                     << " must be an object, found type " << elem.type())};
     }
     auto rootDocEq =
         stdx::make_unique<InternalSchemaRootDocEqMatchExpression>(elem.embeddedObject());
@@ -750,8 +747,7 @@ StatusWith<StringData> parseNamePlaceholder(const BSONObj& containingObject,
     } else if (namePlaceholderElem.type() != BSONType::String) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << expressionName << " requires '" << namePlaceholderFieldName
-                              << "' to be a string, not "
-                              << namePlaceholderElem.type()};
+                              << "' to be a string, not " << namePlaceholderElem.type()};
     }
     return {namePlaceholderElem.valueStringData()};
 }
@@ -803,12 +799,9 @@ StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> parseExprWithPlaceholder(
     if (placeholder && (*placeholder != expectedPlaceholder)) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << expressionName << " expected a name placeholder of "
-                              << expectedPlaceholder
-                              << ", but '"
+                              << expectedPlaceholder << ", but '"
                               << exprWithPlaceholderElem.fieldNameStringData()
-                              << "' has a mismatching placeholder '"
-                              << *placeholder
-                              << "'"};
+                              << "' has a mismatching placeholder '" << *placeholder << "'"};
     }
     return result;
 }
@@ -1248,8 +1241,7 @@ StatusWithMatchExpression parseInternalSchemaFixedArityArgument(
     if (static_cast<size_t>(inputObj.nFields()) != arity) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << elem.fieldNameStringData() << " requires exactly " << arity
-                              << " MatchExpressions, but got "
-                              << inputObj.nFields()};
+                              << " MatchExpressions, but got " << inputObj.nFields()};
     }
 
     // Fill out 'expressions' with all of the parsed subexpressions contained in the array,
@@ -1320,17 +1312,16 @@ StatusWithMatchExpression parseInternalSchemaBinDataSubType(StringData name, BSO
     auto valueAsInt = e.parseIntegerElementToInt();
     if (!valueAsInt.isOK()) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "Invalid numerical BinData subtype value for "
-                                    << InternalSchemaBinDataSubTypeExpression::kName
-                                    << ": "
-                                    << e.number());
+                      str::stream()
+                          << "Invalid numerical BinData subtype value for "
+                          << InternalSchemaBinDataSubTypeExpression::kName << ": " << e.number());
     }
 
     if (!isValidBinDataType(valueAsInt.getValue())) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream() << InternalSchemaBinDataSubTypeExpression::kName
-                                    << " value must represent BinData subtype: "
-                                    << valueAsInt.getValue());
+                      str::stream()
+                          << InternalSchemaBinDataSubTypeExpression::kName
+                          << " value must represent BinData subtype: " << valueAsInt.getValue());
     }
 
     return {stdx::make_unique<InternalSchemaBinDataSubTypeExpression>(

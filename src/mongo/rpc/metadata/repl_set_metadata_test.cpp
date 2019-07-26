@@ -63,18 +63,10 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
         BSON(kReplSetMetadataFieldName
              << BSON("term" << 3 << "lastOpCommitted"
                             << BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm())
-                            << "lastCommittedWall"
-                            << committedWallTime
-                            << "lastOpVisible"
+                            << "lastCommittedWall" << committedWallTime << "lastOpVisible"
                             << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
-                            << "configVersion"
-                            << 6
-                            << "replicaSetId"
-                            << metadata.getReplicaSetId()
-                            << "primaryIndex"
-                            << 12
-                            << "syncSourceIndex"
-                            << -1)));
+                            << "configVersion" << 6 << "replicaSetId" << metadata.getReplicaSetId()
+                            << "primaryIndex" << 12 << "syncSourceIndex" << -1)));
 
     BSONObj serializedObj = builder.obj();
     ASSERT_BSONOBJ_EQ(expectedObj, serializedObj);

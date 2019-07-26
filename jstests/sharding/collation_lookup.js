@@ -7,15 +7,15 @@
  * collection the "aggregate" command was performed on.
  */
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/aggregation/extras/utils.js");                     // for arrayEq
-    load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-    load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
+load("jstests/aggregation/extras/utils.js");                     // for arrayEq
+load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
+load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
 
-    function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collation) {
-        // Test that the $lookup stage respects the inherited collation.
-        let res = withDefaultCollationColl
+function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collation) {
+    // Test that the $lookup stage respects the inherited collation.
+    let res = withDefaultCollationColl
                       .aggregate([{
                           $lookup: {
                               from: withoutDefaultCollationColl.getName(),
@@ -25,14 +25,14 @@
                           },
                       }])
                       .toArray();
-        assert.eq(1, res.length, tojson(res));
+    assert.eq(1, res.length, tojson(res));
 
-        let expected = [{_id: "lowercase", str: "abc"}, {_id: "uppercase", str: "ABC"}];
-        assert(arrayEq(expected, res[0].matched),
-               "Expected " + tojson(expected) + " to equal " + tojson(res[0].matched) +
-                   " up to ordering");
+    let expected = [{_id: "lowercase", str: "abc"}, {_id: "uppercase", str: "ABC"}];
+    assert(
+        arrayEq(expected, res[0].matched),
+        "Expected " + tojson(expected) + " to equal " + tojson(res[0].matched) + " up to ordering");
 
-        res = withDefaultCollationColl
+    res = withDefaultCollationColl
                   .aggregate([{
                       $lookup: {
                           from: withoutDefaultCollationColl.getName(),
@@ -52,28 +52,27 @@
                       },
                   }])
                   .toArray();
-        assert.eq(1, res.length, tojson(res));
+    assert.eq(1, res.length, tojson(res));
 
-        expected = [
-            {
-              "_id": "lowercase",
-              "str": "abc",
-              "matched2": [{"_id": "lowercase", "str": "abc"}, {"_id": "uppercase", "str": "ABC"}]
-            },
-            {
-              "_id": "uppercase",
-              "str": "ABC",
-              "matched2":
-                  [{"_id": "lowercase", "str": "abc"}, {"_id": "uppercase", "str": "ABC"}]
-            }
-        ];
-        assert(arrayEq(expected, res[0].matched1),
-               "Expected " + tojson(expected) + " to equal " + tojson(res[0].matched1) +
-                   " up to ordering. " + tojson(res));
+    expected = [
+        {
+            "_id": "lowercase",
+            "str": "abc",
+            "matched2": [{"_id": "lowercase", "str": "abc"}, {"_id": "uppercase", "str": "ABC"}]
+        },
+        {
+            "_id": "uppercase",
+            "str": "ABC",
+            "matched2": [{"_id": "lowercase", "str": "abc"}, {"_id": "uppercase", "str": "ABC"}]
+        }
+    ];
+    assert(arrayEq(expected, res[0].matched1),
+           "Expected " + tojson(expected) + " to equal " + tojson(res[0].matched1) +
+               " up to ordering. " + tojson(res));
 
-        // Test that the $lookup stage respects the inherited collation when it optimizes with an
-        // $unwind stage.
-        res = withDefaultCollationColl
+    // Test that the $lookup stage respects the inherited collation when it optimizes with an
+    // $unwind stage.
+    res = withDefaultCollationColl
                   .aggregate([
                       {
                         $lookup: {
@@ -86,16 +85,16 @@
                       {$unwind: "$matched"},
                   ])
                   .toArray();
-        assert.eq(2, res.length, tojson(res));
+    assert.eq(2, res.length, tojson(res));
 
-        expected = [
-            {_id: "lowercase", str: "abc", matched: {_id: "lowercase", str: "abc"}},
-            {_id: "lowercase", str: "abc", matched: {_id: "uppercase", str: "ABC"}}
-        ];
-        assert(arrayEq(expected, res),
-               "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
+    expected = [
+        {_id: "lowercase", str: "abc", matched: {_id: "lowercase", str: "abc"}},
+        {_id: "lowercase", str: "abc", matched: {_id: "uppercase", str: "ABC"}}
+    ];
+    assert(arrayEq(expected, res),
+           "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
 
-        res = withDefaultCollationColl
+    res = withDefaultCollationColl
                   .aggregate([
                       {
                         $lookup: {
@@ -119,51 +118,39 @@
                       {$unwind: "$matched1"},
                   ])
                   .toArray();
-        assert.eq(4, res.length, tojson(res));
+    assert.eq(4, res.length, tojson(res));
 
-        expected = [
-            {
-              "_id": "lowercase",
-              "str": "abc",
-              "matched1": {
-                  "_id": "lowercase",
-                  "str": "abc",
-                  "matched2": {"_id": "lowercase", "str": "abc"}
-              }
-            },
-            {
-              "_id": "lowercase",
-              "str": "abc",
-              "matched1": {
-                  "_id": "lowercase",
-                  "str": "abc",
-                  "matched2": {"_id": "uppercase", "str": "ABC"}
-              }
-            },
-            {
-              "_id": "lowercase",
-              "str": "abc",
-              "matched1": {
-                  "_id": "uppercase",
-                  "str": "ABC",
-                  "matched2": {"_id": "lowercase", "str": "abc"}
-              }
-            },
-            {
-              "_id": "lowercase",
-              "str": "abc",
-              "matched1": {
-                  "_id": "uppercase",
-                  "str": "ABC",
-                  "matched2": {"_id": "uppercase", "str": "ABC"}
-              }
-            }
-        ];
-        assert(arrayEq(expected, res),
-               "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
+    expected = [
+        {
+            "_id": "lowercase",
+            "str": "abc",
+            "matched1":
+                {"_id": "lowercase", "str": "abc", "matched2": {"_id": "lowercase", "str": "abc"}}
+        },
+        {
+            "_id": "lowercase",
+            "str": "abc",
+            "matched1":
+                {"_id": "lowercase", "str": "abc", "matched2": {"_id": "uppercase", "str": "ABC"}}
+        },
+        {
+            "_id": "lowercase",
+            "str": "abc",
+            "matched1":
+                {"_id": "uppercase", "str": "ABC", "matched2": {"_id": "lowercase", "str": "abc"}}
+        },
+        {
+            "_id": "lowercase",
+            "str": "abc",
+            "matched1":
+                {"_id": "uppercase", "str": "ABC", "matched2": {"_id": "uppercase", "str": "ABC"}}
+        }
+    ];
+    assert(arrayEq(expected, res),
+           "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
 
-        // Test that the $lookup stage respects an explicit collation on the aggregation operation.
-        res = withoutDefaultCollationColl
+    // Test that the $lookup stage respects an explicit collation on the aggregation operation.
+    res = withoutDefaultCollationColl
                   .aggregate(
                       [
                         {$match: {_id: "lowercase"}},
@@ -178,14 +165,14 @@
                       ],
                       collation)
                   .toArray();
-        assert.eq(1, res.length, tojson(res));
+    assert.eq(1, res.length, tojson(res));
 
-        expected = [{_id: "lowercase", str: "abc"}, {_id: "uppercase", str: "ABC"}];
-        assert(arrayEq(expected, res[0].matched),
-               "Expected " + tojson(expected) + " to equal " + tojson(res[0].matched) +
-                   " up to ordering");
+    expected = [{_id: "lowercase", str: "abc"}, {_id: "uppercase", str: "ABC"}];
+    assert(
+        arrayEq(expected, res[0].matched),
+        "Expected " + tojson(expected) + " to equal " + tojson(res[0].matched) + " up to ordering");
 
-        res = withoutDefaultCollationColl
+    res = withoutDefaultCollationColl
                   .aggregate(
                       [
                         {$match: {_id: "lowercase"}},
@@ -210,29 +197,28 @@
                       ],
                       collation)
                   .toArray();
-        assert.eq(1, res.length, tojson(res));
+    assert.eq(1, res.length, tojson(res));
 
-        expected = [
-            {
-              "_id": "lowercase",
-              "str": "abc",
-              "matched2": [{"_id": "lowercase", "str": "abc"}, {"_id": "uppercase", "str": "ABC"}]
-            },
-            {
-              "_id": "uppercase",
-              "str": "ABC",
-              "matched2":
-                  [{"_id": "lowercase", "str": "abc"}, {"_id": "uppercase", "str": "ABC"}]
-            }
-        ];
-        assert(arrayEq(expected, res[0].matched1),
-               "Expected " + tojson(expected) + " to equal " + tojson(res[0].matched1) +
-                   " up to ordering");
+    expected = [
+        {
+            "_id": "lowercase",
+            "str": "abc",
+            "matched2": [{"_id": "lowercase", "str": "abc"}, {"_id": "uppercase", "str": "ABC"}]
+        },
+        {
+            "_id": "uppercase",
+            "str": "ABC",
+            "matched2": [{"_id": "lowercase", "str": "abc"}, {"_id": "uppercase", "str": "ABC"}]
+        }
+    ];
+    assert(arrayEq(expected, res[0].matched1),
+           "Expected " + tojson(expected) + " to equal " + tojson(res[0].matched1) +
+               " up to ordering");
 
-        // Test that the $lookup stage respects an explicit collation on the aggregation operation
-        // when
-        // it optimizes with an $unwind stage.
-        res = withoutDefaultCollationColl
+    // Test that the $lookup stage respects an explicit collation on the aggregation operation
+    // when
+    // it optimizes with an $unwind stage.
+    res = withoutDefaultCollationColl
                   .aggregate(
                       [
                         {$match: {_id: "lowercase"}},
@@ -248,16 +234,16 @@
                       ],
                       collation)
                   .toArray();
-        assert.eq(2, res.length, tojson(res));
+    assert.eq(2, res.length, tojson(res));
 
-        expected = [
-            {_id: "lowercase", str: "abc", matched: {_id: "lowercase", str: "abc"}},
-            {_id: "lowercase", str: "abc", matched: {_id: "uppercase", str: "ABC"}}
-        ];
-        assert(arrayEq(expected, res),
-               "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
+    expected = [
+        {_id: "lowercase", str: "abc", matched: {_id: "lowercase", str: "abc"}},
+        {_id: "lowercase", str: "abc", matched: {_id: "uppercase", str: "ABC"}}
+    ];
+    assert(arrayEq(expected, res),
+           "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
 
-        res = withoutDefaultCollationColl
+    res = withoutDefaultCollationColl
                   .aggregate(
                       [
                         {$match: {_id: "lowercase"}},
@@ -284,52 +270,40 @@
                       ],
                       collation)
                   .toArray();
-        assert.eq(4, res.length, tojson(res));
+    assert.eq(4, res.length, tojson(res));
 
-        expected = [
-            {
-              "_id": "lowercase",
-              "str": "abc",
-              "matched1": {
-                  "_id": "lowercase",
-                  "str": "abc",
-                  "matched2": {"_id": "lowercase", "str": "abc"}
-              }
-            },
-            {
-              "_id": "lowercase",
-              "str": "abc",
-              "matched1": {
-                  "_id": "lowercase",
-                  "str": "abc",
-                  "matched2": {"_id": "uppercase", "str": "ABC"}
-              }
-            },
-            {
-              "_id": "lowercase",
-              "str": "abc",
-              "matched1": {
-                  "_id": "uppercase",
-                  "str": "ABC",
-                  "matched2": {"_id": "lowercase", "str": "abc"}
-              }
-            },
-            {
-              "_id": "lowercase",
-              "str": "abc",
-              "matched1": {
-                  "_id": "uppercase",
-                  "str": "ABC",
-                  "matched2": {"_id": "uppercase", "str": "ABC"}
-              }
-            }
-        ];
-        assert(arrayEq(expected, res),
-               "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
+    expected = [
+        {
+            "_id": "lowercase",
+            "str": "abc",
+            "matched1":
+                {"_id": "lowercase", "str": "abc", "matched2": {"_id": "lowercase", "str": "abc"}}
+        },
+        {
+            "_id": "lowercase",
+            "str": "abc",
+            "matched1":
+                {"_id": "lowercase", "str": "abc", "matched2": {"_id": "uppercase", "str": "ABC"}}
+        },
+        {
+            "_id": "lowercase",
+            "str": "abc",
+            "matched1":
+                {"_id": "uppercase", "str": "ABC", "matched2": {"_id": "lowercase", "str": "abc"}}
+        },
+        {
+            "_id": "lowercase",
+            "str": "abc",
+            "matched1":
+                {"_id": "uppercase", "str": "ABC", "matched2": {"_id": "uppercase", "str": "ABC"}}
+        }
+    ];
+    assert(arrayEq(expected, res),
+           "Expected " + tojson(expected) + " to equal " + tojson(res) + " up to ordering");
 
-        // Test that the $lookup stage uses the "simple" collation if a collation isn't set on the
-        // collection or the aggregation operation.
-        res = withoutDefaultCollationColl
+    // Test that the $lookup stage uses the "simple" collation if a collation isn't set on the
+    // collection or the aggregation operation.
+    res = withoutDefaultCollationColl
                   .aggregate([
                       {$match: {_id: "lowercase"}},
                       {
@@ -342,9 +316,9 @@
                       },
                   ])
                   .toArray();
-        assert.eq([{_id: "lowercase", str: "abc", matched: [{_id: "lowercase", str: "abc"}]}], res);
+    assert.eq([{_id: "lowercase", str: "abc", matched: [{_id: "lowercase", str: "abc"}]}], res);
 
-        res = withoutDefaultCollationColl
+    res = withoutDefaultCollationColl
                   .aggregate([
                       {$match: {_id: "lowercase"}},
                       {
@@ -368,92 +342,92 @@
                       },
                   ])
                   .toArray();
-        assert.eq([{
-                     "_id": "lowercase",
-                     "str": "abc",
-                     "matched1": [{
-                         "_id": "lowercase",
-                         "str": "abc",
-                         "matched2": {"_id": "lowercase", "str": "abc"}
-                     }]
-                  }],
-                  res);
-    }
+    assert.eq(
+        [{
+            "_id": "lowercase",
+            "str": "abc",
+            "matched1":
+                [{"_id": "lowercase", "str": "abc", "matched2": {"_id": "lowercase", "str": "abc"}}]
+        }],
+        res);
+}
 
-    const st = new ShardingTest({shards: 2, config: 1});
-    setParameterOnAllHosts(
-        DiscoverTopology.findNonConfigNodes(st.s), "internalQueryAllowShardedLookup", true);
+const st = new ShardingTest({shards: 2, config: 1});
+setParameterOnAllHosts(
+    DiscoverTopology.findNonConfigNodes(st.s), "internalQueryAllowShardedLookup", true);
 
-    const testName = "collation_lookup";
-    const caseInsensitive = {collation: {locale: "en_US", strength: 2}};
+const testName = "collation_lookup";
+const caseInsensitive = {
+    collation: {locale: "en_US", strength: 2}
+};
 
-    const mongosDB = st.s0.getDB(testName);
-    const withDefaultCollationColl = mongosDB[testName + "_with_default"];
-    const withoutDefaultCollationColl = mongosDB[testName + "_without_default"];
+const mongosDB = st.s0.getDB(testName);
+const withDefaultCollationColl = mongosDB[testName + "_with_default"];
+const withoutDefaultCollationColl = mongosDB[testName + "_without_default"];
 
-    assert.commandWorked(
-        mongosDB.createCollection(withDefaultCollationColl.getName(), caseInsensitive));
-    assert.writeOK(withDefaultCollationColl.insert({_id: "lowercase", str: "abc"}));
+assert.commandWorked(
+    mongosDB.createCollection(withDefaultCollationColl.getName(), caseInsensitive));
+assert.writeOK(withDefaultCollationColl.insert({_id: "lowercase", str: "abc"}));
 
-    assert.writeOK(withoutDefaultCollationColl.insert({_id: "lowercase", str: "abc"}));
-    assert.writeOK(withoutDefaultCollationColl.insert({_id: "uppercase", str: "ABC"}));
-    assert.writeOK(withoutDefaultCollationColl.insert({_id: "unmatched", str: "def"}));
+assert.writeOK(withoutDefaultCollationColl.insert({_id: "lowercase", str: "abc"}));
+assert.writeOK(withoutDefaultCollationColl.insert({_id: "uppercase", str: "ABC"}));
+assert.writeOK(withoutDefaultCollationColl.insert({_id: "unmatched", str: "def"}));
 
-    //
-    // Sharded collection with default collation and unsharded collection without a default
-    // collation.
-    //
-    assert.commandWorked(
-        withDefaultCollationColl.createIndex({str: 1}, {collation: {locale: "simple"}}));
+//
+// Sharded collection with default collation and unsharded collection without a default
+// collation.
+//
+assert.commandWorked(
+    withDefaultCollationColl.createIndex({str: 1}, {collation: {locale: "simple"}}));
 
-    // Enable sharding on the test DB and ensure its primary is shard0000.
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+// Enable sharding on the test DB and ensure its primary is shard0000.
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
+st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 
-    // Shard the collection with a default collation.
-    assert.commandWorked(mongosDB.adminCommand({
-        shardCollection: withDefaultCollationColl.getFullName(),
-        key: {str: 1},
-        collation: {locale: "simple"}
-    }));
+// Shard the collection with a default collation.
+assert.commandWorked(mongosDB.adminCommand({
+    shardCollection: withDefaultCollationColl.getFullName(),
+    key: {str: 1},
+    collation: {locale: "simple"}
+}));
 
-    // Split the collection into 2 chunks.
-    assert.commandWorked(mongosDB.adminCommand(
-        {split: withDefaultCollationColl.getFullName(), middle: {str: "abc"}}));
+// Split the collection into 2 chunks.
+assert.commandWorked(
+    mongosDB.adminCommand({split: withDefaultCollationColl.getFullName(), middle: {str: "abc"}}));
 
-    // Move the chunk containing {str: "abc"} to shard0001.
-    assert.commandWorked(mongosDB.adminCommand({
-        moveChunk: withDefaultCollationColl.getFullName(),
-        find: {str: "abc"},
-        to: st.shard1.shardName
-    }));
+// Move the chunk containing {str: "abc"} to shard0001.
+assert.commandWorked(mongosDB.adminCommand({
+    moveChunk: withDefaultCollationColl.getFullName(),
+    find: {str: "abc"},
+    to: st.shard1.shardName
+}));
 
-    runTests(withDefaultCollationColl, withoutDefaultCollationColl, caseInsensitive);
+runTests(withDefaultCollationColl, withoutDefaultCollationColl, caseInsensitive);
 
-    // TODO: Enable the following tests once SERVER-32536 is fixed.
-    //
-    // Sharded collection with default collation and sharded collection without a default
-    // collation.
-    //
+// TODO: Enable the following tests once SERVER-32536 is fixed.
+//
+// Sharded collection with default collation and sharded collection without a default
+// collation.
+//
 
-    // Shard the collection without a default collation.
-    // assert.commandWorked(mongosDB.adminCommand({
-    //     shardCollection: withoutDefaultCollationColl.getFullName(),
-    //     key: {_id: 1},
-    // }));
+// Shard the collection without a default collation.
+// assert.commandWorked(mongosDB.adminCommand({
+//     shardCollection: withoutDefaultCollationColl.getFullName(),
+//     key: {_id: 1},
+// }));
 
-    // // Split the collection into 2 chunks.
-    // assert.commandWorked(mongosDB.adminCommand(
-    //     {split: withoutDefaultCollationColl.getFullName(), middle: {_id: "unmatched"}}));
+// // Split the collection into 2 chunks.
+// assert.commandWorked(mongosDB.adminCommand(
+//     {split: withoutDefaultCollationColl.getFullName(), middle: {_id: "unmatched"}}));
 
-    // // Move the chunk containing {_id: "lowercase"} to shard0001.
-    // assert.commandWorked(mongosDB.adminCommand({
-    //     moveChunk: withoutDefaultCollationColl.getFullName(),
-    //     find: {_id: "lowercase"},
-    //     to: st.shard1.shardName
-    // }));
+// // Move the chunk containing {_id: "lowercase"} to shard0001.
+// assert.commandWorked(mongosDB.adminCommand({
+//     moveChunk: withoutDefaultCollationColl.getFullName(),
+//     find: {_id: "lowercase"},
+//     to: st.shard1.shardName
+// }));
 
-    // runTests(withDefaultCollationColl, withoutDefaultCollationColl, caseInsensitive);
+// runTests(withDefaultCollationColl, withoutDefaultCollationColl, caseInsensitive);
 
-    st.stop();
+st.stop();
 })();

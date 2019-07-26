@@ -124,4 +124,4 @@ TEST_F(QueuedDataStageTest, validateStats) {
     unique_ptr<PlanStageStats> allStats(mock->getStats());
     ASSERT_TRUE(stats->isEOF);
 }
-}
+}  // namespace

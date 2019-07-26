@@ -45,7 +45,7 @@ const char kDestinationShard[] = "destination";
 const char kIsDonorShard[] = "isDonorShard";
 const char kChunk[] = "chunk";
 const char kCollection[] = "collection";
-}
+}  // namespace
 
 BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
                                     const ShardId& fromShard,

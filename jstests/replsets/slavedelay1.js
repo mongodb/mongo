@@ -1,7 +1,6 @@
 load("jstests/replsets/rslib.js");
 
 doTest = function(signal) {
-
     var name = "slaveDelay";
     var host = getHostName();
 

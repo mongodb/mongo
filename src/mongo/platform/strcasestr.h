@@ -36,7 +36,7 @@ namespace pal {
 const char* strcasestr(const char* haystack, const char* needle);
 }
 using mongo::pal::strcasestr;
-}
+}  // namespace mongo
 
 #else
 

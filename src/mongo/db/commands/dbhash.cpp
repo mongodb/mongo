@@ -157,8 +157,7 @@ public:
                     str::stream() << "$_internalReadAtClusterTime value must not be greater"
                                      " than the last applied opTime. Requested clusterTime: "
                                   << targetClusterTime.toString()
-                                  << "; last applied opTime: "
-                                  << lastAppliedOpTime.toString(),
+                                  << "; last applied opTime: " << lastAppliedOpTime.toString(),
                     lastAppliedOpTime.getTimestamp() >= targetClusterTime);
 
             // We aren't holding the global lock in intent mode, so it is possible for the global
@@ -173,8 +172,7 @@ public:
                     str::stream() << "$_internalReadAtClusterTime value must not be greater"
                                      " than the all_durable timestamp. Requested clusterTime: "
                                   << targetClusterTime.toString()
-                                  << "; all_durable timestamp: "
-                                  << allDurableTime.toString(),
+                                  << "; all_durable timestamp: " << allDurableTime.toString(),
                     allDurableTime >= targetClusterTime);
 
             // The $_internalReadAtClusterTime option causes any storage-layer cursors created
@@ -334,8 +332,7 @@ private:
                     str::stream() << "Unable to read from a snapshot due to pending collection"
                                      " catalog changes; please retry the operation. Snapshot"
                                      " timestamp is "
-                                  << mySnapshot->toString()
-                                  << ". Collection minimum timestamp is "
+                                  << mySnapshot->toString() << ". Collection minimum timestamp is "
                                   << minSnapshot->toString(),
                     !minSnapshot || *mySnapshot >= *minSnapshot);
         } else {

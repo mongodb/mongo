@@ -444,9 +444,7 @@ StatusWith<FTDCType> getBSONDocumentType(const BSONObj& obj) {
         static_cast<FTDCType>(value) != FTDCType::kMetadata) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Field '" << std::string(kFTDCTypeField)
-                              << "' is not an expected value, found '"
-                              << value
-                              << "'"};
+                              << "' is not an expected value, found '" << value << "'"};
     }
 
     return {static_cast<FTDCType>(value)};

@@ -127,11 +127,7 @@ public:
                     << "MONGODB-CR"
                     << "db"
                     << "admin"
-                    << "user"
-                    << _username
-                    << "pwd"
-                    << _password
-                    << "digest"
+                    << "user" << _username << "pwd" << _password << "digest"
                     << "true");
     }
 
@@ -141,8 +137,7 @@ public:
         pushRequest("$external",
                     BSON("authenticate" << 1 << "mechanism"
                                         << "MONGODB-X509"
-                                        << "user"
-                                        << _username));
+                                        << "user" << _username));
 
         // 2. Client receives 'ok'
         pushResponse(BSON("ok" << 1));
@@ -152,8 +147,7 @@ public:
                     << "MONGODB-X509"
                     << "db"
                     << "$external"
-                    << "user"
-                    << _username);
+                    << "user" << _username);
     }
 
 

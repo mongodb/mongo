@@ -12,7 +12,6 @@ load('jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands
                                                                                         // $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.setup = function(db, collName, cluster) {
         $super.setup.apply(this, arguments);
         this.lsid = tojson({id: UUID()});

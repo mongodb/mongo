@@ -40,12 +40,13 @@ namespace {
 void testSeekExact_Hit(bool unique, bool forward) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted =
-        harnessHelper->newSortedDataInterface(unique,
-                                              /*partial=*/false,
-                                              {
-                                                  {key1, loc1}, {key2, loc1}, {key3, loc1},
-                                              });
+    auto sorted = harnessHelper->newSortedDataInterface(unique,
+                                                        /*partial=*/false,
+                                                        {
+                                                            {key1, loc1},
+                                                            {key2, loc1},
+                                                            {key3, loc1},
+                                                        });
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
 
@@ -111,7 +112,10 @@ TEST(SortedDataInterface, SeekExact_HitWithDups_Forward) {
         /*unique=*/false,
         /*partial=*/false,
         {
-            {key1, loc1}, {key2, loc1}, {key2, loc2}, {key3, loc1},
+            {key1, loc1},
+            {key2, loc1},
+            {key2, loc2},
+            {key3, loc1},
         });
 
     auto cursor = sorted->newCursor(opCtx.get());
@@ -131,7 +135,10 @@ TEST(SortedDataInterface, SeekExact_HitWithDups_Reverse) {
         /*unique=*/false,
         /*partial=*/false,
         {
-            {key1, loc1}, {key2, loc1}, {key2, loc2}, {key3, loc1},
+            {key1, loc1},
+            {key2, loc1},
+            {key2, loc2},
+            {key3, loc1},
         });
 
     auto cursor = sorted->newCursor(opCtx.get(), false);

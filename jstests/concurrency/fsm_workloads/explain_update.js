@@ -10,7 +10,6 @@ load('jstests/concurrency/fsm_workloads/explain.js');              // for $confi
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.states = Object.extend({
         explainBasicUpdate: function explainBasicUpdate(db, collName) {
             var res =

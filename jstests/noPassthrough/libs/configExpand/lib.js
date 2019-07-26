@@ -4,8 +4,8 @@
 
 class ConfigExpandRestServer {
     /**
-    * Create a new webserver.
-    */
+     * Create a new webserver.
+     */
     constructor() {
         load('jstests/libs/python.js');
         this.python = getPython3Binary();

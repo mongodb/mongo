@@ -323,7 +323,7 @@ TEST(Future_EdgeCases, Racing_SharedPromise_getFuture_and_setError) {
 
 TEST(Future_EdgeCases, SharedPromise_CompleteWithUnreadyFuture) {
     SharedSemiFuture<void> sf;
-    auto[promise, future] = makePromiseFuture<void>();
+    auto [promise, future] = makePromiseFuture<void>();
 
     {
         SharedPromise<void> sp;

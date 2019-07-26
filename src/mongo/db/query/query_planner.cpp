@@ -58,8 +58,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::numeric_limits;
+using std::unique_ptr;
 
 namespace dps = ::mongo::dotted_path_support;
 
@@ -520,8 +520,8 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     auto soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
     if (!soln) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "Failed to analyze plan from cache. Query: "
-                                    << query.toStringShort());
+                      str::stream()
+                          << "Failed to analyze plan from cache. Query: " << query.toStringShort());
     }
 
     LOG(5) << "Planner: solution constructed from the cache:\n" << redact(soln->toString());
@@ -610,11 +610,10 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
         if (fullIndexList.size() > 1) {
             return Status(ErrorCodes::IndexNotFound,
-                          str::stream() << "Hint matched multiple indexes, "
-                                        << "must hint by index name. Matched: "
-                                        << fullIndexList[0].toString()
-                                        << " and "
-                                        << fullIndexList[1].toString());
+                          str::stream()
+                              << "Hint matched multiple indexes, "
+                              << "must hint by index name. Matched: " << fullIndexList[0].toString()
+                              << " and " << fullIndexList[1].toString());
         }
 
         hintedIndexEntry.emplace(fullIndexList.front());

@@ -64,7 +64,7 @@ namespace {
 // Ensures that only one command is operating on fsyncLock state at a time. As a 'ResourceMutex',
 // lock time will be reported for a given user operation.
 Lock::ResourceMutex commandMutex("fsyncCommandMutex");
-}
+}  // namespace
 
 /**
  * Maintains a global read lock while mongod is fsyncLocked.
@@ -437,4 +437,4 @@ MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
     setLockedForWritingImpl([]() { return fsyncCmd.fsyncLocked(); });
     return Status::OK();
 }
-}
+}  // namespace mongo

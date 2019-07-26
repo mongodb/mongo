@@ -139,12 +139,8 @@ void File::read(fileofs o, char* data, unsigned len) {
         _bad = true;
         msgasserted(10438,
                     str::stream() << "In File::read(), ReadFile for '" << _name << "' read "
-                                  << bytesRead
-                                  << " bytes while trying to read "
-                                  << len
-                                  << " bytes starting at offset "
-                                  << o
-                                  << ", truncated file?");
+                                  << bytesRead << " bytes while trying to read " << len
+                                  << " bytes starting at offset " << o << ", truncated file?");
     }
 }
 
@@ -242,8 +238,7 @@ void File::open(const char* filename, bool readOnly, bool direct) {
     _fd = ::open(filename,
                  (readOnly ? O_RDONLY : (O_CREAT | O_RDWR | O_NOATIME))
 #if defined(O_DIRECT)
-                     |
-                     (direct ? O_DIRECT : 0)
+                     | (direct ? O_DIRECT : 0)
 #endif
                      ,
                  S_IRUSR | S_IWUSR);
@@ -264,12 +259,8 @@ void File::read(fileofs o, char* data, unsigned len) {
         _bad = true;
         msgasserted(16569,
                     str::stream() << "In File::read(), ::pread for '" << _name << "' read "
-                                  << bytesRead
-                                  << " bytes while trying to read "
-                                  << len
-                                  << " bytes starting at offset "
-                                  << o
-                                  << ", truncated file?");
+                                  << bytesRead << " bytes while trying to read " << len
+                                  << " bytes starting at offset " << o << ", truncated file?");
     }
 }
 
@@ -297,4 +288,4 @@ void File::write(fileofs o, const char* data, unsigned len) {
 }
 
 #endif  // _WIN32
-}
+}  // namespace mongo

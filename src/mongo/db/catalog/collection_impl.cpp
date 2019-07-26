@@ -330,10 +330,8 @@ StatusWithMatchExpression CollectionImpl::parseValidator(
     if (ns().isOnInternalDb()) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Document validators are not allowed on collection " << ns().ns()
-                              << (_uuid ? " with UUID " + _uuid->toString() : "")
-                              << " in the "
-                              << ns().db()
-                              << " internal database"};
+                              << (_uuid ? " with UUID " + _uuid->toString() : "") << " in the "
+                              << ns().db() << " internal database"};
     }
 
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, _collator.get()));
@@ -423,8 +421,9 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
         const auto firstIdElem = data["first_id"];
         // If the failpoint specifies no collection or matches the existing one, hang.
         if ((!collElem || _ns.ns() == collElem.str()) &&
-            (!firstIdElem || (begin != end && firstIdElem.type() == mongo::String &&
-                              begin->doc["_id"].str() == firstIdElem.str()))) {
+            (!firstIdElem ||
+             (begin != end && firstIdElem.type() == mongo::String &&
+              begin->doc["_id"].str() == firstIdElem.str()))) {
             string whenFirst =
                 firstIdElem ? (string(" when first _id is ") + firstIdElem.str()) : "";
             while (MONGO_FAIL_POINT(hangAfterCollectionInserts)) {
@@ -680,9 +679,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     if (_recordStore->isCapped() && oldSize != newDoc.objsize())
         uasserted(ErrorCodes::CannotGrowDocumentInCappedNamespace,
                   str::stream() << "Cannot change the size of a document in a capped collection: "
-                                << oldSize
-                                << " != "
-                                << newDoc.objsize());
+                                << oldSize << " != " << newDoc.objsize());
 
     args->preImageDoc = oldDoc.value().getOwned();
 
@@ -857,11 +854,9 @@ Status CollectionImpl::setValidator(OperationContext* opCtx, BSONObj validatorDo
     DurableCatalog::get(opCtx)->updateValidator(
         opCtx, ns(), validatorDoc, getValidationLevel(), getValidationAction());
 
-    opCtx->recoveryUnit()->onRollback([
-        this,
-        oldValidator = std::move(_validator),
-        oldValidatorDoc = std::move(_validatorDoc)
-    ]() mutable {
+    opCtx->recoveryUnit()->onRollback([this,
+                                       oldValidator = std::move(_validator),
+                                       oldValidatorDoc = std::move(_validatorDoc)]() mutable {
         this->_validator = std::move(oldValidator);
         this->_validatorDoc = std::move(oldValidatorDoc);
     });
@@ -937,13 +932,11 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
                                        StringData newAction) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
 
-    opCtx->recoveryUnit()->onRollback([
-        this,
-        oldValidator = std::move(_validator),
-        oldValidatorDoc = std::move(_validatorDoc),
-        oldValidationLevel = _validationLevel,
-        oldValidationAction = _validationAction
-    ]() mutable {
+    opCtx->recoveryUnit()->onRollback([this,
+                                       oldValidator = std::move(_validator),
+                                       oldValidatorDoc = std::move(_validatorDoc),
+                                       oldValidationLevel = _validationLevel,
+                                       oldValidationAction = _validationAction]() mutable {
         this->_validator = std::move(oldValidator);
         this->_validatorDoc = std::move(oldValidatorDoc);
         this->_validationLevel = oldValidationLevel;
@@ -1276,10 +1269,8 @@ void addErrorIfUnequal(T stored, T cached, StringData name, ValidateResults* res
     if (stored != cached) {
         results->valid = false;
         results->errors.push_back(str::stream() << "stored value for " << name
-                                                << " does not match cached value: "
-                                                << stored
-                                                << " != "
-                                                << cached);
+                                                << " does not match cached value: " << stored
+                                                << " != " << cached);
     }
 }
 
@@ -1383,8 +1374,8 @@ Status CollectionImpl::validate(OperationContext* opCtx,
             opCtx, _indexCatalog.get(), &indexNsResultsMap, &keysPerIndex, level, results, output);
 
         if (!results->valid) {
-            log(LogComponent::kIndex) << "validating collection " << ns() << " failed"
-                                      << uuidString;
+            log(LogComponent::kIndex)
+                << "validating collection " << ns() << " failed" << uuidString;
         } else {
             log(LogComponent::kIndex) << "validated collection " << ns() << uuidString;
         }

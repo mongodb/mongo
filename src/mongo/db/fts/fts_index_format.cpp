@@ -117,8 +117,8 @@ BSONElement extractNonFTSKeyElement(const BSONObj& obj, StringData path) {
     dps::extractAllElementsAlongPath(
         obj, path, indexedElements, expandArrayOnTrailingField, &arrayComponents);
     uassert(ErrorCodes::CannotBuildIndexKeys,
-            str::stream() << "Field '" << path << "' of text index contains an array in document: "
-                          << obj,
+            str::stream() << "Field '" << path
+                          << "' of text index contains an array in document: " << obj,
             arrayComponents.empty());
 
     // Since there aren't any arrays, there cannot be more than one extracted element on 'path'.
@@ -166,9 +166,7 @@ void FTSIndexFormat::getKeys(const FTSSpec& spec, const BSONObj& obj, BSONObjSet
             ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40) {
         uassert(16732,
                 str::stream() << "too many unique keys for a single document to"
-                              << " have a text index, max is "
-                              << term_freqs.size()
-                              << obj["_id"],
+                              << " have a text index, max is " << term_freqs.size() << obj["_id"],
                 term_freqs.size() <= 400000);
     }
 
@@ -205,9 +203,7 @@ void FTSIndexFormat::getKeys(const FTSSpec& spec, const BSONObj& obj, BSONObjSet
                 ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40) {
             uassert(16733,
                     str::stream() << "trying to index text where term list is too big, max is "
-                                  << MaxKeyBSONSizeMB
-                                  << "mb "
-                                  << obj["_id"],
+                                  << MaxKeyBSONSizeMB << "mb " << obj["_id"],
                     keyBSONSize <= (MaxKeyBSONSizeMB * 1024 * 1024));
         }
     }
@@ -267,5 +263,5 @@ void FTSIndexFormat::_appendIndexKey(BSONObjBuilder& b,
         b.append("", weight);
     }
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

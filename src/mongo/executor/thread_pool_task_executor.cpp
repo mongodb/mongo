@@ -360,7 +360,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
     lk.unlock();
 
     auto status = _net->setAlarm(
-        cbHandle.getValue(), when, [ this, cbHandle = cbHandle.getValue() ](Status status) {
+        cbHandle.getValue(), when, [this, cbHandle = cbHandle.getValue()](Status status) {
             if (status == ErrorCodes::CallbackCanceled) {
                 return;
             }

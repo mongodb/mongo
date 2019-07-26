@@ -82,4 +82,4 @@ void logProcessDetailsForLogRotate(ServiceContext* serviceContext) {
     logProcessDetails();
 }
 
-}  // mongo
+}  // namespace mongo

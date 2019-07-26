@@ -222,7 +222,7 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
 
     const auto& keyPattern = shardKeyPattern.getKeyPattern();
 
-    auto nextShardIdForHole = [&, indx = 0 ]() mutable {
+    auto nextShardIdForHole = [&, indx = 0]() mutable {
         return shardIdsForGaps[indx++ % shardIdsForGaps.size()];
     };
 
@@ -249,10 +249,7 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
         const auto& shardIdsForChunk = it->second;
         uassert(50973,
                 str::stream()
-                    << "Cannot shard collection "
-                    << nss.ns()
-                    << " due to zone "
-                    << tag.getTag()
+                    << "Cannot shard collection " << nss.ns() << " due to zone " << tag.getTag()
                     << " which is not assigned to a shard. Please assign this zone to a shard.",
                 !shardIdsForChunk.empty());
 
@@ -395,7 +392,7 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunksU
                                                 shardSelectedSplitPoints,
                                                 shardIds,
                                                 1  // numContiguousChunksPerShard
-                                                );
+    );
 }
 
 boost::optional<CollectionType> InitialSplitPolicy::checkIfCollectionAlreadyShardedWithSameOptions(
@@ -424,8 +421,7 @@ boost::optional<CollectionType> InitialSplitPolicy::checkIfCollectionAlreadyShar
     // match the options the collection was originally sharded with.
     uassert(ErrorCodes::AlreadyInitialized,
             str::stream() << "sharding already enabled for collection " << nss.ns()
-                          << " with options "
-                          << existingOptions.toString(),
+                          << " with options " << existingOptions.toString(),
             requestedOptions.hasSameOptions(existingOptions));
 
     return existingOptions;

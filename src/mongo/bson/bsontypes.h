@@ -223,4 +223,4 @@ inline int canonicalizeBSONType(BSONType type) {
             return -1;
     }
 }
-}
+}  // namespace mongo

@@ -1076,7 +1076,7 @@ public:
     /**
      * Gets the number of retries left for this heartbeat attempt. Invalid to call if the current
      * state is 'UNINITIALIZED'.
-    */
+     */
     int retriesLeft() const {
         return kMaxHeartbeatRetries - _numFailuresSinceLastStart;
     }

@@ -63,16 +63,16 @@ public:
         const auto status = static_cast<::OSStatus>(value);
         apple::CFUniquePtr<::CFStringRef> errstr(::SecCopyErrorMessageString(status, nullptr));
         if (!errstr) {
-            return mongo::str::stream() << "Secure.Transport unknown error: "
-                                        << static_cast<int>(status);
+            return mongo::str::stream()
+                << "Secure.Transport unknown error: " << static_cast<int>(status);
         }
         const auto len = ::CFStringGetMaximumSizeForEncoding(::CFStringGetLength(errstr.get()),
                                                              ::kCFStringEncodingUTF8);
         std::string ret;
         ret.resize(len + 1);
         if (!::CFStringGetCString(errstr.get(), &ret[0], len, ::kCFStringEncodingUTF8)) {
-            return mongo::str::stream() << "Secure.Transport unknown error: "
-                                        << static_cast<int>(status);
+            return mongo::str::stream()
+                << "Secure.Transport unknown error: " << static_cast<int>(status);
         }
 
         ret.resize(strlen(ret.c_str()));

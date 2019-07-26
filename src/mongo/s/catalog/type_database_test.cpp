@@ -49,8 +49,7 @@ TEST(DatabaseType, Basic) {
     UUID uuid = UUID::gen();
     StatusWith<DatabaseType> status = DatabaseType::fromBSON(
         BSON(DatabaseType::name("mydb")
-             << DatabaseType::primary("shard")
-             << DatabaseType::sharded(true)
+             << DatabaseType::primary("shard") << DatabaseType::sharded(true)
              << DatabaseType::version(BSON("uuid" << uuid << "lastMod" << 0))));
     ASSERT_TRUE(status.isOK());
 

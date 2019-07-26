@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/util/net/http_client.h"
 #include "mongo/base/status.h"
+#include "mongo/util/net/http_client.h"
 
 namespace mongo {
 

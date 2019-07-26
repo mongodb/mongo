@@ -132,8 +132,8 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
           _sourceNss.db().toString(),
           makeCommandWithUUIDorCollectionName("listIndexes", _options.uuid, sourceNss),
           [this](const Fetcher::QueryResponseStatus& fetchResult,
-                 Fetcher::NextAction * nextAction,
-                 BSONObjBuilder * getMoreBob) {
+                 Fetcher::NextAction* nextAction,
+                 BSONObjBuilder* getMoreBob) {
               _listIndexesCallback(fetchResult, nextAction, getMoreBob);
           },
           ReadPreferenceSetting::secondaryPreferredMetadata(),
@@ -332,9 +332,7 @@ void CollectionCloner::_countCallback(
             _finishCallback(countStatus.withContext(
                 str::stream() << "There was an error parsing document count from count "
                                  "command result on collection "
-                              << _sourceNss.ns()
-                              << " from "
-                              << _source.toString()));
+                              << _sourceNss.ns() << " from " << _source.toString()));
             return;
         }
     }
@@ -343,8 +341,7 @@ void CollectionCloner::_countCallback(
         _finishCallback({ErrorCodes::BadValue,
                          str::stream() << "Count call on collection " << _sourceNss.ns() << " from "
                                        << _source.toString()
-                                       << " returned negative document count: "
-                                       << count});
+                                       << " returned negative document count: " << count});
         return;
     }
 

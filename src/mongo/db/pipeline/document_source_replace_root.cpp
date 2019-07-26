@@ -50,11 +50,8 @@ Document ReplaceRootTransformation::applyTransformation(const Document& input) {
     uassert(40228,
             str::stream()
                 << "'newRoot' expression must evaluate to an object, but resulting value was: "
-                << newRoot.toString()
-                << ". Type of resulting value: '"
-                << typeName(newRoot.getType())
-                << "'. Input document: "
-                << input.toString(),
+                << newRoot.toString() << ". Type of resulting value: '"
+                << typeName(newRoot.getType()) << "'. Input document: " << input.toString(),
             newRoot.getType() == BSONType::Object);
 
     // Turn the value into a document.
@@ -84,8 +81,7 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
                           << stageName);
         uassert(40229,
                 str::stream() << "expected an object as specification for " << kStageName
-                              << " stage, got "
-                              << typeName(elem.type()),
+                              << " stage, got " << typeName(elem.type()),
                 elem.type() == Object);
 
         auto spec =

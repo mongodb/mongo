@@ -6,7 +6,6 @@ load('jstests/concurrency/fsm_libs/parse_config.js');  // for parseConfig
 load('jstests/libs/specific_secondary_reader_mongo.js');
 
 var workerThread = (function() {
-
     // workloads = list of workload filenames
     // args.tid = the thread identifier
     // args.data = map of workload -> 'this' parameter passed to the FSM state functions
@@ -193,8 +192,7 @@ var workerThread = (function() {
                 // them here as non-configurable and non-writable.
                 Object.defineProperties(data, {
                     'iterations': {configurable: false, writable: false, value: data.iterations},
-                    'threadCount':
-                        {configurable: false, writable: false, value: data.threadCount}
+                    'threadCount': {configurable: false, writable: false, value: data.threadCount}
                 });
 
                 data.tid = args.tid;

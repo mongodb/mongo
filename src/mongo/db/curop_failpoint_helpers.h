@@ -64,4 +64,4 @@ public:
                                           bool checkForInterrupt = false,
                                           boost::optional<NamespaceString> nss = boost::none);
 };
-}
+}  // namespace mongo

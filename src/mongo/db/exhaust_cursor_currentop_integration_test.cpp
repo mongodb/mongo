@@ -51,9 +51,7 @@ std::unique_ptr<DBClientBase> connect(StringData appName) {
 void setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(DBClientBase* conn, bool enable) {
     auto cmdObj = BSON("configureFailPoint"
                        << "waitWithPinnedCursorDuringGetMoreBatch"
-                       << "mode"
-                       << (enable ? "alwaysOn" : "off")
-                       << "data"
+                       << "mode" << (enable ? "alwaysOn" : "off") << "data"
                        << BSON("shouldNotdropLock" << true));
     auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
     ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
@@ -63,8 +61,7 @@ void setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(DBClientBa
                                                                       bool enable) {
     auto cmdObj = BSON("configureFailPoint"
                        << "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch"
-                       << "mode"
-                       << (enable ? "alwaysOn" : "off"));
+                       << "mode" << (enable ? "alwaysOn" : "off"));
     auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
     ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
 }
@@ -158,12 +155,9 @@ TEST(CurrentOpExhaustCursorTest, CanSeeEachExhaustCursorPseudoGetMoreInCurrentOp
         // Generate a currentOp filter based on the cursorId and the cumulative nDocsReturned.
         const auto curOpMatch = BSON("command.collection"
                                      << "exhaust_cursor_currentop"
-                                     << "command.getMore"
-                                     << queryCursor->getCursorId()
-                                     << "msg"
+                                     << "command.getMore" << queryCursor->getCursorId() << "msg"
                                      << "waitWithPinnedCursorDuringGetMoreBatch"
-                                     << "cursor.nDocsReturned"
-                                     << i);
+                                     << "cursor.nDocsReturned" << i);
 
         // Confirm that the exhaust getMore appears in the $currentOp output.
         ASSERT(confirmCurrentOpContents(conn.get(), curOpMatch, parallelWaitTimeoutMS));

@@ -16,133 +16,133 @@ load('jstests/replsets/rslib.js');
 load('jstests/libs/parallelTester.js');
 load('jstests/libs/write_concern_util.js');
 (function() {
-    'use strict';
-    var send_linearizable_read = function() {
-        // The primary will step down and throw an exception, which is expected.
-        var coll = db.getSiblingDB("test").foo;
-        jsTestLog('Sending in linearizable read in secondary thread');
-        // 'isMaster' ensures that the following command fails (and returns a response rather than
-        // an exception) before its connection is cut because of the primary step down. Refer to
-        // SERVER-24574.
-        assert.commandWorked(coll.runCommand({isMaster: 1, hangUpOnStepDown: false}));
-        assert.commandFailedWithCode(
-            coll.runCommand(
-                {'find': 'foo', readConcern: {level: "linearizable"}, maxTimeMS: 60000}),
-            ErrorCodes.InterruptedDueToReplStateChange);
-    };
-
-    var num_nodes = 3;
-    var name = 'linearizable_read_concern';
-    var replTest = new ReplSetTest({name: name, nodes: num_nodes, useBridge: true});
-    var config = replTest.getReplSetConfig();
-
-    // Increased election timeout to avoid having the primary step down while we are
-    // testing linearizable functionality on an isolated primary.
-    config.settings = {electionTimeoutMillis: 60000};
-
-    replTest.startSet();
-    replTest.initiate(config);
-
-    // Without a sync source the heartbeat interval will be half of the election timeout, 30
-    // seconds. It thus will take almost 30 seconds for the secondaries to set the primary as
-    // their sync source and begin replicating.
-    replTest.awaitReplication();
-    var primary = replTest.getPrimary();
-    var secondaries = replTest.getSecondaries();
-
-    // Do a write to have something to read.
-    assert.writeOK(primary.getDB("test").foo.insert(
-        {"number": 7},
-        {"writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}}));
-
-    jsTestLog("Testing linearizable readConcern parsing");
-    // This command is sent to the primary, and the primary is fully connected so it should work.
-    var goodRead = assert.writeOK(primary.getDB("test").runCommand(
-        {'find': 'foo', readConcern: {level: "linearizable"}, "maxTimeMS": 60000}));
-    assert.eq(goodRead.cursor.firstBatch[0].number, 7);
-
-    // This fails because you cannot have a linearizable read command sent to a secondary.
-    var badCmd = assert.commandFailed(secondaries[0].getDB("test").runCommand(
-        {"find": "foo", readConcern: {level: "linearizable"}, "maxTimeMS": 60000}));
-
-    assert.eq(badCmd.errmsg, "cannot satisfy linearizable read concern on non-primary node");
-    assert.eq(badCmd.code, ErrorCodes.NotMaster);
-
-    // This fails because you cannot specify 'afterOpTime' for linearizable read.
-    var opTimeCmd = assert.commandFailed(primary.getDB("test").runCommand({
-        "find": "foo",
-        readConcern: {level: "linearizable", "afterOpTime": {ts: Timestamp(1, 2), t: 1}},
-        "maxTimeMS": 60000
-    }));
-    assert.eq(opTimeCmd.errmsg, "afterOpTime not compatible with linearizable read concern");
-    assert.eq(opTimeCmd.code, ErrorCodes.FailedToParse);
-
-    // A $out aggregation is not allowed with readConcern level "linearizable".
-    let outResult = assert.throws(() => primary.getDB("test").foo.aggregate(
-                                      [{$out: "out"}], {readConcern: {level: "linearizable"}}));
-    assert.eq(outResult.code, ErrorCodes.InvalidOptions);
-
-    // A $merge aggregation is not allowed with readConcern level "linearizable".
-    let mergeResult = assert.throws(
-        () => primary.getDB("test").foo.aggregate(
-            [{$merge: {into: "out", whenMatched: "replace", whenNotMatched: "insert"}}],
-            {readConcern: {level: "linearizable"}}));
-    assert.eq(mergeResult.code, ErrorCodes.InvalidOptions);
-
-    primary = replTest.getPrimary();
-
-    jsTestLog("Starting linearizablility testing");
-
-    const cursorId = assert
-                         .commandWorked(primary.getDB("test").runCommand(
-                             {'find': 'foo', readConcern: {level: "linearizable"}, batchSize: 0}))
-                         .cursor.id;
-    jsTestLog(
-        "Setting up partitions such that the primary is isolated: [Secondary-Secondary] [Primary]");
-    secondaries[0].disconnect(primary);
-    secondaries[1].disconnect(primary);
-
-    jsTestLog(
-        "Testing to make sure that linearizable getMores will time out when the primary is isolated.");
-    assert.commandWorked(primary.getDB("test").foo.insert({_id: 0, x: 0}));
+'use strict';
+var send_linearizable_read = function() {
+    // The primary will step down and throw an exception, which is expected.
+    var coll = db.getSiblingDB("test").foo;
+    jsTestLog('Sending in linearizable read in secondary thread');
+    // 'isMaster' ensures that the following command fails (and returns a response rather than
+    // an exception) before its connection is cut because of the primary step down. Refer to
+    // SERVER-24574.
+    assert.commandWorked(coll.runCommand({isMaster: 1, hangUpOnStepDown: false}));
     assert.commandFailedWithCode(
-        primary.getDB("test").runCommand({"getMore": cursorId, collection: "foo", batchSize: 1}),
-        ErrorCodes.LinearizableReadConcernError);
+        coll.runCommand({'find': 'foo', readConcern: {level: "linearizable"}, maxTimeMS: 60000}),
+        ErrorCodes.InterruptedDueToReplStateChange);
+};
 
-    jsTestLog("Test that a linearizable read will timeout when the primary is isolated.");
-    let findResult = primary.getDB("test").runCommand(
-        {"find": "foo", "readConcern": {level: "linearizable"}, "maxTimeMS": 3000});
-    assert.commandFailedWithCode(findResult, ErrorCodes.MaxTimeMSExpired);
+var num_nodes = 3;
+var name = 'linearizable_read_concern';
+var replTest = new ReplSetTest({name: name, nodes: num_nodes, useBridge: true});
+var config = replTest.getReplSetConfig();
 
-    jsTestLog("Testing to make sure linearizable read command does not block forever.");
+// Increased election timeout to avoid having the primary step down while we are
+// testing linearizable functionality on an isolated primary.
+config.settings = {
+    electionTimeoutMillis: 60000
+};
 
-    // Get last noop Optime before sending the linearizable read command
-    // to ensure that we are waiting for the most recent noop write.
-    var lastOpTimestamp = getLatestOp(primary).ts;
+replTest.startSet();
+replTest.initiate(config);
 
-    var parallelShell = startParallelShell(send_linearizable_read, primary.port);
-    // Sending a linearizable read implicitly replicates a noop to the secondaries. We need to find
-    // the most recently issued noop to ensure that we call stepdown during the recently
-    // issued linearizable read and not before the read (in the separate thread) has been called.
-    jsTestLog("Checking end of oplog for noop");
-    assert.soon(function() {
-        var isEarlierTimestamp = function(ts1, ts2) {
-            if (ts1.getTime() == ts2.getTime()) {
-                return ts1.getInc() < ts2.getInc();
-            }
-            return ts1.getTime() < ts2.getTime();
-        };
-        var latestOp = getLatestOp(primary);
-        if (latestOp.op == "n" && isEarlierTimestamp(lastOpTimestamp, latestOp.ts)) {
-            return true;
+// Without a sync source the heartbeat interval will be half of the election timeout, 30
+// seconds. It thus will take almost 30 seconds for the secondaries to set the primary as
+// their sync source and begin replicating.
+replTest.awaitReplication();
+var primary = replTest.getPrimary();
+var secondaries = replTest.getSecondaries();
+
+// Do a write to have something to read.
+assert.writeOK(primary.getDB("test").foo.insert(
+    {"number": 7}, {"writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}}));
+
+jsTestLog("Testing linearizable readConcern parsing");
+// This command is sent to the primary, and the primary is fully connected so it should work.
+var goodRead = assert.writeOK(primary.getDB("test").runCommand(
+    {'find': 'foo', readConcern: {level: "linearizable"}, "maxTimeMS": 60000}));
+assert.eq(goodRead.cursor.firstBatch[0].number, 7);
+
+// This fails because you cannot have a linearizable read command sent to a secondary.
+var badCmd = assert.commandFailed(secondaries[0].getDB("test").runCommand(
+    {"find": "foo", readConcern: {level: "linearizable"}, "maxTimeMS": 60000}));
+
+assert.eq(badCmd.errmsg, "cannot satisfy linearizable read concern on non-primary node");
+assert.eq(badCmd.code, ErrorCodes.NotMaster);
+
+// This fails because you cannot specify 'afterOpTime' for linearizable read.
+var opTimeCmd = assert.commandFailed(primary.getDB("test").runCommand({
+    "find": "foo",
+    readConcern: {level: "linearizable", "afterOpTime": {ts: Timestamp(1, 2), t: 1}},
+    "maxTimeMS": 60000
+}));
+assert.eq(opTimeCmd.errmsg, "afterOpTime not compatible with linearizable read concern");
+assert.eq(opTimeCmd.code, ErrorCodes.FailedToParse);
+
+// A $out aggregation is not allowed with readConcern level "linearizable".
+let outResult = assert.throws(() => primary.getDB("test").foo.aggregate(
+                                  [{$out: "out"}], {readConcern: {level: "linearizable"}}));
+assert.eq(outResult.code, ErrorCodes.InvalidOptions);
+
+// A $merge aggregation is not allowed with readConcern level "linearizable".
+let mergeResult =
+    assert.throws(() => primary.getDB("test").foo.aggregate(
+                      [{$merge: {into: "out", whenMatched: "replace", whenNotMatched: "insert"}}],
+                      {readConcern: {level: "linearizable"}}));
+assert.eq(mergeResult.code, ErrorCodes.InvalidOptions);
+
+primary = replTest.getPrimary();
+
+jsTestLog("Starting linearizablility testing");
+
+const cursorId = assert
+                     .commandWorked(primary.getDB("test").runCommand(
+                         {'find': 'foo', readConcern: {level: "linearizable"}, batchSize: 0}))
+                     .cursor.id;
+jsTestLog(
+    "Setting up partitions such that the primary is isolated: [Secondary-Secondary] [Primary]");
+secondaries[0].disconnect(primary);
+secondaries[1].disconnect(primary);
+
+jsTestLog(
+    "Testing to make sure that linearizable getMores will time out when the primary is isolated.");
+assert.commandWorked(primary.getDB("test").foo.insert({_id: 0, x: 0}));
+assert.commandFailedWithCode(
+    primary.getDB("test").runCommand({"getMore": cursorId, collection: "foo", batchSize: 1}),
+    ErrorCodes.LinearizableReadConcernError);
+
+jsTestLog("Test that a linearizable read will timeout when the primary is isolated.");
+let findResult = primary.getDB("test").runCommand(
+    {"find": "foo", "readConcern": {level: "linearizable"}, "maxTimeMS": 3000});
+assert.commandFailedWithCode(findResult, ErrorCodes.MaxTimeMSExpired);
+
+jsTestLog("Testing to make sure linearizable read command does not block forever.");
+
+// Get last noop Optime before sending the linearizable read command
+// to ensure that we are waiting for the most recent noop write.
+var lastOpTimestamp = getLatestOp(primary).ts;
+
+var parallelShell = startParallelShell(send_linearizable_read, primary.port);
+// Sending a linearizable read implicitly replicates a noop to the secondaries. We need to find
+// the most recently issued noop to ensure that we call stepdown during the recently
+// issued linearizable read and not before the read (in the separate thread) has been called.
+jsTestLog("Checking end of oplog for noop");
+assert.soon(function() {
+    var isEarlierTimestamp = function(ts1, ts2) {
+        if (ts1.getTime() == ts2.getTime()) {
+            return ts1.getInc() < ts2.getInc();
         }
+        return ts1.getTime() < ts2.getTime();
+    };
+    var latestOp = getLatestOp(primary);
+    if (latestOp.op == "n" && isEarlierTimestamp(lastOpTimestamp, latestOp.ts)) {
+        return true;
+    }
 
-        return false;
-    });
-    assert.eq(primary, replTest.getPrimary(), "Primary unexpectedly changed mid test.");
-    jsTestLog("Making Primary step down");
-    assert.commandWorked(primary.adminCommand(
-        {"replSetStepDown": 100, secondaryCatchUpPeriodSecs: 0, "force": true}));
-    parallelShell();
-    replTest.stopSet();
+    return false;
+});
+assert.eq(primary, replTest.getPrimary(), "Primary unexpectedly changed mid test.");
+jsTestLog("Making Primary step down");
+assert.commandWorked(
+    primary.adminCommand({"replSetStepDown": 100, secondaryCatchUpPeriodSecs: 0, "force": true}));
+parallelShell();
+replTest.stopSet();
 }());

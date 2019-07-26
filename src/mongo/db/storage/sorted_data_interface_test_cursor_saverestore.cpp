@@ -300,7 +300,8 @@ void testSaveAndRestorePositionSeesNewInserts(bool forward, bool unique) {
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
-                                                            {key1, loc1}, {key3, loc1},
+                                                            {key1, loc1},
+                                                            {key3, loc1},
                                                         });
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
@@ -335,7 +336,8 @@ void testSaveAndRestorePositionSeesNewInsertsAfterRemove(bool forward, bool uniq
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
-                                                            {key1, loc1}, {key3, loc1},
+                                                            {key1, loc1},
+                                                            {key3, loc1},
                                                         });
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
@@ -414,12 +416,13 @@ TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterEOF_Reverse_S
 TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_Forward) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted =
-        harnessHelper->newSortedDataInterface(/*unique*/ false,
-                                              /*partial=*/false,
-                                              {
-                                                  {key1, loc1}, {key2, loc1}, {key3, loc1},
-                                              });
+    auto sorted = harnessHelper->newSortedDataInterface(/*unique*/ false,
+                                                        /*partial=*/false,
+                                                        {
+                                                            {key1, loc1},
+                                                            {key2, loc1},
+                                                            {key3, loc1},
+                                                        });
 
     auto cursor = sorted->newCursor(opCtx.get());
 
@@ -497,12 +500,13 @@ TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_For
 TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_Reverse) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted =
-        harnessHelper->newSortedDataInterface(/*unique*/ false,
-                                              /*partial=*/false,
-                                              {
-                                                  {key0, loc1}, {key1, loc1}, {key2, loc2},
-                                              });
+    auto sorted = harnessHelper->newSortedDataInterface(/*unique*/ false,
+                                                        /*partial=*/false,
+                                                        {
+                                                            {key0, loc1},
+                                                            {key1, loc1},
+                                                            {key2, loc2},
+                                                        });
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
 
@@ -580,12 +584,13 @@ TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_Rev
 TEST(SortedDataInterface, SaveUnpositionedAndRestore) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted =
-        harnessHelper->newSortedDataInterface(/*unique=*/false,
-                                              /*partial=*/false,
-                                              {
-                                                  {key1, loc1}, {key2, loc1}, {key3, loc1},
-                                              });
+    auto sorted = harnessHelper->newSortedDataInterface(/*unique=*/false,
+                                                        /*partial=*/false,
+                                                        {
+                                                            {key1, loc1},
+                                                            {key2, loc1},
+                                                            {key3, loc1},
+                                                        });
 
     auto cursor = sorted->newCursor(opCtx.get());
 

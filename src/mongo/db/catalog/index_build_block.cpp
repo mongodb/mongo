@@ -110,7 +110,7 @@ Status IndexCatalogImpl::IndexBuildBlock::init(OperationContext* opCtx, Collecti
 
     if (isBackgroundIndex) {
         opCtx->recoveryUnit()->onCommit(
-            [ entry = _entry, coll = collection ](boost::optional<Timestamp> commitTime) {
+            [entry = _entry, coll = collection](boost::optional<Timestamp> commitTime) {
                 // This will prevent the unfinished index from being visible on index iterators.
                 if (commitTime) {
                     entry->setMinimumVisibleSnapshot(commitTime.get());
@@ -169,7 +169,7 @@ void IndexCatalogImpl::IndexBuildBlock::success(OperationContext* opCtx, Collect
     collection->indexBuildSuccess(opCtx, _entry);
 
     opCtx->recoveryUnit()->onCommit(
-        [ opCtx, entry = _entry, coll = collection ](boost::optional<Timestamp> commitTime) {
+        [opCtx, entry = _entry, coll = collection](boost::optional<Timestamp> commitTime) {
             // Note: this runs after the WUOW commits but before we release our X lock on the
             // collection. This means that any snapshot created after this must include the full
             // index, and no one can try to read this index before we set the visibility.

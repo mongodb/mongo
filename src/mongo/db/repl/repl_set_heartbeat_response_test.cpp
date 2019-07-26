@@ -166,19 +166,16 @@ TEST(ReplSetHeartbeatResponse, InitializeNoDurableWallTime) {
 
 TEST(ReplSetHeartbeatResponse, InitializeWrongAppliedOpTimeType) {
     ReplSetHeartbeatResponse hbResponse;
-    BSONObj initializerObj = BSON(
-        "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t() + Seconds(100)
-             << "opTime"
-             << "hello");
+    BSONObj initializerObj =
+        BSON("ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+                  << "durableWallTime" << Date_t() + Seconds(100) << "opTime"
+                  << "hello");
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS("\"opTime\" had the wrong type. Expected object, found string", result.reason());
 
     initializerObj = BSON("ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON()
-                               << "durableWallTime"
-                               << Date_t() + Seconds(100)
-                               << "opTime"
+                               << "durableWallTime" << Date_t() + Seconds(100) << "opTime"
                                << OpTime().getTimestamp());
     result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
@@ -190,9 +187,7 @@ TEST(ReplSetHeartbeatResponse, InitializeNoAppliedWallTime) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t() + Seconds(100)
-             << "opTime"
-             << OpTime(Timestamp(100, 0), 0).toBSON());
+             << Date_t() + Seconds(100) << "opTime" << OpTime(Timestamp(100, 0), 0).toBSON());
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, result);
     ASSERT_EQUALS("Missing expected field \"wallTime\"", result.reason());
@@ -202,12 +197,8 @@ TEST(ReplSetHeartbeatResponse, InitializeMemberStateWrongType) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t() + Seconds(100)
-             << "opTime"
-             << OpTime(Timestamp(100, 0), 0).toBSON()
-             << "wallTime"
-             << Date_t() + Seconds(100)
-             << "state"
+             << Date_t() + Seconds(100) << "opTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+             << "wallTime" << Date_t() + Seconds(100) << "state"
              << "hello");
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
@@ -221,13 +212,8 @@ TEST(ReplSetHeartbeatResponse, InitializeMemberStateTooLow) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t() + Seconds(100)
-             << "opTime"
-             << OpTime(Timestamp(100, 0), 0).toBSON()
-             << "wallTime"
-             << Date_t() + Seconds(100)
-             << "state"
-             << -1);
+             << Date_t() + Seconds(100) << "opTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+             << "wallTime" << Date_t() + Seconds(100) << "state" << -1);
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::BadValue, result);
     ASSERT_EQUALS(
@@ -240,13 +226,8 @@ TEST(ReplSetHeartbeatResponse, InitializeMemberStateTooHigh) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t() + Seconds(100)
-             << "opTime"
-             << OpTime(Timestamp(100, 0), 0).toBSON()
-             << "wallTime"
-             << Date_t() + Seconds(100)
-             << "state"
-             << 11);
+             << Date_t() + Seconds(100) << "opTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+             << "wallTime" << Date_t() + Seconds(100) << "state" << 11);
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::BadValue, result);
     ASSERT_EQUALS(
@@ -259,12 +240,8 @@ TEST(ReplSetHeartbeatResponse, InitializeVersionWrongType) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON(
         "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t() + Seconds(100)
-             << "opTime"
-             << OpTime(Timestamp(100, 0), 0).toBSON()
-             << "wallTime"
-             << Date_t() + Seconds(100)
-             << "v"
+             << Date_t() + Seconds(100) << "opTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+             << "wallTime" << Date_t() + Seconds(100) << "v"
              << "hello");
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
@@ -276,17 +253,12 @@ TEST(ReplSetHeartbeatResponse, InitializeVersionWrongType) {
 
 TEST(ReplSetHeartbeatResponse, InitializeReplSetNameWrongType) {
     ReplSetHeartbeatResponse hbResponse;
-    BSONObj initializerObj = BSON(
-        "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t() + Seconds(100)
-             << "opTime"
-             << OpTime(Timestamp(100, 0), 0).toBSON()
-             << "wallTime"
-             << Date_t() + Seconds(100)
-             << "v"
-             << 2  // needs a version to get this far in initialize()
-             << "set"
-             << 4);
+    BSONObj initializerObj =
+        BSON("ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+                  << "durableWallTime" << Date_t() + Seconds(100) << "opTime"
+                  << OpTime(Timestamp(100, 0), 0).toBSON() << "wallTime" << Date_t() + Seconds(100)
+                  << "v" << 2  // needs a version to get this far in initialize()
+                  << "set" << 4);
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
@@ -297,17 +269,12 @@ TEST(ReplSetHeartbeatResponse, InitializeReplSetNameWrongType) {
 
 TEST(ReplSetHeartbeatResponse, InitializeSyncingToWrongType) {
     ReplSetHeartbeatResponse hbResponse;
-    BSONObj initializerObj = BSON(
-        "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t() + Seconds(100)
-             << "opTime"
-             << OpTime(Timestamp(100, 0), 0).toBSON()
-             << "wallTime"
-             << Date_t() + Seconds(100)
-             << "v"
-             << 2  // needs a version to get this far in initialize()
-             << "syncingTo"
-             << 4);
+    BSONObj initializerObj =
+        BSON("ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+                  << "durableWallTime" << Date_t() + Seconds(100) << "opTime"
+                  << OpTime(Timestamp(100, 0), 0).toBSON() << "wallTime" << Date_t() + Seconds(100)
+                  << "v" << 2  // needs a version to get this far in initialize()
+                  << "syncingTo" << 4);
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
@@ -318,17 +285,12 @@ TEST(ReplSetHeartbeatResponse, InitializeSyncingToWrongType) {
 
 TEST(ReplSetHeartbeatResponse, InitializeConfigWrongType) {
     ReplSetHeartbeatResponse hbResponse;
-    BSONObj initializerObj = BSON(
-        "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t() + Seconds(100)
-             << "opTime"
-             << OpTime(Timestamp(100, 0), 0).toBSON()
-             << "wallTime"
-             << Date_t() + Seconds(100)
-             << "v"
-             << 2  // needs a version to get this far in initialize()
-             << "config"
-             << 4);
+    BSONObj initializerObj =
+        BSON("ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+                  << "durableWallTime" << Date_t() + Seconds(100) << "opTime"
+                  << OpTime(Timestamp(100, 0), 0).toBSON() << "wallTime" << Date_t() + Seconds(100)
+                  << "v" << 2  // needs a version to get this far in initialize()
+                  << "config" << 4);
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
@@ -339,17 +301,12 @@ TEST(ReplSetHeartbeatResponse, InitializeConfigWrongType) {
 
 TEST(ReplSetHeartbeatResponse, InitializeBadConfig) {
     ReplSetHeartbeatResponse hbResponse;
-    BSONObj initializerObj = BSON(
-        "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
-             << Date_t() + Seconds(100)
-             << "opTime"
-             << OpTime(Timestamp(100, 0), 0).toBSON()
-             << "wallTime"
-             << Date_t() + Seconds(100)
-             << "v"
-             << 2  // needs a version to get this far in initialize()
-             << "config"
-             << BSON("illegalFieldName" << 2));
+    BSONObj initializerObj =
+        BSON("ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+                  << "durableWallTime" << Date_t() + Seconds(100) << "opTime"
+                  << OpTime(Timestamp(100, 0), 0).toBSON() << "wallTime" << Date_t() + Seconds(100)
+                  << "v" << 2  // needs a version to get this far in initialize()
+                  << "config" << BSON("illegalFieldName" << 2));
     Status result = hbResponse.initialize(initializerObj, 0, /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::BadValue, result);
     ASSERT_EQUALS("Unexpected field illegalFieldName in replica set configuration",
@@ -371,12 +328,9 @@ TEST(ReplSetHeartbeatResponse, InvalidResponseOpTimeMissesConfigVersion) {
     ReplSetHeartbeatResponse hbResp;
     Status result = hbResp.initialize(BSON("ok" << 1.0 << "durableOpTime"
                                                 << OpTime(Timestamp(100, 0), 0).toBSON()
-                                                << "durableWallTime"
-                                                << Date_t() + Seconds(100)
-                                                << "opTime"
-                                                << OpTime(Timestamp(100, 0), 0).toBSON()
-                                                << "wallTime"
-                                                << Date_t() + Seconds(100)),
+                                                << "durableWallTime" << Date_t() + Seconds(100)
+                                                << "opTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+                                                << "wallTime" << Date_t() + Seconds(100)),
                                       0,
                                       /*requireWallTime*/ true);
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.code());

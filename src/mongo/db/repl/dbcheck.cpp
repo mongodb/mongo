@@ -40,7 +40,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/dbcheck.h"
-#include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/dbcheck_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
@@ -132,7 +131,7 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const NamespaceString& nss
     entry->setData(data);
     return entry;
 }
-}
+}  // namespace
 
 /**
  * Get an error message if the check fails.
@@ -161,14 +160,9 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(const NamespaceString& nss,
                                                   const repl::OpTime& optime) {
     auto hashes = expectedFound(expectedHash, foundHash);
 
-    auto data =
-        BSON("success" << true << "count" << count << "bytes" << bytes << "md5" << hashes.second
-                       << "minKey"
-                       << minKey.elem()
-                       << "maxKey"
-                       << maxKey.elem()
-                       << "optime"
-                       << optime);
+    auto data = BSON("success" << true << "count" << count << "bytes" << bytes << "md5"
+                               << hashes.second << "minKey" << minKey.elem() << "maxKey"
+                               << maxKey.elem() << "optime" << optime);
 
     auto severity = hashes.first ? SeverityEnum::Info : SeverityEnum::Error;
     std::string msg =
@@ -284,19 +278,9 @@ std::unique_ptr<HealthLogEntry> dbCheckCollectionEntry(const NamespaceString& ns
     std::string msg =
         "dbCheck collection " + (match ? std::string("consistent") : std::string("inconsistent"));
     auto data = BSON("success" << true << "uuid" << uuid.toString() << "found" << true << "name"
-                               << names.second
-                               << "prev"
-                               << prevs.second
-                               << "next"
-                               << nexts.second
-                               << "indexes"
-                               << indices.second
-                               << "options"
-                               << options.second
-                               << "md5"
-                               << md5s.second
-                               << "optime"
-                               << optime);
+                               << names.second << "prev" << prevs.second << "next" << nexts.second
+                               << "indexes" << indices.second << "options" << options.second
+                               << "md5" << md5s.second << "optime" << optime);
 
     return dbCheckHealthLogEntry(nss, severity, msg, OplogEntriesEnum::Collection, data);
 }
@@ -520,7 +504,7 @@ Status dbCheckDatabaseOnSecondary(OperationContext* opCtx,
 
     return Status::OK();
 }
-}
+}  // namespace
 
 namespace repl {
 

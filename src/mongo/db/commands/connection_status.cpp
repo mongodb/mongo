@@ -130,4 +130,4 @@ public:
         return true;
     }
 } cmdConnectionStatus;
-}
+}  // namespace mongo

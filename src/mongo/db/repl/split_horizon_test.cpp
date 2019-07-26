@@ -300,8 +300,7 @@ TEST(SplitHorizonTesting, BSONConstruction) {
 
         // Two horizons with duplicate host and ports.
         {BSON("horizonWithDuplicateHost1" << matchingHostAndPort << "horizonWithDuplicateHost2"
-                                          << matchingHostAndPort
-                                          << "uniqueHorizon"
+                                          << matchingHostAndPort << "uniqueHorizon"
                                           << nonmatchingHost),
          defaultHostAndPort,
          {},

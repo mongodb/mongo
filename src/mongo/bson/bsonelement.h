@@ -117,8 +117,7 @@ public:
     double Number() const {
         uassert(13118,
                 str::stream() << "expected " << fieldName()
-                              << " to have a numeric type, but it is a "
-                              << type(),
+                              << " to have a numeric type, but it is a " << type(),
                 isNumber());
         return number();
     }
@@ -951,4 +950,4 @@ inline BSONElement::BSONElement() {
     fieldNameSize_ = 0;
     totalSize = 1;
 }
-}
+}  // namespace mongo

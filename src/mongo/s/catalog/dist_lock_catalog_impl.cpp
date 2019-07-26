@@ -93,8 +93,7 @@ StatusWith<BSONObj> extractFindAndModifyNewObj(StatusWith<Shard::CommandResponse
             return {ErrorCodes::UnsupportedFormat,
                     str::stream() << "expected an object from the findAndModify response '"
                                   << kFindAndModifyResponseResultDocField
-                                  << "'field, got: "
-                                  << newDocElem};
+                                  << "'field, got: " << newDocElem};
         }
 
         return newDocElem.Obj().getOwned();
@@ -220,14 +219,10 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* opCtx,
                                                     Date_t time,
                                                     StringData why,
                                                     const WriteConcernOptions& writeConcern) {
-    BSONObj newLockDetails(BSON(
-        LocksType::lockID(lockSessionID) << LocksType::state(LocksType::LOCKED) << LocksType::who()
-                                         << who
-                                         << LocksType::process()
-                                         << processId
-                                         << LocksType::when(time)
-                                         << LocksType::why()
-                                         << why));
+    BSONObj newLockDetails(BSON(LocksType::lockID(lockSessionID)
+                                << LocksType::state(LocksType::LOCKED) << LocksType::who() << who
+                                << LocksType::process() << processId << LocksType::when(time)
+                                << LocksType::why() << why));
 
     auto request = FindAndModifyRequest::makeUpdate(
         _locksNS,
@@ -281,14 +276,10 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* opCtx,
         BSON(LocksType::name() << lockID << LocksType::state(LocksType::UNLOCKED)));
     orQueryBuilder.append(BSON(LocksType::name() << lockID << LocksType::lockID(currentHolderTS)));
 
-    BSONObj newLockDetails(BSON(
-        LocksType::lockID(lockSessionID) << LocksType::state(LocksType::LOCKED) << LocksType::who()
-                                         << who
-                                         << LocksType::process()
-                                         << processId
-                                         << LocksType::when(time)
-                                         << LocksType::why()
-                                         << why));
+    BSONObj newLockDetails(BSON(LocksType::lockID(lockSessionID)
+                                << LocksType::state(LocksType::LOCKED) << LocksType::who() << who
+                                << LocksType::process() << processId << LocksType::when(time)
+                                << LocksType::why() << why));
 
     auto request = FindAndModifyRequest::makeUpdate(
         _locksNS, BSON("$or" << orQueryBuilder.arr()), BSON("$set" << newLockDetails));

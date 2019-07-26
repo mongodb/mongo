@@ -44,8 +44,8 @@ namespace mongo {
 namespace {
 
 using PullNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
+using mongo::mutablebson::Element;
 
 TEST(PullNodeTest, InitWithBadMatchExpressionFails) {
     auto update = fromjson("{$pull: {a: {b: {$foo: 1}}}}");

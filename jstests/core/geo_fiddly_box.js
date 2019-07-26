@@ -42,15 +42,14 @@ for (var x = min; x <= max; x += step) {
     }
 }
 
-assert.eq(numItems,
-          t.count({
-              loc: {
-                  $within: {
-                      $box: [
-                          [min - epsilon / 3, min - epsilon / 3],
-                          [max + epsilon / 3, max + epsilon / 3]
-                      ]
-                  }
-              }
-          }),
-          "Not all locations found!");
+assert.eq(
+    numItems,
+    t.count({
+        loc: {
+            $within: {
+                $box:
+                    [[min - epsilon / 3, min - epsilon / 3], [max + epsilon / 3, max + epsilon / 3]]
+            }
+        }
+    }),
+    "Not all locations found!");

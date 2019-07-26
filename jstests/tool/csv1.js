@@ -7,7 +7,8 @@ c = t.startDB("foo");
 base = {
     a: 1,
     b: "foo,bar\"baz,qux",
-    c: 5, 'd d': -6,
+    c: 5,
+    'd d': -6,
     e: '-',
     f: "."
 };

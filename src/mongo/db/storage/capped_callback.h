@@ -63,4 +63,4 @@ public:
      */
     virtual void notifyCappedWaitersIfNeeded() = 0;
 };
-}
+}  // namespace mongo

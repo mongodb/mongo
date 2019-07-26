@@ -257,8 +257,7 @@ TEST_F(ViewCatalogFixture, CanCreateViewWithLookupUsingPipelineSyntax) {
                                                            << "fcoll"
                                                            << "as"
                                                            << "as"
-                                                           << "pipeline"
-                                                           << BSONArray()))),
+                                                           << "pipeline" << BSONArray()))),
                          emptyCollation));
 }
 

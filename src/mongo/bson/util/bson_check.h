@@ -56,8 +56,8 @@ Status bsonCheckOnlyHasFieldsImpl(StringData objectName,
 
         if (!allowed(name)) {
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "Unexpected field " << e.fieldName() << " in "
-                                        << objectName);
+                          str::stream()
+                              << "Unexpected field " << e.fieldName() << " in " << objectName);
         }
 
         bool& seenBefore = seenFields[name];
@@ -65,8 +65,8 @@ Status bsonCheckOnlyHasFieldsImpl(StringData objectName,
             seenBefore = true;
         } else {
             return Status(ErrorCodes::Error(51000),
-                          str::stream() << "Field " << name << " appears multiple times in "
-                                        << objectName);
+                          str::stream()
+                              << "Field " << name << " appears multiple times in " << objectName);
         }
     }
     return Status::OK();
@@ -105,10 +105,7 @@ Status bsonCheckOnlyHasFieldsForCommand(StringData objectName,
 inline void checkBSONType(BSONType expectedType, const BSONElement& elem) {
     uassert(elem.type() == BSONType::EOO ? ErrorCodes::NoSuchKey : ErrorCodes::TypeMismatch,
             str::stream() << "Wrong type for '" << elem.fieldNameStringData() << "'. Expected a "
-                          << typeName(expectedType)
-                          << ", got a "
-                          << typeName(elem.type())
-                          << '.',
+                          << typeName(expectedType) << ", got a " << typeName(elem.type()) << '.',
             elem.type() == expectedType);
 }
 

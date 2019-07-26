@@ -1,4 +1,5 @@
-/** Test TTL collections with replication
+/**
+ * Test TTL collections with replication
  *  Part 1: Initiate replica set. Insert some docs and create a TTL index.
  *          Check that the correct # of docs age out.
  *  Part 2: Add a new member to the set. Check that it also gets the correct # of docs.

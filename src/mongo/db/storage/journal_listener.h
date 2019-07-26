@@ -70,4 +70,4 @@ public:
     // As this has no state, it is de facto const and can be safely shared freely.
     static NoOpJournalListener instance;
 };
-}
+}  // namespace mongo

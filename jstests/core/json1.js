@@ -5,7 +5,7 @@ x = {
 };
 eval("y = " + tojson(x));
 assert.eq(tojson(x), tojson(y), "A");
-assert.eq(typeof(x.nulls), typeof(y.nulls), "B");
+assert.eq(typeof (x.nulls), typeof (y.nulls), "B");
 
 // each type is parsed properly
 x = {

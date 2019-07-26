@@ -9,7 +9,6 @@
  * the updating of said object's PlanCache (SERVER-17117).
  */
 var $config = (function() {
-
     function populateData(db, collName) {
         var coll = db[collName];
 
@@ -28,7 +27,6 @@ var $config = (function() {
     }
 
     var states = (function() {
-
         function count(db, collName) {
             var coll = db.getSiblingDB(this.planCacheDBName)[collName];
 
@@ -52,7 +50,6 @@ var $config = (function() {
         }
 
         return {count: count, dropDB: dropDB};
-
     })();
 
     var transitions = {count: {count: 0.95, dropDB: 0.05}, dropDB: {count: 0.95, dropDB: 0.05}};
@@ -72,5 +69,4 @@ var $config = (function() {
         transitions: transitions,
         setup: setup,
     };
-
 })();

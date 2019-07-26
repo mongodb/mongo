@@ -202,23 +202,20 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
         } else {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "Unrecognized option in " << kReadConcernFieldName
-                                        << ": "
-                                        << fieldName);
+                                        << ": " << fieldName);
         }
     }
 
     if (_afterClusterTime && _opTime) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "Can not specify both " << kAfterClusterTimeFieldName
-                                    << " and "
-                                    << kAfterOpTimeFieldName);
+                                    << " and " << kAfterOpTimeFieldName);
     }
 
     if (_afterClusterTime && _atClusterTime) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "Can not specify both " << kAfterClusterTimeFieldName
-                                    << " and "
-                                    << kAtClusterTimeFieldName);
+                                    << " and " << kAtClusterTimeFieldName);
     }
 
     // Note: 'available' should not be used with after cluster time, as cluster time can wait for
@@ -228,30 +225,24 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
         getLevel() != ReadConcernLevel::kLocalReadConcern &&
         getLevel() != ReadConcernLevel::kSnapshotReadConcern) {
         return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << kAfterClusterTimeFieldName << " field can be set only if "
-                                    << kLevelFieldName
-                                    << " is equal to "
-                                    << kMajorityReadConcernStr
-                                    << ", "
-                                    << kLocalReadConcernStr
-                                    << ", or "
-                                    << kSnapshotReadConcernStr);
+                      str::stream()
+                          << kAfterClusterTimeFieldName << " field can be set only if "
+                          << kLevelFieldName << " is equal to " << kMajorityReadConcernStr << ", "
+                          << kLocalReadConcernStr << ", or " << kSnapshotReadConcernStr);
     }
 
     if (_opTime && getLevel() == ReadConcernLevel::kSnapshotReadConcern) {
         return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << kAfterOpTimeFieldName << " field cannot be set if "
-                                    << kLevelFieldName
-                                    << " is equal to "
-                                    << kSnapshotReadConcernStr);
+                      str::stream()
+                          << kAfterOpTimeFieldName << " field cannot be set if " << kLevelFieldName
+                          << " is equal to " << kSnapshotReadConcernStr);
     }
 
     if (_atClusterTime && getLevel() != ReadConcernLevel::kSnapshotReadConcern) {
         return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << kAtClusterTimeFieldName << " field can be set only if "
-                                    << kLevelFieldName
-                                    << " is equal to "
-                                    << kSnapshotReadConcernStr);
+                      str::stream()
+                          << kAtClusterTimeFieldName << " field can be set only if "
+                          << kLevelFieldName << " is equal to " << kSnapshotReadConcernStr);
     }
 
     if (_afterClusterTime && _afterClusterTime == LogicalTime::kUninitialized) {
@@ -294,8 +285,7 @@ Status ReadConcernArgs::upconvertReadConcernLevelToSnapshot() {
     if (_opTime) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "Cannot upconvert the readConcern level to 'snapshot' when '"
-                                    << kAfterOpTimeFieldName
-                                    << "' is provided");
+                                    << kAfterOpTimeFieldName << "' is provided");
     }
 
     _originalLevel = _level;

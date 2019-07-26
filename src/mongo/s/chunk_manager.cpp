@@ -454,15 +454,13 @@ ShardVersionMap RoutingTableHistory::_constructShardVersionMap() const {
                           str::stream()
                               << "Gap exists in the routing table between chunks "
                               << _chunkMap.at(_extractKeyString(*lastMax))->getRange().toString()
-                              << " and "
-                              << rangeLast->second->getRange().toString());
+                              << " and " << rangeLast->second->getRange().toString());
             else
                 uasserted(ErrorCodes::ConflictingOperationInProgress,
                           str::stream()
                               << "Overlap exists in the routing table between chunks "
                               << _chunkMap.at(_extractKeyString(*lastMax))->getRange().toString()
-                              << " and "
-                              << rangeLast->second->getRange().toString());
+                              << " and " << rangeLast->second->getRange().toString());
         }
 
         if (!firstMin)

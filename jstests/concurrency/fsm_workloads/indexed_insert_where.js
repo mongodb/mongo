@@ -10,7 +10,6 @@
  */
 
 var $config = (function() {
-
     var data = {
         documentsToInsert: 100,
         insertedDocuments: 0,

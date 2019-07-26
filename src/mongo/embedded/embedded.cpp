@@ -110,9 +110,7 @@ void setUpCatalog(ServiceContext* serviceContext) {
 // Create a minimalistic replication coordinator to provide a limited interface for users. Not
 // functional to provide any replication logic.
 ServiceContext::ConstructorActionRegisterer replicationManagerInitializer(
-    "CreateReplicationManager",
-    {"SSLManager", "default"},
-    [](ServiceContext* serviceContext) {
+    "CreateReplicationManager", {"SSLManager", "default"}, [](ServiceContext* serviceContext) {
         repl::StorageInterface::set(serviceContext, std::make_unique<repl::StorageInterfaceImpl>());
 
         auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext);

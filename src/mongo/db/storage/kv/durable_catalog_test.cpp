@@ -129,8 +129,7 @@ public:
         bool match = (expected == actual);
         if (!match) {
             FAIL(str::stream() << "Expected: " << dumpMultikeyPaths(expected) << ", "
-                               << "Actual: "
-                               << dumpMultikeyPaths(actual));
+                               << "Actual: " << dumpMultikeyPaths(actual));
         }
         ASSERT(match);
     }

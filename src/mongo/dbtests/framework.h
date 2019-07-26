@@ -37,5 +37,5 @@
 namespace mongo {
 namespace dbtests {
 int runDbTests(int argc, char** argv);
-}  // dbtests
+}  // namespace dbtests
 }  // namespace mongo

@@ -87,8 +87,7 @@ class HangingHook : public executor::NetworkConnectionHook {
                                                           "admin",
                                                           BSON("sleep" << 1 << "lock"
                                                                        << "none"
-                                                                       << "secs"
-                                                                       << 100000000),
+                                                                       << "secs" << 100000000),
                                                           BSONObj(),
                                                           nullptr))};
     }
@@ -274,8 +273,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeout) {
     auto request = makeTestCommand(Milliseconds{1000});
     request.cmdObj = BSON("sleep" << 1 << "lock"
                                   << "none"
-                                  << "secs"
-                                  << 1000000000);
+                                  << "secs" << 1000000000);
     auto deferred = runCommand(cb, request);
 
     waitForIsMaster();
@@ -322,14 +320,15 @@ TEST_F(NetworkInterfaceTest, SetAlarm) {
     Date_t expiration = net().now() + Milliseconds(100);
     auto makeTimerFuture = [&] {
         auto pf = makePromiseFuture<Date_t>();
-        return std::make_pair([ this, promise = std::move(pf.promise) ](Status status) mutable {
-            if (status.isOK()) {
-                promise.emplaceValue(net().now());
-            } else {
-                promise.setError(status);
-            }
-        },
-                              std::move(pf.future));
+        return std::make_pair(
+            [this, promise = std::move(pf.promise)](Status status) mutable {
+                if (status.isOK()) {
+                    promise.emplaceValue(net().now());
+                } else {
+                    promise.setError(status);
+                }
+            },
+            std::move(pf.future));
     };
 
     auto futurePair = makeTimerFuture();

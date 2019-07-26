@@ -109,9 +109,9 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
         if (kIndexesFieldName == cmdElemFieldName) {
             if (cmdElem.type() != BSONType::Array) {
                 return {ErrorCodes::TypeMismatch,
-                        str::stream() << "The field '" << kIndexesFieldName
-                                      << "' must be an array, but got "
-                                      << typeName(cmdElem.type())};
+                        str::stream()
+                            << "The field '" << kIndexesFieldName << "' must be an array, but got "
+                            << typeName(cmdElem.type())};
             }
 
             for (auto&& indexesElem : cmdElem.Obj()) {
@@ -163,16 +163,15 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
             continue;
         } else {
             return {ErrorCodes::BadValue,
-                    str::stream() << "Invalid field specified for " << kCommandName << " command: "
-                                  << cmdElemFieldName};
+                    str::stream() << "Invalid field specified for " << kCommandName
+                                  << " command: " << cmdElemFieldName};
         }
     }
 
     if (!hasIndexesField) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "The '" << kIndexesFieldName
-                              << "' field is a required argument of the "
-                              << kCommandName
+                              << "' field is a required argument of the " << kCommandName
                               << " command"};
     }
 
@@ -202,15 +201,13 @@ Status validateTTLOptions(OperationContext* opCtx, const BSONObj& cmdObj) {
                     str::stream() << "TTL index '" << kExpireAfterSeconds
                                   << "' option must be numeric, but received a type of '"
                                   << typeName(expireAfterSecondsElt.type())
-                                  << "'. Index spec: "
-                                  << indexObj};
+                                  << "'. Index spec: " << indexObj};
         }
 
         if (expireAfterSecondsElt.safeNumberLong() < 0) {
             return {ErrorCodes::CannotCreateIndex,
                     str::stream() << "TTL index '" << kExpireAfterSeconds
-                                  << "' option cannot be less than 0. Index spec: "
-                                  << indexObj};
+                                  << "' option cannot be less than 0. Index spec: " << indexObj};
         }
 
         const std::string tooLargeErr = str::stream()
@@ -292,8 +289,7 @@ void checkUniqueIndexConstraints(OperationContext* opCtx,
     const ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
     uassert(ErrorCodes::CannotCreateIndex,
             str::stream() << "cannot create unique index over " << newIdxKey
-                          << " with shard key pattern "
-                          << shardKeyPattern.toBSON(),
+                          << " with shard key pattern " << shardKeyPattern.toBSON(),
             shardKeyPattern.isUniqueIndexCompatible(newIdxKey));
 }
 
@@ -392,8 +388,7 @@ Collection* getOrCreateCollection(OperationContext* opCtx,
         auto collection = db->createCollection(opCtx, ns, options);
         invariant(collection,
                   str::stream() << "Failed to create collection " << ns.ns()
-                                << " during index creation: "
-                                << redact(cmdObj));
+                                << " during index creation: " << redact(cmdObj));
         wunit.commit();
         return collection;
     });
@@ -701,9 +696,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         // All other errors should be forwarded to the caller with index build information included.
         log() << "Index build failed: " << buildUUID << ": " << ex.toStatus();
         ex.addContext(str::stream() << "Index build failed: " << buildUUID << ": Collection " << ns
-                                    << " ( "
-                                    << *collectionUUID
-                                    << " )");
+                                    << " ( " << *collectionUUID << " )");
         throw;
     }
 

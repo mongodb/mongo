@@ -44,8 +44,8 @@ namespace mongo {
 namespace {
 
 using CompareNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
+using mongo::mutablebson::Element;
 
 DEATH_TEST(CompareNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
     auto update = fromjson("{$max: {}}");

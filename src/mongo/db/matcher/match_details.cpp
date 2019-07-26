@@ -68,4 +68,4 @@ string MatchDetails::toString() const {
     ss << "elemMatchKey: " << (_elemMatchKey ? _elemMatchKey->c_str() : "NONE") << " ";
     return ss.str();
 }
-}
+}  // namespace mongo

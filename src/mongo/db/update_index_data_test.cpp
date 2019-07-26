@@ -129,4 +129,4 @@ TEST(UpdateIndexDataTest, CanonicalIndexFieldForNestedNumericFieldNames) {
     ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.0.b.1.2")), FieldRef("a.b"_sd));
     ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.01.02.b.c")), FieldRef("a"_sd));
 }
-}
+}  // namespace mongo

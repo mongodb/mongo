@@ -389,8 +389,7 @@ void Value::addToBsonObj(BSONObjBuilder* builder,
                          size_t recursionLevel) const {
     uassert(ErrorCodes::Overflow,
             str::stream() << "cannot convert document to BSON because it exceeds the limit of "
-                          << BSONDepth::getMaxAllowableDepth()
-                          << " levels of nesting",
+                          << BSONDepth::getMaxAllowableDepth() << " levels of nesting",
             recursionLevel <= BSONDepth::getMaxAllowableDepth());
 
     if (getType() == BSONType::Object) {
@@ -411,8 +410,7 @@ void Value::addToBsonObj(BSONObjBuilder* builder,
 void Value::addToBsonArray(BSONArrayBuilder* builder, size_t recursionLevel) const {
     uassert(ErrorCodes::Overflow,
             str::stream() << "cannot convert document to BSON because it exceeds the limit of "
-                          << BSONDepth::getMaxAllowableDepth()
-                          << " levels of nesting",
+                          << BSONDepth::getMaxAllowableDepth() << " levels of nesting",
             recursionLevel <= BSONDepth::getMaxAllowableDepth());
 
     // If this Value is empty, do nothing to avoid incrementing the builder's counter.
@@ -704,7 +702,7 @@ int Value::compare(const Value& rL,
         case Date:  // signed
             return cmp(rL._storage.dateValue, rR._storage.dateValue);
 
-        // Numbers should compare by equivalence even if different types
+            // Numbers should compare by equivalence even if different types
 
         case NumberDecimal: {
             switch (rType) {
@@ -1078,9 +1076,9 @@ size_t Value::getApproximateSize() const {
         case Symbol:
         case BinData:
         case String:
-            return sizeof(Value) + (_storage.shortStr
-                                        ? 0  // string stored inline, so no extra mem usage
-                                        : sizeof(RCString) + _storage.getString().size());
+            return sizeof(Value) +
+                (_storage.shortStr ? 0  // string stored inline, so no extra mem usage
+                                   : sizeof(RCString) + _storage.getString().size());
 
         case Object:
             return sizeof(Value) + getDocument().getApproximateSize();

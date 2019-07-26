@@ -89,4 +89,4 @@ intrusive_ptr<Accumulator> AccumulatorMax::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return new AccumulatorMax(expCtx);
 }
-}
+}  // namespace mongo

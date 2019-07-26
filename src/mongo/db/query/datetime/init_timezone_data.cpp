@@ -49,8 +49,7 @@ ServiceContext::ConstructorActionRegisterer loadTimeZoneDB{
             if (!timeZoneDatabase) {
                 uasserted(ErrorCodes::FailedToParse,
                           str::stream() << "failed to load time zone database from path \""
-                                        << serverGlobalParams.timeZoneInfoPath
-                                        << "\"");
+                                        << serverGlobalParams.timeZoneInfoPath << "\"");
             }
             TimeZoneDatabase::set(service,
                                   stdx::make_unique<TimeZoneDatabase>(std::move(timeZoneDatabase)));

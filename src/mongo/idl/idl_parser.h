@@ -188,8 +188,8 @@ private:
     bool checkAndAssertTypeSlowPath(const BSONElement& element, BSONType type) const;
 
     /**
-    * See comment on checkAndAssertBinDataType.
-    */
+     * See comment on checkAndAssertBinDataType.
+     */
     bool checkAndAssertBinDataTypeSlowPath(const BSONElement& element, BinDataType type) const;
 
 private:
@@ -222,10 +222,7 @@ template <typename T>
 void throwComparisonError(StringData fieldName, StringData op, T actualValue, T expectedValue) {
     uasserted(51024,
               str::stream() << "BSON field '" << fieldName << "' value must be " << op << " "
-                            << expectedValue
-                            << ", actual value '"
-                            << actualValue
-                            << "'");
+                            << expectedValue << ", actual value '" << actualValue << "'");
 }
 
 

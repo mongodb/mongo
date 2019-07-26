@@ -55,10 +55,9 @@ function multiVersionDumpRestoreTest(configObj) {
         var shardingTestConfig = {
             name: testBaseName + "_sharded_source",
             mongos: [{binVersion: configObj.serverSourceVersion}],
-            shards: [{
-                binVersion: configObj.serverSourceVersion,
-                storageEngine: configObj.storageEngine
-            }],
+            shards: [
+                {binVersion: configObj.serverSourceVersion, storageEngine: configObj.storageEngine}
+            ],
             config: [{binVersion: configObj.serverSourceVersion}]
         };
         var shardingTest = new ShardingTest(shardingTestConfig);

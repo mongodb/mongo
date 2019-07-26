@@ -5,24 +5,24 @@
  * @tags: [assumes_unsharded_collection]
  */
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
+load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
 
-    const testDB = db.getSiblingDB("lookup_sort_limit");
-    testDB.dropDatabase();
+const testDB = db.getSiblingDB("lookup_sort_limit");
+testDB.dropDatabase();
 
-    const localColl = testDB.getCollection("local");
-    const fromColl = testDB.getCollection("from");
+const localColl = testDB.getCollection("local");
+const fromColl = testDB.getCollection("from");
 
-    const bulk = fromColl.initializeUnorderedBulkOp();
-    for (let i = 0; i < 10; i++) {
-        bulk.insert({_id: i, foreignField: i});
-    }
-    assert.commandWorked(bulk.execute());
-    assert.commandWorked(localColl.insert({_id: 0}));
+const bulk = fromColl.initializeUnorderedBulkOp();
+for (let i = 0; i < 10; i++) {
+    bulk.insert({_id: i, foreignField: i});
+}
+assert.commandWorked(bulk.execute());
+assert.commandWorked(localColl.insert({_id: 0}));
 
-    let res = localColl
+let res = localColl
                   .aggregate([{
                       $lookup: {
                           from: fromColl.getName(),
@@ -33,10 +33,10 @@
                   }])
                   .toArray();
 
-    assert.eq({_id: 0, result: [{_id: 0, foreignField: 0}]}, res[0]);
+assert.eq({_id: 0, result: [{_id: 0, foreignField: 0}]}, res[0]);
 
-    // Run a similar test except with a sort that cannot be covered with an index scan.
-    res = localColl
+// Run a similar test except with a sort that cannot be covered with an index scan.
+res = localColl
               .aggregate([{
                   $lookup: {
                       from: fromColl.getName(),
@@ -47,6 +47,5 @@
               }])
               .toArray();
 
-    assert.eq({_id: 0, result: [{_id: 9, foreignField: 9}]}, res[0]);
-
+assert.eq({_id: 0, result: [{_id: 9, foreignField: 9}]}, res[0]);
 }());

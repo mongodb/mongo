@@ -41,7 +41,7 @@ class Timestamp;
 namespace rpc {
 class ReplSetMetadata;
 class OplogQueryMetadata;
-}
+}  // namespace rpc
 
 namespace repl {
 

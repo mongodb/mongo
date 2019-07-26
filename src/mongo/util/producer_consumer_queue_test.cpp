@@ -861,7 +861,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(pipeProducerEndClosesAfterProducersLeave,
     ASSERT_EQUALS(consumer.pop(), MoveOnly(2));
 
     auto thread3 =
-        helper.runThread("Producer3", [producer = std::move(producer)](OperationContext * opCtx) {
+        helper.runThread("Producer3", [producer = std::move(producer)](OperationContext* opCtx) {
             producer.push(MoveOnly(3), opCtx);
         });
 
@@ -882,7 +882,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(pipeConsumerEndClosesAfterConsumersLeave,
         helper.runThread("Consumer2", [consumer](OperationContext* opCtx) { consumer.pop(opCtx); });
 
     auto thread3 =
-        helper.runThread("Consumer3", [consumer = std::move(consumer)](OperationContext * opCtx) {
+        helper.runThread("Consumer3", [consumer = std::move(consumer)](OperationContext* opCtx) {
             consumer.pop(opCtx);
         });
 

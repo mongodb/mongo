@@ -179,7 +179,7 @@ function arrayShallowCopy(a) {
  * the same documents, although the order need not match and the _id values need not match.
  *
  * Are non-scalar values references?
-*/
+ */
 function resultsEq(rl, rr, verbose = false) {
     const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
 

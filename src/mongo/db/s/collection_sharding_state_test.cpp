@@ -80,12 +80,9 @@ TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
 
     auto doc = BSON("key3"
                     << "abc"
-                    << "key"
-                    << 3
-                    << "_id"
+                    << "key" << 3 << "_id"
                     << "hello"
-                    << "key2"
-                    << true);
+                    << "key2" << true);
 
     // Check that an order for deletion from an unsharded collection extracts just the "_id" field
     ASSERT_BSONOBJ_EQ(OpObserverImpl::getDocumentKey(operationContext(), kTestNss, doc),
@@ -103,12 +100,9 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
     // The order of fields in `doc` deliberately does not match the shard key
     auto doc = BSON("key3"
                     << "abc"
-                    << "key"
-                    << 100
-                    << "_id"
+                    << "key" << 100 << "_id"
                     << "hello"
-                    << "key2"
-                    << true);
+                    << "key2" << true);
 
     // Verify the shard key is extracted, in correct order, followed by the "_id" field.
     ASSERT_BSONOBJ_EQ(OpObserverImpl::getDocumentKey(operationContext(), kTestNss, doc),
@@ -130,15 +124,13 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
                            << "abc"
                            << "_id"
                            << "hello"
-                           << "key"
-                           << 100);
+                           << "key" << 100);
 
     // Verify the shard key is extracted with "_id" in the right place.
     ASSERT_BSONOBJ_EQ(OpObserverImpl::getDocumentKey(operationContext(), kTestNss, doc),
                       BSON("key" << 100 << "_id"
                                  << "hello"
-                                 << "key2"
-                                 << true));
+                                 << "key2" << true));
     ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
 }
 
@@ -151,8 +143,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
 
     auto doc = BSON("key2" << true << "_id"
                            << "hello"
-                           << "key"
-                           << 100);
+                           << "key" << 100);
 
     // Verify the shard key is extracted with "_id" in the right place, not hashed.
     ASSERT_BSONOBJ_EQ(OpObserverImpl::getDocumentKey(operationContext(), kTestNss, doc),

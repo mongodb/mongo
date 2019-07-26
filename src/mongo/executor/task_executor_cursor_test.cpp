@@ -95,14 +95,10 @@ public:
         NetworkInterfaceMock::InNetworkGuard ing(getNet());
 
         ASSERT(getNet()->hasReadyRequests());
-        auto rcr = getNet()->scheduleSuccessfulResponse(BSON(
-            "cursorsKilled" << BSON_ARRAY((long long)(cursorId)) << "cursorsNotFound" << BSONArray()
-                            << "cursorsAlive"
-                            << BSONArray()
-                            << "cursorsUnknown"
-                            << BSONArray()
-                            << "ok"
-                            << 1));
+        auto rcr = getNet()->scheduleSuccessfulResponse(
+            BSON("cursorsKilled" << BSON_ARRAY((long long)(cursorId)) << "cursorsNotFound"
+                                 << BSONArray() << "cursorsAlive" << BSONArray() << "cursorsUnknown"
+                                 << BSONArray() << "ok" << 1));
         getNet()->runReadyNetworkOperations();
 
         return rcr.cmdObj.getOwned();
@@ -124,8 +120,7 @@ public:
 TEST_F(TaskExecutorCursorFixture, SingleBatchWorks) {
     auto findCmd = BSON("find"
                         << "test"
-                        << "batchSize"
-                        << 2);
+                        << "batchSize" << 2);
 
     RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
 
@@ -150,8 +145,7 @@ TEST_F(TaskExecutorCursorFixture, FailureInFind) {
                              "test",
                              BSON("find"
                                   << "test"
-                                  << "batchSize"
-                                  << 2),
+                                  << "batchSize" << 2),
                              opCtx.get());
 
     TaskExecutorCursor tec(&getExecutor(), rcr);
@@ -175,8 +169,7 @@ TEST_F(TaskExecutorCursorFixture, EarlyReturnKillsCursor) {
                              "test",
                              BSON("find"
                                   << "test"
-                                  << "batchSize"
-                                  << 2),
+                                  << "batchSize" << 2),
                              opCtx.get());
 
     {
@@ -189,8 +182,7 @@ TEST_F(TaskExecutorCursorFixture, EarlyReturnKillsCursor) {
 
     ASSERT_BSONOBJ_EQ(BSON("killCursors"
                            << "test"
-                           << "cursors"
-                           << BSON_ARRAY(1)),
+                           << "cursors" << BSON_ARRAY(1)),
                       scheduleSuccessfulKillCursorResponse(1));
 }
 
@@ -202,8 +194,7 @@ TEST_F(TaskExecutorCursorFixture, MultipleBatchesWorks) {
                              "test",
                              BSON("find"
                                   << "test"
-                                  << "batchSize"
-                                  << 2),
+                                  << "batchSize" << 2),
                              opCtx.get());
 
     TaskExecutorCursor tec(&getExecutor(), rcr, [] {
@@ -230,8 +221,7 @@ TEST_F(TaskExecutorCursorFixture, MultipleBatchesWorks) {
     // We can pick up after that interruption though
     ASSERT_BSONOBJ_EQ(BSON("getMore" << (long long)(1) << "collection"
                                      << "test"
-                                     << "batchSize"
-                                     << 3),
+                                     << "batchSize" << 3),
                       scheduleSuccessfulCursorResponse("nextBatch", 3, 5, 1));
 
     ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 3);
@@ -257,8 +247,7 @@ TEST_F(TaskExecutorCursorFixture, LsidIsPassed) {
 
     auto findCmd = BSON("find"
                         << "test"
-                        << "batchSize"
-                        << 1);
+                        << "batchSize" << 1);
 
     RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
 
@@ -272,10 +261,7 @@ TEST_F(TaskExecutorCursorFixture, LsidIsPassed) {
     // lsid in the first batch
     ASSERT_BSONOBJ_EQ(BSON("find"
                            << "test"
-                           << "batchSize"
-                           << 1
-                           << "lsid"
-                           << lsid.toBSON()),
+                           << "batchSize" << 1 << "lsid" << lsid.toBSON()),
                       scheduleSuccessfulCursorResponse("firstBatch", 1, 1, 1));
 
     ASSERT_EQUALS(tec->getNext(opCtx.get()).get()["x"].Int(), 1);
@@ -283,10 +269,7 @@ TEST_F(TaskExecutorCursorFixture, LsidIsPassed) {
     // lsid in the getmore
     ASSERT_BSONOBJ_EQ(BSON("getMore" << (long long)(1) << "collection"
                                      << "test"
-                                     << "batchSize"
-                                     << 1
-                                     << "lsid"
-                                     << lsid.toBSON()),
+                                     << "batchSize" << 1 << "lsid" << lsid.toBSON()),
                       scheduleSuccessfulCursorResponse("nextBatch", 2, 2, 1));
 
     tec.reset();
@@ -294,10 +277,7 @@ TEST_F(TaskExecutorCursorFixture, LsidIsPassed) {
     // lsid in the killcursor
     ASSERT_BSONOBJ_EQ(BSON("killCursors"
                            << "test"
-                           << "cursors"
-                           << BSON_ARRAY(1)
-                           << "lsid"
-                           << lsid.toBSON()),
+                           << "cursors" << BSON_ARRAY(1) << "lsid" << lsid.toBSON()),
                       scheduleSuccessfulKillCursorResponse(1));
 
     ASSERT_FALSE(hasReadyRequests());

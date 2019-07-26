@@ -282,13 +282,14 @@ var ReplSetTest = function(opts) {
                 if (status.members[i].name == node.host || status.members[i].name == node.name) {
                     for (var j = 0; j < states.length; j++) {
                         if (printStatus) {
-                            print("Status -- " + " current state: " + status.members[i][ind] +
+                            print("Status -- " +
+                                  " current state: " + status.members[i][ind] +
                                   ",  target state : " + states[j]);
                         }
 
-                        if (typeof(states[j]) != "number") {
-                            throw new Error("State was not an number -- type:" + typeof(states[j]) +
-                                            ", value:" + states[j]);
+                        if (typeof (states[j]) != "number") {
+                            throw new Error("State was not an number -- type:" +
+                                            typeof (states[j]) + ", value:" + states[j]);
                         }
                         if (status.members[i][ind] == states[j]) {
                             foundState = states[j];
@@ -299,7 +300,6 @@ var ReplSetTest = function(opts) {
             }
 
             return false;
-
         }, "waiting for state indicator " + ind + " for " + timeout + "ms", timeout);
 
         // If we were waiting for the node to step down, wait until we can connect to it again,
@@ -894,7 +894,6 @@ var ReplSetTest = function(opts) {
      * and returns the 'config' object unchanged. Does not affect 'config' when running CSRS.
      */
     this._updateConfigIfNotDurable = function(config) {
-
         // Get a replica set node (check for use of bridge).
         var replNode = _useBridge ? _unbridgedNodes[0] : this.nodes[0];
 
@@ -936,9 +935,9 @@ var ReplSetTest = function(opts) {
             const result = assert.commandWorkedOrFailedWithCode(
                 master.runCommand(cmd),
                 [
-                  ErrorCodes.NodeNotFound,
-                  ErrorCodes.NewReplicaSetConfigurationIncompatible,
-                  ErrorCodes.InterruptedDueToReplStateChange
+                    ErrorCodes.NodeNotFound,
+                    ErrorCodes.NewReplicaSetConfigurationIncompatible,
+                    ErrorCodes.InterruptedDueToReplStateChange
                 ],
                 errorMsg);
             return result.ok;
@@ -1032,7 +1031,7 @@ var ReplSetTest = function(opts) {
         } else {
             Object.keys(self.nodeOptions).forEach(function(key, index) {
                 let val = self.nodeOptions[key];
-                if (typeof(val) === "object" &&
+                if (typeof (val) === "object" &&
                     (val.hasOwnProperty("shardsvr") ||
                      val.hasOwnProperty("binVersion") &&
                          // Should not wait for keys if version is less than 3.6
@@ -1043,7 +1042,7 @@ var ReplSetTest = function(opts) {
             });
             if (self.startOptions != undefined) {
                 let val = self.startOptions;
-                if (typeof(val) === "object" &&
+                if (typeof (val) === "object" &&
                     (val.hasOwnProperty("shardsvr") ||
                      val.hasOwnProperty("binVersion") &&
                          // Should not wait for keys if version is less than 3.6
@@ -1574,7 +1573,8 @@ var ReplSetTest = function(opts) {
 
     this.getHashesUsingSessions = function(sessions, dbName, {
         filterCapped: filterCapped = true,
-        filterMapReduce: filterMapReduce = true, readAtClusterTime,
+        filterMapReduce: filterMapReduce = true,
+        readAtClusterTime,
     } = {}) {
         return sessions.map(session => {
             const commandObj = {dbHash: 1};
@@ -1906,7 +1906,8 @@ var ReplSetTest = function(opts) {
                 primarySession, secondarySession, dbName, collName);
 
             for (let {
-                     primary: primaryDoc, secondary: secondaryDoc,
+                     primary: primaryDoc,
+                     secondary: secondaryDoc,
                  } of diff.docsWithDifferentContents) {
                 print(`Mismatching documents between the primary ${primary.host}` +
                       ` and the secondary ${secondary.host}:`);
@@ -2004,7 +2005,6 @@ var ReplSetTest = function(opts) {
                             dumpCollectionDiff(primary, secondary, dbName, collName);
                             success = false;
                         }
-
                     });
 
                     // Check that collection information is consistent on the primary and
@@ -2373,7 +2373,7 @@ var ReplSetTest = function(opts) {
 
         // Turn off periodic noop writes for replica sets by default.
         options.setParameter = options.setParameter || {};
-        if (typeof(options.setParameter) === "string") {
+        if (typeof (options.setParameter) === "string") {
             var eqIdx = options.setParameter.indexOf("=");
             if (eqIdx != -1) {
                 var param = options.setParameter.substring(0, eqIdx);

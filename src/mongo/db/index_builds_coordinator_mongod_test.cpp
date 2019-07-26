@@ -96,8 +96,7 @@ std::vector<BSONObj> makeSpecs(const NamespaceString& nss, std::vector<std::stri
     std::vector<BSONObj> indexSpecs;
     for (auto keyName : keys) {
         indexSpecs.push_back(BSON("ns" << nss.toString() << "v" << 2 << "key" << BSON(keyName << 1)
-                                       << "name"
-                                       << (keyName + "_1")));
+                                       << "name" << (keyName + "_1")));
     }
     return indexSpecs;
 }

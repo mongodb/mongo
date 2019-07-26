@@ -19,7 +19,8 @@ orig2 = t.findOne({_id: 2});
 
 out = t.findAndModify({
     query: {_id: 1, 'comments.i': 0},
-    update: {$set: {'comments.$.j': 2}}, 'new': true,
+    update: {$set: {'comments.$.j': 2}},
+    'new': true,
     sort: {other: 1}
 });
 assert.eq(out.comments[0], {i: 0, j: 2});
@@ -29,7 +30,8 @@ assert.eq(t.findOne({_id: 2}), orig2);
 
 out = t.findAndModify({
     query: {other: 1, 'comments.i': 1},
-    update: {$set: {'comments.$.j': 3}}, 'new': true,
+    update: {$set: {'comments.$.j': 3}},
+    'new': true,
     sort: {other: 1}
 });
 assert.eq(out.comments[0], {i: 0, j: 2});

@@ -86,9 +86,10 @@ public:
 
             uassert(ErrorCodes::BadValue,
                     "keyPattern must be empty or must be an object that equals the shard key",
-                    !keyPattern || (keyPattern.type() == Object &&
-                                    SimpleBSONObjComparator::kInstance.evaluate(
-                                        cm->getShardKeyPattern().toBSON() == keyPattern.Obj())));
+                    !keyPattern ||
+                        (keyPattern.type() == Object &&
+                         SimpleBSONObjComparator::kInstance.evaluate(
+                             cm->getShardKeyPattern().toBSON() == keyPattern.Obj())));
 
             uassert(ErrorCodes::BadValue,
                     str::stream() << "min value " << min << " does not have shard key",

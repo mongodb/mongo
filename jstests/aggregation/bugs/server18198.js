@@ -1,67 +1,67 @@
 // SERVER-18198 check read pref is only applied when there is no $out stage
 // in aggregate shell helper
 (function() {
-    "use strict";
-    var t = db.server18198;
-    t.drop();
+"use strict";
+var t = db.server18198;
+t.drop();
 
-    var mongo = db.getMongo();
+var mongo = db.getMongo();
 
-    try {
-        var commandsRan = [];
-        // hook in our patched mongo
-        var mockMongo = {
-            getSlaveOk: function() {
-                return true;
-            },
-            runCommand: function(db, cmd, opts) {
-                commandsRan.push({db: db, cmd: cmd, opts: opts});
-                return {ok: 1.0};
-            },
-            getReadPref: function() {
-                return {mode: "secondaryPreferred"};
-            },
-            getReadPrefMode: function() {
-                return "secondaryPreferred";
-            },
-            getMinWireVersion: function() {
-                return mongo.getMinWireVersion();
-            },
-            getMaxWireVersion: function() {
-                return mongo.getMaxWireVersion();
-            },
-            isReplicaSetMember: function() {
-                return mongo.isReplicaSetMember();
-            },
-            isMongos: function() {
-                return mongo.isMongos();
-            },
-            isCausalConsistency: function() {
-                return false;
-            },
-            getClusterTime: function() {
-                return mongo.getClusterTime();
-            },
-        };
+try {
+    var commandsRan = [];
+    // hook in our patched mongo
+    var mockMongo = {
+        getSlaveOk: function() {
+            return true;
+        },
+        runCommand: function(db, cmd, opts) {
+            commandsRan.push({db: db, cmd: cmd, opts: opts});
+            return {ok: 1.0};
+        },
+        getReadPref: function() {
+            return {mode: "secondaryPreferred"};
+        },
+        getReadPrefMode: function() {
+            return "secondaryPreferred";
+        },
+        getMinWireVersion: function() {
+            return mongo.getMinWireVersion();
+        },
+        getMaxWireVersion: function() {
+            return mongo.getMaxWireVersion();
+        },
+        isReplicaSetMember: function() {
+            return mongo.isReplicaSetMember();
+        },
+        isMongos: function() {
+            return mongo.isMongos();
+        },
+        isCausalConsistency: function() {
+            return false;
+        },
+        getClusterTime: function() {
+            return mongo.getClusterTime();
+        },
+    };
 
-        db._mongo = mockMongo;
-        db._session = new _DummyDriverSession(mockMongo);
+    db._mongo = mockMongo;
+    db._session = new _DummyDriverSession(mockMongo);
 
-        // this query should not get a read pref
-        t.aggregate([{$sort: {"x": 1}}, {$out: "foo"}]);
-        assert.eq(commandsRan.length, 1);
-        // check that it doesn't have a read preference
-        assert(!commandsRan[0].cmd.hasOwnProperty("$readPreference"));
+    // this query should not get a read pref
+    t.aggregate([{$sort: {"x": 1}}, {$out: "foo"}]);
+    assert.eq(commandsRan.length, 1);
+    // check that it doesn't have a read preference
+    assert(!commandsRan[0].cmd.hasOwnProperty("$readPreference"));
 
-        commandsRan = [];
+    commandsRan = [];
 
-        t.aggregate([{$sort: {"x": 1}}]);
-        // check another command was run
-        assert.eq(commandsRan.length, 1);
-        // check that it has a read preference
-        assert(commandsRan[0].cmd.hasOwnProperty("$readPreference"));
-    } finally {
-        db._mongo = mongo;
-        db._session = new _DummyDriverSession(mongo);
-    }
+    t.aggregate([{$sort: {"x": 1}}]);
+    // check another command was run
+    assert.eq(commandsRan.length, 1);
+    // check that it has a read preference
+    assert(commandsRan[0].cmd.hasOwnProperty("$readPreference"));
+} finally {
+    db._mongo = mongo;
+    db._session = new _DummyDriverSession(mongo);
+}
 })();

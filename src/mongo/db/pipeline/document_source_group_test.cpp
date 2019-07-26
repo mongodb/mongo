@@ -215,10 +215,10 @@ TEST_F(DocumentSourceGroupTest, ShouldReportMultipleFieldGroupKeysAsARename) {
         std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>&>> expressions;
         auto doc = std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>{{"x", x},
                                                                                          {"y", y}};
-        for (auto & [ unused, expression ] : doc)
+        for (auto& [unused, expression] : doc)
             children.push_back(std::move(expression));
         std::vector<boost::intrusive_ptr<Expression>>::size_type index = 0;
-        for (auto & [ fieldName, unused ] : doc) {
+        for (auto& [fieldName, unused] : doc) {
             expressions.emplace_back(fieldName, children[index]);
             ++index;
         }
@@ -523,8 +523,9 @@ class AggregateObjectExpression : public ExpressionBase {
         return BSON("a" << 6);
     }
     BSONObj spec() {
-        return BSON("_id" << 0 << "z" << BSON("$first" << BSON("x"
-                                                               << "$a")));
+        return BSON("_id" << 0 << "z"
+                          << BSON("$first" << BSON("x"
+                                                   << "$a")));
     }
     BSONObj expected() {
         return BSON("_id" << 0 << "z" << BSON("x" << 6));
@@ -537,8 +538,9 @@ class AggregateOperatorExpression : public ExpressionBase {
         return BSON("a" << 6);
     }
     BSONObj spec() {
-        return BSON("_id" << 0 << "z" << BSON("$first"
-                                              << "$a"));
+        return BSON("_id" << 0 << "z"
+                          << BSON("$first"
+                                  << "$a"));
     }
     BSONObj expected() {
         return BSON("_id" << 0 << "z" << 6);
@@ -635,8 +637,9 @@ class SingleDocument : public CheckResultsBase {
         return {DOC("a" << 1)};
     }
     virtual BSONObj groupSpec() {
-        return BSON("_id" << 0 << "a" << BSON("$sum"
-                                              << "$a"));
+        return BSON("_id" << 0 << "a"
+                          << BSON("$sum"
+                                  << "$a"));
     }
     virtual string expectedResultSetString() {
         return "[{_id:0,a:1}]";
@@ -649,8 +652,9 @@ class TwoValuesSingleKey : public CheckResultsBase {
         return {DOC("a" << 1), DOC("a" << 2)};
     }
     virtual BSONObj groupSpec() {
-        return BSON("_id" << 0 << "a" << BSON("$push"
-                                              << "$a"));
+        return BSON("_id" << 0 << "a"
+                          << BSON("$push"
+                                  << "$a"));
     }
     virtual string expectedResultSetString() {
         return "[{_id:0,a:[1,2]}]";
@@ -708,8 +712,7 @@ class FourValuesTwoKeysTwoAccumulators : public CheckResultsBase {
                     << "list"
                     << BSON("$push"
                             << "$a")
-                    << "sum"
-                    << BSON("$sum" << BSON("$divide" << BSON_ARRAY("$a" << 2))));
+                    << "sum" << BSON("$sum" << BSON("$divide" << BSON_ARRAY("$a" << 2))));
     }
     virtual string expectedResultSetString() {
         return "[{_id:0,list:[1,3],sum:2},{_id:1,list:[2,4],sum:3}]";
@@ -770,8 +773,9 @@ class UndefinedAccumulatorValue : public CheckResultsBase {
         return {Document()};
     }
     virtual BSONObj groupSpec() {
-        return BSON("_id" << 0 << "first" << BSON("$first"
-                                                  << "$missing"));
+        return BSON("_id" << 0 << "first"
+                          << BSON("$first"
+                                  << "$missing"));
     }
     virtual string expectedResultSetString() {
         return "[{_id:0, first:null}]";

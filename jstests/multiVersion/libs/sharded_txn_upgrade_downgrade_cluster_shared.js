@@ -46,7 +46,9 @@ function runTxn(testDB, collName, {lsid, txnNumber}, {multiShard}) {
         insert: collName,
         documents: docs,
         txnNumber: NumberLong(txnNumber),
-        startTransaction: true, lsid, autocommit,
+        startTransaction: true,
+        lsid,
+        autocommit,
     });
     if (!startTransactionRes.ok) {
         return startTransactionRes;
@@ -55,7 +57,9 @@ function runTxn(testDB, collName, {lsid, txnNumber}, {multiShard}) {
     const secondStatementRes = testDB.runCommand({
         insert: collName,
         documents: docs,
-        txnNumber: NumberLong(txnNumber), lsid, autocommit,
+        txnNumber: NumberLong(txnNumber),
+        lsid,
+        autocommit,
     });
     if (!secondStatementRes.ok) {
         return secondStatementRes;
@@ -82,7 +86,8 @@ function assertMultiShardRetryableWriteWorked(testDB, collName, {lsid, txnNumber
     assert.commandWorked(testDB.runCommand({
         insert: collName,
         documents: [{skey: -1, fromRetryableWrite: true}, {skey: 1, fromRetryableWrite: true}],
-        txnNumber: NumberLong(txnNumber), lsid
+        txnNumber: NumberLong(txnNumber),
+        lsid
     }));
 }
 
@@ -93,7 +98,8 @@ function assertMultiShardRetryableWriteCanBeRetried(testDB, collName, {lsid, txn
     assert.commandWorked(testDB.runCommand({
         insert: collName,
         documents: [{skey: -1, fromRetryableWrite: true}, {skey: 1, fromRetryableWrite: true}],
-        txnNumber: NumberLong(txnNumber), lsid
+        txnNumber: NumberLong(txnNumber),
+        lsid
     }));
     assert.eq(numMultiShardRetryableWrites * 2,  // Each write inserts 2 documents.
               testDB[collName].find({fromRetryableWrite: true}).itcount());

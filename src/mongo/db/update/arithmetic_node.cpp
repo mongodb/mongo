@@ -55,9 +55,7 @@ Status ArithmeticNode::init(BSONElement modExpr,
     if (!modExpr.isNumber()) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Cannot " << getNameForOp(_op)
-                                    << " with non-numeric argument: {"
-                                    << modExpr
-                                    << "}");
+                                    << " with non-numeric argument: {" << modExpr << "}");
     }
 
     _val = modExpr;
@@ -72,10 +70,8 @@ ModifierNode::ModifyResult ArithmeticNode::updateExistingElement(
                   str::stream() << "Cannot apply " << operatorName()
                                 << " to a value of non-numeric type. {"
                                 << (idElem.ok() ? idElem.toString() : "no id")
-                                << "} has the field '"
-                                << element->getFieldName()
-                                << "' of non-numeric type "
-                                << typeName(element->getType()));
+                                << "} has the field '" << element->getFieldName()
+                                << "' of non-numeric type " << typeName(element->getType()));
     }
 
     SafeNum originalValue = element->getValueSafeNum();
@@ -97,10 +93,8 @@ ModifierNode::ModifyResult ArithmeticNode::updateExistingElement(
         auto idElem = mutablebson::findFirstChildNamed(element->getDocument().root(), "_id");
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "Failed to apply " << operatorName()
-                                << " operations to current value ("
-                                << originalValue.debugString()
-                                << ") for document {"
-                                << (idElem.ok() ? idElem.toString() : "no id")
+                                << " operations to current value (" << originalValue.debugString()
+                                << ") for document {" << (idElem.ok() ? idElem.toString() : "no id")
                                 << "}");
     } else {
         invariant(element->setValueSafeNum(valueToSet));

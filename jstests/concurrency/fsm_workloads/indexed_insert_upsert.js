@@ -14,7 +14,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extend
 load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.data.indexedField = 'indexed_insert_upsert';
     $config.data.shardKey = {};
     $config.data.shardKey[$config.data.indexedField] = 1;

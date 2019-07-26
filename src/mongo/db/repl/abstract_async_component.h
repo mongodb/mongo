@@ -247,8 +247,7 @@ Status AbstractAsyncComponent::_startupComponent_inlock(std::unique_ptr<T>& comp
         component.reset();
         return Status(ErrorCodes::CallbackCanceled,
                       str::stream() << "failed to start up " << componentToStartUp << ": "
-                                    << _componentName
-                                    << " is shutting down");
+                                    << _componentName << " is shutting down");
     }
 
     auto status = component->startup();

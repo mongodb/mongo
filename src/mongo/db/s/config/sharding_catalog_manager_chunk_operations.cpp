@@ -129,8 +129,7 @@ BSONArray buildMergeChunksTransactionPrecond(const std::vector<ChunkType>& chunk
                  BSON("query" << BSON(ChunkType::ns(chunk.getNS().ns())
                                       << ChunkType::min(chunk.getMin())
                                       << ChunkType::max(chunk.getMax()))
-                              << "orderby"
-                              << BSON(ChunkType::lastmod() << -1)));
+                              << "orderby" << BSON(ChunkType::lastmod() << -1)));
         b.append("res",
                  BSON(ChunkType::epoch(collVersion.epoch())
                       << ChunkType::shard(chunk.getShard().toString())));
@@ -146,8 +145,7 @@ Status checkChunkIsOnShard(OperationContext* opCtx,
                            const ShardId& shard) {
     BSONObj chunkQuery =
         BSON(ChunkType::ns() << nss.ns() << ChunkType::min() << min << ChunkType::max() << max
-                             << ChunkType::shard()
-                             << shard);
+                             << ChunkType::shard() << shard);
 
     // Must use local read concern because we're going to perform subsequent writes.
     auto findResponseWith =
@@ -166,8 +164,7 @@ Status checkChunkIsOnShard(OperationContext* opCtx,
     if (findResponseWith.getValue().docs.empty()) {
         return {ErrorCodes::Error(40165),
                 str::stream()
-                    << "Could not find the chunk ("
-                    << chunkQuery.toString()
+                    << "Could not find the chunk (" << chunkQuery.toString()
                     << ") on the shard. Cannot execute the migration commit with invalid chunks."};
     }
 
@@ -345,18 +342,14 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
             return {
                 ErrorCodes::InvalidOptions,
                 str::stream() << "Split keys must be specified in strictly increasing order. Key "
-                              << endKey
-                              << " was specified after "
-                              << startKey
-                              << "."};
+                              << endKey << " was specified after " << startKey << "."};
         }
 
         // Verify that splitPoints are not repeated
         if (endKey.woCompare(startKey) == 0) {
             return {ErrorCodes::InvalidOptions,
                     str::stream() << "Split on lower bound of chunk "
-                                  << ChunkRange(startKey, endKey).toString()
-                                  << "is not allowed"};
+                                  << ChunkRange(startKey, endKey).toString() << "is not allowed"};
         }
 
         // verify that splits don't create too-big shard keys
@@ -419,10 +412,8 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         b.append("ns", ChunkType::ConfigNS.ns());
         b.append("q",
                  BSON("query" << BSON(ChunkType::ns(nss.ns()) << ChunkType::min() << range.getMin()
-                                                              << ChunkType::max()
-                                                              << range.getMax())
-                              << "orderby"
-                              << BSON(ChunkType::lastmod() << -1)));
+                                                              << ChunkType::max() << range.getMax())
+                              << "orderby" << BSON(ChunkType::lastmod() << -1)));
         {
             BSONObjBuilder bb(b.subobjStart("res"));
             bb.append(ChunkType::epoch(), requestEpoch);
@@ -544,10 +535,7 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
                 ErrorCodes::InvalidOptions,
                 str::stream()
                     << "Chunk boundaries must be specified in strictly increasing order. Boundary "
-                    << chunkBoundaries[i]
-                    << " was specified after "
-                    << itChunk.getMin()
-                    << "."};
+                    << chunkBoundaries[i] << " was specified after " << itChunk.getMin() << "."};
         }
 
         itChunk.setMax(chunkBoundaries[i]);
@@ -660,11 +648,9 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
                               << "' has been dropped and recreated since the migration began."
                                  " The config server's collection version epoch is now '"
                               << currentCollectionVersion.epoch().toString()
-                              << "', but the shard's is "
-                              << collectionEpoch.toString()
+                              << "', but the shard's is " << collectionEpoch.toString()
                               << "'. Aborting migration commit for chunk ("
-                              << migratedChunk.getRange().toString()
-                              << ")."};
+                              << migratedChunk.getRange().toString() << ")."};
     }
 
     // Check that migratedChunk is where it should be, on fromShard.
@@ -827,9 +813,7 @@ StatusWith<ChunkVersion> ShardingCatalogManager::_findCollectionVersion(
                               << "' has been dropped and recreated since the migration began."
                                  " The config server's collection version epoch is now '"
                               << currentCollectionVersion.epoch().toString()
-                              << "', but the shard's is "
-                              << collectionEpoch.toString()
-                              << "'."};
+                              << "', but the shard's is " << collectionEpoch.toString() << "'."};
     }
 
     return currentCollectionVersion;

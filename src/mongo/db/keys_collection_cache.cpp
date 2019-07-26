@@ -106,10 +106,8 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::getKeyById(long long key
 
     return {ErrorCodes::KeyNotFound,
             str::stream() << "Cache Reader No keys found for " << _purpose
-                          << " that is valid for time: "
-                          << forThisTime.toString()
-                          << " with id: "
-                          << keyId};
+                          << " that is valid for time: " << forThisTime.toString()
+                          << " with id: " << keyId};
 }
 
 StatusWith<KeysCollectionDocument> KeysCollectionCache::getKey(const LogicalTime& forThisTime) {

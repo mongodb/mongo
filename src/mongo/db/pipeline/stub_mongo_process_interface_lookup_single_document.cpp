@@ -93,12 +93,8 @@ boost::optional<Document> StubMongoProcessInterfaceLookupSingleDocument::lookupS
     if (auto next = pipeline->getNext()) {
         uasserted(ErrorCodes::TooManyMatchingDocuments,
                   str::stream() << "found more than one document matching "
-                                << documentKey.toString()
-                                << " ["
-                                << lookedUpDocument->toString()
-                                << ", "
-                                << next->toString()
-                                << "]");
+                                << documentKey.toString() << " [" << lookedUpDocument->toString()
+                                << ", " << next->toString() << "]");
     }
     return lookedUpDocument;
 }

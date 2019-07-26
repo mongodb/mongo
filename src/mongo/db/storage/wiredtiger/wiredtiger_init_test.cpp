@@ -85,15 +85,9 @@ void _testValidateMetadata(const StorageEngine::Factory* factory,
     if (expectedCode != status.code()) {
         FAIL(str::stream()
              << "Unexpected StorageEngine::Factory::validateMetadata result. Expected: "
-             << ErrorCodes::errorString(expectedCode)
-             << " but got "
-             << status.toString()
-             << " instead. metadataOptions: "
-             << metadataOptions
-             << "; directoryPerDB: "
-             << directoryPerDB
-             << "; directoryForIndexes: "
-             << directoryForIndexes);
+             << ErrorCodes::errorString(expectedCode) << " but got " << status.toString()
+             << " instead. metadataOptions: " << metadataOptions << "; directoryPerDB: "
+             << directoryPerDB << "; directoryForIndexes: " << directoryForIndexes);
     }
 }
 

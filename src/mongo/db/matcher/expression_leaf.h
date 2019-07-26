@@ -40,7 +40,7 @@
 
 namespace pcrecpp {
 class RE;
-}  // namespace pcrecpp;
+}  // namespace pcrecpp
 
 namespace mongo {
 

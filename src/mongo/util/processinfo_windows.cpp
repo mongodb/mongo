@@ -413,4 +413,4 @@ bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<
     }
     return true;
 }
-}
+}  // namespace mongo

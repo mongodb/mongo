@@ -21,7 +21,7 @@ runWorkloadsSerially(workloadList.filter(function(file) {
                      {},
                      {dbNamePrefix: dbNamePrefix},
                      {
-                       keepExistingDatabases: true,
-                       dropDatabaseBlacklist: fsmDbBlacklist,
-                       validateCollections: validateCollectionsOnCleanup
+                         keepExistingDatabases: true,
+                         dropDatabaseBlacklist: fsmDbBlacklist,
+                         validateCollections: validateCollectionsOnCleanup
                      });

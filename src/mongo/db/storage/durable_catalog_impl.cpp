@@ -804,7 +804,7 @@ StatusWith<std::unique_ptr<RecordStore>> DurableCatalogImpl::createCollection(
     }
 
     CollectionUUID uuid = options.uuid.get();
-    opCtx->recoveryUnit()->onRollback([ opCtx, catalog = this, nss, ident, uuid ]() {
+    opCtx->recoveryUnit()->onRollback([opCtx, catalog = this, nss, ident, uuid]() {
         // Intentionally ignoring failure
         catalog->_engine->getEngine()->dropIdent(opCtx, ident).ignore();
     });
@@ -871,7 +871,7 @@ Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, const Namespa
 
     // This will notify the storageEngine to drop the collection only on WUOW::commit().
     opCtx->recoveryUnit()->onCommit(
-        [ opCtx, catalog = this, nss, uuid, ident ](boost::optional<Timestamp> commitTimestamp) {
+        [opCtx, catalog = this, nss, uuid, ident](boost::optional<Timestamp> commitTimestamp) {
             StorageEngineInterface* engine = catalog->_engine;
             auto storageEngine = engine->getStorageEngine();
             if (storageEngine->supportsPendingDrops() && commitTimestamp) {

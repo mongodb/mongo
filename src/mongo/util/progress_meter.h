@@ -168,4 +168,4 @@ public:
 private:
     ProgressMeter* _pm;
 };
-}
+}  // namespace mongo

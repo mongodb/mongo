@@ -11,7 +11,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');
 load('jstests/concurrency/fsm_workloads/sharded_base_partitioned.js');
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.threadCount = 1;
     $config.iterations = 1;
 

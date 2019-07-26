@@ -45,9 +45,9 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 using stdx::make_unique;
 
 WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx,
@@ -110,4 +110,4 @@ unique_ptr<MatchExpression> WhereMatchExpression::shallowClone() const {
     }
     return std::move(e);
 }
-}
+}  // namespace mongo

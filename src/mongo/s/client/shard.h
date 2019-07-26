@@ -205,9 +205,9 @@ public:
                                          const BSONObj& cmdObj) = 0;
 
     /**
-    * Runs a cursor command, exhausts the cursor, and pulls all data into memory. Performs retries
-    * if the command fails in accordance with the kIdempotent RetryPolicy.
-    */
+     * Runs a cursor command, exhausts the cursor, and pulls all data into memory. Performs retries
+     * if the command fails in accordance with the kIdempotent RetryPolicy.
+     */
     StatusWith<QueryResponse> runExhaustiveCursorCommand(OperationContext* opCtx,
                                                          const ReadPreferenceSetting& readPref,
                                                          const std::string& dbName,
@@ -225,13 +225,13 @@ public:
                                                 RetryPolicy retryPolicy);
 
     /**
-    * Warning: This method exhausts the cursor and pulls all data into memory.
-    * Do not use other than for very small (i.e., admin or metadata) collections.
-    * Performs retries if the query fails in accordance with the kIdempotent RetryPolicy.
-    *
-    * ShardRemote instances expect "readConcernLevel" to always be kMajorityReadConcern, whereas
-    * ShardLocal instances expect either kLocalReadConcern or kMajorityReadConcern.
-    */
+     * Warning: This method exhausts the cursor and pulls all data into memory.
+     * Do not use other than for very small (i.e., admin or metadata) collections.
+     * Performs retries if the query fails in accordance with the kIdempotent RetryPolicy.
+     *
+     * ShardRemote instances expect "readConcernLevel" to always be kMajorityReadConcern, whereas
+     * ShardLocal instances expect either kLocalReadConcern or kMajorityReadConcern.
+     */
     StatusWith<QueryResponse> exhaustiveFindOnConfig(OperationContext* opCtx,
                                                      const ReadPreferenceSetting& readPref,
                                                      const repl::ReadConcernLevel& readConcernLevel,

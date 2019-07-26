@@ -48,8 +48,8 @@
 
 namespace mongo {
 
-using std::shared_ptr;
 using std::map;
+using std::shared_ptr;
 using std::string;
 
 namespace {
@@ -302,33 +302,24 @@ bool checkShardVersion(OperationContext* opCtx,
             const ChunkVersion refVersion(refManager->getVersion(shard->getId()));
             const ChunkVersion currentVersion(manager->getVersion(shard->getId()));
 
-            string msg(str::stream() << "manager (" << currentVersion.toString() << " : "
-                                     << manager->getSequenceNumber()
-                                     << ") "
-                                     << "not compatible with reference manager ("
-                                     << refVersion.toString()
-                                     << " : "
-                                     << refManager->getSequenceNumber()
-                                     << ") "
-                                     << "on shard "
-                                     << shard->getId()
-                                     << " ("
-                                     << shard->getConnString().toString()
-                                     << ")");
+            string msg(str::stream()
+                       << "manager (" << currentVersion.toString() << " : "
+                       << manager->getSequenceNumber() << ") "
+                       << "not compatible with reference manager (" << refVersion.toString()
+                       << " : " << refManager->getSequenceNumber() << ") "
+                       << "on shard " << shard->getId() << " (" << shard->getConnString().toString()
+                       << ")");
 
             uasserted(StaleConfigInfo(nss, refVersion, currentVersion), msg);
         }
     } else if (refManager) {
-        string msg(str::stream() << "not sharded (" << (!manager ? string("<none>") : str::stream()
-                                                                << manager->getSequenceNumber())
+        string msg(str::stream() << "not sharded ("
+                                 << (!manager ? string("<none>")
+                                              : str::stream() << manager->getSequenceNumber())
                                  << ") but has reference manager ("
-                                 << refManager->getSequenceNumber()
-                                 << ") "
-                                 << "on conn "
-                                 << conn->getServerAddress()
-                                 << " ("
-                                 << conn_in->getServerAddress()
-                                 << ")");
+                                 << refManager->getSequenceNumber() << ") "
+                                 << "on conn " << conn->getServerAddress() << " ("
+                                 << conn_in->getServerAddress() << ")");
 
         uasserted(
             StaleConfigInfo(nss, refManager->getVersion(shard->getId()), ChunkVersion::UNSHARDED()),

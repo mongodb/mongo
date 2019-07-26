@@ -88,8 +88,7 @@ void ChunkInfo::throwIfMovedSince(const Timestamp& ts) const {
 
     uasserted(ErrorCodes::MigrationConflict,
               str::stream() << "Chunk has moved since timestamp: " << ts.toString()
-                            << ", most recently at timestamp: "
-                            << latestValidAfter.toString());
+                            << ", most recently at timestamp: " << latestValidAfter.toString());
 }
 
 bool ChunkInfo::containsKey(const BSONObj& shardKey) const {

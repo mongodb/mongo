@@ -105,4 +105,4 @@ public:
         return true;
     }
 } cmdLockInfo;
-}
+}  // namespace mongo

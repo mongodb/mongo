@@ -120,8 +120,8 @@ void setSockTimeouts(int sock, double secs) {
         log() << "unable to set SO_RCVTIMEO: " << errnoWithDescription(WSAGetLastError());
     status =
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char*>(&timeout), sizeof(DWORD));
-    DEV if (report && (status == SOCKET_ERROR)) log() << "unable to set SO_SNDTIMEO: "
-                                                      << errnoWithDescription(WSAGetLastError());
+    DEV if (report && (status == SOCKET_ERROR)) log()
+        << "unable to set SO_SNDTIMEO: " << errnoWithDescription(WSAGetLastError());
 #else
     struct timeval tv;
     tv.tv_sec = (int)secs;
@@ -547,7 +547,7 @@ void Socket::handleSendError(int ret, const char* context) {
                        << ' ' << remoteString();
         throwSocketError(SocketErrorKind::SEND_ERROR, remoteString());
     }
-}
+}  // namespace mongo
 
 void Socket::handleRecvError(int ret, int len) {
     if (ret == 0) {

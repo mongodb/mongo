@@ -240,9 +240,7 @@ public:
         if (val.type() != String) {
             uasserted(ErrorCodes::TypeMismatch,
                       str::stream() << "Argument to getLog must be of type String; found "
-                                    << val.toString(false)
-                                    << " of type "
-                                    << typeName(val.type()));
+                                    << val.toString(false) << " of type " << typeName(val.type()));
         }
 
         string p = val.String();

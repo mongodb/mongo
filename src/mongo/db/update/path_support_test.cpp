@@ -58,10 +58,10 @@ namespace {
 
 using namespace mongo;
 using namespace pathsupport;
-using str::stream;
 using mutablebson::Element;
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
+using str::stream;
 
 class EmptyDoc : public mongo::unittest::Test {
 public:
@@ -607,9 +607,7 @@ static void assertContains(const EqualityMatches& equalities, const BSONObj& wra
                                  &SimpleStringDataComparator::kInstance);
     if (eltCmp.evaluate(it->second->getData() != value)) {
         FAIL(stream() << "Equality match at path \"" << path << "\" contains value "
-                      << it->second->getData()
-                      << ", not value "
-                      << value);
+                      << it->second->getData() << ", not value " << value);
     }
 }
 
@@ -899,19 +897,14 @@ static void assertParent(const EqualityMatches& equalities,
     StringData foundParentPath = path.dottedSubstring(0, parentPathPart);
     if (foundParentPath != parentPath) {
         FAIL(stream() << "Equality match parent at path \"" << foundParentPath
-                      << "\" does not match \""
-                      << parentPath
-                      << "\"");
+                      << "\" does not match \"" << parentPath << "\"");
     }
 
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
                                  &SimpleStringDataComparator::kInstance);
     if (eltCmp.evaluate(parentEl != value)) {
         FAIL(stream() << "Equality match parent for \"" << pathStr << "\" at path \"" << parentPath
-                      << "\" contains value "
-                      << parentEl
-                      << ", not value "
-                      << value);
+                      << "\" contains value " << parentEl << ", not value " << value);
     }
 }
 
@@ -931,8 +924,7 @@ static void assertNoParent(const EqualityMatches& equalities, StringData pathStr
     if (!parentEl.eoo()) {
         StringData foundParentPath = path.dottedSubstring(0, parentPathPart);
         FAIL(stream() << "Equality matches contained parent for \"" << pathStr << "\" at \""
-                      << foundParentPath
-                      << "\"");
+                      << foundParentPath << "\"");
     }
 }
 

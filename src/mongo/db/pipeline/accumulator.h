@@ -351,4 +351,4 @@ public:
 private:
     MutableDocument _output;
 };
-}
+}  // namespace mongo

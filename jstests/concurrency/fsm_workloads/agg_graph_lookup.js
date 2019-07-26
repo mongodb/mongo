@@ -6,7 +6,6 @@
  * Runs a $graphLookup aggregation simultaneously with updates.
  */
 var $config = (function() {
-
     var data = {numDocs: 1000};
 
     var states = {

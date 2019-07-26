@@ -1,6 +1,6 @@
 /* Test boundary conditions for $minDistance option for $near and $nearSphere
  * queries. SERVER-9395.
-*/
+ */
 var t = db.geo_mindistance_boundaries;
 t.drop();
 t.insert({loc: [1, 0]});  // 1 degree of longitude from origin.
@@ -19,7 +19,7 @@ var km = 1000, earthRadiusMeters = 6378.1 * km, geoJSONPoint = {type: 'Point', c
 /* Grow epsilon's exponent until epsilon exceeds the margin of error for the
  * representation of degreeInMeters. The server uses 64-bit math, too, so we'll
  * find the smallest epsilon the server can detect.
-*/
+ */
 while (degreeInMeters + metersEpsilon == degreeInMeters) {
     metersEpsilon *= 2;
 }
@@ -37,19 +37,17 @@ assert.eq(1,
           t.find({loc: {$near: {$geometry: geoJSONPoint, $minDistance: degreeInMeters}}}).itcount(),
           "Expected to find (0, 1) within $minDistance 1 degree from origin");
 
-assert.eq(
-    1,
-    t.find({
-         loc: {$near: {$geometry: geoJSONPoint, $minDistance: degreeInMeters - metersEpsilon}}
-     }).itcount(),
-    "Expected to find (0, 1) within $minDistance (1 degree - epsilon) from origin");
+assert.eq(1,
+          t.find({
+               loc: {$near: {$geometry: geoJSONPoint, $minDistance: degreeInMeters - metersEpsilon}}
+           }).itcount(),
+          "Expected to find (0, 1) within $minDistance (1 degree - epsilon) from origin");
 
-assert.eq(
-    0,
-    t.find({
-         loc: {$near: {$geometry: geoJSONPoint, $minDistance: degreeInMeters + metersEpsilon}}
-     }).itcount(),
-    "Expected *not* to find (0, 1) within $minDistance (1 degree + epsilon) from origin");
+assert.eq(0,
+          t.find({
+               loc: {$near: {$geometry: geoJSONPoint, $minDistance: degreeInMeters + metersEpsilon}}
+           }).itcount(),
+          "Expected *not* to find (0, 1) within $minDistance (1 degree + epsilon) from origin");
 
 //
 // Test boundary conditions for $nearSphere and GeoJSON, in meters.

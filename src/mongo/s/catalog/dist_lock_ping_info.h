@@ -64,4 +64,4 @@ struct DistLockPingInfo {
     // Note: unused by legacy dist lock.
     OID electionId;
 };
-}
+}  // namespace mongo

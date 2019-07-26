@@ -124,7 +124,7 @@ public:
 private:
     OperationContext* _opCtx;
 };
-}
+}  // namespace
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
@@ -258,12 +258,12 @@ public:
 
         BSONObj indexInfoObj;
         {
-            auto swIndexInfoObj = indexer.init(
-                _opCtx,
-                coll,
-                {BSON("v" << 2 << "name" << indexName << "ns" << coll->ns().ns() << "key"
-                          << indexKey)},
-                MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, coll));
+            auto swIndexInfoObj =
+                indexer.init(_opCtx,
+                             coll,
+                             {BSON("v" << 2 << "name" << indexName << "ns" << coll->ns().ns()
+                                       << "key" << indexKey)},
+                             MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, coll));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
@@ -388,11 +388,11 @@ public:
                                    const BSONObj& expectedDoc) {
         OneOffRead oor(_opCtx, ts);
         if (expectedDoc.isEmpty()) {
-            ASSERT_EQ(0, itCount(coll)) << "Should not find any documents in " << coll->ns()
-                                        << " at ts: " << ts;
+            ASSERT_EQ(0, itCount(coll))
+                << "Should not find any documents in " << coll->ns() << " at ts: " << ts;
         } else {
-            ASSERT_EQ(1, itCount(coll)) << "Should find one document in " << coll->ns()
-                                        << " at ts: " << ts;
+            ASSERT_EQ(1, itCount(coll))
+                << "Should find one document in " << coll->ns() << " at ts: " << ts;
             auto doc = findOne(coll);
             ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, expectedDoc))
                 << "Doc: " << doc.toString() << " Expected: " << expectedDoc.toString();
@@ -669,8 +669,7 @@ public:
         const bool match = (expectedMultikeyPaths == actualMultikeyPaths);
         if (!match) {
             FAIL(str::stream() << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
-                               << ", Actual: "
-                               << dumpMultikeyPaths(actualMultikeyPaths));
+                               << ", Actual: " << dumpMultikeyPaths(actualMultikeyPaths));
         }
         ASSERT_TRUE(match);
     }
@@ -705,23 +704,17 @@ public:
                 nss.db().toString(),
                 BSON("applyOps" << BSON_ARRAY(
                          BSON("ts" << firstInsertTime.addTicks(idx).asTimestamp() << "t" << 1LL
-                                   << "v"
-                                   << 2
-                                   << "op"
+                                   << "v" << 2 << "op"
                                    << "i"
-                                   << "ns"
-                                   << nss.ns()
-                                   << "ui"
-                                   << autoColl.getCollection()->uuid().get()
-                                   << "o"
+                                   << "ns" << nss.ns() << "ui"
+                                   << autoColl.getCollection()->uuid().get() << "o"
                                    << BSON("_id" << idx))
                          << BSON("ts" << firstInsertTime.addTicks(idx).asTimestamp() << "t" << 1LL
                                       << "op"
                                       << "c"
                                       << "ns"
                                       << "test.$cmd"
-                                      << "o"
-                                      << BSON("applyOps" << BSONArrayBuilder().obj())))),
+                                      << "o" << BSON("applyOps" << BSONArrayBuilder().obj())))),
                 repl::OplogApplication::Mode::kApplyOpsCmd,
                 &result));
         }
@@ -823,20 +816,14 @@ public:
         // Delete all documents one at a time.
         const LogicalTime startDeleteTime = _clock->reserveTicks(docsToInsert);
         for (std::int32_t num = 0; num < docsToInsert; ++num) {
-            ASSERT_OK(
-                doNonAtomicApplyOps(
-                    nss.db().toString(),
-                    {BSON("ts" << startDeleteTime.addTicks(num).asTimestamp() << "t" << 0LL << "v"
-                               << 2
-                               << "op"
-                               << "d"
-                               << "ns"
-                               << nss.ns()
-                               << "ui"
-                               << autoColl.getCollection()->uuid().get()
-                               << "o"
-                               << BSON("_id" << num))})
-                    .getStatus());
+            ASSERT_OK(doNonAtomicApplyOps(nss.db().toString(),
+                                          {BSON("ts" << startDeleteTime.addTicks(num).asTimestamp()
+                                                     << "t" << 0LL << "v" << 2 << "op"
+                                                     << "d"
+                                                     << "ns" << nss.ns() << "ui"
+                                                     << autoColl.getCollection()->uuid().get()
+                                                     << "o" << BSON("_id" << num))})
+                          .getStatus());
         }
 
         for (std::int32_t num = 0; num <= docsToInsert; ++num) {
@@ -892,17 +879,10 @@ public:
                 doNonAtomicApplyOps(
                     nss.db().toString(),
                     {BSON("ts" << firstUpdateTime.addTicks(idx).asTimestamp() << "t" << 0LL << "v"
-                               << 2
-                               << "op"
+                               << 2 << "op"
                                << "u"
-                               << "ns"
-                               << nss.ns()
-                               << "ui"
-                               << autoColl.getCollection()->uuid().get()
-                               << "o2"
-                               << BSON("_id" << 0)
-                               << "o"
-                               << updates[idx].first)})
+                               << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid().get()
+                               << "o2" << BSON("_id" << 0) << "o" << updates[idx].first)})
                     .getStatus());
         }
 
@@ -940,19 +920,11 @@ public:
             nss.db().toString(),
             {BSON("ts" << insertTime.asTimestamp() << "t" << 1LL << "op"
                        << "i"
-                       << "ns"
-                       << nss.ns()
-                       << "ui"
-                       << autoColl.getCollection()->uuid().get()
-                       << "o"
+                       << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid().get() << "o"
                        << BSON("_id" << 0 << "field" << 0)),
              BSON("ts" << insertTime.addTicks(1).asTimestamp() << "t" << 1LL << "op"
                        << "i"
-                       << "ns"
-                       << nss.ns()
-                       << "ui"
-                       << autoColl.getCollection()->uuid().get()
-                       << "o"
+                       << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid().get() << "o"
                        << BSON("_id" << 0))}));
 
         ASSERT_EQ(2, result.getIntField("applied"));
@@ -994,19 +966,13 @@ public:
         auto swResult = doAtomicApplyOps(nss.db().toString(),
                                          {BSON("op"
                                                << "i"
-                                               << "ns"
-                                               << nss.ns()
-                                               << "ui"
-                                               << autoColl.getCollection()->uuid().get()
-                                               << "o"
+                                               << "ns" << nss.ns() << "ui"
+                                               << autoColl.getCollection()->uuid().get() << "o"
                                                << BSON("_id" << 0)),
                                           BSON("op"
                                                << "i"
-                                               << "ns"
-                                               << nss.ns()
-                                               << "ui"
-                                               << autoColl.getCollection()->uuid().get()
-                                               << "o"
+                                               << "ns" << nss.ns() << "ui"
+                                               << autoColl.getCollection()->uuid().get() << "o"
                                                << BSON("_id" << 1))});
         ASSERT_OK(swResult);
 
@@ -1053,19 +1019,13 @@ public:
         auto swResult = doAtomicApplyOps(nss.db().toString(),
                                          {BSON("op"
                                                << "i"
-                                               << "ns"
-                                               << nss.ns()
-                                               << "ui"
-                                               << autoColl.getCollection()->uuid().get()
-                                               << "o"
+                                               << "ns" << nss.ns() << "ui"
+                                               << autoColl.getCollection()->uuid().get() << "o"
                                                << BSON("_id" << 0 << "field" << 0)),
                                           BSON("op"
                                                << "i"
-                                               << "ns"
-                                               << nss.ns()
-                                               << "ui"
-                                               << autoColl.getCollection()->uuid().get()
-                                               << "o"
+                                               << "ns" << nss.ns() << "ui"
+                                               << autoColl.getCollection()->uuid().get() << "o"
                                                << BSON("_id" << 0))});
         ASSERT_OK(swResult);
 
@@ -1104,17 +1064,14 @@ public:
         { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
 
         BSONObjBuilder resultBuilder;
-        auto swResult = doNonAtomicApplyOps(nss.db().toString(),
-                                            {
-                                                BSON("ts" << presentTs << "t" << 1LL << "op"
-                                                          << "c"
-                                                          << "ui"
-                                                          << UUID::gen()
-                                                          << "ns"
-                                                          << nss.getCommandNS().ns()
-                                                          << "o"
-                                                          << BSON("create" << nss.coll())),
-                                            });
+        auto swResult = doNonAtomicApplyOps(
+            nss.db().toString(),
+            {
+                BSON("ts" << presentTs << "t" << 1LL << "op"
+                          << "c"
+                          << "ui" << UUID::gen() << "ns" << nss.getCommandNS().ns() << "o"
+                          << BSON("create" << nss.coll())),
+            });
         ASSERT_OK(swResult);
 
         { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
@@ -1145,25 +1102,18 @@ public:
         const Timestamp dummyTs = dummyLt.asTimestamp();
 
         BSONObjBuilder resultBuilder;
-        auto swResult = doNonAtomicApplyOps(dbName,
-                                            {
-                                                BSON("ts" << presentTs << "t" << 1LL << "op"
-                                                          << "c"
-                                                          << "ui"
-                                                          << UUID::gen()
-                                                          << "ns"
-                                                          << nss1.getCommandNS().ns()
-                                                          << "o"
-                                                          << BSON("create" << nss1.coll())),
-                                                BSON("ts" << futureTs << "t" << 1LL << "op"
-                                                          << "c"
-                                                          << "ui"
-                                                          << UUID::gen()
-                                                          << "ns"
-                                                          << nss2.getCommandNS().ns()
-                                                          << "o"
-                                                          << BSON("create" << nss2.coll())),
-                                            });
+        auto swResult = doNonAtomicApplyOps(
+            dbName,
+            {
+                BSON("ts" << presentTs << "t" << 1LL << "op"
+                          << "c"
+                          << "ui" << UUID::gen() << "ns" << nss1.getCommandNS().ns() << "o"
+                          << BSON("create" << nss1.coll())),
+                BSON("ts" << futureTs << "t" << 1LL << "op"
+                          << "c"
+                          << "ui" << UUID::gen() << "ns" << nss2.getCommandNS().ns() << "o"
+                          << BSON("create" << nss2.coll())),
+            });
         ASSERT_OK(swResult);
 
         { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss1).getCollection()); }
@@ -1211,34 +1161,21 @@ public:
             { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection()); }
 
             BSONObjBuilder resultBuilder;
-            auto swResult =
-                doNonAtomicApplyOps(dbName,
-                                    {
-                                        BSON("ts" << presentTs << "t" << 1LL << "op"
-                                                  << "i"
-                                                  << "ns"
-                                                  << nss1.ns()
-                                                  << "ui"
-                                                  << autoColl.getCollection()->uuid().get()
-                                                  << "o"
-                                                  << doc1),
-                                        BSON("ts" << futureTs << "t" << 1LL << "op"
-                                                  << "c"
-                                                  << "ui"
-                                                  << uuid2
-                                                  << "ns"
-                                                  << nss2.getCommandNS().ns()
-                                                  << "o"
-                                                  << BSON("create" << nss2.coll())),
-                                        BSON("ts" << insert2Ts << "t" << 1LL << "op"
-                                                  << "i"
-                                                  << "ns"
-                                                  << nss2.ns()
-                                                  << "ui"
-                                                  << uuid2
-                                                  << "o"
-                                                  << doc2),
-                                    });
+            auto swResult = doNonAtomicApplyOps(
+                dbName,
+                {
+                    BSON("ts" << presentTs << "t" << 1LL << "op"
+                              << "i"
+                              << "ns" << nss1.ns() << "ui" << autoColl.getCollection()->uuid().get()
+                              << "o" << doc1),
+                    BSON("ts" << futureTs << "t" << 1LL << "op"
+                              << "c"
+                              << "ui" << uuid2 << "ns" << nss2.getCommandNS().ns() << "o"
+                              << BSON("create" << nss2.coll())),
+                    BSON("ts" << insert2Ts << "t" << 1LL << "op"
+                              << "i"
+                              << "ns" << nss2.ns() << "ui" << uuid2 << "o" << doc2),
+                });
             ASSERT_OK(swResult);
         }
 
@@ -1283,17 +1220,14 @@ public:
         { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
 
         BSONObjBuilder resultBuilder;
-        auto swResult = doNonAtomicApplyOps(nss.db().toString(),
-                                            {
-                                                BSON("ts" << presentTs << "t" << 1LL << "op"
-                                                          << "c"
-                                                          << "ui"
-                                                          << UUID::gen()
-                                                          << "ns"
-                                                          << nss.getCommandNS().ns()
-                                                          << "o"
-                                                          << BSON("create" << nss.coll())),
-                                            });
+        auto swResult = doNonAtomicApplyOps(
+            nss.db().toString(),
+            {
+                BSON("ts" << presentTs << "t" << 1LL << "op"
+                          << "c"
+                          << "ui" << UUID::gen() << "ns" << nss.getCommandNS().ns() << "o"
+                          << BSON("create" << nss.coll())),
+            });
         ASSERT_OK(swResult);
 
         { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
@@ -1331,9 +1265,8 @@ public:
             uuid = autoColl.getCollection()->uuid().get();
         }
         auto indexName = "a_1";
-        auto indexSpec =
-            BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1) << "v"
-                        << static_cast<int>(kIndexVersion));
+        auto indexSpec = BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1)
+                                     << "v" << static_cast<int>(kIndexVersion));
         ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
 
         _coordinatorMock->alwaysAllowWrites(false);
@@ -1349,30 +1282,15 @@ public:
         auto op0 = repl::OplogEntry(BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2
                                               << "op"
                                               << "i"
-                                              << "ns"
-                                              << nss.ns()
-                                              << "ui"
-                                              << uuid
-                                              << "o"
-                                              << doc0));
+                                              << "ns" << nss.ns() << "ui" << uuid << "o" << doc0));
         auto op1 = repl::OplogEntry(BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "v" << 2
                                               << "op"
                                               << "i"
-                                              << "ns"
-                                              << nss.ns()
-                                              << "ui"
-                                              << uuid
-                                              << "o"
-                                              << doc1));
+                                              << "ns" << nss.ns() << "ui" << uuid << "o" << doc1));
         auto op2 = repl::OplogEntry(BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "v" << 2
                                               << "op"
                                               << "i"
-                                              << "ns"
-                                              << nss.ns()
-                                              << "ui"
-                                              << uuid
-                                              << "o"
-                                              << doc2));
+                                              << "ns" << nss.ns() << "ui" << uuid << "o" << doc2));
         std::vector<repl::OplogEntry> ops = {op0, op1, op2};
 
         DoNothingOplogApplierObserver observer;
@@ -1417,9 +1335,8 @@ public:
             uuid = autoColl.getCollection()->uuid().get();
         }
         auto indexName = "a_1";
-        auto indexSpec =
-            BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1) << "v"
-                        << static_cast<int>(kIndexVersion));
+        auto indexSpec = BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1)
+                                     << "v" << static_cast<int>(kIndexVersion));
         ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
 
         _coordinatorMock->alwaysAllowWrites(false);
@@ -1437,45 +1354,23 @@ public:
         auto op0 = repl::OplogEntry(BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2
                                               << "op"
                                               << "i"
-                                              << "ns"
-                                              << nss.ns()
-                                              << "ui"
-                                              << uuid
-                                              << "o"
-                                              << doc0));
+                                              << "ns" << nss.ns() << "ui" << uuid << "o" << doc0));
         auto op1 = repl::OplogEntry(BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "v" << 2
                                               << "op"
                                               << "i"
-                                              << "ns"
-                                              << nss.ns()
-                                              << "ui"
-                                              << uuid
-                                              << "o"
-                                              << doc1));
+                                              << "ns" << nss.ns() << "ui" << uuid << "o" << doc1));
         auto op2 = repl::OplogEntry(BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "v" << 2
                                               << "op"
                                               << "i"
-                                              << "ns"
-                                              << nss.ns()
-                                              << "ui"
-                                              << uuid
-                                              << "o"
-                                              << doc2));
+                                              << "ns" << nss.ns() << "ui" << uuid << "o" << doc2));
         auto indexSpec2 = BSON("createIndexes" << nss.coll() << "ns" << nss.ns() << "v"
-                                               << static_cast<int>(kIndexVersion)
-                                               << "key"
-                                               << BSON("b" << 1)
-                                               << "name"
+                                               << static_cast<int>(kIndexVersion) << "key"
+                                               << BSON("b" << 1) << "name"
                                                << "b_1");
         auto createIndexOp = repl::OplogEntry(
             BSON("ts" << indexBuildTime.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
                       << "c"
-                      << "ns"
-                      << nss.getCommandNS().ns()
-                      << "ui"
-                      << uuid
-                      << "o"
-                      << indexSpec2));
+                      << "ns" << nss.getCommandNS().ns() << "ui" << uuid << "o" << indexSpec2));
 
         // We add in an index creation op to test that we restart tracking multikey path info
         // after bulk index builds.
@@ -1536,9 +1431,8 @@ public:
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
         auto indexName = "a_1";
-        auto indexSpec =
-            BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1) << "v"
-                        << static_cast<int>(kIndexVersion));
+        auto indexSpec = BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1)
+                                     << "v" << static_cast<int>(kIndexVersion));
         ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
 
         const LogicalTime pastTime = _clock->reserveTicks(1);
@@ -1566,9 +1460,8 @@ public:
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
         auto indexName = "a_1";
-        auto indexSpec =
-            BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1) << "v"
-                        << static_cast<int>(kIndexVersion));
+        auto indexSpec = BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1)
+                                     << "v" << static_cast<int>(kIndexVersion));
         ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
 
         const LogicalTime pastTime = _clock->reserveTicks(1);
@@ -1599,9 +1492,8 @@ public:
         reset(nss);
 
         auto indexName = "a_1";
-        auto indexSpec =
-            BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1) << "v"
-                        << static_cast<int>(kIndexVersion));
+        auto indexSpec = BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1)
+                                     << "v" << static_cast<int>(kIndexVersion));
         auto doc = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
 
         {
@@ -1991,10 +1883,7 @@ public:
                 autoColl.getCollection(),
                 {BSON("v" << 2 << "unique" << true << "name"
                           << "a_1"
-                          << "ns"
-                          << nss.ns()
-                          << "key"
-                          << BSON("a" << 1))},
+                          << "ns" << nss.ns() << "key" << BSON("a" << 1))},
                 MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, autoColl.getCollection()));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
@@ -2101,10 +1990,7 @@ public:
                 autoColl.getCollection(),
                 {BSON("v" << 2 << "unique" << true << "name"
                           << "a_1"
-                          << "ns"
-                          << nss.ns()
-                          << "key"
-                          << BSON("a" << 1))},
+                          << "ns" << nss.ns() << "key" << BSON("a" << 1))},
                 MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, autoColl.getCollection()));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
@@ -2257,8 +2143,7 @@ public:
 
         const Timestamp indexAComplete = queryOplog(BSON("op"
                                                          << "c"
-                                                         << "o.createIndexes"
-                                                         << nss.coll()
+                                                         << "o.createIndexes" << nss.coll()
                                                          << "o.name"
                                                          << "a_1"))["ts"]
                                              .timestamp();
@@ -2348,9 +2233,9 @@ public:
             BSON("renameCollection" << nss.ns() << "to" << renamedNss.ns() << "dropTarget" << true),
             renameResult);
 
-        const auto createIndexesDocument = queryOplog(BSON("ns" << renamedNss.db() + ".$cmd"
-                                                                << "o.createIndexes"
-                                                                << BSON("$exists" << true)));
+        const auto createIndexesDocument =
+            queryOplog(BSON("ns" << renamedNss.db() + ".$cmd"
+                                 << "o.createIndexes" << BSON("$exists" << true)));
 
         // Find index creation timestamps.
         const auto createIndexesString =
@@ -2363,15 +2248,13 @@ public:
 
         const Timestamp indexCreateInitTs = queryOplog(BSON("op"
                                                             << "c"
-                                                            << "o.create"
-                                                            << tmpName.coll()))["ts"]
+                                                            << "o.create" << tmpName.coll()))["ts"]
                                                 .timestamp();
 
         const Timestamp indexAComplete = createIndexesDocument["ts"].timestamp();
         const Timestamp indexBComplete = queryOplog(BSON("op"
                                                          << "c"
-                                                         << "o.createIndexes"
-                                                         << tmpName.coll()
+                                                         << "o.createIndexes" << tmpName.coll()
                                                          << "o.name"
                                                          << "b_1"))["ts"]
                                              .timestamp();
@@ -2550,14 +2433,10 @@ public:
 
         // Make a simple insert operation.
         BSONObj doc0 = BSON("_id" << 0 << "a" << 0);
-        auto insertOp = repl::OplogEntry(BSON("ts" << futureTs << "t" << 1LL << "v" << 2 << "op"
-                                                   << "i"
-                                                   << "ns"
-                                                   << ns.ns()
-                                                   << "ui"
-                                                   << uuid
-                                                   << "o"
-                                                   << doc0));
+        auto insertOp =
+            repl::OplogEntry(BSON("ts" << futureTs << "t" << 1LL << "v" << 2 << "op"
+                                       << "i"
+                                       << "ns" << ns.ns() << "ui" << uuid << "o" << doc0));
 
         // Apply the operation.
         auto storageInterface = repl::StorageInterface::get(_opCtx);
@@ -2635,20 +2514,14 @@ public:
             }
 
             auto indexSpec = BSON("createIndexes" << nss.coll() << "ns" << nss.ns() << "v"
-                                                  << static_cast<int>(kIndexVersion)
-                                                  << "key"
-                                                  << BSON("field" << 1)
-                                                  << "name"
+                                                  << static_cast<int>(kIndexVersion) << "key"
+                                                  << BSON("field" << 1) << "name"
                                                   << "field_1");
 
             auto createIndexOp = BSON("ts" << startBuildTs << "t" << 1LL << "v" << 2 << "op"
                                            << "c"
-                                           << "ns"
-                                           << nss.getCommandNS().ns()
-                                           << "ui"
-                                           << collUUID
-                                           << "o"
-                                           << indexSpec);
+                                           << "ns" << nss.getCommandNS().ns() << "ui" << collUUID
+                                           << "o" << indexSpec);
 
             ASSERT_OK(doAtomicApplyOps(nss.db().toString(), {createIndexOp}));
 
@@ -2683,21 +2556,17 @@ public:
         ASSERT_OK(createCollection(_opCtx,
                                    viewNss.db().toString(),
                                    BSON("create" << viewNss.coll() << "pipeline" << BSONArray()
-                                                 << "viewOn"
-                                                 << backingCollNss.coll())));
+                                                 << "viewOn" << backingCollNss.coll())));
 
         const Timestamp systemViewsCreateTs = queryOplog(BSON("op"
                                                               << "c"
-                                                              << "ns"
-                                                              << (viewNss.db() + ".$cmd")
+                                                              << "ns" << (viewNss.db() + ".$cmd")
                                                               << "o.create"
                                                               << "system.views"))["ts"]
                                                   .timestamp();
         const Timestamp viewCreateTs = queryOplog(BSON("op"
                                                        << "i"
-                                                       << "ns"
-                                                       << systemViewsNss.ns()
-                                                       << "o._id"
+                                                       << "ns" << systemViewsNss.ns() << "o._id"
                                                        << viewNss.ns()))["ts"]
                                            .timestamp();
 
@@ -2714,11 +2583,11 @@ public:
 
             AutoGetCollection autoColl(_opCtx, systemViewsNss, LockMode::MODE_IS);
             assertDocumentAtTimestamp(autoColl.getCollection(), systemViewsCreateTs, BSONObj());
-            assertDocumentAtTimestamp(
-                autoColl.getCollection(),
-                viewCreateTs,
-                BSON("_id" << viewNss.ns() << "viewOn" << backingCollNss.coll() << "pipeline"
-                           << BSONArray()));
+            assertDocumentAtTimestamp(autoColl.getCollection(),
+                                      viewCreateTs,
+                                      BSON("_id" << viewNss.ns() << "viewOn"
+                                                 << backingCollNss.coll() << "pipeline"
+                                                 << BSONArray()));
         }
     }
 };
@@ -2745,9 +2614,7 @@ public:
 
         BSONObj result = queryOplog(BSON("op"
                                          << "c"
-                                         << "ns"
-                                         << nss.getCommandNS().ns()
-                                         << "o.create"
+                                         << "ns" << nss.getCommandNS().ns() << "o.create"
                                          << nss.coll()));
         repl::OplogEntry op(result);
         // The logOp() call for createCollection should have timestamp 'futureTs', which will also
@@ -2763,9 +2630,7 @@ public:
 
         result = queryOplog(BSON("op"
                                  << "c"
-                                 << "ns"
-                                 << nss.getCommandNS().ns()
-                                 << "o.createIndexes"
+                                 << "ns" << nss.getCommandNS().ns() << "o.createIndexes"
                                  << nss.coll()));
         repl::OplogEntry indexOp(result);
         ASSERT_EQ(indexOp.getObject()["name"].str(), "user_1_db_1");
@@ -2969,18 +2834,13 @@ public:
             assertFilteredDocumentAtTimestamp(coll, query2, nullTs, doc2);
 
             // Implicit commit oplog entry should exist at commitEntryTs.
-            const auto commitFilter =
-                BSON("ts" << commitEntryTs << "o"
-                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                                << "i"
-                                                                << "ns"
-                                                                << nss.ns()
-                                                                << "ui"
-                                                                << coll->uuid().get()
-                                                                << "o"
-                                                                << doc2))
-                                             << "count"
-                                             << 2));
+            const auto commitFilter = BSON(
+                "ts" << commitEntryTs << "o"
+                     << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                           << "i"
+                                                           << "ns" << nss.ns() << "ui"
+                                                           << coll->uuid().get() << "o" << doc2))
+                                        << "count" << 2));
             assertOplogDocumentExistsAtTimestamp(commitFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, firstOplogEntryTs, false);
@@ -2996,18 +2856,13 @@ public:
             assertOldestActiveTxnTimestampEquals(boost::none, nullTs);
 
             // first oplog entry should exist at firstOplogEntryTs and after it.
-            const auto firstOplogEntryFilter =
-                BSON("ts" << firstOplogEntryTs << "o"
-                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                                << "i"
-                                                                << "ns"
-                                                                << nss.ns()
-                                                                << "ui"
-                                                                << coll->uuid().get()
-                                                                << "o"
-                                                                << doc))
-                                             << "partialTxn"
-                                             << true));
+            const auto firstOplogEntryFilter = BSON(
+                "ts" << firstOplogEntryTs << "o"
+                     << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                           << "i"
+                                                           << "ns" << nss.ns() << "ui"
+                                                           << coll->uuid().get() << "o" << doc))
+                                        << "partialTxn" << true));
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, firstOplogEntryTs, true);
@@ -3175,18 +3030,13 @@ public:
             assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, true);
 
             // The first oplog entry should exist at firstOplogEntryTs and onwards.
-            const auto firstOplogEntryFilter =
-                BSON("ts" << firstOplogEntryTs << "o"
-                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                                << "i"
-                                                                << "ns"
-                                                                << nss.ns()
-                                                                << "ui"
-                                                                << coll->uuid().get()
-                                                                << "o"
-                                                                << doc))
-                                             << "partialTxn"
-                                             << true));
+            const auto firstOplogEntryFilter = BSON(
+                "ts" << firstOplogEntryTs << "o"
+                     << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                           << "i"
+                                                           << "ns" << nss.ns() << "ui"
+                                                           << coll->uuid().get() << "o" << doc))
+                                        << "partialTxn" << true));
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, firstOplogEntryTs, true);
@@ -3194,20 +3044,13 @@ public:
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, commitEntryTs, true);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, nullTs, true);
             // The prepare oplog entry should exist at prepareEntryTs and onwards.
-            const auto prepareOplogEntryFilter =
-                BSON("ts" << prepareEntryTs << "o"
-                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                                << "i"
-                                                                << "ns"
-                                                                << nss.ns()
-                                                                << "ui"
-                                                                << coll->uuid().get()
-                                                                << "o"
-                                                                << doc2))
-                                             << "prepare"
-                                             << true
-                                             << "count"
-                                             << 2));
+            const auto prepareOplogEntryFilter = BSON(
+                "ts" << prepareEntryTs << "o"
+                     << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                           << "i"
+                                                           << "ns" << nss.ns() << "ui"
+                                                           << coll->uuid().get() << "o" << doc2))
+                                        << "prepare" << true << "count" << 2));
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, firstOplogEntryTs, false);
@@ -3320,17 +3163,13 @@ public:
             }
 
             // The prepare oplog entry should exist at firstOplogEntryTs and onwards.
-            const auto prepareOplogEntryFilter =
-                BSON("ts" << prepareEntryTs << "o" << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                                                         << "i"
-                                                                                         << "ns"
-                                                                                         << nss.ns()
-                                                                                         << "ui"
-                                                                                         << ui
-                                                                                         << "o"
-                                                                                         << doc))
-                                                                      << "prepare"
-                                                                      << true));
+            const auto prepareOplogEntryFilter = BSON(
+                "ts" << prepareEntryTs << "o"
+                     << BSON("applyOps"
+                             << BSON_ARRAY(BSON("op"
+                                                << "i"
+                                                << "ns" << nss.ns() << "ui" << ui << "o" << doc))
+                             << "prepare" << true));
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, prepareEntryTs, true);

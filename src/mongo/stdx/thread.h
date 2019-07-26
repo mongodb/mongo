@@ -57,8 +57,8 @@ namespace stdx {
  */
 class thread : private ::std::thread {  // NOLINT
 public:
-    using ::std::thread::native_handle_type;  // NOLINT
     using ::std::thread::id;                  // NOLINT
+    using ::std::thread::native_handle_type;  // NOLINT
 
     thread() noexcept : ::std::thread::thread() {}  // NOLINT
 
@@ -91,13 +91,13 @@ public:
             ::std::thread::operator=(static_cast<::std::thread&&>(std::move(other))));  // NOLINT
     };
 
-    using ::std::thread::joinable;              // NOLINT
     using ::std::thread::get_id;                // NOLINT
-    using ::std::thread::native_handle;         // NOLINT
     using ::std::thread::hardware_concurrency;  // NOLINT
+    using ::std::thread::joinable;              // NOLINT
+    using ::std::thread::native_handle;         // NOLINT
 
-    using ::std::thread::join;    // NOLINT
     using ::std::thread::detach;  // NOLINT
+    using ::std::thread::join;    // NOLINT
 
     void swap(thread& other) noexcept {
         ::std::thread::swap(static_cast<::std::thread&>(other));  // NOLINT

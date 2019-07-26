@@ -247,7 +247,7 @@ public:
                                 // Release any waiting write operations.
                                 core_.pending_write_.expires_at(core_.neg_infin());
 
-                            // Fall through to call handler.
+                                // Fall through to call handler.
 
                             default:
 

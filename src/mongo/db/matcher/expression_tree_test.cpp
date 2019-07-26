@@ -321,4 +321,4 @@ TEST(NorOp, Equivalent) {
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));
 }
-}
+}  // namespace mongo

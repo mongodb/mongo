@@ -77,12 +77,8 @@ public:
 
         BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
                                   << "testIndex"
-                                  << "v"
-                                  << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
-                                  << "ns"
-                                  << ns
-                                  << "unique"
-                                  << unique);
+                                  << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
+                                  << "ns" << ns << "unique" << unique);
 
         if (partial) {
             auto partialBSON =

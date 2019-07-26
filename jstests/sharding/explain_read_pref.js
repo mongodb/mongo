@@ -27,7 +27,6 @@ var assertCorrectTargeting = function(explain, isMongos, secExpected) {
 };
 
 var testAllModes = function(conn, isMongos) {
-
     // The primary is tagged with { tag: 'one' } and the secondary with
     // { tag: 'two' } so we can test the interaction of modes and tags. Test
     // a bunch of combinations.

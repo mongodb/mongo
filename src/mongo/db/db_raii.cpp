@@ -122,8 +122,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                       str::stream()
                           << "Unable to read from a snapshot due to pending collection catalog "
                              "changes; please retry the operation. Snapshot timestamp is "
-                          << mySnapshot->toString()
-                          << ". Collection minimum is "
+                          << mySnapshot->toString() << ". Collection minimum is "
                           << minSnapshot->toString());
         }
 

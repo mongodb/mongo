@@ -1,77 +1,77 @@
 (function() {
-    "use strict";
-    var t = db.create_indexes_shell_helper;
-    t.drop();
+"use strict";
+var t = db.create_indexes_shell_helper;
+t.drop();
 
-    var mongo = db.getMongo();
+var mongo = db.getMongo();
 
-    try {
-        var commandsRan = [];
-        var insertsRan = [];
-        var mockMongo = {
-            writeMode: function() {
-                return "commands";
-            },
-            getSlaveOk: function() {
-                return true;
-            },
-            runCommand: function(db, cmd, opts) {
-                commandsRan.push({db: db, cmd: cmd, opts: opts});
-                return {ok: 1.0};
-            },
-            getWriteConcern: function() {
-                return null;
-            },
-            useWriteCommands: function() {
-                return true;
-            },
-            hasWriteCommands: function() {
-                return true;
-            },
-            getMinWireVersion: function() {
-                return mongo.getMinWireVersion();
-            },
-            getMaxWireVersion: function() {
-                return mongo.getMaxWireVersion();
-            },
-            isReplicaSetMember: function() {
-                return mongo.isReplicaSetMember();
-            },
-            isMongos: function() {
-                return mongo.isMongos();
-            },
-            isCausalConsistency: function() {
-                return false;
-            },
-            getClusterTime: function() {
-                return null;
-            },
-        };
+try {
+    var commandsRan = [];
+    var insertsRan = [];
+    var mockMongo = {
+        writeMode: function() {
+            return "commands";
+        },
+        getSlaveOk: function() {
+            return true;
+        },
+        runCommand: function(db, cmd, opts) {
+            commandsRan.push({db: db, cmd: cmd, opts: opts});
+            return {ok: 1.0};
+        },
+        getWriteConcern: function() {
+            return null;
+        },
+        useWriteCommands: function() {
+            return true;
+        },
+        hasWriteCommands: function() {
+            return true;
+        },
+        getMinWireVersion: function() {
+            return mongo.getMinWireVersion();
+        },
+        getMaxWireVersion: function() {
+            return mongo.getMaxWireVersion();
+        },
+        isReplicaSetMember: function() {
+            return mongo.isReplicaSetMember();
+        },
+        isMongos: function() {
+            return mongo.isMongos();
+        },
+        isCausalConsistency: function() {
+            return false;
+        },
+        getClusterTime: function() {
+            return null;
+        },
+    };
 
-        db._mongo = mockMongo;
-        db._session = new _DummyDriverSession(mockMongo);
+    db._mongo = mockMongo;
+    db._session = new _DummyDriverSession(mockMongo);
 
-        t.createIndexes([{x: 1}]);
-        assert.eq(commandsRan.length, 1);
-        assert(commandsRan[0].cmd.hasOwnProperty("createIndexes"));
-        assert.eq(commandsRan[0].cmd["indexes"][0], {key: {x: 1}, name: "x_1"});
+    t.createIndexes([{x: 1}]);
+    assert.eq(commandsRan.length, 1);
+    assert(commandsRan[0].cmd.hasOwnProperty("createIndexes"));
+    assert.eq(commandsRan[0].cmd["indexes"][0], {key: {x: 1}, name: "x_1"});
 
-        commandsRan = [];
+    commandsRan = [];
 
-        t.createIndexes([{y: 1}, {z: -1}]);
-        assert.eq(commandsRan.length, 1);
-        assert(commandsRan[0].cmd.hasOwnProperty("createIndexes"));
-        assert.eq(commandsRan[0].cmd["indexes"][0], {key: {y: 1}, name: "y_1"});
-        assert.eq(commandsRan[0].cmd["indexes"][1], {key: {z: -1}, name: "z_-1"});
+    t.createIndexes([{y: 1}, {z: -1}]);
+    assert.eq(commandsRan.length, 1);
+    assert(commandsRan[0].cmd.hasOwnProperty("createIndexes"));
+    assert.eq(commandsRan[0].cmd["indexes"][0], {key: {y: 1}, name: "y_1"});
+    assert.eq(commandsRan[0].cmd["indexes"][1], {key: {z: -1}, name: "z_-1"});
 
-        commandsRan = [];
+    commandsRan = [];
 
-        t.createIndex({a: 1});
-        assert.eq(commandsRan.length, 1);
-        assert(commandsRan[0].cmd.hasOwnProperty("createIndexes"));
-        assert.eq(commandsRan[0].cmd["indexes"][0], {key: {a: 1}, name: "a_1"});
-    } finally {
-        db._mongo = mongo;
-        db._session = new _DummyDriverSession(mongo);
-    }
+    t.createIndex({a: 1});
+    assert.eq(commandsRan.length, 1);
+    assert(commandsRan[0].cmd.hasOwnProperty("createIndexes"));
+    assert.eq(commandsRan[0].cmd["indexes"][0], {key: {a: 1}, name: "a_1"});
+} finally {
+    db._mongo = mongo;
+    db._session = new _DummyDriverSession(mongo);
+}
 }());

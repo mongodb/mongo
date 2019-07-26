@@ -228,5 +228,5 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
                            const repl::OplogEntry& entry,
                            OplogApplication::Mode mode,
                            boost::optional<Timestamp> stableTimestampForRecovery);
-}
-}
+}  // namespace repl
+}  // namespace mongo

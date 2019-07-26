@@ -11,73 +11,73 @@
 // ]
 
 (function() {
-    'use strict';
+'use strict';
 
-    const admin = db.getSisterDB('admin');
-    function listLocalSessions() {
-        return admin.aggregate([{'$listLocalSessions': {allUsers: false}}]);
-    }
+const admin = db.getSisterDB('admin');
+function listLocalSessions() {
+    return admin.aggregate([{'$listLocalSessions': {allUsers: false}}]);
+}
 
-    // Get current log level.
-    let originalLogLevel = assert.commandWorked(admin.setLogLevel(1)).was.verbosity;
+// Get current log level.
+let originalLogLevel = assert.commandWorked(admin.setLogLevel(1)).was.verbosity;
 
-    try {
-        // Start a new session and capture its sessionId.
-        const myid = assert.commandWorked(db.runCommand({startSession: 1})).id.id;
-        assert(myid !== undefined);
+try {
+    // Start a new session and capture its sessionId.
+    const myid = assert.commandWorked(db.runCommand({startSession: 1})).id.id;
+    assert(myid !== undefined);
 
-        // Ensure that the cache now contains the session and is visible.
-        const resultArray = assert.doesNotThrow(listLocalSessions).toArray();
-        assert.gte(resultArray.length, 1);
-        const resultArrayMine = resultArray
-                                    .map(function(sess) {
-                                        return sess._id.id;
-                                    })
-                                    .filter(function(id) {
-                                        return 0 == bsonWoCompare({x: id}, {x: myid});
-                                    });
-        assert.eq(resultArrayMine.length, 1);
+    // Ensure that the cache now contains the session and is visible.
+    const resultArray = assert.doesNotThrow(listLocalSessions).toArray();
+    assert.gte(resultArray.length, 1);
+    const resultArrayMine = resultArray
+                                .map(function(sess) {
+                                    return sess._id.id;
+                                })
+                                .filter(function(id) {
+                                    return 0 == bsonWoCompare({x: id}, {x: myid});
+                                });
+    assert.eq(resultArrayMine.length, 1);
 
-        // Try asking for the session by username.
-        const myusername = (function() {
-            if (0 == bsonWoCompare({x: resultArray[0]._id.uid}, {x: computeSHA256Block("")})) {
-                // Code for "we're running in no-auth mode"
-                return {user: "", db: ""};
-            }
-            const connstats = assert.commandWorked(db.runCommand({connectionStatus: 1}));
-            const authUsers = connstats.authInfo.authenticatedUsers;
-            assert(authUsers !== undefined);
-            assert.eq(authUsers.length, 1);
-            assert(authUsers[0].user !== undefined);
-            assert(authUsers[0].db !== undefined);
-            return {user: authUsers[0].user, db: authUsers[0].db};
-        })();
+    // Try asking for the session by username.
+    const myusername = (function() {
+        if (0 == bsonWoCompare({x: resultArray[0]._id.uid}, {x: computeSHA256Block("")})) {
+            // Code for "we're running in no-auth mode"
+            return {user: "", db: ""};
+        }
+        const connstats = assert.commandWorked(db.runCommand({connectionStatus: 1}));
+        const authUsers = connstats.authInfo.authenticatedUsers;
+        assert(authUsers !== undefined);
+        assert.eq(authUsers.length, 1);
+        assert(authUsers[0].user !== undefined);
+        assert(authUsers[0].db !== undefined);
+        return {user: authUsers[0].user, db: authUsers[0].db};
+    })();
 
-        const listMyLocalSessions = function() {
-            return admin.aggregate([{'$listLocalSessions': {users: [myusername]}}]);
-        };
+    const listMyLocalSessions = function() {
+        return admin.aggregate([{'$listLocalSessions': {users: [myusername]}}]);
+    };
 
-        const myArray = assert.doesNotThrow(listMyLocalSessions)
-                            .toArray()
-                            .map(function(sess) {
-                                return sess._id.id;
-                            })
-                            .filter(function(id) {
-                                return 0 == bsonWoCompare({x: id}, {x: myid});
-                            });
-        assert.eq(myArray.length, 1);
+    const myArray = assert.doesNotThrow(listMyLocalSessions)
+                        .toArray()
+                        .map(function(sess) {
+                            return sess._id.id;
+                        })
+                        .filter(function(id) {
+                            return 0 == bsonWoCompare({x: id}, {x: myid});
+                        });
+    assert.eq(myArray.length, 1);
 
-        print("sessions returned from $listLocalSessions filtered by user:          [ " + myArray +
-              " ]");
-        print("sessions returned from un-filtered $listLocalSessions for this user: [ " +
-              resultArrayMine + " ]");
+    print("sessions returned from $listLocalSessions filtered by user:          [ " + myArray +
+          " ]");
+    print("sessions returned from un-filtered $listLocalSessions for this user: [ " +
+          resultArrayMine + " ]");
 
-        assert.eq(
-            0,
-            bsonWoCompare(myArray, resultArrayMine),
-            "set of listed sessions for user contains different sessions from prior $listLocalSessions run");
+    assert.eq(
+        0,
+        bsonWoCompare(myArray, resultArrayMine),
+        "set of listed sessions for user contains different sessions from prior $listLocalSessions run");
 
-    } finally {
-        admin.setLogLevel(originalLogLevel);
-    }
+} finally {
+    admin.setLogLevel(originalLogLevel);
+}
 })();

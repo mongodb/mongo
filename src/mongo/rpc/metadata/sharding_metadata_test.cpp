@@ -54,8 +54,7 @@ TEST(ShardingMetadata, ReadFromMetadata) {
         auto sm = checkParse(
             BSON("$gleStats" << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
                                                                << kLastOpTime.getTerm())
-                                                  << "electionId"
-                                                  << kElectionId)));
+                                                  << "electionId" << kElectionId)));
         ASSERT_EQ(sm.getLastElectionId(), kElectionId);
         ASSERT_EQ(sm.getLastOpTime(), kLastOpTime);
     }
@@ -89,8 +88,7 @@ TEST(ShardingMetadata, ReadFromInvalidMetadata) {
         checkParseFails(
             BSON("$gleStats" << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
                                                                << kLastOpTime.getTerm())
-                                                  << "electionId"
-                                                  << 3)),
+                                                  << "electionId" << 3)),
             ErrorCodes::TypeMismatch);
     }
     {
@@ -104,9 +102,7 @@ TEST(ShardingMetadata, ReadFromInvalidMetadata) {
         checkParseFails(
             BSON("$gleStats" << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
                                                                << kLastOpTime.getTerm())
-                                                  << "electionId"
-                                                  << kElectionId
-                                                  << "extra"
+                                                  << "electionId" << kElectionId << "extra"
                                                   << "this should not be here")),
             ErrorCodes::InvalidOptions);
     }

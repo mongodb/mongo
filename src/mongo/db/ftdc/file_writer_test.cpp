@@ -60,16 +60,10 @@ TEST_F(FTDCFileTest, TestFileBasicMetadata) {
 
     BSONObj doc1 = BSON("name"
                         << "joe"
-                        << "key1"
-                        << 34
-                        << "key2"
-                        << 45);
+                        << "key1" << 34 << "key2" << 45);
     BSONObj doc2 = BSON("name"
                         << "joe"
-                        << "key3"
-                        << 34
-                        << "key5"
-                        << 45);
+                        << "key3" << 34 << "key5" << 45);
 
     FTDCConfig config;
     FTDCFileWriter writer(&config);
@@ -111,16 +105,10 @@ TEST_F(FTDCFileTest, TestFileBasicCompress) {
 
     BSONObj doc1 = BSON("name"
                         << "joe"
-                        << "key1"
-                        << 34
-                        << "key2"
-                        << 45);
+                        << "key1" << 34 << "key2" << 45);
     BSONObj doc2 = BSON("name"
                         << "joe"
-                        << "key3"
-                        << 34
-                        << "key5"
-                        << 45);
+                        << "key3" << 34 << "key5" << 45);
 
     FTDCConfig config;
     FTDCFileWriter writer(&config);
@@ -216,69 +204,41 @@ TEST_F(FTDCFileTest, TestSchemaChanges) {
 
     c.addSample(BSON("name"
                      << "joe"
-                     << "key1"
-                     << 33
-                     << "key2"
-                     << 42));
+                     << "key1" << 33 << "key2" << 42));
     c.addSample(BSON("name"
                      << "joe"
-                     << "key1"
-                     << 34
-                     << "key2"
-                     << 45));
+                     << "key1" << 34 << "key2" << 45));
     c.addSample(BSON("name"
                      << "joe"
-                     << "key1"
-                     << 34
-                     << "key2"
-                     << 45));
+                     << "key1" << 34 << "key2" << 45));
 
     // Add Value
     c.addSample(BSON("name"
                      << "joe"
-                     << "key1"
-                     << 34
-                     << "key2"
-                     << 45
-                     << "key3"
-                     << 47));
+                     << "key1" << 34 << "key2" << 45 << "key3" << 47));
 
     c.addSample(BSON("name"
                      << "joe"
-                     << "key1"
-                     << 34
-                     << "key2"
-                     << 45
-                     << "key3"
-                     << 47));
+                     << "key1" << 34 << "key2" << 45 << "key3" << 47));
 
     // Rename field
     c.addSample(BSON("name"
                      << "joe"
-                     << "key1"
-                     << 34
-                     << "key5"
-                     << 45
-                     << "key3"
-                     << 47));
+                     << "key1" << 34 << "key5" << 45 << "key3" << 47));
 
     // Change type
     c.addSample(BSON("name"
                      << "joe"
-                     << "key1"
-                     << 34
-                     << "key5"
+                     << "key1" << 34 << "key5"
                      << "45"
-                     << "key3"
-                     << 47));
+                     << "key3" << 47));
 
     // RemoveField
     c.addSample(BSON("name"
                      << "joe"
                      << "key5"
                      << "45"
-                     << "key3"
-                     << 47));
+                     << "key3" << 47));
 }
 
 // Test a full buffer
@@ -289,34 +249,22 @@ TEST_F(FTDCFileTest, TestFull) {
 
         c.addSample(BSON("name"
                          << "joe"
-                         << "key1"
-                         << 33
-                         << "key2"
-                         << 42));
+                         << "key1" << 33 << "key2" << 42));
 
         for (size_t i = 0; i <= FTDCConfig::kMaxSamplesPerArchiveMetricChunkDefault - 2; i++) {
             c.addSample(BSON("name"
                              << "joe"
-                             << "key1"
-                             << static_cast<long long int>(i * j)
-                             << "key2"
-                             << 45));
+                             << "key1" << static_cast<long long int>(i * j) << "key2" << 45));
         }
 
         c.addSample(BSON("name"
                          << "joe"
-                         << "key1"
-                         << 34
-                         << "key2"
-                         << 45));
+                         << "key1" << 34 << "key2" << 45));
 
         // Add Value
         c.addSample(BSON("name"
                          << "joe"
-                         << "key1"
-                         << 34
-                         << "key2"
-                         << 45));
+                         << "key1" << 34 << "key2" << 45));
     }
 }
 

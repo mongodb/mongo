@@ -136,10 +136,10 @@ private:
     mutable stdx::mutex _lastCommittedOpTimeMutex;
 
     /**
-    * Logical time representing the latest opTime timestamp known to be in this shard's majority
-    * committed snapshot. Only the latest time is kept because lagged secondaries may return earlier
-    * times.
-    */
+     * Logical time representing the latest opTime timestamp known to be in this shard's majority
+     * committed snapshot. Only the latest time is kept because lagged secondaries may return
+     * earlier times.
+     */
     LogicalTime _lastCommittedOpTime;
 
     /**

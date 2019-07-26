@@ -131,10 +131,9 @@ private:
         T typedVal;
         if (!val.get(&typedVal).isOK()) {
             return {ErrorCodes::InternalError,
-                    str::stream() << "Error: value for key: " << _key << " was found as type: "
-                                  << val.typeToString()
-                                  << " but is required to be type: "
-                                  << typeid(typedVal).name()};
+                    str::stream() << "Error: value for key: " << _key
+                                  << " was found as type: " << val.typeToString()
+                                  << " but is required to be type: " << typeid(typedVal).name()};
         }
 
         return _valueCallback(typedVal);

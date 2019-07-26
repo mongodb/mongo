@@ -90,8 +90,9 @@ ResumeToken::ResumeToken(const Document& resumeDoc) {
     _typeBits = resumeDoc[kTypeBitsFieldName];
     uassert(40648,
             str::stream() << "Bad resume token: _typeBits of wrong type " << resumeDoc.toString(),
-            _typeBits.missing() || (_typeBits.getType() == BSONType::BinData &&
-                                    _typeBits.getBinData().type == BinDataGeneral));
+            _typeBits.missing() ||
+                (_typeBits.getType() == BSONType::BinData &&
+                 _typeBits.getBinData().type == BinDataGeneral));
 }
 
 // We encode the resume token as a KeyString with the sequence:

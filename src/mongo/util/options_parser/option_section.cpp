@@ -157,8 +157,7 @@ OptionDescription& OptionSection::addOptionChaining(
     // Should not be the same as dottedName.
     uassert(ErrorCodes::InternalError,
             str::stream() << "Attempted to register option with conflict between dottedName and "
-                          << "deprecatedDottedName: "
-                          << dottedName,
+                          << "deprecatedDottedName: " << dottedName,
             !std::count(deprecatedDottedNames.begin(), deprecatedDottedNames.end(), dottedName));
 
     // Verify deprecated single names.
@@ -170,8 +169,7 @@ OptionDescription& OptionSection::addOptionChaining(
     // Should not be the same as singleName.
     uassert(ErrorCodes::InternalError,
             str::stream() << "Attempted to register option with conflict between singleName and "
-                          << "deprecatedSingleName: "
-                          << singleName,
+                          << "deprecatedSingleName: " << singleName,
             !std::count(deprecatedSingleNames.begin(), deprecatedSingleNames.end(), singleName));
 
     // Should not contain any already registered name.

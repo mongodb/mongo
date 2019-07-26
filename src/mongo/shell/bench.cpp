@@ -924,8 +924,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                     {
                         opState.stats->trappedErrors.push_back(
                             BSON("error" << ex.what() << "op" << kOpTypeNames.find(op.op)->second
-                                         << "count"
-                                         << count));
+                                         << "count" << count));
                     }
                     if (_config->breakOnTrap)
                         return;
@@ -1040,8 +1039,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                                                   boost::none);  // lastKnownCommittedOpTime
                     BSONObj getMoreCommandResult;
                     uassert(ErrorCodes::CommandFailed,
-                            str::stream() << "getMore command failed; reply was: "
-                                          << getMoreCommandResult,
+                            str::stream()
+                                << "getMore command failed; reply was: " << getMoreCommandResult,
                             runCommandWithSession(conn,
                                                   this->ns,
                                                   getMoreRequest.toBSON(),
@@ -1390,11 +1389,11 @@ void BenchRunner::start() {
         if (_config->username != "") {
             std::string errmsg;
             if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
-                uasserted(
-                    16704,
-                    str::stream() << "User " << _config->username
-                                  << " could not authenticate to admin db; admin db access is "
-                                     "required to use benchRun with auth enabled");
+                uasserted(16704,
+                          str::stream()
+                              << "User " << _config->username
+                              << " could not authenticate to admin db; admin db access is "
+                                 "required to use benchRun with auth enabled");
             }
         }
 
@@ -1429,11 +1428,11 @@ void BenchRunner::stop() {
             std::string errmsg;
             // this can only fail if admin access was revoked since start of run
             if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
-                uasserted(
-                    16705,
-                    str::stream() << "User " << _config->username
-                                  << " could not authenticate to admin db; admin db access is "
-                                     "still required to use benchRun with auth enabled");
+                uasserted(16705,
+                          str::stream()
+                              << "User " << _config->username
+                              << " could not authenticate to admin db; admin db access is "
+                                 "still required to use benchRun with auth enabled");
             }
         }
     }

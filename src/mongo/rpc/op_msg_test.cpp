@@ -183,11 +183,13 @@ const uint32_t kNoFlags = 0;
 const uint32_t kHaveChecksum = 1;
 
 TEST_F(OpMsgParser, SucceedsWithJustBody) {
-    auto msg = OpMsgBytes{
-        kNoFlags,  //
-        kBodySection,
-        fromjson("{ping: 1}"),
-    }.parse();
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,  //
+            kBodySection,
+            fromjson("{ping: 1}"),
+        }
+            .parse();
 
     ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1}"));
     ASSERT_EQ(msg.sequences.size(), 0u);
@@ -205,18 +207,20 @@ TEST_F(OpMsgParser, SucceedsWithChecksum) {
 }
 
 TEST_F(OpMsgParser, SucceedsWithBodyThenSequence) {
-    auto msg = OpMsgBytes{
-        kNoFlags,  //
-        kBodySection,
-        fromjson("{ping: 1}"),
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,  //
+            kBodySection,
+            fromjson("{ping: 1}"),
 
-        kDocSequenceSection,
-        Sized{
-            "docs",  //
-            fromjson("{a: 1}"),
-            fromjson("{a: 2}"),
-        },
-    }.parse();
+            kDocSequenceSection,
+            Sized{
+                "docs",  //
+                fromjson("{a: 1}"),
+                fromjson("{a: 2}"),
+            },
+        }
+            .parse();
 
     ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1}"));
     ASSERT_EQ(msg.sequences.size(), 1u);
@@ -227,17 +231,19 @@ TEST_F(OpMsgParser, SucceedsWithBodyThenSequence) {
 }
 
 TEST_F(OpMsgParser, SucceedsWithSequenceThenBody) {
-    auto msg = OpMsgBytes{
-        kNoFlags,  //
-        kDocSequenceSection,
-        Sized{
-            "docs",  //
-            fromjson("{a: 1}"),
-        },
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,  //
+            kDocSequenceSection,
+            Sized{
+                "docs",  //
+                fromjson("{a: 1}"),
+            },
 
-        kBodySection,
-        fromjson("{ping: 1}"),
-    }.parse();
+            kBodySection,
+            fromjson("{ping: 1}"),
+        }
+            .parse();
 
     ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1}"));
     ASSERT_EQ(msg.sequences.size(), 1u);
@@ -247,22 +253,24 @@ TEST_F(OpMsgParser, SucceedsWithSequenceThenBody) {
 }
 
 TEST_F(OpMsgParser, SucceedsWithSequenceThenBodyThenSequence) {
-    auto msg = OpMsgBytes{
-        kNoFlags,  //
-        kDocSequenceSection,
-        Sized{
-            "empty",  //
-        },
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,  //
+            kDocSequenceSection,
+            Sized{
+                "empty",  //
+            },
 
-        kBodySection,
-        fromjson("{ping: 1}"),
+            kBodySection,
+            fromjson("{ping: 1}"),
 
-        kDocSequenceSection,
-        Sized{
-            "docs",  //
-            fromjson("{a: 1}"),
-        },
-    }.parse();
+            kDocSequenceSection,
+            Sized{
+                "docs",  //
+                fromjson("{a: 1}"),
+            },
+        }
+            .parse();
 
     ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1}"));
     ASSERT_EQ(msg.sequences.size(), 2u);
@@ -274,22 +282,24 @@ TEST_F(OpMsgParser, SucceedsWithSequenceThenBodyThenSequence) {
 }
 
 TEST_F(OpMsgParser, SucceedsWithSequenceThenSequenceThenBody) {
-    auto msg = OpMsgBytes{
-        kNoFlags,  //
-        kDocSequenceSection,
-        Sized{
-            "empty",  //
-        },
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,  //
+            kDocSequenceSection,
+            Sized{
+                "empty",  //
+            },
 
-        kDocSequenceSection,
-        Sized{
-            "docs",  //
-            fromjson("{a: 1}"),
-        },
+            kDocSequenceSection,
+            Sized{
+                "docs",  //
+                fromjson("{a: 1}"),
+            },
 
-        kBodySection,
-        fromjson("{ping: 1}"),
-    }.parse();
+            kBodySection,
+            fromjson("{ping: 1}"),
+        }
+            .parse();
 
     ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1}"));
     ASSERT_EQ(msg.sequences.size(), 2u);
@@ -301,22 +311,24 @@ TEST_F(OpMsgParser, SucceedsWithSequenceThenSequenceThenBody) {
 }
 
 TEST_F(OpMsgParser, SucceedsWithBodyThenSequenceThenSequence) {
-    auto msg = OpMsgBytes{
-        kNoFlags,  //
-        kBodySection,
-        fromjson("{ping: 1}"),
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,  //
+            kBodySection,
+            fromjson("{ping: 1}"),
 
-        kDocSequenceSection,
-        Sized{
-            "docs",  //
-            fromjson("{a: 1}"),
-        },
+            kDocSequenceSection,
+            Sized{
+                "docs",  //
+                fromjson("{a: 1}"),
+            },
 
-        kDocSequenceSection,
-        Sized{
-            "empty",  //
-        },
-    }.parse();
+            kDocSequenceSection,
+            Sized{
+                "empty",  //
+            },
+        }
+            .parse();
 
     ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1}"));
     ASSERT_EQ(msg.sequences.size(), 2u);
@@ -402,17 +414,19 @@ TEST_F(OpMsgParser, FailsIfDuplicateSequenceWithBodyNested) {
 }
 
 TEST_F(OpMsgParser, SucceedsIfSequenceAndBodyHaveCommonPrefix) {
-    auto msg = OpMsgBytes{
-        kNoFlags,  //
-        kBodySection,
-        fromjson("{cursor: {ns: 'foo.bar', id: 1}}"),
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,  //
+            kBodySection,
+            fromjson("{cursor: {ns: 'foo.bar', id: 1}}"),
 
-        kDocSequenceSection,
-        Sized{
-            "cursor.firstBatch",  //
-            fromjson("{_id: 1}"),
-        },
-    }.parse();
+            kDocSequenceSection,
+            Sized{
+                "cursor.firstBatch",  //
+                fromjson("{_id: 1}"),
+            },
+        }
+            .parse();
 
     ASSERT_BSONOBJ_EQ(msg.body, fromjson("{cursor: {ns: 'foo.bar', id: 1}}"));
     ASSERT_EQ(msg.sequences.size(), 1u);
@@ -432,11 +446,13 @@ TEST_F(OpMsgParser, FailsIfUnknownSectionKind) {
 }
 
 TEST_F(OpMsgParser, FailsIfBodyTooBig) {
-    auto msg = OpMsgBytes{
-        kNoFlags,  //
-        kBodySection,
-        fromjson("{ping: 1}"),
-    }.addToSize(-1);  // Shrink message so body extends past end.
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,  //
+            kBodySection,
+            fromjson("{ping: 1}"),
+        }
+            .addToSize(-1);  // Shrink message so body extends past end.
 
     ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::InvalidBSON);
 }
@@ -447,24 +463,27 @@ TEST_F(OpMsgParser, FailsIfBodyTooBigIntoChecksum) {
             kHaveChecksum,  //
             kBodySection,
             fromjson("{ping: 1}"),
-        }.appendChecksum()
+        }
+            .appendChecksum()
             .addToSize(-1);  // Shrink message so body extends past end.
 
     ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::InvalidBSON);
 }
 
 TEST_F(OpMsgParser, FailsIfDocumentSequenceTooBig) {
-    auto msg = OpMsgBytes{
-        kNoFlags,  //
-        kBodySection,
-        fromjson("{ping: 1}"),
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,  //
+            kBodySection,
+            fromjson("{ping: 1}"),
 
-        kDocSequenceSection,
-        Sized{
-            "docs",  //
-            fromjson("{a: 1}"),
-        },
-    }.addToSize(-1);  // Shrink message so body extends past end.
+            kDocSequenceSection,
+            Sized{
+                "docs",  //
+                fromjson("{a: 1}"),
+            },
+        }
+            .addToSize(-1);  // Shrink message so body extends past end.
 
     ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::Overflow);
 }
@@ -481,7 +500,8 @@ TEST_F(OpMsgParser, FailsIfDocumentSequenceTooBigIntoChecksum) {
                 "docs",  //
                 fromjson("{a: 1}"),
             },
-        }.appendChecksum()
+        }
+            .appendChecksum()
             .addToSize(-1);  // Shrink message so body extends past end.
 
     ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::Overflow);
@@ -497,7 +517,8 @@ TEST_F(OpMsgParser, FailsIfDocumentInSequenceTooBig) {
         Sized{
             "docs",  //
             fromjson("{a: 1}"),
-        }.addToSize(-1),  // Shrink sequence so document extends past end.
+        }
+            .addToSize(-1),  // Shrink sequence so document extends past end.
     };
 
     ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::InvalidBSON);
@@ -512,7 +533,8 @@ TEST_F(OpMsgParser, FailsIfNameOfDocumentSequenceTooBig) {
         kDocSequenceSection,
         Sized{
             "foo",
-        }.addToSize(-1),  // Shrink sequence so document extends past end.
+        }
+            .addToSize(-1),  // Shrink sequence so document extends past end.
     };
 
     ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::Overflow);
@@ -611,7 +633,8 @@ TEST_F(OpMsgParser, SucceedsWithUnknownOptionalFlags) {
             flags,  //
             kBodySection,
             fromjson("{ping: 1}"),
-        }.parse();
+        }
+            .parse();
     }
 }
 

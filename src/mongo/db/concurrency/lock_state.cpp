@@ -328,8 +328,7 @@ void LockerImpl::reacquireTicket(OperationContext* opCtx) {
     } else {
         uassert(ErrorCodes::LockTimeout,
                 str::stream() << "Unable to acquire ticket with mode '" << _modeForTicket
-                              << "' within a max lock request timeout of '"
-                              << *_maxLockTimeout
+                              << "' within a max lock request timeout of '" << *_maxLockTimeout
                               << "' milliseconds.",
                 _acquireTicket(opCtx, _modeForTicket, Date_t::now() + *_maxLockTimeout));
     }
@@ -369,8 +368,7 @@ LockResult LockerImpl::_lockGlobalBegin(OperationContext* opCtx, LockMode mode, 
             uassert(ErrorCodes::LockTimeout,
                     str::stream() << "Unable to acquire ticket with mode '" << _modeForTicket
                                   << "' within a max lock request timeout of '"
-                                  << Date_t::now() - beforeAcquire
-                                  << "' milliseconds.",
+                                  << Date_t::now() - beforeAcquire << "' milliseconds.",
                     _acquireTicket(opCtx, mode, deadline));
         }
         _modeForTicket = mode;
@@ -965,8 +963,7 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
 
         uassert(ErrorCodes::LockTimeout,
                 str::stream() << "Unable to acquire lock '" << resId.toString() << "' within "
-                              << timeout
-                              << "' milliseconds.",
+                              << timeout << "' milliseconds.",
                 waitTime > Milliseconds(0));
     }
 

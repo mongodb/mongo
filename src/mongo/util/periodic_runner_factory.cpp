@@ -40,4 +40,4 @@ std::unique_ptr<PeriodicRunner> makePeriodicRunner(ServiceContext* svc) {
     return std::make_unique<PeriodicRunnerImpl>(svc, svc->getPreciseClockSource());
 }
 
-}  // namespace
+}  // namespace mongo

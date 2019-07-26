@@ -130,23 +130,23 @@ struct ServerGlobalParams {
     enum ClusterAuthModes {
         ClusterAuthMode_undefined,
         /**
-        * Authenticate using keyfile, accept only keyfiles
-        */
+         * Authenticate using keyfile, accept only keyfiles
+         */
         ClusterAuthMode_keyFile,
 
         /**
-        * Authenticate using keyfile, accept both keyfiles and X.509
-        */
+         * Authenticate using keyfile, accept both keyfiles and X.509
+         */
         ClusterAuthMode_sendKeyFile,
 
         /**
-        * Authenticate using X.509, accept both keyfiles and X.509
-        */
+         * Authenticate using X.509, accept both keyfiles and X.509
+         */
         ClusterAuthMode_sendX509,
 
         /**
-        * Authenticate using X.509, accept only X.509
-        */
+         * Authenticate using X.509, accept only X.509
+         */
         ClusterAuthMode_x509
     };
 
@@ -271,4 +271,4 @@ struct TraitNamedDomain {
         return ret;
     }
 };
-}
+}  // namespace mongo

@@ -100,8 +100,9 @@ boost::optional<long long> _parseDroppedCollectionCount(const OplogEntry& oplogE
 
     auto obj2 = oplogEntry.getObject2();
     if (!obj2) {
-        warning() << "Unable to get collection count from " << desc << " without the o2 "
-                                                                       "field. oplog op: "
+        warning() << "Unable to get collection count from " << desc
+                  << " without the o2 "
+                     "field. oplog op: "
                   << redact(oplogEntry.toBSON());
         return boost::none;
     }
@@ -324,10 +325,10 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
         auto status =
             _replicationCoordinator->setFollowerModeStrict(opCtx, MemberState::RS_ROLLBACK);
         if (!status.isOK()) {
-            status.addContext(str::stream() << "Cannot transition from "
-                                            << _replicationCoordinator->getMemberState().toString()
-                                            << " to "
-                                            << MemberState(MemberState::RS_ROLLBACK).toString());
+            status.addContext(str::stream()
+                              << "Cannot transition from "
+                              << _replicationCoordinator->getMemberState().toString() << " to "
+                              << MemberState(MemberState::RS_ROLLBACK).toString());
             log() << status;
             return status;
         }
@@ -416,9 +417,9 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
                 // These commands do not need to be supported by rollback. 'convertToCapped' should
                 // always be converted to lower level DDL operations, and 'emptycapped' is a
                 // testing-only command.
-                std::string message = str::stream() << "Encountered unsupported command type '"
-                                                    << firstElem.fieldName()
-                                                    << "' during rollback.";
+                std::string message = str::stream()
+                    << "Encountered unsupported command type '" << firstElem.fieldName()
+                    << "' during rollback.";
                 return Status(ErrorCodes::UnrecoverableRollbackError, message);
             }
             case OplogEntry::CommandType::kCreate:
@@ -594,8 +595,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
             auto collToScan = autoCollToScan.getCollection();
             invariant(coll == collToScan,
                       str::stream() << "Catalog returned invalid collection: " << nss.ns() << " ("
-                                    << uuid.toString()
-                                    << ")");
+                                    << uuid.toString() << ")");
             auto exec = collToScan->makePlanExecutor(
                 opCtx, PlanExecutor::INTERRUPT_ONLY, Collection::ScanDirection::kForward);
             long long countFromScan = 0;
@@ -816,8 +816,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             const auto uuid = oplogEntry.getUuid().get();
             invariant(_countDiffs.find(uuid) == _countDiffs.end(),
                       str::stream() << "Unexpected existing count diff for " << uuid.toString()
-                                    << " op: "
-                                    << redact(oplogEntry.toBSON()));
+                                    << " op: " << redact(oplogEntry.toBSON()));
             if (auto countResult = _parseDroppedCollectionCount(oplogEntry)) {
                 PendingDropInfo info;
                 info.count = *countResult;
@@ -843,10 +842,9 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
                     << "Oplog entry to roll back is unexpectedly missing dropTarget UUID: "
                     << redact(oplogEntry.toBSON()));
             invariant(_countDiffs.find(dropTargetUUID) == _countDiffs.end(),
-                      str::stream() << "Unexpected existing count diff for "
-                                    << dropTargetUUID.toString()
-                                    << " op: "
-                                    << redact(oplogEntry.toBSON()));
+                      str::stream()
+                          << "Unexpected existing count diff for " << dropTargetUUID.toString()
+                          << " op: " << redact(oplogEntry.toBSON()));
             if (auto countResult = _parseDroppedCollectionCount(oplogEntry)) {
                 PendingDropInfo info;
                 info.count = *countResult;
@@ -1012,9 +1010,7 @@ Status RollbackImpl::_checkAgainstTimeLimit(
             if (diff > timeLimit) {
                 return Status(ErrorCodes::UnrecoverableRollbackError,
                               str::stream() << "not willing to roll back more than " << timeLimit
-                                            << " seconds of data. Have: "
-                                            << diff
-                                            << " seconds.");
+                                            << " seconds of data. Have: " << diff << " seconds.");
             }
 
         } else {
@@ -1044,8 +1040,7 @@ Timestamp RollbackImpl::_findTruncateTimestamp(
     invariant(commonPointTime.getStatus());
     invariant(commonPointTime.getValue() == commonPointOpTime,
               str::stream() << "Common point: " << commonPointOpTime.toString()
-                            << ", record found: "
-                            << commonPointTime.getValue().toString());
+                            << ", record found: " << commonPointTime.getValue().toString());
 
     // Get the next document, which will be the first document to truncate.
     auto truncatePointRecord = oplogCursor->next();

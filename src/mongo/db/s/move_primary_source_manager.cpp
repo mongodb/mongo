@@ -282,8 +282,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
         fassert(50762,
                 validateStatus.withContext(
                     str::stream() << "Failed to commit movePrimary for database " << getNss().ns()
-                                  << " due to "
-                                  << redact(commitStatus)
+                                  << " due to " << redact(commitStatus)
                                   << ". Updating the optime with a write before clearing the "
                                   << "version also failed"));
 

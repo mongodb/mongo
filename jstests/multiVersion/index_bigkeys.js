@@ -102,89 +102,88 @@ function downgradeAndVerifyBehavior(testDowngradeBehaviorFunc) {
 }
 
 (function() {
-    load("jstests/libs/feature_compatibility_version.js");
+load("jstests/libs/feature_compatibility_version.js");
 
-    // Test the behavior of inserting big index keys of each version.
-    // 4.2 binary (with FCV 4.2)
-    let conn = MongoRunner.runMongod({binVersion: "latest", cleanData: true});
-    testInsertDocumentWithLargeKey(conn, false);
+// Test the behavior of inserting big index keys of each version.
+// 4.2 binary (with FCV 4.2)
+let conn = MongoRunner.runMongod({binVersion: "latest", cleanData: true});
+testInsertDocumentWithLargeKey(conn, false);
 
-    // 4.2 binary (with FCV 4.0)
+// 4.2 binary (with FCV 4.0)
+assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
+testInsertDocumentWithLargeKey(conn, true);
+MongoRunner.stopMongod(conn);
+
+// 4.0 binary
+conn = MongoRunner.runMongod({binVersion: "4.0", cleanData: true});
+testInsertDocumentWithLargeKey(conn, true);
+MongoRunner.stopMongod(conn);
+
+// Downgrade path
+// 1. Test that 4.0 binary could read and delete big index keys which got
+// inserted by 4.2 binary.
+downgradeAndVerifyBehavior(testColl => {
+    assert.commandWorked(testColl.remove({x: largeKey}));
+    assert(testColl.validate().valid);
+});
+
+// 2. Test that 4.0 binary could update big keys with small keys.
+downgradeAndVerifyBehavior(testColl => {
+    assert.commandWorked(testColl.update({x: largeKey}, {$set: {x: "sss"}}));
+    assert.eq("sss", testColl.find({x: "sss"}).toArray()[0].x);
+});
+
+// 3. Test that 4.0 binary could drop the index which has big keys and the
+// validate will succeed after that.
+downgradeAndVerifyBehavior(testColl => {
+    assert.eq(2, testColl.getIndexes().length);
+    assert(!testColl.validate().valid);
+    assert.commandWorked(testColl.dropIndex({x: 1}));
+    assert.eq(1, testColl.getIndexes().length);
+    assert(testColl.validate().valid);
+});
+
+// Upgrade path
+// 1. Test the normal upgrade path.
+[true, false].forEach(function(uniqueIndex) {
+    // Upgrade all the way to 4.2 binary with FCV 4.2.
+    let conn = MongoRunner.runMongod({binVersion: "4.0", cleanData: true, dbpath: dbpath});
+    assert.commandWorked(
+        conn.getDB(dbName)[collName].createIndex({x: 1}, {name: "x_1", unique: uniqueIndex}));
     assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
-    testInsertDocumentWithLargeKey(conn, true);
     MongoRunner.stopMongod(conn);
+    conn = MongoRunner.runMongod({binVersion: "latest", noCleanData: true, dbpath: dbpath});
+    // Setting the FCV to 4.2
+    assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        conn.getDB(dbName).runCommand({insert: collName, documents: [documentWithLargeKey]}));
+    MongoRunner.stopMongod(conn, null, {skipValidation: false});
+});
 
-    // 4.0 binary
-    conn = MongoRunner.runMongod({binVersion: "4.0", cleanData: true});
-    testInsertDocumentWithLargeKey(conn, true);
+// 2. If 4.0 binary has already inserted documents with large keys by setting
+// 'failIndexKeyTooLong' to be false (which bypasses inserting the index key), 4.2 binary cannot
+// successfully validate the index consistency because some index keys are missing. But reindex
+// should solve this problem.
+[true, false].forEach(function(uniqueIndex) {
+    let conn = MongoRunner.runMongod({
+        binVersion: "4.0",
+        cleanData: true,
+        setParameter: "failIndexKeyTooLong=false",
+        dbpath: dbpath
+    });
+    assert.commandWorked(
+        conn.getDB(dbName)[collName].createIndex({x: 1}, {name: "x_1", unique: uniqueIndex}));
+    assert.commandWorked(conn.getDB(dbName)[collName].insert(documentWithLargeKey));
+    assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
     MongoRunner.stopMongod(conn);
+    conn = MongoRunner.runMongod({binVersion: "latest", noCleanData: true, dbpath: dbpath});
+    assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
-    // Downgrade path
-    // 1. Test that 4.0 binary could read and delete big index keys which got
-    // inserted by 4.2 binary.
-    downgradeAndVerifyBehavior(testColl => {
-        assert.commandWorked(testColl.remove({x: largeKey}));
-        assert(testColl.validate().valid);
-    });
+    let testColl = conn.getDB(dbName)[collName];
+    assert(!testColl.validate().valid);
+    testColl.reIndex();
+    assert(testColl.validate().valid);
 
-    // 2. Test that 4.0 binary could update big keys with small keys.
-    downgradeAndVerifyBehavior(testColl => {
-        assert.commandWorked(testColl.update({x: largeKey}, {$set: {x: "sss"}}));
-        assert.eq("sss", testColl.find({x: "sss"}).toArray()[0].x);
-    });
-
-    // 3. Test that 4.0 binary could drop the index which has big keys and the
-    // validate will succeed after that.
-    downgradeAndVerifyBehavior(testColl => {
-        assert.eq(2, testColl.getIndexes().length);
-        assert(!testColl.validate().valid);
-        assert.commandWorked(testColl.dropIndex({x: 1}));
-        assert.eq(1, testColl.getIndexes().length);
-        assert(testColl.validate().valid);
-    });
-
-    // Upgrade path
-    // 1. Test the normal upgrade path.
-    [true, false].forEach(function(uniqueIndex) {
-        // Upgrade all the way to 4.2 binary with FCV 4.2.
-        let conn = MongoRunner.runMongod({binVersion: "4.0", cleanData: true, dbpath: dbpath});
-        assert.commandWorked(
-            conn.getDB(dbName)[collName].createIndex({x: 1}, {name: "x_1", unique: uniqueIndex}));
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({binVersion: "latest", noCleanData: true, dbpath: dbpath});
-        // Setting the FCV to 4.2
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-        assert.commandWorked(
-            conn.getDB(dbName).runCommand({insert: collName, documents: [documentWithLargeKey]}));
-        MongoRunner.stopMongod(conn, null, {skipValidation: false});
-    });
-
-    // 2. If 4.0 binary has already inserted documents with large keys by setting
-    // 'failIndexKeyTooLong' to be false (which bypasses inserting the index key), 4.2 binary cannot
-    // successfully validate the index consistency because some index keys are missing. But reindex
-    // should solve this problem.
-    [true, false].forEach(function(uniqueIndex) {
-        let conn = MongoRunner.runMongod({
-            binVersion: "4.0",
-            cleanData: true,
-            setParameter: "failIndexKeyTooLong=false",
-            dbpath: dbpath
-        });
-        assert.commandWorked(
-            conn.getDB(dbName)[collName].createIndex({x: 1}, {name: "x_1", unique: uniqueIndex}));
-        assert.commandWorked(conn.getDB(dbName)[collName].insert(documentWithLargeKey));
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({binVersion: "latest", noCleanData: true, dbpath: dbpath});
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-
-        let testColl = conn.getDB(dbName)[collName];
-        assert(!testColl.validate().valid);
-        testColl.reIndex();
-        assert(testColl.validate().valid);
-
-        MongoRunner.stopMongod(conn, null, {skipValidation: false});
-    });
-
+    MongoRunner.stopMongod(conn, null, {skipValidation: false});
+});
 }());

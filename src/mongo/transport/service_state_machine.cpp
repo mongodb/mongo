@@ -569,7 +569,7 @@ void ServiceStateMachine::_scheduleNextWithGuard(ThreadGuard guard,
                                                  transport::ServiceExecutor::ScheduleFlags flags,
                                                  transport::ServiceExecutorTaskName taskName,
                                                  Ownership ownershipModel) {
-    auto func = [ ssm = shared_from_this(), ownershipModel ] {
+    auto func = [ssm = shared_from_this(), ownershipModel] {
         ThreadGuard guard(ssm.get());
         if (ownershipModel == Ownership::kStatic)
             guard.markStaticOwnership();

@@ -35,8 +35,8 @@ namespace mongo {
 namespace stdx {
 
 using ::std::mutex;            // NOLINT
-using ::std::timed_mutex;      // NOLINT
 using ::std::recursive_mutex;  // NOLINT
+using ::std::timed_mutex;      // NOLINT
 
 using ::std::adopt_lock_t;   // NOLINT
 using ::std::defer_lock_t;   // NOLINT

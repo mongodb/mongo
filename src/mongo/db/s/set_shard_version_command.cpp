@@ -164,8 +164,7 @@ public:
         const auto storedShardName = shardingState->shardId().toString();
         uassert(ErrorCodes::BadValue,
                 str::stream() << "received shardName " << shardName
-                              << " which differs from stored shardName "
-                              << storedShardName,
+                              << " which differs from stored shardName " << storedShardName,
                 storedShardName == shardName);
 
         // Validate config connection string parameter.
@@ -184,8 +183,7 @@ public:
             Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString();
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "Given config server set name: " << givenConnStr.getSetName()
-                              << " differs from known set name: "
-                              << storedConnStr.getSetName(),
+                              << " differs from known set name: " << storedConnStr.getSetName(),
                 givenConnStr.getSetName() == storedConnStr.getSetName());
 
         // Validate namespace parameter.
@@ -366,11 +364,11 @@ public:
             if (!status.isOK()) {
                 // The reload itself was interrupted or confused here
 
-                errmsg = str::stream() << "could not refresh metadata for " << nss.ns()
-                                       << " with requested shard version "
-                                       << requestedVersion.toString()
-                                       << ", stored shard version is " << currVersion.toString()
-                                       << causedBy(redact(status));
+                errmsg = str::stream()
+                    << "could not refresh metadata for " << nss.ns()
+                    << " with requested shard version " << requestedVersion.toString()
+                    << ", stored shard version is " << currVersion.toString()
+                    << causedBy(redact(status));
 
                 warning() << errmsg;
 

@@ -72,13 +72,10 @@ StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj
             verbosity = Verbosity::kExecStats;
         } else if (verbStr != kAllPlansExecutionVerbosityStr) {
             return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "verbosity string must be one of {'"
-                                        << kQueryPlannerVerbosityStr
-                                        << "', '"
-                                        << kExecStatsVerbosityStr
-                                        << "', '"
-                                        << kAllPlansExecutionVerbosityStr
-                                        << "'}");
+                          str::stream()
+                              << "verbosity string must be one of {'" << kQueryPlannerVerbosityStr
+                              << "', '" << kExecStatsVerbosityStr << "', '"
+                              << kAllPlansExecutionVerbosityStr << "'}");
         }
     }
 

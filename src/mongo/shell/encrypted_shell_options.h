@@ -42,4 +42,4 @@ struct EncryptedShellGlobalParams {
 };
 
 extern EncryptedShellGlobalParams encryptedShellGlobalParams;
-}
+}  // namespace mongo

@@ -13,27 +13,27 @@ function getCoordinatorFailpoints() {
     const coordinatorFailpointDataArr = [
         {failpoint: "hangBeforeWritingParticipantList", numTimesShouldBeHit: 1},
         {
-          // Test targeting remote nodes for prepare
-          failpoint: "hangWhileTargetingRemoteHost",
-          numTimesShouldBeHit: 2 /* once per remote participant */
+            // Test targeting remote nodes for prepare
+            failpoint: "hangWhileTargetingRemoteHost",
+            numTimesShouldBeHit: 2 /* once per remote participant */
         },
         {
-          // Test targeting local node for prepare
-          failpoint: "hangWhileTargetingLocalHost",
-          numTimesShouldBeHit: 1
+            // Test targeting local node for prepare
+            failpoint: "hangWhileTargetingLocalHost",
+            numTimesShouldBeHit: 1
         },
         {failpoint: "hangBeforeWritingDecision", numTimesShouldBeHit: 1},
         {
-          // Test targeting remote nodes for decision
-          failpoint: "hangWhileTargetingRemoteHost",
-          numTimesShouldBeHit: 2, /* once per remote participant */
-          skip: 2                 /* to skip when the failpoint is hit for prepare */
+            // Test targeting remote nodes for decision
+            failpoint: "hangWhileTargetingRemoteHost",
+            numTimesShouldBeHit: 2, /* once per remote participant */
+            skip: 2                 /* to skip when the failpoint is hit for prepare */
         },
         {
-          // Test targeting local node for decision
-          failpoint: "hangWhileTargetingLocalHost",
-          numTimesShouldBeHit: 1,
-          skip: 1 /* to skip when the failpoint is hit for prepare */
+            // Test targeting local node for decision
+            failpoint: "hangWhileTargetingLocalHost",
+            numTimesShouldBeHit: 1,
+            skip: 1 /* to skip when the failpoint is hit for prepare */
         },
         {failpoint: "hangBeforeDeletingCoordinatorDoc", numTimesShouldBeHit: 1},
     ];
@@ -70,16 +70,16 @@ function assertNoSuchTransactionOnAllShards(st, lsid, txnNumber) {
 }
 
 function assertNoSuchTransactionOnConn(conn, lsid, txnNumber) {
-    assert.commandFailedWithCode(conn.getDB("foo").runCommand({
-        find: "bar",
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-    }),
-                                 ErrorCodes.NoSuchTransaction,
-                                 "expected there to be no active transaction on shard, lsid: " +
-                                     tojson(lsid) + ", txnNumber: " + tojson(txnNumber) +
-                                     ", connection: " + tojson(conn));
+    assert.commandFailedWithCode(
+        conn.getDB("foo").runCommand({
+            find: "bar",
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+        }),
+        ErrorCodes.NoSuchTransaction,
+        "expected there to be no active transaction on shard, lsid: " + tojson(lsid) +
+            ", txnNumber: " + tojson(txnNumber) + ", connection: " + tojson(conn));
 }
 
 function waitForFailpoint(hitFailpointStr, numTimes) {

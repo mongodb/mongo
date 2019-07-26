@@ -239,21 +239,21 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     auto executor = baton ? ExecutorPtr(baton) : ExecutorPtr(_reactor);
     std::move(cmdPF.future)
         .thenRunOn(executor)
-        .onError([requestId = cmdState->requestOnAny.id](auto error)
-                     ->StatusWith<RemoteCommandOnAnyResponse> {
-                         LOG(2) << "Failed to get connection from pool for request " << requestId
-                                << ": " << redact(error);
+        .onError([requestId = cmdState->requestOnAny.id](
+                     auto error) -> StatusWith<RemoteCommandOnAnyResponse> {
+            LOG(2) << "Failed to get connection from pool for request " << requestId << ": "
+                   << redact(error);
 
-                         // The TransportLayer has, for historical reasons returned SocketException
-                         // for network errors, but sharding assumes HostUnreachable on network
-                         // errors.
-                         if (error == ErrorCodes::SocketException) {
-                             error = Status(ErrorCodes::HostUnreachable, error.reason());
-                         }
-                         return error;
-                     })
-        .getAsync([ this, cmdState, onFinish = std::move(onFinish) ](
-            StatusWith<RemoteCommandOnAnyResponse> response) {
+            // The TransportLayer has, for historical reasons returned SocketException
+            // for network errors, but sharding assumes HostUnreachable on network
+            // errors.
+            if (error == ErrorCodes::SocketException) {
+                error = Status(ErrorCodes::HostUnreachable, error.reason());
+            }
+            return error;
+        })
+        .getAsync([this, cmdState, onFinish = std::move(onFinish)](
+                      StatusWith<RemoteCommandOnAnyResponse> response) {
             auto duration = now() - cmdState->start;
             if (!response.isOK()) {
                 onFinish(RemoteCommandOnAnyResponse(boost::none, response.getStatus(), duration));
@@ -270,7 +270,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         return Status::OK();
     }
 
-    auto[connPromise, connFuture] = makePromiseFuture<ConnectionPool::ConnectionHandle>();
+    auto [connPromise, connFuture] = makePromiseFuture<ConnectionPool::ConnectionHandle>();
 
     std::move(connFuture).thenRunOn(executor).getAsync([this, cmdState, baton](auto swConn) {
         auto status = swConn.getStatus();
@@ -360,8 +360,7 @@ void NetworkInterfaceTL::_onAcquireConn(std::shared_ptr<CommandState> state,
             uasserted(ErrorCodes::NetworkInterfaceExceededTimeLimit,
                       str::stream() << "Remote command timed out while waiting to get a "
                                        "connection from the pool, took "
-                                    << connDuration
-                                    << ", timeout was set to "
+                                    << connDuration << ", timeout was set to "
                                     << state->requestOnAny.timeout);
         }
 
@@ -509,14 +508,14 @@ Status NetworkInterfaceTL::setAlarm(const TaskExecutor::CallbackHandle& cbHandle
         // If a user has already scheduled an alarm with a handle, make sure they intentionally
         // override it by canceling and setting a new one.
         auto alarmPair = std::make_pair(cbHandle, std::shared_ptr<AlarmState>(alarmState));
-        auto && [ _, wasInserted ] = _inProgressAlarms.insert(std::move(alarmPair));
+        auto&& [_, wasInserted] = _inProgressAlarms.insert(std::move(alarmPair));
         invariant(wasInserted);
     }
 
-    alarmState->timer->waitUntil(alarmState->when, nullptr).getAsync([
-        this,
-        state = std::move(alarmState)
-    ](Status status) mutable { _answerAlarm(status, state); });
+    alarmState->timer->waitUntil(alarmState->when, nullptr)
+        .getAsync([this, state = std::move(alarmState)](Status status) mutable {
+            _answerAlarm(status, state);
+        });
 
     return Status::OK();
 }
@@ -546,7 +545,7 @@ void NetworkInterfaceTL::_cancelAllAlarms() {
         return std::exchange(_inProgressAlarms, {});
     }();
 
-    for (auto && [ cbHandle, state ] : alarms) {
+    for (auto&& [cbHandle, state] : alarms) {
         state->timer->cancel();
         state->promise.setError(Status(ErrorCodes::CallbackCanceled, "Alarm cancelled"));
     }
@@ -566,10 +565,10 @@ void NetworkInterfaceTL::_answerAlarm(Status status, std::shared_ptr<AlarmState>
     if (status.isOK() && currentTime < state->when) {
         LOG(2) << "Alarm returned early. Expected at: " << state->when
                << ", fired at: " << currentTime;
-        state->timer->waitUntil(state->when, nullptr).getAsync([
-            this,
-            state = std::move(state)
-        ](Status status) mutable { _answerAlarm(status, state); });
+        state->timer->waitUntil(state->when, nullptr)
+            .getAsync([this, state = std::move(state)](Status status) mutable {
+                _answerAlarm(status, state);
+            });
         return;
     }
 

@@ -158,7 +158,7 @@ private:
      * result in "__returnValue"
      * @param key OUT
      * @param endSizeEstimate OUT
-    */
+     */
     void _reduce(const BSONList& values, BSONObj& key, int& endSizeEstimate);
 
     JSFunction _func;
@@ -281,13 +281,13 @@ public:
     void emit(const BSONObj& a);
 
     /**
-    * Checks the size of the transient in-memory results accumulated so far and potentially
-    * runs reduce in order to compact them. If the data is still too large, it will be
-    * spilled to the output collection.
-    *
-    * NOTE: Make sure that no DB locks are held, when calling this function, because it may
-    * try to acquire write DB lock for the write to the output collection.
-    */
+     * Checks the size of the transient in-memory results accumulated so far and potentially
+     * runs reduce in order to compact them. If the data is still too large, it will be
+     * spilled to the output collection.
+     *
+     * NOTE: Make sure that no DB locks are held, when calling this function, because it may
+     * try to acquire write DB lock for the write to the output collection.
+     */
     void reduceAndSpillInMemoryStateIfNeeded();
 
     /**

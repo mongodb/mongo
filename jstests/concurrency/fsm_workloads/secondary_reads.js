@@ -20,7 +20,6 @@
  */
 
 var $config = (function() {
-
     // Use the workload name as the collection name.
     var uniqueCollectionName = 'secondary_reads';
 
@@ -86,7 +85,6 @@ var $config = (function() {
     }
 
     var states = (function() {
-
         // One thread is dedicated to writing and other threads perform reads on
         // secondaries with a randomly chosen readConcern level.
         function readFromSecondaries(db, collName) {

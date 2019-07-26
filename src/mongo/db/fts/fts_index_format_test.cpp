@@ -68,14 +68,12 @@ TEST(FTSIndexFormat, Simple1) {
 TEST(FTSIndexFormat, ExtraBack1) {
     FTSSpec spec(assertGet(FTSSpec::fixSpec(BSON("key" << BSON("data"
                                                                << "text"
-                                                               << "x"
-                                                               << 1)))));
+                                                               << "x" << 1)))));
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     FTSIndexFormat::getKeys(spec,
                             BSON("data"
                                  << "cat"
-                                 << "x"
-                                 << 5),
+                                 << "x" << 5),
                             &keys);
 
     ASSERT_EQUALS(1U, keys.size());
@@ -94,8 +92,7 @@ TEST(FTSIndexFormat, ExtraFront1) {
     FTSIndexFormat::getKeys(spec,
                             BSON("data"
                                  << "cat"
-                                 << "x"
-                                 << 5),
+                                 << "x" << 5),
                             &keys);
 
     ASSERT_EQUALS(1U, keys.size());
@@ -158,8 +155,7 @@ void assertEqualsIndexKeys(std::set<std::string>& expectedKeys, const BSONObjSet
 TEST(FTSIndexFormat, LongWordsTextIndexVersion1) {
     FTSSpec spec(assertGet(FTSSpec::fixSpec(BSON("key" << BSON("data"
                                                                << "text")
-                                                       << "textIndexVersion"
-                                                       << 1))));
+                                                       << "textIndexVersion" << 1))));
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     string longPrefix(1024U, 'a');
     // "aaa...aaacat"
@@ -188,8 +184,7 @@ TEST(FTSIndexFormat, LongWordsTextIndexVersion1) {
 TEST(FTSIndexFormat, LongWordTextIndexVersion2) {
     FTSSpec spec(assertGet(FTSSpec::fixSpec(BSON("key" << BSON("data"
                                                                << "text")
-                                                       << "textIndexVersion"
-                                                       << 2))));
+                                                       << "textIndexVersion" << 2))));
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     string longPrefix(1024U, 'a');
     // "aaa...aaacat"
@@ -222,8 +217,7 @@ TEST(FTSIndexFormat, LongWordTextIndexVersion2) {
 TEST(FTSIndexFormat, LongWordTextIndexVersion3) {
     FTSSpec spec(assertGet(FTSSpec::fixSpec(BSON("key" << BSON("data"
                                                                << "text")
-                                                       << "textIndexVersion"
-                                                       << 3))));
+                                                       << "textIndexVersion" << 3))));
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     string longPrefix(1024U, 'a');
     // "aaa...aaacat"

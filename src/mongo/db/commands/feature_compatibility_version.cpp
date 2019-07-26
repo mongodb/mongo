@@ -215,12 +215,9 @@ void FeatureCompatibilityVersion::updateMinWireVersion() {
 void FeatureCompatibilityVersion::_validateVersion(StringData version) {
     uassert(40284,
             str::stream() << "featureCompatibilityVersion must be '"
-                          << FeatureCompatibilityVersionParser::kVersion42
-                          << "' or '"
-                          << FeatureCompatibilityVersionParser::kVersion40
-                          << "'. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
-                          << ".",
+                          << FeatureCompatibilityVersionParser::kVersion42 << "' or '"
+                          << FeatureCompatibilityVersionParser::kVersion40 << "'. See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink << ".",
             version == FeatureCompatibilityVersionParser::kVersion42 ||
                 version == FeatureCompatibilityVersionParser::kVersion40);
 }

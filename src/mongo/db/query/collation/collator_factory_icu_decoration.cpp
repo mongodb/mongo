@@ -39,9 +39,7 @@ namespace mongo {
 namespace {
 
 ServiceContext::ConstructorActionRegisterer registerIcuCollator{
-    "CreateCollatorFactory",
-    {"LoadICUData"},
-    [](ServiceContext* service) {
+    "CreateCollatorFactory", {"LoadICUData"}, [](ServiceContext* service) {
         CollatorFactoryInterface::set(service, stdx::make_unique<CollatorFactoryICU>());
     }};
 }  // namespace

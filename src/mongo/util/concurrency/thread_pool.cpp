@@ -173,8 +173,8 @@ void ThreadPool::_drainPendingTasks() {
     // Tasks cannot be run inline because they can create OperationContexts and the join() caller
     // may already have one associated with the thread.
     stdx::thread cleanThread = stdx::thread([&] {
-        const std::string threadName = str::stream() << _options.threadNamePrefix
-                                                     << _nextThreadId++;
+        const std::string threadName = str::stream()
+            << _options.threadNamePrefix << _nextThreadId++;
         setThreadName(threadName);
         _options.onCreateThread(threadName);
         stdx::unique_lock<stdx::mutex> lock(_mutex);

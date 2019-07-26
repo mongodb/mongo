@@ -625,7 +625,7 @@ void startService() {
     }
 }
 
-}  // namspace ntservice
+}  // namespace ntservice
 }  // namespace mongo
 
 #endif

@@ -78,15 +78,12 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
 }
 
 TEST_F(WriteOpsRetryability, ParseOplogEntryForUpdate) {
-    const auto entry =
-        assertGet(repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "op"
-                                                    << "u"
-                                                    << "ns"
-                                                    << "a.b"
-                                                    << "o"
-                                                    << BSON("_id" << 1 << "x" << 5)
-                                                    << "o2"
-                                                    << BSON("_id" << 1))));
+    const auto entry = assertGet(repl::OplogEntry::parse(
+        BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "op"
+                  << "u"
+                  << "ns"
+                  << "a.b"
+                  << "o" << BSON("_id" << 1 << "x" << 5) << "o2" << BSON("_id" << 1))));
 
     auto res = parseOplogEntryForUpdate(entry);
 
@@ -120,8 +117,7 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForUpsert) {
                                                     << "i"
                                                     << "ns"
                                                     << "a.b"
-                                                    << "o"
-                                                    << BSON("_id" << 1 << "x" << 5))));
+                                                    << "o" << BSON("_id" << 1 << "x" << 5))));
 
     auto res = parseOplogEntryForUpdate(entry);
 
@@ -187,8 +183,7 @@ TEST_F(FindAndModifyRetryability, BasicUpsertReturnNew) {
                                       kNs,                        // namespace
                                       BSON("_id"
                                            << "ID value"
-                                           << "x"
-                                           << 1));  // o
+                                           << "x" << 1));  // o
 
     auto result = constructFindAndModifyRetryResult(opCtx(), request, insertOplog);
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject"
@@ -197,8 +192,7 @@ TEST_F(FindAndModifyRetryability, BasicUpsertReturnNew) {
                            << "value"
                            << BSON("_id"
                                    << "ID value"
-                                   << "x"
-                                   << 1)),
+                                   << "x" << 1)),
                       result);
 }
 
@@ -212,15 +206,13 @@ TEST_F(FindAndModifyRetryability, BasicUpsertReturnOld) {
                                       kNs,                        // namespace
                                       BSON("_id"
                                            << "ID value"
-                                           << "x"
-                                           << 1));  // o
+                                           << "x" << 1));  // o
 
     auto result = constructFindAndModifyRetryResult(opCtx(), request, insertOplog);
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject"
                            << BSON("n" << 1 << "updatedExisting" << false << "upserted"
                                        << "ID value")
-                           << "value"
-                           << BSONNULL),
+                           << "value" << BSONNULL),
                       result);
 }
 
@@ -242,8 +234,7 @@ TEST_F(FindAndModifyRetryability, NestedUpsert) {
     auto result = constructFindAndModifyRetryResult(opCtx(), request, insertOplog);
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject"
                            << BSON("n" << 1 << "updatedExisting" << false << "upserted" << 1)
-                           << "value"
-                           << BSON("_id" << 1)),
+                           << "value" << BSON("_id" << 1)),
                       result);
 }
 
@@ -353,8 +344,7 @@ TEST_F(FindAndModifyRetryability, UpdateWithPreImage) {
 
     auto result = constructFindAndModifyRetryResult(opCtx(), request, updateOplog);
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
-                                             << "value"
-                                             << BSON("_id" << 1 << "z" << 1)),
+                                             << "value" << BSON("_id" << 1 << "z" << 1)),
                       result);
 }
 
@@ -386,8 +376,7 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPreImage) {
 
     auto result = constructFindAndModifyRetryResult(opCtx(), request, updateOplog);
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
-                                             << "value"
-                                             << BSON("_id" << 1 << "z" << 1)),
+                                             << "value" << BSON("_id" << 1 << "z" << 1)),
                       result);
 }
 
@@ -413,8 +402,7 @@ TEST_F(FindAndModifyRetryability, UpdateWithPostImage) {
 
     auto result = constructFindAndModifyRetryResult(opCtx(), request, updateOplog);
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
-                                             << "value"
-                                             << BSON("a" << 1 << "b" << 1)),
+                                             << "value" << BSON("a" << 1 << "b" << 1)),
                       result);
 }
 
@@ -446,8 +434,7 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPostImage) {
 
     auto result = constructFindAndModifyRetryResult(opCtx(), request, updateOplog);
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
-                                             << "value"
-                                             << BSON("a" << 1 << "b" << 1)),
+                                             << "value" << BSON("a" << 1 << "b" << 1)),
                       result);
 }
 

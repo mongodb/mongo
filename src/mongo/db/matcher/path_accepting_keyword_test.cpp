@@ -49,33 +49,42 @@ TEST(PathAcceptingKeyword, CanParseKnownMatchTypes) {
                 MatchExpressionParser::parsePathAcceptingKeyword(BSON("$in" << 1).firstElement()));
     ASSERT_TRUE(PathAcceptingKeyword::NOT_EQUAL ==
                 MatchExpressionParser::parsePathAcceptingKeyword(BSON("$ne" << 1).firstElement()));
-    ASSERT_TRUE(PathAcceptingKeyword::SIZE == MatchExpressionParser::parsePathAcceptingKeyword(
-                                                  BSON("$size" << 1).firstElement()));
+    ASSERT_TRUE(
+        PathAcceptingKeyword::SIZE ==
+        MatchExpressionParser::parsePathAcceptingKeyword(BSON("$size" << 1).firstElement()));
     ASSERT_TRUE(PathAcceptingKeyword::ALL ==
                 MatchExpressionParser::parsePathAcceptingKeyword(BSON("$all" << 1).firstElement()));
     ASSERT_TRUE(PathAcceptingKeyword::NOT_IN ==
                 MatchExpressionParser::parsePathAcceptingKeyword(BSON("$nin" << 1).firstElement()));
-    ASSERT_TRUE(PathAcceptingKeyword::EXISTS == MatchExpressionParser::parsePathAcceptingKeyword(
-                                                    BSON("$exists" << 1).firstElement()));
+    ASSERT_TRUE(
+        PathAcceptingKeyword::EXISTS ==
+        MatchExpressionParser::parsePathAcceptingKeyword(BSON("$exists" << 1).firstElement()));
     ASSERT_TRUE(PathAcceptingKeyword::MOD ==
                 MatchExpressionParser::parsePathAcceptingKeyword(BSON("$mod" << 1).firstElement()));
-    ASSERT_TRUE(PathAcceptingKeyword::TYPE == MatchExpressionParser::parsePathAcceptingKeyword(
-                                                  BSON("$type" << 1).firstElement()));
-    ASSERT_TRUE(PathAcceptingKeyword::REGEX == MatchExpressionParser::parsePathAcceptingKeyword(
-                                                   BSON("$regex" << 1).firstElement()));
-    ASSERT_TRUE(PathAcceptingKeyword::OPTIONS == MatchExpressionParser::parsePathAcceptingKeyword(
-                                                     BSON("$options" << 1).firstElement()));
+    ASSERT_TRUE(
+        PathAcceptingKeyword::TYPE ==
+        MatchExpressionParser::parsePathAcceptingKeyword(BSON("$type" << 1).firstElement()));
+    ASSERT_TRUE(
+        PathAcceptingKeyword::REGEX ==
+        MatchExpressionParser::parsePathAcceptingKeyword(BSON("$regex" << 1).firstElement()));
+    ASSERT_TRUE(
+        PathAcceptingKeyword::OPTIONS ==
+        MatchExpressionParser::parsePathAcceptingKeyword(BSON("$options" << 1).firstElement()));
     ASSERT_TRUE(
         PathAcceptingKeyword::ELEM_MATCH ==
         MatchExpressionParser::parsePathAcceptingKeyword(BSON("$elemMatch" << 1).firstElement()));
-    ASSERT_TRUE(PathAcceptingKeyword::GEO_NEAR == MatchExpressionParser::parsePathAcceptingKeyword(
-                                                      BSON("$near" << 1).firstElement()));
-    ASSERT_TRUE(PathAcceptingKeyword::GEO_NEAR == MatchExpressionParser::parsePathAcceptingKeyword(
-                                                      BSON("$geoNear" << 1).firstElement()));
-    ASSERT_TRUE(PathAcceptingKeyword::WITHIN == MatchExpressionParser::parsePathAcceptingKeyword(
-                                                    BSON("$within" << 1).firstElement()));
-    ASSERT_TRUE(PathAcceptingKeyword::WITHIN == MatchExpressionParser::parsePathAcceptingKeyword(
-                                                    BSON("$geoWithin" << 1).firstElement()));
+    ASSERT_TRUE(
+        PathAcceptingKeyword::GEO_NEAR ==
+        MatchExpressionParser::parsePathAcceptingKeyword(BSON("$near" << 1).firstElement()));
+    ASSERT_TRUE(
+        PathAcceptingKeyword::GEO_NEAR ==
+        MatchExpressionParser::parsePathAcceptingKeyword(BSON("$geoNear" << 1).firstElement()));
+    ASSERT_TRUE(
+        PathAcceptingKeyword::WITHIN ==
+        MatchExpressionParser::parsePathAcceptingKeyword(BSON("$within" << 1).firstElement()));
+    ASSERT_TRUE(
+        PathAcceptingKeyword::WITHIN ==
+        MatchExpressionParser::parsePathAcceptingKeyword(BSON("$geoWithin" << 1).firstElement()));
     ASSERT_TRUE(PathAcceptingKeyword::GEO_INTERSECTS ==
                 MatchExpressionParser::parsePathAcceptingKeyword(
                     BSON("$geoIntersects" << 1).firstElement()));

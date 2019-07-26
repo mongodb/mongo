@@ -86,11 +86,7 @@ void ProjectionSpecValidator::ensurePathDoesNotConflictOrThrow(const std::string
     uassert(40176,
             str::stream() << "specification contains two conflicting paths. "
                              "Cannot specify both '"
-                          << path
-                          << "' and '"
-                          << *conflictingPath
-                          << "': "
-                          << _rawObj.toString(),
+                          << path << "' and '" << *conflictingPath << "': " << _rawObj.toString(),
             !conflictingPath);
 }
 
@@ -129,10 +125,8 @@ void ProjectionSpecValidator::parseNestedObject(const BSONObj& thisLevelSpec,
                 uasserted(40181,
                           str::stream() << "an expression specification must contain exactly "
                                            "one field, the name of the expression. Found "
-                                        << thisLevelSpec.nFields()
-                                        << " fields in "
-                                        << thisLevelSpec.toString()
-                                        << ", while parsing object "
+                                        << thisLevelSpec.nFields() << " fields in "
+                                        << thisLevelSpec.toString() << ", while parsing object "
                                         << _rawObj.toString());
             }
             ensurePathDoesNotConflictOrThrow(prefix.fullPath());
@@ -141,8 +135,7 @@ void ProjectionSpecValidator::parseNestedObject(const BSONObj& thisLevelSpec,
         if (fieldName.find('.') != std::string::npos) {
             uasserted(40183,
                       str::stream() << "cannot use dotted field name '" << fieldName
-                                    << "' in a sub object: "
-                                    << _rawObj.toString());
+                                    << "' in a sub object: " << _rawObj.toString());
         }
         parseElement(elem, FieldPath::getFullyQualifiedPath(prefix.fullPath(), fieldName));
     }
@@ -245,23 +238,25 @@ private:
         } else if ((elem.isBoolean() || elem.isNumber()) && !elem.trueValue()) {
             // If this is an excluded field other than '_id', ensure that the projection type has
             // not already been set to kInclusionProjection.
-            uassert(40178,
-                    str::stream() << "Bad projection specification, cannot exclude fields "
-                                     "other than '_id' in an inclusion projection: "
-                                  << _rawObj.toString(),
-                    !_parsedType || (*_parsedType ==
-                                     TransformerInterface::TransformerType::kExclusionProjection));
+            uassert(
+                40178,
+                str::stream() << "Bad projection specification, cannot exclude fields "
+                                 "other than '_id' in an inclusion projection: "
+                              << _rawObj.toString(),
+                !_parsedType ||
+                    (*_parsedType == TransformerInterface::TransformerType::kExclusionProjection));
             _parsedType = TransformerInterface::TransformerType::kExclusionProjection;
         } else {
             // A boolean true, a truthy numeric value, or any expression can only be used with an
             // inclusion projection. Note that literal values like "string" or null are also treated
             // as expressions.
-            uassert(40179,
-                    str::stream() << "Bad projection specification, cannot include fields or "
-                                     "add computed fields during an exclusion projection: "
-                                  << _rawObj.toString(),
-                    !_parsedType || (*_parsedType ==
-                                     TransformerInterface::TransformerType::kInclusionProjection));
+            uassert(
+                40179,
+                str::stream() << "Bad projection specification, cannot include fields or "
+                                 "add computed fields during an exclusion projection: "
+                              << _rawObj.toString(),
+                !_parsedType ||
+                    (*_parsedType == TransformerInterface::TransformerType::kInclusionProjection));
             _parsedType = TransformerInterface::TransformerType::kInclusionProjection;
         }
     }

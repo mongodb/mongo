@@ -12,7 +12,6 @@ load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');
 load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.threadCount = 5;
     $config.iterations = 50;
 

@@ -48,7 +48,7 @@ public:
     bool match(const mutablebson::ConstElement& element) final {
         return std::any_of(_elementsToMatch.begin(),
                            _elementsToMatch.end(),
-                           [&element, collator{_collator} ](const auto& elementToMatch) {
+                           [&element, collator{_collator}](const auto& elementToMatch) {
                                return element.compareWithBSONElement(
                                           elementToMatch, collator, false) == 0;
                            });

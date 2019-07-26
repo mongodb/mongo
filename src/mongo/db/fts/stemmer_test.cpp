@@ -47,5 +47,5 @@ TEST(English, Caps) {
     ASSERT_EQUALS("unit", s.stem("united"));
     ASSERT_EQUALS("Unite", s.stem("United"));
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

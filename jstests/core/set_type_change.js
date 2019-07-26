@@ -8,21 +8,21 @@
  * the document, including any relevant indices.
  */
 (function() {
-    "use strict";
+"use strict";
 
-    var coll = db.set_type_change;
-    coll.drop();
-    assert.commandWorked(coll.ensureIndex({a: 1}));
+var coll = db.set_type_change;
+coll.drop();
+assert.commandWorked(coll.ensureIndex({a: 1}));
 
-    assert.writeOK(coll.insert({a: 2}));
+assert.writeOK(coll.insert({a: 2}));
 
-    var newVal = new NumberLong(2);
-    var res = coll.update({}, {$set: {a: newVal}});
-    assert.eq(res.nMatched, 1);
-    if (coll.getMongo().writeMode() == "commands")
-        assert.eq(res.nModified, 1);
+var newVal = new NumberLong(2);
+var res = coll.update({}, {$set: {a: newVal}});
+assert.eq(res.nMatched, 1);
+if (coll.getMongo().writeMode() == "commands")
+    assert.eq(res.nModified, 1);
 
-    // Make sure it actually changed the type.
-    var updated = coll.findOne();
-    assert(updated.a instanceof NumberLong, "$set did not update type of value: " + updated.a);
+// Make sure it actually changed the type.
+var updated = coll.findOne();
+assert(updated.a instanceof NumberLong, "$set did not update type of value: " + updated.a);
 })();

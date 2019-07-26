@@ -167,7 +167,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
               << connectionCount << word << " now open)";
     }
 
-    ssm->setCleanupHook([ this, ssmIt, quiet, session = std::move(session) ] {
+    ssm->setCleanupHook([this, ssmIt, quiet, session = std::move(session)] {
         size_t connectionCount;
         auto remote = session->remote();
         {
@@ -223,8 +223,8 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     auto noWorkersLeft = [this] { return numOpenSessions() == 0; };
     while (timeSpent < timeout &&
            !_shutdownCondition.wait_for(lk, checkInterval.toSystemDuration(), noWorkersLeft)) {
-        log(LogComponent::kNetwork) << "shutdown: still waiting on " << numOpenSessions()
-                                    << " active workers to drain... ";
+        log(LogComponent::kNetwork)
+            << "shutdown: still waiting on " << numOpenSessions() << " active workers to drain... ";
         timeSpent += checkInterval;
     }
 

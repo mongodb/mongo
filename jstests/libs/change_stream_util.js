@@ -305,7 +305,6 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
                 }));
             }
         }
-
     };
 
     /**

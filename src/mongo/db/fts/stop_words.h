@@ -61,5 +61,5 @@ public:
 private:
     StringMap<bool> _words;  // Used as a set. The values have no meaning.
 };
-}
-}
+}  // namespace fts
+}  // namespace mongo

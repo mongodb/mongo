@@ -118,8 +118,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
             if (!statusWithMigrationQueryResult.isOK()) {
                 return statusWithMigrationQueryResult.getStatus().withContext(
                     str::stream() << "Failed to verify whether conflicting migration is in "
-                                  << "progress for migration '"
-                                  << redact(migrateInfo.toString())
+                                  << "progress for migration '" << redact(migrateInfo.toString())
                                   << "' while trying to query config.migrations.");
             }
             if (statusWithMigrationQueryResult.getValue().docs.empty()) {
@@ -134,11 +133,9 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
             if (!statusWithActiveMigration.isOK()) {
                 return statusWithActiveMigration.getStatus().withContext(
                     str::stream() << "Failed to verify whether conflicting migration is in "
-                                  << "progress for migration '"
-                                  << redact(migrateInfo.toString())
+                                  << "progress for migration '" << redact(migrateInfo.toString())
                                   << "' while trying to parse active migration document '"
-                                  << redact(activeMigrationBSON.toString())
-                                  << "'.");
+                                  << redact(activeMigrationBSON.toString()) << "'.");
             }
 
             MigrateInfo activeMigrateInfo = statusWithActiveMigration.getValue().toMigrateInfo();
@@ -172,8 +169,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
                   str::stream() << "Failed to insert the config.migrations document after max "
                                 << "number of retries. Chunk '"
                                 << ChunkRange(migrateInfo.minKey, migrateInfo.maxKey).toString()
-                                << "' in collection '"
-                                << migrateInfo.nss.ns()
+                                << "' in collection '" << migrateInfo.nss.ns()
                                 << "' was being moved (somewhere) by another operation.");
 }
 

@@ -432,10 +432,10 @@ TEST_F(DropDatabaseTest,
 
     auto status = dropDatabase(_opCtx.get(), _nss.db().toString());
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
-    ASSERT_EQUALS(
-        status.reason(),
-        std::string(str::stream() << "Could not drop database " << _nss.db()
-                                  << " because it does not exist after dropping 1 collection(s)."));
+    ASSERT_EQUALS(status.reason(),
+                  std::string(str::stream()
+                              << "Could not drop database " << _nss.db()
+                              << " because it does not exist after dropping 1 collection(s)."));
 
     ASSERT_FALSE(AutoGetDb(_opCtx.get(), _nss.db(), MODE_X).getDb());
 }

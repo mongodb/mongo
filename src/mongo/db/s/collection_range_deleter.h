@@ -59,14 +59,14 @@ class CollectionRangeDeleter {
 
 public:
     /**
-      * This is an object n that asynchronously changes state when a scheduled range deletion
-      * completes or fails. Call n.ready() to discover if the event has already occurred.  Call
-      * n.waitStatus(opCtx) to sleep waiting for the event, and get its result.  If the wait is
-      * interrupted, waitStatus throws.
-      *
-      * It is an error to destroy a returned CleanupNotification object n unless either n.ready()
-      * is true or n.abandon() has been called.  After n.abandon(), n is in a moved-from state.
-      */
+     * This is an object n that asynchronously changes state when a scheduled range deletion
+     * completes or fails. Call n.ready() to discover if the event has already occurred.  Call
+     * n.waitStatus(opCtx) to sleep waiting for the event, and get its result.  If the wait is
+     * interrupted, waitStatus throws.
+     *
+     * It is an error to destroy a returned CleanupNotification object n unless either n.ready()
+     * is true or n.abandon() has been called.  After n.abandon(), n is in a moved-from state.
+     */
     class DeleteNotification {
     public:
         DeleteNotification();

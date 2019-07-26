@@ -16,92 +16,90 @@
  *
  */
 (function() {
-    'use strict';
+'use strict';
 
-    load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries, //
-                                                 // restartServerReplication,
-                                                 // restartReplSetReplication
+load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries, //
+                                             // restartServerReplication,
+                                             // restartReplSetReplication
 
-    function assertStepDownFailsWithExceededTimeLimit(node) {
-        assert.commandFailedWithCode(
-            node.adminCommand({replSetStepDown: 5, secondaryCatchUpPeriodSecs: 5}),
-            ErrorCodes.ExceededTimeLimit,
-            "step down did not fail with 'ExceededTimeLimit'");
-    }
+function assertStepDownFailsWithExceededTimeLimit(node) {
+    assert.commandFailedWithCode(
+        node.adminCommand({replSetStepDown: 5, secondaryCatchUpPeriodSecs: 5}),
+        ErrorCodes.ExceededTimeLimit,
+        "step down did not fail with 'ExceededTimeLimit'");
+}
 
-    function assertStepDownSucceeds(node) {
-        assert.commandWorked(
-            node.adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60}));
-    }
+function assertStepDownSucceeds(node) {
+    assert.commandWorked(node.adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60}));
+}
 
-    function nodeIdStr(repltest, node) {
-        return "node #" + repltest.getNodeId(node) + ", " + node.host;
-    }
+function nodeIdStr(repltest, node) {
+    return "node #" + repltest.getNodeId(node) + ", " + node.host;
+}
 
-    //
-    // Test setup
-    //
-    var name = 'stepdown_needs_majority';
-    var replTest = new ReplSetTest({name: name, nodes: 5, settings: {chainingAllowed: false}});
+//
+// Test setup
+//
+var name = 'stepdown_needs_majority';
+var replTest = new ReplSetTest({name: name, nodes: 5, settings: {chainingAllowed: false}});
 
-    replTest.startSet();
-    replTest.initiate();
+replTest.startSet();
+replTest.initiate();
 
-    var primary = replTest.getPrimary();
-    var testDB = primary.getDB('testdb');
-    var coll = testDB[name];
-    var dummy_doc = {"dummy_key": "dummy_val"};
-    var timeout = ReplSetTest.kDefaultTimeoutMS;
+var primary = replTest.getPrimary();
+var testDB = primary.getDB('testdb');
+var coll = testDB[name];
+var dummy_doc = {"dummy_key": "dummy_val"};
+var timeout = ReplSetTest.kDefaultTimeoutMS;
 
-    //
-    // Block writes to all secondaries
-    //
-    jsTestLog("Blocking writes to all secondaries.");
-    stopReplicationOnSecondaries(replTest);
+//
+// Block writes to all secondaries
+//
+jsTestLog("Blocking writes to all secondaries.");
+stopReplicationOnSecondaries(replTest);
 
-    //
-    // Write to the primary and attempt stepdown
-    //
-    jsTestLog("Issuing a write to the primary(" + primary.host + ") with write_concern:1");
-    assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 1, wtimeout: timeout}}));
+//
+// Write to the primary and attempt stepdown
+//
+jsTestLog("Issuing a write to the primary(" + primary.host + ") with write_concern:1");
+assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 1, wtimeout: timeout}}));
 
-    jsTestLog("Trying to step down primary with only 1 node out of 5 caught up.");
-    assertStepDownFailsWithExceededTimeLimit(primary);
+jsTestLog("Trying to step down primary with only 1 node out of 5 caught up.");
+assertStepDownFailsWithExceededTimeLimit(primary);
 
-    //
-    // Re-enable writes to Secondary A and attempt stepdown
-    //
-    var secondaryA = replTest.getSecondaries()[0];
-    jsTestLog("Reenabling writes to one secondary (" + nodeIdStr(replTest, secondaryA) + ")");
-    restartServerReplication(secondaryA);
+//
+// Re-enable writes to Secondary A and attempt stepdown
+//
+var secondaryA = replTest.getSecondaries()[0];
+jsTestLog("Reenabling writes to one secondary (" + nodeIdStr(replTest, secondaryA) + ")");
+restartServerReplication(secondaryA);
 
-    jsTestLog("Issuing a write to the primary with write_concern:2");
-    assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 2, wtimeout: timeout}}));
+jsTestLog("Issuing a write to the primary with write_concern:2");
+assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 2, wtimeout: timeout}}));
 
-    jsTestLog("Trying to step down primary with only 2 nodes out of 5 caught up.");
-    assertStepDownFailsWithExceededTimeLimit(primary);
+jsTestLog("Trying to step down primary with only 2 nodes out of 5 caught up.");
+assertStepDownFailsWithExceededTimeLimit(primary);
 
-    //
-    // Re-enable writes to Secondary B and attempt stepdown
-    //
-    var secondaryB = replTest.getSecondaries()[1];
-    jsTestLog("Reenabling writes to another secondary (" + nodeIdStr(replTest, secondaryB) + ")");
-    restartServerReplication(secondaryB);
+//
+// Re-enable writes to Secondary B and attempt stepdown
+//
+var secondaryB = replTest.getSecondaries()[1];
+jsTestLog("Reenabling writes to another secondary (" + nodeIdStr(replTest, secondaryB) + ")");
+restartServerReplication(secondaryB);
 
-    jsTestLog("Issuing a write to the primary with write_concern:3");
-    assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 3, wtimeout: timeout}}));
+jsTestLog("Issuing a write to the primary with write_concern:3");
+assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 3, wtimeout: timeout}}));
 
-    jsTestLog("Trying to step down primary with 3 nodes out of 5 caught up.");
-    assertStepDownSucceeds(primary);
+jsTestLog("Trying to step down primary with 3 nodes out of 5 caught up.");
+assertStepDownSucceeds(primary);
 
-    jsTestLog("Waiting for PRIMARY(" + primary.host + ") to step down & become SECONDARY.");
-    replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
+jsTestLog("Waiting for PRIMARY(" + primary.host + ") to step down & become SECONDARY.");
+replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
 
-    //
-    // Disable failpoints and stop replica set
-    //
-    jsTestLog("Disabling all fail points to allow for clean shutdown");
-    restartReplSetReplication(replTest);
-    replTest.stopSet();
-
+//
+// Disable failpoints and stop replica set
+//
+jsTestLog("Disabling all fail points to allow for clean shutdown");
+restartReplSetReplication(replTest);
+replTest.stopSet();
 }());

@@ -682,13 +682,14 @@ void QueryPlannerIXSelect::_rateIndices(MatchExpression* node,
             const IndexEntry& index = indices[i];
             std::size_t keyPatternIndex = 0;
             for (auto&& keyPatternElt : index.keyPattern) {
-                if (keyPatternElt.fieldNameStringData() == fullPath && _compatible(keyPatternElt,
-                                                                                   index,
-                                                                                   keyPatternIndex,
-                                                                                   node,
-                                                                                   fullPath,
-                                                                                   collator,
-                                                                                   elemMatchCtx)) {
+                if (keyPatternElt.fieldNameStringData() == fullPath &&
+                    _compatible(keyPatternElt,
+                                index,
+                                keyPatternIndex,
+                                node,
+                                fullPath,
+                                collator,
+                                elemMatchCtx)) {
                     if (keyPatternIndex == 0) {
                         rt->first.push_back(i);
                     } else {

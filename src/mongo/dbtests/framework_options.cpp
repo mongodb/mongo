@@ -138,4 +138,4 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
 
     return Status::OK();
 }
-}
+}  // namespace mongo

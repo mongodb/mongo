@@ -182,6 +182,6 @@ private:
     AsyncDBClient::Handle _client;
 };
 
-}  // namespace connection_pool_asio
+}  // namespace connection_pool_tl
 }  // namespace executor
 }  // namespace mongo

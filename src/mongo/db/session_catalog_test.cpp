@@ -123,12 +123,14 @@ TEST_F(SessionCatalogTest, ScanSession) {
                                               makeLogicalSessionIdForTest(),
                                               makeLogicalSessionIdForTest()};
     for (const auto& lsid : lsids) {
-        stdx::async(stdx::launch::async, [this, lsid] {
-            ThreadClient tc(getServiceContext());
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(lsid);
-            OperationContextSession ocs(opCtx.get());
-        }).get();
+        stdx::async(stdx::launch::async,
+                    [this, lsid] {
+                        ThreadClient tc(getServiceContext());
+                        auto opCtx = makeOperationContext();
+                        opCtx->setLogicalSessionId(lsid);
+                        OperationContextSession ocs(opCtx.get());
+                    })
+            .get();
     }
 
     catalog()->scanSession(lsids[0], [&lsids](const ObservableSession& session) {
@@ -154,12 +156,14 @@ TEST_F(SessionCatalogTest, ScanSessionMarkForReapWhenSessionIsIdle) {
                                               makeLogicalSessionIdForTest(),
                                               makeLogicalSessionIdForTest()};
     for (const auto& lsid : lsids) {
-        stdx::async(stdx::launch::async, [this, lsid] {
-            ThreadClient tc(getServiceContext());
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(lsid);
-            OperationContextSession ocs(opCtx.get());
-        }).get();
+        stdx::async(stdx::launch::async,
+                    [this, lsid] {
+                        ThreadClient tc(getServiceContext());
+                        auto opCtx = makeOperationContext();
+                        opCtx->setLogicalSessionId(lsid);
+                        OperationContextSession ocs(opCtx.get());
+                    })
+            .get();
     }
 
     catalog()->scanSession(lsids[0],
@@ -196,12 +200,14 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessions) {
                                               makeLogicalSessionIdForTest(),
                                               makeLogicalSessionIdForTest()};
     for (const auto& lsid : lsids) {
-        stdx::async(stdx::launch::async, [this, lsid] {
-            ThreadClient tc(getServiceContext());
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(lsid);
-            OperationContextSession ocs(opCtx.get());
-        }).get();
+        stdx::async(stdx::launch::async,
+                    [this, lsid] {
+                        ThreadClient tc(getServiceContext());
+                        auto opCtx = makeOperationContext();
+                        opCtx->setLogicalSessionId(lsid);
+                        OperationContextSession ocs(opCtx.get());
+                    })
+            .get();
     }
 
     // Scan over all Sessions.

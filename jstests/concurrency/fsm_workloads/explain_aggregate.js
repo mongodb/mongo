@@ -10,7 +10,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/explain.js');     // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     function assertCursorStages(num, obj) {
         assertAlways(obj.stages, tojson(obj));
         assertAlways.eq(num, obj.stages.length, tojson(obj.stages));

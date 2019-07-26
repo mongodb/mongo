@@ -524,7 +524,6 @@ TEST_F(KeyStringTest, LotsOfNumbers3) {
 
     for (double k = 0; k < 8; k++) {
         futures.push_back(stdx::async(stdx::launch::async, [k, this] {
-
             for (double i = -1100; i < 1100; i++) {
                 for (double j = 0; j < 52; j++) {
                     const auto V1 = KeyString::Version::V1;
@@ -746,10 +745,8 @@ const std::vector<BSONObj>& getInterestingElements(KeyString::Version version) {
         // Something with exceptional typeBits for Decimal
         elements.push_back(
             BSON("" << BSON_ARRAY("" << BSONSymbol("") << Decimal128::kNegativeInfinity
-                                     << Decimal128::kPositiveInfinity
-                                     << Decimal128::kPositiveNaN
-                                     << Decimal128("0.0000000")
-                                     << Decimal128("-0E1000"))));
+                                     << Decimal128::kPositiveInfinity << Decimal128::kPositiveNaN
+                                     << Decimal128("0.0000000") << Decimal128("-0E1000"))));
     }
 
     //

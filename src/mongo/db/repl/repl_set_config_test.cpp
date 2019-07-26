@@ -63,11 +63,7 @@ TEST(ReplSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_OK(config.validate());
@@ -92,32 +88,24 @@ TEST(ReplSetConfig, ParseMinimalConfigAndCheckDefaults) {
 
 TEST(ReplSetConfig, ParseLargeConfigAndCheckAccessors) {
     ReplSetConfig config;
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version"
-                                     << 1234
-                                     << "members"
-                                     << BSON_ARRAY(BSON("_id" << 234 << "host"
-                                                              << "localhost:12345"
-                                                              << "tags"
-                                                              << BSON("NYC"
-                                                                      << "NY")))
-                                     << "protocolVersion"
-                                     << 1
-                                     << "settings"
-                                     << BSON("getLastErrorDefaults"
-                                             << BSON("w"
-                                                     << "majority")
-                                             << "getLastErrorModes"
-                                             << BSON("eastCoast" << BSON("NYC" << 1))
-                                             << "chainingAllowed"
-                                             << false
-                                             << "heartbeatIntervalMillis"
-                                             << 5000
-                                             << "heartbeatTimeoutSecs"
-                                             << 120
-                                             << "electionTimeoutMillis"
-                                             << 10))));
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1234 << "members"
+                               << BSON_ARRAY(BSON("_id" << 234 << "host"
+                                                        << "localhost:12345"
+                                                        << "tags"
+                                                        << BSON("NYC"
+                                                                << "NY")))
+                               << "protocolVersion" << 1 << "settings"
+                               << BSON("getLastErrorDefaults"
+                                       << BSON("w"
+                                               << "majority")
+                                       << "getLastErrorModes"
+                                       << BSON("eastCoast" << BSON("NYC" << 1)) << "chainingAllowed"
+                                       << false << "heartbeatIntervalMillis" << 5000
+                                       << "heartbeatTimeoutSecs" << 120 << "electionTimeoutMillis"
+                                       << 10))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS("rs0", config.getReplSetName());
     ASSERT_EQUALS(1234, config.getConfigVersion());
@@ -139,27 +127,20 @@ TEST(ReplSetConfig, ParseLargeConfigAndCheckAccessors) {
 
 TEST(ReplSetConfig, GetConnectionStringFiltersHiddenNodes) {
     ReplSetConfig config;
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:11111")
-                                                   << BSON("_id" << 1 << "host"
-                                                                 << "localhost:22222"
-                                                                 << "arbiterOnly"
-                                                                 << true)
-                                                   << BSON("_id" << 2 << "host"
-                                                                 << "localhost:33333"
-                                                                 << "hidden"
-                                                                 << true
-                                                                 << "priority"
-                                                                 << 0)
-                                                   << BSON("_id" << 3 << "host"
-                                                                 << "localhost:44444")))));
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "protocolVersion" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:11111")
+                                             << BSON("_id" << 1 << "host"
+                                                           << "localhost:22222"
+                                                           << "arbiterOnly" << true)
+                                             << BSON("_id" << 2 << "host"
+                                                           << "localhost:33333"
+                                                           << "hidden" << true << "priority" << 0)
+                                             << BSON("_id" << 3 << "host"
+                                                           << "localhost:44444")))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(ConnectionString::forReplicaSet(
                       "rs0", {HostAndPort{"localhost:11111"}, HostAndPort{"localhost:44444"}})
@@ -169,31 +150,22 @@ TEST(ReplSetConfig, GetConnectionStringFiltersHiddenNodes) {
 
 TEST(ReplSetConfig, MajorityCalculationThreeVotersNoArbiters) {
     ReplSetConfig config;
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version"
-                                     << 2
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
-                                     << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                              << "h1:1")
-                                                   << BSON("_id" << 2 << "host"
-                                                                 << "h2:1")
-                                                   << BSON("_id" << 3 << "host"
-                                                                 << "h3:1")
-                                                   << BSON("_id" << 4 << "host"
-                                                                 << "h4:1"
-                                                                 << "votes"
-                                                                 << 0
-                                                                 << "priority"
-                                                                 << 0)
-                                                   << BSON("_id" << 5 << "host"
-                                                                 << "h5:1"
-                                                                 << "votes"
-                                                                 << 0
-                                                                 << "priority"
-                                                                 << 0)))));
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 2 << "protocolVersion" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                        << "h1:1")
+                                             << BSON("_id" << 2 << "host"
+                                                           << "h2:1")
+                                             << BSON("_id" << 3 << "host"
+                                                           << "h3:1")
+                                             << BSON("_id" << 4 << "host"
+                                                           << "h4:1"
+                                                           << "votes" << 0 << "priority" << 0)
+                                             << BSON("_id" << 5 << "host"
+                                                           << "h5:1"
+                                                           << "votes" << 0 << "priority" << 0)))));
     ASSERT_OK(config.validate());
 
     ASSERT_EQUALS(2, config.getWriteMajority());
@@ -201,37 +173,25 @@ TEST(ReplSetConfig, MajorityCalculationThreeVotersNoArbiters) {
 
 TEST(ReplSetConfig, MajorityCalculationNearlyHalfArbiters) {
     ReplSetConfig config;
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "mySet"
-                                     << "version"
-                                     << 2
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
-                                     << BSON_ARRAY(BSON("host"
-                                                        << "node1:12345"
-                                                        << "_id"
-                                                        << 0)
-                                                   << BSON("host"
-                                                           << "node2:12345"
-                                                           << "_id"
-                                                           << 1)
-                                                   << BSON("host"
-                                                           << "node3:12345"
-                                                           << "_id"
-                                                           << 2)
-                                                   << BSON("host"
-                                                           << "node4:12345"
-                                                           << "_id"
-                                                           << 3
-                                                           << "arbiterOnly"
-                                                           << true)
-                                                   << BSON("host"
-                                                           << "node5:12345"
-                                                           << "_id"
-                                                           << 4
-                                                           << "arbiterOnly"
-                                                           << true)))));
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "mySet"
+                               << "version" << 2 << "protocolVersion" << 1 << "members"
+                               << BSON_ARRAY(BSON("host"
+                                                  << "node1:12345"
+                                                  << "_id" << 0)
+                                             << BSON("host"
+                                                     << "node2:12345"
+                                                     << "_id" << 1)
+                                             << BSON("host"
+                                                     << "node3:12345"
+                                                     << "_id" << 2)
+                                             << BSON("host"
+                                                     << "node4:12345"
+                                                     << "_id" << 3 << "arbiterOnly" << true)
+                                             << BSON("host"
+                                                     << "node5:12345"
+                                                     << "_id" << 4 << "arbiterOnly" << true)))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(3, config.getWriteMajority());
 }
@@ -240,68 +200,45 @@ TEST(ReplSetConfig, MajorityCalculationEvenNumberOfMembers) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "mySet"
-                                     << "version"
-                                     << 2
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 2 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("host"
                                                         << "node1:12345"
-                                                        << "_id"
-                                                        << 0)
+                                                        << "_id" << 0)
                                                    << BSON("host"
                                                            << "node2:12345"
-                                                           << "_id"
-                                                           << 1)
+                                                           << "_id" << 1)
                                                    << BSON("host"
                                                            << "node3:12345"
-                                                           << "_id"
-                                                           << 2)
+                                                           << "_id" << 2)
                                                    << BSON("host"
                                                            << "node4:12345"
-                                                           << "_id"
-                                                           << 3)))));
+                                                           << "_id" << 3)))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(3, config.getWriteMajority());
 }
 
 TEST(ReplSetConfig, MajorityCalculationNearlyHalfSecondariesNoVotes) {
     ReplSetConfig config;
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "mySet"
-                                     << "version"
-                                     << 2
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
-                                     << BSON_ARRAY(BSON("host"
-                                                        << "node1:12345"
-                                                        << "_id"
-                                                        << 0)
-                                                   << BSON("host"
-                                                           << "node2:12345"
-                                                           << "_id"
-                                                           << 1
-                                                           << "votes"
-                                                           << 0
-                                                           << "priority"
-                                                           << 0)
-                                                   << BSON("host"
-                                                           << "node3:12345"
-                                                           << "_id"
-                                                           << 2
-                                                           << "votes"
-                                                           << 0
-                                                           << "priority"
-                                                           << 0)
-                                                   << BSON("host"
-                                                           << "node4:12345"
-                                                           << "_id"
-                                                           << 3)
-                                                   << BSON("host"
-                                                           << "node5:12345"
-                                                           << "_id"
-                                                           << 4)))));
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "mySet"
+                               << "version" << 2 << "protocolVersion" << 1 << "members"
+                               << BSON_ARRAY(
+                                      BSON("host"
+                                           << "node1:12345"
+                                           << "_id" << 0)
+                                      << BSON("host"
+                                              << "node2:12345"
+                                              << "_id" << 1 << "votes" << 0 << "priority" << 0)
+                                      << BSON("host"
+                                              << "node3:12345"
+                                              << "_id" << 2 << "votes" << 0 << "priority" << 0)
+                                      << BSON("host"
+                                              << "node4:12345"
+                                              << "_id" << 3)
+                                      << BSON("host"
+                                              << "node5:12345"
+                                              << "_id" << 4)))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(2, config.getWriteMajority());
 }
@@ -317,18 +254,14 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingIdField) {
     // Replica set name must be present.
     ASSERT_EQUALS(
         ErrorCodes::NoSuchKey,
-        config.initialize(
-            BSON("version" << 1 << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                      << "localhost:12345")))));
+        config.initialize(BSON("version" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345")))));
 
     // Empty repl set name parses, but does not validate.
     ASSERT_OK(config.initialize(BSON("_id"
                                      << ""
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
 
@@ -341,9 +274,7 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingVersionField) {
     ASSERT_EQUALS(ErrorCodes::NoSuchKey,
                   config.initialize(BSON("_id"
                                          << "rs0"
-                                         << "protocolVersion"
-                                         << 1
-                                         << "members"
+                                         << "protocolVersion" << 1 << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                   << "localhost:12345")))));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
@@ -351,29 +282,19 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingVersionField) {
                                          << "rs0"
                                          << "version"
                                          << "1"
-                                         << "protocolVersion"
-                                         << 1
-                                         << "members"
+                                         << "protocolVersion" << 1 << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                   << "localhost:12345")))));
 
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1.0
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1.0 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_OK(config.validate());
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 0.0
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 0.0 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
@@ -381,9 +302,7 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingVersionField) {
                                      << "rs0"
                                      << "version"
                                      << static_cast<long long>(std::numeric_limits<int>::max()) + 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
@@ -394,21 +313,13 @@ TEST(ReplSetConfig, ParseFailsWithBadMembers) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
                   config.initialize(BSON("_id"
                                          << "rs0"
-                                         << "version"
-                                         << 1
-                                         << "protocolVersion"
-                                         << 1
-                                         << "members"
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                   << "localhost:12345")
                                                        << "localhost:23456"))));
     ASSERT_NOT_OK(config.initialize(BSON("_id"
                                          << "rs0"
-                                         << "version"
-                                         << 1
-                                         << "protocolVersion"
-                                         << 1
-                                         << "members"
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
                                          << BSON_ARRAY(BSON("host"
                                                             << "localhost:12345")))));
 }
@@ -417,11 +328,7 @@ TEST(ReplSetConfig, ParseFailsWithLocalNonLocalHostMix) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost")
                                                    << BSON("_id" << 1 << "host"
@@ -433,15 +340,11 @@ TEST(ReplSetConfig, ParseFailsWithNoElectableNodes) {
     ReplSetConfig config;
     const BSONObj configBsonNoElectableNodes = BSON("_id"
                                                     << "rs0"
-                                                    << "version"
-                                                    << 1
-                                                    << "protocolVersion"
-                                                    << 1
+                                                    << "version" << 1 << "protocolVersion" << 1
                                                     << "members"
                                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                              << "localhost:1"
-                                                                             << "priority"
-                                                                             << 0)
+                                                                             << "priority" << 0)
                                                                   << BSON("_id" << 1 << "host"
                                                                                 << "localhost:2"
                                                                                 << "priority"
@@ -450,57 +353,41 @@ TEST(ReplSetConfig, ParseFailsWithNoElectableNodes) {
     ASSERT_OK(config.initialize(configBsonNoElectableNodes));
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 
-    const BSONObj configBsonNoElectableNodesOneArbiter = BSON("_id"
-                                                              << "rs0"
-                                                              << "version"
-                                                              << 1
-                                                              << "protocolVersion"
-                                                              << 1
-                                                              << "members"
-                                                              << BSON_ARRAY(
-                                                                     BSON("_id" << 0 << "host"
-                                                                                << "localhost:1"
-                                                                                << "arbiterOnly"
-                                                                                << 1)
-                                                                     << BSON("_id" << 1 << "host"
-                                                                                   << "localhost:2"
-                                                                                   << "priority"
-                                                                                   << 0)));
+    const BSONObj configBsonNoElectableNodesOneArbiter =
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:1"
+                                      << "arbiterOnly" << 1)
+                           << BSON("_id" << 1 << "host"
+                                         << "localhost:2"
+                                         << "priority" << 0)));
 
     ASSERT_OK(config.initialize(configBsonNoElectableNodesOneArbiter));
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 
-    const BSONObj configBsonNoElectableNodesTwoArbiters = BSON("_id"
-                                                               << "rs0"
-                                                               << "version"
-                                                               << 1
-                                                               << "protocolVersion"
-                                                               << 1
-                                                               << "members"
-                                                               << BSON_ARRAY(
-                                                                      BSON("_id" << 0 << "host"
-                                                                                 << "localhost:1"
-                                                                                 << "arbiterOnly"
-                                                                                 << 1)
-                                                                      << BSON("_id" << 1 << "host"
-                                                                                    << "localhost:2"
-                                                                                    << "arbiterOnly"
-                                                                                    << 1)));
+    const BSONObj configBsonNoElectableNodesTwoArbiters =
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:1"
+                                      << "arbiterOnly" << 1)
+                           << BSON("_id" << 1 << "host"
+                                         << "localhost:2"
+                                         << "arbiterOnly" << 1)));
 
     ASSERT_OK(config.initialize(configBsonNoElectableNodesOneArbiter));
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 
     const BSONObj configBsonOneElectableNode = BSON("_id"
                                                     << "rs0"
-                                                    << "version"
-                                                    << 1
-                                                    << "protocolVersion"
-                                                    << 1
+                                                    << "version" << 1 << "protocolVersion" << 1
                                                     << "members"
                                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                              << "localhost:1"
-                                                                             << "priority"
-                                                                             << 0)
+                                                                             << "priority" << 0)
                                                                   << BSON("_id" << 1 << "host"
                                                                                 << "localhost:2"
                                                                                 << "priority"
@@ -511,46 +398,30 @@ TEST(ReplSetConfig, ParseFailsWithNoElectableNodes) {
 
 TEST(ReplSetConfig, ParseFailsWithTooFewVoters) {
     ReplSetConfig config;
-    const BSONObj configBsonNoVoters = BSON("_id"
-                                            << "rs0"
-                                            << "version"
-                                            << 1
-                                            << "protocolVersion"
-                                            << 1
-                                            << "members"
-                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                     << "localhost:1"
-                                                                     << "votes"
-                                                                     << 0
-                                                                     << "priority"
-                                                                     << 0)
-                                                          << BSON("_id" << 1 << "host"
-                                                                        << "localhost:2"
-                                                                        << "votes"
-                                                                        << 0
-                                                                        << "priority"
-                                                                        << 0)));
+    const BSONObj configBsonNoVoters =
+        BSON("_id"
+             << "rs0"
+             << "version" << 1 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:1"
+                                      << "votes" << 0 << "priority" << 0)
+                           << BSON("_id" << 1 << "host"
+                                         << "localhost:2"
+                                         << "votes" << 0 << "priority" << 0)));
 
     ASSERT_OK(config.initialize(configBsonNoVoters));
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 
     const BSONObj configBsonOneVoter = BSON("_id"
                                             << "rs0"
-                                            << "version"
-                                            << 1
-                                            << "protocolVersion"
-                                            << 1
-                                            << "members"
+                                            << "version" << 1 << "protocolVersion" << 1 << "members"
                                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                      << "localhost:1"
-                                                                     << "votes"
-                                                                     << 0
-                                                                     << "priority"
+                                                                     << "votes" << 0 << "priority"
                                                                      << 0)
                                                           << BSON("_id" << 1 << "host"
                                                                         << "localhost:2"
-                                                                        << "votes"
-                                                                        << 1)));
+                                                                        << "votes" << 1)));
     ASSERT_OK(config.initialize(configBsonOneVoter));
     ASSERT_OK(config.validate());
 }
@@ -567,11 +438,7 @@ TEST(ReplSetConfig, ParseFailsWithDuplicateHost) {
     ReplSetConfig config;
     const BSONObj configBson = BSON("_id"
                                     << "rs0"
-                                    << "version"
-                                    << 1
-                                    << "protocolVersion"
-                                    << 1
-                                    << "members"
+                                    << "version" << 1 << "protocolVersion" << 1 << "members"
                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                              << "localhost:1")
                                                   << BSON("_id" << 1 << "host"
@@ -621,14 +488,11 @@ TEST(ReplSetConfig, ParseFailsWithTooManyNodes) {
 
 TEST(ReplSetConfig, ParseFailsWithUnexpectedField) {
     ReplSetConfig config;
-    Status status = config.initialize(BSON("_id"
-                                           << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "unexpectedfield"
-                                           << "value"));
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "protocolVersion" << 1 << "unexpectedfield"
+                               << "value"));
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
@@ -636,11 +500,7 @@ TEST(ReplSetConfig, ParseFailsWithNonArrayMembersField) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << "value"));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
@@ -649,11 +509,7 @@ TEST(ReplSetConfig, ParseFailsWithNonNumericHeartbeatIntervalMillisField) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"))
                                            << "settings"
@@ -671,11 +527,7 @@ TEST(ReplSetConfig, ParseFailsWithNonNumericElectionTimeoutMillisField) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"))
                                            << "settings"
@@ -688,11 +540,7 @@ TEST(ReplSetConfig, ParseFailsWithNonNumericHeartbeatTimeoutSecsField) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"))
                                            << "settings"
@@ -705,11 +553,7 @@ TEST(ReplSetConfig, ParseFailsWithNonBoolChainingAllowedField) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"))
                                            << "settings"
@@ -722,11 +566,7 @@ TEST(ReplSetConfig, ParseFailsWithNonBoolConfigServerField) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"))
                                            << "configsvr"
@@ -738,11 +578,7 @@ TEST(ReplSetConfig, ParseFailsWithNonObjectSettingsField) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"))
                                            << "settings"
@@ -754,11 +590,7 @@ TEST(ReplSetConfig, ParseFailsWithGetLastErrorDefaultsFieldUnparseable) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"))
                                            << "settings"
@@ -771,11 +603,7 @@ TEST(ReplSetConfig, ParseFailsWithNonObjectGetLastErrorDefaultsField) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"))
                                            << "settings"
@@ -788,11 +616,7 @@ TEST(ReplSetConfig, ParseFailsWithNonObjectGetLastErrorModesField) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"))
                                            << "settings"
@@ -805,11 +629,7 @@ TEST(ReplSetConfig, ParseFailsWithDuplicateGetLastErrorModesField) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"
                                                                     << "tags"
@@ -824,20 +644,16 @@ TEST(ReplSetConfig, ParseFailsWithDuplicateGetLastErrorModesField) {
 
 TEST(ReplSetConfig, ParseFailsWithNonObjectGetLastErrorModesEntryField) {
     ReplSetConfig config;
-    Status status = config.initialize(BSON("_id"
-                                           << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
-                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                    << "localhost:12345"
-                                                                    << "tags"
-                                                                    << BSON("tag"
-                                                                            << "yes")))
-                                           << "settings"
-                                           << BSON("getLastErrorModes" << BSON("one" << 1))));
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "protocolVersion" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345"
+                                                        << "tags"
+                                                        << BSON("tag"
+                                                                << "yes")))
+                               << "settings" << BSON("getLastErrorModes" << BSON("one" << 1))));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
@@ -846,11 +662,7 @@ TEST(ReplSetConfig, ParseFailsWithNonNumericGetLastErrorModesConstraintValue) {
     Status status =
         config.initialize(BSON("_id"
                                << "rs0"
-                               << "version"
-                               << 1
-                               << "protocolVersion"
-                               << 1
-                               << "members"
+                               << "version" << 1 << "protocolVersion" << 1 << "members"
                                << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                         << "localhost:12345"
                                                         << "tags"
@@ -867,11 +679,7 @@ TEST(ReplSetConfig, ParseFailsWithNegativeGetLastErrorModesConstraintValue) {
     Status status =
         config.initialize(BSON("_id"
                                << "rs0"
-                               << "version"
-                               << 1
-                               << "protocolVersion"
-                               << 1
-                               << "members"
+                               << "version" << 1 << "protocolVersion" << 1 << "members"
                                << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                         << "localhost:12345"
                                                         << "tags"
@@ -887,11 +695,7 @@ TEST(ReplSetConfig, ParseFailsWithNonExistentGetLastErrorModesConstraintTag) {
     Status status =
         config.initialize(BSON("_id"
                                << "rs0"
-                               << "version"
-                               << 1
-                               << "protocolVersion"
-                               << 1
-                               << "members"
+                               << "version" << 1 << "protocolVersion" << 1 << "members"
                                << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                         << "localhost:12345"
                                                         << "tags"
@@ -906,13 +710,8 @@ TEST(ReplSetConfig, ParseFailsWithRepairField) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "repaired"
-                                           << true
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "repaired" << true << "version" << 1
+                                           << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"))));
     ASSERT_EQUALS(ErrorCodes::RepairedReplicaSetNode, status);
@@ -922,11 +721,7 @@ TEST(ReplSetConfig, ValidateFailsWithBadProtocolVersion) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "protocolVersion"
-                                           << 3
-                                           << "version"
-                                           << 1
-                                           << "members"
+                                           << "protocolVersion" << 3 << "version" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345")
                                                          << BSON("_id" << 1 << "host"
@@ -941,11 +736,7 @@ TEST(ReplSetConfig, ValidateFailsWithProtocolVersion0) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "protocolVersion"
-                                           << 0
-                                           << "version"
-                                           << 1
-                                           << "members"
+                                           << "protocolVersion" << 0 << "version" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345")
                                                          << BSON("_id" << 1 << "host"
@@ -960,11 +751,7 @@ TEST(ReplSetConfig, ValidateFailsWithDuplicateMemberId) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345")
                                                          << BSON("_id" << 0 << "host"
@@ -979,15 +766,10 @@ TEST(ReplSetConfig, ValidateFailsWithInvalidMember) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
+                                           << "version" << 1 << "protocolVersion" << 1 << "members"
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"
-                                                                    << "hidden"
-                                                                    << true))));
+                                                                    << "hidden" << true))));
     ASSERT_OK(status);
 
     status = config.validate();
@@ -998,29 +780,19 @@ TEST(ReplSetConfig, ChainingAllowedField) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345"))
-                                     << "settings"
-                                     << BSON("chainingAllowed" << true))));
+                                     << "settings" << BSON("chainingAllowed" << true))));
     ASSERT_OK(config.validate());
     ASSERT_TRUE(config.isChainingAllowed());
 
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345"))
-                                     << "settings"
-                                     << BSON("chainingAllowed" << false))));
+                                     << "settings" << BSON("chainingAllowed" << false))));
     ASSERT_OK(config.validate());
     ASSERT_FALSE(config.isChainingAllowed());
 }
@@ -1029,13 +801,8 @@ TEST(ReplSetConfig, ConfigServerField) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "protocolVersion"
-                                     << 1
-                                     << "version"
-                                     << 1
-                                     << "configsvr"
-                                     << true
-                                     << "members"
+                                     << "protocolVersion" << 1 << "version" << 1 << "configsvr"
+                                     << true << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_TRUE(config.isConfigServer());
@@ -1043,13 +810,8 @@ TEST(ReplSetConfig, ConfigServerField) {
     ReplSetConfig config2;
     ASSERT_OK(config2.initialize(BSON("_id"
                                       << "rs0"
-                                      << "version"
-                                      << 1
-                                      << "protocolVersion"
-                                      << 1
-                                      << "configsvr"
-                                      << false
-                                      << "members"
+                                      << "version" << 1 << "protocolVersion" << 1 << "configsvr"
+                                      << false << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")))));
     ASSERT_FALSE(config2.isConfigServer());
@@ -1072,25 +834,18 @@ TEST(ReplSetConfig, ConfigServerFieldDefaults) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "protocolVersion"
-                                     << 1
-                                     << "version"
-                                     << 1
-                                     << "members"
+                                     << "protocolVersion" << 1 << "version" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_FALSE(config.isConfigServer());
 
     ReplSetConfig config2;
-    ASSERT_OK(config2.initializeForInitiate(BSON("_id"
-                                                 << "rs0"
-                                                 << "protocolVersion"
-                                                 << 1
-                                                 << "version"
-                                                 << 1
-                                                 << "members"
-                                                 << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                          << "localhost:12345")))));
+    ASSERT_OK(
+        config2.initializeForInitiate(BSON("_id"
+                                           << "rs0"
+                                           << "protocolVersion" << 1 << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345")))));
     ASSERT_FALSE(config2.isConfigServer());
 
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
@@ -1099,25 +854,18 @@ TEST(ReplSetConfig, ConfigServerFieldDefaults) {
     ReplSetConfig config3;
     ASSERT_OK(config3.initialize(BSON("_id"
                                       << "rs0"
-                                      << "protocolVersion"
-                                      << 1
-                                      << "version"
-                                      << 1
-                                      << "members"
+                                      << "protocolVersion" << 1 << "version" << 1 << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")))));
     ASSERT_FALSE(config3.isConfigServer());
 
     ReplSetConfig config4;
-    ASSERT_OK(config4.initializeForInitiate(BSON("_id"
-                                                 << "rs0"
-                                                 << "protocolVersion"
-                                                 << 1
-                                                 << "version"
-                                                 << 1
-                                                 << "members"
-                                                 << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                          << "localhost:12345")))));
+    ASSERT_OK(
+        config4.initializeForInitiate(BSON("_id"
+                                           << "rs0"
+                                           << "protocolVersion" << 1 << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345")))));
     ASSERT_TRUE(config4.isConfigServer());
 }
 
@@ -1125,29 +873,19 @@ TEST(ReplSetConfig, HeartbeatIntervalField) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345"))
-                                     << "settings"
-                                     << BSON("heartbeatIntervalMillis" << 5000))));
+                                     << "settings" << BSON("heartbeatIntervalMillis" << 5000))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(Seconds(5), config.getHeartbeatInterval());
 
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345"))
-                                     << "settings"
-                                     << BSON("heartbeatIntervalMillis" << -5000))));
+                                     << "settings" << BSON("heartbeatIntervalMillis" << -5000))));
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 }
 
@@ -1155,29 +893,19 @@ TEST(ReplSetConfig, ElectionTimeoutField) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345"))
-                                     << "settings"
-                                     << BSON("electionTimeoutMillis" << 20))));
+                                     << "settings" << BSON("electionTimeoutMillis" << 20))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(Milliseconds(20), config.getElectionTimeoutPeriod());
 
     auto status = config.initialize(BSON("_id"
                                          << "rs0"
-                                         << "version"
-                                         << 1
-                                         << "protocolVersion"
-                                         << 1
-                                         << "members"
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                   << "localhost:12345"))
-                                         << "settings"
-                                         << BSON("electionTimeoutMillis" << -20)));
+                                         << "settings" << BSON("electionTimeoutMillis" << -20)));
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), "election timeout must be greater than 0");
 }
@@ -1186,29 +914,19 @@ TEST(ReplSetConfig, HeartbeatTimeoutField) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345"))
-                                     << "settings"
-                                     << BSON("heartbeatTimeoutSecs" << 20))));
+                                     << "settings" << BSON("heartbeatTimeoutSecs" << 20))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(Seconds(20), config.getHeartbeatTimeoutPeriod());
 
     auto status = config.initialize(BSON("_id"
                                          << "rs0"
-                                         << "version"
-                                         << 1
-                                         << "protocolVersion"
-                                         << 1
-                                         << "members"
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                   << "localhost:12345"))
-                                         << "settings"
-                                         << BSON("heartbeatTimeoutSecs" << -20)));
+                                         << "settings" << BSON("heartbeatTimeoutSecs" << -20)));
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), "heartbeat timeout must be greater than 0");
 }
@@ -1217,11 +935,7 @@ TEST(ReplSetConfig, GleDefaultField) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345"))
                                      << "settings"
@@ -1232,11 +946,7 @@ TEST(ReplSetConfig, GleDefaultField) {
 
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345"))
                                      << "settings"
@@ -1244,27 +954,19 @@ TEST(ReplSetConfig, GleDefaultField) {
                                                                             << "frim")))));
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345"))
-                                     << "settings"
-                                     << BSON("getLastErrorDefaults" << BSON("w" << 0)))));
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "protocolVersion" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345"))
+                               << "settings" << BSON("getLastErrorDefaults" << BSON("w" << 0)))));
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 
     ASSERT_OK(
         config.initialize(BSON("_id"
                                << "rs0"
-                               << "version"
-                               << 1
-                               << "protocolVersion"
-                               << 1
-                               << "members"
+                               << "version" << 1 << "protocolVersion" << 1 << "members"
                                << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                         << "localhost:12345"
                                                         << "tags"
@@ -1352,19 +1054,15 @@ bool operator==(const ReplSetConfig& a, const ReplSetConfig& b) {
 TEST(ReplSetConfig, toBSONRoundTripAbility) {
     ReplSetConfig configA;
     ReplSetConfig configB;
-    ASSERT_OK(configA.initialize(BSON(
-        "_id"
-        << "rs0"
-        << "version"
-        << 1
-        << "protocolVersion"
-        << 1
-        << "members"
-        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                 << "localhost:12345"))
-        << "settings"
-        << BSON("heartbeatIntervalMillis" << 5000 << "heartbeatTimeoutSecs" << 20 << "replicaSetId"
-                                          << OID::gen()))));
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "protocolVersion" << 1 << "members"
+                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                               << "localhost:12345"))
+                                      << "settings"
+                                      << BSON("heartbeatIntervalMillis"
+                                              << 5000 << "heartbeatTimeoutSecs" << 20
+                                              << "replicaSetId" << OID::gen()))));
     ASSERT_OK(configB.initialize(configA.toBSON()));
     ASSERT_TRUE(configA == configB);
 }
@@ -1372,22 +1070,18 @@ TEST(ReplSetConfig, toBSONRoundTripAbility) {
 TEST(ReplSetConfig, toBSONRoundTripAbilityWithHorizon) {
     ReplSetConfig configA;
     ReplSetConfig configB;
-    ASSERT_OK(configA.initialize(BSON(
-        "_id"
-        << "rs0"
-        << "version"
-        << 1
-        << "protocolVersion"
-        << 1
-        << "members"
-        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                 << "localhost:12345"
-                                 << "horizons"
-                                 << BSON("horizon"
-                                         << "example.com:42")))
-        << "settings"
-        << BSON("heartbeatIntervalMillis" << 5000 << "heartbeatTimeoutSecs" << 20 << "replicaSetId"
-                                          << OID::gen()))));
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "protocolVersion" << 1 << "members"
+                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                               << "localhost:12345"
+                                                               << "horizons"
+                                                               << BSON("horizon"
+                                                                       << "example.com:42")))
+                                      << "settings"
+                                      << BSON("heartbeatIntervalMillis"
+                                              << 5000 << "heartbeatTimeoutSecs" << 20
+                                              << "replicaSetId" << OID::gen()))));
     ASSERT_OK(configB.initialize(configA.toBSON()));
     ASSERT_TRUE(configA == configB);
 }
@@ -1395,66 +1089,39 @@ TEST(ReplSetConfig, toBSONRoundTripAbilityWithHorizon) {
 TEST(ReplSetConfig, toBSONRoundTripAbilityLarge) {
     ReplSetConfig configA;
     ReplSetConfig configB;
-    ASSERT_OK(configA.initialize(
-        BSON("_id"
-             << "asdf"
-             << "version"
-             << 9
-             << "writeConcernMajorityJournalDefault"
-             << true
-             << "members"
-             << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                      << "localhost:12345"
-                                      << "arbiterOnly"
-                                      << true
-                                      << "votes"
-                                      << 1)
-                           << BSON("_id" << 3 << "host"
-                                         << "localhost:3828"
-                                         << "arbiterOnly"
-                                         << false
-                                         << "hidden"
-                                         << true
-                                         << "buildIndexes"
-                                         << false
-                                         << "priority"
-                                         << 0
-                                         << "slaveDelay"
-                                         << 17
-                                         << "votes"
-                                         << 0
-                                         << "tags"
-                                         << BSON("coast"
-                                                 << "east"
-                                                 << "ssd"
-                                                 << "true"))
-                           << BSON("_id" << 2 << "host"
-                                         << "foo.com:3828"
-                                         << "votes"
-                                         << 0
-                                         << "priority"
-                                         << 0
-                                         << "tags"
-                                         << BSON("coast"
-                                                 << "west"
-                                                 << "hdd"
-                                                 << "true")))
-             << "protocolVersion"
-             << 1
-             << "settings"
+    ASSERT_OK(configA.initialize(BSON(
+        "_id"
+        << "asdf"
+        << "version" << 9 << "writeConcernMajorityJournalDefault" << true << "members"
+        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                 << "localhost:12345"
+                                 << "arbiterOnly" << true << "votes" << 1)
+                      << BSON("_id" << 3 << "host"
+                                    << "localhost:3828"
+                                    << "arbiterOnly" << false << "hidden" << true << "buildIndexes"
+                                    << false << "priority" << 0 << "slaveDelay" << 17 << "votes"
+                                    << 0 << "tags"
+                                    << BSON("coast"
+                                            << "east"
+                                            << "ssd"
+                                            << "true"))
+                      << BSON("_id" << 2 << "host"
+                                    << "foo.com:3828"
+                                    << "votes" << 0 << "priority" << 0 << "tags"
+                                    << BSON("coast"
+                                            << "west"
+                                            << "hdd"
+                                            << "true")))
+        << "protocolVersion" << 1 << "settings"
 
-             << BSON("heartbeatIntervalMillis" << 5000 << "heartbeatTimeoutSecs" << 20
-                                               << "electionTimeoutMillis"
-                                               << 4
-                                               << "chainingAllowd"
-                                               << true
-                                               << "getLastErrorDefaults"
-                                               << BSON("w"
-                                                       << "majority")
-                                               << "getLastErrorModes"
-                                               << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1)
-                                                               << "coasts"
-                                                               << BSON("coast" << 2))))));
+        << BSON("heartbeatIntervalMillis" << 5000 << "heartbeatTimeoutSecs" << 20
+                                          << "electionTimeoutMillis" << 4 << "chainingAllowd"
+                                          << true << "getLastErrorDefaults"
+                                          << BSON("w"
+                                                  << "majority")
+                                          << "getLastErrorModes"
+                                          << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1)
+                                                          << "coasts" << BSON("coast" << 2))))));
     BSONObj configObjA = configA.toBSON();
     ASSERT_OK(configB.initialize(configObjA));
     ASSERT_TRUE(configA == configB);
@@ -1463,41 +1130,23 @@ TEST(ReplSetConfig, toBSONRoundTripAbilityLarge) {
 TEST(ReplSetConfig, toBSONRoundTripAbilityInvalid) {
     ReplSetConfig configA;
     ReplSetConfig configB;
-    ASSERT_OK(
-        configA.initialize(BSON("_id"
-                                << ""
-                                << "version"
-                                << -3
-                                << "protocolVersion"
-                                << 1
-                                << "members"
-                                << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                         << "localhost:12345"
-                                                         << "arbiterOnly"
-                                                         << true
-                                                         << "votes"
-                                                         << 0
-                                                         << "priority"
-                                                         << 0)
-                                              << BSON("_id" << 0 << "host"
-                                                            << "localhost:3828"
-                                                            << "arbiterOnly"
-                                                            << false
-                                                            << "buildIndexes"
-                                                            << false
-                                                            << "priority"
-                                                            << 2)
-                                              << BSON("_id" << 2 << "host"
-                                                            << "localhost:3828"
-                                                            << "votes"
-                                                            << 0
-                                                            << "priority"
-                                                            << 0))
-                                << "settings"
-                                << BSON("heartbeatIntervalMillis" << -5000 << "heartbeatTimeoutSecs"
-                                                                  << 20
-                                                                  << "electionTimeoutMillis"
-                                                                  << 2))));
+    ASSERT_OK(configA.initialize(
+        BSON("_id"
+             << ""
+             << "version" << -3 << "protocolVersion" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:12345"
+                                      << "arbiterOnly" << true << "votes" << 0 << "priority" << 0)
+                           << BSON("_id" << 0 << "host"
+                                         << "localhost:3828"
+                                         << "arbiterOnly" << false << "buildIndexes" << false
+                                         << "priority" << 2)
+                           << BSON("_id" << 2 << "host"
+                                         << "localhost:3828"
+                                         << "votes" << 0 << "priority" << 0))
+             << "settings"
+             << BSON("heartbeatIntervalMillis" << -5000 << "heartbeatTimeoutSecs" << 20
+                                               << "electionTimeoutMillis" << 2))));
     ASSERT_OK(configB.initialize(configA.toBSON()));
     ASSERT_NOT_OK(configA.validate());
     ASSERT_NOT_OK(configB.validate());
@@ -1506,59 +1155,52 @@ TEST(ReplSetConfig, toBSONRoundTripAbilityInvalid) {
 
 TEST(ReplSetConfig, CheckIfWriteConcernCanBeSatisfied) {
     ReplSetConfig configA;
-    ASSERT_OK(configA.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version"
-                                      << 1
-                                      << "protocolVersion"
-                                      << 1
-                                      << "members"
-                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                               << "node0"
-                                                               << "tags"
-                                                               << BSON("dc"
-                                                                       << "NA"
-                                                                       << "rack"
-                                                                       << "rackNA1"))
-                                                    << BSON("_id" << 1 << "host"
-                                                                  << "node1"
-                                                                  << "tags"
-                                                                  << BSON("dc"
-                                                                          << "NA"
-                                                                          << "rack"
-                                                                          << "rackNA2"))
-                                                    << BSON("_id" << 2 << "host"
-                                                                  << "node2"
-                                                                  << "tags"
-                                                                  << BSON("dc"
-                                                                          << "NA"
-                                                                          << "rack"
-                                                                          << "rackNA3"))
-                                                    << BSON("_id" << 3 << "host"
-                                                                  << "node3"
-                                                                  << "tags"
-                                                                  << BSON("dc"
-                                                                          << "EU"
-                                                                          << "rack"
-                                                                          << "rackEU1"))
-                                                    << BSON("_id" << 4 << "host"
-                                                                  << "node4"
-                                                                  << "tags"
-                                                                  << BSON("dc"
-                                                                          << "EU"
-                                                                          << "rack"
-                                                                          << "rackEU2"))
-                                                    << BSON("_id" << 5 << "host"
-                                                                  << "node5"
-                                                                  << "arbiterOnly"
-                                                                  << true))
-                                      << "settings"
-                                      << BSON("getLastErrorModes"
-                                              << BSON("valid" << BSON("dc" << 2 << "rack" << 3)
-                                                              << "invalidNotEnoughValues"
-                                                              << BSON("dc" << 3)
-                                                              << "invalidNotEnoughNodes"
-                                                              << BSON("rack" << 6))))));
+    ASSERT_OK(configA.initialize(BSON(
+        "_id"
+        << "rs0"
+        << "version" << 1 << "protocolVersion" << 1 << "members"
+        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                 << "node0"
+                                 << "tags"
+                                 << BSON("dc"
+                                         << "NA"
+                                         << "rack"
+                                         << "rackNA1"))
+                      << BSON("_id" << 1 << "host"
+                                    << "node1"
+                                    << "tags"
+                                    << BSON("dc"
+                                            << "NA"
+                                            << "rack"
+                                            << "rackNA2"))
+                      << BSON("_id" << 2 << "host"
+                                    << "node2"
+                                    << "tags"
+                                    << BSON("dc"
+                                            << "NA"
+                                            << "rack"
+                                            << "rackNA3"))
+                      << BSON("_id" << 3 << "host"
+                                    << "node3"
+                                    << "tags"
+                                    << BSON("dc"
+                                            << "EU"
+                                            << "rack"
+                                            << "rackEU1"))
+                      << BSON("_id" << 4 << "host"
+                                    << "node4"
+                                    << "tags"
+                                    << BSON("dc"
+                                            << "EU"
+                                            << "rack"
+                                            << "rackEU2"))
+                      << BSON("_id" << 5 << "host"
+                                    << "node5"
+                                    << "arbiterOnly" << true))
+        << "settings"
+        << BSON("getLastErrorModes" << BSON(
+                    "valid" << BSON("dc" << 2 << "rack" << 3) << "invalidNotEnoughValues"
+                            << BSON("dc" << 3) << "invalidNotEnoughNodes" << BSON("rack" << 6))))));
 
     WriteConcernOptions validNumberWC;
     validNumberWC.wNumNodes = 5;
@@ -1619,19 +1261,13 @@ TEST(ReplSetConfig, CheckConfigServerCantHaveArbiters) {
     ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
-                                      << "protocolVersion"
-                                      << 1
-                                      << "version"
-                                      << 1
-                                      << "configsvr"
-                                      << true
-                                      << "members"
+                                      << "protocolVersion" << 1 << "version" << 1 << "configsvr"
+                                      << true << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")
                                                     << BSON("_id" << 1 << "host"
                                                                   << "localhost:54321"
-                                                                  << "arbiterOnly"
-                                                                  << true)))));
+                                                                  << "arbiterOnly" << true)))));
     Status status = configA.validate();
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), "Arbiters are not allowed");
@@ -1641,21 +1277,14 @@ TEST(ReplSetConfig, CheckConfigServerMustBuildIndexes) {
     ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
-                                      << "protocolVersion"
-                                      << 1
-                                      << "version"
-                                      << 1
-                                      << "configsvr"
-                                      << true
-                                      << "members"
+                                      << "protocolVersion" << 1 << "version" << 1 << "configsvr"
+                                      << true << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")
                                                     << BSON("_id" << 1 << "host"
                                                                   << "localhost:54321"
-                                                                  << "priority"
-                                                                  << 0
-                                                                  << "buildIndexes"
-                                                                  << false)))));
+                                                                  << "priority" << 0
+                                                                  << "buildIndexes" << false)))));
     Status status = configA.validate();
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), "must build indexes");
@@ -1665,20 +1294,13 @@ TEST(ReplSetConfig, CheckConfigServerCantHaveSlaveDelay) {
     ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
-                                      << "protocolVersion"
-                                      << 1
-                                      << "version"
-                                      << 1
-                                      << "configsvr"
-                                      << true
-                                      << "members"
+                                      << "protocolVersion" << 1 << "version" << 1 << "configsvr"
+                                      << true << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")
                                                     << BSON("_id" << 1 << "host"
                                                                   << "localhost:54321"
-                                                                  << "priority"
-                                                                  << 0
-                                                                  << "slaveDelay"
+                                                                  << "priority" << 0 << "slaveDelay"
                                                                   << 3)))));
     Status status = configA.validate();
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
@@ -1691,19 +1313,13 @@ TEST(ReplSetConfig, CheckConfigServerMustHaveTrueForWriteConcernMajorityJournalD
     ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
-                                      << "protocolVersion"
-                                      << 1
-                                      << "version"
-                                      << 1
-                                      << "configsvr"
-                                      << true
-                                      << "members"
+                                      << "protocolVersion" << 1 << "version" << 1 << "configsvr"
+                                      << true << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")
                                                     << BSON("_id" << 1 << "host"
                                                                   << "localhost:54321"))
-                                      << "writeConcernMajorityJournalDefault"
-                                      << false)));
+                                      << "writeConcernMajorityJournalDefault" << false)));
     Status status = configA.validate();
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), " must be true in replica set configurations being ");
@@ -1713,33 +1329,23 @@ TEST(ReplSetConfig, GetPriorityTakeoverDelay) {
     ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
-                                      << "version"
-                                      << 1
-                                      << "protocolVersion"
-                                      << 1
-                                      << "members"
+                                      << "version" << 1 << "protocolVersion" << 1 << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345"
-                                                               << "priority"
-                                                               << 1)
+                                                               << "priority" << 1)
                                                     << BSON("_id" << 1 << "host"
                                                                   << "localhost:54321"
-                                                                  << "priority"
-                                                                  << 2)
+                                                                  << "priority" << 2)
                                                     << BSON("_id" << 2 << "host"
                                                                   << "localhost:5321"
-                                                                  << "priority"
-                                                                  << 3)
+                                                                  << "priority" << 3)
                                                     << BSON("_id" << 3 << "host"
                                                                   << "localhost:5421"
-                                                                  << "priority"
-                                                                  << 4)
+                                                                  << "priority" << 4)
                                                     << BSON("_id" << 4 << "host"
                                                                   << "localhost:5431"
-                                                                  << "priority"
-                                                                  << 5))
-                                      << "settings"
-                                      << BSON("electionTimeoutMillis" << 1000))));
+                                                                  << "priority" << 5))
+                                      << "settings" << BSON("electionTimeoutMillis" << 1000))));
     ASSERT_OK(configA.validate());
     ASSERT_EQUALS(Milliseconds(5000), configA.getPriorityTakeoverDelay(0));
     ASSERT_EQUALS(Milliseconds(4000), configA.getPriorityTakeoverDelay(1));
@@ -1750,33 +1356,23 @@ TEST(ReplSetConfig, GetPriorityTakeoverDelay) {
     ReplSetConfig configB;
     ASSERT_OK(configB.initialize(BSON("_id"
                                       << "rs0"
-                                      << "version"
-                                      << 1
-                                      << "protocolVersion"
-                                      << 1
-                                      << "members"
+                                      << "version" << 1 << "protocolVersion" << 1 << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345"
-                                                               << "priority"
-                                                               << 1)
+                                                               << "priority" << 1)
                                                     << BSON("_id" << 1 << "host"
                                                                   << "localhost:54321"
-                                                                  << "priority"
-                                                                  << 2)
+                                                                  << "priority" << 2)
                                                     << BSON("_id" << 2 << "host"
                                                                   << "localhost:5321"
-                                                                  << "priority"
-                                                                  << 2)
+                                                                  << "priority" << 2)
                                                     << BSON("_id" << 3 << "host"
                                                                   << "localhost:5421"
-                                                                  << "priority"
-                                                                  << 3)
+                                                                  << "priority" << 3)
                                                     << BSON("_id" << 4 << "host"
                                                                   << "localhost:5431"
-                                                                  << "priority"
-                                                                  << 3))
-                                      << "settings"
-                                      << BSON("electionTimeoutMillis" << 1000))));
+                                                                  << "priority" << 3))
+                                      << "settings" << BSON("electionTimeoutMillis" << 1000))));
     ASSERT_OK(configB.validate());
     ASSERT_EQUALS(Milliseconds(5000), configB.getPriorityTakeoverDelay(0));
     ASSERT_EQUALS(Milliseconds(3000), configB.getPriorityTakeoverDelay(1));
@@ -1789,29 +1385,20 @@ TEST(ReplSetConfig, GetCatchUpTakeoverDelay) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345"))
-                                     << "settings"
-                                     << BSON("catchUpTakeoverDelayMillis" << 5000))));
+                                     << "settings" << BSON("catchUpTakeoverDelayMillis" << 5000))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(Milliseconds(5000), config.getCatchUpTakeoverDelay());
 
-    Status status = config.initialize(BSON("_id"
-                                           << "rs0"
-                                           << "version"
-                                           << 1
-                                           << "protocolVersion"
-                                           << 1
-                                           << "members"
-                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                    << "localhost:12345"))
-                                           << "settings"
-                                           << BSON("catchUpTakeoverDelayMillis" << -5000)));
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "protocolVersion" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345"))
+                               << "settings" << BSON("catchUpTakeoverDelayMillis" << -5000)));
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(
         status.reason(),
@@ -1822,23 +1409,16 @@ TEST(ReplSetConfig, GetCatchUpTakeoverDelayDefault) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "protocolVersion"
-                                     << 1
-                                     << "members"
+                                     << "version" << 1 << "protocolVersion" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345"
-                                                              << "priority"
-                                                              << 1)
+                                                              << "priority" << 1)
                                                    << BSON("_id" << 1 << "host"
                                                                  << "localhost:54321"
-                                                                 << "priority"
-                                                                 << 2)
+                                                                 << "priority" << 2)
                                                    << BSON("_id" << 2 << "host"
                                                                  << "localhost:5321"
-                                                                 << "priority"
-                                                                 << 3)))));
+                                                                 << "priority" << 3)))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(Milliseconds(30000), config.getCatchUpTakeoverDelay());
 }
@@ -1849,11 +1429,7 @@ TEST(ReplSetConfig, ConfirmDefaultValuesOfAndAbilityToSetWriteConcernMajorityJou
     // PV1, should default to true.
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "protocolVersion"
-                                     << 1
-                                     << "version"
-                                     << 1
-                                     << "members"
+                                     << "protocolVersion" << 1 << "version" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_OK(config.validate());
@@ -1863,15 +1439,10 @@ TEST(ReplSetConfig, ConfirmDefaultValuesOfAndAbilityToSetWriteConcernMajorityJou
     // Should be able to set it false in PV1.
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "protocolVersion"
-                                     << 1
-                                     << "version"
-                                     << 1
-                                     << "members"
+                                     << "protocolVersion" << 1 << "version" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345"))
-                                     << "writeConcernMajorityJournalDefault"
-                                     << false)));
+                                     << "writeConcernMajorityJournalDefault" << false)));
     ASSERT_OK(config.validate());
     ASSERT_FALSE(config.getWriteConcernMajorityShouldJournal());
     ASSERT_TRUE(config.toBSON().hasField("writeConcernMajorityJournalDefault"));
@@ -1881,11 +1452,7 @@ TEST(ReplSetConfig, HorizonConsistency) {
     ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "protocolVersion"
-                                     << 1
-                                     << "version"
-                                     << 1
-                                     << "members"
+                                     << "protocolVersion" << 1 << "version" << 1 << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345"
                                                               << "horizons"
@@ -1914,8 +1481,7 @@ TEST(ReplSetConfig, HorizonConsistency) {
                                                                          << "delta"
 
                                                                          << "c.host3:44")))
-                                     << "writeConcernMajorityJournalDefault"
-                                     << false)));
+                                     << "writeConcernMajorityJournalDefault" << false)));
 
     Status status = config.validate();
     ASSERT_NOT_OK(status);
@@ -1929,11 +1495,7 @@ TEST(ReplSetConfig, HorizonConsistency) {
     // in the member-config code path.
     status = config.initialize(BSON("_id"
                                     << "rs0"
-                                    << "protocolVersion"
-                                    << 1
-                                    << "version"
-                                    << 1
-                                    << "members"
+                                    << "protocolVersion" << 1 << "version" << 1 << "members"
                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                              << "same1"
                                                              << "horizons"
@@ -1978,8 +1540,7 @@ TEST(ReplSetConfig, HorizonConsistency) {
                                                                         << "d.host3:44"
                                                                         << "delta"
                                                                         << "d.host4:44")))
-                                    << "writeConcernMajorityJournalDefault"
-                                    << false));
+                                    << "writeConcernMajorityJournalDefault" << false));
     ASSERT_OK(status) << " failing status was: " << status.reason();
 
     status = config.validate();
@@ -2003,15 +1564,11 @@ TEST(ReplSetConfig, ReplSetId) {
     auto status =
         ReplSetConfig().initializeForInitiate(BSON("_id"
                                                    << "rs0"
-                                                   << "version"
-                                                   << 1
-                                                   << "protocolVersion"
-                                                   << 1
+                                                   << "version" << 1 << "protocolVersion" << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                             << "localhost:12345"
-                                                                            << "priority"
-                                                                            << 1))
+                                                                            << "priority" << 1))
                                                    << "settings"
                                                    << BSON("replicaSetId" << OID::gen())));
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
@@ -2025,15 +1582,11 @@ TEST(ReplSetConfig, ReplSetId) {
     ASSERT_OK(
         configInitiate.initializeForInitiate(BSON("_id"
                                                   << "rs0"
-                                                  << "version"
-                                                  << 1
-                                                  << "protocolVersion"
-                                                  << 1
+                                                  << "version" << 1 << "protocolVersion" << 1
                                                   << "members"
                                                   << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                            << "localhost:12345"
-                                                                           << "priority"
-                                                                           << 1)))));
+                                                                           << "priority" << 1)))));
     ASSERT_OK(configInitiate.validate());
     ASSERT_TRUE(configInitiate.hasReplicaSetId());
     OID replicaSetId = configInitiate.getReplicaSetId();
@@ -2042,17 +1595,11 @@ TEST(ReplSetConfig, ReplSetId) {
     ReplSetConfig configLocal;
     ASSERT_OK(configLocal.initialize(BSON("_id"
                                           << "rs0"
-                                          << "version"
-                                          << 1
-                                          << "protocolVersion"
-                                          << 1
-                                          << "members"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                    << "localhost:12345"
-                                                                   << "priority"
-                                                                   << 1))
-                                          << "settings"
-                                          << BSON("replicaSetId" << replicaSetId))));
+                                                                   << "priority" << 1))
+                                          << "settings" << BSON("replicaSetId" << replicaSetId))));
     ASSERT_OK(configLocal.validate());
     ASSERT_TRUE(configLocal.hasReplicaSetId());
     ASSERT_EQUALS(replicaSetId, configLocal.getReplicaSetId());
@@ -2061,15 +1608,10 @@ TEST(ReplSetConfig, ReplSetId) {
     OID defaultReplicaSetId = OID::gen();
     ASSERT_OK(configLocal.initialize(BSON("_id"
                                           << "rs0"
-                                          << "version"
-                                          << 1
-                                          << "protocolVersion"
-                                          << 1
-                                          << "members"
+                                          << "version" << 1 << "protocolVersion" << 1 << "members"
                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                    << "localhost:12345"
-                                                                   << "priority"
-                                                                   << 1))),
+                                                                   << "priority" << 1))),
                                      defaultReplicaSetId));
     ASSERT_OK(configLocal.validate());
     ASSERT_TRUE(configLocal.hasReplicaSetId());
@@ -2078,34 +1620,22 @@ TEST(ReplSetConfig, ReplSetId) {
     // 'replicaSetId' field cannot be null.
     status = configLocal.initialize(BSON("_id"
                                          << "rs0"
-                                         << "version"
-                                         << 1
-                                         << "protocolVersion"
-                                         << 1
-                                         << "members"
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                   << "localhost:12345"
-                                                                  << "priority"
-                                                                  << 1))
-                                         << "settings"
-                                         << BSON("replicaSetId" << OID())));
+                                                                  << "priority" << 1))
+                                         << "settings" << BSON("replicaSetId" << OID())));
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), "replicaSetId field value cannot be null");
 
     // 'replicaSetId' field must be an OID.
     status = configLocal.initialize(BSON("_id"
                                          << "rs0"
-                                         << "version"
-                                         << 1
-                                         << "protocolVersion"
-                                         << 1
-                                         << "members"
+                                         << "version" << 1 << "protocolVersion" << 1 << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                   << "localhost:12345"
-                                                                  << "priority"
-                                                                  << 1))
-                                         << "settings"
-                                         << BSON("replicaSetId" << 12345)));
+                                                                  << "priority" << 1))
+                                         << "settings" << BSON("replicaSetId" << 12345)));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
     ASSERT_STRING_CONTAINS(status.reason(),
                            "\"replicaSetId\" had the wrong type. Expected objectId, found int");

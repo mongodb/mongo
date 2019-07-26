@@ -101,22 +101,14 @@ assert.throws(function() {
 t.drop();
 t.ensureIndex({loc: "2dsphere"});
 res = t.insert({
-    loc: {
-        type: 'Point',
-        coordinates: [40, 5],
-        crs: {type: 'name', properties: {name: 'EPSG:2000'}}
-    }
+    loc: {type: 'Point', coordinates: [40, 5], crs: {type: 'name', properties: {name: 'EPSG:2000'}}}
 });
 assert.writeError(res);
 assert.eq(0, t.find().itcount());
 res = t.insert({loc: {type: 'Point', coordinates: [40, 5]}});
 assert.writeOK(res);
 res = t.insert({
-    loc: {
-        type: 'Point',
-        coordinates: [40, 5],
-        crs: {type: 'name', properties: {name: 'EPSG:4326'}}
-    }
+    loc: {type: 'Point', coordinates: [40, 5], crs: {type: 'name', properties: {name: 'EPSG:4326'}}}
 });
 assert.writeOK(res);
 res = t.insert({

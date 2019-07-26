@@ -61,7 +61,7 @@ BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames)
 
     return bob.obj();
 }
-}
+}  // namespace
 
 using std::unique_ptr;
 using std::vector;

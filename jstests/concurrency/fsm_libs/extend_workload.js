@@ -2,7 +2,8 @@
 
 load('jstests/concurrency/fsm_libs/parse_config.js');  // for parseConfig
 
-/** extendWorkload usage:
+/**
+ * extendWorkload usage:
  *
  * $config = extendWorkload($config, function($config, $super) {
  *   // ... modify $config ...
@@ -25,7 +26,8 @@ function extendWorkload($config, callback) {
     return callback(childConfig, parsedSuperConfig);
 }
 
-/** assignEqualProbsToTransitions example usage:
+/**
+ * assignEqualProbsToTransitions example usage:
  * $config.transitions = Object.extend({<state>:
  * assignEqualProbsToTransitions(Object.keys($config.states))}, $super.transitions);
  */

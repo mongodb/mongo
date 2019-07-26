@@ -8,7 +8,6 @@
  * Each thread operates on the same collection.
  */
 var $config = (function() {
-
     var data = {
         randRange: function randRange(low, high) {
             assertAlways.gt(high, low);
@@ -18,7 +17,6 @@ var $config = (function() {
     };
 
     var states = (function() {
-
         function init(db, collName) {
             this.modulus = this.randRange(5, 15);
 
@@ -36,11 +34,9 @@ var $config = (function() {
         }
 
         return {init: init, distinct: distinct};
-
     })();
 
     var transitions = {init: {distinct: 1}, distinct: {distinct: 1}};
 
     return {data: data, threadCount: 10, iterations: 20, states: states, transitions: transitions};
-
 })();

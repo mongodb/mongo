@@ -124,10 +124,10 @@ public:
         std::condition_variable::notify_all();  // NOLINT
     }
 
+    using std::condition_variable::native_handle;  // NOLINT
     using std::condition_variable::wait;           // NOLINT
     using std::condition_variable::wait_for;       // NOLINT
     using std::condition_variable::wait_until;     // NOLINT
-    using std::condition_variable::native_handle;  // NOLINT
 
 private:
     friend class ::mongo::Waitable;

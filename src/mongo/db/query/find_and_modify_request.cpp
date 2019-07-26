@@ -171,18 +171,18 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
             auto queryElement = cmdObj[kQueryField];
             if (queryElement.type() != Object) {
                 return {ErrorCodes::Error(31160),
-                        str::stream() << "'" << kQueryField
-                                      << "' parameter must be an object, found "
-                                      << queryElement.type()};
+                        str::stream()
+                            << "'" << kQueryField << "' parameter must be an object, found "
+                            << queryElement.type()};
             }
             query = queryElement.embeddedObject();
         } else if (field == kSortField) {
             auto sortElement = cmdObj[kSortField];
             if (sortElement.type() != Object) {
                 return {ErrorCodes::Error(31174),
-                        str::stream() << "'" << kSortField
-                                      << "' parameter must be an object, found "
-                                      << sortElement.type()};
+                        str::stream()
+                            << "'" << kSortField << "' parameter must be an object, found "
+                            << sortElement.type()};
             }
             sort = sortElement.embeddedObject();
         } else if (field == kRemoveField) {
@@ -195,9 +195,9 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
             auto projectionElement = cmdObj[kFieldProjectionField];
             if (projectionElement.type() != Object) {
                 return {ErrorCodes::Error(31175),
-                        str::stream() << "'" << kFieldProjectionField
-                                      << "' parameter must be an object, found "
-                                      << projectionElement.type()};
+                        str::stream()
+                            << "'" << kFieldProjectionField
+                            << "' parameter must be an object, found " << projectionElement.type()};
             }
             fields = projectionElement.embeddedObject();
         } else if (field == kUpsertField) {

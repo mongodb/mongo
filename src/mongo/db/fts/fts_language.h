@@ -168,5 +168,5 @@ private:
 extern BasicFTSLanguage languagePorterV1;
 extern BasicFTSLanguage languageEnglishV2;
 extern BasicFTSLanguage languageFrenchV2;
-}
-}
+}  // namespace fts
+}  // namespace mongo

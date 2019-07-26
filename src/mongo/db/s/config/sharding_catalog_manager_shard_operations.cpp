@@ -181,19 +181,17 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
 
     Status commandStatus = getStatusFromCommandResult(result);
     if (!Shard::shouldErrorBePropagated(commandStatus.code())) {
-        commandStatus = {ErrorCodes::OperationFailed,
-                         str::stream() << "failed to run command " << cmdObj
-                                       << " when attempting to add shard "
-                                       << targeter->connectionString().toString()
-                                       << causedBy(commandStatus)};
+        commandStatus = {
+            ErrorCodes::OperationFailed,
+            str::stream() << "failed to run command " << cmdObj << " when attempting to add shard "
+                          << targeter->connectionString().toString() << causedBy(commandStatus)};
     }
 
     Status writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
     if (!Shard::shouldErrorBePropagated(writeConcernStatus.code())) {
         writeConcernStatus = {ErrorCodes::OperationFailed,
                               str::stream() << "failed to satisfy writeConcern for command "
-                                            << cmdObj
-                                            << " when attempting to add shard "
+                                            << cmdObj << " when attempting to add shard "
                                             << targeter->connectionString().toString()
                                             << causedBy(writeConcernStatus)};
     }
@@ -257,8 +255,7 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
             } else {
                 return {ErrorCodes::IllegalOperation,
                         str::stream() << "A shard already exists containing the replica set '"
-                                      << existingShardConnStr.getSetName()
-                                      << "'"};
+                                      << existingShardConnStr.getSetName() << "'"};
             }
         }
 
@@ -277,10 +274,8 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
                         return {ErrorCodes::IllegalOperation,
                                 str::stream() << "'" << addingHost.toString() << "' "
                                               << "is already a member of the existing shard '"
-                                              << existingShard.getHost()
-                                              << "' ("
-                                              << existingShard.getName()
-                                              << ")."};
+                                              << existingShard.getHost() << "' ("
+                                              << existingShard.getName() << ")."};
                     }
                 }
             }
@@ -340,8 +335,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     if (!status.isOK()) {
         return status.withContext(str::stream() << "isMaster returned invalid 'maxWireVersion' "
                                                 << "field when attempting to add "
-                                                << connectionString.toString()
-                                                << " as a shard");
+                                                << connectionString.toString() << " as a shard");
     }
     if (serverGlobalParams.featureCompatibility.getVersion() >
         ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40) {
@@ -362,8 +356,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     if (!status.isOK()) {
         return status.withContext(str::stream() << "isMaster returned invalid 'ismaster' "
                                                 << "field when attempting to add "
-                                                << connectionString.toString()
-                                                << " as a shard");
+                                                << connectionString.toString() << " as a shard");
     }
     if (!isMaster) {
         return {ErrorCodes::NotMaster,
@@ -387,8 +380,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     if (!providedSetName.empty() && foundSetName.empty()) {
         return {ErrorCodes::OperationFailed,
                 str::stream() << "host did not return a set name; "
-                              << "is the replica set still initializing? "
-                              << resIsMaster};
+                              << "is the replica set still initializing? " << resIsMaster};
     }
 
     // Make sure the set name specified in the connection string matches the one where its hosts
@@ -396,8 +388,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     if (!providedSetName.empty() && (providedSetName != foundSetName)) {
         return {ErrorCodes::OperationFailed,
                 str::stream() << "the provided connection string (" << connectionString.toString()
-                              << ") does not match the actual set name "
-                              << foundSetName};
+                              << ") does not match the actual set name " << foundSetName};
     }
 
     // Is it a config server?
@@ -437,11 +428,8 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
             if (hostSet.find(host) == hostSet.end()) {
                 return {ErrorCodes::OperationFailed,
                         str::stream() << "in seed list " << connectionString.toString() << ", host "
-                                      << host
-                                      << " does not belong to replica set "
-                                      << foundSetName
-                                      << "; found "
-                                      << resIsMaster.toString()};
+                                      << host << " does not belong to replica set " << foundSetName
+                                      << "; found " << resIsMaster.toString()};
             }
         }
     }
@@ -611,13 +599,9 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             const auto& dbDoc = dbt.getValue().value;
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "can't add shard "
-                                        << "'"
-                                        << shardConnectionString.toString()
-                                        << "'"
-                                        << " because a local database '"
-                                        << dbName
-                                        << "' exists in another "
-                                        << dbDoc.getPrimary());
+                                        << "'" << shardConnectionString.toString() << "'"
+                                        << " because a local database '" << dbName
+                                        << "' exists in another " << dbDoc.getPrimary());
         } else if (dbt != ErrorCodes::NamespaceNotFound) {
             return dbt.getStatus();
         }

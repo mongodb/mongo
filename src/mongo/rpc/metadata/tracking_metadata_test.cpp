@@ -52,9 +52,9 @@ const auto kParentOperId = "541b1a00e8a23afa832b2016";
 
 TEST(TrackingMetadata, ReadFromMetadata) {
     {
-        auto metadata = checkParse(BSON(
-            "tracking_info" << BSON("operId" << kOperId << "operName" << kOperName << "parentOperId"
-                                             << kParentOperId)));
+        auto metadata =
+            checkParse(BSON("tracking_info" << BSON("operId" << kOperId << "operName" << kOperName
+                                                             << "parentOperId" << kParentOperId)));
         ASSERT_EQ(*metadata.getOperId(), kOperId);
         ASSERT_EQ(*metadata.getParentOperId(), kParentOperId);
         ASSERT_EQ(*metadata.getOperName(), kOperName);
@@ -78,8 +78,7 @@ TEST(TrackingMetadata, ReadFromInvalidMetadata) {
     }
     {
         checkParseFails(BSON("tracking_info" << BSON("operId" << kOperId << "operName" << kOperName
-                                                              << "parentOperId"
-                                                              << 111)),
+                                                              << "parentOperId" << 111)),
                         ErrorCodes::TypeMismatch);
     }
 }

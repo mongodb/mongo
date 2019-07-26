@@ -10,7 +10,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');       // for extendWork
 load('jstests/concurrency/fsm_workloads/yield_rooted_or.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     /*
      * Issue a query that will use the AND_SORTED stage. This is a little tricky, so use
      * stagedebug to force it to happen. Unfortunately this means it can't be batched.

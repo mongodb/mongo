@@ -86,8 +86,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
     const auto& nss = collection->ns();
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X),
               str::stream() << "Unable to set up index build " << buildUUID << ": collection "
-                            << nss.ns()
-                            << " is not locked in exclusive mode.");
+                            << nss.ns() << " is not locked in exclusive mode.");
 
     auto builder = _getBuilder(buildUUID);
 

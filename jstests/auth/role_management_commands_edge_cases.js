@@ -92,10 +92,8 @@ function runTest(conn) {
             db.createRole({
                 role: 'role13',
                 roles: [],
-                privileges: [{
-                    resource: {db: "test", collection: "foo", cluster: true},
-                    actions: ['find']
-                }]
+                privileges:
+                    [{resource: {db: "test", collection: "foo", cluster: true}, actions: ['find']}]
             });
         });
         assert.throws(function() {
@@ -116,8 +114,7 @@ function runTest(conn) {
             db.createRole({
                 role: 'role16',
                 roles: [],
-                privileges:
-                    [{resource: {db: "test", collection: "foo"}, actions: ['fakeAction']}]
+                privileges: [{resource: {db: "test", collection: "foo"}, actions: ['fakeAction']}]
             });
         });
 
@@ -233,7 +230,6 @@ function runTest(conn) {
         assert.throws(function() {
             db.revokeRolesFromRole("readWrite", ['read']);
         });
-
     })();
 
     (function testGrantPrivilegesToRole() {

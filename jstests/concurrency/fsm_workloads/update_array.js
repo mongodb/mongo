@@ -14,9 +14,7 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
-
     var states = (function() {
-
         // db: explicitly passed to avoid accidentally using the global `db`
         // res: WriteResult
         // nModifiedPossibilities: array of allowed values for res.nModified
@@ -107,7 +105,6 @@ var $config = (function() {
                 doPull(db, collName, docIndex, value);
             }
         };
-
     })();
 
     var transitions = {push: {push: 0.8, pull: 0.2}, pull: {push: 0.8, pull: 0.2}};
@@ -131,5 +128,4 @@ var $config = (function() {
         data: {numDocs: 10},
         setup: setup
     };
-
 })();

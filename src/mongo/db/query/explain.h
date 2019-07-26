@@ -246,4 +246,4 @@ private:
     static void generateServerInfo(BSONObjBuilder* out);
 };
 
-}  // namespace
+}  // namespace mongo

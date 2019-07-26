@@ -61,8 +61,7 @@ StatusWith<std::string> parseArrayFilterIdentifier(
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Cannot have array filter identifier (i.e. '$[<id>]') "
                                        "element in the first position in path '"
-                                    << fieldRef.dottedField()
-                                    << "'");
+                                    << fieldRef.dottedField() << "'");
     }
 
     auto identifier = field.substr(2, field.size() - 3);
@@ -70,9 +69,7 @@ StatusWith<std::string> parseArrayFilterIdentifier(
     if (!identifier.empty() && arrayFilters.find(identifier) == arrayFilters.end()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "No array filter found for identifier '" << identifier
-                                    << "' in path '"
-                                    << fieldRef.dottedField()
-                                    << "'");
+                                    << "' in path '" << fieldRef.dottedField() << "'");
     }
 
     if (!identifier.empty()) {
@@ -189,7 +186,7 @@ void applyChild(const UpdateNode& child,
 
 BSONObj makeBSONForOperator(const std::vector<std::pair<std::string, BSONObj>>& updatesForOp) {
     BSONObjBuilder bob;
-    for (const auto & [ path, value ] : updatesForOp)
+    for (const auto& [path, value] : updatesForOp)
         bob << path << value.firstElement();
     return bob.obj();
 }
@@ -227,8 +224,8 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
         //    be a string value.
         if (BSONType::String != modExpr.type()) {
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "The 'to' field for $rename must be a string: "
-                                        << modExpr);
+                          str::stream()
+                              << "The 'to' field for $rename must be a string: " << modExpr);
         }
 
         fieldRef.parse(modExpr.valueStringData());
@@ -249,8 +246,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
     if (positional && positionalCount > 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Too many positional (i.e. '$') elements found in path '"
-                                    << fieldRef.dottedField()
-                                    << "'");
+                                    << fieldRef.dottedField() << "'");
     }
 
     if (positional && positionalIndex == 0) {
@@ -258,8 +254,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
             ErrorCodes::BadValue,
             str::stream()
                 << "Cannot have positional (i.e. '$') element in the first position in path '"
-                << fieldRef.dottedField()
-                << "'");
+                << fieldRef.dottedField() << "'");
     }
 
     // Construct and initialize the leaf node.
@@ -297,8 +292,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
                 return Status(ErrorCodes::ConflictingUpdateOperators,
                               str::stream() << "Updating the path '" << fieldRef.dottedField()
                                             << "' would create a conflict at '"
-                                            << fieldRef.dottedSubstring(0, i + 1)
-                                            << "'");
+                                            << fieldRef.dottedSubstring(0, i + 1) << "'");
             }
         } else {
             std::unique_ptr<UpdateInternalNode> ownedChild;
@@ -334,10 +328,9 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
 
     if (current->getChild(childName)) {
         return Status(ErrorCodes::ConflictingUpdateOperators,
-                      str::stream() << "Updating the path '" << fieldRef.dottedField()
-                                    << "' would create a conflict at '"
-                                    << fieldRef.dottedField()
-                                    << "'");
+                      str::stream()
+                          << "Updating the path '" << fieldRef.dottedField()
+                          << "' would create a conflict at '" << fieldRef.dottedField() << "'");
     }
     current->setChild(std::move(childName), std::move(leaf));
 
@@ -388,12 +381,12 @@ BSONObj UpdateObjectNode::serialize() const {
 
     BSONObjBuilder bob;
 
-    for (const auto & [ pathPrefix, child ] : _children) {
+    for (const auto& [pathPrefix, child] : _children) {
         auto path = FieldRef(pathPrefix);
         child->produceSerializationMap(&path, &operatorOrientedUpdates);
     }
 
-    for (const auto & [ op, updates ] : operatorOrientedUpdates)
+    for (const auto& [op, updates] : operatorOrientedUpdates)
         bob << op << makeBSONForOperator(updates);
 
     return bob.obj();

@@ -14,11 +14,11 @@
  * ]
  */
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/libs/index_bigkeys.js");
+load("jstests/libs/index_bigkeys.js");
 
-    const collName = "index_bigkeys_background_test";
+const collName = "index_bigkeys_background_test";
 
-    testAllInteractionsWithBigIndexKeys(db, collName, true);
+testAllInteractionsWithBigIndexKeys(db, collName, true);
 }());

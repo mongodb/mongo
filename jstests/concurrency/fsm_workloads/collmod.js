@@ -11,14 +11,12 @@
  * All threads update the same TTL index on the same collection.
  */
 var $config = (function() {
-
     var data = {
         numDocs: 1000,
         maxTTL: 5000  // max time to live
     };
 
     var states = (function() {
-
         function collMod(db, collName) {
             var newTTL = Random.randInt(this.maxTTL);
             var res = db.runCommand({
@@ -33,7 +31,6 @@ var $config = (function() {
         }
 
         return {collMod: collMod};
-
     })();
 
     var transitions = {collMod: {collMod: 1}};
@@ -64,5 +61,4 @@ var $config = (function() {
         transitions: transitions,
         setup: setup
     };
-
 })();

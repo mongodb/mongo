@@ -83,4 +83,4 @@ extern Future<void> (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
  * into "*payload".  In all other cases, returns
  */
 Status saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType* type);
-}
+}  // namespace mongo

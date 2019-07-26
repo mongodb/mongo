@@ -37,7 +37,7 @@ namespace mongo {
  * This class has a destructor that handles rerouting exceptions that might have occurred
  * during an operation. For this reason, there should be only one instance of this object
  * on the chain of one OperationContext.
-*/
+ */
 class OperationContext;
 
 class ScopedOperationCompletionShardingActions : public PolymorphicScoped {

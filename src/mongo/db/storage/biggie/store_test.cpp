@@ -2492,5 +2492,5 @@ TEST_F(RadixStoreTest, LowerBoundEndpoint) {
     ASSERT_TRUE(it == thisStore.end());
 }
 
-}  // biggie namespace
-}  // mongo namespace
+}  // namespace biggie
+}  // namespace mongo

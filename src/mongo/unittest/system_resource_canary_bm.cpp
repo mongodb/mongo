@@ -94,7 +94,7 @@ class CacheLatencyTest : public benchmark::Fixture {
     // Fixture for CPU Cache and RAM latency test. Adapted from lmbench's lat_mem_rd test.
 public:
     // Array of pointers used as a linked list.
-    std::unique_ptr<char* []> data;
+    std::unique_ptr<char*[]> data;
 
     void SetUp(benchmark::State& state) override {
         if (state.thread_index == 0) {
@@ -107,7 +107,7 @@ public:
             const int arrLength = state.range(0);
             int counter = 0;
 
-            data = std::make_unique<char* []>(arrLength);
+            data = std::make_unique<char*[]>(arrLength);
 
             char** arr = data.get();
 

@@ -71,9 +71,7 @@ OplogApplicationValidity validateDoTxnCommand(const BSONObj& doTxnObj) {
         } catch (...) {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream() << "cannot apply a malformed operation in doTxn: "
-                                    << redact(opObj)
-                                    << ": "
-                                    << exceptionToStatus().toString());
+                                    << redact(opObj) << ": " << exceptionToStatus().toString());
         }
     };
 

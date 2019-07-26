@@ -48,8 +48,8 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 using std::pair;
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 REGISTER_DOCUMENT_SOURCE(match,

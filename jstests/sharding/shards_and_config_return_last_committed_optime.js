@@ -10,185 +10,183 @@
  *   - standalone mongod
  */
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/libs/write_concern_util.js");  // For stopReplProducer
+load("jstests/libs/write_concern_util.js");  // For stopReplProducer
 
-    function assertCmdDoesNotReturnLastCommittedOpTime(testDB, cmdObj, connType, expectSuccess) {
+function assertCmdDoesNotReturnLastCommittedOpTime(testDB, cmdObj, connType, expectSuccess) {
+    const res = testDB.runCommand(cmdObj);
+    assert.eq(expectSuccess ? 1 : 0, res.ok);
+    assert(typeof res.lastCommittedOpTime === "undefined",
+           "Expected response from a " + connType + " to not contain lastCommittedOpTime," +
+               " received: " + tojson(res) + ", cmd was: " + tojson(cmdObj));
+}
+
+function assertDoesNotReturnLastCommittedOpTime(testDB, collName, connType) {
+    // Successful commands return lastCommittedOpTime.
+    assertCmdDoesNotReturnLastCommittedOpTime(testDB, {find: collName}, connType, true);
+
+    // Failed commands return lastCommittedOpTime.
+    assertCmdDoesNotReturnLastCommittedOpTime(
+        testDB, {dummyCommand: collName}, connType, false /* expectSuccess */);
+    assertCmdDoesNotReturnLastCommittedOpTime(testDB,
+                                              {find: collName, readConcern: {invalid: "rc"}},
+                                              connType,
+                                              false /* expectSuccess */);
+    assertCmdDoesNotReturnLastCommittedOpTime(
+        testDB,
+        {insert: collName, documents: [{x: 2}], writeConcern: {invalid: "wc"}},
+        connType,
+        false /* expectSuccess */);
+}
+
+function assertCmdReturnsLastCommittedOpTime(testDB, cmdObj, connType, expectSuccess) {
+    // Retry up to one time to avoid possible failures from lag in setting the
+    // lastCommittedOpTime.
+    assert.retryNoExcept(() => {
         const res = testDB.runCommand(cmdObj);
         assert.eq(expectSuccess ? 1 : 0, res.ok);
-        assert(typeof res.lastCommittedOpTime === "undefined",
-               "Expected response from a " + connType + " to not contain lastCommittedOpTime," +
+        assert(typeof res.lastCommittedOpTime !== "undefined",
+               "Expected response from a " + connType + " to contain lastCommittedOpTime," +
                    " received: " + tojson(res) + ", cmd was: " + tojson(cmdObj));
-    }
 
-    function assertDoesNotReturnLastCommittedOpTime(testDB, collName, connType) {
-        // Successful commands return lastCommittedOpTime.
-        assertCmdDoesNotReturnLastCommittedOpTime(testDB, {find: collName}, connType, true);
+        // The last committed opTime may advance after replSetGetStatus finishes executing and
+        // before its response's metadata is computed, in which case the response's
+        // lastCommittedOpTime will be greater than the lastCommittedOpTime timestamp in its
+        // body. Assert the timestamp is <= lastCommittedOpTime to account for this.
+        const statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
+        assert.lte(0,
+                   bsonWoCompare(res.lastCommittedOpTime, statusRes.optimes.lastCommittedOpTime.ts),
+                   "lastCommittedOpTime in command response, " + res.lastCommittedOpTime +
+                       ", is not <= to the replSetGetStatus lastCommittedOpTime timestamp, " +
+                       statusRes.optimes.lastCommittedOpTime.ts + ", cmd was: " + tojson(cmdObj));
 
-        // Failed commands return lastCommittedOpTime.
-        assertCmdDoesNotReturnLastCommittedOpTime(
-            testDB, {dummyCommand: collName}, connType, false /* expectSuccess */);
-        assertCmdDoesNotReturnLastCommittedOpTime(testDB,
-                                                  {find: collName, readConcern: {invalid: "rc"}},
-                                                  connType,
-                                                  false /* expectSuccess */);
-        assertCmdDoesNotReturnLastCommittedOpTime(
-            testDB,
-            {insert: collName, documents: [{x: 2}], writeConcern: {invalid: "wc"}},
-            connType,
-            false /* expectSuccess */);
-    }
+        return true;
+    }, "command: " + tojson(cmdObj) + " failed to return correct lastCommittedOpTime", 2);
+}
 
-    function assertCmdReturnsLastCommittedOpTime(testDB, cmdObj, connType, expectSuccess) {
-        // Retry up to one time to avoid possible failures from lag in setting the
-        // lastCommittedOpTime.
-        assert.retryNoExcept(() => {
-            const res = testDB.runCommand(cmdObj);
-            assert.eq(expectSuccess ? 1 : 0, res.ok);
-            assert(typeof res.lastCommittedOpTime !== "undefined",
-                   "Expected response from a " + connType + " to contain lastCommittedOpTime," +
-                       " received: " + tojson(res) + ", cmd was: " + tojson(cmdObj));
+function assertReturnsLastCommittedOpTime(testDB, collName, connType) {
+    // Successful commands return lastCommittedOpTime.
+    assertCmdReturnsLastCommittedOpTime(
+        testDB, {find: collName}, connType, true /* expectSuccess */);
 
-            // The last committed opTime may advance after replSetGetStatus finishes executing and
-            // before its response's metadata is computed, in which case the response's
-            // lastCommittedOpTime will be greater than the lastCommittedOpTime timestamp in its
-            // body. Assert the timestamp is <= lastCommittedOpTime to account for this.
-            const statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
-            assert.lte(
-                0,
-                bsonWoCompare(res.lastCommittedOpTime, statusRes.optimes.lastCommittedOpTime.ts),
-                "lastCommittedOpTime in command response, " + res.lastCommittedOpTime +
-                    ", is not <= to the replSetGetStatus lastCommittedOpTime timestamp, " +
-                    statusRes.optimes.lastCommittedOpTime.ts + ", cmd was: " + tojson(cmdObj));
+    // Failed commands return lastCommittedOpTime.
+    assertCmdReturnsLastCommittedOpTime(
+        testDB, {dummyCommand: collName}, connType, false /* expectSuccess */);
+    assertCmdReturnsLastCommittedOpTime(testDB,
+                                        {find: collName, readConcern: {invalid: "rc"}},
+                                        connType,
+                                        false /* expectSuccess */);
+    assertCmdReturnsLastCommittedOpTime(
+        testDB,
+        {insert: collName, documents: [{x: 2}], writeConcern: {invalid: "wc"}},
+        connType,
+        false /* expectSuccess */);
+}
 
-            return true;
-        }, "command: " + tojson(cmdObj) + " failed to return correct lastCommittedOpTime", 2);
-    }
+//
+// Mongos should not return lastCommittedOpTime.
+//
 
-    function assertReturnsLastCommittedOpTime(testDB, collName, connType) {
-        // Successful commands return lastCommittedOpTime.
-        assertCmdReturnsLastCommittedOpTime(
-            testDB, {find: collName}, connType, true /* expectSuccess */);
+const st = new ShardingTest({shards: 1, rs: {nodes: 2}, config: 2});
+assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
+assert.commandWorked(st.s.adminCommand({shardCollection: "test.foo", key: {x: 1}}));
 
-        // Failed commands return lastCommittedOpTime.
-        assertCmdReturnsLastCommittedOpTime(
-            testDB, {dummyCommand: collName}, connType, false /* expectSuccess */);
-        assertCmdReturnsLastCommittedOpTime(testDB,
-                                            {find: collName, readConcern: {invalid: "rc"}},
-                                            connType,
-                                            false /* expectSuccess */);
-        assertCmdReturnsLastCommittedOpTime(
-            testDB,
-            {insert: collName, documents: [{x: 2}], writeConcern: {invalid: "wc"}},
-            connType,
-            false /* expectSuccess */);
-    }
+// Sharded collection.
+assertDoesNotReturnLastCommittedOpTime(
+    st.s.getDB("test"), "foo", "mongos talking to a sharded collection");
 
-    //
-    // Mongos should not return lastCommittedOpTime.
-    //
+// Unsharded collection.
+assertDoesNotReturnLastCommittedOpTime(
+    st.s.getDB("test"), "unsharded", "mongos talking to a non-sharded collection");
 
-    const st = new ShardingTest({shards: 1, rs: {nodes: 2}, config: 2});
-    assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
-    assert.commandWorked(st.s.adminCommand({shardCollection: "test.foo", key: {x: 1}}));
+// Collection stored on the config server.
+assertDoesNotReturnLastCommittedOpTime(
+    st.s.getDB("config"), "foo", "mongos talking to a config server collection");
 
-    // Sharded collection.
-    assertDoesNotReturnLastCommittedOpTime(
-        st.s.getDB("test"), "foo", "mongos talking to a sharded collection");
+//
+// A mongod in a sharded replica set returns lastCommittedOpTime.
+//
 
-    // Unsharded collection.
-    assertDoesNotReturnLastCommittedOpTime(
-        st.s.getDB("test"), "unsharded", "mongos talking to a non-sharded collection");
+// To verify the lastCommittedOpTime is being returned, pause replication on the secondary to
+// prevent the primary from advancing its lastCommittedOpTime and then perform a local write to
+// advance the primary's lastAppliedOpTime.
+let primary = st.rs0.getPrimary();
+let secondary = st.rs0.getSecondary();
 
-    // Collection stored on the config server.
-    assertDoesNotReturnLastCommittedOpTime(
-        st.s.getDB("config"), "foo", "mongos talking to a config server collection");
+st.rs0.awaitLastOpCommitted();
+stopServerReplication(secondary);
+assert.writeOK(primary.getDB("test").foo.insert({x: 1}, {writeConcern: {w: 1}}));
 
-    //
-    // A mongod in a sharded replica set returns lastCommittedOpTime.
-    //
+// Sharded collection.
+assertReturnsLastCommittedOpTime(primary.getDB("test"), "foo", "sharding-aware shard primary");
+assertReturnsLastCommittedOpTime(secondary.getDB("test"), "foo", "sharding-aware shard secondary");
 
-    // To verify the lastCommittedOpTime is being returned, pause replication on the secondary to
-    // prevent the primary from advancing its lastCommittedOpTime and then perform a local write to
-    // advance the primary's lastAppliedOpTime.
-    let primary = st.rs0.getPrimary();
-    let secondary = st.rs0.getSecondary();
+// Unsharded collection.
+assertReturnsLastCommittedOpTime(
+    primary.getDB("test"), "unsharded", "sharding-aware shard primary");
+assertReturnsLastCommittedOpTime(
+    secondary.getDB("test"), "unsharded", "sharding-aware shard secondary");
 
-    st.rs0.awaitLastOpCommitted();
-    stopServerReplication(secondary);
-    assert.writeOK(primary.getDB("test").foo.insert({x: 1}, {writeConcern: {w: 1}}));
+restartServerReplication(secondary);
 
-    // Sharded collection.
-    assertReturnsLastCommittedOpTime(primary.getDB("test"), "foo", "sharding-aware shard primary");
-    assertReturnsLastCommittedOpTime(
-        secondary.getDB("test"), "foo", "sharding-aware shard secondary");
+//
+// A config server in a sharded replica set returns lastCommittedOpTime.
+//
 
-    // Unsharded collection.
-    assertReturnsLastCommittedOpTime(
-        primary.getDB("test"), "unsharded", "sharding-aware shard primary");
-    assertReturnsLastCommittedOpTime(
-        secondary.getDB("test"), "unsharded", "sharding-aware shard secondary");
+// Split the lastCommitted and lastApplied opTimes by pausing secondary application and
+// performing a local write.
+primary = st.configRS.getPrimary();
+secondary = st.configRS.getSecondary();
 
-    restartServerReplication(secondary);
+st.configRS.awaitLastOpCommitted();
+stopServerReplication(secondary);
+assert.writeOK(primary.getDB("config").foo.insert({x: 1}, {writeConcern: {w: 1}}));
 
-    //
-    // A config server in a sharded replica set returns lastCommittedOpTime.
-    //
+assertReturnsLastCommittedOpTime(primary.getDB("test"), "foo", "config server primary");
+assertReturnsLastCommittedOpTime(secondary.getDB("test"), "foo", "config server secondary");
 
-    // Split the lastCommitted and lastApplied opTimes by pausing secondary application and
-    // performing a local write.
-    primary = st.configRS.getPrimary();
-    secondary = st.configRS.getSecondary();
+restartServerReplication(secondary);
+st.stop();
 
-    st.configRS.awaitLastOpCommitted();
-    stopServerReplication(secondary);
-    assert.writeOK(primary.getDB("config").foo.insert({x: 1}, {writeConcern: {w: 1}}));
+//
+// A mongod started with --shardsvr that is not sharding aware does not return
+// lastCommittedOpTime.
+//
 
-    assertReturnsLastCommittedOpTime(primary.getDB("test"), "foo", "config server primary");
-    assertReturnsLastCommittedOpTime(secondary.getDB("test"), "foo", "config server secondary");
+const replTestShardSvr = new ReplSetTest({nodes: 2, nodeOptions: {shardsvr: ""}});
+replTestShardSvr.startSet();
+replTestShardSvr.initiate();
 
-    restartServerReplication(secondary);
-    st.stop();
+assertDoesNotReturnLastCommittedOpTime(
+    replTestShardSvr.getPrimary().getDB("test"), "foo", "non-sharding aware shard primary");
+assertDoesNotReturnLastCommittedOpTime(
+    replTestShardSvr.getSecondary().getDB("test"), "foo", "non-sharding aware shard secondary");
 
-    //
-    // A mongod started with --shardsvr that is not sharding aware does not return
-    // lastCommittedOpTime.
-    //
+replTestShardSvr.stopSet();
 
-    const replTestShardSvr = new ReplSetTest({nodes: 2, nodeOptions: {shardsvr: ""}});
-    replTestShardSvr.startSet();
-    replTestShardSvr.initiate();
+//
+// A mongod from a standalone replica set does not return lastCommittedOpTime.
+//
 
-    assertDoesNotReturnLastCommittedOpTime(
-        replTestShardSvr.getPrimary().getDB("test"), "foo", "non-sharding aware shard primary");
-    assertDoesNotReturnLastCommittedOpTime(
-        replTestShardSvr.getSecondary().getDB("test"), "foo", "non-sharding aware shard secondary");
+const replTest = new ReplSetTest({nodes: 2});
+replTest.startSet();
+replTest.initiate();
 
-    replTestShardSvr.stopSet();
+assertDoesNotReturnLastCommittedOpTime(
+    replTest.getPrimary().getDB("test"), "foo", "standalone replica set primary");
+assertDoesNotReturnLastCommittedOpTime(
+    replTest.getSecondary().getDB("test"), "foo", "standalone replica set secondary");
 
-    //
-    // A mongod from a standalone replica set does not return lastCommittedOpTime.
-    //
+replTest.stopSet();
 
-    const replTest = new ReplSetTest({nodes: 2});
-    replTest.startSet();
-    replTest.initiate();
+//
+// A standalone mongod does not return lastCommittedOpTime.
+//
 
-    assertDoesNotReturnLastCommittedOpTime(
-        replTest.getPrimary().getDB("test"), "foo", "standalone replica set primary");
-    assertDoesNotReturnLastCommittedOpTime(
-        replTest.getSecondary().getDB("test"), "foo", "standalone replica set secondary");
+const standalone = MongoRunner.runMongod();
 
-    replTest.stopSet();
+assertDoesNotReturnLastCommittedOpTime(standalone.getDB("test"), "foo", "standalone mongod");
 
-    //
-    // A standalone mongod does not return lastCommittedOpTime.
-    //
-
-    const standalone = MongoRunner.runMongod();
-
-    assertDoesNotReturnLastCommittedOpTime(standalone.getDB("test"), "foo", "standalone mongod");
-
-    MongoRunner.stopMongod(standalone);
+MongoRunner.stopMongod(standalone);
 })();

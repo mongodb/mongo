@@ -132,8 +132,8 @@ Status GeoExpression::parseFrom(const BSONObj& obj) {
     if (GeoExpression::INTERSECT == predicate) {
         if (!geoContainer->supportsProject(SPHERE)) {
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "$geoIntersect not supported with provided geometry: "
-                                        << obj);
+                          str::stream()
+                              << "$geoIntersect not supported with provided geometry: " << obj);
         }
         geoContainer->projectInto(SPHERE);
     }
@@ -218,8 +218,7 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "geo near accepts just one argument when querying for a GeoJSON "
-                          << "point. Extra field found: "
-                          << objIt.next());
+                          << "point. Extra field found: " << objIt.next());
     }
 
     // Parse "new" near:
@@ -247,9 +246,7 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
                     return Status(ErrorCodes::BadValue,
                                   str::stream()
                                       << "invalid point in geo near query $geometry argument: "
-                                      << embeddedObj
-                                      << "  "
-                                      << status.reason());
+                                      << embeddedObj << "  " << status.reason());
                 }
                 uassert(16681,
                         "$near requires geojson point, given " + embeddedObj.toString(),
@@ -326,16 +323,16 @@ Status GeoNearExpression::parseFrom(const BSONObj& obj) {
 //
 
 /**
-* Takes ownership of the passed-in GeoExpression.
-*/
+ * Takes ownership of the passed-in GeoExpression.
+ */
 GeoMatchExpression::GeoMatchExpression(StringData path,
                                        const GeoExpression* query,
                                        const BSONObj& rawObj)
     : LeafMatchExpression(GEO, path), _rawObj(rawObj), _query(query), _canSkipValidation(false) {}
 
 /**
-* Takes shared ownership of the passed-in GeoExpression.
-*/
+ * Takes shared ownership of the passed-in GeoExpression.
+ */
 GeoMatchExpression::GeoMatchExpression(StringData path,
                                        std::shared_ptr<const GeoExpression> query,
                                        const BSONObj& rawObj)
@@ -467,4 +464,4 @@ std::unique_ptr<MatchExpression> GeoNearMatchExpression::shallowClone() const {
     }
     return std::move(next);
 }
-}
+}  // namespace mongo

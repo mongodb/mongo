@@ -12,108 +12,110 @@
  */
 
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/libs/check_log.js");
-    load("jstests/core/txns/libs/prepare_helpers.js");
+load("jstests/libs/check_log.js");
+load("jstests/core/txns/libs/prepare_helpers.js");
 
-    const replTest = new ReplSetTest({nodes: 2});
-    replTest.startSet();
+const replTest = new ReplSetTest({nodes: 2});
+replTest.startSet();
 
-    const config = replTest.getReplSetConfig();
-    // Increase the election timeout so that we do not accidentally trigger an election while the
-    // secondary is restarting.
-    config.settings = {"electionTimeoutMillis": 12 * 60 * 60 * 1000};
-    replTest.initiate(config);
+const config = replTest.getReplSetConfig();
+// Increase the election timeout so that we do not accidentally trigger an election while the
+// secondary is restarting.
+config.settings = {
+    "electionTimeoutMillis": 12 * 60 * 60 * 1000
+};
+replTest.initiate(config);
 
-    const primary = replTest.getPrimary();
-    let secondary = replTest.getSecondary();
+const primary = replTest.getPrimary();
+let secondary = replTest.getSecondary();
 
-    const dbName = "test";
-    const collName = "reconstruct_prepared_transactions_initial_sync_on_oplog_seed";
+const dbName = "test";
+const collName = "reconstruct_prepared_transactions_initial_sync_on_oplog_seed";
 
-    let testDB = primary.getDB(dbName);
-    let testColl = testDB.getCollection(collName);
+let testDB = primary.getDB(dbName);
+let testColl = testDB.getCollection(collName);
 
-    const session = primary.startSession();
-    const sessionDB = session.getDatabase(dbName);
-    const sessionColl = sessionDB.getCollection(collName);
+const session = primary.startSession();
+const sessionDB = session.getDatabase(dbName);
+const sessionColl = sessionDB.getCollection(collName);
 
-    assert.commandWorked(testColl.insert({_id: 1}));
+assert.commandWorked(testColl.insert({_id: 1}));
 
-    jsTestLog("Restarting the secondary");
+jsTestLog("Restarting the secondary");
 
-    // Restart the secondary with startClean set to true so that it goes through initial sync.
-    replTest.stop(secondary, undefined /* signal */, {skipValidation: true});
-    secondary = replTest.start(
-        secondary,
-        {
-          startClean: true,
-          setParameter: {
-              'numInitialSyncAttempts': 2,
-              // Fail point to force the first attempt to fail and hang before starting the second
-              // attempt.
-              'failpoint.failAndHangInitialSync': tojson({mode: 'alwaysOn'}),
-              'failpoint.initialSyncHangDuringCollectionClone': tojson(
-                  {mode: 'alwaysOn', data: {namespace: testColl.getFullName(), numDocsToClone: 0}}),
-              'logComponentVerbosity': tojson({'replication': {'initialSync': 2}})
-          }
-        },
-        true /* wait */);
+// Restart the secondary with startClean set to true so that it goes through initial sync.
+replTest.stop(secondary, undefined /* signal */, {skipValidation: true});
+secondary = replTest.start(
+    secondary,
+    {
+        startClean: true,
+        setParameter: {
+            'numInitialSyncAttempts': 2,
+            // Fail point to force the first attempt to fail and hang before starting the second
+            // attempt.
+            'failpoint.failAndHangInitialSync': tojson({mode: 'alwaysOn'}),
+            'failpoint.initialSyncHangDuringCollectionClone': tojson(
+                {mode: 'alwaysOn', data: {namespace: testColl.getFullName(), numDocsToClone: 0}}),
+            'logComponentVerbosity': tojson({'replication': {'initialSync': 2}})
+        }
+    },
+    true /* wait */);
 
-    // Wait for failpoint to be reached so we know that collection cloning is paused.
-    checkLog.contains(secondary, "initialSyncHangDuringCollectionClone fail point enabled");
+// Wait for failpoint to be reached so we know that collection cloning is paused.
+checkLog.contains(secondary, "initialSyncHangDuringCollectionClone fail point enabled");
 
-    jsTestLog("Running operations while collection cloning is paused");
+jsTestLog("Running operations while collection cloning is paused");
 
-    // Perform writes while collection cloning is paused so that we know they must be applied during
-    // the first attempt of initial sync.
-    assert.commandWorked(testColl.insert({_id: 2}));
+// Perform writes while collection cloning is paused so that we know they must be applied during
+// the first attempt of initial sync.
+assert.commandWorked(testColl.insert({_id: 2}));
 
-    jsTestLog("Resuming initial sync");
+jsTestLog("Resuming initial sync");
 
-    // Resume initial sync.
-    assert.commandWorked(secondary.adminCommand(
-        {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+// Resume initial sync.
+assert.commandWorked(secondary.adminCommand(
+    {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
 
-    // Wait for failpoint to be reached so we know that first attempt is finishing and is about to
-    // fail.
-    checkLog.contains(secondary, "failAndHangInitialSync fail point enabled");
+// Wait for failpoint to be reached so we know that first attempt is finishing and is about to
+// fail.
+checkLog.contains(secondary, "failAndHangInitialSync fail point enabled");
 
-    jsTestLog("Preparing the transaction before the second attempt of initial sync");
+jsTestLog("Preparing the transaction before the second attempt of initial sync");
 
-    session.startTransaction();
-    assert.commandWorked(sessionColl.update({_id: 1}, {_id: 1, a: 1}));
-    const prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1});
+session.startTransaction();
+assert.commandWorked(sessionColl.update({_id: 1}, {_id: 1, a: 1}));
+const prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1});
 
-    jsTestLog("Resuming initial sync for the second attempt");
-    // Resume initial sync.
-    assert.commandWorked(
-        secondary.adminCommand({configureFailPoint: "failAndHangInitialSync", mode: "off"}));
+jsTestLog("Resuming initial sync for the second attempt");
+// Resume initial sync.
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "failAndHangInitialSync", mode: "off"}));
 
-    // Wait for the secondary to complete initial sync.
-    replTest.awaitSecondaryNodes();
-    PrepareHelpers.awaitMajorityCommitted(replTest, prepareTimestamp);
+// Wait for the secondary to complete initial sync.
+replTest.awaitSecondaryNodes();
+PrepareHelpers.awaitMajorityCommitted(replTest, prepareTimestamp);
 
-    jsTestLog("Initial sync completed");
+jsTestLog("Initial sync completed");
 
-    secondary.setSlaveOk();
-    const secondaryColl = secondary.getDB(dbName).getCollection(collName);
+secondary.setSlaveOk();
+const secondaryColl = secondary.getDB(dbName).getCollection(collName);
 
-    jsTestLog("Checking that the transaction is properly prepared");
+jsTestLog("Checking that the transaction is properly prepared");
 
-    // Make sure that we can't read changes to the document from the prepared transaction after
-    // initial sync.
-    assert.eq(secondaryColl.findOne({_id: 1}), {_id: 1});
+// Make sure that we can't read changes to the document from the prepared transaction after
+// initial sync.
+assert.eq(secondaryColl.findOne({_id: 1}), {_id: 1});
 
-    jsTestLog("Committing the transaction");
+jsTestLog("Committing the transaction");
 
-    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
-    replTest.awaitReplication();
+assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
+replTest.awaitReplication();
 
-    // Make sure that we can see the data from the committed transaction on the secondary if it was
-    // applied during secondary oplog application.
-    assert.eq(secondaryColl.findOne({_id: 1}), {_id: 1, a: 1});
+// Make sure that we can see the data from the committed transaction on the secondary if it was
+// applied during secondary oplog application.
+assert.eq(secondaryColl.findOne({_id: 1}), {_id: 1, a: 1});
 
-    replTest.stopSet();
+replTest.stopSet();
 })();

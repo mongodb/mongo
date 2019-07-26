@@ -63,17 +63,12 @@ public:
                            << (oldestRequiredTimestampForCrashRecovery
                                    ? *oldestRequiredTimestampForCrashRecovery
                                    : Timestamp())
-                           << "supportsPendingDrops"
-                           << engine->supportsPendingDrops()
+                           << "supportsPendingDrops" << engine->supportsPendingDrops()
                            << "dropPendingIdents"
                            << static_cast<long long>(engine->getDropPendingIdents().size())
-                           << "supportsSnapshotReadConcern"
-                           << engine->supportsReadConcernSnapshot()
-                           << "readOnly"
-                           << storageGlobalParams.readOnly
-                           << "persistent"
-                           << !engine->isEphemeral()
-                           << "backupCursorOpen"
+                           << "supportsSnapshotReadConcern" << engine->supportsReadConcernSnapshot()
+                           << "readOnly" << storageGlobalParams.readOnly << "persistent"
+                           << !engine->isEphemeral() << "backupCursorOpen"
                            << backupCursorHooks->isBackupCursorOpen());
     }
 

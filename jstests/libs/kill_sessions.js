@@ -403,41 +403,40 @@ var _kill_sessions_api_module = (function() {
     });
 
     [[
-       // Verifies that we can killSessions by lsid
-       "killSessions",
-       function(x) {
-           if (!x.uid) {
-               return {
-                   id: x.id,
-                   uid: computeSHA256Block(""),
-               };
-           } else {
-               return x;
-           }
-       }
+        // Verifies that we can killSessions by lsid
+        "killSessions",
+        function(x) {
+            if (!x.uid) {
+                return {
+                    id: x.id,
+                    uid: computeSHA256Block(""),
+                };
+            } else {
+                return x;
+            }
+        }
     ],
      [
-       // Verifies that we can kill by pattern by lsid
-       "killAllSessionsByPattern",
-       function(x) {
-           if (!x.uid) {
-               return {
-                   lsid: {
-                       id: x.id,
-                       uid: computeSHA256Block(""),
-                   }
-               };
-           } else {
-               return {lsid: x};
-           }
-       }
+         // Verifies that we can kill by pattern by lsid
+         "killAllSessionsByPattern",
+         function(x) {
+             if (!x.uid) {
+                 return {
+                     lsid: {
+                         id: x.id,
+                         uid: computeSHA256Block(""),
+                     }
+                 };
+             } else {
+                 return {lsid: x};
+             }
+         }
      ]].forEach(function(cmd) {
         noAuth = noAuth.concat(makeNoAuthArgKill.apply({}, cmd));
     });
 
     KillSessionsTestHelper.runNoAuth = function(
         clientToExecuteVia, clientToKillVia, clientsToVerifyVia) {
-
         var fixture = new Fixture(clientToExecuteVia, clientToKillVia, clientsToVerifyVia);
 
         for (var i = 0; i < noAuth.length; ++i) {
@@ -564,102 +563,102 @@ var _kill_sessions_api_module = (function() {
 
     // Tests for makeAuthNoArgKill
     [[
-       // We can kill our own sessions
-       "killSessions",
-       "simple",
-       "simple",
+        // We can kill our own sessions
+        "killSessions",
+        "simple",
+        "simple",
     ],
      [
-       // We can kill all sessions
-       "killAllSessions",
-       "simple",
-       "killAny",
+         // We can kill all sessions
+         "killAllSessions",
+         "simple",
+         "killAny",
      ],
      [
-       // We can kill all sessions by pattern
-       "killAllSessionsByPattern",
-       "simple",
-       "killAny",
+         // We can kill all sessions by pattern
+         "killAllSessionsByPattern",
+         "simple",
+         "killAny",
      ]].forEach(function(cmd) {
         auth = auth.concat(makeAuthNoArgKill.apply({}, cmd));
     });
 
     // Tests for makeAuthArgKill
     [[
-       // We can kill our own sessions by id (spoofing our own id)
-       "killSessions",
-       "simple",
-       "simple",
-       "killAny",
-       function() {
-           return function(x) {
-               if (!x.uid) {
-                   return {
-                       id: x.id,
-                       uid: computeSHA256Block("simple@admin"),
-                   };
-               } else {
-                   return x;
-               }
-           };
-       }
+        // We can kill our own sessions by id (spoofing our own id)
+        "killSessions",
+        "simple",
+        "simple",
+        "killAny",
+        function() {
+            return function(x) {
+                if (!x.uid) {
+                    return {
+                        id: x.id,
+                        uid: computeSHA256Block("simple@admin"),
+                    };
+                } else {
+                    return x;
+                }
+            };
+        }
     ],
      [
-       // We can kill our own sessions without spoofing
-       "killSessions",
-       "simple",
-       "simple",
-       "simple",
-       function() {
-           return function(x) {
-               return x;
-           };
-       }
+         // We can kill our own sessions without spoofing
+         "killSessions",
+         "simple",
+         "simple",
+         "simple",
+         function() {
+             return function(x) {
+                 return x;
+             };
+         }
      ],
      [
-       // We can kill by pattern by id
-       "killAllSessionsByPattern",
-       "simple",
-       "simple",
-       "killAny",
-       function() {
-           return function(x) {
-               if (!x.uid) {
-                   return {
-                       lsid: {
-                           id: x.id,
-                           uid: computeSHA256Block("simple@admin"),
-                       }
-                   };
-               } else {
-                   return {lsid: x};
-               }
-           };
-       }
+         // We can kill by pattern by id
+         "killAllSessionsByPattern",
+         "simple",
+         "simple",
+         "killAny",
+         function() {
+             return function(x) {
+                 if (!x.uid) {
+                     return {
+                         lsid: {
+                             id: x.id,
+                             uid: computeSHA256Block("simple@admin"),
+                         }
+                     };
+                 } else {
+                     return {lsid: x};
+                 }
+             };
+         }
      ],
      [
-       // We can kill any by user
-       "killAllSessions",
-       "simple",
-       "simple2",
-       "killAny",
-       function(user) {
-           return function(x) {
-               return {db: "admin", user: user};
-           };
-       }
+         // We can kill any by user
+         "killAllSessions",
+         "simple",
+         "simple2",
+         "killAny",
+         function(user) {
+             return function(x) {
+                 return {db: "admin", user: user};
+             };
+         }
      ],
      [
-       // We can kill any by pattern by user
-       "killAllSessionsByPattern",
-       "simple",
-       "simple2",
-       "killAny",
-       function(user) {
-           return function(x) {
-               return {uid: computeSHA256Block(user + "@admin")};
-           };
-       }
+         // We can kill any by pattern by user
+         "killAllSessionsByPattern",
+         "simple",
+         "simple2",
+         "killAny",
+         function(user) {
+             return function(x) {
+                 return {uid: computeSHA256Block(user + "@admin")};
+             };
+         }
      ]].forEach(function(cmd) {
         auth = auth.concat(makeAuthArgKill.apply({}, cmd));
     });
@@ -683,32 +682,32 @@ var _kill_sessions_api_module = (function() {
 
     // Tests for makeAuthArgKillFailure
     [[
-       // We can't kill another users sessions
-       "killSessions",
-       "simple",
-       "simple2",
-       function(user) {
-           return function(x) {
-               return {
-                   id: x.id,
-                   uid: computeSHA256Block(user + "@admin"),
-               };
-           };
-       },
+        // We can't kill another users sessions
+        "killSessions",
+        "simple",
+        "simple2",
+        function(user) {
+            return function(x) {
+                return {
+                    id: x.id,
+                    uid: computeSHA256Block(user + "@admin"),
+                };
+            };
+        },
     ],
      [
-       // We can't impersonate without impersonate
-       "killAllSessionsByPattern",
-       "simple",
-       "killAny",
-       function(user) {
-           return function(x) {
-               return {
-                   users: {},
-                   roles: {},
-               };
-           };
-       },
+         // We can't impersonate without impersonate
+         "killAllSessionsByPattern",
+         "simple",
+         "killAny",
+         function(user) {
+             return function(x) {
+                 return {
+                     users: {},
+                     roles: {},
+                 };
+             };
+         },
      ]].forEach(function(cmd) {
         auth = auth.concat(makeAuthArgKillFailure.apply({}, cmd));
     });

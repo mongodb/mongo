@@ -42,4 +42,4 @@ std::ostream& operator<<(std::ostream& s, const Timestamp& ot) {
     s << ot.toString();
     return s;
 }
-}
+}  // namespace mongo

@@ -299,19 +299,19 @@ protected:
                    const BSONObj idIndexSpec,
                    const std::vector<BSONObj>& secondaryIndexSpecs)
             -> StatusWith<std::unique_ptr<CollectionBulkLoaderMock>> {
-                // Get collection info from map.
-                const auto collInfo = &_collections[nss];
-                if (collInfo->stats->initCalled) {
-                    log() << "reusing collection during test which may cause problems, ns:" << nss;
-                }
-                auto localLoader = std::make_unique<CollectionBulkLoaderMock>(collInfo->stats);
-                auto status = localLoader->init(secondaryIndexSpecs);
-                if (!status.isOK())
-                    return status;
-                collInfo->loader = localLoader.get();
+            // Get collection info from map.
+            const auto collInfo = &_collections[nss];
+            if (collInfo->stats->initCalled) {
+                log() << "reusing collection during test which may cause problems, ns:" << nss;
+            }
+            auto localLoader = std::make_unique<CollectionBulkLoaderMock>(collInfo->stats);
+            auto status = localLoader->init(secondaryIndexSpecs);
+            if (!status.isOK())
+                return status;
+            collInfo->loader = localLoader.get();
 
-                return std::move(localLoader);
-            };
+            return std::move(localLoader);
+        };
         _storageInterface->upgradeNonReplicatedUniqueIndexesFn = [this](OperationContext* opCtx) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
             if (_storageInterfaceWorkDone.upgradeNonReplicatedUniqueIndexesShouldFail) {
@@ -372,17 +372,13 @@ protected:
         dataReplicatorExternalState->lastCommittedOpTime = _myLastOpTime;
         {
             ReplSetConfig config;
-            ASSERT_OK(config.initialize(BSON("_id"
-                                             << "myset"
-                                             << "version"
-                                             << 1
-                                             << "protocolVersion"
-                                             << 1
-                                             << "members"
-                                             << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                      << "localhost:12345"))
-                                             << "settings"
-                                             << BSON("electionTimeoutMillis" << 10000))));
+            ASSERT_OK(
+                config.initialize(BSON("_id"
+                                       << "myset"
+                                       << "version" << 1 << "protocolVersion" << 1 << "members"
+                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                << "localhost:12345"))
+                                       << "settings" << BSON("electionTimeoutMillis" << 10000))));
             dataReplicatorExternalState->replSetConfigResult = config;
         }
         _externalState = dataReplicatorExternalState.get();
@@ -1170,14 +1166,14 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingOpTimeSchedu
     // We reject the 'find' command for the begin fetching optime and save the request for
     // inspection at the end of this test case.
     executor::RemoteCommandRequest request;
-    _executorProxy->shouldFailScheduleRemoteCommandRequest = [&request](
-        const executor::RemoteCommandRequestOnAny& requestToSend) {
-        request = {requestToSend, 0};
-        auto elem = requestToSend.cmdObj.firstElement();
-        return (
-            ("find" == elem.fieldNameStringData()) &&
-            (NamespaceString::kSessionTransactionsTableNamespace.coll() == elem.valueStringData()));
-    };
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequestOnAny& requestToSend) {
+            request = {requestToSend, 0};
+            auto elem = requestToSend.cmdObj.firstElement();
+            return (("find" == elem.fieldNameStringData()) &&
+                    (NamespaceString::kSessionTransactionsTableNamespace.coll() ==
+                     elem.valueStringData()));
+        };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -1260,12 +1256,13 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherSchedul
     // We reject the 'find' command on the oplog and save the request for inspection at the end of
     // this test case.
     executor::RemoteCommandRequest request;
-    _executorProxy->shouldFailScheduleRemoteCommandRequest = [&request](
-        const executor::RemoteCommandRequestOnAny& requestToSend) {
-        request = {requestToSend, 0};
-        auto elem = requestToSend.cmdObj.firstElement();
-        return (("find" == elem.fieldNameStringData()) && ("oplog.rs" == elem.valueStringData()));
-    };
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequestOnAny& requestToSend) {
+            request = {requestToSend, 0};
+            auto elem = requestToSend.cmdObj.firstElement();
+            return (("find" == elem.fieldNameStringData()) &&
+                    ("oplog.rs" == elem.valueStringData()));
+        };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -1680,8 +1677,7 @@ TEST_F(InitialSyncerTest,
 TEST_F(InitialSyncerTest,
        InitialSyncerReturnsIncompatibleServerVersionWhenFCVFetcherReturnsUpgradeTargetVersion) {
     auto docs = {BSON("_id" << FeatureCompatibilityVersionParser::kParameterName << "version"
-                            << FeatureCompatibilityVersionParser::kVersion40
-                            << "targetVersion"
+                            << FeatureCompatibilityVersionParser::kVersion40 << "targetVersion"
                             << FeatureCompatibilityVersionParser::kVersion42)};
     runInitialSyncWithBadFCVResponse(docs, ErrorCodes::IncompatibleServerVersion);
 }
@@ -1689,8 +1685,7 @@ TEST_F(InitialSyncerTest,
 TEST_F(InitialSyncerTest,
        InitialSyncerReturnsIncompatibleServerVersionWhenFCVFetcherReturnsDowngradeTargetVersion) {
     auto docs = {BSON("_id" << FeatureCompatibilityVersionParser::kParameterName << "version"
-                            << FeatureCompatibilityVersionParser::kVersion40
-                            << "targetVersion"
+                            << FeatureCompatibilityVersionParser::kVersion40 << "targetVersion"
                             << FeatureCompatibilityVersionParser::kVersion40)};
     runInitialSyncWithBadFCVResponse(docs, ErrorCodes::IncompatibleServerVersion);
 }
@@ -2241,8 +2236,7 @@ TEST_F(InitialSyncerTest,
                                                                                    << "dbinfo")
                                                                            << BSON("name"
                                                                                    << "b"))
-                                                             << "ok"
-                                                             << 1)));
+                                                             << "ok" << 1)));
         net->runReadyNetworkOperations();
 
         // Oplog tailing query.
@@ -2609,8 +2603,7 @@ TEST_F(
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({BSON("ts"
                                                              << "not a timestamp"
-                                                             << "t"
-                                                             << 1)});
+                                                             << "t" << 1)});
 
         // _lastOplogEntryFetcherCallbackAfterCloningData() will shut down the OplogFetcher after
         // setting the completion status.
@@ -3226,8 +3219,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
                 NamespaceString(nss.getCommandNS()),
                 {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
                           << "_id_"
-                          << "ns"
-                          << nss.ns())})));
+                          << "ns" << nss.ns())})));
         ASSERT_EQUALS(*_options1.uuid, UUID::parse(request.cmdObj.firstElement()));
         ASSERT_EQUALS(nss.db(), request.dbname);
 
@@ -3960,8 +3952,7 @@ TEST_F(InitialSyncerTest,
             NamespaceString(nss.getCommandNS()),
             {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
                       << "_id_"
-                      << "ns"
-                      << nss.ns())}));
+                      << "ns" << nss.ns())}));
         assertRemoteCommandNameEquals("listIndexes", request);
         ASSERT_EQUALS(*_options1.uuid, UUID::parse(request.cmdObj.firstElement()));
         ASSERT_EQUALS(nss.db(), request.dbname);
@@ -4344,8 +4335,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
             NamespaceString(nss.getCommandNS()),
             {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
                       << "_id_"
-                      << "ns"
-                      << nss.ns())}));
+                      << "ns" << nss.ns())}));
         assertRemoteCommandNameEquals("listIndexes", request);
         ASSERT_EQUALS(*_options1.uuid, UUID::parse(request.cmdObj.firstElement()));
         ASSERT_EQUALS(nss.db(), request.dbname);

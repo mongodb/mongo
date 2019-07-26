@@ -2479,8 +2479,7 @@ public:
 
     virtual BSONObj bson() const {
         return BSON("int" << 123 << "long" << 9223372036854775807ll  // 2**63 - 1
-                          << "double"
-                          << 3.14);
+                          << "double" << 3.14);
     }
     virtual string json() const {
         return "{ \"int\": 123, \"long\": 9223372036854775807, \"double\": 3.14 }";
@@ -2503,8 +2502,7 @@ public:
 
     virtual BSONObj bson() const {
         return BSON("int" << 123 << "long" << 9223372036854775807ll  // 2**63 - 1
-                          << "double"
-                          << 3.14);
+                          << "double" << 3.14);
     }
     virtual string json() const {
         return "{ 'int': NumberInt(123), "
@@ -2604,8 +2602,7 @@ public:
 
     virtual BSONObj bson() const {
         return BSON("int" << -123 << "long" << -9223372036854775807ll  // -1 * (2**63 - 1)
-                          << "double"
-                          << -3.14);
+                          << "double" << -3.14);
     }
     virtual string json() const {
         return "{ \"int\": -123, \"long\": -9223372036854775807, \"double\": -3.14 }";

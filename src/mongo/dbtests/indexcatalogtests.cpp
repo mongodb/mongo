@@ -147,9 +147,7 @@ public:
             &opCtx,
             _nss.ns(),
             BSON("name" << indexName << "ns" << _nss.ns() << "key" << BSON("x" << 1) << "v"
-                        << static_cast<int>(kIndexVersion)
-                        << "expireAfterSeconds"
-                        << 5)));
+                        << static_cast<int>(kIndexVersion) << "expireAfterSeconds" << 5)));
 
         const IndexDescriptor* desc = _catalog->findIndexByName(&opCtx, indexName);
         ASSERT(desc);
@@ -194,4 +192,4 @@ public:
 };
 
 SuiteInstance<IndexCatalogTests> indexCatalogTests;
-}
+}  // namespace IndexCatalogTests

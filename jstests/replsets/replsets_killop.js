@@ -17,9 +17,11 @@ assert.soon(function() {
 });
 
 // Start a parallel shell to insert new documents on the primary.
-inserter = startParallelShell('var bulk = db.test.initializeUnorderedBulkOp(); \
-     for( i = 1; i < ' + numDocs +
-                              '; ++i ) { \
+inserter = startParallelShell(
+    'var bulk = db.test.initializeUnorderedBulkOp(); \
+     for( i = 1; i < ' +
+    numDocs +
+    '; ++i ) { \
          bulk.insert({ a: i });  \
      } \
      bulk.execute();');

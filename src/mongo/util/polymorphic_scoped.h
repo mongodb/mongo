@@ -31,8 +31,8 @@
 
 namespace mongo {
 /**
-* Base class to implement interfaces with RAII-style objects
-*/
+ * Base class to implement interfaces with RAII-style objects
+ */
 class PolymorphicScoped {
 public:
     virtual ~PolymorphicScoped() = default;

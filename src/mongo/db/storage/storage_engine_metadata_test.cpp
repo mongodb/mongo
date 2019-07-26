@@ -44,8 +44,8 @@
 
 namespace {
 
-using std::string;
 using mongo::unittest::TempDir;
+using std::string;
 
 using namespace mongo;
 

@@ -71,8 +71,8 @@
 namespace mongo {
 
 using namespace fmt::literals;
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 
 namespace {
 
@@ -480,8 +480,7 @@ StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj o
             // Return error on first unrecognized field.
             return StatusWith<std::string>(ErrorCodes::InvalidOptions,
                                            str::stream() << '\'' << elem.fieldNameStringData()
-                                                         << '\''
-                                                         << " is not a supported option.");
+                                                         << '\'' << " is not a supported option.");
         }
     }
     return StatusWith<std::string>(ss.str());
@@ -644,10 +643,11 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _engineName(params.engineName),
       _isCapped(params.isCapped),
       _isEphemeral(params.isEphemeral),
-      _isLogged(!isTemp() && WiredTigerUtil::useTableLogging(
-                                 NamespaceString(ns()),
-                                 getGlobalReplSettings().usingReplSets() ||
-                                     repl::ReplSettings::shouldRecoverFromOplogAsStandalone())),
+      _isLogged(!isTemp() &&
+                WiredTigerUtil::useTableLogging(
+                    NamespaceString(ns()),
+                    getGlobalReplSettings().usingReplSets() ||
+                        repl::ReplSettings::shouldRecoverFromOplogAsStandalone())),
       _isOplog(NamespaceString::oplog(params.ns)),
       _cappedMaxSize(params.cappedMaxSize),
       _cappedMaxSizeSlack(std::min(params.cappedMaxSize / 10, int64_t(16 * 1024 * 1024))),

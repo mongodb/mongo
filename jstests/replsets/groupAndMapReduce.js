@@ -1,7 +1,6 @@
 load("jstests/replsets/rslib.js");
 
 doTest = function(signal) {
-
     // Test basic replica set functionality.
     // -- Replication
     // -- Failover
@@ -83,7 +82,6 @@ doTest = function(signal) {
         } catch (e) {
             print("Received exception: " + e);
         }
-
     });
 
     // Shut down the set and finish the test.

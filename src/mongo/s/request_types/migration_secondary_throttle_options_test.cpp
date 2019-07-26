@@ -178,8 +178,9 @@ TEST(MigrationSecondaryThrottleOptions, ParseFailsDisabledInCommandBSONWriteConc
 
 TEST(MigrationSecondaryThrottleOptions, ParseFailsNotSpecifiedInCommandBSONWriteConcernSpecified) {
     auto status = MigrationSecondaryThrottleOptions::createFromCommand(
-        BSON("someOtherField" << 1 << "writeConcern" << BSON("w"
-                                                             << "majority")));
+        BSON("someOtherField" << 1 << "writeConcern"
+                              << BSON("w"
+                                      << "majority")));
     ASSERT_EQ(ErrorCodes::UnsupportedFormat, status.getStatus().code());
 }
 

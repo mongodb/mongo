@@ -43,8 +43,8 @@ namespace mongo {
 namespace {
 
 using CurrentDateNodeTest = UpdateNodeTest;
-using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
+using mongo::mutablebson::Element;
 
 DEATH_TEST(CurrentDateNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
     auto update = fromjson("{$currentDate: {}}");
@@ -286,4 +286,4 @@ TEST_F(CurrentDateNodeTest, ApplyNoIndexDataOrLogBuilder) {
 }
 
 }  // namespace
-}  // namespace
+}  // namespace mongo

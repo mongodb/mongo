@@ -3,7 +3,6 @@
 // Tests that the default auth roles of backup and restore work properly.
 
 var dumpRestoreAuth2 = function(backup_role, restore_role) {
-
     t = new ToolTest("dumprestore_auth2", {auth: ""});
 
     coll = t.startDB("foo");
@@ -18,10 +17,9 @@ var dumpRestoreAuth2 = function(backup_role, restore_role) {
 
     admindb.createRole({
         role: "customRole",
-        privileges: [{
-            resource: {db: "jstests_tool_dumprestore_auth2", collection: "foo"},
-            actions: ["find"]
-        }],
+        privileges: [
+            {resource: {db: "jstests_tool_dumprestore_auth2", collection: "foo"}, actions: ["find"]}
+        ],
         roles: []
     });
     admindb.createUser({user: "test", pwd: "pass", roles: ["customRole"]});
@@ -118,7 +116,6 @@ var dumpRestoreAuth2 = function(backup_role, restore_role) {
     admindb.logout();
 
     t.stop();
-
 };
 
 // Tests that the default auth roles of backup and restore work properly.

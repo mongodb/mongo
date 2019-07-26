@@ -147,9 +147,7 @@ void DocumentSourceChangeStream::checkValueType(const Value v,
                                                 BSONType expectedType) {
     uassert(40532,
             str::stream() << "Entry field \"" << filedName << "\" should be "
-                          << typeName(expectedType)
-                          << ", found: "
-                          << typeName(v.getType()),
+                          << typeName(expectedType) << ", found: " << typeName(v.getType()),
             (v.getType() == expectedType));
 }
 
@@ -402,11 +400,12 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
     // There might not be a starting point if we're on mongos, otherwise we should either have a
     // 'resumeAfter' starting point, or should start from the latest majority committed operation.
     auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
-    uassert(40573,
-            "The $changeStream stage is only supported on replica sets",
-            expCtx->inMongos || (replCoord &&
-                                 replCoord->getReplicationMode() ==
-                                     repl::ReplicationCoordinator::Mode::modeReplSet));
+    uassert(
+        40573,
+        "The $changeStream stage is only supported on replica sets",
+        expCtx->inMongos ||
+            (replCoord &&
+             replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet));
     if (!startFrom && !expCtx->inMongos) {
         startFrom = replCoord->getMyLastAppliedOpTime().getTimestamp();
     }
@@ -464,8 +463,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
             str::stream() << "unrecognized value for the 'fullDocument' option to the "
                              "$changeStream stage. Expected \"default\" or "
                              "\"updateLookup\", got \""
-                          << fullDocOption
-                          << "\"",
+                          << fullDocOption << "\"",
             fullDocOption == "updateLookup"_sd || fullDocOption == "default"_sd);
 
     const bool shouldLookupPostImage = (fullDocOption == "updateLookup"_sd);

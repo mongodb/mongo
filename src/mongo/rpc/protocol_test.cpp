@@ -39,8 +39,8 @@ namespace {
 
 using mongo::WireVersion;
 using namespace mongo::rpc;
-using mongo::unittest::assertGet;
 using mongo::BSONObj;
+using mongo::unittest::assertGet;
 
 // Checks if negotiation of the first to protocol sets results in the 'proto'
 const auto assert_negotiated = [](ProtocolSet fst, ProtocolSet snd, Protocol proto) {
@@ -105,8 +105,7 @@ TEST(Protocol, parseProtocolSetFromIsMasterReply) {
         auto mongos32 =
             BSON("maxWireVersion" << static_cast<int>(WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN)
                                   << "minWireVersion"
-                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE)
-                                  << "msg"
+                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE) << "msg"
                                   << "isdbgrid");
 
         ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongos32)).protocolSet,
@@ -114,8 +113,8 @@ TEST(Protocol, parseProtocolSetFromIsMasterReply) {
     }
     {
         // MongoDB 3.0 (mongod)
-        auto mongod30 = BSON(
-            "maxWireVersion" << static_cast<int>(WireVersion::RELEASE_2_7_7) << "minWireVersion"
+        auto mongod30 = BSON("maxWireVersion"
+                             << static_cast<int>(WireVersion::RELEASE_2_7_7) << "minWireVersion"
                              << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
         ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod30)).protocolSet,
                   supports::kOpQueryOnly);

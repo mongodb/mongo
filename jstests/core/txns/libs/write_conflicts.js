@@ -5,7 +5,6 @@
  *
  */
 var WriteConflictHelpers = (function() {
-
     /**
      * Write conflict test cases.
      *
@@ -125,8 +124,8 @@ var WriteConflictHelpers = (function() {
         const session2 = conn.startSession(sessionOptions);
 
         jsTestLog("Executing write conflict test, case '" + writeConflictTestCase.name +
-                  "'. \n transaction 1 op: " + tojson(txn1Op) + "\n transaction 2 op: " +
-                  tojson(txn2Op));
+                  "'. \n transaction 1 op: " + tojson(txn1Op) +
+                  "\n transaction 2 op: " + tojson(txn2Op));
 
         // Run the specified write conflict test.
         try {

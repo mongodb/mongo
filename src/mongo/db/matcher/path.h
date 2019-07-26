@@ -260,4 +260,4 @@ private:
     std::unique_ptr<ElementIterator> _subCursor;
     std::unique_ptr<ElementPath> _subCursorPath;
 };
-}
+}  // namespace mongo

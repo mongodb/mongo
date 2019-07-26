@@ -70,5 +70,5 @@ private:
                                 const std::string& term,
                                 TextIndexVersion textIndexVersion);
 };
-}
-}
+}  // namespace fts
+}  // namespace mongo

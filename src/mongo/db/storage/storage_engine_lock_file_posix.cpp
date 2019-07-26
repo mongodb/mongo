@@ -67,8 +67,8 @@ void flushMyDirectory(const boost::filesystem::path& file) {
 
     int fd = ::open(dir.string().c_str(), O_RDONLY);  // DO NOT THROW OR ASSERT BEFORE CLOSING
     massert(40387,
-            str::stream() << "Couldn't open directory '" << dir.string() << "' for flushing: "
-                          << errnoWithDescription(),
+            str::stream() << "Couldn't open directory '" << dir.string()
+                          << "' for flushing: " << errnoWithDescription(),
             fd >= 0);
     if (fsync(fd) != 0) {
         int e = errno;
@@ -85,8 +85,8 @@ void flushMyDirectory(const boost::filesystem::path& file) {
         } else {
             close(fd);
             massert(40388,
-                    str::stream() << "Couldn't fsync directory '" << dir.string() << "': "
-                                  << errnoWithDescription(e),
+                    str::stream() << "Couldn't fsync directory '" << dir.string()
+                                  << "': " << errnoWithDescription(e),
                     false);
         }
     }
@@ -136,8 +136,7 @@ Status StorageEngineLockFile::open() {
     } catch (const std::exception& ex) {
         return Status(ErrorCodes::UnknownError,
                       str::stream() << "Unable to check existence of data directory " << _dbpath
-                                    << ": "
-                                    << ex.what());
+                                    << ": " << ex.what());
     }
 
     // Use file permissions 644
@@ -153,13 +152,11 @@ Status StorageEngineLockFile::open() {
         }
         return Status(ErrorCodes::DBPathInUse,
                       str::stream() << "Unable to create/open the lock file: " << _filespec << " ("
-                                    << errnoWithDescription(errorcode)
-                                    << ")."
+                                    << errnoWithDescription(errorcode) << ")."
                                     << " Ensure the user executing mongod is the owner of the lock "
                                        "file and has the appropriate permissions. Also make sure "
                                        "that another mongod instance is not already running on the "
-                                    << _dbpath
-                                    << " directory");
+                                    << _dbpath << " directory");
     }
     int ret = ::flock(lockFile, LOCK_EX | LOCK_NB);
     if (ret != 0) {
@@ -167,11 +164,9 @@ Status StorageEngineLockFile::open() {
         ::close(lockFile);
         return Status(ErrorCodes::DBPathInUse,
                       str::stream() << "Unable to lock the lock file: " << _filespec << " ("
-                                    << errnoWithDescription(errorcode)
-                                    << ")."
+                                    << errnoWithDescription(errorcode) << ")."
                                     << " Another mongod instance is already running on the "
-                                    << _dbpath
-                                    << " directory");
+                                    << _dbpath << " directory");
     }
     _lockFileHandle->_fd = lockFile;
     return Status::OK();
@@ -197,9 +192,7 @@ Status StorageEngineLockFile::writeString(StringData str) {
         int errorcode = errno;
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write string to file (ftruncate failed): "
-                                    << _filespec
-                                    << ' '
-                                    << errnoWithDescription(errorcode));
+                                    << _filespec << ' ' << errnoWithDescription(errorcode));
     }
 
     int bytesWritten = ::write(_lockFileHandle->_fd, str.rawData(), str.size());
@@ -207,8 +200,7 @@ Status StorageEngineLockFile::writeString(StringData str) {
         int errorcode = errno;
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write string " << str << " to file: " << _filespec
-                                    << ' '
-                                    << errnoWithDescription(errorcode));
+                                    << ' ' << errnoWithDescription(errorcode));
 
     } else if (bytesWritten == 0) {
         return Status(ErrorCodes::FileStreamFailed,
@@ -220,9 +212,7 @@ Status StorageEngineLockFile::writeString(StringData str) {
         int errorcode = errno;
         return Status(ErrorCodes::FileStreamFailed,
                       str::stream() << "Unable to write process id " << str
-                                    << " to file (fsync failed): "
-                                    << _filespec
-                                    << ' '
+                                    << " to file (fsync failed): " << _filespec << ' '
                                     << errnoWithDescription(errorcode));
     }
 

@@ -132,8 +132,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
     {
         BSONObj readConcern = BSON("readConcern" << BSON("level"
                                                          << "snapshot"
-                                                         << "atClusterTime"
-                                                         << Timestamp(100, 0)));
+                                                         << "atClusterTime" << Timestamp(100, 0)));
 
         auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
         ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
@@ -163,8 +162,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
     {
         BSONObj readConcern = BSON("readConcern" << BSON("level"
                                                          << "snapshot"
-                                                         << "atClusterTime"
-                                                         << Timestamp(50, 0)));
+                                                         << "atClusterTime" << Timestamp(50, 0)));
 
         auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
         ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
@@ -202,8 +200,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
     {
         BSONObj readConcern = BSON("readConcern" << BSON("level"
                                                          << "snapshot"
-                                                         << "atClusterTime"
-                                                         << Timestamp(10, 0)));
+                                                         << "atClusterTime" << Timestamp(10, 0)));
 
         auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
         ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));

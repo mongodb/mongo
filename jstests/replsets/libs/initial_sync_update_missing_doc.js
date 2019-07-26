@@ -14,7 +14,6 @@
 // must be called after reInitiateSetWithSecondary, followed by
 // turnOffHangBeforeGettingMissingDocFailPoint.
 var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
-
     const secondary = replSet.add(secondaryConfig);
     secondary.setSlaveOk();
 
@@ -32,14 +31,12 @@ var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
                       'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
 
     return secondary;
-
 };
 
 // Must be called after reInitiateSetWithSecondary. Turns off the
 // initialSyncHangBeforeCopyingDatabases fail point so that the secondary will start copying all
 // non-local databases.
 var turnOffHangBeforeCopyingDatabasesFailPoint = function(secondary) {
-
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
 
@@ -55,7 +52,6 @@ var turnOffHangBeforeCopyingDatabasesFailPoint = function(secondary) {
 // initialSyncHangBeforeGettingMissingDocument fail point so that the secondary can check if the
 // sync source has the missing document.
 var turnOffHangBeforeGettingMissingDocFailPoint = function(primary, secondary, name, numInserted) {
-
     if (numInserted === 0) {
         // If we did not re-insert the missing document, insert an arbitrary document to move
         // forward minValid even though the document was not found.
@@ -77,11 +73,9 @@ var turnOffHangBeforeGettingMissingDocFailPoint = function(primary, secondary, n
             secondary, 'Missing document not found on source; presumably deleted later in oplog.');
     }
     checkLog.contains(secondary, 'initial sync done');
-
 };
 
 var finishAndValidate = function(replSet, name, firstOplogEnd, numInserted, numDocuments) {
-
     replSet.awaitReplication();
     replSet.awaitSecondaryNodes();
     const dbName = 'test';
@@ -112,7 +106,6 @@ var finishAndValidate = function(replSet, name, firstOplogEnd, numInserted, numD
     assert.eq(0,
               secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
               "Oplog buffer was not dropped after initial sync");
-
 };
 
 var updateRemove = function(sessionColl, query) {

@@ -163,4 +163,4 @@ TEST(Basic, FromTerm) {
     ASSERT_EQUALS("7fffffff", oidHead);
     ASSERT_EQUALS(term, std::stoi(oidTail));
 }
-}
+}  // namespace

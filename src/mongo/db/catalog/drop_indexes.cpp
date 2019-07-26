@@ -105,7 +105,6 @@ Status wrappedRun(OperationContext* opCtx,
                                                                              collection->uuid(),
                                                                              desc->indexName(),
                                                                              desc->infoObj());
-
                 });
 
             anObjBuilder->append("msg", "non-_id indexes dropped for collection");
@@ -121,16 +120,14 @@ Status wrappedRun(OperationContext* opCtx,
             opCtx, indexElem.embeddedObject(), false, &indexes);
         if (indexes.empty()) {
             return Status(ErrorCodes::IndexNotFound,
-                          str::stream() << "can't find index with key: "
-                                        << indexElem.embeddedObject());
+                          str::stream()
+                              << "can't find index with key: " << indexElem.embeddedObject());
         } else if (indexes.size() > 1) {
             return Status(ErrorCodes::AmbiguousIndexKeyPattern,
-                          str::stream() << indexes.size() << " indexes found for key: "
-                                        << indexElem.embeddedObject()
+                          str::stream() << indexes.size()
+                                        << " indexes found for key: " << indexElem.embeddedObject()
                                         << ", identify by name instead."
-                                        << " Conflicting indexes: "
-                                        << indexes[0]->infoObj()
-                                        << ", "
+                                        << " Conflicting indexes: " << indexes[0]->infoObj() << ", "
                                         << indexes[1]->infoObj());
         }
 
@@ -166,23 +163,19 @@ Status wrappedRun(OperationContext* opCtx,
         for (auto indexNameElem : indexElem.Array()) {
             if (indexNameElem.type() != String) {
                 return Status(ErrorCodes::TypeMismatch,
-                              str::stream() << "dropIndexes " << collection->ns() << " ("
-                                            << collection->uuid()
-                                            << ") failed to drop multiple indexes "
-                                            << indexElem.toString(false)
-                                            << ": index name must be a string");
+                              str::stream()
+                                  << "dropIndexes " << collection->ns() << " ("
+                                  << collection->uuid() << ") failed to drop multiple indexes "
+                                  << indexElem.toString(false) << ": index name must be a string");
             }
 
             auto indexToDelete = indexNameElem.String();
             auto status = dropIndexByName(opCtx, collection, indexCatalog, indexToDelete);
             if (!status.isOK()) {
-                return status.withContext(str::stream() << "dropIndexes " << collection->ns()
-                                                        << " ("
-                                                        << collection->uuid()
-                                                        << ") failed to drop multiple indexes "
-                                                        << indexElem.toString(false)
-                                                        << ": "
-                                                        << indexToDelete);
+                return status.withContext(
+                    str::stream() << "dropIndexes " << collection->ns() << " ("
+                                  << collection->uuid() << ") failed to drop multiple indexes "
+                                  << indexElem.toString(false) << ": " << indexToDelete);
             }
         }
 

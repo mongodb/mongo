@@ -46,4 +46,4 @@ void censorArgsVector(std::vector<std::string>* args);
 void censorBSONObj(BSONObj* params);
 
 }  // namespace cmdline_utils
-}
+}  // namespace mongo

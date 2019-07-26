@@ -8,68 +8,68 @@
 load('jstests/aggregation/extras/utils.js');  // For resultsEq.
 
 (function() {
-    "use strict";
+"use strict";
 
-    var coll = db.groupMissing;
-    coll.drop();
+var coll = db.groupMissing;
+coll.drop();
 
-    coll.insert({a: null});
-    coll.insert({});
+coll.insert({a: null});
+coll.insert({});
 
-    var res = coll.aggregate({$group: {_id: "$a"}});
-    var arr = res.toArray();
-    assert.eq(arr.length, 1);
-    assert.eq(arr[0]._id, null);
+var res = coll.aggregate({$group: {_id: "$a"}});
+var arr = res.toArray();
+assert.eq(arr.length, 1);
+assert.eq(arr[0]._id, null);
 
-    coll.createIndex({a: 1});
-    res = coll.aggregate({$sort: {a: 1}}, {$group: {_id: "$a"}});
-    arr = res.toArray();
-    assert.eq(arr.length, 1);
-    assert.eq(arr[0]._id, null);
+coll.createIndex({a: 1});
+res = coll.aggregate({$sort: {a: 1}}, {$group: {_id: "$a"}});
+arr = res.toArray();
+assert.eq(arr.length, 1);
+assert.eq(arr[0]._id, null);
 
-    coll.drop();
+coll.drop();
 
-    coll.insert({a: null});
-    coll.insert({});
+coll.insert({a: null});
+coll.insert({});
 
-    // Bug, see SERVER-21992.
+// Bug, see SERVER-21992.
+res = coll.aggregate({$group: {_id: {a: "$a"}}});
+assert(resultsEq(res.toArray(), [{_id: {a: null}}]));
+
+// Correct behavior after SERVER-21992 is fixed.
+if (0) {
     res = coll.aggregate({$group: {_id: {a: "$a"}}});
-    assert(resultsEq(res.toArray(), [{_id: {a: null}}]));
+    assert(resultsEq(res.toArray(), [{_id: {a: null}}, {_id: {a: {}}}]));
+}
 
-    // Correct behavior after SERVER-21992 is fixed.
-    if (0) {
-        res = coll.aggregate({$group: {_id: {a: "$a"}}});
-        assert(resultsEq(res.toArray(), [{_id: {a: null}}, {_id: {a: {}}}]));
-    }
+// Bug, see SERVER-21992.
+coll.createIndex({a: 1});
+res = coll.aggregate({$group: {_id: {a: "$a"}}});
+assert(resultsEq(res.toArray(), [{_id: {a: null}}]));
 
-    // Bug, see SERVER-21992.
-    coll.createIndex({a: 1});
+// Correct behavior after SERVER-21992 is fixed.
+if (0) {
     res = coll.aggregate({$group: {_id: {a: "$a"}}});
-    assert(resultsEq(res.toArray(), [{_id: {a: null}}]));
+    assert(resultsEq(res.toArray(), [{_id: {a: null}}, {_id: {a: {}}}]));
+}
 
-    // Correct behavior after SERVER-21992 is fixed.
-    if (0) {
-        res = coll.aggregate({$group: {_id: {a: "$a"}}});
-        assert(resultsEq(res.toArray(), [{_id: {a: null}}, {_id: {a: {}}}]));
-    }
+coll.drop();
+coll.insert({a: null, b: 1});
+coll.insert({b: 1});
+coll.insert({a: null, b: 1});
 
-    coll.drop();
-    coll.insert({a: null, b: 1});
-    coll.insert({b: 1});
-    coll.insert({a: null, b: 1});
+res = coll.aggregate({$group: {_id: {a: "$a", b: "$b"}}});
+assert(resultsEq(res.toArray(), [{_id: {b: 1}}, {_id: {a: null, b: 1}}]));
 
-    res = coll.aggregate({$group: {_id: {a: "$a", b: "$b"}}});
-    assert(resultsEq(res.toArray(), [{_id: {b: 1}}, {_id: {a: null, b: 1}}]));
+// Bug, see SERVER-23229.
+coll.createIndex({a: 1, b: 1});
+res = coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}});
+assert(resultsEq(res.toArray(), [{_id: {a: null, b: 1}}]));
 
-    // Bug, see SERVER-23229.
+// Correct behavior after SERVER-23229 is fixed.
+if (0) {
     coll.createIndex({a: 1, b: 1});
     res = coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}});
-    assert(resultsEq(res.toArray(), [{_id: {a: null, b: 1}}]));
-
-    // Correct behavior after SERVER-23229 is fixed.
-    if (0) {
-        coll.createIndex({a: 1, b: 1});
-        res = coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}});
-        assert(resultsEq(res.toArray(), [{_id: {b: 1}}, {_id: {a: null, b: 1}}]));
-    }
+    assert(resultsEq(res.toArray(), [{_id: {b: 1}}, {_id: {a: null, b: 1}}]));
+}
 }());

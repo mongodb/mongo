@@ -151,8 +151,8 @@ public:
     };
 
     /**
-    * The destructor should only be called if we are tearing down but not exiting the process.
-    */
+     * The destructor should only be called if we are tearing down but not exiting the process.
+     */
     virtual ~StorageEngine() {}
 
     /**

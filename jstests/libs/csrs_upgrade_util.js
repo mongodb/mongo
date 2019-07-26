@@ -1,9 +1,9 @@
 /**
-* This file defines a class, CSRSUpgradeCoordinator, which contains logic for spinning up a
-* sharded cluster using SCCC config servers and for upgrading that cluster to CSRS.
-* Include this file and use the CSRSUpgradeCoordinator class in any targetted jstests of csrs
-* upgrade behavior.
-*/
+ * This file defines a class, CSRSUpgradeCoordinator, which contains logic for spinning up a
+ * sharded cluster using SCCC config servers and for upgrading that cluster to CSRS.
+ * Include this file and use the CSRSUpgradeCoordinator class in any targetted jstests of csrs
+ * upgrade behavior.
+ */
 
 load("jstests/replsets/rslib.js");
 
@@ -204,5 +204,4 @@ var CSRSUpgradeCoordinator = function() {
         jsTest.log("Shutting down final SCCC config server now that upgrade is complete");
         MongoRunner.stopMongod(st.c1);
     };
-
 };

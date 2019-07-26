@@ -409,7 +409,7 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
 
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
 }
-}  // end anon namespace
+}  // namespace
 
 /* we write to local.oplog.rs:
      { ts : ..., h: ..., v: ..., op: ..., etc }
@@ -429,8 +429,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
  * writers - an array with size nDocs of DocWriter objects.
  * timestamps - an array with size nDocs of respective Timestamp objects for each DocWriter.
  * oplogCollection - collection to be written to.
-  * finalOpTime - the OpTime of the last DocWriter object.
-  * wallTime - the wall clock time of the corresponding oplog entry.
+ * finalOpTime - the OpTime of the last DocWriter object.
+ * wallTime - the wall clock time of the corresponding oplog entry.
  */
 void _logOpsInner(OperationContext* opCtx,
                   const NamespaceString& nss,
@@ -459,8 +459,7 @@ void _logOpsInner(OperationContext* opCtx,
                 // are logging within one WriteUnitOfWork.
                 invariant(finalOpTime.getTimestamp() <= *commitTime,
                           str::stream() << "Final OpTime: " << finalOpTime.toString()
-                                        << ". Commit Time: "
-                                        << commitTime->toString());
+                                        << ". Commit Time: " << commitTime->toString());
             }
 
             // Optionally hang before advancing lastApplied.
@@ -495,12 +494,8 @@ OpTime logOp(OperationContext* opCtx,
     // All collections should have UUIDs now, so all insert, update, and delete oplog entries should
     // also have uuids. Some no-op (n) and command (c) entries may still elide the uuid field.
     invariant(uuid || 'n' == *opstr || 'c' == *opstr,
-              str::stream() << "Expected uuid for logOp with opstr: " << opstr << ", nss: "
-                            << nss.ns()
-                            << ", obj: "
-                            << obj
-                            << ", os: "
-                            << o2);
+              str::stream() << "Expected uuid for logOp with opstr: " << opstr
+                            << ", nss: " << nss.ns() << ", obj: " << obj << ", os: " << o2);
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
     // For commands, the test below is on the command ns and therefore does not check for
@@ -629,7 +624,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         sleepmillis(numMillis);
     }
 
-    std::unique_ptr<DocWriter const* []> basePtrs(new DocWriter const*[count]);
+    std::unique_ptr<DocWriter const*[]> basePtrs(new DocWriter const*[count]);
     for (size_t i = 0; i < count; i++) {
         basePtrs[i] = &writers[i];
     }
@@ -656,7 +651,7 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
         LOG(3) << "32bit system; choosing " << sz << " bytes oplog";
         return sz;
     }
-// First choose a minimum size.
+    // First choose a minimum size.
 
 #if defined(__APPLE__)
     // typically these are desktops (dev machines), so keep it smallish
@@ -786,8 +781,7 @@ std::pair<OptionalCollectionUUID, NamespaceString> parseCollModUUIDAndNss(Operat
     const auto nsByUUID = catalog.lookupNSSByUUID(uuid);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to apply operation due to missing collection (" << uuid
-                          << "): "
-                          << redact(cmd.toString()),
+                          << "): " << redact(cmd.toString()),
             nsByUUID);
     return std::pair<OptionalCollectionUUID, NamespaceString>(uuid, *nsByUUID);
 }
@@ -1342,8 +1336,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         collection = catalog.lookupCollectionByUUID(uuid);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply operation due to missing collection (" << uuid
-                              << "): "
-                              << redact(op.toString()),
+                              << "): " << redact(op.toString()),
                 collection);
         requestNss = collection->ns();
         dassert(opCtx->lockState()->isCollectionLockedForMode(

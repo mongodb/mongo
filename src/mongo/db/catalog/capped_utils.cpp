@@ -64,8 +64,8 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
-                      str::stream() << "Not primary while truncating collection: "
-                                    << collectionName);
+                      str::stream()
+                          << "Not primary while truncating collection: " << collectionName);
     }
 
     Database* db = autoDb.getDb();
@@ -91,8 +91,8 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
          repl::ReplicationCoordinator::modeNone) &&
         collectionName.isOplog()) {
         return Status(ErrorCodes::OplogOperationUnsupported,
-                      str::stream() << "Cannot truncate a live oplog while replicating: "
-                                    << collectionName);
+                      str::stream()
+                          << "Cannot truncate a live oplog while replicating: " << collectionName);
     }
 
     BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
@@ -140,8 +140,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 
     uassert(ErrorCodes::NamespaceExists,
             str::stream() << "cloneCollectionAsCapped failed - destination collection " << toNss
-                          << " already exists. source collection: "
-                          << fromNss,
+                          << " already exists. source collection: " << fromNss,
             !db->getCollection(opCtx, toNss));
 
     // create new collection
@@ -269,8 +268,7 @@ void convertToCapped(OperationContext* opCtx,
     uassertStatusOKWithContext(tmpNameResult,
                                str::stream()
                                    << "Cannot generate temporary collection namespace to convert "
-                                   << collectionName
-                                   << " to a capped collection");
+                                   << collectionName << " to a capped collection");
 
     const auto& longTmpName = tmpNameResult.getValue();
     const auto shortTmpName = longTmpName.coll().toString();

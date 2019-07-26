@@ -42,4 +42,4 @@ V mapFindWithDefault(const M& myMap, const K& key, const V& defaultValue = V()) 
     return it->second;
 }
 
-}  // end namespace
+}  // namespace mongo

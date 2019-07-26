@@ -59,9 +59,9 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::set;
 using std::string;
+using std::unique_ptr;
 
 /* fetch a single object from collection ns that matches query
    set your db SavedContext first

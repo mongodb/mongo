@@ -1403,4 +1403,4 @@ TEST(ExpressionDegreesToRadiansTest, DecimalArg) {
 TEST(ExpressionDegreesToRadiansTest, NullArg) {
     assertEvaluates("$degreesToRadians", Value(BSONNULL), Value(BSONNULL));
 }
-}  // namespace expression_trigonometric_test
+}  // namespace expression_tests

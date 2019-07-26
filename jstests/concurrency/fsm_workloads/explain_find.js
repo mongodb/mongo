@@ -11,7 +11,6 @@ load('jstests/concurrency/fsm_workloads/explain.js');     // for $config
 load('jstests/libs/analyze_plan.js');                     // for planHasStage and isIxscan
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.states = Object.extend({
         explainLimit: function explainLimit(db, collName) {
             var res = db[collName].find().limit(3).explain();

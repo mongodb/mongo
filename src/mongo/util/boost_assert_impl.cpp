@@ -40,8 +40,11 @@ struct BoostAssertImpl {
                 invariantFailed(expr, file, line);
             };
 
-        BoostAssertFuncs::global().assertMsgFunc = [](
-            char const* expr, char const* msg, char const* function, char const* file, long line) {
+        BoostAssertFuncs::global().assertMsgFunc = [](char const* expr,
+                                                      char const* msg,
+                                                      char const* function,
+                                                      char const* file,
+                                                      long line) {
             invariantFailedWithMsg(expr, msg, file, line);
         };
     }

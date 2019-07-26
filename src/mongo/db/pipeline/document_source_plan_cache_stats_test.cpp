@@ -159,8 +159,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsOnlyMatchingStatsAfterAbsorbingM
                                     << "baz"),
                                BSON("foo"
                                     << "bar"
-                                    << "match"
-                                    << true)};
+                                    << "match" << true)};
     getExpCtx()->mongoProcessInterface =
         std::make_shared<PlanCacheStatsMongoProcessInterface>(stats);
 

@@ -94,7 +94,6 @@ function CharybdefsControl(test_name) {
         // Wait for watchdog to stop
         print("Waiting for MongoDB to hang.");
         sleep(fs_delay_sec * 1000);
-
     };
 
     /**
@@ -105,7 +104,6 @@ function CharybdefsControl(test_name) {
      * @param {number} delay_us - optional delay in microseconds to wait
      */
     this.addFault = function(method, file_name, delay_us) {
-
         this._runControl("set_fault",
                          "--methods=" + method,
                          "--errno=5",

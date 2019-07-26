@@ -115,4 +115,4 @@ public:
         return true;
     }
 } repairCursorCmd;
-}
+}  // namespace mongo

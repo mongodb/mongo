@@ -269,4 +269,4 @@ private:
     PseudoRandom rng;
 };
 
-}  // end namespace
+}  // namespace mongo

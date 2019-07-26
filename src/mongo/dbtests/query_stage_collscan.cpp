@@ -408,4 +408,4 @@ public:
 };
 
 SuiteInstance<All> all;
-}
+}  // namespace QueryStageCollectionScan

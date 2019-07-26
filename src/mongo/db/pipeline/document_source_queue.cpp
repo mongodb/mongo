@@ -55,4 +55,4 @@ DocumentSource::GetNextResult DocumentSourceQueue::getNext() {
     _queue.pop_front();
     return next;
 }
-}
+}  // namespace mongo

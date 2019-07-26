@@ -101,4 +101,4 @@ private:
     uint8_t _lastDigitIndex = 0;     // Indicates the last digit in _digits.
     T _counter = 0;
 };
-}
+}  // namespace mongo

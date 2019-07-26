@@ -278,4 +278,4 @@ private:
     stdx::condition_variable _cvNoLongerFull;
     stdx::condition_variable _cvNoLongerEmpty;
 };
-}
+}  // namespace mongo

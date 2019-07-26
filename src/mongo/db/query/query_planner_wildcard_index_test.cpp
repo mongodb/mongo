@@ -901,8 +901,7 @@ TEST_F(QueryPlannerWildcardTest, WildcardIndexDoesNotSupplyCandidatePlanForTextS
     addWildcardIndex(BSON("$**" << 1));
     addIndex(BSON("a" << 1 << "_fts"
                       << "text"
-                      << "_ftsx"
-                      << 1));
+                      << "_ftsx" << 1));
 
     // Confirm that the wildcard index generates candidate plans for queries which do not include a
     // $text predicate.

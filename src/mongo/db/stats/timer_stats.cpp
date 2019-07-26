@@ -69,4 +69,4 @@ BSONObj TimerStats::getReport() const {
     b.appendNumber("totalMillis", t);
     return b.obj();
 }
-}
+}  // namespace mongo

@@ -45,8 +45,8 @@ namespace mongo {
 
 namespace {
 
-using std::unique_ptr;
 using std::set;
+using std::unique_ptr;
 
 /**
  * Unit tests related to DBHelpers

@@ -6,24 +6,24 @@
 // when the 'connectToField' is a nested array, or when the 'connectFromField' is a nested array.
 
 (function() {
-    "use strict";
+"use strict";
 
-    var local = db.local;
-    var foreign = db.foreign;
+var local = db.local;
+var foreign = db.foreign;
 
-    local.drop();
-    foreign.drop();
+local.drop();
+foreign.drop();
 
-    // 'connectFromField' is an array of objects.
-    var bulk = foreign.initializeUnorderedBulkOp();
-    for (var i = 0; i < 100; i++) {
-        bulk.insert({_id: i, neighbors: [{id: i + 1}, {id: i + 2}]});
-    }
-    assert.writeOK(bulk.execute());
+// 'connectFromField' is an array of objects.
+var bulk = foreign.initializeUnorderedBulkOp();
+for (var i = 0; i < 100; i++) {
+    bulk.insert({_id: i, neighbors: [{id: i + 1}, {id: i + 2}]});
+}
+assert.writeOK(bulk.execute());
 
-    assert.writeOK(local.insert({starting: 0}));
+assert.writeOK(local.insert({starting: 0}));
 
-    var res = local
+var res = local
                   .aggregate({
                       $graphLookup: {
                           from: "foreign",
@@ -34,18 +34,18 @@
                       }
                   })
                   .toArray()[0];
-    assert.eq(res.integers.length, 100);
+assert.eq(res.integers.length, 100);
 
-    foreign.drop();
+foreign.drop();
 
-    // 'connectToField' is an array of objects.
-    var bulk = foreign.initializeUnorderedBulkOp();
-    for (var i = 0; i < 100; i++) {
-        bulk.insert({previous: [{neighbor: i}, {neighbor: i - 1}], value: i + 1});
-    }
-    assert.writeOK(bulk.execute());
+// 'connectToField' is an array of objects.
+var bulk = foreign.initializeUnorderedBulkOp();
+for (var i = 0; i < 100; i++) {
+    bulk.insert({previous: [{neighbor: i}, {neighbor: i - 1}], value: i + 1});
+}
+assert.writeOK(bulk.execute());
 
-    var res = local
+var res = local
                   .aggregate({
                       $graphLookup: {
                           from: "foreign",
@@ -56,21 +56,21 @@
                       }
                   })
                   .toArray()[0];
-    assert.eq(res.integers.length, 100);
+assert.eq(res.integers.length, 100);
 
-    foreign.drop();
+foreign.drop();
 
-    // Both 'connectToField' and 'connectFromField' are arrays of objects.
-    var bulk = foreign.initializeUnorderedBulkOp();
-    for (var i = 0; i < 100; i++) {
-        bulk.insert({
-            previous: [{neighbor: i}, {neighbor: i - 1}],
-            values: [{neighbor: i + 1}, {neighbor: i + 2}]
-        });
-    }
-    assert.writeOK(bulk.execute());
+// Both 'connectToField' and 'connectFromField' are arrays of objects.
+var bulk = foreign.initializeUnorderedBulkOp();
+for (var i = 0; i < 100; i++) {
+    bulk.insert({
+        previous: [{neighbor: i}, {neighbor: i - 1}],
+        values: [{neighbor: i + 1}, {neighbor: i + 2}]
+    });
+}
+assert.writeOK(bulk.execute());
 
-    var res = local
+var res = local
                   .aggregate({
                       $graphLookup: {
                           from: "foreign",
@@ -81,5 +81,5 @@
                       }
                   })
                   .toArray()[0];
-    assert.eq(res.integers.length, 100);
+assert.eq(res.integers.length, 100);
 }());

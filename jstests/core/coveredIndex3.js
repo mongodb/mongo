@@ -12,13 +12,15 @@ if (0) {  // SERVER-4975
         // Insert an array, which will make the { a:1 } index multikey and should disable covered
         // index
         // matching.
-        p1 = startParallelShell('for( i = 0; i < 60; ++i ) { \
+        p1 = startParallelShell(
+            'for( i = 0; i < 60; ++i ) { \
                                db.jstests_coveredIndex3.save( { a:[ 2000, 2001 ] } ); \
                                sleep( 300 ); \
                            }');
 
         // Frequent writes cause the find operation to yield.
-        p2 = startParallelShell('for( i = 0; i < 1800; ++i ) { \
+        p2 = startParallelShell(
+            'for( i = 0; i < 1800; ++i ) { \
                             db.jstests_coveredIndex3_other.save( {} ); \
                             sleep( 10 ); \
                             }');

@@ -65,8 +65,8 @@ printjson(lastOp);
 // crash.
 local.replset.minvalid.update({},
                               {
-                                ts: new Timestamp(lastOp.ts.t, lastOp.ts.i + 1),
-                                t: NumberLong(-1),
+                                  ts: new Timestamp(lastOp.ts.t, lastOp.ts.i + 1),
+                                  t: NumberLong(-1),
                               },
                               {upsert: true});
 printjson(local.replset.minvalid.findOne());

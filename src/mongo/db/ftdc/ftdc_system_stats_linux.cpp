@@ -68,7 +68,10 @@ static const std::vector<StringData> kMemKeys{
 };
 
 static const std::vector<StringData> kNetstatKeys{
-    "Tcp:"_sd, "Ip:"_sd, "TcpExt:"_sd, "IpExt:"_sd,
+    "Tcp:"_sd,
+    "Ip:"_sd,
+    "TcpExt:"_sd,
+    "IpExt:"_sd,
 };
 
 /**

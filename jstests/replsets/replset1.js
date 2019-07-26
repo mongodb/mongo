@@ -3,7 +3,6 @@ var ssl_options2;
 var ssl_name;
 load("jstests/replsets/rslib.js");
 var doTest = function(signal) {
-
     // Test basic replica set functionality.
     // -- Replication
     // -- Failover

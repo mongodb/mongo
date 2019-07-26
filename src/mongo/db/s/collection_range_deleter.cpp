@@ -178,14 +178,8 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
                                 NamespaceString::kServerConfigurationNamespace.ns(),
                                 BSON("_id"
                                      << "startRangeDeletion"
-                                     << "ns"
-                                     << nss.ns()
-                                     << "epoch"
-                                     << epoch
-                                     << "min"
-                                     << range->getMin()
-                                     << "max"
-                                     << range->getMax()));
+                                     << "ns" << nss.ns() << "epoch" << epoch << "min"
+                                     << range->getMin() << "max" << range->getMax()));
             } catch (const DBException& e) {
                 stdx::lock_guard<stdx::mutex> scopedLock(csr->_metadataManager->_managerLock);
                 csr->_metadataManager->_clearAllCleanups(
@@ -354,8 +348,8 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
     auto catalog = collection->getIndexCatalog();
     const IndexDescriptor* idx = catalog->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
     if (!idx) {
-        std::string msg = str::stream() << "Unable to find shard key index for "
-                                        << keyPattern.toString() << " in " << nss.ns();
+        std::string msg = str::stream()
+            << "Unable to find shard key index for " << keyPattern.toString() << " in " << nss.ns();
         LOG(0) << msg;
         return {ErrorCodes::InternalError, msg};
     }
@@ -375,8 +369,8 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
     const IndexDescriptor* descriptor =
         collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     if (!descriptor) {
-        std::string msg = str::stream() << "shard key index with name " << indexName << " on '"
-                                        << nss.ns() << "' was dropped";
+        std::string msg = str::stream()
+            << "shard key index with name " << indexName << " on '" << nss.ns() << "' was dropped";
         LOG(0) << msg;
         return {ErrorCodes::InternalError, msg};
     }

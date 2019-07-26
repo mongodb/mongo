@@ -101,7 +101,7 @@ TEST(UniqueFunctionTest, reassign_simple_unique_function_from_lambda) {
 TEST(UniqueFunctionTest, accepts_a_functor_that_is_move_only) {
     struct Checker {};
 
-    mongo::unique_function<void()> uf = [checkerPtr = std::make_unique<Checker>()]{};
+    mongo::unique_function<void()> uf = [checkerPtr = std::make_unique<Checker>()] {};
 
     mongo::unique_function<void()> uf2 = std::move(uf);
 

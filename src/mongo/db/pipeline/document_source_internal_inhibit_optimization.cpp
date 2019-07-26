@@ -65,4 +65,4 @@ Value DocumentSourceInternalInhibitOptimization::serialize(
     return Value(Document{{getSourceName(), Value{Document{}}}});
 }
 
-}  // namesace mongo
+}  // namespace mongo

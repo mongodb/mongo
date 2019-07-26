@@ -387,8 +387,8 @@ Status BSONObj::storageValidEmbedded() const {
         if (name.startsWith("$")) {
             if (first &&
                 // $ref is a collection name and must be a String
-                (name == "$ref") &&
-                e.type() == String && (i.next().fieldNameStringData() == "$id")) {
+                (name == "$ref") && e.type() == String &&
+                (i.next().fieldNameStringData() == "$id")) {
                 first = false;
                 // keep inspecting fields for optional "$db"
                 e = i.next();

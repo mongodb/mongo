@@ -38,8 +38,8 @@
 namespace mongo {
 namespace {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 
 // Verify that the name of the record store is not NULL and nonempty.
 TEST(RecordStoreTestHarness, RecordStoreName) {

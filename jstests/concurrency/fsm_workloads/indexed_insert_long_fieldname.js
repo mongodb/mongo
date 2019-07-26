@@ -11,7 +11,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extend
 load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     // The indexedField must be limited such that the namespace and indexedField does not
     // exceed 128 characters. The namespace defaults to // "test<i>_fsmdb<j>.fsmcoll<k>",
     // where i, j & k are increasing integers for each test, workload and thread.

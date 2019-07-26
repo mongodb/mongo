@@ -4,7 +4,6 @@
  * Helpers for filtering the index specifications returned by DBCollection.prototype.getIndexes().
  */
 var GetIndexHelpers = (function() {
-
     /**
      * Returns the index specification with the name 'indexName' if it is present in the
      * 'indexSpecs' array, and returns null otherwise.
@@ -17,8 +16,8 @@ var GetIndexHelpers = (function() {
         const found = indexSpecs.filter(spec => spec.name === indexName);
 
         if (found.length > 1) {
-            throw new Error("Found multiple indexes with name '" + indexName + "': " +
-                            tojson(indexSpecs));
+            throw new Error("Found multiple indexes with name '" + indexName +
+                            "': " + tojson(indexSpecs));
         }
         return (found.length === 1) ? found[0] : null;
     }
@@ -38,9 +37,9 @@ var GetIndexHelpers = (function() {
 
         if (!collationWasSpecified) {
             if (foundByKeyPattern.length > 1) {
-                throw new Error("Found multiple indexes with key pattern " + tojson(keyPattern) +
-                                " and 'collation' parameter was not specified: " +
-                                tojson(indexSpecs));
+                throw new Error(
+                    "Found multiple indexes with key pattern " + tojson(keyPattern) +
+                    " and 'collation' parameter was not specified: " + tojson(indexSpecs));
             }
             return (foundByKeyPattern.length === 1) ? foundByKeyPattern[0] : null;
         }

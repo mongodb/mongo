@@ -90,8 +90,7 @@ TEST_F(TaskExecutorCursorFixture, Basic) {
                              "test",
                              BSON("find"
                                   << "test"
-                                  << "batchSize"
-                                  << 10),
+                                  << "batchSize" << 10),
                              opCtx.get());
 
     TaskExecutorCursor tec(executor(), rcr, [] {

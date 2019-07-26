@@ -251,9 +251,8 @@ private:
         mongo::stdx::unordered_map<CollectionUUID, NamespaceString, CollectionUUID::Hash>>
         _shadowCatalog;
 
-    using CollectionCatalogMap = mongo::stdx::unordered_map<CollectionUUID,
-                                                            std::unique_ptr<Collection>,
-                                                            CollectionUUID::Hash>;
+    using CollectionCatalogMap = mongo::stdx::
+        unordered_map<CollectionUUID, std::unique_ptr<Collection>, CollectionUUID::Hash>;
     using OrderedCollectionMap = std::map<std::pair<std::string, CollectionUUID>, Collection*>;
     using NamespaceCollectionMap = mongo::stdx::unordered_map<NamespaceString, Collection*>;
     CollectionCatalogMap _catalog;

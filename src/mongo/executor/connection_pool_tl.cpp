@@ -139,7 +139,7 @@ AsyncDBClient* TLConnection::client() {
 
 void TLConnection::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
     auto anchor = shared_from_this();
-    _timer->setTimeout(timeout, [ cb = std::move(cb), anchor = std::move(anchor) ] { cb(); });
+    _timer->setTimeout(timeout, [cb = std::move(cb), anchor = std::move(anchor)] { cb(); });
 }
 
 void TLConnection::cancelTimeout() {
@@ -213,14 +213,14 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
     auto pf = makePromiseFuture<void>();
     auto handler = std::make_shared<TimeoutHandler>(std::move(pf.promise));
     std::move(pf.future).thenRunOn(_reactor).getAsync(
-        [ this, cb = std::move(cb), anchor ](Status status) { cb(this, std::move(status)); });
+        [this, cb = std::move(cb), anchor](Status status) { cb(this, std::move(status)); });
 
     setTimeout(timeout, [this, handler, timeout] {
         if (handler->done.swap(true)) {
             return;
         }
-        std::string reason = str::stream() << "Timed out connecting to " << _peer << " after "
-                                           << timeout;
+        std::string reason = str::stream()
+            << "Timed out connecting to " << _peer << " after " << timeout;
         handler->promise.setError(
             Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, std::move(reason)));
 
@@ -286,7 +286,7 @@ void TLConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
     auto pf = makePromiseFuture<void>();
     auto handler = std::make_shared<TimeoutHandler>(std::move(pf.promise));
     std::move(pf.future).thenRunOn(_reactor).getAsync(
-        [ this, cb = std::move(cb), anchor ](Status status) { cb(this, status); });
+        [this, cb = std::move(cb), anchor](Status status) { cb(this, status); });
 
     setTimeout(timeout, [this, handler] {
         if (handler->done.swap(true)) {
@@ -361,4 +361,4 @@ Date_t TLTypeFactory::now() {
 
 }  // namespace connection_pool_tl
 }  // namespace executor
-}  // namespace
+}  // namespace mongo

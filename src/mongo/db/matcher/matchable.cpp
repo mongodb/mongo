@@ -38,4 +38,4 @@ BSONMatchableDocument::BSONMatchableDocument(const BSONObj& obj) : _obj(obj) {
 }
 
 BSONMatchableDocument::~BSONMatchableDocument() {}
-}
+}  // namespace mongo

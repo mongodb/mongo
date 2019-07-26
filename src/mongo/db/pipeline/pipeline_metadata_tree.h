@@ -117,8 +117,7 @@ inline auto findStageContents(const NamespaceString& ns,
     auto it = initialStageContents.find(ns);
     uassert(51213,
             str::stream() << "Metadata to initialize an aggregation pipeline associated with "
-                          << ns.coll()
-                          << " is missing.",
+                          << ns.coll() << " is missing.",
             it != initialStageContents.end());
     return it->second;
 }
@@ -154,7 +153,7 @@ inline auto makeAdditionalChildren(
     std::vector<T> offTheEndContents;
     if (auto lookupSource = dynamic_cast<const DocumentSourceLookUp*>(&source);
         lookupSource && lookupSource->wasConstructedWithPipelineSyntax()) {
-        auto[child, offTheEndReshaper] =
+        auto [child, offTheEndReshaper] =
             makeTreeWithOffTheEndStage(std::move(initialStageContents),
                                        lookupSource->getResolvedIntrospectionPipeline(),
                                        propagator);
@@ -166,7 +165,7 @@ inline auto makeAdditionalChildren(
                        facetSource->getFacetPipelines().end(),
                        std::back_inserter(children),
                        [&](const auto& fPipe) {
-                           auto[child, offTheEndReshaper] = makeTreeWithOffTheEndStage(
+                           auto [child, offTheEndReshaper] = makeTreeWithOffTheEndStage(
                                std::move(initialStageContents), *fPipe.pipeline, propagator);
                            offTheEndContents.push_back(offTheEndReshaper(child.get().contents));
                            return std::move(*child);
@@ -192,13 +191,15 @@ inline auto makeStage(
     auto contents = (previous) ? reshapeContents(previous.get().contents)
                                : findStageContents(source.getContext()->ns, initialStageContents);
 
-    auto[additionalChildren, offTheEndContents] =
+    auto [additionalChildren, offTheEndContents] =
         makeAdditionalChildren(std::move(initialStageContents), source, propagator, contents);
 
     auto principalChild = previous ? std::make_unique<Stage<T>>(std::move(previous.get()))
                                    : std::unique_ptr<Stage<T>>();
-    std::function<T(const T&)> reshaper([&, offTheEndContents{std::move(offTheEndContents)} ](
-        const T& reshapable) { return propagator(reshapable, offTheEndContents, source); });
+    std::function<T(const T&)> reshaper(
+        [&, offTheEndContents{std::move(offTheEndContents)}](const T& reshapable) {
+            return propagator(reshapable, offTheEndContents, source);
+        });
     return std::pair(
         boost::optional<Stage<T>>(
             Stage(std::move(contents), std::move(principalChild), std::move(additionalChildren))),
@@ -278,7 +279,7 @@ inline std::pair<boost::optional<Stage<T>>, T> makeTree(
                          findStageContents(pipeline.getContext()->ns, initialStageContents));
     }
 
-    auto && [ finalStage, reshaper ] =
+    auto&& [finalStage, reshaper] =
         detail::makeTreeWithOffTheEndStage(std::move(initialStageContents), pipeline, propagator);
 
     return std::pair(std::move(*finalStage), reshaper(finalStage.get().contents));

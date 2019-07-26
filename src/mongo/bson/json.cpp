@@ -45,9 +45,9 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::ostringstream;
 using std::string;
+using std::unique_ptr;
 
 #if 0
 #define MONGO_JSON_DEBUG(message)                                                          \
@@ -468,7 +468,7 @@ Status JParse::dateObject(StringData fieldName, BSONObjBuilder& builder) {
         }
         if (errno == ERANGE) {
             /* Need to handle this because jsonString outputs the value of Date_t as unsigned.
-            * See SERVER-8330 and SERVER-8573 */
+             * See SERVER-8330 and SERVER-8573 */
             errno = 0;
             // SERVER-11920: We should use parseNumberFromString here, but that function
             // requires that we know ahead of time where the number ends, which is not currently
@@ -763,7 +763,7 @@ Status JParse::date(StringData fieldName, BSONObjBuilder& builder) {
     }
     if (errno == ERANGE) {
         /* Need to handle this because jsonString outputs the value of Date_t as unsigned.
-        * See SERVER-8330 and SERVER-8573 */
+         * See SERVER-8330 and SERVER-8573 */
         errno = 0;
         // SERVER-11920: We should use parseNumberFromString here, but that function requires
         // that we know ahead of time where the number ends, which is not currently the case.

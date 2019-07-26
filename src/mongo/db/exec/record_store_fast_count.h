@@ -75,4 +75,4 @@ private:
     CountStats _specificStats;
 };
 
-}  // namepace mongo
+}  // namespace mongo

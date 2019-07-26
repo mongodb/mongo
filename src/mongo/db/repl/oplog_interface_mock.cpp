@@ -90,8 +90,7 @@ public:
                       str::stream()
                           << "oplog no longer contains the complete write history of this "
                              "transaction, log with opTime "
-                          << _nextOpTime.toBSON()
-                          << " cannot be found");
+                          << _nextOpTime.toBSON() << " cannot be found");
         }
         // We shouldn't get any other error.
         MONGO_UNREACHABLE;

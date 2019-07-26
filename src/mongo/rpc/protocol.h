@@ -133,8 +133,8 @@ StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
     const BSONObj& isMasterReply);
 
 /**
-  * Computes supported protocols from wire versions.
-  */
+ * Computes supported protocols from wire versions.
+ */
 ProtocolSet computeProtocolSet(const WireVersionInfo version);
 
 }  // namespace rpc

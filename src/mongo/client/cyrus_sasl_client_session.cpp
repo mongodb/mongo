@@ -147,8 +147,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
     if (result != SASL_OK) {
         return Status(ErrorCodes::UnknownError,
                       str::stream() << "Could not initialize sasl client components ("
-                                    << sasl_errstring(result, NULL, NULL)
-                                    << ")");
+                                    << sasl_errstring(result, NULL, NULL) << ")");
     }
 
     SaslClientSession::create = createCyrusSaslClientSession;
@@ -311,4 +310,4 @@ Status CyrusSaslClientSession::step(StringData inputData, std::string* outputDat
             return Status(ErrorCodes::ProtocolError, sasl_errdetail(_saslConnection));
     }
 }
-}  // namespace
+}  // namespace mongo

@@ -145,8 +145,7 @@ StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& option
             // Return error on first unrecognized field.
             return StatusWith<std::string>(ErrorCodes::InvalidOptions,
                                            str::stream() << '\'' << elem.fieldNameStringData()
-                                                         << '\''
-                                                         << " is not a supported option.");
+                                                         << '\'' << " is not a supported option.");
         }
     }
     return StatusWith<std::string>(ss.str());
@@ -274,9 +273,7 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
         Status indexVersionStatus(
             ErrorCodes::UnsupportedFormat,
             str::stream() << versionStatus.reason() << " Index: {name: " << desc->indexName()
-                          << ", ns: "
-                          << desc->parentNS()
-                          << "} - version too new for this mongod."
+                          << ", ns: " << desc->parentNS() << "} - version too new for this mongod."
                           << " See http://dochub.mongodb.org/core/4.2-downgrade-index for detailed"
                           << " instructions on how to handle this error.");
         fassertFailedWithStatusNoTrace(28579, indexVersionStatus);
@@ -346,10 +343,10 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
             warning() << msg;
             fullResults->warnings.push_back(msg);
         } else if (err) {
-            std::string msg = str::stream() << "verify() returned " << wiredtiger_strerror(err)
-                                            << ". "
-                                            << "This indicates structural damage. "
-                                            << "Not examining individual index entries.";
+            std::string msg = str::stream()
+                << "verify() returned " << wiredtiger_strerror(err) << ". "
+                << "This indicates structural damage. "
+                << "Not examining individual index entries.";
             error() << msg;
             fullResults->errors.push_back(msg);
             fullResults->valid = false;

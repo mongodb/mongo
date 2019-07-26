@@ -1,4 +1,5 @@
-/** Simple test of sharding TTL collections.
+/**
+ * Simple test of sharding TTL collections.
  *  - Creates a new collection with a TTL index
  *  - Shards it, and moves one chunk containing half the docs to another shard.
  *  - Checks that both shards have TTL index, and docs get deleted on both shards.

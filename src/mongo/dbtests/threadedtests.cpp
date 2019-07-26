@@ -48,10 +48,10 @@
 
 namespace ThreadedTests {
 
-using std::unique_ptr;
 using std::cout;
 using std::endl;
 using std::string;
+using std::unique_ptr;
 
 template <int nthreads_param = 10>
 class ThreadedTest {

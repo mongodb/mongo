@@ -366,8 +366,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     auto numIndexesInProgress = collection->getIndexCatalog()->numIndexesInProgress(opCtx);
     massert(ErrorCodes::BackgroundOperationInProgressForNamespace,
             str::stream() << "cannot drop collection " << nss << " (" << uuidString << ") when "
-                          << numIndexesInProgress
-                          << " index builds in progress.",
+                          << numIndexesInProgress << " index builds in progress.",
             numIndexesInProgress == 0);
 
     audit::logDropCollection(&cc(), nss.toString());
@@ -566,9 +565,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
     // This check only applies for actual collections, not indexes or other types of ns.
     uassert(17381,
             str::stream() << "fully qualified namespace " << nss << " is too long "
-                          << "(max is "
-                          << NamespaceString::MaxNsCollectionLen
-                          << " bytes)",
+                          << "(max is " << NamespaceString::MaxNsCollectionLen << " bytes)",
             !nss.isNormal() || nss.size() <= NamespaceString::MaxNsCollectionLen);
 
     uassert(17316, "cannot create a blank collection", nss.coll() > 0);
@@ -623,8 +620,8 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     bool generatedUUID = false;
     if (!optionsWithUUID.uuid) {
         if (!canAcceptWrites) {
-            std::string msg = str::stream() << "Attempted to create a new collection " << nss
-                                            << " without a UUID";
+            std::string msg = str::stream()
+                << "Attempted to create a new collection " << nss << " without a UUID";
             severe() << msg;
             uasserted(ErrorCodes::InvalidOptions, msg);
         } else {
@@ -726,8 +723,7 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
                                        "model for collection name "
                                     << collectionNameModel
                                     << " must contain at least one percent sign within first "
-                                    << maxModelLength
-                                    << " characters.");
+                                    << maxModelLength << " characters.");
     }
 
     if (!_uniqueCollectionNamespacePseudoRandom) {
@@ -766,9 +762,7 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
     return Status(
         ErrorCodes::NamespaceExists,
         str::stream() << "Cannot generate collection name for temporary collection with model "
-                      << collectionNameModel
-                      << " after "
-                      << numGenerationAttempts
+                      << collectionNameModel << " after " << numGenerationAttempts
                       << " attempts due to namespace conflicts with existing collections.");
 }
 
@@ -897,8 +891,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
     } else {
         invariant(createCollection(opCtx, nss, collectionOptions, createDefaultIndexes, idIndex),
                   str::stream() << "Collection creation failed after validating options: " << nss
-                                << ". Options: "
-                                << collectionOptions.toBSON());
+                                << ". Options: " << collectionOptions.toBSON());
     }
 
     return Status::OK();

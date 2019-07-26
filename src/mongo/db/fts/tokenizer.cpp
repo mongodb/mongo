@@ -132,5 +132,5 @@ Token::Type Tokenizer::_type(char c) const {
             return Token::TEXT;
     }
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

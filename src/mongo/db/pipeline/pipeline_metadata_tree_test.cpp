@@ -129,7 +129,8 @@ TEST_F(PipelineMetadataTreeTest, LinearPipelinesConstructProperTrees) {
         auto pipePtr = jsonToPipeline("[{$project: {name: 1}}]");
         return makeTree<TestThing>(
             {{NamespaceString("test.collection"), initial}}, *pipePtr, ignoreDocumentSourceAddOne);
-    }().first.get() == Stage(TestThing{23}, {}, {}));
+    }()
+               .first.get() == Stage(TestThing{23}, {}, {}));
 
     ASSERT([&]() {
         auto pipePtr = jsonToPipeline(
@@ -137,7 +138,8 @@ TEST_F(PipelineMetadataTreeTest, LinearPipelinesConstructProperTrees) {
             "{$match: {status: \"completed\"}}]");
         return makeTree<TestThing>(
             {{NamespaceString("test.collection"), initial}}, *pipePtr, ignoreDocumentSourceAddOne);
-    }().first.get() == Stage(TestThing{24}, makeUniqueStage(TestThing{23}, {}, {}), {}));
+    }()
+               .first.get() == Stage(TestThing{24}, makeUniqueStage(TestThing{23}, {}, {}), {}));
 
     ASSERT([&]() {
         auto pipePtr = jsonToPipeline(
@@ -149,7 +151,8 @@ TEST_F(PipelineMetadataTreeTest, LinearPipelinesConstructProperTrees) {
             "{$match: {status: \"completed\"}}]");
         return makeTree<TestThing>(
             {{NamespaceString("test.collection"), initial}}, *pipePtr, ignoreDocumentSourceAddOne);
-    }().first.get() ==
+    }()
+               .first.get() ==
            Stage(TestThing{28},
                  makeUniqueStage(
                      TestThing{27},
@@ -247,7 +250,8 @@ TEST_F(PipelineMetadataTreeTest, BranchingPipelinesConstructProperTrees) {
                                     {NamespaceString("test.instruments"), {"2"}}},
                                    *pipePtr,
                                    buildRepresentativeString);
-    }().first.get() ==
+    }()
+               .first.get() ==
            Stage(TestThing{"1mpxul[2m]ulu"},
                  makeUniqueStage(
                      TestThing{"1mpxul[2m]ul"},
@@ -283,7 +287,8 @@ TEST_F(PipelineMetadataTreeTest, BranchingPipelinesConstructProperTrees) {
             "{$limit: 12}]");
         return makeTree<TestThing>(
             {{NamespaceString("test.collection"), {""}}}, *pipePtr, buildRepresentativeString);
-    }().first.get() ==
+    }()
+               .first.get() ==
            Stage(TestThing{"f[tugs, tmgs, tb]"},
                  makeUniqueStage(
                      TestThing{""},

@@ -131,19 +131,17 @@ SaslConversation::SaslConversation(std::string mech)
                            << scram::Secrets<SHA256Block>::generateCredentials(
                                   "frim", saslGlobalParams.scramSHA256IterationCount.load()));
 
-    ASSERT_OK(authManagerExternalState->insert(opCtx.get(),
-                                               NamespaceString("admin.system.users"),
-                                               BSON("_id"
-                                                    << "test.andy"
-                                                    << "user"
-                                                    << "andy"
-                                                    << "db"
-                                                    << "test"
-                                                    << "credentials"
-                                                    << creds
-                                                    << "roles"
-                                                    << BSONArray()),
-                                               BSONObj()));
+    ASSERT_OK(
+        authManagerExternalState->insert(opCtx.get(),
+                                         NamespaceString("admin.system.users"),
+                                         BSON("_id"
+                                              << "test.andy"
+                                              << "user"
+                                              << "andy"
+                                              << "db"
+                                              << "test"
+                                              << "credentials" << creds << "roles" << BSONArray()),
+                                         BSONObj()));
 }
 
 void SaslConversation::assertConversationFailure() {

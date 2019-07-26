@@ -188,4 +188,4 @@ public:
         return true;
     }
 } cmdListDatabases;
-}
+}  // namespace mongo

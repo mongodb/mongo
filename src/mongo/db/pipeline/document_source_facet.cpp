@@ -94,11 +94,8 @@ vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& ele
         for (auto&& subPipeElem : facetElem.Obj()) {
             uassert(40171,
                     str::stream() << "elements of arrays in $facet spec must be non-empty objects, "
-                                  << facetName
-                                  << " argument contained an element of type "
-                                  << typeName(subPipeElem.type())
-                                  << ": "
-                                  << subPipeElem,
+                                  << facetName << " argument contained an element of type "
+                                  << typeName(subPipeElem.type()) << ": " << subPipeElem,
                     subPipeElem.type() == BSONType::Object);
             rawPipeline.push_back(subPipeElem.embeddedObject());
         }
@@ -351,8 +348,7 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
         }
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "$facet pipeline '" << *needsMongoS
-                              << "' must run on mongoS, but '"
-                              << *needsShard
+                              << "' must run on mongoS, but '" << *needsShard
                               << "' requires a shard",
                 !(needsShard && needsMongoS));
 

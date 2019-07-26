@@ -493,8 +493,7 @@ Status AuthorizationSessionImpl::checkAuthorizedToGrantPrivilege(const Privilege
                 ActionType::grantRole)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "Not authorized to grant privileges on the "
-                                        << resource.databaseToMatch()
-                                        << "database");
+                                        << resource.databaseToMatch() << "database");
         }
     } else if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName("admin"),
                                                  ActionType::grantRole)) {
@@ -514,8 +513,7 @@ Status AuthorizationSessionImpl::checkAuthorizedToRevokePrivilege(const Privileg
                 ActionType::revokeRole)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "Not authorized to revoke privileges on the "
-                                        << resource.databaseToMatch()
-                                        << "database");
+                                        << resource.databaseToMatch() << "database");
         }
     } else if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName("admin"),
                                                  ActionType::revokeRole)) {
@@ -1001,9 +999,7 @@ bool AuthorizationSessionImpl::isImpersonating() const {
 auto AuthorizationSessionImpl::checkCursorSessionPrivilege(
     OperationContext* const opCtx, const boost::optional<LogicalSessionId> cursorSessionId)
     -> Status {
-    auto nobodyIsLoggedIn = [authSession = this] {
-        return !authSession->isAuthenticated();
-    };
+    auto nobodyIsLoggedIn = [authSession = this] { return !authSession->isAuthenticated(); };
 
     auto authHasImpersonatePrivilege = [authSession = this] {
         return authSession->isAuthorizedForPrivilege(
@@ -1037,13 +1033,12 @@ auto AuthorizationSessionImpl::checkCursorSessionPrivilege(
                                         // Operation Context (which implies a background job
         !authHasImpersonatePrivilege()  // Or if the user has an impersonation privilege, in which
                                         // case, the user gets to sidestep certain checks.
-        ) {
+    ) {
         return Status{ErrorCodes::Unauthorized,
-                      str::stream() << "Cursor session id ("
-                                    << sessionIdToStringOrNone(cursorSessionId)
-                                    << ") is not the same as the operation context's session id ("
-                                    << sessionIdToStringOrNone(opCtx->getLogicalSessionId())
-                                    << ")"};
+                      str::stream()
+                          << "Cursor session id (" << sessionIdToStringOrNone(cursorSessionId)
+                          << ") is not the same as the operation context's session id ("
+                          << sessionIdToStringOrNone(opCtx->getLogicalSessionId()) << ")"};
     }
 
     return Status::OK();

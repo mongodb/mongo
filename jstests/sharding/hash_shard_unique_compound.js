@@ -7,41 +7,41 @@
 // SERVER-36321.
 // @tags: [blacklist_from_rhel_67_s390x]
 (function() {
-    'use strict';
+'use strict';
 
-    var s = new ShardingTest({shards: 1, mongos: 1});
-    var dbName = "test";
-    var collName = "foo";
-    var ns = dbName + "." + collName;
-    var db = s.getDB(dbName);
-    var coll = db.getCollection(collName);
+var s = new ShardingTest({shards: 1, mongos: 1});
+var dbName = "test";
+var collName = "foo";
+var ns = dbName + "." + collName;
+var db = s.getDB(dbName);
+var coll = db.getCollection(collName);
 
-    // Enable sharding on DB
-    assert.commandWorked(db.adminCommand({enablesharding: dbName}));
+// Enable sharding on DB
+assert.commandWorked(db.adminCommand({enablesharding: dbName}));
 
-    // Shard a fresh collection using a hashed shard key
-    assert.commandWorked(db.adminCommand({shardcollection: ns, key: {a: "hashed"}}));
+// Shard a fresh collection using a hashed shard key
+assert.commandWorked(db.adminCommand({shardcollection: ns, key: {a: "hashed"}}));
 
-    // Create unique index
-    assert.commandWorked(coll.ensureIndex({a: 1, b: 1}, {unique: true}));
+// Create unique index
+assert.commandWorked(coll.ensureIndex({a: 1, b: 1}, {unique: true}));
 
-    jsTest.log("------ indexes -------");
-    jsTest.log(tojson(coll.getIndexes()));
+jsTest.log("------ indexes -------");
+jsTest.log(tojson(coll.getIndexes()));
 
-    // Second Part
-    jsTest.log("------ dropping sharded collection to start part 2 -------");
-    coll.drop();
+// Second Part
+jsTest.log("------ dropping sharded collection to start part 2 -------");
+coll.drop();
 
-    // Create unique index
-    assert.commandWorked(coll.ensureIndex({a: 1, b: 1}, {unique: true}));
+// Create unique index
+assert.commandWorked(coll.ensureIndex({a: 1, b: 1}, {unique: true}));
 
-    // shard a fresh collection using a hashed shard key
-    assert.commandWorked(db.adminCommand({shardcollection: ns, key: {a: "hashed"}}),
-                         "shardcollection didn't worked 2");
+// shard a fresh collection using a hashed shard key
+assert.commandWorked(db.adminCommand({shardcollection: ns, key: {a: "hashed"}}),
+                     "shardcollection didn't worked 2");
 
-    s.printShardingStatus();
-    jsTest.log("------ indexes 2-------");
-    jsTest.log(tojson(coll.getIndexes()));
+s.printShardingStatus();
+jsTest.log("------ indexes 2-------");
+jsTest.log(tojson(coll.getIndexes()));
 
-    s.stop();
+s.stop();
 })();

@@ -399,9 +399,7 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
         } else if (!isGenericArgument(fieldName)) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "
-                                        << "Unrecognized field '"
-                                        << fieldName
-                                        << "'.");
+                                        << "Unrecognized field '" << fieldName << "'.");
         }
     }
 
@@ -645,26 +643,26 @@ Status QueryRequest::validate() const {
 
     if (_limit && *_limit < 0) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "Limit value must be non-negative, but received: "
-                                    << *_limit);
+                      str::stream()
+                          << "Limit value must be non-negative, but received: " << *_limit);
     }
 
     if (_batchSize && *_batchSize < 0) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "BatchSize value must be non-negative, but received: "
-                                    << *_batchSize);
+                      str::stream()
+                          << "BatchSize value must be non-negative, but received: " << *_batchSize);
     }
 
     if (_ntoreturn && *_ntoreturn < 0) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "NToReturn value must be non-negative, but received: "
-                                    << *_ntoreturn);
+                      str::stream()
+                          << "NToReturn value must be non-negative, but received: " << *_ntoreturn);
     }
 
     if (_maxTimeMS < 0) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "MaxTimeMS value must be non-negative, but received: "
-                                    << _maxTimeMS);
+                      str::stream()
+                          << "MaxTimeMS value must be non-negative, but received: " << _maxTimeMS);
     }
 
     if (_tailableMode != TailableModeEnum::kNormal) {

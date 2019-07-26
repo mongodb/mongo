@@ -15,71 +15,71 @@
  */
 
 (function() {
-    'use strict';
+'use strict';
 
-    const t = db.apply_ops_invalid_index_spec;
-    t.drop();
+const t = db.apply_ops_invalid_index_spec;
+t.drop();
 
-    const collNs = t.getFullName();
-    const cmdNs = db.getName() + '.$cmd';
-    const systemIndexesNs = db.getCollection('system.indexes').getFullName();
+const collNs = t.getFullName();
+const cmdNs = db.getName() + '.$cmd';
+const systemIndexesNs = db.getCollection('system.indexes').getFullName();
 
-    assert.commandWorked(db.createCollection(t.getName()));
-    assert.writeOK(t.save({_id: 100, a: 100}));
+assert.commandWorked(db.createCollection(t.getName()));
+assert.writeOK(t.save({_id: 100, a: 100}));
 
-    // Tests that db.collection.createIndex() fails when given an index spec containing an unknown
-    // field.
-    assert.commandFailedWithCode(t.createIndex({a: 1}, {v: 2, name: 'a_1_base_v2', unknown: 1}),
-                                 ErrorCodes.InvalidIndexSpecificationOption);
-    assert.commandFailedWithCode(t.createIndex({a: 1}, {v: 1, name: 'a_1_base_v1', unknown: 1}),
-                                 ErrorCodes.InvalidIndexSpecificationOption);
+// Tests that db.collection.createIndex() fails when given an index spec containing an unknown
+// field.
+assert.commandFailedWithCode(t.createIndex({a: 1}, {v: 2, name: 'a_1_base_v2', unknown: 1}),
+                             ErrorCodes.InvalidIndexSpecificationOption);
+assert.commandFailedWithCode(t.createIndex({a: 1}, {v: 1, name: 'a_1_base_v1', unknown: 1}),
+                             ErrorCodes.InvalidIndexSpecificationOption);
 
-    // A createIndexes command for a v:2 index with an unknown field in the index spec should fail.
-    assert.commandFailedWithCode(db.adminCommand({
-        applyOps: [{
-            op: 'c',
-            ns: cmdNs,
-            o: {
-                createIndexes: t.getName(),
-                v: 2,
-                key: {a: 1},
-                name: 'a_1_create_v2',
-                unknown: 1,
-            },
-        }],
-    }),
-                                 ErrorCodes.InvalidIndexSpecificationOption);
+// A createIndexes command for a v:2 index with an unknown field in the index spec should fail.
+assert.commandFailedWithCode(db.adminCommand({
+    applyOps: [{
+        op: 'c',
+        ns: cmdNs,
+        o: {
+            createIndexes: t.getName(),
+            v: 2,
+            key: {a: 1},
+            name: 'a_1_create_v2',
+            unknown: 1,
+        },
+    }],
+}),
+                             ErrorCodes.InvalidIndexSpecificationOption);
 
-    // A createIndexes command for a background index with unknown field in the index spec should
-    // fail.
-    assert.commandFailedWithCode(db.adminCommand({
-        applyOps: [{
-            op: 'c',
-            ns: cmdNs,
-            o: {
-                createIndexes: t.getName(),
-                v: 2,
-                key: {a: 1},
-                background: true,
-                name: 'a_1_background',
-                unknown: 1,
-            },
-        }],
-    }),
-                                 ErrorCodes.InvalidIndexSpecificationOption);
+// A createIndexes command for a background index with unknown field in the index spec should
+// fail.
+assert.commandFailedWithCode(db.adminCommand({
+    applyOps: [{
+        op: 'c',
+        ns: cmdNs,
+        o: {
+            createIndexes: t.getName(),
+            v: 2,
+            key: {a: 1},
+            background: true,
+            name: 'a_1_background',
+            unknown: 1,
+        },
+    }],
+}),
+                             ErrorCodes.InvalidIndexSpecificationOption);
 
-    // A createIndexes command for a v:1 index with an unknown field in the index spec should work.
-    const res1 = assert.commandWorked(db.adminCommand({
-        applyOps: [{
-            op: 'c',
-            ns: cmdNs,
-            o: {
-                createIndexes: t.getName(),
-                v: 1,
-                key: {a: 1},
-                name: 'a_1_create_v1',
-                unknown: 1,
-            },
-        }],
-    }));
+// A createIndexes command for a v:1 index with an unknown field in the index spec should work.
+const res1 = assert.commandWorked(db.adminCommand({
+    applyOps: [{
+        op: 'c',
+        ns: cmdNs,
+        o: {
+            createIndexes: t.getName(),
+            v: 1,
+            key: {a: 1},
+            name: 'a_1_create_v1',
+            unknown: 1,
+        },
+    }],
+}));
 })();

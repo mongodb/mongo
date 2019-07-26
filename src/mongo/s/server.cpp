@@ -424,7 +424,7 @@ public:
     void onConfirmedSet(const State& state) final {
         auto connStr = state.connStr;
 
-        auto fun = [ serviceContext = _serviceContext, connStr ](auto args) {
+        auto fun = [serviceContext = _serviceContext, connStr](auto args) {
             if (ErrorCodes::isCancelationError(args.status.code())) {
                 return;
             }

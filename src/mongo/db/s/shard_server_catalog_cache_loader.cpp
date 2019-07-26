@@ -158,9 +158,7 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
     }
     uassert(ErrorCodes::OperationFailed,
             str::stream() << "Failed to read persisted collections entry for collection '"
-                          << nss.ns()
-                          << "' due to '"
-                          << statusWithCollection.getStatus().toString()
+                          << nss.ns() << "' due to '" << statusWithCollection.getStatus().toString()
                           << "'.",
             statusWithCollection.isOK());
 
@@ -173,9 +171,7 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
                                            statusWithCollection.getValue().getEpoch());
     uassert(ErrorCodes::OperationFailed,
             str::stream() << "Failed to read highest version persisted chunk for collection '"
-                          << nss.ns()
-                          << "' due to '"
-                          << statusWithChunk.getStatus().toString()
+                          << nss.ns() << "' due to '" << statusWithChunk.getStatus().toString()
                           << "'.",
             statusWithChunk.isOK());
 
@@ -263,8 +259,8 @@ StatusWith<CollectionAndChangedChunks> getIncompletePersistedMetadataSinceVersio
             return CollectionAndChangedChunks();
         }
         return Status(ErrorCodes::OperationFailed,
-                      str::stream() << "Failed to load local metadata due to '" << status.toString()
-                                    << "'.");
+                      str::stream()
+                          << "Failed to load local metadata due to '" << status.toString() << "'.");
     }
 }
 
@@ -437,8 +433,8 @@ void ShardServerCatalogCacheLoader::getDatabase(
         return std::make_tuple(_role == ReplicaSetRole::Primary, _term);
     }();
 
-    _threadPool.schedule([ this, name = dbName.toString(), callbackFn, isPrimary, term ](
-        auto status) noexcept {
+    _threadPool.schedule([ this, name = dbName.toString(), callbackFn, isPrimary,
+                           term ](auto status) noexcept {
         invariant(status);
 
         auto context = _contexts.makeOperationContext(*Client::getCurrent());
@@ -611,19 +607,18 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     }();
 
     auto remoteRefreshFn = [this, nss, catalogCacheSinceVersion, maxLoaderVersion, termScheduled](
-        OperationContext* opCtx,
-        StatusWith<CollectionAndChangedChunks>
-            swCollectionAndChangedChunks) -> StatusWith<CollectionAndChangedChunks> {
-
+                               OperationContext* opCtx,
+                               StatusWith<CollectionAndChangedChunks> swCollectionAndChangedChunks)
+        -> StatusWith<CollectionAndChangedChunks> {
         if (swCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound) {
             _ensureMajorityPrimaryAndScheduleCollAndChunksTask(
                 opCtx,
                 nss,
                 collAndChunkTask{swCollectionAndChangedChunks, maxLoaderVersion, termScheduled});
 
-            LOG_CATALOG_REFRESH(1) << "Cache loader remotely refreshed for collection " << nss
-                                   << " from version " << maxLoaderVersion
-                                   << " and no metadata was found.";
+            LOG_CATALOG_REFRESH(1)
+                << "Cache loader remotely refreshed for collection " << nss << " from version "
+                << maxLoaderVersion << " and no metadata was found.";
             return swCollectionAndChangedChunks;
         }
 
@@ -634,12 +629,11 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
         auto& collAndChunks = swCollectionAndChangedChunks.getValue();
 
         if (collAndChunks.changedChunks.back().getVersion().epoch() != collAndChunks.epoch) {
-            return Status{
-                ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Invalid chunks found when reloading '" << nss.toString()
+            return Status{ErrorCodes::ConflictingOperationInProgress,
+                          str::stream()
+                              << "Invalid chunks found when reloading '" << nss.toString()
                               << "' Previous collection epoch was '"
-                              << collAndChunks.epoch.toString()
-                              << "', but found a new epoch '"
+                              << collAndChunks.epoch.toString() << "', but found a new epoch '"
                               << collAndChunks.changedChunks.back().getVersion().epoch().toString()
                               << "'. Collection was dropped and recreated."};
         }
@@ -716,8 +710,8 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
     StringData dbName,
     long long termScheduled,
     stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
-    auto remoteRefreshFn = [ this, name = dbName.toString(), termScheduled ](
-        OperationContext * opCtx, StatusWith<DatabaseType> swDatabaseType) {
+    auto remoteRefreshFn = [this, name = dbName.toString(), termScheduled](
+                               OperationContext* opCtx, StatusWith<DatabaseType> swDatabaseType) {
         if (swDatabaseType == ErrorCodes::NamespaceNotFound) {
             _ensureMajorityPrimaryAndScheduleDbTask(
                 opCtx, name, DBTask{swDatabaseType, termScheduled});
@@ -777,11 +771,12 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
                 : ("enqueued metadata from " +
                    enqueued.changedChunks.front().getVersion().toString() + " to " +
                    enqueued.changedChunks.back().getVersion().toString()))
-        << " and " << (persisted.changedChunks.empty()
-                           ? "no persisted metadata"
-                           : ("persisted metadata from " +
-                              persisted.changedChunks.front().getVersion().toString() + " to " +
-                              persisted.changedChunks.back().getVersion().toString()))
+        << " and "
+        << (persisted.changedChunks.empty()
+                ? "no persisted metadata"
+                : ("persisted metadata from " +
+                   persisted.changedChunks.front().getVersion().toString() + " to " +
+                   persisted.changedChunks.back().getVersion().toString()))
         << ", GTE cache version " << catalogCacheSinceVersion;
 
     if (!tasksAreEnqueued) {
@@ -892,7 +887,7 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(Oper
             return;
     }
 
-    _threadPool.schedule([ this, name = dbName.toString() ](auto status) {
+    _threadPool.schedule([this, name = dbName.toString()](auto status) {
         invariant(status);
 
         _runDbTasks(name);
@@ -979,7 +974,7 @@ void ShardServerCatalogCacheLoader::_runDbTasks(StringData dbName) {
         }
     }
 
-    _threadPool.schedule([ this, name = dbName.toString() ](auto status) {
+    _threadPool.schedule([this, name = dbName.toString()](auto status) {
         if (ErrorCodes::isCancelationError(status.code())) {
             LOG(0) << "Cache loader failed to schedule a persisted metadata update"
                    << " task for namespace '" << name << "' due to '" << redact(status)
@@ -1026,12 +1021,8 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
     uassertStatusOKWithContext(
         persistCollectionAndChangedChunks(opCtx, nss, task.collectionAndChangedChunks.get()),
         str::stream() << "Failed to update the persisted chunk metadata for collection '"
-                      << nss.ns()
-                      << "' from '"
-                      << task.minQueryVersion.toString()
-                      << "' to '"
-                      << task.maxQueryVersion.toString()
-                      << "'. Will be retried.");
+                      << nss.ns() << "' from '" << task.minQueryVersion.toString() << "' to '"
+                      << task.maxQueryVersion.toString() << "'. Will be retried.");
 
     LOG_CATALOG_REFRESH(1) << "Successfully updated persisted chunk metadata for collection '"
                            << nss << "' from '" << task.minQueryVersion
@@ -1057,15 +1048,13 @@ void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext*
         // The database was dropped. The persisted metadata for the collection must be cleared.
         uassertStatusOKWithContext(deleteDatabasesEntry(opCtx, dbName),
                                    str::stream() << "Failed to clear persisted metadata for db '"
-                                                 << dbName.toString()
-                                                 << "'. Will be retried.");
+                                                 << dbName.toString() << "'. Will be retried.");
         return;
     }
 
     uassertStatusOKWithContext(persistDbVersion(opCtx, *task.dbType),
                                str::stream() << "Failed to update the persisted metadata for db '"
-                                             << dbName.toString()
-                                             << "'. Will be retried.");
+                                             << dbName.toString() << "'. Will be retried.");
 
     LOG_CATALOG_REFRESH(1) << "Successfully updated persisted metadata for db "
                            << dbName.toString();

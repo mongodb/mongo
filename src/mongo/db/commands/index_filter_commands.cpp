@@ -110,8 +110,8 @@ namespace mongo {
 
 using std::string;
 using std::stringstream;
-using std::vector;
 using std::unique_ptr;
+using std::vector;
 
 IndexFilterCommand::IndexFilterCommand(const string& name, const string& helpText)
     : BasicCommand(name), helpText(helpText) {}

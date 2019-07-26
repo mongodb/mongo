@@ -145,15 +145,14 @@ Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
     if (key != "thumbprint") {
         return {ErrorCodes::BadValue,
                 str::stream() << "Unknown certificate selector property for '" << name << "': '"
-                              << key
-                              << "'"};
+                              << key << "'"};
     }
 
     auto swHex = hexToVector(value.substr(delim + 1));
     if (!swHex.isOK()) {
         return {ErrorCodes::BadValue,
-                str::stream() << "Invalid certificate selector value for '" << name << "': "
-                              << swHex.getStatus().reason()};
+                str::stream() << "Invalid certificate selector value for '" << name
+                              << "': " << swHex.getStatus().reason()};
     }
 
     selector->thumbprint = std::move(swHex.getValue());
@@ -174,8 +173,7 @@ StatusWith<SSLParams::SSLModes> SSLParams::sslModeParse(StringData strMode) {
         return Status(
             ErrorCodes::BadValue,
             str::stream()
-                << "Invalid sslMode setting '"
-                << strMode
+                << "Invalid sslMode setting '" << strMode
                 << "', expected one of: 'disabled', 'allowSSL', 'preferSSL', or 'requireSSL'");
     }
 }
@@ -193,8 +191,7 @@ StatusWith<SSLParams::SSLModes> SSLParams::tlsModeParse(StringData strMode) {
         return Status(
             ErrorCodes::BadValue,
             str::stream()
-                << "Invalid tlsMode setting '"
-                << strMode
+                << "Invalid tlsMode setting '" << strMode
                 << "', expected one of: 'disabled', 'allowTLS', 'preferTLS', or 'requireTLS'");
     }
 }

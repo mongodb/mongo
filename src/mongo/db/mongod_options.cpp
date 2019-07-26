@@ -417,8 +417,7 @@ Status storeMongodOptions(const moe::Environment& params) {
             storageGlobalParams.syncdelay > StorageGlobalParams::kMaxSyncdelaySecs) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "syncdelay out of allowed range (0-"
-                                        << StorageGlobalParams::kMaxSyncdelaySecs
-                                        << "s)");
+                                        << StorageGlobalParams::kMaxSyncdelaySecs << "s)");
         }
     }
 
@@ -457,9 +456,9 @@ Status storeMongodOptions(const moe::Environment& params) {
         if (journalCommitIntervalMs < 1 ||
             journalCommitIntervalMs > StorageGlobalParams::kMaxJournalCommitIntervalMs) {
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "--journalCommitInterval out of allowed range (1-"
-                                        << StorageGlobalParams::kMaxJournalCommitIntervalMs
-                                        << "ms)");
+                          str::stream()
+                              << "--journalCommitInterval out of allowed range (1-"
+                              << StorageGlobalParams::kMaxJournalCommitIntervalMs << "ms)");
         }
     }
 

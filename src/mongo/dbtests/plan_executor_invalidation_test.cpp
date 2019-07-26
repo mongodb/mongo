@@ -354,8 +354,7 @@ TEST_F(PlanExecutorInvalidationTest, CollScanDiesOnCollectionRenameWithinDatabas
     ASSERT_TRUE(_client.runCommand("admin",
                                    BSON("renameCollection" << nss.ns() << "to"
                                                            << "unittests.new_collection_name"
-                                                           << "dropTarget"
-                                                           << true),
+                                                           << "dropTarget" << true),
                                    info));
 
     ASSERT_THROWS_CODE(exec->restoreState(), DBException, ErrorCodes::QueryPlanKilled);
@@ -381,8 +380,7 @@ TEST_F(PlanExecutorInvalidationTest, IxscanDiesOnCollectionRenameWithinDatabase)
     ASSERT_TRUE(_client.runCommand("admin",
                                    BSON("renameCollection" << nss.ns() << "to"
                                                            << "unittests.new_collection_name"
-                                                           << "dropTarget"
-                                                           << true),
+                                                           << "dropTarget" << true),
                                    info));
 
     ASSERT_THROWS_CODE(exec->restoreState(), DBException, ErrorCodes::QueryPlanKilled);

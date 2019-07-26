@@ -14,59 +14,61 @@
  */
 
 (function() {
-    load("jstests/libs/check_log.js");
-    load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
-    load("jstests/replsets/libs/two_phase_drops.js");  // For TwoPhaseDropCollectionTest.
+load("jstests/libs/check_log.js");
+load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
+load("jstests/replsets/libs/two_phase_drops.js");  // For TwoPhaseDropCollectionTest.
 
-    var name = 'initial_sync_update_missing_doc3';
-    var replSet = new ReplSetTest({
-        name: name,
-        nodes: 1,
-    });
+var name = 'initial_sync_update_missing_doc3';
+var replSet = new ReplSetTest({
+    name: name,
+    nodes: 1,
+});
 
-    replSet.startSet();
-    replSet.initiate();
-    const primary = replSet.getPrimary();
-    const dbName = 'test';
+replSet.startSet();
+replSet.initiate();
+const primary = replSet.getPrimary();
+const dbName = 'test';
 
-    // Check for 'system.drop' two phase drop support.
-    if (!TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replSet)) {
-        jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
-        replSet.stopSet();
-        return;
-    }
-
-    var coll = primary.getDB(dbName).getCollection(name);
-    assert.commandWorked(coll.insert({_id: 0, x: 1}));
-
-    // Add a secondary node with priority: 0 so that we prevent elections while it is syncing
-    // from the primary.
-    // We cannot give the secondary votes: 0 because then it will not be able to acknowledge
-    // majority writes. That means the sync source can immediately drop it's collection
-    // because it alone determines the majority commit point.
-    const secondaryConfig = {rsConfig: {priority: 0}};
-    const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
-
-    // Update and remove document on primary.
-    updateRemove(coll, {_id: 0});
-
-    turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
-
-    // Re-insert deleted document.
-    assert.commandWorked(coll.insert({_id: 0, x: 3}));
-    // Mark the collection as drop pending so it gets renamed, but retains the UUID.
-    assert.commandWorked(primary.getDB('test').runCommand({"drop": name}));
-
-    var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
-    assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
-    var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
-
-    secondary.getDB('test').setLogLevel(1, 'replication');
-    turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 1);
-    secondary.getDB('test').setLogLevel(0, 'replication');
-
-    replSet.awaitReplication();
-    replSet.awaitSecondaryNodes();
-
+// Check for 'system.drop' two phase drop support.
+if (!TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replSet)) {
+    jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
     replSet.stopSet();
+    return;
+}
+
+var coll = primary.getDB(dbName).getCollection(name);
+assert.commandWorked(coll.insert({_id: 0, x: 1}));
+
+// Add a secondary node with priority: 0 so that we prevent elections while it is syncing
+// from the primary.
+// We cannot give the secondary votes: 0 because then it will not be able to acknowledge
+// majority writes. That means the sync source can immediately drop it's collection
+// because it alone determines the majority commit point.
+const secondaryConfig = {
+    rsConfig: {priority: 0}
+};
+const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
+
+// Update and remove document on primary.
+updateRemove(coll, {_id: 0});
+
+turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
+
+// Re-insert deleted document.
+assert.commandWorked(coll.insert({_id: 0, x: 3}));
+// Mark the collection as drop pending so it gets renamed, but retains the UUID.
+assert.commandWorked(primary.getDB('test').runCommand({"drop": name}));
+
+var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
+var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
+
+secondary.getDB('test').setLogLevel(1, 'replication');
+turnOffHangBeforeGettingMissingDocFailPoint(primary, secondary, name, 1);
+secondary.getDB('test').setLogLevel(0, 'replication');
+
+replSet.awaitReplication();
+replSet.awaitSecondaryNodes();
+
+replSet.stopSet();
 })();

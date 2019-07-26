@@ -67,9 +67,9 @@ public:
      */
     static StatusWith<SHABlock> fromBuffer(const uint8_t* input, size_t inputLen) {
         if (inputLen != kHashLength) {
-            return {
-                ErrorCodes::InvalidLength,
-                str::stream() << "Unsupported " << Traits::name << " hash length: " << inputLen};
+            return {ErrorCodes::InvalidLength,
+                    str::stream() << "Unsupported " << Traits::name
+                                  << " hash length: " << inputLen};
         }
 
         HashType newHash;
@@ -157,8 +157,8 @@ public:
 
         if (binData.length != kHashLength) {
             return {ErrorCodes::UnsupportedFormat,
-                    str::stream() << "Unsupported " << Traits::name << " hash length: "
-                                  << binData.length};
+                    str::stream() << "Unsupported " << Traits::name
+                                  << " hash length: " << binData.length};
         }
 
         HashType newHash;

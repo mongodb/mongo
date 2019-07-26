@@ -7,7 +7,6 @@
  * removing documents that they operate on.
  */
 var $config = (function() {
-
     // The explain used to build the assertion message in advanceCursor() is the only command not
     // allowed in a transaction used in the query state function. With shard stepdowns, getMores
     // aren't allowed outside a transaction, so if the explain runs when the suite is configured to
@@ -36,13 +35,14 @@ var $config = (function() {
             while (cursor.hasNext()) {
                 prevDoc = doc;
                 doc = cursor.next();
-                assertAlways(verifier(doc, prevDoc),
-                             'Verifier failed!\nQuery: ' + tojson(cursor._query) + '\n' +
-                                 (skipExplainInErrorMessage ? '' : 'Query plan: ' +
-                                          tojson(cursor.explain())) +
-                                 '\n' +
-                                 'Previous doc: ' + tojson(prevDoc) + '\n' +
-                                 'This doc: ' + tojson(doc));
+                assertAlways(
+                    verifier(doc, prevDoc),
+                    'Verifier failed!\nQuery: ' + tojson(cursor._query) + '\n' +
+                        (skipExplainInErrorMessage ? ''
+                                                   : 'Query plan: ' + tojson(cursor.explain())) +
+                        '\n' +
+                        'Previous doc: ' + tojson(prevDoc) + '\n' +
+                        'This doc: ' + tojson(doc));
             }
             assertAlways.eq(cursor.itcount(), 0);
         },
@@ -169,5 +169,4 @@ var $config = (function() {
         teardown: teardown,
         data: data
     };
-
 })();

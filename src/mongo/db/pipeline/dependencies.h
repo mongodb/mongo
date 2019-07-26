@@ -205,4 +205,4 @@ private:
     Document _fields;
     int _nFields;  // Cache the number of top-level fields needed.
 };
-}
+}  // namespace mongo

@@ -118,8 +118,7 @@ public:
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
             uasserted(ErrorCodes::NotMaster,
                       str::stream() << "Not primary while cloning collection " << from << " to "
-                                    << to
-                                    << " (as capped)");
+                                    << to << " (as capped)");
         }
 
         Database* const db = autoDb.getDb();

@@ -12,7 +12,6 @@
  * @tags: [requires_non_retryable_writes]
  */
 var $config = (function() {
-
     var states = {
         insert: function insert(db, collName) {
             var query, update, options;
@@ -80,5 +79,4 @@ var $config = (function() {
         data: {counter: 0, shardKey: {tid: 1}},
         setup: setup
     };
-
 })();

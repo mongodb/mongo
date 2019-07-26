@@ -17,7 +17,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');                     // 
 load('jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     // The base setup will insert 'partitionSize' number of documents per thread, evenly
     // distributing across the chunks. Documents will only have the "_id" field.
     $config.data.partitionSize = 50;

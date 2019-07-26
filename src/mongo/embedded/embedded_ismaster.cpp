@@ -110,5 +110,5 @@ public:
     }
 } CmdIsMaster;
 
-}  // namespace repl
+}  // namespace
 }  // namespace mongo

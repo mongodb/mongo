@@ -203,5 +203,5 @@ BSONObj FTSQueryImpl::toBSON() const {
     bob.append("negatedPhrases", getNegatedPhr());
     return bob.obj();
 }
-}
-}
+}  // namespace fts
+}  // namespace mongo

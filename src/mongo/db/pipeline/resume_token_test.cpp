@@ -360,5 +360,5 @@ TEST(ResumeToken, StringEncodingSortsCorrectly) {
              {ts10_4, 0, 0, lower_uuid, Value(Document{{"_id", 0}})});
 }
 
-}  // namspace
-}  // namspace mongo
+}  // namespace
+}  // namespace mongo

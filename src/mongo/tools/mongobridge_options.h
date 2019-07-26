@@ -68,4 +68,4 @@ bool handlePreValidationMongoBridgeOptions(const moe::Environment& params);
 
 Status storeMongoBridgeOptions(const moe::Environment& params,
                                const std::vector<std::string>& args);
-}
+}  // namespace mongo

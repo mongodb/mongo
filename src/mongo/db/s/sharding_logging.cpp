@@ -121,10 +121,10 @@ Status ShardingLogging::_log(OperationContext* opCtx,
                              const BSONObj& detail,
                              const WriteConcernOptions& writeConcern) {
     Date_t now = Grid::get(opCtx)->getNetwork()->now();
-    const std::string serverName = str::stream() << Grid::get(opCtx)->getNetwork()->getHostName()
-                                                 << ":" << serverGlobalParams.port;
-    const std::string changeId = str::stream() << serverName << "-" << now.toString() << "-"
-                                               << OID::gen();
+    const std::string serverName = str::stream()
+        << Grid::get(opCtx)->getNetwork()->getHostName() << ":" << serverGlobalParams.port;
+    const std::string changeId = str::stream()
+        << serverName << "-" << now.toString() << "-" << OID::gen();
 
     ChangeLogType changeLog;
     changeLog.setChangeId(changeId);
@@ -162,9 +162,9 @@ Status ShardingLogging::_createCappedConfigCollection(OperationContext* opCtx,
                                                       StringData collName,
                                                       int cappedSize,
                                                       const WriteConcernOptions& writeConcern) {
-    BSONObj createCmd = BSON("create" << collName << "capped" << true << "size" << cappedSize
-                                      << WriteConcernOptions::kWriteConcernField
-                                      << writeConcern.toBSON());
+    BSONObj createCmd =
+        BSON("create" << collName << "capped" << true << "size" << cappedSize
+                      << WriteConcernOptions::kWriteConcernField << writeConcern.toBSON());
 
     auto result =
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(

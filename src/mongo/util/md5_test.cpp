@@ -35,4 +35,4 @@ namespace mongo {
 TEST(MD5, BuiltIn1) {
     ASSERT_EQUALS(0, do_md5_test());
 }
-}
+}  // namespace mongo

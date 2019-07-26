@@ -40,7 +40,7 @@ function testProperAuthorization(conn, t, testcase, privileges) {
     authCommandsLib.authenticatedSetup(t, runOnDb);
 
     var command = t.command;
-    if (typeof(command) === "function") {
+    if (typeof (command) === "function") {
         command = t.command(state, testcase.commandArgs);
     }
     var res = runOnDb.runCommand(command);
@@ -51,8 +51,9 @@ function testProperAuthorization(conn, t, testcase, privileges) {
         out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb +
             " with privileges " + tojson(privileges);
     } else if (testcase.expectFail && res.code == authErrCode) {
-        out = "expected authorization success" + " but received " + tojson(res) + " on db " +
-            testcase.runOnDb + " with privileges " + tojson(privileges);
+        out = "expected authorization success" +
+            " but received " + tojson(res) + " on db " + testcase.runOnDb + " with privileges " +
+            tojson(privileges);
     }
 
     firstDb.logout();
@@ -78,14 +79,14 @@ function testInsufficientPrivileges(conn, t, testcase, privileges) {
     authCommandsLib.authenticatedSetup(t, runOnDb);
 
     var command = t.command;
-    if (typeof(command) === "function") {
+    if (typeof (command) === "function") {
         command = t.command(state, testcase.commandArgs);
     }
     var res = runOnDb.runCommand(command);
 
     if (res.ok == 1 || res.code != authErrCode) {
-        out = "expected authorization failure " + " but received " + tojson(res) +
-            " with privileges " + tojson(privileges);
+        out = "expected authorization failure " +
+            " but received " + tojson(res) + " with privileges " + tojson(privileges);
     }
 
     firstDb.logout();

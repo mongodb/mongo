@@ -110,11 +110,13 @@ TEST(MongoDnsQuery, srvRecords) {
     } tests[] = {
         {"test1.test.build.10gen.cc.",
          {
-             {"localhost.test.build.10gen.cc.", 27017}, {"localhost.test.build.10gen.cc.", 27018},
+             {"localhost.test.build.10gen.cc.", 27017},
+             {"localhost.test.build.10gen.cc.", 27018},
          }},
         {"test2.test.build.10gen.cc.",
          {
-             {"localhost.test.build.10gen.cc.", 27018}, {"localhost.test.build.10gen.cc.", 27019},
+             {"localhost.test.build.10gen.cc.", 27018},
+             {"localhost.test.build.10gen.cc.", 27019},
          }},
         {"test3.test.build.10gen.cc.",
          {
@@ -174,7 +176,8 @@ TEST(MongoDnsQuery, txtRecords) {
          }},
         {"test6.test.build.10gen.cc",
          {
-             "authSource=otherDB", "replicaSet=repl0",
+             "authSource=otherDB",
+             "replicaSet=repl0",
          }},
     };
 

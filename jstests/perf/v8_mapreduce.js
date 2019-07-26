@@ -77,7 +77,6 @@ if (/V8/.test(interpreterVersion()) && db.runCommand({buildinfo: 1}).javascriptE
     db.getLastError();
 
     var mrWorkFunction = function() {
-
         function verifyOutput(out) {
             // printjson(out);
             assert.eq(out.counts.input, 51200, "input count is wrong");

@@ -83,10 +83,10 @@ StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
         BSONObj versionField = source.getObjectField("version");
         if (versionField.isEmpty()) {
             return Status{ErrorCodes::InternalError,
-                          str::stream() << "DatabaseVersion doesn't exist in database entry "
-                                        << source
-                                        << " despite the config server being in binary version 4.2 "
-                                           "or later."};
+                          str::stream()
+                              << "DatabaseVersion doesn't exist in database entry " << source
+                              << " despite the config server being in binary version 4.2 "
+                                 "or later."};
         }
         dbtVersion = DatabaseVersion::parse(IDLParserErrorContext("DatabaseType"), versionField);
     }

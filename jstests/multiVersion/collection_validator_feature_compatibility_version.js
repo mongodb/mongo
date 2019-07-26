@@ -9,197 +9,193 @@
  */
 
 (function() {
-    "use strict";
+"use strict";
 
-    const testName = "collection_validator_feature_compatibility_version";
-    const dbpath = MongoRunner.dataPath + testName;
+const testName = "collection_validator_feature_compatibility_version";
+const dbpath = MongoRunner.dataPath + testName;
 
-    // In order to avoid restarting the server for each test case, we declare all the test cases up
-    // front, and test them all at once.
-    const testCases = [
-        {validator: {$expr: {$eq: [{$round: "$a"}, 4]}}, nonMatchingDocument: {a: 5.2}},
-        {validator: {$expr: {$eq: [{$trunc: ["$a", 2]}, 4.1]}}, nonMatchingDocument: {a: 4.23}},
-        {
-          validator: {$expr: {$regexMatch: {input: "$a", regex: /sentinel/}}},
-          nonMatchingDocument: {a: "no dice"}
-        },
-    ];
+// In order to avoid restarting the server for each test case, we declare all the test cases up
+// front, and test them all at once.
+const testCases = [
+    {validator: {$expr: {$eq: [{$round: "$a"}, 4]}}, nonMatchingDocument: {a: 5.2}},
+    {validator: {$expr: {$eq: [{$trunc: ["$a", 2]}, 4.1]}}, nonMatchingDocument: {a: 4.23}},
+    {
+        validator: {$expr: {$regexMatch: {input: "$a", regex: /sentinel/}}},
+        nonMatchingDocument: {a: "no dice"}
+    },
+];
 
-    let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest"});
-    assert.neq(null, conn, "mongod was unable to start up");
+let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest"});
+assert.neq(null, conn, "mongod was unable to start up");
 
-    let testDB = conn.getDB(testName);
+let testDB = conn.getDB(testName);
 
-    let adminDB = conn.getDB("admin");
+let adminDB = conn.getDB("admin");
 
-    // Explicitly set feature compatibility version 4.2.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "4.2"}));
+// Explicitly set feature compatibility version 4.2.
+assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "4.2"}));
 
-    testCases.forEach(function(test, i) {
-        // Create a collection with a validator using 4.2 query features.
-        const coll = testDB["coll" + i];
-        assert.commandWorked(
-            testDB.createCollection(coll.getName(), {validator: test.validator}),
-            `Expected to be able to create collection with validator ${tojson(test.validator)}`);
+testCases.forEach(function(test, i) {
+    // Create a collection with a validator using 4.2 query features.
+    const coll = testDB["coll" + i];
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {validator: test.validator}),
+        `Expected to be able to create collection with validator ${tojson(test.validator)}`);
 
-        // The validator should cause this insert to fail.
-        assert.writeErrorWithCode(
-            coll.insert(test.nonMatchingDocument),
-            ErrorCodes.DocumentValidationFailure,
-            `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
-                `collection with validator ${tojson(test.validator)}`);
+    // The validator should cause this insert to fail.
+    assert.writeErrorWithCode(
+        coll.insert(test.nonMatchingDocument),
+        ErrorCodes.DocumentValidationFailure,
+        `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
+            `collection with validator ${tojson(test.validator)}`);
 
-        // Set a validator using 4.2 query features on an existing collection.
-        coll.drop();
-        assert.commandWorked(testDB.createCollection(coll.getName()));
-        assert.commandWorked(
-            testDB.runCommand({collMod: coll.getName(), validator: test.validator}),
-            `Expected to be able to modify collection validator to be ${tojson(test.validator)}`);
+    // Set a validator using 4.2 query features on an existing collection.
+    coll.drop();
+    assert.commandWorked(testDB.createCollection(coll.getName()));
+    assert.commandWorked(
+        testDB.runCommand({collMod: coll.getName(), validator: test.validator}),
+        `Expected to be able to modify collection validator to be ${tojson(test.validator)}`);
 
-        // Another failing update.
-        assert.writeErrorWithCode(
-            coll.insert(test.nonMatchingDocument),
-            ErrorCodes.DocumentValidationFailure,
-            `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
-                `collection with validator ${tojson(test.validator)}`);
-    });
+    // Another failing update.
+    assert.writeErrorWithCode(
+        coll.insert(test.nonMatchingDocument),
+        ErrorCodes.DocumentValidationFailure,
+        `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
+            `collection with validator ${tojson(test.validator)}`);
+});
 
-    // Set the feature compatibility version to 4.0.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "4.0"}));
+// Set the feature compatibility version to 4.0.
+assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "4.0"}));
 
-    testCases.forEach(function(test, i) {
-        // The validator is already in place, so it should still cause this insert to fail.
-        const coll = testDB["coll" + i];
-        assert.writeErrorWithCode(
-            coll.insert(test.nonMatchingDocument),
-            ErrorCodes.DocumentValidationFailure,
-            `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
-                `collection with validator ${tojson(test.validator)}`);
+testCases.forEach(function(test, i) {
+    // The validator is already in place, so it should still cause this insert to fail.
+    const coll = testDB["coll" + i];
+    assert.writeErrorWithCode(
+        coll.insert(test.nonMatchingDocument),
+        ErrorCodes.DocumentValidationFailure,
+        `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
+            `collection with validator ${tojson(test.validator)}`);
 
-        // Trying to create a new collection with a validator using 4.2 query features should fail
-        // while feature compatibility version is 4.0.
-        let res = testDB.createCollection("other", {validator: test.validator});
-        assert.commandFailedWithCode(
-            res,
-            ErrorCodes.QueryFeatureNotAllowed,
-            'Expected *not* to be able to create collection with validator ' +
-                tojson(test.validator));
-        assert(
-            res.errmsg.match(/feature compatibility version/),
-            `Expected error message from createCollection with validator ` +
-                `${tojson(test.validator)} to reference 'feature compatibility version' but got: ` +
-                res.errmsg);
+    // Trying to create a new collection with a validator using 4.2 query features should fail
+    // while feature compatibility version is 4.0.
+    let res = testDB.createCollection("other", {validator: test.validator});
+    assert.commandFailedWithCode(
+        res,
+        ErrorCodes.QueryFeatureNotAllowed,
+        'Expected *not* to be able to create collection with validator ' + tojson(test.validator));
+    assert(res.errmsg.match(/feature compatibility version/),
+           `Expected error message from createCollection with validator ` +
+               `${tojson(test.validator)} to reference 'feature compatibility version' but got: ` +
+               res.errmsg);
 
-        // Trying to update a collection with a validator using 4.2 query features should also fail.
-        res = testDB.runCommand({collMod: coll.getName(), validator: test.validator});
-        assert.commandFailedWithCode(
-            res,
-            ErrorCodes.QueryFeatureNotAllowed,
-            `Expected to be able to create collection with validator ${tojson(test.validator)}`);
-        assert(
-            res.errmsg.match(/feature compatibility version/),
-            `Expected error message from createCollection with validator ` +
-                `${tojson(test.validator)} to reference 'feature compatibility version' but got: ` +
-                res.errmsg);
-    });
+    // Trying to update a collection with a validator using 4.2 query features should also fail.
+    res = testDB.runCommand({collMod: coll.getName(), validator: test.validator});
+    assert.commandFailedWithCode(
+        res,
+        ErrorCodes.QueryFeatureNotAllowed,
+        `Expected to be able to create collection with validator ${tojson(test.validator)}`);
+    assert(res.errmsg.match(/feature compatibility version/),
+           `Expected error message from createCollection with validator ` +
+               `${tojson(test.validator)} to reference 'feature compatibility version' but got: ` +
+               res.errmsg);
+});
 
-    MongoRunner.stopMongod(conn);
+MongoRunner.stopMongod(conn);
 
-    // If we try to start up a 4.0 mongod, it will fail, because it will not be able to parse
-    // the validator using 4.2 query features.
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "4.0", noCleanData: true});
-    assert.eq(
-        null, conn, "mongod 4.0 started, even with a validator using 4.2 query features in place.");
+// If we try to start up a 4.0 mongod, it will fail, because it will not be able to parse
+// the validator using 4.2 query features.
+conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "4.0", noCleanData: true});
+assert.eq(
+    null, conn, "mongod 4.0 started, even with a validator using 4.2 query features in place.");
 
-    // Starting up a 4.2 mongod, however, should succeed, even though the feature compatibility
-    // version is still set to 4.0.
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest", noCleanData: true});
-    assert.neq(null, conn, "mongod was unable to start up");
+// Starting up a 4.2 mongod, however, should succeed, even though the feature compatibility
+// version is still set to 4.0.
+conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest", noCleanData: true});
+assert.neq(null, conn, "mongod was unable to start up");
 
-    adminDB = conn.getDB("admin");
-    testDB = conn.getDB(testName);
+adminDB = conn.getDB("admin");
+testDB = conn.getDB(testName);
 
-    // And the validator should still work.
-    testCases.forEach(function(test, i) {
-        const coll = testDB["coll" + i];
-        assert.writeErrorWithCode(
-            coll.insert(test.nonMatchingDocument),
-            ErrorCodes.DocumentValidationFailure,
-            `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
-                `collection with validator ${tojson(test.validator)}`);
+// And the validator should still work.
+testCases.forEach(function(test, i) {
+    const coll = testDB["coll" + i];
+    assert.writeErrorWithCode(
+        coll.insert(test.nonMatchingDocument),
+        ErrorCodes.DocumentValidationFailure,
+        `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
+            `collection with validator ${tojson(test.validator)}`);
 
-        // Remove the validator.
-        assert.commandWorked(testDB.runCommand({collMod: coll.getName(), validator: {}}));
-    });
+    // Remove the validator.
+    assert.commandWorked(testDB.runCommand({collMod: coll.getName(), validator: {}}));
+});
 
-    MongoRunner.stopMongod(conn);
+MongoRunner.stopMongod(conn);
 
-    // Now, we should be able to start up a 4.0 mongod.
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "4.0", noCleanData: true});
-    assert.neq(
-        null,
-        conn,
-        "mongod 4.0 failed to start, even after we removed the validator using 4.2 query features");
+// Now, we should be able to start up a 4.0 mongod.
+conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "4.0", noCleanData: true});
+assert.neq(
+    null,
+    conn,
+    "mongod 4.0 failed to start, even after we removed the validator using 4.2 query features");
 
-    MongoRunner.stopMongod(conn);
+MongoRunner.stopMongod(conn);
 
-    // The rest of the test uses mongod 4.2.
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest", noCleanData: true});
-    assert.neq(null, conn, "mongod was unable to start up");
+// The rest of the test uses mongod 4.2.
+conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest", noCleanData: true});
+assert.neq(null, conn, "mongod was unable to start up");
 
-    adminDB = conn.getDB("admin");
-    testDB = conn.getDB(testName);
+adminDB = conn.getDB("admin");
+testDB = conn.getDB(testName);
 
-    // Set the feature compatibility version back to 4.2.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "4.2"}));
+// Set the feature compatibility version back to 4.2.
+assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "4.2"}));
 
-    testCases.forEach(function(test, i) {
-        const coll = testDB["coll2" + i];
+testCases.forEach(function(test, i) {
+    const coll = testDB["coll2" + i];
 
-        // Now we should be able to create a collection with a validator using 4.2 query features
-        // again.
-        assert.commandWorked(
-            testDB.createCollection(coll.getName(), {validator: test.validator}),
-            `Expected to be able to create collection with validator ${tojson(test.validator)}`);
+    // Now we should be able to create a collection with a validator using 4.2 query features
+    // again.
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {validator: test.validator}),
+        `Expected to be able to create collection with validator ${tojson(test.validator)}`);
 
-        // And we should be able to modify a collection to have a validator using 4.2 query
-        // features.
-        assert.commandWorked(
-            testDB.runCommand({collMod: coll.getName(), validator: test.validator}),
-            `Expected to be able to modify collection validator to be ${tojson(test.validator)}`);
-    });
+    // And we should be able to modify a collection to have a validator using 4.2 query
+    // features.
+    assert.commandWorked(
+        testDB.runCommand({collMod: coll.getName(), validator: test.validator}),
+        `Expected to be able to modify collection validator to be ${tojson(test.validator)}`);
+});
 
-    // Set the feature compatibility version to 4.0 and then restart with
-    // internalValidateFeaturesAsMaster=false.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "4.0"}));
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({
-        dbpath: dbpath,
-        binVersion: "latest",
-        noCleanData: true,
-        setParameter: "internalValidateFeaturesAsMaster=false"
-    });
-    assert.neq(null, conn, "mongod was unable to start up");
+// Set the feature compatibility version to 4.0 and then restart with
+// internalValidateFeaturesAsMaster=false.
+assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "4.0"}));
+MongoRunner.stopMongod(conn);
+conn = MongoRunner.runMongod({
+    dbpath: dbpath,
+    binVersion: "latest",
+    noCleanData: true,
+    setParameter: "internalValidateFeaturesAsMaster=false"
+});
+assert.neq(null, conn, "mongod was unable to start up");
 
-    testDB = conn.getDB(testName);
+testDB = conn.getDB(testName);
 
-    testCases.forEach(function(test, i) {
-        const coll = testDB["coll3" + i];
-        // Even though the feature compatibility version is 4.0, we should still be able to add a
-        // validator using 4.2 query features, because internalValidateFeaturesAsMaster is false.
-        assert.commandWorked(
-            testDB.createCollection(coll.getName(), {validator: test.validator}),
-            `Expected to be able to create collection with validator ${tojson(test.validator)}`);
+testCases.forEach(function(test, i) {
+    const coll = testDB["coll3" + i];
+    // Even though the feature compatibility version is 4.0, we should still be able to add a
+    // validator using 4.2 query features, because internalValidateFeaturesAsMaster is false.
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {validator: test.validator}),
+        `Expected to be able to create collection with validator ${tojson(test.validator)}`);
 
-        // We should also be able to modify a collection to have a validator using 4.2 query
-        // features.
-        coll.drop();
-        assert.commandWorked(testDB.createCollection(coll.getName()));
-        assert.commandWorked(
-            testDB.runCommand({collMod: coll.getName(), validator: test.validator}),
-            `Expected to be able to modify collection validator to be ${tojson(test.validator)}`);
-    });
+    // We should also be able to modify a collection to have a validator using 4.2 query
+    // features.
+    coll.drop();
+    assert.commandWorked(testDB.createCollection(coll.getName()));
+    assert.commandWorked(
+        testDB.runCommand({collMod: coll.getName(), validator: test.validator}),
+        `Expected to be able to modify collection validator to be ${tojson(test.validator)}`);
+});
 
-    MongoRunner.stopMongod(conn);
-
+MongoRunner.stopMongod(conn);
 }());

@@ -147,8 +147,7 @@ DEATH_TEST(SortKeyGeneratorTest,
     MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
         stdx::make_unique<SortKeyGenerator>(BSON("a" << BSON("$meta"
                                                              << "textScore"
-                                                             << "extra"
-                                                             << 1)),
+                                                             << "extra" << 1)),
                                             nullptr);
 }
 

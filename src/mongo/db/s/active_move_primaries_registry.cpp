@@ -90,9 +90,7 @@ Status ActiveMovePrimariesRegistry::ActiveMovePrimaryState::constructErrorStatus
             str::stream()
                 << "Unable to start new movePrimary operation because this shard is currently "
                    "moving its primary for namespace "
-                << requestArgs.get_movePrimary().ns()
-                << " to "
-                << requestArgs.getTo()};
+                << requestArgs.get_movePrimary().ns() << " to " << requestArgs.getTo()};
 }
 
 ScopedMovePrimary::ScopedMovePrimary(ActiveMovePrimariesRegistry* registry,

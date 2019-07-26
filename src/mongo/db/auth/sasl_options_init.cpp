@@ -95,4 +95,4 @@ MONGO_INITIALIZER_GENERAL(StoreSASLOptions, ("CoreOptions_Store"), ("EndStartupO
 (InitializerContext* const context) {
     return storeSASLOptions(moe::startupOptionsParsed);
 }
-}
+}  // namespace mongo

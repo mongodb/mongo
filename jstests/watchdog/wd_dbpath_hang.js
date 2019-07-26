@@ -3,12 +3,11 @@
 load("jstests/watchdog/lib/wd_test_common.js");
 
 (function() {
-    'use strict';
+'use strict';
 
-    let control = new CharybdefsControl("dbpath_hang");
+let control = new CharybdefsControl("dbpath_hang");
 
-    const dbPath = control.getMountPath() + "/db";
+const dbPath = control.getMountPath() + "/db";
 
-    testFuseAndMongoD(control, {dbpath: dbPath});
-
+testFuseAndMongoD(control, {dbpath: dbPath});
 })();

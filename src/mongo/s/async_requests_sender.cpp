@@ -186,7 +186,7 @@ auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(std::vector<HostAndP
 
     // We have to make a promise future pair because the TaskExecutor doesn't currently support a
     // future returning variant of scheduleRemoteCommand
-    auto[p, f] = makePromiseFuture<RemoteCommandOnAnyCallbackArgs>();
+    auto [p, f] = makePromiseFuture<RemoteCommandOnAnyCallbackArgs>();
 
     // Failures to schedule skip the retry loop
     uassertStatusOK(_ars->_subExecutor->scheduleRemoteCommandOnAny(
@@ -242,8 +242,9 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandOnAnyCallbackA
             _retryCount < kMaxNumFailedHostRetryAttempts) {
 
             LOG(1) << "Command to remote " << _shardId
-                   << (failedTargets.empty() ? " " : (failedTargets.size() > 1 ? " for hosts "
-                                                                               : " at host "))
+                   << (failedTargets.empty()
+                           ? " "
+                           : (failedTargets.size() > 1 ? " for hosts " : " at host "))
                    << "{}"_format(fmt::join(failedTargets, ", "))
                    << "failed with retriable error and will be retried "
                    << causedBy(redact(status));

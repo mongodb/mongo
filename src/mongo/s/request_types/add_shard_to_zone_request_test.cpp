@@ -92,8 +92,7 @@ TEST(AddShardToZoneRequest, WrongShardNameTypeErrors) {
 TEST(AddShardToZoneRequest, WrongZoneNameTypeErrors) {
     auto request = AddShardToZoneRequest::parseFromMongosCommand(BSON("addShardToZone"
                                                                       << "a"
-                                                                      << "zone"
-                                                                      << 1234));
+                                                                      << "zone" << 1234));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
@@ -141,25 +140,23 @@ TEST(CfgAddShardToZoneRequest, MissingShardNameErrors) {
 }
 
 TEST(CfgAddShardToZoneRequest, WrongShardNameTypeErrors) {
-    auto request = AddShardToZoneRequest::parseFromConfigCommand(
-        BSON("_configsvrAddShardToZone" << 1234 << "zone"
-                                        << "z"));
+    auto request = AddShardToZoneRequest::parseFromConfigCommand(BSON("_configsvrAddShardToZone"
+                                                                      << 1234 << "zone"
+                                                                      << "z"));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
 TEST(CfgAddShardToZoneRequest, WrongZoneNameTypeErrors) {
     auto request = AddShardToZoneRequest::parseFromConfigCommand(BSON("_configsvrAddShardToZone"
                                                                       << "a"
-                                                                      << "zone"
-                                                                      << 1234));
+                                                                      << "zone" << 1234));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
 TEST(CfgAddShardToZoneRequest, CannotUseConfigToParseMongosCommand) {
     auto request = AddShardToZoneRequest::parseFromConfigCommand(BSON("addShardToZone"
                                                                       << "a"
-                                                                      << "zone"
-                                                                      << 1234));
+                                                                      << "zone" << 1234));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 

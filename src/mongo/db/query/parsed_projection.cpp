@@ -34,8 +34,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 
 /**
  * Parses the projection 'spec' and checks its validity with respect to the query 'query'.
@@ -297,9 +297,9 @@ Status ParsedProjection::make(OperationContext* opCtx,
             // $meta sortKey should not be checked as a part of _requiredFields, since it can
             // potentially produce a covered projection as long as the sort key is covered.
             if (BSONType::Object == elt.type()) {
-                dassert(
-                    SimpleBSONObjComparator::kInstance.evaluate(elt.Obj() == BSON("$meta"
-                                                                                  << "sortKey")));
+                dassert(SimpleBSONObjComparator::kInstance.evaluate(elt.Obj() ==
+                                                                    BSON("$meta"
+                                                                         << "sortKey")));
                 continue;
             }
             if (elt.trueValue()) {

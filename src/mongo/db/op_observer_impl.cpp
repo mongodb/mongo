@@ -534,11 +534,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         if (!collElem || args.nss.ns() == collElem.String()) {
             uasserted(40654,
                       str::stream() << "failCollectionUpdates failpoint enabled, namespace: "
-                                    << args.nss.ns()
-                                    << ", update: "
-                                    << args.updateArgs.update
-                                    << " on document with "
-                                    << args.updateArgs.criteria);
+                                    << args.nss.ns() << ", update: " << args.updateArgs.update
+                                    << " on document with " << args.updateArgs.criteria);
         }
     }
 
@@ -1228,7 +1225,6 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 
     writeConflictRetry(
         opCtx, "onPreparedTransactionCommitOrAbort", NamespaceString::kRsOplogNamespace.ns(), [&] {
-
             // Writes to the oplog only require a Global intent lock. Guaranteed by
             // OplogSlotReserver.
             invariant(opCtx->lockState()->isWriteLocked());

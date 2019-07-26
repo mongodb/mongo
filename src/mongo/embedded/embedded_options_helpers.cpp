@@ -60,4 +60,4 @@ Status parseCommandLineOptions(int argc,
 }
 
 }  // namespace embedded_integration_helpers
-}  // namepsace mongo
+}  // namespace mongo

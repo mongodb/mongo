@@ -10,7 +10,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/agg_base.js');    // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.data.getOutputCollPrefix = function getOutputCollPrefix(collName) {
         return collName + '_out_agg_sort_';
     };

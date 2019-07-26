@@ -158,13 +158,13 @@ TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPending
             // tests.
             ON_BLOCK_EXIT([&wuow] { wuow.commit(); });
 
-            ASSERT_THROWS_CODE_AND_WHAT(
-                db->createCollection(_opCtx.get(), _nss),
-                AssertionException,
-                ErrorCodes::DatabaseDropPending,
-                (StringBuilder() << "Cannot create collection " << _nss
-                                 << " - database is in the process of being dropped.")
-                    .stringData());
+            ASSERT_THROWS_CODE_AND_WHAT(db->createCollection(_opCtx.get(), _nss),
+                                        AssertionException,
+                                        ErrorCodes::DatabaseDropPending,
+                                        (StringBuilder()
+                                         << "Cannot create collection " << _nss
+                                         << " - database is in the process of being dropped.")
+                                            .stringData());
         });
 }
 
@@ -297,11 +297,10 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
 
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT_EQUALS(indexCatalog->numIndexesInProgress(opCtx), 0);
-        auto indexInfoObj = BSON(
-            "v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("a" << 1) << "name"
-                << "a_1"
-                << "ns"
-                << nss.ns());
+        auto indexInfoObj = BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key"
+                                     << BSON("a" << 1) << "name"
+                                     << "a_1"
+                                     << "ns" << nss.ns());
 
         auto indexBuildBlock =
             indexCatalog->createIndexBuildBlock(opCtx, indexInfoObj, IndexBuildMethod::kHybrid);
@@ -418,8 +417,7 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
         auto nss1 = unittest::assertGet(db->makeUniqueCollectionNamespace(_opCtx.get(), model));
         if (!re.FullMatch(nss1.ns())) {
             FAIL((StringBuilder() << "First generated namespace \"" << nss1.ns()
-                                  << "\" does not match reqular expression \""
-                                  << re.pattern()
+                                  << "\" does not match reqular expression \"" << re.pattern()
                                   << "\"")
                      .str());
         }
@@ -436,8 +434,7 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
         auto nss2 = unittest::assertGet(db->makeUniqueCollectionNamespace(_opCtx.get(), model));
         if (!re.FullMatch(nss2.ns())) {
             FAIL((StringBuilder() << "Second generated namespace \"" << nss2.ns()
-                                  << "\" does not match reqular expression \""
-                                  << re.pattern()
+                                  << "\" does not match reqular expression \"" << re.pattern()
                                   << "\"")
                      .str());
         }
@@ -530,28 +527,28 @@ TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineMin) {
 }
 
 TEST_F(DatabaseTest, CreateCollectionProhibitsReplicatedCollectionsWithoutIdIndex) {
-    writeConflictRetry(
-        _opCtx.get(),
-        "testÇreateCollectionProhibitsReplicatedCollectionsWithoutIdIndex",
-        _nss.ns(),
-        [this] {
-            AutoGetOrCreateDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
-            auto db = autoDb.getDb();
-            ASSERT_TRUE(db);
+    writeConflictRetry(_opCtx.get(),
+                       "testÇreateCollectionProhibitsReplicatedCollectionsWithoutIdIndex",
+                       _nss.ns(),
+                       [this] {
+                           AutoGetOrCreateDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+                           auto db = autoDb.getDb();
+                           ASSERT_TRUE(db);
 
-            WriteUnitOfWork wuow(_opCtx.get());
+                           WriteUnitOfWork wuow(_opCtx.get());
 
-            CollectionOptions options;
-            options.setNoIdIndex();
+                           CollectionOptions options;
+                           options.setNoIdIndex();
 
-            ASSERT_THROWS_CODE_AND_WHAT(
-                db->createCollection(_opCtx.get(), _nss, options),
-                AssertionException,
-                50001,
-                (StringBuilder() << "autoIndexId:false is not allowed for collection " << _nss
-                                 << " because it can be replicated")
-                    .stringData());
-        });
+                           ASSERT_THROWS_CODE_AND_WHAT(
+                               db->createCollection(_opCtx.get(), _nss, options),
+                               AssertionException,
+                               50001,
+                               (StringBuilder()
+                                << "autoIndexId:false is not allowed for collection " << _nss
+                                << " because it can be replicated")
+                                   .stringData());
+                       });
 }
 
 

@@ -117,7 +117,7 @@ public:
 
     Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}
 };
-}
+}  // namespace EncodedValueStorageTest
 
 TEST(EncodedValueStorage, EncodedValueStorage) {
     EncodedValueStorageTest::Value raw;

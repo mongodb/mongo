@@ -355,14 +355,8 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
     NamespaceString nss("test.t");
     auto op = BSON("op"
                    << "c"
-                   << "ns"
-                   << nss.getCommandNS().ns()
-                   << "o"
-                   << BSON("create" << nss.coll())
-                   << "ts"
-                   << Timestamp(1, 1)
-                   << "ui"
-                   << UUID::gen());
+                   << "ns" << nss.getCommandNS().ns() << "o" << BSON("create" << nss.coll()) << "ts"
+                   << Timestamp(1, 1) << "ui" << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
                                             Collection*,
@@ -387,13 +381,10 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
 TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
     const BSONObj op = BSON("op"
                             << "c"
-                            << "ns"
-                            << 12345
-                            << "o"
+                            << "ns" << 12345 << "o"
                             << BSON("create"
                                     << "t")
-                            << "ts"
-                            << Timestamp(1, 1));
+                            << "ts" << Timestamp(1, 1));
     // This test relies on the namespace type check of IDL.
     ASSERT_THROWS(
         SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync, boost::none),
@@ -493,14 +484,9 @@ protected:
             cmdNss,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns"
-                                               << _nss1.ns()
-                                               << "ui"
-                                               << *_uuid1
-                                               << "o"
+                                               << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
                                                << BSON("_id" << 1)))
-                            << "partialTxn"
-                            << true),
+                            << "partialTxn" << true),
             _lsid,
             _txnNum,
             StmtId(0),
@@ -510,14 +496,9 @@ protected:
             cmdNss,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns"
-                                               << _nss2.ns()
-                                               << "ui"
-                                               << *_uuid2
-                                               << "o"
+                                               << "ns" << _nss2.ns() << "ui" << *_uuid2 << "o"
                                                << BSON("_id" << 2)))
-                            << "partialTxn"
-                            << true),
+                            << "partialTxn" << true),
             _lsid,
             _txnNum,
             StmtId(1),
@@ -527,11 +508,7 @@ protected:
             cmdNss,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns"
-                                               << _nss2.ns()
-                                               << "ui"
-                                               << *_uuid2
-                                               << "o"
+                                               << "ns" << _nss2.ns() << "ui" << *_uuid2 << "o"
                                                << BSON("_id" << 3)))),
             _lsid,
             _txnNum,
@@ -683,14 +660,10 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionTwoBatches) {
             cmdNss,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns"
-                                               << (i == 1 ? _nss2.ns() : _nss1.ns())
-                                               << "ui"
-                                               << (i == 1 ? *_uuid2 : *_uuid1)
-                                               << "o"
+                                               << "ns" << (i == 1 ? _nss2.ns() : _nss1.ns()) << "ui"
+                                               << (i == 1 ? *_uuid2 : *_uuid1) << "o"
                                                << insertDocs.back()))
-                            << "partialTxn"
-                            << true),
+                            << "partialTxn" << true),
             _lsid,
             _txnNum,
             StmtId(i),
@@ -757,14 +730,9 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyTwoTransactionsOneBatch) {
         cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns"
-                                           << _nss1.ns()
-                                           << "ui"
-                                           << *_uuid1
-                                           << "o"
+                                           << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
                                            << BSON("_id" << 1)))
-                        << "partialTxn"
-                        << true),
+                        << "partialTxn" << true),
         _lsid,
         txnNum1,
         StmtId(0),
@@ -774,14 +742,9 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyTwoTransactionsOneBatch) {
         cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns"
-                                           << _nss1.ns()
-                                           << "ui"
-                                           << *_uuid1
-                                           << "o"
+                                           << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
                                            << BSON("_id" << 2)))
-                        << "partialTxn"
-                        << true),
+                        << "partialTxn" << true),
 
         _lsid,
         txnNum1,
@@ -792,14 +755,9 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyTwoTransactionsOneBatch) {
         cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns"
-                                           << _nss1.ns()
-                                           << "ui"
-                                           << *_uuid1
-                                           << "o"
+                                           << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
                                            << BSON("_id" << 3)))
-                        << "partialTxn"
-                        << true),
+                        << "partialTxn" << true),
         _lsid,
         txnNum2,
         StmtId(0),
@@ -809,14 +767,9 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyTwoTransactionsOneBatch) {
         cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns"
-                                           << _nss1.ns()
-                                           << "ui"
-                                           << *_uuid1
-                                           << "o"
+                                           << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
                                            << BSON("_id" << 4)))
-                        << "partialTxn"
-                        << true),
+                        << "partialTxn" << true),
         _lsid,
         txnNum2,
         StmtId(1),
@@ -877,14 +830,9 @@ protected:
             _nss1,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns"
-                                               << _nss2.ns()
-                                               << "ui"
-                                               << *_uuid2
-                                               << "o"
+                                               << "ns" << _nss2.ns() << "ui" << *_uuid2 << "o"
                                                << BSON("_id" << 3)))
-                            << "prepare"
-                            << true),
+                            << "prepare" << true),
             _lsid,
             _txnNum,
             StmtId(2),
@@ -894,14 +842,9 @@ protected:
             _nss1,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns"
-                                               << _nss1.ns()
-                                               << "ui"
-                                               << *_uuid1
-                                               << "o"
+                                               << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
                                                << BSON("_id" << 0)))
-                            << "prepare"
-                            << true),
+                            << "prepare" << true),
             _lsid,
             _txnNum,
             StmtId(0),
@@ -2190,28 +2133,18 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
         auto insertOp2 = insert(fromjson("{ _id: 'Foo', x: 1 }"));
         auto updateOp = update("foo", BSON("$set" << BSON("x" << 2)));
         auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
-        auto options = BSON("collation" << BSON("locale"
-                                                << "en"
-                                                << "caseLevel"
-                                                << false
-                                                << "caseFirst"
-                                                << "off"
-                                                << "strength"
-                                                << 1
-                                                << "numericOrdering"
-                                                << false
-                                                << "alternate"
-                                                << "non-ignorable"
-                                                << "maxVariable"
-                                                << "punct"
-                                                << "normalization"
-                                                << false
-                                                << "backwards"
-                                                << false
-                                                << "version"
-                                                << "57.1")
-                                        << "uuid"
-                                        << uuid);
+        auto options = BSON("collation"
+                            << BSON("locale"
+                                    << "en"
+                                    << "caseLevel" << false << "caseFirst"
+                                    << "off"
+                                    << "strength" << 1 << "numericOrdering" << false << "alternate"
+                                    << "non-ignorable"
+                                    << "maxVariable"
+                                    << "punct"
+                                    << "normalization" << false << "backwards" << false << "version"
+                                    << "57.1")
+                            << "uuid" << uuid);
         auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), nss, options);
 
         // We don't drop and re-create the collection since we don't have ways
@@ -2235,12 +2168,8 @@ TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
 
     auto options1 = BSON("idIndex" << BSON("key" << fromjson("{_id: 1}") << "name"
                                                  << "_id_"
-                                                 << "v"
-                                                 << 2
-                                                 << "ns"
-                                                 << nss.ns())
-                                   << "uuid"
-                                   << uuid);
+                                                 << "v" << 2 << "ns" << nss.ns())
+                                   << "uuid" << uuid);
     auto createColl1 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options1);
     ASSERT_OK(runOpInitialSync(createColl1));
 
@@ -2274,9 +2203,8 @@ TEST_F(IdempotencyTest, CreateCollectionWithView) {
     ASSERT_OK(
         runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), viewNss, options.toBSON())));
 
-    auto viewDoc =
-        BSON("_id" << NamespaceString(nss.db(), "view").ns() << "viewOn" << nss.coll() << "pipeline"
-                   << fromjson("[ { '$project' : { 'x' : 1 } } ]"));
+    auto viewDoc = BSON("_id" << NamespaceString(nss.db(), "view").ns() << "viewOn" << nss.coll()
+                              << "pipeline" << fromjson("[ { '$project' : { 'x' : 1 } } ]"));
     auto insertViewOp = makeInsertDocumentOplogEntry(nextOpTime(), viewNss, viewDoc);
     auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
 
@@ -2698,14 +2626,9 @@ TEST_F(SyncTailTxnTableTest, RetryableWriteThenMultiStatementTxnWriteOnSameSessi
         cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns"
-                                           << nss().ns()
-                                           << "ui"
-                                           << *uuid
-                                           << "o"
+                                           << "ns" << nss().ns() << "ui" << *uuid << "o"
                                            << BSON("_id" << 2)))
-                        << "partialTxn"
-                        << true),
+                        << "partialTxn" << true),
         sessionId,
         *sessionInfo.getTxnNumber(),
         StmtId(0),
@@ -2754,14 +2677,9 @@ TEST_F(SyncTailTxnTableTest, MultiStatementTxnWriteThenRetryableWriteOnSameSessi
         cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns"
-                                           << nss().ns()
-                                           << "ui"
-                                           << *uuid
-                                           << "o"
+                                           << "ns" << nss().ns() << "ui" << *uuid << "o"
                                            << BSON("_id" << 2)))
-                        << "partialTxn"
-                        << true),
+                        << "partialTxn" << true),
         sessionId,
         *sessionInfo.getTxnNumber(),
         StmtId(0),

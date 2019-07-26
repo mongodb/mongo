@@ -176,7 +176,7 @@ enum ShellExitCode : int {
 };
 
 Scope* shellMainScope;
-}
+}  // namespace mongo
 
 void generateCompletions(const std::string& prefix, std::vector<std::string>& all) {
     if (prefix.find('"') != std::string::npos)
@@ -477,10 +477,9 @@ size_t skipOverString(const std::string& code, size_t start, char quote) {
         // that the escaping backslash is not itself escaped.  Comparisons of start and pos
         // are to keep us from reading beyond the beginning of the quoted string.
         //
-        if (start == pos || code[pos - 1] != '\\' ||  // previous char was backslash
-            start == pos - 1 ||
-            code[pos - 2] == '\\'  // char before backslash was not another
-            ) {
+        if (start == pos || code[pos - 1] != '\\' ||   // previous char was backslash
+            start == pos - 1 || code[pos - 2] == '\\'  // char before backslash was not another
+        ) {
             break;  // The quote we found was not preceded by an unescaped backslash; it is real
         }
         ++pos;  // The quote we found was escaped with backslash, so it doesn't count
@@ -941,8 +940,8 @@ int _main(int argc, char* argv[], char** envp) {
 #else
     wchar_t programDataPath[MAX_PATH];
     if (S_OK == SHGetFolderPathW(NULL, CSIDL_COMMON_APPDATA, NULL, 0, programDataPath)) {
-        rcGlobalLocation = str::stream() << toUtf8String(programDataPath)
-                                         << "\\MongoDB\\mongorc.js";
+        rcGlobalLocation = str::stream()
+            << toUtf8String(programDataPath) << "\\MongoDB\\mongorc.js";
     }
 #endif
     if (!rcGlobalLocation.empty() && ::mongo::shell_utils::fileExists(rcGlobalLocation)) {
@@ -1022,9 +1021,9 @@ int _main(int argc, char* argv[], char** envp) {
                 rcLocation = str::stream() << getenv("HOME") << "/.mongorc.js";
 #else
             if (getenv("HOMEDRIVE") != NULL && getenv("HOMEPATH") != NULL)
-                rcLocation = str::stream() << toUtf8String(_wgetenv(L"HOMEDRIVE"))
-                                           << toUtf8String(_wgetenv(L"HOMEPATH"))
-                                           << "\\.mongorc.js";
+                rcLocation = str::stream()
+                    << toUtf8String(_wgetenv(L"HOMEDRIVE")) << toUtf8String(_wgetenv(L"HOMEPATH"))
+                    << "\\.mongorc.js";
 #endif
             if (!rcLocation.empty() && ::mongo::shell_utils::fileExists(rcLocation)) {
                 hasMongoRC = true;

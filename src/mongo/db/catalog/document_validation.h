@@ -84,4 +84,4 @@ public:
 private:
     boost::optional<DisableDocumentValidation> _documentValidationDisabler;
 };
-}
+}  // namespace mongo

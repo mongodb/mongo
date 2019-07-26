@@ -14,7 +14,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');            // for exten
 load('jstests/concurrency/fsm_workloads/findAndModify_upsert.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     $config.data.sort = {$natural: 1};
 
     return $config;

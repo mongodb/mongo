@@ -46,5 +46,5 @@ enum TextIndexVersion {
     TEXT_INDEX_VERSION_2 = 2,        // Index format with ASCII support and murmur hashing.
     TEXT_INDEX_VERSION_3 = 3,        // Current index format with basic Unicode support.
 };
-}
-}
+}  // namespace fts
+}  // namespace mongo

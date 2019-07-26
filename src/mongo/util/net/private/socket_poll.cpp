@@ -70,4 +70,4 @@ int socketPoll(pollfd* fdarray, unsigned long nfds, int timeout) {
 }
 
 #endif
-}
+}  // namespace mongo

@@ -170,9 +170,7 @@ BSONObj DurableViewCatalogImpl::_validateViewDefinition(OperationContext* opCtx,
 
     uassert(ErrorCodes::InvalidViewDefinition,
             str::stream() << "found invalid view definition " << viewDefinition["_id"]
-                          << " while reading '"
-                          << _db->getSystemViewsName()
-                          << "'",
+                          << " while reading '" << _db->getSystemViewsName() << "'",
             valid);
 
     return viewDefinition;

@@ -774,12 +774,12 @@ public:
     virtual std::vector<MemberData> getMemberData() const = 0;
 
     /*
-    * Handles an incoming replSetRequestVotes command.
-    *
-    * Populates the given 'response' object with the result of the request. If there is a failure
-    * processing the vote request, returns an error status. If an error is returned, the value of
-    * the populated 'response' object is invalid.
-    */
+     * Handles an incoming replSetRequestVotes command.
+     *
+     * Populates the given 'response' object with the result of the request. If there is a failure
+     * processing the vote request, returns an error status. If an error is returned, the value of
+     * the populated 'response' object is invalid.
+     */
     virtual Status processReplSetRequestVotes(OperationContext* opCtx,
                                               const ReplSetRequestVotesArgs& args,
                                               ReplSetRequestVotesResponse* response) = 0;

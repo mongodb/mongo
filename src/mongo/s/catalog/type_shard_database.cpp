@@ -65,10 +65,10 @@ StatusWith<ShardDatabaseType> ShardDatabaseType::fromBSON(const BSONObj& source)
         BSONObj versionField = source.getObjectField("version");
         if (versionField.isEmpty()) {
             return Status{ErrorCodes::InternalError,
-                          str::stream() << "DatabaseVersion doesn't exist in database entry "
-                                        << source
-                                        << " despite the shard being in binary version 4.2 or "
-                                           "later."};
+                          str::stream()
+                              << "DatabaseVersion doesn't exist in database entry " << source
+                              << " despite the shard being in binary version 4.2 or "
+                                 "later."};
         }
         dbVersion = DatabaseVersion::parse(IDLParserErrorContext("DatabaseType"), versionField);
     }

@@ -181,7 +181,8 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotMasterError) {
             documents: [
                 {a: 1}
             ]
-        })")).serialize();
+        })"))
+                           .serialize();
 
         // Round-trip command fails with NotMaster error. Note that this failure is in command
         // dispatch which ignores w:0.

@@ -5,105 +5,104 @@
 
 (function() {
 
-    function makeShutdownByCrashFn(crashHow) {
-        return function(conn) {
-            var admin = conn.getDB("admin");
-            assert.commandWorked(admin.runCommand(
-                {configureFailPoint: "crashOnShutdown", mode: "alwaysOn", data: {how: crashHow}}));
-            admin.shutdownServer();
-        };
-    }
+function makeShutdownByCrashFn(crashHow) {
+    return function(conn) {
+        var admin = conn.getDB("admin");
+        assert.commandWorked(admin.runCommand(
+            {configureFailPoint: "crashOnShutdown", mode: "alwaysOn", data: {how: crashHow}}));
+        admin.shutdownServer();
+    };
+}
 
-    function makeRegExMatchFn(pattern) {
-        return function(text) {
-            return pattern.test(text);
-        };
-    }
+function makeRegExMatchFn(pattern) {
+    return function(text) {
+        return pattern.test(text);
+    };
+}
 
-    function testShutdownLogging(launcher, crashFn, matchFn, expectedExitCode) {
-        clearRawMongoProgramOutput();
-        var conn = launcher.start({});
+function testShutdownLogging(launcher, crashFn, matchFn, expectedExitCode) {
+    clearRawMongoProgramOutput();
+    var conn = launcher.start({});
 
-        function checkOutput() {
-            var logContents = rawMongoProgramOutput();
-            function printLog() {
-                // We can't just return a string because it will be well over the max
-                // line length.
-                // So we just print manually.
-                print("================ BEGIN LOG CONTENTS ==================");
-                logContents.split(/\n/).forEach((line) => {
-                    print(line);
-                });
-                print("================ END LOG CONTENTS =====================");
-                return "";
-            }
-
-            assert(matchFn(logContents), printLog);
+    function checkOutput() {
+        var logContents = rawMongoProgramOutput();
+        function printLog() {
+            // We can't just return a string because it will be well over the max
+            // line length.
+            // So we just print manually.
+            print("================ BEGIN LOG CONTENTS ==================");
+            logContents.split(/\n/).forEach((line) => {
+                print(line);
+            });
+            print("================ END LOG CONTENTS =====================");
+            return "";
         }
 
-        crashFn(conn);
-        launcher.stop(conn, undefined, {allowedExitCode: expectedExitCode});
-        checkOutput();
+        assert(matchFn(logContents), printLog);
     }
 
-    function runAllTests(launcher) {
-        const SIGSEGV = 11;
-        const SIGABRT = 6;
-        testShutdownLogging(launcher, function(conn) {
-            conn.getDB('admin').shutdownServer();
-        }, makeRegExMatchFn(/shutdown command received/), MongoRunner.EXIT_CLEAN);
+    crashFn(conn);
+    launcher.stop(conn, undefined, {allowedExitCode: expectedExitCode});
+    checkOutput();
+}
 
-        testShutdownLogging(launcher,
-                            makeShutdownByCrashFn('fault'),
-                            makeRegExMatchFn(/Invalid access at address[\s\S]*printStackTrace/),
-                            -SIGSEGV);
+function runAllTests(launcher) {
+    const SIGSEGV = 11;
+    const SIGABRT = 6;
+    testShutdownLogging(launcher, function(conn) {
+        conn.getDB('admin').shutdownServer();
+    }, makeRegExMatchFn(/shutdown command received/), MongoRunner.EXIT_CLEAN);
 
-        testShutdownLogging(launcher,
-                            makeShutdownByCrashFn('abort'),
-                            makeRegExMatchFn(/Got signal[\s\S]*printStackTrace/),
-                            -SIGABRT);
-    }
+    testShutdownLogging(launcher,
+                        makeShutdownByCrashFn('fault'),
+                        makeRegExMatchFn(/Invalid access at address[\s\S]*printStackTrace/),
+                        -SIGSEGV);
 
-    if (_isWindows()) {
-        print("SKIPPING TEST ON WINDOWS");
-        return;
-    }
+    testShutdownLogging(launcher,
+                        makeShutdownByCrashFn('abort'),
+                        makeRegExMatchFn(/Got signal[\s\S]*printStackTrace/),
+                        -SIGABRT);
+}
 
-    if (_isAddressSanitizerActive()) {
-        print("SKIPPING TEST ON ADDRESS SANITIZER BUILD");
-        return;
-    }
+if (_isWindows()) {
+    print("SKIPPING TEST ON WINDOWS");
+    return;
+}
 
-    (function testMongod() {
-        print("********************\nTesting exit logging in mongod\n********************");
+if (_isAddressSanitizerActive()) {
+    print("SKIPPING TEST ON ADDRESS SANITIZER BUILD");
+    return;
+}
 
-        runAllTests({
-            start: function(opts) {
-                var actualOpts = {nojournal: ""};
-                Object.extend(actualOpts, opts);
-                return MongoRunner.runMongod(actualOpts);
-            },
+(function testMongod() {
+    print("********************\nTesting exit logging in mongod\n********************");
 
-            stop: MongoRunner.stopMongod
-        });
-    }());
+    runAllTests({
+        start: function(opts) {
+            var actualOpts = {nojournal: ""};
+            Object.extend(actualOpts, opts);
+            return MongoRunner.runMongod(actualOpts);
+        },
 
-    (function testMongos() {
-        print("********************\nTesting exit logging in mongos\n********************");
+        stop: MongoRunner.stopMongod
+    });
+}());
 
-        var st = new ShardingTest({shards: 1});
-        var mongosLauncher = {
-            start: function(opts) {
-                var actualOpts = {configdb: st._configDB};
-                Object.extend(actualOpts, opts);
-                return MongoRunner.runMongos(actualOpts);
-            },
+(function testMongos() {
+    print("********************\nTesting exit logging in mongos\n********************");
 
-            stop: MongoRunner.stopMongos
-        };
+    var st = new ShardingTest({shards: 1});
+    var mongosLauncher = {
+        start: function(opts) {
+            var actualOpts = {configdb: st._configDB};
+            Object.extend(actualOpts, opts);
+            return MongoRunner.runMongos(actualOpts);
+        },
 
-        runAllTests(mongosLauncher);
-        st.stop();
-    }());
+        stop: MongoRunner.stopMongos
+    };
 
+    runAllTests(mongosLauncher);
+    st.stop();
+}());
 }());

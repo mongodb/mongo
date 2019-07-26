@@ -91,7 +91,7 @@ bool nodeIsConservativelySupportedBySparseIndex(const MatchExpression* me) {
     const bool inElemMatch = false;
     return QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(me, inElemMatch);
 }
-}
+}  // namespace
 
 void PlanCacheIndexabilityState::processSparseIndex(const std::string& indexName,
                                                     const BSONObj& keyPattern) {

@@ -100,9 +100,9 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
 #endif
 
     /*
-    * We did not add the message to startupWarningsLog as the user can not
-    * specify a sslCAFile parameter from the shell
-    */
+     * We did not add the message to startupWarningsLog as the user can not
+     * specify a sslCAFile parameter from the shell
+     */
     if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled &&
 #ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
         sslGlobalParams.sslCertificateSelector.empty() &&

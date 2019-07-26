@@ -121,7 +121,7 @@ public:
     void checkCollections(std::string dbName) {
         unsigned long counter = 0;
 
-        for (auto[orderedIt, catalogIt] = std::tuple{collsIterator(dbName), catalog.begin(dbName)};
+        for (auto [orderedIt, catalogIt] = std::tuple{collsIterator(dbName), catalog.begin(dbName)};
              catalogIt != catalog.end() && orderedIt != collsIteratorEnd(dbName);
              ++catalogIt, ++orderedIt) {
 

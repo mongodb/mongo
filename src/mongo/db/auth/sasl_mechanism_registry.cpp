@@ -79,8 +79,7 @@ StatusWith<std::unique_ptr<ServerMechanismBase>> SASLServerMechanismRegistry::ge
 
     return Status(ErrorCodes::BadValue,
                   str::stream() << "Unsupported mechanism '" << mechanismName
-                                << "' on authentication database '"
-                                << authenticationDatabase
+                                << "' on authentication database '" << authenticationDatabase
                                 << "'");
 }
 
@@ -147,9 +146,7 @@ bool SASLServerMechanismRegistry::_mechanismSupportedByConfig(StringData mechNam
 
 namespace {
 ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryInitializer{
-    "CreateSASLServerMechanismRegistry",
-    {"EndStartupOptionStorage"},
-    [](ServiceContext* service) {
+    "CreateSASLServerMechanismRegistry", {"EndStartupOptionStorage"}, [](ServiceContext* service) {
         SASLServerMechanismRegistry::set(service,
                                          std::make_unique<SASLServerMechanismRegistry>(
                                              saslGlobalParams.authenticationMechanisms));

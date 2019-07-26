@@ -73,9 +73,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigReceivedWhileSecondary) {
     init();
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -99,9 +97,7 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
     // start up, become primary, receive uninitializable config
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -117,21 +113,14 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
     args.force = false;
     args.newConfigObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 2
-                             << "protocolVersion"
-                             << 1
-                             << "invalidlyNamedField"
-                             << 3
-                             << "members"
+                             << "version" << 2 << "protocolVersion" << 1 << "invalidlyNamedField"
+                             << 3 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345"
-                                                      << "arbiterOnly"
-                                                      << true)
+                                                      << "arbiterOnly" << true)
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345"
-                                                         << "arbiterOnly"
-                                                         << true)));
+                                                         << "arbiterOnly" << true)));
     const auto opCtx = makeOperationContext();
     // ErrorCodes::BadValue should be propagated from ReplSetConfig::initialize()
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
@@ -143,9 +132,7 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
     // start up, become primary, receive config with incorrect replset name
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -161,11 +148,7 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
     args.force = false;
     args.newConfigObj = BSON("_id"
                              << "notMySet"
-                             << "version"
-                             << 3
-                             << "protocolVersion"
-                             << 1
-                             << "members"
+                             << "version" << 3 << "protocolVersion" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
@@ -181,15 +164,12 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
     // start up, become primary, receive config with incorrect replset name
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
                                                         << "node2:12345"))
-                            << "settings"
-                            << BSON("replicaSetId" << OID::gen())),
+                            << "settings" << BSON("replicaSetId" << OID::gen())),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
@@ -201,17 +181,12 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
     args.force = false;
     args.newConfigObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 3
-                             << "protocolVersion"
-                             << 1
-                             << "members"
+                             << "version" << 3 << "protocolVersion" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345"))
-                             << "settings"
-                             << BSON("replicaSetId" << OID::gen()));
+                             << "settings" << BSON("replicaSetId" << OID::gen()));
 
     const auto opCtx = makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
@@ -224,9 +199,7 @@ TEST_F(ReplCoordTest,
     // start up, become primary, validate fails
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -242,11 +215,7 @@ TEST_F(ReplCoordTest,
     args.force = false;
     args.newConfigObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << -3
-                             << "protocolVersion"
-                             << 1
-                             << "members"
+                             << "version" << -3 << "protocolVersion" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
@@ -266,9 +235,7 @@ void doReplSetInitiate(ReplicationCoordinatorImpl* replCoord,
         replCoord->processReplSetInitiate(opCtx,
                                           BSON("_id"
                                                << "mySet"
-                                               << "version"
-                                               << 1
-                                               << "members"
+                                               << "version" << 1 << "members"
                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                         << "node1:12345")
                                                              << BSON("_id" << 2 << "host"
@@ -285,17 +252,12 @@ void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord,
     // Replica set id will be copied from existing configuration.
     args.newConfigObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 3
-                             << "protocolVersion"
-                             << 1
-                             << "members"
+                             << "version" << 3 << "protocolVersion" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345"
-                                                         << "priority"
-                                                         << 3)));
+                                                         << "priority" << 3)));
     *status = replCoord->processReplSetReconfig(opCtx, args, &garbage);
 }
 
@@ -305,9 +267,7 @@ TEST_F(ReplCoordTest,
     // containing a higher config version
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -348,9 +308,7 @@ TEST_F(ReplCoordTest, NodeReturnsOutOfDiskSpaceWhenSavingANewConfigFailsDuringRe
     // start up, become primary, saving the config fails
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -377,9 +335,7 @@ TEST_F(ReplCoordTest,
     // start up, become primary, reconfig, then before that reconfig concludes, reconfig again
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -404,11 +360,7 @@ TEST_F(ReplCoordTest,
     args.force = false;
     args.newConfigObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 3
-                             << "protocolVersion"
-                             << 1
-                             << "members"
+                             << "version" << 3 << "protocolVersion" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
@@ -443,11 +395,7 @@ TEST_F(ReplCoordTest, NodeReturnsConfigurationInProgressWhenReceivingAReconfigWh
     args.force = false;
     args.newConfigObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 3
-                             << "protocolVersion"
-                             << 1
-                             << "members"
+                             << "version" << 3 << "protocolVersion" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
@@ -464,15 +412,12 @@ TEST_F(ReplCoordTest, PrimaryNodeAcceptsNewConfigWhenReceivingAReconfigWithAComp
     // start up, become primary, reconfig successfully
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
                                                         << "node2:12345"))
-                            << "settings"
-                            << BSON("replicaSetId" << OID::gen())),
+                            << "settings" << BSON("replicaSetId" << OID::gen())),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100));
@@ -512,9 +457,7 @@ TEST_F(
     // from reconfig
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -538,11 +481,7 @@ TEST_F(
     config
         .initialize(BSON("_id"
                          << "mySet"
-                         << "version"
-                         << 3
-                         << "protocolVersion"
-                         << 1
-                         << "members"
+                         << "version" << 3 << "protocolVersion" << 1 << "members"
                          << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                   << "node1:12345")
                                        << BSON("_id" << 2 << "host"
@@ -581,9 +520,7 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
     // start up, become primary, reconfig, while reconfigging receive reconfig via heartbeat
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -614,9 +551,7 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
     config
         .initialize(BSON("_id"
                          << "mySet"
-                         << "version"
-                         << 4
-                         << "members"
+                         << "version" << 4 << "members"
                          << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                   << "node1:12345")
                                        << BSON("_id" << 2 << "host"
@@ -652,9 +587,7 @@ TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary
     init();
     assertStartSuccess(BSON("_id"
                             << "mySet"
-                            << "version"
-                            << 2
-                            << "members"
+                            << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
                                           << BSON("_id" << 2 << "host"
@@ -670,11 +603,7 @@ TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary
     args.force = false;
     args.newConfigObj = BSON("_id"
                              << "mySet"
-                             << "version"
-                             << 3
-                             << "protocolVersion"
-                             << 1
-                             << "members"
+                             << "version" << 3 << "protocolVersion" << 1 << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"

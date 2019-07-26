@@ -40,7 +40,7 @@ namespace mongo {
 namespace mutablebson {
 class Element;
 class Document;
-}
+}  // namespace mutablebson
 
 /**
  * SafeNum holds and does arithmetic on a number in a safe way, handling overflow

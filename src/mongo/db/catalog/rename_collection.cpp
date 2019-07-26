@@ -203,15 +203,8 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
     if (!tmpNameResult.isOK()) {
         return tmpNameResult.getStatus().withContext(
             str::stream() << "Cannot generate a temporary collection name for the target "
-                          << targetNs
-                          << " ("
-                          << targetUUID
-                          << ") so that the source"
-                          << sourceNs
-                          << " ("
-                          << sourceUUID
-                          << ") could be renamed to "
-                          << targetNs);
+                          << targetNs << " (" << targetUUID << ") so that the source" << sourceNs
+                          << " (" << sourceUUID << ") could be renamed to " << targetNs);
     }
     const auto& tmpName = tmpNameResult.getValue();
     const bool stayTemp = true;
@@ -339,9 +332,10 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     boost::optional<Lock::CollectionLock> targetLock;
     // To prevent deadlock, always lock system.views collection in the end because concurrent
     // view-related operations always lock system.views in the end.
-    if (!source.isSystemDotViews() && (target.isSystemDotViews() ||
-                                       ResourceId(RESOURCE_COLLECTION, source.ns()) <
-                                           ResourceId(RESOURCE_COLLECTION, target.ns()))) {
+    if (!source.isSystemDotViews() &&
+        (target.isSystemDotViews() ||
+         ResourceId(RESOURCE_COLLECTION, source.ns()) <
+             ResourceId(RESOURCE_COLLECTION, target.ns()))) {
         // To prevent deadlock, always lock source and target in ascending resourceId order.
         sourceLock.emplace(opCtx, source, MODE_X);
         targetLock.emplace(opCtx, target, MODE_X);
@@ -546,8 +540,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
     if (!tmpNameResult.isOK()) {
         return tmpNameResult.getStatus().withContext(
             str::stream() << "Cannot generate temporary collection name to rename " << source
-                          << " to "
-                          << target);
+                          << " to " << target);
     }
     const auto& tmpName = tmpNameResult.getValue();
 
@@ -639,7 +632,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
                                           *(tmpColl->uuid()),
                                           indexToCopy,
                                           false  // fromMigrate
-                                          );
+                );
                 auto indexResult =
                     tmpIndexCatalog->createIndexOnEmptyCollection(opCtx, indexToCopy);
                 if (!indexResult.isOK()) {
@@ -700,7 +693,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
                 }
                 cursor->save();
                 // When this exits via success or WCE, we need to restore the cursor.
-                ON_BLOCK_EXIT([ opCtx, ns = tmpName.ns(), &cursor ]() {
+                ON_BLOCK_EXIT([opCtx, ns = tmpName.ns(), &cursor]() {
                     writeConflictRetry(
                         opCtx, "retryRestoreCursor", ns, [&cursor] { cursor->restore(); });
                 });
@@ -867,9 +860,7 @@ Status renameCollectionForRollback(OperationContext* opCtx,
     invariant(source->db() == target.db(),
               str::stream() << "renameCollectionForRollback: source and target namespaces must "
                                "have the same database. source: "
-                            << *source
-                            << ". target: "
-                            << target);
+                            << *source << ". target: " << target);
 
     log() << "renameCollectionForRollback: rename " << *source << " (" << uuid << ") to " << target
           << ".";

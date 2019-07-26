@@ -765,8 +765,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     bool permitYield,
     size_t plannerOptions) {
     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    auto yieldPolicy = (permitYield && (readConcernArgs.getLevel() !=
-                                        repl::ReadConcernLevel::kSnapshotReadConcern))
+    auto yieldPolicy =
+        (permitYield &&
+         (readConcernArgs.getLevel() != repl::ReadConcernLevel::kSnapshotReadConcern))
         ? PlanExecutor::YIELD_AUTO
         : PlanExecutor::INTERRUPT_ONLY;
     return _getExecutorFind(
@@ -1512,10 +1513,11 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
         const IndexCatalogEntry* ice = ii->next();
         const IndexDescriptor* desc = ice->descriptor();
         if (desc->keyPattern().hasField(parsedDistinct.getKey())) {
-            if (!mayUnwindArrays && isAnyComponentOfPathMultikey(desc->keyPattern(),
-                                                                 desc->isMultikey(opCtx),
-                                                                 desc->getMultikeyPaths(opCtx),
-                                                                 parsedDistinct.getKey())) {
+            if (!mayUnwindArrays &&
+                isAnyComponentOfPathMultikey(desc->keyPattern(),
+                                             desc->isMultikey(opCtx),
+                                             desc->getMultikeyPaths(opCtx),
+                                             parsedDistinct.getKey())) {
                 // If the caller requested "strict" distinct that does not "pre-unwind" arrays,
                 // then an index which is multikey on the distinct field may not be used. This is
                 // because when indexing an array each element gets inserted individually. Any plan

@@ -8,15 +8,14 @@ load('jstests/concurrency/fsm_utils/name_utils.js');  // for uniqueCollName and 
 load('jstests/concurrency/fsm_utils/setup_teardown_functions.js');
 
 var runner = (function() {
-
     function validateExecutionMode(mode) {
         var allowedKeys = ['composed', 'parallel', 'serial'];
 
         Object.keys(mode).forEach(function(option) {
             assert.contains(option,
                             allowedKeys,
-                            'invalid option: ' + tojson(option) + '; valid options are: ' +
-                                tojson(allowedKeys));
+                            'invalid option: ' + tojson(option) +
+                                '; valid options are: ' + tojson(allowedKeys));
         });
 
         mode.composed = mode.composed || false;
@@ -61,8 +60,8 @@ var runner = (function() {
         Object.keys(options).forEach(function(option) {
             assert.contains(option,
                             allowedKeys,
-                            'invalid option: ' + tojson(option) + '; valid options are: ' +
-                                tojson(allowedKeys));
+                            'invalid option: ' + tojson(option) +
+                                '; valid options are: ' + tojson(allowedKeys));
         });
 
         if (typeof options.subsetSize !== 'undefined') {
@@ -130,8 +129,8 @@ var runner = (function() {
         Object.keys(options).forEach(function(option) {
             assert.contains(option,
                             allowedKeys,
-                            'invalid option: ' + tojson(option) + '; valid options are: ' +
-                                tojson(allowedKeys));
+                            'invalid option: ' + tojson(option) +
+                                '; valid options are: ' + tojson(allowedKeys));
         });
 
         if (typeof options.dropDatabaseBlacklist !== 'undefined') {
@@ -752,7 +751,6 @@ var runner = (function() {
             loadWorkloadContext,
         }
     };
-
 })();
 
 var runWorkloadsSerially = runner.serial;

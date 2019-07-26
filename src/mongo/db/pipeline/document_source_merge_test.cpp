@@ -140,8 +140,7 @@ TEST_F(DocumentSourceMergeTest, CorrectlyParsesIfWhenMatchedIsStringOrArray) {
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "whenMatched"
-                                 << BSONArray()));
+                                 << "whenMatched" << BSONArray()));
     ASSERT(createMergeStage(spec));
 }
 
@@ -238,14 +237,12 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsNotAValidUserCollection) {
 TEST_F(DocumentSourceMergeTest, FailsToParseIfDbIsNotString) {
     auto spec = BSON("$merge" << BSON("into" << BSON("coll"
                                                      << "target_collection"
-                                                     << "db"
-                                                     << true)));
+                                                     << "db" << true)));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
 
     spec = BSON("$merge" << BSON("into" << BSON("coll"
                                                 << "target_collection"
-                                                << "db"
-                                                << BSONArray())));
+                                                << "db" << BSONArray())));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
 
     spec = BSON("$merge" << BSON("into" << BSON("coll"
@@ -259,14 +256,12 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfDbIsNotString) {
 TEST_F(DocumentSourceMergeTest, FailsToParseIfCollIsNotString) {
     auto spec = BSON("$merge" << BSON("into" << BSON("db"
                                                      << "target_db"
-                                                     << "coll"
-                                                     << true)));
+                                                     << "coll" << true)));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
 
     spec = BSON("$merge" << BSON("into" << BSON("db"
                                                 << "target_db"
-                                                << "coll"
-                                                << BSONArray())));
+                                                << "coll" << BSONArray())));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
 
     spec = BSON("$merge" << BSON("into" << BSON("db"
@@ -294,40 +289,34 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfDbIsNotAValidDatabaseName) {
 TEST_F(DocumentSourceMergeTest, FailsToParseIfWhenMatchedModeIsNotStringOrArray) {
     auto spec = BSON("$merge" << BSON("into"
                                       << "target_collection"
-                                      << "whenMatched"
-                                      << true));
+                                      << "whenMatched" << true));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51191);
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "whenMatched"
-                                 << 100));
+                                 << "whenMatched" << 100));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51191);
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "whenMatched"
-                                 << BSON("" << kDefaultWhenMatchedMode)));
+                                 << "whenMatched" << BSON("" << kDefaultWhenMatchedMode)));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51191);
 }
 
 TEST_F(DocumentSourceMergeTest, FailsToParseIfWhenNotMatchedModeIsNotString) {
     auto spec = BSON("$merge" << BSON("into"
                                       << "target_collection"
-                                      << "whenNotMatched"
-                                      << true));
+                                      << "whenNotMatched" << true));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "whenNotMatched"
-                                 << BSONArray()));
+                                 << "whenNotMatched" << BSONArray()));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "whenNotMatched"
-                                 << BSON("" << kDefaultWhenNotMatchedMode)));
+                                 << "whenNotMatched" << BSON("" << kDefaultWhenNotMatchedMode)));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
 }
 
@@ -371,26 +360,22 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfWhenNotMatchedModeIsUnsupportedStr
 TEST_F(DocumentSourceMergeTest, FailsToParseIfOnFieldIsNotStringOrArrayOfStrings) {
     auto spec = BSON("$merge" << BSON("into"
                                       << "target_collection"
-                                      << "on"
-                                      << 1));
+                                      << "on" << 1));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51186);
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "on"
-                                 << BSONArray()));
+                                 << "on" << BSONArray()));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51187);
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "on"
-                                 << BSON_ARRAY(1 << 2 << BSON("a" << 3))));
+                                 << "on" << BSON_ARRAY(1 << 2 << BSON("a" << 3))));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51134);
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "on"
-                                 << BSON("_id" << 1)));
+                                 << "on" << BSON("_id" << 1)));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 51186);
 }
 
@@ -646,24 +631,21 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "whenMatched"
-                                 << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
+                                 << "whenMatched" << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
                                  << "whenNotMatched"
                                  << "insert"));
     ASSERT(createMergeStage(spec));
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "whenMatched"
-                                 << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
+                                 << "whenMatched" << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
                                  << "whenNotMatched"
                                  << "fail"));
     ASSERT(createMergeStage(spec));
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "whenMatched"
-                                 << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
+                                 << "whenMatched" << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
                                  << "whenNotMatched"
                                  << "discard"));
     ASSERT(createMergeStage(spec));
@@ -688,41 +670,33 @@ TEST_F(DocumentSourceMergeTest, CorrectlyHandlesWhenMatchedAndWhenNotMatchedMode
 TEST_F(DocumentSourceMergeTest, LetVariablesCanOnlyBeUsedWithPipelineMode) {
     auto let = BSON("foo"
                     << "bar");
-    auto spec = BSON("$merge" << BSON("into"
-                                      << "target_collection"
-                                      << "let"
-                                      << let
-                                      << "whenMatched"
-                                      << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
-                                      << "whenNotMatched"
-                                      << "insert"));
+    auto spec =
+        BSON("$merge" << BSON("into"
+                              << "target_collection"
+                              << "let" << let << "whenMatched"
+                              << BSON_ARRAY(BSON("$project" << BSON("x" << 1))) << "whenNotMatched"
+                              << "insert"));
+    ASSERT(createMergeStage(spec));
+
+    spec =
+        BSON("$merge" << BSON("into"
+                              << "target_collection"
+                              << "let" << let << "whenMatched"
+                              << BSON_ARRAY(BSON("$project" << BSON("x" << 1))) << "whenNotMatched"
+                              << "fail"));
+    ASSERT(createMergeStage(spec));
+
+    spec =
+        BSON("$merge" << BSON("into"
+                              << "target_collection"
+                              << "let" << let << "whenMatched"
+                              << BSON_ARRAY(BSON("$project" << BSON("x" << 1))) << "whenNotMatched"
+                              << "discard"));
     ASSERT(createMergeStage(spec));
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "let"
-                                 << let
-                                 << "whenMatched"
-                                 << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
-                                 << "whenNotMatched"
-                                 << "fail"));
-    ASSERT(createMergeStage(spec));
-
-    spec = BSON("$merge" << BSON("into"
-                                 << "target_collection"
-                                 << "let"
-                                 << let
-                                 << "whenMatched"
-                                 << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
-                                 << "whenNotMatched"
-                                 << "discard"));
-    ASSERT(createMergeStage(spec));
-
-    spec = BSON("$merge" << BSON("into"
-                                 << "target_collection"
-                                 << "let"
-                                 << let
-                                 << "whenMatched"
+                                 << "let" << let << "whenMatched"
                                  << "replace"
                                  << "whenNotMatched"
                                  << "insert"));
@@ -730,9 +704,7 @@ TEST_F(DocumentSourceMergeTest, LetVariablesCanOnlyBeUsedWithPipelineMode) {
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "let"
-                                 << let
-                                 << "whenMatched"
+                                 << "let" << let << "whenMatched"
                                  << "replace"
                                  << "whenNotMatched"
                                  << "fail"));
@@ -740,9 +712,7 @@ TEST_F(DocumentSourceMergeTest, LetVariablesCanOnlyBeUsedWithPipelineMode) {
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "let"
-                                 << let
-                                 << "whenMatched"
+                                 << "let" << let << "whenMatched"
                                  << "replace"
                                  << "whenNotMatched"
                                  << "discard"));
@@ -750,9 +720,7 @@ TEST_F(DocumentSourceMergeTest, LetVariablesCanOnlyBeUsedWithPipelineMode) {
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "let"
-                                 << let
-                                 << "whenMatched"
+                                 << "let" << let << "whenMatched"
                                  << "merge"
                                  << "whenNotMatched"
                                  << "insert"));
@@ -760,9 +728,7 @@ TEST_F(DocumentSourceMergeTest, LetVariablesCanOnlyBeUsedWithPipelineMode) {
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "let"
-                                 << let
-                                 << "whenMatched"
+                                 << "let" << let << "whenMatched"
                                  << "merge"
                                  << "whenNotMatched"
                                  << "fail"));
@@ -770,9 +736,7 @@ TEST_F(DocumentSourceMergeTest, LetVariablesCanOnlyBeUsedWithPipelineMode) {
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "let"
-                                 << let
-                                 << "whenMatched"
+                                 << "let" << let << "whenMatched"
                                  << "merge"
                                  << "whenNotMatched"
                                  << "discard"));
@@ -780,9 +744,7 @@ TEST_F(DocumentSourceMergeTest, LetVariablesCanOnlyBeUsedWithPipelineMode) {
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "let"
-                                 << let
-                                 << "whenMatched"
+                                 << "let" << let << "whenMatched"
                                  << "keepExisting"
                                  << "whenNotMatched"
                                  << "insert"));
@@ -790,9 +752,7 @@ TEST_F(DocumentSourceMergeTest, LetVariablesCanOnlyBeUsedWithPipelineMode) {
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "let"
-                                 << let
-                                 << "whenMatched"
+                                 << "let" << let << "whenMatched"
                                  << "fail"
                                  << "whenNotMatched"
                                  << "insert"));
@@ -800,12 +760,12 @@ TEST_F(DocumentSourceMergeTest, LetVariablesCanOnlyBeUsedWithPipelineMode) {
 }
 
 TEST_F(DocumentSourceMergeTest, SerializeDefaultLetVariable) {
-    auto spec = BSON("$merge" << BSON("into"
-                                      << "target_collection"
-                                      << "whenMatched"
-                                      << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
-                                      << "whenNotMatched"
-                                      << "insert"));
+    auto spec =
+        BSON("$merge" << BSON("into"
+                              << "target_collection"
+                              << "whenMatched" << BSON_ARRAY(BSON("$project" << BSON("x" << 1)))
+                              << "whenNotMatched"
+                              << "insert"));
     auto mergeStage = createMergeStage(spec);
     auto serialized = mergeStage->serialize().getDocument();
     ASSERT_VALUE_EQ(serialized["$merge"]["let"],
@@ -826,11 +786,10 @@ TEST_F(DocumentSourceMergeTest, SerializeLetVariables) {
                                       << BSON("v1" << 10 << "v2"
                                                    << "foo"
                                                    << "v3"
-                                                   << BSON("x" << 1 << "y" << BSON("z"
-                                                                                   << "bar")))
-                                      << "whenMatched"
-                                      << pipeline
-                                      << "whenNotMatched"
+                                                   << BSON("x" << 1 << "y"
+                                                               << BSON("z"
+                                                                       << "bar")))
+                                      << "whenMatched" << pipeline << "whenNotMatched"
                                       << "insert"));
     auto mergeStage = createMergeStage(spec);
     ASSERT(mergeStage);
@@ -840,8 +799,9 @@ TEST_F(DocumentSourceMergeTest, SerializeLetVariables) {
                     Value(BSON("$const"
                                << "foo")));
     ASSERT_VALUE_EQ(serialized["$merge"]["let"]["v3"],
-                    Value(BSON("x" << BSON("$const" << 1) << "y" << BSON("z" << BSON("$const"
-                                                                                     << "bar")))));
+                    Value(BSON("x" << BSON("$const" << 1) << "y"
+                                   << BSON("z" << BSON("$const"
+                                                       << "bar")))));
     ASSERT_VALUE_EQ(serialized["$merge"]["whenMatched"], Value(pipeline));
 }
 
@@ -853,9 +813,7 @@ TEST_F(DocumentSourceMergeTest, SerializeLetArrayVariable) {
                               << "target_collection"
                               << "let"
                               << BSON("v1" << BSON_ARRAY(1 << "2" << BSON("x" << 1 << "y" << 2)))
-                              << "whenMatched"
-                              << pipeline
-                              << "whenNotMatched"
+                              << "whenMatched" << pipeline << "whenNotMatched"
                               << "insert"));
     auto mergeStage = createMergeStage(spec);
     ASSERT(mergeStage);
@@ -877,14 +835,11 @@ TEST_F(DocumentSourceMergeTest, SerializeLetArrayVariable) {
 TEST_F(DocumentSourceMergeTest, SerializeNullLetVariablesAsDefault) {
     auto pipeline = BSON_ARRAY(BSON("$project" << BSON("x"
                                                        << "1")));
-    auto spec = BSON("$merge" << BSON("into"
-                                      << "target_collection"
-                                      << "let"
-                                      << BSONNULL
-                                      << "whenMatched"
-                                      << pipeline
-                                      << "whenNotMatched"
-                                      << "insert"));
+    auto spec =
+        BSON("$merge" << BSON("into"
+                              << "target_collection"
+                              << "let" << BSONNULL << "whenMatched" << pipeline << "whenNotMatched"
+                              << "insert"));
     auto mergeStage = createMergeStage(spec);
     ASSERT(mergeStage);
     auto serialized = mergeStage->serialize().getDocument();
@@ -897,14 +852,11 @@ TEST_F(DocumentSourceMergeTest, SerializeNullLetVariablesAsDefault) {
 TEST_F(DocumentSourceMergeTest, SerializeEmptyLetVariables) {
     auto pipeline = BSON_ARRAY(BSON("$project" << BSON("x"
                                                        << "1")));
-    auto spec = BSON("$merge" << BSON("into"
-                                      << "target_collection"
-                                      << "let"
-                                      << BSONObj()
-                                      << "whenMatched"
-                                      << pipeline
-                                      << "whenNotMatched"
-                                      << "insert"));
+    auto spec =
+        BSON("$merge" << BSON("into"
+                              << "target_collection"
+                              << "let" << BSONObj() << "whenMatched" << pipeline << "whenNotMatched"
+                              << "insert"));
     auto mergeStage = createMergeStage(spec);
     ASSERT(mergeStage);
     auto serialized = mergeStage->serialize().getDocument();
@@ -917,11 +869,7 @@ TEST_F(DocumentSourceMergeTest, OnlyObjectCanBeUsedAsLetVariables) {
                                                        << "1")));
     auto spec = BSON("$merge" << BSON("into"
                                       << "target_collection"
-                                      << "let"
-                                      << 1
-                                      << "whenMatched"
-                                      << pipeline
-                                      << "whenNotMatched"
+                                      << "let" << 1 << "whenMatched" << pipeline << "whenNotMatched"
                                       << "insert"));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
 
@@ -929,18 +877,13 @@ TEST_F(DocumentSourceMergeTest, OnlyObjectCanBeUsedAsLetVariables) {
                                  << "target_collection"
                                  << "let"
                                  << "foo"
-                                 << "whenMatched"
-                                 << pipeline
-                                 << "whenNotMatched"
+                                 << "whenMatched" << pipeline << "whenNotMatched"
                                  << "insert"));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);
 
     spec = BSON("$merge" << BSON("into"
                                  << "target_collection"
-                                 << "let"
-                                 << BSON_ARRAY(1 << "2")
-                                 << "whenMatched"
-                                 << pipeline
+                                 << "let" << BSON_ARRAY(1 << "2") << "whenMatched" << pipeline
                                  << "whenNotMatched"
                                  << "insert"));
     ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::TypeMismatch);

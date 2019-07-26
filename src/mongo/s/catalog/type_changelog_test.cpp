@@ -46,12 +46,10 @@ TEST(ChangeLogType, Empty) {
 
 TEST(ChangeLogType, Valid) {
     BSONObj obj = BSON(ChangeLogType::changeId("host.local-2012-11-21T19:14:10-8")
-                       << ChangeLogType::server("host.local")
-                       << ChangeLogType::shard("shardname")
+                       << ChangeLogType::server("host.local") << ChangeLogType::shard("shardname")
                        << ChangeLogType::clientAddr("192.168.0.189:51128")
                        << ChangeLogType::time(Date_t::fromMillisSinceEpoch(1))
-                       << ChangeLogType::what("split")
-                       << ChangeLogType::ns("test.test")
+                       << ChangeLogType::what("split") << ChangeLogType::ns("test.test")
                        << ChangeLogType::details(BSON("dummy"
                                                       << "info")));
 
@@ -77,8 +75,7 @@ TEST(ChangeLogType, MissingChangeId) {
                        << ChangeLogType::shard("shardname")
                        << ChangeLogType::clientAddr("192.168.0.189:51128")
                        << ChangeLogType::time(Date_t::fromMillisSinceEpoch(1))
-                       << ChangeLogType::what("split")
-                       << ChangeLogType::ns("test.test")
+                       << ChangeLogType::what("split") << ChangeLogType::ns("test.test")
                        << ChangeLogType::details(BSON("dummy"
                                                       << "info")));
 
@@ -91,8 +88,7 @@ TEST(ChangeLogType, MissingServer) {
                        << ChangeLogType::shard("shardname")
                        << ChangeLogType::clientAddr("192.168.0.189:51128")
                        << ChangeLogType::time(Date_t::fromMillisSinceEpoch(1))
-                       << ChangeLogType::what("split")
-                       << ChangeLogType::ns("test.test")
+                       << ChangeLogType::what("split") << ChangeLogType::ns("test.test")
                        << ChangeLogType::details(BSON("dummy"
                                                       << "info")));
 
@@ -102,11 +98,9 @@ TEST(ChangeLogType, MissingServer) {
 
 TEST(ChangeLogType, MissingClientAddr) {
     BSONObj obj = BSON(ChangeLogType::changeId("host.local-2012-11-21T19:14:10-8")
-                       << ChangeLogType::server("host.local")
-                       << ChangeLogType::shard("shardname")
+                       << ChangeLogType::server("host.local") << ChangeLogType::shard("shardname")
                        << ChangeLogType::time(Date_t::fromMillisSinceEpoch(1))
-                       << ChangeLogType::what("split")
-                       << ChangeLogType::ns("test.test")
+                       << ChangeLogType::what("split") << ChangeLogType::ns("test.test")
                        << ChangeLogType::details(BSON("dummy"
                                                       << "info")));
 
@@ -116,11 +110,9 @@ TEST(ChangeLogType, MissingClientAddr) {
 
 TEST(ChangeLogType, MissingTime) {
     BSONObj obj = BSON(ChangeLogType::changeId("host.local-2012-11-21T19:14:10-8")
-                       << ChangeLogType::server("host.local")
-                       << ChangeLogType::shard("shardname")
+                       << ChangeLogType::server("host.local") << ChangeLogType::shard("shardname")
                        << ChangeLogType::clientAddr("192.168.0.189:51128")
-                       << ChangeLogType::what("split")
-                       << ChangeLogType::ns("test.test")
+                       << ChangeLogType::what("split") << ChangeLogType::ns("test.test")
                        << ChangeLogType::details(BSON("dummy"
                                                       << "info")));
 
@@ -130,8 +122,7 @@ TEST(ChangeLogType, MissingTime) {
 
 TEST(ChangeLogType, MissingWhat) {
     BSONObj obj = BSON(ChangeLogType::changeId("host.local-2012-11-21T19:14:10-8")
-                       << ChangeLogType::server("host.local")
-                       << ChangeLogType::shard("shardname")
+                       << ChangeLogType::server("host.local") << ChangeLogType::shard("shardname")
                        << ChangeLogType::clientAddr("192.168.0.189:51128")
                        << ChangeLogType::time(Date_t::fromMillisSinceEpoch(1))
                        << ChangeLogType::ns("test.test")
@@ -143,14 +134,13 @@ TEST(ChangeLogType, MissingWhat) {
 }
 
 TEST(ChangeLogType, MissingNS) {
-    BSONObj obj = BSON(ChangeLogType::changeId("host.local-2012-11-21T19:14:10-8")
-                       << ChangeLogType::server("host.local")
-                       << ChangeLogType::shard("shardname")
-                       << ChangeLogType::clientAddr("192.168.0.189:51128")
-                       << ChangeLogType::time(Date_t::fromMillisSinceEpoch(1))
-                       << ChangeLogType::what("split")
-                       << ChangeLogType::details(BSON("dummy"
-                                                      << "info")));
+    BSONObj obj =
+        BSON(ChangeLogType::changeId("host.local-2012-11-21T19:14:10-8")
+             << ChangeLogType::server("host.local") << ChangeLogType::shard("shardname")
+             << ChangeLogType::clientAddr("192.168.0.189:51128")
+             << ChangeLogType::time(Date_t::fromMillisSinceEpoch(1)) << ChangeLogType::what("split")
+             << ChangeLogType::details(BSON("dummy"
+                                            << "info")));
 
     auto changeLogResult = ChangeLogType::fromBSON(obj);
     ASSERT_OK(changeLogResult.getStatus());
@@ -170,12 +160,10 @@ TEST(ChangeLogType, MissingNS) {
 
 TEST(ChangeLogType, MissingDetails) {
     BSONObj obj = BSON(ChangeLogType::changeId("host.local-2012-11-21T19:14:10-8")
-                       << ChangeLogType::server("host.local")
-                       << ChangeLogType::shard("shardname")
+                       << ChangeLogType::server("host.local") << ChangeLogType::shard("shardname")
                        << ChangeLogType::clientAddr("192.168.0.189:51128")
                        << ChangeLogType::time(Date_t::fromMillisSinceEpoch(1))
-                       << ChangeLogType::what("split")
-                       << ChangeLogType::ns("test.test"));
+                       << ChangeLogType::what("split") << ChangeLogType::ns("test.test"));
 
     auto changeLogResult = ChangeLogType::fromBSON(obj);
     ASSERT_EQ(ErrorCodes::NoSuchKey, changeLogResult.getStatus());
@@ -186,8 +174,7 @@ TEST(ChangeLogType, MissingShard) {
                        << ChangeLogType::server("host.local")
                        << ChangeLogType::clientAddr("192.168.0.189:51128")
                        << ChangeLogType::time(Date_t::fromMillisSinceEpoch(1))
-                       << ChangeLogType::what("split")
-                       << ChangeLogType::ns("test.test")
+                       << ChangeLogType::what("split") << ChangeLogType::ns("test.test")
                        << ChangeLogType::details(BSON("dummy"
                                                       << "info")));
 

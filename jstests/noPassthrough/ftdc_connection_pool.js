@@ -7,30 +7,30 @@
 load('jstests/libs/ftdc.js');
 
 (function() {
-    'use strict';
-    const testPath = MongoRunner.toRealPath('ftdc_dir');
-    const st = new ShardingTest({
-        shards: 2,
-        mongos: {
-            s0: {setParameter: {diagnosticDataCollectionDirectoryPath: testPath}},
-        }
-    });
+'use strict';
+const testPath = MongoRunner.toRealPath('ftdc_dir');
+const st = new ShardingTest({
+    shards: 2,
+    mongos: {
+        s0: {setParameter: {diagnosticDataCollectionDirectoryPath: testPath}},
+    }
+});
 
-    const admin = st.s0.getDB('admin');
-    const stats = verifyGetDiagnosticData(admin).connPoolStats;
-    jsTestLog(`Diagnostic connection pool stats: ${tojson(stats)}`);
+const admin = st.s0.getDB('admin');
+const stats = verifyGetDiagnosticData(admin).connPoolStats;
+jsTestLog(`Diagnostic connection pool stats: ${tojson(stats)}`);
 
-    assert(stats.hasOwnProperty('totalInUse'));
-    assert(stats.hasOwnProperty('totalAvailable'));
-    assert(stats.hasOwnProperty('totalCreated'));
-    assert(stats.hasOwnProperty('totalRefreshing'));
+assert(stats.hasOwnProperty('totalInUse'));
+assert(stats.hasOwnProperty('totalAvailable'));
+assert(stats.hasOwnProperty('totalCreated'));
+assert(stats.hasOwnProperty('totalRefreshing'));
 
-    // The connPoolStats command reply has "hosts", but FTDC's stats do not.
-    assert(!stats.hasOwnProperty('hosts'));
+// The connPoolStats command reply has "hosts", but FTDC's stats do not.
+assert(!stats.hasOwnProperty('hosts'));
 
-    // Check a few properties, without attempting to be thorough.
-    assert(stats.connectionsInUsePerPool.hasOwnProperty('NetworkInterfaceTL-ShardRegistry'));
-    assert(stats.replicaSetPingTimesMillis.hasOwnProperty(st.configRS.name));
+// Check a few properties, without attempting to be thorough.
+assert(stats.connectionsInUsePerPool.hasOwnProperty('NetworkInterfaceTL-ShardRegistry'));
+assert(stats.replicaSetPingTimesMillis.hasOwnProperty(st.configRS.name));
 
-    st.stop();
+st.stop();
 })();

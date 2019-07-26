@@ -39,7 +39,7 @@ r = function(k, v) {
     total = 0;
     for (var i = 0; i < v.length; i++) {
         var x = v[i];
-        if (typeof(x) == "number")
+        if (typeof (x) == "number")
             total += x;
         else
             total += x.length;

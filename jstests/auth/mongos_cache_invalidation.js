@@ -120,7 +120,6 @@ db3.auth('spencer', 'pwd');
     db3.adminCommand("invalidateUserCache");
     assert.writeOK(db3.foo.update({}, {$inc: {a: 1}}));
     assert.eq(4, db3.foo.findOne().a);
-
 })();
 
 (function testRevokingPrivileges() {
@@ -212,7 +211,6 @@ db3.auth('spencer', 'pwd');
     // We manually invalidate the cache on s2/db3.
     db3.adminCommand("invalidateUserCache");
     assert.commandFailedWithCode(db3.foo.runCommand("collStats"), authzErrorCode);
-
 })();
 
 st.stop();

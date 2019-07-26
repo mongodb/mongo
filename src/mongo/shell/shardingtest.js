@@ -102,7 +102,6 @@
  * configRS - If the config servers are a replset, this will contain the config ReplSetTest object
  */
 var ShardingTest = function(params) {
-
     if (!(this instanceof ShardingTest)) {
         return new ShardingTest(params);
     }
@@ -292,16 +291,16 @@ var ShardingTest = function(params) {
             countDBsFound++;
             printjson(db);
         });
-        throw Error("couldn't find dbname: " + dbname + " in config.databases. Total DBs: " +
-                    countDBsFound);
+        throw Error("couldn't find dbname: " + dbname +
+                    " in config.databases. Total DBs: " + countDBsFound);
     };
 
     this.getNonPrimaries = function(dbname) {
         var x = this.config.databases.findOne({_id: dbname});
         if (!x) {
             this.config.databases.find().forEach(printjson);
-            throw Error("couldn't find dbname: " + dbname + " total: " +
-                        this.config.databases.count());
+            throw Error("couldn't find dbname: " + dbname +
+                        " total: " + this.config.databases.count());
         }
 
         return this.config.shards.find({_id: {$ne: x.primary}}).map(z => z._id);
@@ -334,8 +333,8 @@ var ShardingTest = function(params) {
             }
         }
 
-        throw Error("can't find server connection for db '" + dbname + "'s primary shard: " +
-                    tojson(primaryShard));
+        throw Error("can't find server connection for db '" + dbname +
+                    "'s primary shard: " + tojson(primaryShard));
     };
 
     this.normalize = function(x) {
@@ -859,9 +858,9 @@ var ShardingTest = function(params) {
         }
 
         if (arguments.length >= 3) {
-            if (typeof(beforeRestartCallback) !== "function") {
+            if (typeof (beforeRestartCallback) !== "function") {
                 throw new Error("beforeRestartCallback must be a function but was of type " +
-                                typeof(beforeRestartCallback));
+                                typeof (beforeRestartCallback));
             }
             beforeRestartCallback();
         }
@@ -1621,7 +1620,6 @@ var ShardingTest = function(params) {
              MongoRunner.getBinVersionFor(otherParams.configOptions.binVersion)))) {
         this.configRS.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
     }
-
 };
 
 // Stub for a hook to check that collection UUIDs are consistent across shards and the config

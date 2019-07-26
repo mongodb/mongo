@@ -94,24 +94,21 @@ bool wrapConstrainedMethod(JSContext* cx, unsigned argc, JS::Value* vp) {
 
         if (!args.thisv().isObject()) {
             uasserted(ErrorCodes::BadValue,
-                      str::stream() << "Cannot call \"" << T::name()
-                                    << "\" on non-object of type \""
-                                    << ValueWriter(cx, args.thisv()).typeAsString()
-                                    << "\"");
+                      str::stream()
+                          << "Cannot call \"" << T::name() << "\" on non-object of type \""
+                          << ValueWriter(cx, args.thisv()).typeAsString() << "\"");
         }
 
         if (!instanceOf<Args..., void>(getScope(cx), &isProto, args.thisv())) {
             uasserted(ErrorCodes::BadValue,
                       str::stream() << "Cannot call \"" << T::name() << "\" on object of type \""
-                                    << ObjectWrapper(cx, args.thisv()).getClassName()
-                                    << "\"");
+                                    << ObjectWrapper(cx, args.thisv()).getClassName() << "\"");
         }
 
         if (noProto && isProto) {
             uasserted(ErrorCodes::BadValue,
                       str::stream() << "Cannot call \"" << T::name() << "\" on prototype of \""
-                                    << ObjectWrapper(cx, args.thisv()).getClassName()
-                                    << "\"");
+                                    << ObjectWrapper(cx, args.thisv()).getClassName() << "\"");
         }
 
         T::call(cx, args);

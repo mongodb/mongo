@@ -109,13 +109,13 @@ sh.enableSharding = function(dbname) {
 sh.shardCollection = function(fullName, key, unique, options) {
     sh._checkFullName(fullName);
     assert(key, "need a key");
-    assert(typeof(key) == "object", "key needs to be an object");
+    assert(typeof (key) == "object", "key needs to be an object");
 
     var cmd = {shardCollection: fullName, key: key};
     if (unique)
         cmd.unique = true;
     if (options) {
-        if (typeof(options) !== "object") {
+        if (typeof (options) !== "object") {
             throw new Error("options must be an object");
         }
         Object.extend(cmd, options);
@@ -140,7 +140,7 @@ sh.moveChunk = function(fullName, find, to) {
 };
 
 sh.setBalancerState = function(isOn) {
-    assert(typeof(isOn) == "boolean", "Must pass boolean to setBalancerState");
+    assert(typeof (isOn) == "boolean", "Must pass boolean to setBalancerState");
     if (isOn) {
         return sh.startBalancer();
     } else {
@@ -243,7 +243,7 @@ sh.waitForPingChange = function(activePings, timeout, interval) {
 };
 
 sh.waitForBalancer = function(wait, timeout, interval) {
-    if (typeof(wait) === 'undefined') {
+    if (typeof (wait) === 'undefined') {
         wait = false;
     }
     var initialStatus = sh._getBalancerStatus();
@@ -296,7 +296,6 @@ sh.enableBalancing = function(coll) {
  * mongos )
  */
 sh._lastMigration = function(ns) {
-
     var coll = null;
     var dbase = null;
     var config = null;
@@ -480,12 +479,12 @@ sh.getRecentMigrations = function(configDB) {
     var result = configDB.changelog
                      .aggregate([
                          {
-                           $match: {
-                               time: {$gt: yesterday},
-                               what: "moveChunk.from",
-                               'details.errmsg': {$exists: false},
-                               'details.note': 'success'
-                           }
+                             $match: {
+                                 time: {$gt: yesterday},
+                                 what: "moveChunk.from",
+                                 'details.errmsg': {$exists: false},
+                                 'details.note': 'success'
+                             }
                          },
                          {$group: {_id: {msg: "$details.errmsg"}, count: {$sum: 1}}},
                          {$project: {_id: {$ifNull: ["$_id.msg", "Success"]}, count: "$count"}}
@@ -497,28 +496,28 @@ sh.getRecentMigrations = function(configDB) {
         configDB.changelog
             .aggregate([
                 {
-                  $match: {
-                      time: {$gt: yesterday},
-                      what: "moveChunk.from",
-                      $or: [
-                          {'details.errmsg': {$exists: true}},
-                          {'details.note': {$ne: 'success'}}
-                      ]
-                  }
+                    $match: {
+                        time: {$gt: yesterday},
+                        what: "moveChunk.from",
+                        $or: [
+                            {'details.errmsg': {$exists: true}},
+                            {'details.note': {$ne: 'success'}}
+                        ]
+                    }
                 },
                 {
-                  $group: {
-                      _id: {msg: "$details.errmsg", from: "$details.from", to: "$details.to"},
-                      count: {$sum: 1}
-                  }
+                    $group: {
+                        _id: {msg: "$details.errmsg", from: "$details.from", to: "$details.to"},
+                        count: {$sum: 1}
+                    }
                 },
                 {
-                  $project: {
-                      _id: {$ifNull: ['$_id.msg', 'aborted']},
-                      from: "$_id.from",
-                      to: "$_id.to",
-                      count: "$count"
-                  }
+                    $project: {
+                        _id: {$ifNull: ['$_id.msg', 'aborted']},
+                        from: "$_id.from",
+                        to: "$_id.to",
+                        count: "$count"
+                    }
                 }
             ])
             .toArray());
@@ -703,7 +702,7 @@ function printShardingStatus(configDB, verbose) {
         var nonBooleanNote = function(name, value) {
             // If the given value is not a boolean, return a string of the
             // form " (<name>: <value>)", where <value> is converted to JSON.
-            var t = typeof(value);
+            var t = typeof (value);
             var s = "";
             if (t != "boolean" && t != "undefined") {
                 s = " (" + name + ": " + tojson(value) + ")";
@@ -814,9 +813,8 @@ function printShardingSizes(configDB) {
                         delete out.ok;
 
                         output(4,
-                               tojson(chunk.min) + " -->> " + tojson(chunk.max) + " on : " +
-                                   chunk.shard + " " + tojson(out));
-
+                               tojson(chunk.min) + " -->> " + tojson(chunk.max) +
+                                   " on : " + chunk.shard + " " + tojson(out));
                     });
                 });
         }

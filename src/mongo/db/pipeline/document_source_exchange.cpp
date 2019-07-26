@@ -124,9 +124,7 @@ Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter>
 
     uassert(50951,
             str::stream() << "Specified exchange buffer size (" << _maxBufferSize
-                          << ") exceeds the maximum allowable amount ("
-                          << kMaxBufferSize
-                          << ").",
+                          << ") exceeds the maximum allowable amount (" << kMaxBufferSize << ").",
             _maxBufferSize <= kMaxBufferSize);
 
     for (int idx = 0; idx < _spec.getConsumers(); ++idx) {
@@ -205,8 +203,7 @@ std::vector<size_t> Exchange::extractConsumerIds(
 
     uassert(50950,
             str::stream() << "Specified number of exchange consumers (" << nConsumers
-                          << ") exceeds the maximum allowable amount ("
-                          << kMaxNumberConsumers
+                          << ") exceeds the maximum allowable amount (" << kMaxNumberConsumers
                           << ").",
             nConsumers <= kMaxNumberConsumers);
 
@@ -411,8 +408,9 @@ size_t Exchange::getTargetConsumer(const Document& input) {
         }
 
         if (elem.type() == BSONType::String && elem.str() == "hashed") {
-            kb << "" << BSONElementHasher::hash64(BSON("" << value).firstElement(),
-                                                  BSONElementHasher::DEFAULT_HASH_SEED);
+            kb << ""
+               << BSONElementHasher::hash64(BSON("" << value).firstElement(),
+                                            BSONElementHasher::DEFAULT_HASH_SEED);
         } else {
             kb << "" << value;
         }

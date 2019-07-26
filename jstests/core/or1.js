@@ -17,7 +17,6 @@ checkArrs = function(a, b) {
 };
 
 doTest = function() {
-
     t.save({_id: 0, a: 1});
     t.save({_id: 1, a: 2});
     t.save({_id: 2, b: 1});
@@ -43,11 +42,11 @@ doTest = function() {
     a1b2 = t.find({$or: [{a: 1}, {b: 2}]}).toArray();
     checkArrs(
         [
-          {_id: 0, a: 1},
-          {_id: 3, b: 2},
-          {_id: 4, a: 1, b: 1},
-          {_id: 5, a: 1, b: 2},
-          {_id: 7, a: 2, b: 2}
+            {_id: 0, a: 1},
+            {_id: 3, b: 2},
+            {_id: 4, a: 1, b: 1},
+            {_id: 5, a: 1, b: 2},
+            {_id: 7, a: 2, b: 2}
         ],
         a1b2);
 
@@ -56,7 +55,6 @@ doTest = function() {
     assert.eq(1, t.find({$or: [{a: {$in: [0, 1]}}]}).toArray().length);
     assert.eq(1, t.find({$or: [{b: {$in: [0, 1]}}]}).toArray().length);
     assert.eq(1, t.find({$or: [{a: {$in: [0, 1]}}, {b: {$in: [0, 1]}}]}).toArray().length);
-
 };
 
 doTest();

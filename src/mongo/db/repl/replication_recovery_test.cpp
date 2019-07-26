@@ -1051,9 +1051,7 @@ TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfi
 
     const auto txnOperations = BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns"
-                                               << testNs.toString()
-                                               << "o"
+                                               << "ns" << testNs.toString() << "o"
                                                << BSON("_id" << 1)));
     const auto prepareDate = Date_t::now();
     const auto prepareOp =
@@ -1128,9 +1126,7 @@ TEST_F(ReplicationRecoveryTest,
 
     const auto txnOperations = BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns"
-                                               << testNs.toString()
-                                               << "o"
+                                               << "ns" << testNs.toString() << "o"
                                                << BSON("_id" << 1)));
     const auto prepareDate = Date_t::now();
     const auto prepareOp =

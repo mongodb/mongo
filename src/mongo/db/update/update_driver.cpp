@@ -76,26 +76,21 @@ modifiertable::ModifierType validateMod(BSONElement mod) {
     uassert(
         ErrorCodes::FailedToParse,
         str::stream()
-            << "Unknown modifier: "
-            << mod.fieldName()
+            << "Unknown modifier: " << mod.fieldName()
             << ". Expected a valid update modifier or pipeline-style update specified as an array",
         modType != modifiertable::MOD_UNKNOWN);
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "Modifiers operate on fields but we found type "
-                          << typeName(mod.type())
-                          << " instead. For example: {$mod: {<field>: ...}}"
-                          << " not {"
-                          << mod
-                          << "}",
+                          << typeName(mod.type()) << " instead. For example: {$mod: {<field>: ...}}"
+                          << " not {" << mod << "}",
             mod.type() == BSONType::Object);
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "'" << mod.fieldName()
                           << "' is empty. You must specify a field like so: "
                              "{"
-                          << mod.fieldName()
-                          << ": {<field>: ...}}",
+                          << mod.fieldName() << ": {<field>: ...}}",
             !mod.embeddedObject().isEmpty());
 
     return modType;
@@ -134,8 +129,7 @@ bool parseUpdateExpression(
     for (const auto& arrayFilter : arrayFilters) {
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "The array filter for identifier '" << arrayFilter.first
-                              << "' was not used in the update "
-                              << updateExpr,
+                              << "' was not used in the update " << updateExpr,
                 foundIdentifiers.find(arrayFilter.first.toString()) != foundIdentifiers.end());
     }
 

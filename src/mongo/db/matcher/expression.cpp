@@ -95,4 +95,4 @@ void MatchExpression::addDependencies(DepsTracker* deps) const {
 
     _doAddDependencies(deps);
 }
-}
+}  // namespace mongo

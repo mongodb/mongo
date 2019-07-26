@@ -80,8 +80,7 @@ TEST(InternalSchemaObjectMatchExpression, AcceptsObjectsThatMatch) {
                                                       << "string"))));
     ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON("b"
                                                       << "string"
-                                                      << "c"
-                                                      << 1))));
+                                                      << "c" << 1))));
     ASSERT_FALSE(
         objMatch.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 1) << BSON("b"
                                                                            << "string")))));

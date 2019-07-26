@@ -120,8 +120,8 @@ Status ShardingEgressMetadataHook::_advanceConfigOpTimeFromShard(OperationContex
             if (opTime.is_initialized()) {
                 grid->advanceConfigOpTime(opCtx,
                                           opTime.get(),
-                                          str::stream() << "reply from shard " << shardId
-                                                        << " node");
+                                          str::stream()
+                                              << "reply from shard " << shardId << " node");
             }
         }
         return Status::OK();

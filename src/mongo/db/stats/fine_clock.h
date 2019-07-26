@@ -69,6 +69,6 @@ public:
         return diff;
     }
 };
-}
+}  // namespace mongo
 
 #endif  // DB_STATS_FINE_CLOCK_HEADER

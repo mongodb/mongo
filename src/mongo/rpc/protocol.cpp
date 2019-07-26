@@ -140,10 +140,7 @@ StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
         maxWireVersion >= std::numeric_limits<int>::max()) {
         return Status(ErrorCodes::IncompatibleServerVersion,
                       str::stream() << "Server min and max wire version have invalid values ("
-                                    << minWireVersion
-                                    << ","
-                                    << maxWireVersion
-                                    << ")");
+                                    << minWireVersion << "," << maxWireVersion << ")");
     }
 
     WireVersionInfo version{static_cast<int>(minWireVersion), static_cast<int>(maxWireVersion)};
@@ -176,11 +173,9 @@ Status validateWireVersion(const WireVersionInfo client, const WireVersionInfo s
     // Server may return bad data.
     if (server.minWireVersion > server.maxWireVersion) {
         return Status(ErrorCodes::IncompatibleServerVersion,
-                      str::stream() << "Server min and max wire version are incorrect ("
-                                    << server.minWireVersion
-                                    << ","
-                                    << server.maxWireVersion
-                                    << ")");
+                      str::stream()
+                          << "Server min and max wire version are incorrect ("
+                          << server.minWireVersion << "," << server.maxWireVersion << ")");
     }
 
     // Determine if the [min, max] tuples overlap.

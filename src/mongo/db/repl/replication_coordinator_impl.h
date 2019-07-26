@@ -546,7 +546,7 @@ private:
          * Loops continuously to kill all conflicting operations. And, aborts all stashed (inactive)
          * transactions.
          * Terminates once killSignaled is set true.
-        */
+         */
         void _killOpThreadFn();
 
         /*

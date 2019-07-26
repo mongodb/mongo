@@ -56,9 +56,8 @@ Status applyMaxCacheOverflowSizeGBParameter(WiredTigerMaxCacheOverflowSizeGBPara
     int ret = param._data.second->reconfigure(
         fmt::format("cache_overflow=(file_max={}M)", valueMB).c_str());
     if (ret != 0) {
-        string result =
-            (str::stream() << "WiredTiger reconfiguration failed with error code (" << ret << "): "
-                           << wiredtiger_strerror(ret));
+        string result = (str::stream() << "WiredTiger reconfiguration failed with error code ("
+                                       << ret << "): " << wiredtiger_strerror(ret));
         error() << result;
 
         return Status(ErrorCodes::BadValue, result);
@@ -91,9 +90,8 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
     invariant(_data.second);
     int ret = _data.second->reconfigure(str.c_str());
     if (ret != 0) {
-        string result =
-            (str::stream() << "WiredTiger reconfiguration failed with error code (" << ret << "): "
-                           << wiredtiger_strerror(ret));
+        string result = (str::stream() << "WiredTiger reconfiguration failed with error code ("
+                                       << ret << "): " << wiredtiger_strerror(ret));
         error() << result;
 
         return Status(ErrorCodes::BadValue, result);

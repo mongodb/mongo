@@ -73,10 +73,10 @@ TEST(ParsedDistinctTest, ConvertToAggregationNoQuery) {
     std::vector<BSONObj> expectedPipeline{
         BSON("$unwind" << BSON("path"
                                << "$x"
-                               << "preserveNullAndEmptyArrays"
-                               << true)),
-        BSON("$group" << BSON("_id" << BSONNULL << "distinct" << BSON("$addToSet"
-                                                                      << "$x")))};
+                               << "preserveNullAndEmptyArrays" << true)),
+        BSON("$group" << BSON("_id" << BSONNULL << "distinct"
+                                    << BSON("$addToSet"
+                                            << "$x")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),
@@ -113,23 +113,21 @@ TEST(ParsedDistinctTest, ConvertToAggregationDottedPathNoQuery) {
     std::vector<BSONObj> expectedPipeline{
         BSON("$unwind" << BSON("path"
                                << "$x"
-                               << "preserveNullAndEmptyArrays"
-                               << true)),
+                               << "preserveNullAndEmptyArrays" << true)),
         BSON("$unwind" << BSON("path"
                                << "$x.y"
-                               << "preserveNullAndEmptyArrays"
-                               << true)),
+                               << "preserveNullAndEmptyArrays" << true)),
         BSON("$unwind" << BSON("path"
                                << "$x.y.z"
-                               << "preserveNullAndEmptyArrays"
-                               << true)),
+                               << "preserveNullAndEmptyArrays" << true)),
         BSON("$match" << BSON("x" << BSON("$_internalSchemaType"
                                           << "object")
                                   << "x.y"
                                   << BSON("$_internalSchemaType"
                                           << "object"))),
-        BSON("$group" << BSON("_id" << BSONNULL << "distinct" << BSON("$addToSet"
-                                                                      << "$x.y.z")))};
+        BSON("$group" << BSON("_id" << BSONNULL << "distinct"
+                                    << BSON("$addToSet"
+                                            << "$x.y.z")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),
@@ -159,9 +157,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
                                                  << "secondary")
                                          << "comment"
                                          << "aComment"
-                                         << "maxTimeMS"
-                                         << 100
-                                         << "$db"
+                                         << "maxTimeMS" << 100 << "$db"
                                          << "testdb"),
                                     ExtensionsCallbackNoop(),
                                     !isExplain);
@@ -190,10 +186,10 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
     std::vector<BSONObj> expectedPipeline{
         BSON("$unwind" << BSON("path"
                                << "$x"
-                               << "preserveNullAndEmptyArrays"
-                               << true)),
-        BSON("$group" << BSON("_id" << BSONNULL << "distinct" << BSON("$addToSet"
-                                                                      << "$x")))};
+                               << "preserveNullAndEmptyArrays" << true)),
+        BSON("$group" << BSON("_id" << BSONNULL << "distinct"
+                                    << BSON("$addToSet"
+                                            << "$x")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),
@@ -232,10 +228,10 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithQuery) {
         BSON("$match" << BSON("z" << 7)),
         BSON("$unwind" << BSON("path"
                                << "$y"
-                               << "preserveNullAndEmptyArrays"
-                               << true)),
-        BSON("$group" << BSON("_id" << BSONNULL << "distinct" << BSON("$addToSet"
-                                                                      << "$y")))};
+                               << "preserveNullAndEmptyArrays" << true)),
+        BSON("$group" << BSON("_id" << BSONNULL << "distinct"
+                                    << BSON("$addToSet"
+                                            << "$y")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),
@@ -269,10 +265,10 @@ TEST(ParsedDistinctTest, ExplainNotIncludedWhenConvertingToAggregationCommand) {
     std::vector<BSONObj> expectedPipeline{
         BSON("$unwind" << BSON("path"
                                << "$x"
-                               << "preserveNullAndEmptyArrays"
-                               << true)),
-        BSON("$group" << BSON("_id" << BSONNULL << "distinct" << BSON("$addToSet"
-                                                                      << "$x")))};
+                               << "preserveNullAndEmptyArrays" << true)),
+        BSON("$group" << BSON("_id" << BSONNULL << "distinct"
+                                    << BSON("$addToSet"
+                                            << "$x")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),

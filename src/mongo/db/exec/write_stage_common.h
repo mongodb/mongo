@@ -54,5 +54,5 @@ bool ensureStillMatches(const Collection* collection,
                         WorkingSet* ws,
                         WorkingSetID id,
                         const CanonicalQuery* cq);
-}
-}
+}  // namespace write_stage_common
+}  // namespace mongo

@@ -336,8 +336,7 @@ public:
         explicit Waiter(ProducerState& x, size_t wants) : _x(x) {
             uassert(ErrorCodes::ProducerConsumerQueueProducerQueueDepthExceeded,
                     str::stream() << "ProducerConsumerQueue producer queue depth exceeded, "
-                                  << (_x._producerQueueDepth + wants)
-                                  << " > "
+                                  << (_x._producerQueueDepth + wants) << " > "
                                   << _x._maxProducerQueueDepth,
                     _x._maxProducerQueueDepth == std::numeric_limits<size_t>::max() ||
                         _x._producerQueueDepth + wants <= _x._maxProducerQueueDepth);
@@ -473,8 +472,7 @@ public:
             auto cost = _invokeCostFunc(t, lk);
             uassert(ErrorCodes::ProducerConsumerQueueBatchTooLarge,
                     str::stream() << "cost of item (" << cost
-                                  << ") larger than maximum queue size ("
-                                  << _options.maxQueueDepth
+                                  << ") larger than maximum queue size (" << _options.maxQueueDepth
                                   << ")",
                     cost <= _options.maxQueueDepth);
 
@@ -506,8 +504,7 @@ public:
 
             uassert(ErrorCodes::ProducerConsumerQueueBatchTooLarge,
                     str::stream() << "cost of items in batch (" << cost
-                                  << ") larger than maximum queue size ("
-                                  << _options.maxQueueDepth
+                                  << ") larger than maximum queue size (" << _options.maxQueueDepth
                                   << ")",
                     cost <= _options.maxQueueDepth);
 

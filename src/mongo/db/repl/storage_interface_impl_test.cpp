@@ -69,11 +69,7 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 BSONObj makeIdIndexSpec(const NamespaceString& nss) {
     return BSON("ns" << nss.toString() << "name"
                      << "_id_"
-                     << "key"
-                     << BSON("_id" << 1)
-                     << "unique"
-                     << true
-                     << "v"
+                     << "key" << BSON("_id" << 1) << "unique" << true << "v"
                      << static_cast<int>(kIndexVersion));
 }
 
@@ -299,8 +295,7 @@ void _assertRollbackIDDocument(OperationContext* opCtx, int id) {
         opCtx,
         NamespaceString(StorageInterfaceImpl::kDefaultRollbackIdNamespace),
         {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId
-                    << StorageInterfaceImpl::kRollbackIdFieldName
-                    << id)});
+                    << StorageInterfaceImpl::kRollbackIdFieldName << id)});
 }
 
 TEST_F(StorageInterfaceImplTest, RollbackIdInitializesIncrementsAndReadsProperly) {
@@ -380,8 +375,7 @@ TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfRollbackIDIsNotI
 
     std::vector<TimestampedBSONObj> badDoc = {
         TimestampedBSONObj{BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId
-                                      << StorageInterfaceImpl::kRollbackIdFieldName
-                                      << "bad id"),
+                                      << StorageInterfaceImpl::kRollbackIdFieldName << "bad id"),
                            Timestamp::min()}};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(badDoc)));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, storage.getRollbackID(opCtx).getStatus());
@@ -625,8 +619,7 @@ TEST_F(StorageInterfaceImplTest, DestroyingUncommittedCollectionBulkLoaderDropsI
     auto nss = makeNamespace(_agent);
     std::vector<BSONObj> indexes = {BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
                                              << "x_1"
-                                             << "ns"
-                                             << nss.ns())};
+                                             << "ns" << nss.ns())};
     auto destroyLoaderFn = [](std::unique_ptr<CollectionBulkLoader> loader) {
         // Destroy 'loader' by letting it go out of scope.
     };
@@ -650,8 +643,7 @@ TEST_F(StorageInterfaceImplTest,
     auto nss = makeNamespace(_agent);
     std::vector<BSONObj> indexes = {BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
                                              << "x_1"
-                                             << "ns"
-                                             << nss.ns())};
+                                             << "ns" << nss.ns())};
     auto destroyLoaderFn = [](std::unique_ptr<CollectionBulkLoader> loader) {
         // Destroy 'loader' in a new thread that does not have a Client.
         stdx::thread([&loader]() { loader.reset(); }).join();
@@ -914,9 +906,7 @@ TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsIndexOptionsConflictIfIndex
     auto nss = makeNamespace(_agent);
     std::vector<BSONObj> indexes = {BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
                                              << "x_1"
-                                             << "ns"
-                                             << nss.ns()
-                                             << "partialFilterExpression"
+                                             << "ns" << nss.ns() << "partialFilterExpression"
                                              << BSON("y" << 1))};
     auto loader = unittest::assertGet(storage.createCollectionForBulkLoading(
         nss, generateOptionsWithUuid(), makeIdIndexSpec(nss), indexes));
@@ -975,8 +965,8 @@ void _assertDocumentsEqual(const StatusWith<std::vector<BSONObj>>& statusWithDoc
                            const std::vector<BSONObj>& expectedDocs) {
     const auto actualDocs = unittest::assertGet(statusWithDocs);
     auto iter = actualDocs.cbegin();
-    std::string msg = str::stream() << "expected: " << _toString(expectedDocs)
-                                    << "; actual: " << _toString(actualDocs);
+    std::string msg = str::stream()
+        << "expected: " << _toString(expectedDocs) << "; actual: " << _toString(actualDocs);
     for (const auto& doc : expectedDocs) {
         ASSERT_TRUE(iter != actualDocs.cend()) << msg;
         ASSERT_BSONOBJ_EQ(doc, *(iter++));
@@ -2264,9 +2254,7 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenDatab
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
     ASSERT_EQUALS(std::string(str::stream()
                               << "Database [nosuchdb] not found. Unable to delete documents in "
-                              << nss.ns()
-                              << " using filter "
-                              << filter),
+                              << nss.ns() << " using filter " << filter),
                   status.reason());
 }
 
@@ -2362,9 +2350,7 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenColle
     ASSERT_EQUALS(std::string(
                       str::stream()
                       << "Collection [mydb.wrongColl] not found. Unable to delete documents in "
-                      << wrongColl.ns()
-                      << " using filter "
-                      << filter),
+                      << wrongColl.ns() << " using filter " << filter),
                   status.reason());
 }
 
@@ -2484,8 +2470,7 @@ TEST_F(StorageInterfaceImplTest,
     CollectionOptions options = generateOptionsWithUuid();
     options.collation = BSON("locale"
                              << "en_US"
-                             << "strength"
-                             << 2);
+                             << "strength" << 2);
     ASSERT_OK(storage.createCollection(opCtx, nss, options));
 
     auto doc1 = BSON("_id" << 1 << "x"
@@ -2660,9 +2645,8 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeySucceeds) {
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
 
     auto indexName = "a_b_1";
-    auto indexSpec =
-        BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a.b" << 1) << "v"
-                    << static_cast<int>(kIndexVersion));
+    auto indexSpec = BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a.b" << 1)
+                                 << "v" << static_cast<int>(kIndexVersion));
     ASSERT_EQUALS(_createIndexOnEmptyCollection(opCtx, nss, indexSpec), 2);
 
     MultikeyPaths paths = {{1}};

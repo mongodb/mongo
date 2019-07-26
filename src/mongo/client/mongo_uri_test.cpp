@@ -828,7 +828,8 @@ TEST(MongoURI, srvRecordTest) {
              {"localhost.sub.test.build.10gen.cc", 27017},
          },
          {
-             {"ssl", "true"}, {"replicaSet", "repl0"},
+             {"ssl", "true"},
+             {"replicaSet", "repl0"},
          },
          success},
 
@@ -842,7 +843,8 @@ TEST(MongoURI, srvRecordTest) {
              {"localhost.sub.test.build.10gen.cc", 27017},
          },
          {
-             {"ssl", "true"}, {"replicaSet", "repl0"},
+             {"ssl", "true"},
+             {"replicaSet", "repl0"},
          },
          success},
 
@@ -988,19 +990,19 @@ TEST(MongoURI, srvRecordTest) {
     for (const auto& test : tests) {
         auto rs = MongoURI::parse(test.uri);
         if (test.expectation == failure) {
-            ASSERT_FALSE(rs.getStatus().isOK()) << "Failing URI: " << test.uri
-                                                << " data on line: " << test.lineNumber;
+            ASSERT_FALSE(rs.getStatus().isOK())
+                << "Failing URI: " << test.uri << " data on line: " << test.lineNumber;
             continue;
         }
         ASSERT_OK(rs.getStatus()) << "Failed on URI: " << test.uri
                                   << " data on line: " << test.lineNumber;
         auto rv = rs.getValue();
-        ASSERT_EQ(rv.getUser(), test.user) << "Failed on URI: " << test.uri
-                                           << " data on line: " << test.lineNumber;
-        ASSERT_EQ(rv.getPassword(), test.password) << "Failed on URI: " << test.uri
-                                                   << " data on line : " << test.lineNumber;
-        ASSERT_EQ(rv.getDatabase(), test.database) << "Failed on URI: " << test.uri
-                                                   << " data on line : " << test.lineNumber;
+        ASSERT_EQ(rv.getUser(), test.user)
+            << "Failed on URI: " << test.uri << " data on line: " << test.lineNumber;
+        ASSERT_EQ(rv.getPassword(), test.password)
+            << "Failed on URI: " << test.uri << " data on line : " << test.lineNumber;
+        ASSERT_EQ(rv.getDatabase(), test.database)
+            << "Failed on URI: " << test.uri << " data on line : " << test.lineNumber;
         compareOptions(test.lineNumber, test.uri, rv.getOptions(), test.options);
 
         std::vector<HostAndPort> hosts(begin(rv.getServers()), end(rv.getServers()));
@@ -1009,9 +1011,9 @@ TEST(MongoURI, srvRecordTest) {
         std::sort(begin(expectedHosts), end(expectedHosts));
 
         for (std::size_t i = 0; i < std::min(hosts.size(), expectedHosts.size()); ++i) {
-            ASSERT_EQ(hosts[i], expectedHosts[i]) << "Failed on URI: " << test.uri
-                                                  << " at host number" << i
-                                                  << " data on line: " << test.lineNumber;
+            ASSERT_EQ(hosts[i], expectedHosts[i])
+                << "Failed on URI: " << test.uri << " at host number" << i
+                << " data on line: " << test.lineNumber;
         }
         ASSERT_TRUE(hosts.size() == expectedHosts.size())
             << "Failed on URI: " << test.uri << " Found " << hosts.size() << " hosts, expected "

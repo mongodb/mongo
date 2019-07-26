@@ -137,8 +137,8 @@ Status WriteConcernErrorDetail::toStatus() const {
         return _status;
     }
 
-    return _status.withReason(
-        str::stream() << _status.reason() << "; Error details: " << _errInfo.toString());
+    return _status.withReason(str::stream()
+                              << _status.reason() << "; Error details: " << _errInfo.toString());
 }
 
 void WriteConcernErrorDetail::setErrInfo(const BSONObj& errInfo) {

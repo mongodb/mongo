@@ -345,9 +345,7 @@ public:
                 opCtx, dbname, shardedCommand, nss.ns(), q, collation, &mrCommandResults);
         } catch (DBException& e) {
             e.addContext(str::stream() << "could not run map command on all shards for ns "
-                                       << nss.ns()
-                                       << " and query "
-                                       << q);
+                                       << nss.ns() << " and query " << q);
             throw;
         }
 
@@ -378,8 +376,8 @@ public:
 
                 if (!ok) {
                     // At this point we will return
-                    errmsg = str::stream() << "MR parallel processing failed: "
-                                           << singleResult.toString();
+                    errmsg = str::stream()
+                        << "MR parallel processing failed: " << singleResult.toString();
                     continue;
                 }
 
@@ -498,11 +496,11 @@ public:
                     // the output collection exists and is unsharded, fail because we should not go
                     // from unsharded to sharded.
                     BSONObj listCollsCmdResponse;
-                    ok = conn->runCommand(
-                        outDB,
-                        BSON("listCollections" << 1 << "filter"
+                    ok = conn->runCommand(outDB,
+                                          BSON("listCollections"
+                                               << 1 << "filter"
                                                << BSON("name" << outputCollNss.coll())),
-                        listCollsCmdResponse);
+                                          listCollsCmdResponse);
                     BSONObj cursorObj = listCollsCmdResponse.getObjectField("cursor");
                     BSONObj collections = cursorObj["firstBatch"].Obj();
 
@@ -575,9 +573,7 @@ public:
                     ok = true;
                 } catch (DBException& e) {
                     e.addContext(str::stream() << "could not run final reduce on all shards for "
-                                               << nss.ns()
-                                               << ", output "
-                                               << outputCollNss.ns());
+                                               << nss.ns() << ", output " << outputCollNss.ns());
                     throw;
                 }
 

@@ -95,9 +95,7 @@ TEST_F(DocumentSourceLookUpTest, PreservesParentPipelineLetVariables) {
     auto docSource = DocumentSourceLookUp::createFromBson(
         BSON("$lookup" << BSON("from"
                                << "coll"
-                               << "pipeline"
-                               << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                               << "as"
+                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
                                << "as"))
             .firstElement(),
         expCtx);
@@ -117,9 +115,7 @@ TEST_F(DocumentSourceLookUpTest, AcceptsPipelineSyntax) {
     auto docSource = DocumentSourceLookUp::createFromBson(
         BSON("$lookup" << BSON("from"
                                << "coll"
-                               << "pipeline"
-                               << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                               << "as"
+                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
                                << "as"))
             .firstElement(),
         expCtx);
@@ -229,17 +225,17 @@ TEST_F(DocumentSourceLookUpTest, RejectLookupWhenDepthLimitIsExceeded) {
 
     expCtx->subPipelineDepth = DocumentSourceLookUp::kMaxSubPipelineDepth;
 
-    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(
-                           BSON("$lookup" << BSON("from"
-                                                  << "coll"
-                                                  << "pipeline"
-                                                  << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                                                  << "as"
-                                                  << "as"))
-                               .firstElement(),
-                           expCtx),
-                       AssertionException,
-                       ErrorCodes::MaxSubPipelineDepthExceeded);
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from"
+                                   << "coll"
+                                   << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                   << "as"
+                                   << "as"))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        ErrorCodes::MaxSubPipelineDepthExceeded);
 }
 
 TEST_F(ReplDocumentSourceLookUpTest, RejectsPipelineWithChangeStreamStage) {
@@ -286,8 +282,7 @@ TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenPipelineIsSpec
         auto lookupStage = DocumentSourceLookUp::createFromBson(
             BSON("$lookup" << BSON("from"
                                    << "coll"
-                                   << "pipeline"
-                                   << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                   << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
                                    << "localField"
                                    << "a"
                                    << "foreignField"
@@ -298,8 +293,7 @@ TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenPipelineIsSpec
             expCtx);
 
         FAIL(str::stream()
-             << "Expected creation of the "
-             << lookupStage->getSourceName()
+             << "Expected creation of the " << lookupStage->getSourceName()
              << " stage to uassert on mix of localField/foreignField and pipeline options");
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ErrorCodes::FailedToParse, ex.code());
@@ -335,50 +329,50 @@ TEST_F(DocumentSourceLookUpTest, RejectsInvalidLetVariableName) {
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
-    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(
-                           BSON("$lookup" << BSON("from"
-                                                  << "coll"
-                                                  << "let"
-                                                  << BSON(""  // Empty variable name.
-                                                          << "$a")
-                                                  << "pipeline"
-                                                  << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                                                  << "as"
-                                                  << "as"))
-                               .firstElement(),
-                           expCtx),
-                       AssertionException,
-                       16866);
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from"
+                                   << "coll"
+                                   << "let"
+                                   << BSON(""  // Empty variable name.
+                                           << "$a")
+                                   << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                   << "as"
+                                   << "as"))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        16866);
 
-    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(
-                           BSON("$lookup" << BSON("from"
-                                                  << "coll"
-                                                  << "let"
-                                                  << BSON("^invalidFirstChar"
-                                                          << "$a")
-                                                  << "pipeline"
-                                                  << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                                                  << "as"
-                                                  << "as"))
-                               .firstElement(),
-                           expCtx),
-                       AssertionException,
-                       16867);
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from"
+                                   << "coll"
+                                   << "let"
+                                   << BSON("^invalidFirstChar"
+                                           << "$a")
+                                   << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                   << "as"
+                                   << "as"))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        16867);
 
-    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(
-                           BSON("$lookup" << BSON("from"
-                                                  << "coll"
-                                                  << "let"
-                                                  << BSON("contains.invalidChar"
-                                                          << "$a")
-                                                  << "pipeline"
-                                                  << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                                                  << "as"
-                                                  << "as"))
-                               .firstElement(),
-                           expCtx),
-                       AssertionException,
-                       16868);
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from"
+                                   << "coll"
+                                   << "let"
+                                   << BSON("contains.invalidChar"
+                                           << "$a")
+                                   << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                   << "as"
+                                   << "as"))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        16868);
 }
 
 TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {
@@ -393,9 +387,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {
                                << "let"
                                << BSON("local_x"
                                        << "$x")
-                               << "pipeline"
-                               << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
-                               << "as"
+                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
                                << "as"))
             .firstElement(),
         expCtx);
@@ -729,8 +721,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheNonCorrelatedSubPipelinePrefix) {
 
     auto expectedPipe = fromjson(
         str::stream() << "[{mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
-                      << sequentialCacheStageObj()
-                      << ", {$addFields: {varField: {$const: 5} }}]");
+                      << sequentialCacheStageObj() << ", {$addFields: {varField: {$const: 5} }}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }
@@ -914,8 +905,7 @@ TEST_F(DocumentSourceLookUpTest,
         str::stream() << "[{mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
                          "{$lookup: {from: 'coll', as: 'subas', let: {var1: '$y'}, "
                          "pipeline: [{$match: {$expr: { $eq: ['$z', '$$var1']}}}]}}, "
-                      << sequentialCacheStageObj()
-                      << ", {$addFields: {varField: {$const: 5} }}]");
+                      << sequentialCacheStageObj() << ", {$addFields: {varField: {$const: 5} }}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }
@@ -947,8 +937,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheEntirePipelineIfNonCorrelated) {
         << "[{mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, {$lookup: {from: "
            "'coll', as: 'subas', let: {}, pipeline: [{$match: {y: 5}}]}}, {$addFields: "
            "{constField: {$const: 5}}}, "
-        << sequentialCacheStageObj()
-        << "]");
+        << sequentialCacheStageObj() << "]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }

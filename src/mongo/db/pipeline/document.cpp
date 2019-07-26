@@ -288,8 +288,7 @@ BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Document& d
 void Document::toBson(BSONObjBuilder* builder, size_t recursionLevel) const {
     uassert(ErrorCodes::Overflow,
             str::stream() << "cannot convert document to BSON because it exceeds the limit of "
-                          << BSONDepth::getMaxAllowableDepth()
-                          << " levels of nesting",
+                          << BSONDepth::getMaxAllowableDepth() << " levels of nesting",
             recursionLevel <= BSONDepth::getMaxAllowableDepth());
 
     for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
@@ -587,4 +586,4 @@ Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeS
 
     return doc.freeze();
 }
-}
+}  // namespace mongo

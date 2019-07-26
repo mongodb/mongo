@@ -112,5 +112,5 @@ private:
     const FTSQueryImpl _query;
     const FTSSpec _spec;
 };
-}
-}
+}  // namespace fts
+}  // namespace mongo

@@ -231,8 +231,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
                 "Secondary loops not contained by first exterior loop - "
                 "secondary loops must be holes: "
                 << coordinateElt.toString(false)
-                << " first loop: "
-                << elem.Obj().firstElement().toString(false));
+                << " first loop: " << elem.Obj().firstElement().toString(false));
         }
     }
 

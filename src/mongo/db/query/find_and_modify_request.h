@@ -117,13 +117,13 @@ public:
     //
 
     /**
-    * Sets the filter to find a document.
-    */
+     * Sets the filter to find a document.
+     */
     void setQuery(BSONObj query);
 
     /**
-    * Sets the update object that specifies how a document gets updated.
-    */
+     * Sets the update object that specifies how a document gets updated.
+     */
     void setUpdateObj(BSONObj updateObj);
 
     /**
@@ -134,8 +134,8 @@ public:
     void setShouldReturnNew(bool shouldReturnNew);
 
     /**
-    * Sets a flag whether the statement performs an upsert.
-    */
+     * Sets a flag whether the statement performs an upsert.
+     */
     void setUpsert(bool upsert);
 
     //
@@ -210,4 +210,4 @@ private:
     // Holds value when performing an update request and none when a remove request.
     boost::optional<write_ops::UpdateModification> _update;
 };
-}
+}  // namespace mongo

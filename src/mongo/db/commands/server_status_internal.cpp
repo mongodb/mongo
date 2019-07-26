@@ -83,4 +83,4 @@ void MetricTree::appendTo(BSONObjBuilder& b) const {
         bb.done();
     }
 }
-}
+}  // namespace mongo

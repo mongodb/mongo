@@ -5,101 +5,97 @@
 //
 // @tags: [requires_persistence, requires_majority_read_concern]
 (function() {
-    "use strict";
+"use strict";
 
-    // Skip db hash check because secondary restarted as standalone.
-    TestData.skipCheckDBHashes = true;
+// Skip db hash check because secondary restarted as standalone.
+TestData.skipCheckDBHashes = true;
 
-    var rst = new ReplSetTest({
-        name: "name",
-        nodes: 2,
-        oplogSize: 500,
-    });
+var rst = new ReplSetTest({
+    name: "name",
+    nodes: 2,
+    oplogSize: 500,
+});
 
-    rst.startSet();
-    var conf = rst.getReplSetConfig();
-    conf.members[1].votes = 0;
-    conf.members[1].priority = 0;
-    printjson(conf);
-    rst.initiate(conf);
+rst.startSet();
+var conf = rst.getReplSetConfig();
+conf.members[1].votes = 0;
+conf.members[1].priority = 0;
+printjson(conf);
+rst.initiate(conf);
 
-    var primary = rst.getPrimary();  // Waits for PRIMARY state.
-    var slave = rst.nodes[1];
+var primary = rst.getPrimary();  // Waits for PRIMARY state.
+var slave = rst.nodes[1];
 
-    // Stop replication on the secondary.
-    assert.commandWorked(
-        slave.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}));
+// Stop replication on the secondary.
+assert.commandWorked(slave.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}));
 
-    // Prime the main collection.
-    primary.getCollection("test.coll").insert({_id: -1});
+// Prime the main collection.
+primary.getCollection("test.coll").insert({_id: -1});
 
-    // Start a w:2 write that will block until replication is resumed.
-    var waitForReplStart = startParallelShell(function() {
-        printjson(assert.writeOK(
-            db.getCollection('side').insert({}, {writeConcern: {w: 2, wtimeout: 30 * 60 * 1000}})));
-    }, primary.host.split(':')[1]);
+// Start a w:2 write that will block until replication is resumed.
+var waitForReplStart = startParallelShell(function() {
+    printjson(assert.writeOK(
+        db.getCollection('side').insert({}, {writeConcern: {w: 2, wtimeout: 30 * 60 * 1000}})));
+}, primary.host.split(':')[1]);
 
-    // Insert a lot of data in increasing order to test.coll.
-    var op = primary.getCollection("test.coll").initializeUnorderedBulkOp();
-    for (var i = 0; i < 1000 * 1000; i++) {
-        op.insert({_id: i});
+// Insert a lot of data in increasing order to test.coll.
+var op = primary.getCollection("test.coll").initializeUnorderedBulkOp();
+for (var i = 0; i < 1000 * 1000; i++) {
+    op.insert({_id: i});
+}
+assert.writeOK(op.execute());
+
+// Resume replication and wait for ops to start replicating, then do a clean shutdown on the
+// secondary.
+assert.commandWorked(slave.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
+waitForReplStart();
+sleep(100);  // wait a bit to increase the chances of killing mid-batch.
+rst.stop(1);
+
+// Restart the secondary as a standalone node.
+var options = slave.savedOptions;
+options.noCleanData = true;
+delete options.replSet;
+
+var storageEngine = jsTest.options().storageEngine || "wiredTiger";
+if (storageEngine === "wiredTiger") {
+    options.setParameter = options.setParameter || {};
+    options.setParameter.recoverFromOplogAsStandalone = true;
+}
+
+var conn = MongoRunner.runMongod(options);
+assert.neq(null, conn, "secondary failed to start");
+
+// Following clean shutdown of a node, the oplog must exactly match the applied operations.
+// Additionally, the begin field must not be in the minValid document, the ts must match the
+// top of the oplog (SERVER-25353), and the oplogTruncateAfterPoint must be null (SERVER-7200
+// and SERVER-25071).
+var oplogDoc =
+    conn.getCollection('local.oplog.rs').find({ns: 'test.coll'}).sort({$natural: -1}).limit(1)[0];
+var collDoc = conn.getCollection('test.coll').find().sort({_id: -1}).limit(1)[0];
+var minValidDoc =
+    conn.getCollection('local.replset.minvalid').find().sort({$natural: -1}).limit(1)[0];
+var oplogTruncateAfterPointDoc =
+    conn.getCollection('local.replset.oplogTruncateAfterPoint').find().limit(1)[0];
+printjson({
+    oplogDoc: oplogDoc,
+    collDoc: collDoc,
+    minValidDoc: minValidDoc,
+    oplogTruncateAfterPointDoc: oplogTruncateAfterPointDoc
+});
+try {
+    assert.eq(collDoc._id, oplogDoc.o._id);
+    assert(!('begin' in minValidDoc), 'begin in minValidDoc');
+    if (storageEngine !== "wiredTiger") {
+        assert.eq(minValidDoc.ts, oplogDoc.ts);
     }
-    assert.writeOK(op.execute());
+    assert.eq(oplogTruncateAfterPointDoc.oplogTruncateAfterPoint, Timestamp());
+} catch (e) {
+    // TODO remove once SERVER-25777 is resolved.
+    jsTest.log("Look above and make sure clean shutdown finished without resorting to SIGKILL." +
+               "\nUnfortunately that currently doesn't fail the test.");
+    throw e;
+}
 
-    // Resume replication and wait for ops to start replicating, then do a clean shutdown on the
-    // secondary.
-    assert.commandWorked(slave.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
-    waitForReplStart();
-    sleep(100);  // wait a bit to increase the chances of killing mid-batch.
-    rst.stop(1);
-
-    // Restart the secondary as a standalone node.
-    var options = slave.savedOptions;
-    options.noCleanData = true;
-    delete options.replSet;
-
-    var storageEngine = jsTest.options().storageEngine || "wiredTiger";
-    if (storageEngine === "wiredTiger") {
-        options.setParameter = options.setParameter || {};
-        options.setParameter.recoverFromOplogAsStandalone = true;
-    }
-
-    var conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, "secondary failed to start");
-
-    // Following clean shutdown of a node, the oplog must exactly match the applied operations.
-    // Additionally, the begin field must not be in the minValid document, the ts must match the
-    // top of the oplog (SERVER-25353), and the oplogTruncateAfterPoint must be null (SERVER-7200
-    // and SERVER-25071).
-    var oplogDoc = conn.getCollection('local.oplog.rs')
-                       .find({ns: 'test.coll'})
-                       .sort({$natural: -1})
-                       .limit(1)[0];
-    var collDoc = conn.getCollection('test.coll').find().sort({_id: -1}).limit(1)[0];
-    var minValidDoc =
-        conn.getCollection('local.replset.minvalid').find().sort({$natural: -1}).limit(1)[0];
-    var oplogTruncateAfterPointDoc =
-        conn.getCollection('local.replset.oplogTruncateAfterPoint').find().limit(1)[0];
-    printjson({
-        oplogDoc: oplogDoc,
-        collDoc: collDoc,
-        minValidDoc: minValidDoc,
-        oplogTruncateAfterPointDoc: oplogTruncateAfterPointDoc
-    });
-    try {
-        assert.eq(collDoc._id, oplogDoc.o._id);
-        assert(!('begin' in minValidDoc), 'begin in minValidDoc');
-        if (storageEngine !== "wiredTiger") {
-            assert.eq(minValidDoc.ts, oplogDoc.ts);
-        }
-        assert.eq(oplogTruncateAfterPointDoc.oplogTruncateAfterPoint, Timestamp());
-    } catch (e) {
-        // TODO remove once SERVER-25777 is resolved.
-        jsTest.log(
-            "Look above and make sure clean shutdown finished without resorting to SIGKILL." +
-            "\nUnfortunately that currently doesn't fail the test.");
-        throw e;
-    }
-
-    rst.stopSet();
+rst.stopSet();
 })();

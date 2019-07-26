@@ -189,16 +189,15 @@ Status AbstractAsyncComponent::_scheduleWorkAtAndSaveHandle_inlock(
     const std::string& name) {
     invariant(handle);
     if (_isShuttingDown_inlock()) {
-        return Status(
-            ErrorCodes::CallbackCanceled,
-            str::stream() << "failed to schedule work " << name << " at " << when.toString() << ": "
-                          << _componentName
-                          << " is shutting down");
+        return Status(ErrorCodes::CallbackCanceled,
+                      str::stream()
+                          << "failed to schedule work " << name << " at " << when.toString() << ": "
+                          << _componentName << " is shutting down");
     }
     auto result = _executor->scheduleWorkAt(when, std::move(work));
     if (!result.isOK()) {
-        return result.getStatus().withContext(
-            str::stream() << "failed to schedule work " << name << " at " << when.toString());
+        return result.getStatus().withContext(str::stream() << "failed to schedule work " << name
+                                                            << " at " << when.toString());
     }
     *handle = result.getValue();
     return Status::OK();

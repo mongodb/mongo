@@ -85,4 +85,4 @@ Value DocumentSourceIndexStats::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return Value(DOC(getSourceName() << Document()));
 }
-}
+}  // namespace mongo

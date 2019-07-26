@@ -434,4 +434,4 @@ TEST(GeoParser, parseGeometryCollection) {
         ASSERT_TRUE(gc.supportsContains());
     }
 }
-}
+}  // namespace

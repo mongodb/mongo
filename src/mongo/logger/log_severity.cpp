@@ -46,7 +46,11 @@ constexpr auto infoSeverityString = "info"_sd;
 constexpr auto debugSeverityString = "debug"_sd;
 
 constexpr StringData kDebugLevelStrings[LogSeverity::kMaxDebugLevel] = {
-    "D1"_sd, "D2"_sd, "D3"_sd, "D4"_sd, "D5"_sd,
+    "D1"_sd,
+    "D2"_sd,
+    "D3"_sd,
+    "D4"_sd,
+    "D5"_sd,
 };
 
 }  // namespace

@@ -43,10 +43,10 @@
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
-using mongo::getGlobalFailPointRegistry;
 using mongo::BSONObj;
 using mongo::FailPoint;
 using mongo::FailPointEnableBlock;
+using mongo::getGlobalFailPointRegistry;
 namespace stdx = mongo::stdx;
 
 namespace mongo_test {
@@ -398,8 +398,7 @@ TEST(FailPoint, parseBSONInvalidDataFails) {
 TEST(FailPoint, parseBSONValidDataSucceeds) {
     auto swTuple = FailPoint::parseBSON(BSON("mode"
                                              << "alwaysOn"
-                                             << "data"
-                                             << BSON("a" << 1)));
+                                             << "data" << BSON("a" << 1)));
     ASSERT_TRUE(swTuple.isOK());
 }
 
@@ -448,4 +447,4 @@ TEST(FailPoint, FailPointBlockIfBasicTest) {
         ASSERT(!"shouldn't get here");
     }
 }
-}
+}  // namespace mongo_test

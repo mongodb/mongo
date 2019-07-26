@@ -12,7 +12,6 @@ load("./jstests/replsets/rslib.js");
  */
 var multversionInitialSyncTest = function(
     name, replSetVersion, newNodeVersion, configSettings, fcv) {
-
     var nodes = {n1: {binVersion: replSetVersion}, n2: {binVersion: replSetVersion}};
 
     jsTestLog("Starting up a two-node '" + replSetVersion + "' version replica set.");

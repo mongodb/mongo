@@ -61,8 +61,8 @@ std::string MultikeyPathTracker::dumpMultikeyPaths(const MultikeyPaths& multikey
 void MultikeyPathTracker::mergeMultikeyPaths(MultikeyPaths* toMergeInto,
                                              const MultikeyPaths& newPaths) {
     invariant(toMergeInto->size() == newPaths.size(),
-              str::stream() << "toMergeInto: " << dumpMultikeyPaths(*toMergeInto) << "; newPaths: "
-                            << dumpMultikeyPaths(newPaths));
+              str::stream() << "toMergeInto: " << dumpMultikeyPaths(*toMergeInto)
+                            << "; newPaths: " << dumpMultikeyPaths(newPaths));
     for (auto idx = std::size_t(0); idx < toMergeInto->size(); ++idx) {
         toMergeInto->at(idx).insert(newPaths[idx].begin(), newPaths[idx].end());
     }

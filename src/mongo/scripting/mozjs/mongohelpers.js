@@ -35,7 +35,6 @@
 exportToMongoHelpers = {
     // This function accepts an expression or function body and returns a function definition
     'functionExpressionParser': function functionExpressionParser(fnSrc) {
-
         // Ensure that a provided expression or function body is not terminated with a ';'.
         // This ensures we interpret the input as a single expression, rather than a sequence
         // of expressions, and can wrap it in parentheses.
@@ -52,7 +51,7 @@ exportToMongoHelpers = {
             } else if (e == 'SyntaxError: return not in function') {
                 return 'function() { ' + fnSrc + ' }';
             } else {
-                throw(e);
+                throw (e);
             }
         }
         // Input source is a series of expressions. we should prepend the last one with return

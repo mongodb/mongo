@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -201,8 +201,7 @@ public:
                  << "credentials"
                  << BSON("SCRAM-SHA-256"
                          << scram::Secrets<SHA256Block>::generateCredentials("sajack‍", 15000))
-                 << "roles"
-                 << BSONArray()),
+                 << "roles" << BSONArray()),
             BSONObj()));
 
 
@@ -214,10 +213,8 @@ public:
                                                         << "sajack"
                                                         << "db"
                                                         << "$external"
-                                                        << "credentials"
-                                                        << BSON("external" << true)
-                                                        << "roles"
-                                                        << BSONArray()),
+                                                        << "credentials" << BSON("external" << true)
+                                                        << "roles" << BSONArray()),
                                                    BSONObj()));
 
         internalSecurity.user = std::make_shared<User>(UserName("__system", "local"));

@@ -38,9 +38,9 @@
 namespace mongo {
 namespace {
 
-using std::unique_ptr;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 
 // Verify that calling truncate() on an already empty collection returns an OK status.
 TEST(RecordStoreTestHarness, TruncateEmpty) {

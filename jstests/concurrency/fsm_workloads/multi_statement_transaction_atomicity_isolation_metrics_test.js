@@ -13,7 +13,6 @@ load('jstests/core/txns/libs/prepare_helpers.js');
 // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
     /**
      * Returns all elements in the given array that evaluate to false for the given predicate
      * function 'predFn'.
@@ -163,7 +162,6 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.states.checkInvariants = function checkInvariants(db, collName) {
-
         // Check server-wide invariants using 100 samples. This sample size is deemed big enough to
         // account for transient inconsistencies, which we assume are rare.
         let nSamples = 100;
@@ -179,7 +177,6 @@ var $config = extendWorkload($config, function($config, $super) {
             let timeOpen = Number(txnStats["timeOpenMicros"]);
             assertAlways.eq(timeActive + timeInactive, timeOpen, () => tojson(txnStats));
         });
-
     };
 
     $config.transitions = {

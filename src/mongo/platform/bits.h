@@ -93,4 +93,4 @@ int countTrailingZeros64(unsigned long long num) {
 #else
 #error "No bit-ops definitions for your platform"
 #endif
-}
+}  // namespace mongo

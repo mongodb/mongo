@@ -328,8 +328,7 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
                 return {ErrorCodes::OperationIncomplete,
                         str::stream() << "Unable to enter critical section because the recipient "
                                          "shard thinks all data is cloned while there are still "
-                                      << cloneLocsRemaining
-                                      << " documents remaining"};
+                                      << cloneLocsRemaining << " documents remaining"};
             }
 
             return Status::OK();
@@ -746,8 +745,7 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     if (!idx) {
         return {ErrorCodes::IndexNotFound,
                 str::stream() << "can't find index with prefix " << _shardKeyPattern.toBSON()
-                              << " in storeCurrentLocs for "
-                              << _args.getNss().ns()};
+                              << " in storeCurrentLocs for " << _args.getNss().ns()};
     }
 
     // Assume both min and max non-empty, append MinKey's to make them fit chosen index
@@ -819,19 +817,10 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
         return {
             ErrorCodes::ChunkTooBig,
             str::stream() << "Cannot move chunk: the maximum number of documents for a chunk is "
-                          << maxRecsWhenFull
-                          << ", the maximum chunk size is "
-                          << _args.getMaxChunkSizeBytes()
-                          << ", average document size is "
-                          << avgRecSize
-                          << ". Found "
-                          << recCount
-                          << " documents in chunk "
-                          << " ns: "
-                          << _args.getNss().ns()
-                          << " "
-                          << _args.getMinKey()
-                          << " -> "
+                          << maxRecsWhenFull << ", the maximum chunk size is "
+                          << _args.getMaxChunkSizeBytes() << ", average document size is "
+                          << avgRecSize << ". Found " << recCount << " documents in chunk "
+                          << " ns: " << _args.getNss().ns() << " " << _args.getMinKey() << " -> "
                           << _args.getMaxKey()};
     }
 

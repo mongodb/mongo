@@ -457,8 +457,9 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(HostAndPort peer,
 #else
     auto globalSSLMode = _sslMode();
     if (sslMode == kEnableSSL ||
-        (sslMode == kGlobalSSLMode && ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
-                                       (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
+        (sslMode == kGlobalSSLMode &&
+         ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
+          (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
         auto sslStatus = session->handshakeSSLForEgress(peer).getNoThrow();
         if (!sslStatus.isOK()) {
             return sslStatus;
@@ -606,8 +607,9 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
 #else
             auto globalSSLMode = _sslMode();
             if (sslMode == kEnableSSL ||
-                (sslMode == kGlobalSSLMode && ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
-                                               (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
+                (sslMode == kGlobalSSLMode &&
+                 ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
+                  (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
                 return connector->session
                     ->handshakeSSLForEgressWithLock(std::move(lk), connector->peer)
                     .then([connector] { return Status::OK(); });

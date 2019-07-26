@@ -45,7 +45,7 @@
 
 namespace pcrecpp {
 class RE;
-}  // namespace pcrecpp;
+}  // namespace pcrecpp
 
 namespace mongo {
 
@@ -431,9 +431,9 @@ public:
     bool shouldWorkerFinish() const;
 
     /**
-    * Predicate that workers call to see if they should start collecting stats (as a result
-    * of a call to tellWorkersToCollectStats()).
-    */
+     * Predicate that workers call to see if they should start collecting stats (as a result
+     * of a call to tellWorkersToCollectStats()).
+     */
     bool shouldWorkerCollectStats() const;
 
     /**

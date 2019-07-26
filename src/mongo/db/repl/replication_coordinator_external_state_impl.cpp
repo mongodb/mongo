@@ -171,13 +171,13 @@ auto makeTaskExecutor(ServiceContext* service, const std::string& poolName) {
  * down.
  */
 void scheduleWork(executor::TaskExecutor* executor, executor::TaskExecutor::CallbackFn work) {
-    auto cbh = executor->scheduleWork([work = std::move(work)](
-        const executor::TaskExecutor::CallbackArgs& args) {
-        if (args.status == ErrorCodes::CallbackCanceled) {
-            return;
-        }
-        work(args);
-    });
+    auto cbh = executor->scheduleWork(
+        [work = std::move(work)](const executor::TaskExecutor::CallbackArgs& args) {
+            if (args.status == ErrorCodes::CallbackCanceled) {
+                return;
+            }
+            work(args);
+        });
     if (cbh == ErrorCodes::ShutdownInProgress) {
         return;
     }
@@ -552,9 +552,7 @@ Status ReplicationCoordinatorExternalStateImpl::createLocalLastVoteCollection(
     if (!status.isOK() && status.code() != ErrorCodes::NamespaceExists) {
         return {ErrorCodes::CannotCreateCollection,
                 str::stream() << "Failed to create local last vote collection. Ns: "
-                              << lastVoteCollectionName
-                              << " Error: "
-                              << status.toString()};
+                              << lastVoteCollectionName << " Error: " << status.toString()};
     }
 
     // Make sure there's always a last vote document.
@@ -682,9 +680,7 @@ StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastO
             return StatusWith<OpTimeAndWallTime>(
                 ErrorCodes::NoSuchKey,
                 str::stream() << "Most recent entry in " << NamespaceString::kRsOplogNamespace.ns()
-                              << " missing \""
-                              << tsFieldName
-                              << "\" field");
+                              << " missing \"" << tsFieldName << "\" field");
         }
         if (tsElement.type() != bsonTimestamp) {
             return StatusWith<OpTimeAndWallTime>(

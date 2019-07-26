@@ -3,38 +3,37 @@
 // @tags: [assumes_unsharded_collection, requires_non_retryable_commands, requires_fastcount]
 
 (function() {
-    'use strict';
-    let collName = 'system_indexes_invalidations';
-    let collNameRenamed = 'renamed_collection';
-    let coll = db[collName];
-    let collRenamed = db[collNameRenamed];
+'use strict';
+let collName = 'system_indexes_invalidations';
+let collNameRenamed = 'renamed_collection';
+let coll = db[collName];
+let collRenamed = db[collNameRenamed];
 
-    function testIndexInvalidation(isRename) {
-        coll.drop();
-        collRenamed.drop();
-        assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}, {c: 1}]));
+function testIndexInvalidation(isRename) {
+    coll.drop();
+    collRenamed.drop();
+    assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}, {c: 1}]));
 
-        // Get the first two indexes.
-        let cmd = {listIndexes: collName};
-        Object.extend(cmd, {batchSize: 2});
-        let res = db.runCommand(cmd);
-        assert.commandWorked(res, 'could not run ' + tojson(cmd));
-        printjson(res);
+    // Get the first two indexes.
+    let cmd = {listIndexes: collName};
+    Object.extend(cmd, {batchSize: 2});
+    let res = db.runCommand(cmd);
+    assert.commandWorked(res, 'could not run ' + tojson(cmd));
+    printjson(res);
 
-        // Ensure the cursor has data, rename or drop the collection, and exhaust the cursor.
-        let cursor = new DBCommandCursor(db, res);
-        let errMsg =
-            'expected more data from command ' + tojson(cmd) + ', with result ' + tojson(res);
-        assert(cursor.hasNext(), errMsg);
-        if (isRename) {
-            assert.commandWorked(coll.renameCollection(collNameRenamed));
-        } else {
-            assert(coll.drop());
-        }
-        assert.gt(cursor.itcount(), 0, errMsg);
+    // Ensure the cursor has data, rename or drop the collection, and exhaust the cursor.
+    let cursor = new DBCommandCursor(db, res);
+    let errMsg = 'expected more data from command ' + tojson(cmd) + ', with result ' + tojson(res);
+    assert(cursor.hasNext(), errMsg);
+    if (isRename) {
+        assert.commandWorked(coll.renameCollection(collNameRenamed));
+    } else {
+        assert(coll.drop());
     }
+    assert.gt(cursor.itcount(), 0, errMsg);
+}
 
-    // Test that we invalidate indexes for both collection drops and renames.
-    testIndexInvalidation(false);
-    testIndexInvalidation(true);
+// Test that we invalidate indexes for both collection drops and renames.
+testIndexInvalidation(false);
+testIndexInvalidation(true);
 }());

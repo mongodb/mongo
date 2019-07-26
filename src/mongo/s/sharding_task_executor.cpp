@@ -160,9 +160,12 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
 
     auto clusterGLE = ClusterLastErrorInfo::get(request.opCtx->getClient());
 
-    auto shardingCb =
-        [ timeTracker, clusterGLE, cb, grid = Grid::get(request.opCtx), hosts = request.target ](
-            const TaskExecutor::RemoteCommandOnAnyCallbackArgs& args) {
+    auto shardingCb = [timeTracker,
+                       clusterGLE,
+                       cb,
+                       grid = Grid::get(request.opCtx),
+                       hosts = request.target](
+                          const TaskExecutor::RemoteCommandOnAnyCallbackArgs& args) {
         ON_BLOCK_EXIT([&cb, &args]() { cb(args); });
 
         if (!args.response.isOK()) {

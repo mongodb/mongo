@@ -136,8 +136,7 @@ UpdateExecutor::ApplyResult ObjectReplaceExecutor::applyReplacementUpdate(
             uassert(ErrorCodes::ImmutableField,
                     str::stream() << "After applying the update, the (immutable) field '"
                                   << (*path)->dottedField()
-                                  << "' was found to have been altered to "
-                                  << newElem.toString(),
+                                  << "' was found to have been altered to " << newElem.toString(),
                     newElem.compareWithBSONElement(oldElem, nullptr, false) == 0);
         }
     }

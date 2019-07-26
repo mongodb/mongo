@@ -114,8 +114,9 @@ void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs) {
             ExitCode originallyRequestedCode = shutdownExitCode.get();
             if (code != originallyRequestedCode) {
                 log() << "While running shutdown tasks with the intent to exit with code "
-                      << originallyRequestedCode << ", an additional shutdown request arrived with "
-                                                    "the intent to exit with a different exit code "
+                      << originallyRequestedCode
+                      << ", an additional shutdown request arrived with "
+                         "the intent to exit with a different exit code "
                       << code << "; ignoring the conflicting exit code";
             }
 

@@ -66,10 +66,8 @@ void checkImmutablePathsNotModifiedFromOriginal(mutablebson::Element element,
         if (prefixSize == (*immutablePath)->numParts()) {
             uasserted(ErrorCodes::ImmutableField,
                       str::stream() << "Updating the path '" << pathTaken->dottedField() << "' to "
-                                    << element.toString()
-                                    << " would modify the immutable field '"
-                                    << (*immutablePath)->dottedField()
-                                    << "'");
+                                    << element.toString() << " would modify the immutable field '"
+                                    << (*immutablePath)->dottedField() << "'");
         }
 
         // If 'pathTaken' is a strict prefix of 'immutablePath', then we may have modified
@@ -106,8 +104,7 @@ void checkImmutablePathsNotModifiedFromOriginal(mutablebson::Element element,
             uassert(ErrorCodes::ImmutableField,
                     str::stream() << "After applying the update, the immutable field '"
                                   << (*immutablePath)->dottedField()
-                                  << "' was found to have been altered to "
-                                  << newElem.toString(),
+                                  << "' was found to have been altered to " << newElem.toString(),
                     newElem.compareWithBSONElement(oldElem, nullptr, false) == 0);
         }
     }
@@ -137,8 +134,7 @@ void checkImmutablePathsNotModified(mutablebson::Element element,
         uassert(ErrorCodes::ImmutableField,
                 str::stream() << "Performing an update on the path '" << pathTaken->dottedField()
                               << "' would modify the immutable field '"
-                              << (*immutablePath)->dottedField()
-                              << "'",
+                              << (*immutablePath)->dottedField() << "'",
                 pathTaken->commonPrefixSize(**immutablePath) <
                     std::min(pathTaken->numParts(), (*immutablePath)->numParts()));
     }
@@ -265,12 +261,10 @@ UpdateExecutor::ApplyResult ModifierNode::applyToNonexistentElement(
             // because we just created this element.)
             uassert(ErrorCodes::ImmutableField,
                     str::stream() << "Updating the path '"
-                                  << updateNodeApplyParams.pathTaken->dottedField()
-                                  << "' to "
+                                  << updateNodeApplyParams.pathTaken->dottedField() << "' to "
                                   << applyParams.element.toString()
                                   << " would modify the immutable field '"
-                                  << (*immutablePath)->dottedField()
-                                  << "'",
+                                  << (*immutablePath)->dottedField() << "'",
                     updateNodeApplyParams.pathTaken->commonPrefixSize(**immutablePath) !=
                         (*immutablePath)->numParts());
         }

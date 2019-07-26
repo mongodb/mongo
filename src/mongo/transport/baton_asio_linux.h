@@ -83,8 +83,8 @@ class TransportLayerASIO::BatonASIO : public NetworkingBaton {
         EventFDHolder() : fd(::eventfd(0, EFD_CLOEXEC)) {
             if (fd < 0) {
                 auto e = errno;
-                std::string reason = str::stream() << "error in creating eventfd: "
-                                                   << errnoWithDescription(e);
+                std::string reason = str::stream()
+                    << "error in creating eventfd: " << errnoWithDescription(e);
 
                 auto code = (e == EMFILE || e == ENFILE) ? ErrorCodes::TooManyFilesOpen
                                                          : ErrorCodes::UnknownError;
@@ -165,7 +165,7 @@ public:
         }
 
         _safeExecute(std::move(lk),
-                     [ id, expiration, promise = std::move(pf.promise), this ]() mutable {
+                     [id, expiration, promise = std::move(pf.promise), this]() mutable {
                          auto iter = _timers.emplace(std::piecewise_construct,
                                                      std::forward_as_tuple(expiration),
                                                      std::forward_as_tuple(id, std::move(promise)));
@@ -381,7 +381,7 @@ private:
         }
 
         _safeExecute(std::move(lk),
-                     [ id, fd, type, promise = std::move(pf.promise), this ]() mutable {
+                     [id, fd, type, promise = std::move(pf.promise), this]() mutable {
                          _sessions[id] = TransportSession{fd, type, std::move(promise)};
                      });
 
@@ -440,7 +440,7 @@ private:
     template <typename Callback>
     void _safeExecute(stdx::unique_lock<stdx::mutex> lk, Callback&& cb) {
         if (_inPoll) {
-            _scheduled.push_back([ cb = std::forward<Callback>(cb), this ](Status) mutable {
+            _scheduled.push_back([cb = std::forward<Callback>(cb), this](Status) mutable {
                 stdx::lock_guard<stdx::mutex> lk(_mutex);
                 cb();
             });

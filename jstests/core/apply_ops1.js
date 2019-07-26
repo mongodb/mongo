@@ -7,438 +7,421 @@
 // ]
 
 (function() {
-    "use strict";
+"use strict";
 
-    load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/get_index_helpers.js");
 
-    var t = db.apply_ops1;
-    t.drop();
+var t = db.apply_ops1;
+t.drop();
 
-    //
-    // Input validation tests
-    //
+//
+// Input validation tests
+//
 
-    // Empty array of operations.
-    assert.commandWorked(db.adminCommand({applyOps: []}),
-                         'applyOps should not fail on empty array of operations');
+// Empty array of operations.
+assert.commandWorked(db.adminCommand({applyOps: []}),
+                     'applyOps should not fail on empty array of operations');
 
-    // Non-array type for operations.
-    assert.commandFailed(db.adminCommand({applyOps: "not an array"}),
-                         'applyOps should fail on non-array type for operations');
+// Non-array type for operations.
+assert.commandFailed(db.adminCommand({applyOps: "not an array"}),
+                     'applyOps should fail on non-array type for operations');
 
-    // Missing 'op' field in an operation.
-    assert.commandFailed(db.adminCommand({applyOps: [{ns: t.getFullName()}]}),
-                         'applyOps should fail on operation without "op" field');
+// Missing 'op' field in an operation.
+assert.commandFailed(db.adminCommand({applyOps: [{ns: t.getFullName()}]}),
+                     'applyOps should fail on operation without "op" field');
 
-    // Non-string 'op' field in an operation.
-    assert.commandFailed(db.adminCommand({applyOps: [{op: 12345, ns: t.getFullName()}]}),
-                         'applyOps should fail on operation with non-string "op" field');
+// Non-string 'op' field in an operation.
+assert.commandFailed(db.adminCommand({applyOps: [{op: 12345, ns: t.getFullName()}]}),
+                     'applyOps should fail on operation with non-string "op" field');
 
-    // Empty 'op' field value in an operation.
-    assert.commandFailed(db.adminCommand({applyOps: [{op: '', ns: t.getFullName()}]}),
-                         'applyOps should fail on operation with empty "op" field value');
+// Empty 'op' field value in an operation.
+assert.commandFailed(db.adminCommand({applyOps: [{op: '', ns: t.getFullName()}]}),
+                     'applyOps should fail on operation with empty "op" field value');
 
-    // Missing 'ns' field in an operation.
-    assert.commandFailed(db.adminCommand({applyOps: [{op: 'c'}]}),
-                         'applyOps should fail on operation without "ns" field');
+// Missing 'ns' field in an operation.
+assert.commandFailed(db.adminCommand({applyOps: [{op: 'c'}]}),
+                     'applyOps should fail on operation without "ns" field');
 
-    // Non-string 'ns' field in an operation.
-    assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: 12345}]}),
-                         'applyOps should fail on operation with non-string "ns" field');
+// Non-string 'ns' field in an operation.
+assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: 12345}]}),
+                     'applyOps should fail on operation with non-string "ns" field');
 
-    // Empty 'ns' field value in an operation of type 'n' (noop).
-    assert.commandWorked(db.adminCommand({applyOps: [{op: 'n', ns: ''}]}),
-                         'applyOps should work on no op operation with empty "ns" field value');
+// Empty 'ns' field value in an operation of type 'n' (noop).
+assert.commandWorked(db.adminCommand({applyOps: [{op: 'n', ns: ''}]}),
+                     'applyOps should work on no op operation with empty "ns" field value');
 
-    // Missing dbname in 'ns' field.
-    assert.commandFailed(db.adminCommand({applyOps: [{op: 'd', ns: t.getName(), o: {_id: 1}}]}));
+// Missing dbname in 'ns' field.
+assert.commandFailed(db.adminCommand({applyOps: [{op: 'd', ns: t.getName(), o: {_id: 1}}]}));
 
-    // Missing 'o' field value in an operation of type 'c' (command).
-    assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: t.getFullName()}]}),
-                         'applyOps should fail on command operation without "o" field');
+// Missing 'o' field value in an operation of type 'c' (command).
+assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: t.getFullName()}]}),
+                     'applyOps should fail on command operation without "o" field');
 
-    // Non-object 'o' field value in an operation of type 'c' (command).
-    assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: t.getFullName(), o: 'bar'}]}),
-                         'applyOps should fail on command operation with non-object "o" field');
+// Non-object 'o' field value in an operation of type 'c' (command).
+assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: t.getFullName(), o: 'bar'}]}),
+                     'applyOps should fail on command operation with non-object "o" field');
 
-    // Empty object 'o' field value in an operation of type 'c' (command).
-    assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: t.getFullName(), o: {}}]}),
-                         'applyOps should fail on command operation with empty object "o" field');
+// Empty object 'o' field value in an operation of type 'c' (command).
+assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: t.getFullName(), o: {}}]}),
+                     'applyOps should fail on command operation with empty object "o" field');
 
-    // Unknown key in 'o' field value in an operation of type 'c' (command).
-    assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: t.getFullName(), o: {a: 1}}]}),
-                         'applyOps should fail on command operation on unknown key in "o" field');
+// Unknown key in 'o' field value in an operation of type 'c' (command).
+assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: t.getFullName(), o: {a: 1}}]}),
+                     'applyOps should fail on command operation on unknown key in "o" field');
 
-    // Empty 'ns' field value in operation type other than 'n'.
-    assert.commandFailed(
-        db.adminCommand({applyOps: [{op: 'c', ns: ''}]}),
-        'applyOps should fail on non-"n" operation type with empty "ns" field value');
+// Empty 'ns' field value in operation type other than 'n'.
+assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: ''}]}),
+                     'applyOps should fail on non-"n" operation type with empty "ns" field value');
 
-    // Excessively nested applyOps commands gracefully fail.
-    assert.commandFailed(db.adminCommand({
-        "applyOps": [{
-            "ts": {"$timestamp": {"t": 1, "i": 100}},
-            "h": 0,
-            "v": 2,
-            "op": "c",
-            "ns": "test.$cmd",
-            "o": {
-                "applyOps": [{
-                    "ts": {"$timestamp": {"t": 1, "i": 100}},
-                    "h": 0,
-                    "v": 2,
-                    "op": "c",
-                    "ns": "test.$cmd",
-                    "o": {
-                        "applyOps": [{
-                            "ts": {"$timestamp": {"t": 1, "i": 100}},
-                            "h": 0,
-                            "v": 2,
-                            "op": "c",
-                            "ns": "test.$cmd",
-                            "o": {
-                                "applyOps": [{
-                                    "ts": {"$timestamp": {"t": 1, "i": 100}},
-                                    "h": 0,
-                                    "v": 2,
-                                    "op": "c",
-                                    "ns": "test.$cmd",
-                                    "o": {
-                                        "applyOps": [{
-                                            "ts": {"$timestamp": {"t": 1, "i": 100}},
-                                            "h": 0,
-                                            "v": 2,
-                                            "op": "c",
-                                            "ns": "test.$cmd",
-                                            "o": {
-                                                "applyOps": [{
-                                                    "ts": {"$timestamp": {"t": 1, "i": 100}},
-                                                    "h": 0,
-                                                    "v": 2,
-                                                    "op": "c",
-                                                    "ns": "test.$cmd",
-                                                    "o": {
-                                                        "applyOps": [{
-                                                            "ts":
-                                                                {"$timestamp": {"t": 1, "i": 100}},
-                                                            "h": 0,
-                                                            "v": 2,
-                                                            "op": "c",
-                                                            "ns": "test.$cmd",
-                                                            "o": {
-                                                                "applyOps": [{
-                                                                    "ts": {
-                                                                        "$timestamp":
-                                                                            {"t": 1, "i": 100}
-                                                                    },
-                                                                    "h": 0,
-                                                                    "v": 2,
-                                                                    "op": "c",
-                                                                    "ns": "test.$cmd",
-                                                                    "o": {
-                                                                        "applyOps": [{
-                                                                            "ts": {
-                                                                                "$timestamp": {
-                                                                                    "t": 1,
-                                                                                    "i": 100
-                                                                                }
-                                                                            },
-                                                                            "h": 0,
-                                                                            "v": 2,
-                                                                            "op": "c",
-                                                                            "ns": "test.$cmd",
-                                                                            "o": {
-                                                                                "applyOps": [{
-                                                                                    "ts": {
-                                                                                        "$timestamp":
-                                                                                            {
-                                                                                              "t":
-                                                                                                  1,
-                                                                                              "i":
-                                                                                                  100
-                                                                                            }
-                                                                                    },
-                                                                                    "h": 0,
-                                                                                    "v": 2,
-                                                                                    "op": "c",
-                                                                                    "ns":
-                                                                                        "test.$cmd",
-                                                                                    "o": {
-                                                                                        "applyOps": [
-                                                                                            {
-                                                                                              "ts": {
-                                                                                                  "$timestamp": {
-                                                                                                      "t":
-                                                                                                          1,
-                                                                                                      "i":
-                                                                                                          100
-                                                                                                  }
-                                                                                              },
-                                                                                              "h":
-                                                                                                  0,
-                                                                                              "v":
-                                                                                                  2,
-                                                                                              "op":
-                                                                                                  "c",
-                                                                                              "ns":
-                                                                                                  "test.$cmd",
-                                                                                              "o": {
-                                                                                                  "applyOps":
-                                                                                                      [
-                                                                                                      ]
-                                                                                              }
-                                                                                            }
-                                                                                        ]
+// Excessively nested applyOps commands gracefully fail.
+assert.commandFailed(db.adminCommand({
+    "applyOps": [{
+        "ts": {"$timestamp": {"t": 1, "i": 100}},
+        "h": 0,
+        "v": 2,
+        "op": "c",
+        "ns": "test.$cmd",
+        "o": {
+            "applyOps": [{
+                "ts": {"$timestamp": {"t": 1, "i": 100}},
+                "h": 0,
+                "v": 2,
+                "op": "c",
+                "ns": "test.$cmd",
+                "o": {
+                    "applyOps": [{
+                        "ts": {"$timestamp": {"t": 1, "i": 100}},
+                        "h": 0,
+                        "v": 2,
+                        "op": "c",
+                        "ns": "test.$cmd",
+                        "o": {
+                            "applyOps": [{
+                                "ts": {"$timestamp": {"t": 1, "i": 100}},
+                                "h": 0,
+                                "v": 2,
+                                "op": "c",
+                                "ns": "test.$cmd",
+                                "o": {
+                                    "applyOps": [{
+                                        "ts": {"$timestamp": {"t": 1, "i": 100}},
+                                        "h": 0,
+                                        "v": 2,
+                                        "op": "c",
+                                        "ns": "test.$cmd",
+                                        "o": {
+                                            "applyOps": [{
+                                                "ts": {"$timestamp": {"t": 1, "i": 100}},
+                                                "h": 0,
+                                                "v": 2,
+                                                "op": "c",
+                                                "ns": "test.$cmd",
+                                                "o": {
+                                                    "applyOps": [{
+                                                        "ts": {"$timestamp": {"t": 1, "i": 100}},
+                                                        "h": 0,
+                                                        "v": 2,
+                                                        "op": "c",
+                                                        "ns": "test.$cmd",
+                                                        "o": {
+                                                            "applyOps": [{
+                                                                "ts": {
+                                                                    "$timestamp": {"t": 1, "i": 100}
+                                                                },
+                                                                "h": 0,
+                                                                "v": 2,
+                                                                "op": "c",
+                                                                "ns": "test.$cmd",
+                                                                "o": {
+                                                                    "applyOps": [{
+                                                                        "ts": {
+                                                                            "$timestamp":
+                                                                                {"t": 1, "i": 100}
+                                                                        },
+                                                                        "h": 0,
+                                                                        "v": 2,
+                                                                        "op": "c",
+                                                                        "ns": "test.$cmd",
+                                                                        "o": {
+                                                                            "applyOps": [{
+                                                                                "ts": {
+                                                                                    "$timestamp": {
+                                                                                        "t": 1,
+                                                                                        "i": 100
                                                                                     }
-                                                                                }]
-                                                                            }
-                                                                        }]
-                                                                    }
-                                                                }]
-                                                            }
-                                                        }]
-                                                    }
-                                                }]
-                                            }
-                                        }]
-                                    }
-                                }]
-                            }
-                        }]
-                    }
-                }]
-            }
-        }]
-    }),
-                         "Excessively nested applyOps should be rejected");
-
-    // Valid 'ns' field value in unknown operation type 'x'.
-    assert.commandFailed(
-        db.adminCommand({applyOps: [{op: 'x', ns: t.getFullName()}]}),
-        'applyOps should fail on unknown operation type "x" with valid "ns" value');
-
-    assert.eq(0, t.find().count(), "Non-zero amount of documents in collection to start");
-
-    /**
-     * Test function for running CRUD operations on non-existent namespaces using various
-     * combinations of invalid namespaces (collection/database), allowAtomic and alwaysUpsert,
-     * and nesting.
-     *
-     * Leave 'expectedErrorCode' undefined if this command is expected to run successfully.
-     */
-    function testCrudOperationOnNonExistentNamespace(optype, o, o2, expectedErrorCode) {
-        expectedErrorCode = expectedErrorCode || ErrorCodes.OK;
-        const t2 = db.getSiblingDB('apply_ops1_no_such_db').getCollection('t');
-        [t, t2].forEach(coll => {
-            const op = {op: optype, ns: coll.getFullName(), o: o, o2: o2};
-            [false, true].forEach(nested => {
-                const opToRun =
-                    nested ? {op: 'c', ns: 'test.$cmd', o: {applyOps: [op]}, o2: {}} : op;
-                [false, true].forEach(allowAtomic => {
-                    [false, true].forEach(alwaysUpsert => {
-                        const cmd = {
-                            applyOps: [opToRun],
-                            allowAtomic: allowAtomic,
-                            alwaysUpsert: alwaysUpsert
-                        };
-                        jsTestLog('Testing applyOps on non-existent namespace: ' + tojson(cmd));
-                        if (expectedErrorCode === ErrorCodes.OK) {
-                            assert.commandWorked(db.adminCommand(cmd));
-                        } else {
-                            assert.commandFailedWithCode(db.adminCommand(cmd), expectedErrorCode);
+                                                                                },
+                                                                                "h": 0,
+                                                                                "v": 2,
+                                                                                "op": "c",
+                                                                                "ns": "test.$cmd",
+                                                                                "o": {
+                                                                                    "applyOps": [{
+                                                                                        "ts": {
+                                                                                            "$timestamp": {
+                                                                                                "t":
+                                                                                                    1,
+                                                                                                "i":
+                                                                                                    100
+                                                                                            }
+                                                                                        },
+                                                                                        "h": 0,
+                                                                                        "v": 2,
+                                                                                        "op": "c",
+                                                                                        "ns":
+                                                                                            "test.$cmd",
+                                                                                        "o": {
+                                                                                            "applyOps":
+                                                                                                []
+                                                                                        }
+                                                                                    }]
+                                                                                }
+                                                                            }]
+                                                                        }
+                                                                    }]
+                                                                }
+                                                            }]
+                                                        }
+                                                    }]
+                                                }
+                                            }]
+                                        }
+                                    }]
+                                }
+                            }]
                         }
-                    });
+                    }]
+                }
+            }]
+        }
+    }]
+}),
+                     "Excessively nested applyOps should be rejected");
+
+// Valid 'ns' field value in unknown operation type 'x'.
+assert.commandFailed(db.adminCommand({applyOps: [{op: 'x', ns: t.getFullName()}]}),
+                     'applyOps should fail on unknown operation type "x" with valid "ns" value');
+
+assert.eq(0, t.find().count(), "Non-zero amount of documents in collection to start");
+
+/**
+ * Test function for running CRUD operations on non-existent namespaces using various
+ * combinations of invalid namespaces (collection/database), allowAtomic and alwaysUpsert,
+ * and nesting.
+ *
+ * Leave 'expectedErrorCode' undefined if this command is expected to run successfully.
+ */
+function testCrudOperationOnNonExistentNamespace(optype, o, o2, expectedErrorCode) {
+    expectedErrorCode = expectedErrorCode || ErrorCodes.OK;
+    const t2 = db.getSiblingDB('apply_ops1_no_such_db').getCollection('t');
+    [t, t2].forEach(coll => {
+        const op = {op: optype, ns: coll.getFullName(), o: o, o2: o2};
+        [false, true].forEach(nested => {
+            const opToRun = nested ? {op: 'c', ns: 'test.$cmd', o: {applyOps: [op]}, o2: {}} : op;
+            [false, true].forEach(allowAtomic => {
+                [false, true].forEach(alwaysUpsert => {
+                    const cmd = {
+                        applyOps: [opToRun],
+                        allowAtomic: allowAtomic,
+                        alwaysUpsert: alwaysUpsert
+                    };
+                    jsTestLog('Testing applyOps on non-existent namespace: ' + tojson(cmd));
+                    if (expectedErrorCode === ErrorCodes.OK) {
+                        assert.commandWorked(db.adminCommand(cmd));
+                    } else {
+                        assert.commandFailedWithCode(db.adminCommand(cmd), expectedErrorCode);
+                    }
                 });
             });
         });
-    }
-
-    // Insert and update operations on non-existent collections/databases should return
-    // NamespaceNotFound.
-    testCrudOperationOnNonExistentNamespace('i', {_id: 0}, {}, ErrorCodes.NamespaceNotFound);
-    testCrudOperationOnNonExistentNamespace('u', {x: 0}, {_id: 0}, ErrorCodes.NamespaceNotFound);
-
-    // Delete operations on non-existent collections/databases should return OK for idempotency
-    // reasons.
-    testCrudOperationOnNonExistentNamespace('d', {_id: 0}, {});
-
-    assert.commandWorked(db.createCollection(t.getName()));
-    var a = assert.commandWorked(
-        db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}));
-    assert.eq(1, t.find().count(), "Valid insert failed");
-    assert.eq(true, a.results[0], "Bad result value for valid insert");
-
-    a = assert.commandWorked(
-        db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}));
-    assert.eq(1, t.find().count(), "Duplicate insert failed");
-    assert.eq(true, a.results[0], "Bad result value for duplicate insert");
-
-    var o = {_id: 5, x: 17};
-    assert.eq(o, t.findOne(), "Mismatching document inserted.");
-
-    // 'o' field is an empty array.
-    assert.commandFailed(db.adminCommand({applyOps: [{op: 'i', ns: t.getFullName(), o: []}]}),
-                         'applyOps should fail on insert of object with empty array element');
-
-    var res = assert.commandWorked(db.runCommand({
-        applyOps: [
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 18}}},
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 19}}}
-        ]
-    }));
-
-    o.x++;
-    o.x++;
-
-    assert.eq(1, t.find().count(), "Updates increased number of documents");
-    assert.eq(o, t.findOne(), "Document doesn't match expected");
-    assert.eq(true, res.results[0], "Bad result value for valid update");
-    assert.eq(true, res.results[1], "Bad result value for valid update");
-
-    // preCondition fully matches
-    res = db.runCommand({
-        applyOps: [
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 20}}},
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 21}}}
-        ],
-        preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
     });
+}
 
-    // The use of preCondition requires applyOps to run atomically. Therefore, it is incompatible
-    // with {allowAtomic: false}.
-    assert.commandFailedWithCode(
-        db.runCommand({
-            applyOps: [{op: 'u', ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}}],
-            preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 21}}],
-            allowAtomic: false,
-        }),
-        ErrorCodes.InvalidOptions,
-        'applyOps should fail when preCondition is present and atomicAllowed is false.');
+// Insert and update operations on non-existent collections/databases should return
+// NamespaceNotFound.
+testCrudOperationOnNonExistentNamespace('i', {_id: 0}, {}, ErrorCodes.NamespaceNotFound);
+testCrudOperationOnNonExistentNamespace('u', {x: 0}, {_id: 0}, ErrorCodes.NamespaceNotFound);
 
-    // The use of preCondition is also incompatible with operations that include commands.
-    assert.commandFailedWithCode(
-        db.runCommand({
-            applyOps: [{op: 'c', ns: t.getCollection('$cmd').getFullName(), o: {applyOps: []}}],
-            preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 21}}],
-        }),
-        ErrorCodes.InvalidOptions,
-        'applyOps should fail when preCondition is present and operations includes commands.');
+// Delete operations on non-existent collections/databases should return OK for idempotency
+// reasons.
+testCrudOperationOnNonExistentNamespace('d', {_id: 0}, {});
 
-    o.x++;
-    o.x++;
+assert.commandWorked(db.createCollection(t.getName()));
+var a = assert.commandWorked(
+    db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}));
+assert.eq(1, t.find().count(), "Valid insert failed");
+assert.eq(true, a.results[0], "Bad result value for valid insert");
 
-    assert.eq(1, t.find().count(), "Updates increased number of documents");
-    assert.eq(o, t.findOne(), "Document doesn't match expected");
-    assert.eq(true, res.results[0], "Bad result value for valid update");
-    assert.eq(true, res.results[1], "Bad result value for valid update");
+a = assert.commandWorked(
+    db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}));
+assert.eq(1, t.find().count(), "Duplicate insert failed");
+assert.eq(true, a.results[0], "Bad result value for duplicate insert");
 
-    // preCondition doesn't match ns
-    res = db.runCommand({
-        applyOps: [
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}},
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 23}}}
-        ],
-        preCondition: [{ns: "foo.otherName", q: {_id: 5}, res: {x: 21}}]
-    });
+var o = {_id: 5, x: 17};
+assert.eq(o, t.findOne(), "Mismatching document inserted.");
 
-    assert.eq(o, t.findOne(), "preCondition didn't match, but ops were still applied");
+// 'o' field is an empty array.
+assert.commandFailed(db.adminCommand({applyOps: [{op: 'i', ns: t.getFullName(), o: []}]}),
+                     'applyOps should fail on insert of object with empty array element');
 
-    // preCondition doesn't match query
-    res = db.runCommand({
-        applyOps: [
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}},
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 23}}}
-        ],
-        preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
-    });
+var res = assert.commandWorked(db.runCommand({
+    applyOps: [
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 18}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 19}}}
+    ]
+}));
 
-    assert.eq(o, t.findOne(), "preCondition didn't match, but ops were still applied");
+o.x++;
+o.x++;
 
-    res = db.runCommand({
-        applyOps: [
-            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}},
-            {op: "u", ns: t.getFullName(), o2: {_id: 6}, o: {$set: {x: 23}}}
-        ]
-    });
+assert.eq(1, t.find().count(), "Updates increased number of documents");
+assert.eq(o, t.findOne(), "Document doesn't match expected");
+assert.eq(true, res.results[0], "Bad result value for valid update");
+assert.eq(true, res.results[1], "Bad result value for valid update");
 
-    assert.eq(true, res.results[0], "Valid update failed");
-    assert.eq(true, res.results[1], "Valid update failed");
+// preCondition fully matches
+res = db.runCommand({
+    applyOps: [
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 20}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 21}}}
+    ],
+    preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
+});
 
-    // Ops with transaction numbers are valid.
-    const lsid = {
-        "id": UUID("3eea4a58-6018-40b6-8743-6a55783bf902"),
-        "uid": BinData(0, "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=")
-    };
-    res = db.runCommand({
-        applyOps: [
-            {
-              op: "i",
-              ns: t.getFullName(),
-              o: {_id: 7, x: 24},
-              lsid: lsid,
-              txnNumber: NumberLong(1),
-              stmtId: NumberInt(0)
-            },
-            {
-              op: "u",
-              ns: t.getFullName(),
-              o2: {_id: 8},
-              o: {$set: {x: 25}},
-              lsid: lsid,
-              txnNumber: NumberLong(1),
-              stmtId: NumberInt(1)
-            },
-            {
-              op: "d",
-              ns: t.getFullName(),
-              o: {_id: 7},
-              lsid: lsid,
-              txnNumber: NumberLong(2),
-              stmtId: NumberInt(0)
-            },
-        ]
-    });
+// The use of preCondition requires applyOps to run atomically. Therefore, it is incompatible
+// with {allowAtomic: false}.
+assert.commandFailedWithCode(
+    db.runCommand({
+        applyOps: [{op: 'u', ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}}],
+        preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 21}}],
+        allowAtomic: false,
+    }),
+    ErrorCodes.InvalidOptions,
+    'applyOps should fail when preCondition is present and atomicAllowed is false.');
 
-    assert.eq(true, res.results[0], "Valid insert with transaction number failed");
-    assert.eq(true, res.results[1], "Valid update with transaction number failed");
-    assert.eq(true, res.results[2], "Valid delete with transaction number failed");
+// The use of preCondition is also incompatible with operations that include commands.
+assert.commandFailedWithCode(
+    db.runCommand({
+        applyOps: [{op: 'c', ns: t.getCollection('$cmd').getFullName(), o: {applyOps: []}}],
+        preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 21}}],
+    }),
+    ErrorCodes.InvalidOptions,
+    'applyOps should fail when preCondition is present and operations includes commands.');
 
-    // When applying a "u" (update) op, we default to 'UpdateNode' update semantics, and $set
-    // operations add new fields in lexicographic order.
-    res = assert.commandWorked(db.adminCommand({
-        applyOps: [
-            {"op": "i", "ns": t.getFullName(), "o": {_id: 6}},
-            {"op": "u", "ns": t.getFullName(), "o2": {_id: 6}, "o": {$set: {z: 1, a: 2}}}
-        ]
-    }));
-    assert.eq(t.findOne({_id: 6}), {_id: 6, a: 2, z: 1});  // Note: 'a' and 'z' have been sorted.
+o.x++;
+o.x++;
 
-    // 'ModifierInterface' semantics are not supported, so an update with {$v: 0} should fail.
-    res = assert.commandFailed(db.adminCommand({
-        applyOps: [
-            {"op": "i", "ns": t.getFullName(), "o": {_id: 7}},
-            {
-              "op": "u",
-              "ns": t.getFullName(),
-              "o2": {_id: 7},
-              "o": {$v: NumberLong(0), $set: {z: 1, a: 2}}
-            }
-        ]
-    }));
-    assert.eq(res.code, 40682);
+assert.eq(1, t.find().count(), "Updates increased number of documents");
+assert.eq(o, t.findOne(), "Document doesn't match expected");
+assert.eq(true, res.results[0], "Bad result value for valid update");
+assert.eq(true, res.results[1], "Bad result value for valid update");
 
-    // When we explicitly specify {$v: 1}, we should get 'UpdateNode' update semantics, and $set
-    // operations get performed in lexicographic order.
-    res = assert.commandWorked(db.adminCommand({
-        applyOps: [
-            {"op": "i", "ns": t.getFullName(), "o": {_id: 8}},
-            {
-              "op": "u",
-              "ns": t.getFullName(),
-              "o2": {_id: 8},
-              "o": {$v: NumberLong(1), $set: {z: 1, a: 2}}
-            }
-        ]
-    }));
-    assert.eq(t.findOne({_id: 8}), {_id: 8, a: 2, z: 1});  // Note: 'a' and 'z' have been sorted.
+// preCondition doesn't match ns
+res = db.runCommand({
+    applyOps: [
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 23}}}
+    ],
+    preCondition: [{ns: "foo.otherName", q: {_id: 5}, res: {x: 21}}]
+});
+
+assert.eq(o, t.findOne(), "preCondition didn't match, but ops were still applied");
+
+// preCondition doesn't match query
+res = db.runCommand({
+    applyOps: [
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 23}}}
+    ],
+    preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
+});
+
+assert.eq(o, t.findOne(), "preCondition didn't match, but ops were still applied");
+
+res = db.runCommand({
+    applyOps: [
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$set: {x: 22}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 6}, o: {$set: {x: 23}}}
+    ]
+});
+
+assert.eq(true, res.results[0], "Valid update failed");
+assert.eq(true, res.results[1], "Valid update failed");
+
+// Ops with transaction numbers are valid.
+const lsid = {
+    "id": UUID("3eea4a58-6018-40b6-8743-6a55783bf902"),
+    "uid": BinData(0, "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=")
+};
+res = db.runCommand({
+    applyOps: [
+        {
+            op: "i",
+            ns: t.getFullName(),
+            o: {_id: 7, x: 24},
+            lsid: lsid,
+            txnNumber: NumberLong(1),
+            stmtId: NumberInt(0)
+        },
+        {
+            op: "u",
+            ns: t.getFullName(),
+            o2: {_id: 8},
+            o: {$set: {x: 25}},
+            lsid: lsid,
+            txnNumber: NumberLong(1),
+            stmtId: NumberInt(1)
+        },
+        {
+            op: "d",
+            ns: t.getFullName(),
+            o: {_id: 7},
+            lsid: lsid,
+            txnNumber: NumberLong(2),
+            stmtId: NumberInt(0)
+        },
+    ]
+});
+
+assert.eq(true, res.results[0], "Valid insert with transaction number failed");
+assert.eq(true, res.results[1], "Valid update with transaction number failed");
+assert.eq(true, res.results[2], "Valid delete with transaction number failed");
+
+// When applying a "u" (update) op, we default to 'UpdateNode' update semantics, and $set
+// operations add new fields in lexicographic order.
+res = assert.commandWorked(db.adminCommand({
+    applyOps: [
+        {"op": "i", "ns": t.getFullName(), "o": {_id: 6}},
+        {"op": "u", "ns": t.getFullName(), "o2": {_id: 6}, "o": {$set: {z: 1, a: 2}}}
+    ]
+}));
+assert.eq(t.findOne({_id: 6}), {_id: 6, a: 2, z: 1});  // Note: 'a' and 'z' have been sorted.
+
+// 'ModifierInterface' semantics are not supported, so an update with {$v: 0} should fail.
+res = assert.commandFailed(db.adminCommand({
+    applyOps: [
+        {"op": "i", "ns": t.getFullName(), "o": {_id: 7}},
+        {
+            "op": "u",
+            "ns": t.getFullName(),
+            "o2": {_id: 7},
+            "o": {$v: NumberLong(0), $set: {z: 1, a: 2}}
+        }
+    ]
+}));
+assert.eq(res.code, 40682);
+
+// When we explicitly specify {$v: 1}, we should get 'UpdateNode' update semantics, and $set
+// operations get performed in lexicographic order.
+res = assert.commandWorked(db.adminCommand({
+    applyOps: [
+        {"op": "i", "ns": t.getFullName(), "o": {_id: 8}},
+        {
+            "op": "u",
+            "ns": t.getFullName(),
+            "o2": {_id: 8},
+            "o": {$v: NumberLong(1), $set: {z: 1, a: 2}}
+        }
+    ]
+}));
+assert.eq(t.findOne({_id: 8}), {_id: 8, a: 2, z: 1});  // Note: 'a' and 'z' have been sorted.
 })();

@@ -45,7 +45,7 @@ Mongo.prototype.getDB = function(name) {
     // There is a weird issue where typeof(db._name) !== "string" when the db name
     // is created from objects returned from native C++ methods.
     // This hack ensures that the db._name is always a string.
-    if (typeof(name) === "object") {
+    if (typeof (name) === "object") {
         name = name.toString();
     }
     return new DB(this, name);
@@ -84,7 +84,6 @@ Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession(),
                                   filter = undefined,
                                   nameOnly = undefined,
                                   authorizedDatabases = undefined) {
-
     return function(driverSession, filter, nameOnly, authorizedDatabases) {
         'use strict';
 
@@ -227,7 +226,7 @@ Mongo.prototype.tojson = Mongo.prototype.toString;
  *     Note that this object only keeps a shallow copy of this array.
  */
 Mongo.prototype.setReadPref = function(mode, tagSet) {
-    if ((this._readPrefMode === "primary") && (typeof(tagSet) !== "undefined") &&
+    if ((this._readPrefMode === "primary") && (typeof (tagSet) !== "undefined") &&
         (Object.keys(tagSet).length > 0)) {
         // we allow empty arrays/objects or no tagSet for compatibility reasons
         throw Error("Can not supply tagSet with readPref mode primary");
@@ -252,7 +251,7 @@ Mongo.prototype.getReadPrefTagSet = function() {
 // Returns a readPreference object of the type expected by mongos.
 Mongo.prototype.getReadPref = function() {
     var obj = {}, mode, tagSet;
-    if (typeof(mode = this.getReadPrefMode()) === "string") {
+    if (typeof (mode = this.getReadPrefMode()) === "string") {
         obj.mode = mode;
     } else {
         return null;
@@ -381,7 +380,8 @@ connect = function(url, user, pass) {
     return db;
 };
 
-/** deprecated, use writeMode below
+/**
+ * deprecated, use writeMode below
  *
  */
 Mongo.prototype.useWriteCommands = function() {
@@ -410,7 +410,6 @@ Mongo.prototype.hasExplainCommand = function() {
  */
 
 Mongo.prototype.writeMode = function() {
-
     if ('_writeMode' in this) {
         return this._writeMode;
     }
@@ -539,8 +538,8 @@ Mongo.prototype.startSession = function startSession(options = {}) {
     // Only log this message if we are running a test
     if (typeof TestData === "object" && TestData.testName) {
         jsTest.log("New session started with sessionID: " +
-                   tojsononeline(newDriverSession.getSessionId()) + " and options: " +
-                   tojsononeline(options));
+                   tojsononeline(newDriverSession.getSessionId()) +
+                   " and options: " + tojsononeline(options));
     }
 
     return newDriverSession;
@@ -560,7 +559,7 @@ Mongo.prototype._getDefaultSession = function getDefaultSession() {
                     this._setDummyDefaultSession();
                 } else {
                     print("ERROR: Implicit session failed: " + e.message);
-                    throw(e);
+                    throw (e);
                 }
             }
         } else {

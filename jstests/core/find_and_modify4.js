@@ -11,7 +11,8 @@ function getNextVal(counterName) {
     var ret = t.findAndModify({
         query: {_id: counterName},
         update: {$inc: {val: 1}},
-        upsert: true, 'new': true,
+        upsert: true,
+        'new': true,
     });
     return ret;
 }

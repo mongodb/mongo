@@ -15,7 +15,6 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
-
     var data = {
         // Use the workload name as the database name, since the workload name is assumed to be
         // unique.
@@ -57,7 +56,6 @@ var $config = (function() {
     };
 
     var states = (function() {
-
         function remove(db, collName) {
             var res = db.runCommand(
                 {findAndModify: db[collName].getName(), query: {}, sort: {rand: -1}, remove: true});
@@ -78,7 +76,6 @@ var $config = (function() {
         }
 
         return {remove: remove};
-
     })();
 
     var transitions = {remove: {remove: 1}};
@@ -194,5 +191,4 @@ var $config = (function() {
         setup: setup,
         teardown: teardown
     };
-
 })();

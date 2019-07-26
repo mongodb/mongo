@@ -14,7 +14,6 @@
 load("jstests/libs/fixture_helpers.js");  // For isMongos.
 
 var $config = (function() {
-
     var data = {
         randRange: function randRange(low, high) {
             // return random number in range [low, high]
@@ -31,7 +30,6 @@ var $config = (function() {
     };
 
     var states = (function() {
-
         function init(db, collName) {
             this.modulus = this.randRange(5, 10);
             this.countPerNum = this.randRange(50, 100);
@@ -59,11 +57,9 @@ var $config = (function() {
         }
 
         return {init: init, count: count};
-
     })();
 
     var transitions = {init: {count: 1}, count: {count: 1}};
 
     return {data: data, threadCount: 10, iterations: 20, states: states, transitions: transitions};
-
 })();

@@ -402,7 +402,7 @@ private:
     void streamCore(StreamLike& os) const {
         std::for_each(rbegin(_nameComponents),
                       rend(_nameComponents),
-                      [ first = true, &os ](const auto& component) mutable {
+                      [first = true, &os](const auto& component) mutable {
                           if (!first)
                               os << '.';
                           first = false;
@@ -439,7 +439,7 @@ private:
     // FQDNs and Relative Names are discriminated by this field.
     Qualification fullyQualified;
 };
-}  // detail_dns_host_name
+}  // namespace detail_dns_host_name
 
 // The `operator==` function has to be defined out-of-line, because it uses `make_equality_lens`
 // which is an auto-deduced return type function defined later in the class body.

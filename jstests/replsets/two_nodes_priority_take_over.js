@@ -8,7 +8,6 @@ if (false) {
     load("jstests/replsets/rslib.js");
 
     (function() {
-
         "use strict";
         var name = "two_nodes_priority_take_over";
         var rst = new ReplSetTest({name: name, nodes: 2});
@@ -55,6 +54,5 @@ if (false) {
         // no current candidate. If vote requests failed (wrongly) for some reason,
         // nodes have to start new elections, which increase the term unnecessarily.
         assert.eq(newTerm, stableTerm + 1);
-
     })();
 }

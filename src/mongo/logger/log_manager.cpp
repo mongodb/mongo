@@ -72,5 +72,5 @@ bool LogManager::isDefaultConsoleAppenderAttached() const {
     return static_cast<bool>(_defaultAppender);
 }
 
-}  // logger
-}  // mongo
+}  // namespace logger
+}  // namespace mongo

@@ -160,5 +160,4 @@ var $config = (function() {
         setup: setup,
         data: data,
     };
-
 })();

@@ -92,16 +92,16 @@ void PeriodicThreadToDecreaseSnapshotHistoryIfNotNeeded::_init(ServiceContext* s
 
     _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 
-    SnapshotWindowParams::observeCheckCachePressurePeriodSeconds.addObserver([anchor = _anchor](
-        const auto& secs) {
-        try {
-            anchor->setPeriod(Seconds(secs));
-        } catch (const DBException& ex) {
-            log() << "Failed to update the period of the thread which decreases data history "
-                     "target window size if there have been no new SnapshotTooOld errors."
-                  << ex.toStatus();
-        }
-    });
+    SnapshotWindowParams::observeCheckCachePressurePeriodSeconds.addObserver(
+        [anchor = _anchor](const auto& secs) {
+            try {
+                anchor->setPeriod(Seconds(secs));
+            } catch (const DBException& ex) {
+                log() << "Failed to update the period of the thread which decreases data history "
+                         "target window size if there have been no new SnapshotTooOld errors."
+                      << ex.toStatus();
+            }
+        });
 }
 
 }  // namespace mongo

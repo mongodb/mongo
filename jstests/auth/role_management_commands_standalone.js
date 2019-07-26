@@ -1,9 +1,9 @@
 (function() {
-    'use strict';
+'use strict';
 
-    load('jstests/auth/role_management_commands_lib.js');
+load('jstests/auth/role_management_commands_lib.js');
 
-    var conn = MongoRunner.runMongod({auth: '', useHostname: false});
-    runAllRoleManagementCommandsTests(conn);
-    MongoRunner.stopMongod(conn);
+var conn = MongoRunner.runMongod({auth: '', useHostname: false});
+runAllRoleManagementCommandsTests(conn);
+MongoRunner.stopMongod(conn);
 })();

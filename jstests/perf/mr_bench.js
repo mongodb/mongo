@@ -47,7 +47,7 @@ m2 = function() {
 r = function(k, vals) {
     var tmp = {};
     vals.forEach(function(i) {
-        if (typeof(i) == 'string') {
+        if (typeof (i) == 'string') {
             tmp[i] = true;
         } else {
             for (var z in i)

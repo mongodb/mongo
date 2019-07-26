@@ -187,7 +187,7 @@ Update MongoInterfaceStandalone::buildUpdateOp(
         for (auto&& obj : batch) {
             updateEntries.push_back([&] {
                 UpdateOpEntry entry;
-                auto && [ q, u, c ] = obj;
+                auto&& [q, u, c] = obj;
                 entry.setQ(std::move(q));
                 entry.setU(std::move(u));
                 entry.setC(std::move(c));
@@ -306,8 +306,7 @@ void MongoInterfaceStandalone::renameIfOptionsAndIndexesHaveNotChanged(
             str::stream() << "collection options of target collection " << targetNs.ns()
                           << " changed during processing. Original options: "
                           << originalCollectionOptions
-                          << ", new options: "
-                          << getCollectionOptions(targetNs),
+                          << ", new options: " << getCollectionOptions(targetNs),
             SimpleBSONObjComparator::kInstance.evaluate(originalCollectionOptions ==
                                                         getCollectionOptions(targetNs)));
 
@@ -432,12 +431,8 @@ boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
     if (auto next = pipeline->getNext()) {
         uasserted(ErrorCodes::TooManyMatchingDocuments,
                   str::stream() << "found more than one document with document key "
-                                << documentKey.toString()
-                                << " ["
-                                << lookedUpDocument->toString()
-                                << ", "
-                                << next->toString()
-                                << "]");
+                                << documentKey.toString() << " [" << lookedUpDocument->toString()
+                                << ", " << next->toString() << "]");
     }
 
     // Set the speculative read timestamp appropriately after we do a document lookup locally. We
@@ -581,14 +576,12 @@ void MongoInterfaceStandalone::_reportCurrentOpsForIdleSessions(OperationContext
                               ? makeSessionFilterForAuthenticatedUsers(opCtx)
                               : KillAllSessionsByPatternSet{{}});
 
-    sessionCatalog->scanSessions(
-        {std::move(sessionFilter)},
-        [&](const ObservableSession& session) {
-            auto op = TransactionParticipant::get(session).reportStashedState(opCtx);
-            if (!op.isEmpty()) {
-                ops->emplace_back(op);
-            }
-        });
+    sessionCatalog->scanSessions({std::move(sessionFilter)}, [&](const ObservableSession& session) {
+        auto op = TransactionParticipant::get(session).reportStashedState(opCtx);
+        if (!op.isEmpty()) {
+            ops->emplace_back(op);
+        }
+    });
 }
 
 std::unique_ptr<CollatorInterface> MongoInterfaceStandalone::_getCollectionDefaultCollator(

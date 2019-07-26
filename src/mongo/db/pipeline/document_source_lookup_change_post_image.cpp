@@ -43,14 +43,9 @@ Value assertFieldHasType(const Document& fullDoc, StringData fieldName, BSONType
     auto val = fullDoc[fieldName];
     uassert(40578,
             str::stream() << "failed to look up post image after change: expected \"" << fieldName
-                          << "\" field to have type "
-                          << typeName(expectedType)
-                          << ", instead found type "
-                          << typeName(val.getType())
-                          << ": "
-                          << val.toString()
-                          << ", full object: "
-                          << fullDoc.toString(),
+                          << "\" field to have type " << typeName(expectedType)
+                          << ", instead found type " << typeName(val.getType()) << ": "
+                          << val.toString() << ", full object: " << fullDoc.toString(),
             val.getType() == expectedType);
     return val;
 }
@@ -88,8 +83,7 @@ NamespaceString DocumentSourceLookupChangePostImage::assertValidNamespace(
     // lookup into any namespace.
     uassert(40579,
             str::stream() << "unexpected namespace during post image lookup: " << nss.ns()
-                          << ", expected "
-                          << pExpCtx->ns.ns(),
+                          << ", expected " << pExpCtx->ns.ns(),
             nss == pExpCtx->ns ||
                 (pExpCtx->isClusterAggregation() || pExpCtx->isDBAggregation(nss.db())));
 
@@ -112,8 +106,7 @@ Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updat
     const auto readConcern = pExpCtx->inMongos
         ? boost::optional<BSONObj>(BSON("level"
                                         << "majority"
-                                        << "afterClusterTime"
-                                        << resumeToken.getData().clusterTime))
+                                        << "afterClusterTime" << resumeToken.getData().clusterTime))
         : boost::none;
 
 

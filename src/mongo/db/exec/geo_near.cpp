@@ -96,7 +96,7 @@ struct StoredGeometry {
     BSONElement element;
     GeometryContainer geometry;
 };
-}
+}  // namespace
 
 /**
  * Find and parse all geometry elements on the appropriate field path from the document.
@@ -556,7 +556,7 @@ private:
     // Owns matcher
     const unique_ptr<MatchExpression> _matcher;
 };
-}
+}  // namespace
 
 static double min2DBoundsIncrement(const GeoNearExpression& query,
                                    const IndexDescriptor* twoDIndex) {
@@ -591,9 +591,9 @@ static R2Annulus projectBoundsToTwoDDegrees(R2Annulus sphereBounds) {
 }
 
 StatusWith<NearStage::CoveredInterval*>  //
-    GeoNear2DStage::nextInterval(OperationContext* opCtx,
-                                 WorkingSet* workingSet,
-                                 const Collection* collection) {
+GeoNear2DStage::nextInterval(OperationContext* opCtx,
+                             WorkingSet* workingSet,
+                             const Collection* collection) {
     // The search is finished if we searched at least once and all the way to the edge
     if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
         return StatusWith<CoveredInterval*>(NULL);
@@ -830,7 +830,7 @@ S2Region* buildS2Region(const R2Annulus& sphereBounds) {
     // Takes ownership of caps
     return new S2RegionIntersection(&regions);
 }
-}
+}  // namespace
 
 // Estimate the density of data by search the nearest cells level by level around center.
 class GeoNear2DSphereStage::DensityEstimator {
@@ -1011,9 +1011,9 @@ PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* opCtx,
 }
 
 StatusWith<NearStage::CoveredInterval*>  //
-    GeoNear2DSphereStage::nextInterval(OperationContext* opCtx,
-                                       WorkingSet* workingSet,
-                                       const Collection* collection) {
+GeoNear2DSphereStage::nextInterval(OperationContext* opCtx,
+                                   WorkingSet* workingSet,
+                                   const Collection* collection) {
     // The search is finished if we searched at least once and all the way to the edge
     if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
         return StatusWith<CoveredInterval*>(NULL);

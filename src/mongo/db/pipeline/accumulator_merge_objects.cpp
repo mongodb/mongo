@@ -71,8 +71,7 @@ void AccumulatorMergeObjects::processInternal(const Value& input, bool merging) 
 
     uassert(40400,
             str::stream() << "$mergeObjects requires object inputs, but input " << input.toString()
-                          << " is of type "
-                          << typeName(input.getType()),
+                          << " is of type " << typeName(input.getType()),
             (input.getType() == BSONType::Object));
 
     FieldIterator iter = input.getDocument().fieldIterator();

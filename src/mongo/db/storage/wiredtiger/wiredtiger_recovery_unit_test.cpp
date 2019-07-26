@@ -60,7 +60,7 @@ public:
                   false,                  // .ephemeral
                   false,                  // .repair
                   false                   // .readOnly
-                  ) {
+          ) {
         repl::ReplicationCoordinator::set(
             getGlobalServiceContext(),
             std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(

@@ -117,5 +117,5 @@ bool LogComponentSettings::shouldLog(LogComponent component, LogSeverity severit
     return severity >= LogSeverity::cast(_minimumLoggedSeverity[component].loadRelaxed());
 }
 
-}  // logger
-}  // mongo
+}  // namespace logger
+}  // namespace mongo

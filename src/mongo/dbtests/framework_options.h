@@ -68,4 +68,4 @@ bool handlePreValidationTestFrameworkOptions(const moe::Environment& params,
 
 Status storeTestFrameworkOptions(const moe::Environment& params,
                                  const std::vector<std::string>& args);
-}
+}  // namespace mongo

@@ -1,14 +1,14 @@
 // Tests that a pipeline with a blend of variable-using expressions reports correct results.
 
 (function() {
-    "use strict";
-    const testDB = db.getSiblingDB("layered_variables");
-    assert.commandWorked(testDB.dropDatabase());
-    const coll = testDB.getCollection("test");
+"use strict";
+const testDB = db.getSiblingDB("layered_variables");
+assert.commandWorked(testDB.dropDatabase());
+const coll = testDB.getCollection("test");
 
-    assert.writeOK(coll.insert({_id: 1, has_permissions: 1, my_array: [2, 3]}));
+assert.writeOK(coll.insert({_id: 1, has_permissions: 1, my_array: [2, 3]}));
 
-    const res = assert.commandWorked(testDB.runCommand({
+const res = assert.commandWorked(testDB.runCommand({
         aggregate: "test",
         pipeline: [
             {
@@ -51,8 +51,7 @@
         cursor: {}
     }));
 
-    assert.eq(
-        {_id: 1, has_permissions: 1, my_array: [2, 3], a: 1, b: 6, c: [2, 3], d: 3000, e: [3, 4]},
-        res.cursor.firstBatch[0],
-        tojson(res));
+assert.eq({_id: 1, has_permissions: 1, my_array: [2, 3], a: 1, b: 6, c: [2, 3], d: 3000, e: [3, 4]},
+          res.cursor.firstBatch[0],
+          tojson(res));
 })();

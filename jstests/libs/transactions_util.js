@@ -76,7 +76,7 @@ var TransactionsUtil = (function() {
     function deepCopyObject(dst, src) {
         for (var k in src) {
             var v = src[k];
-            if (typeof(v) == "object" && v !== null) {
+            if (typeof (v) == "object" && v !== null) {
                 if (v.constructor === ObjectId) {  // convert ObjectId properly
                     eval("v = " + tojson(v));
                 } else if (v instanceof NumberLong) {  // convert NumberLong properly

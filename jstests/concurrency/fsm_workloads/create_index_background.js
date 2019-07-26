@@ -13,7 +13,6 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 
 var $config = (function() {
-
     var data = {
         nDocumentsToSeed: 1000,
         nDocumentsToCreate: 200,
@@ -46,7 +45,6 @@ var $config = (function() {
     };
 
     var states = (function() {
-
         function init(db, collName) {
             // Add thread-specific documents
             var bulk = db[collName].initializeUnorderedBulkOp();
@@ -187,7 +185,6 @@ var $config = (function() {
             updateDocs: updateDocs,
             deleteDocs: deleteDocs
         };
-
     })();
 
     var transitions = {
@@ -249,5 +246,4 @@ var $config = (function() {
         teardown: teardown,
         transitions: transitions,
     };
-
 })();

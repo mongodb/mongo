@@ -40,9 +40,9 @@
 namespace mongo {
 
 /**
-* Provides a simple version of an atomic version of T
-* that uses std::atomic<BaseWordT> as a backing type;
-*/
+ * Provides a simple version of an atomic version of T
+ * that uses std::atomic<BaseWordT> as a backing type;
+ */
 template <typename T, typename BaseWordT>
 class AtomicProxy {
     MONGO_STATIC_ASSERT_MSG(sizeof(T) == sizeof(BaseWordT),
@@ -87,4 +87,4 @@ private:
 };
 
 using AtomicDouble = AtomicProxy<double, std::uint64_t>;
-}
+}  // namespace mongo

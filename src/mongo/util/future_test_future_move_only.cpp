@@ -130,11 +130,11 @@ TEST(Future_MoveOnly, Success_getAsync) {
     FUTURE_SUCCESS_TEST([] { return Widget(1); },
                         [](/*Future<Widget>*/ auto&& fut) {
                             auto pf = makePromiseFuture<Widget>();
-                            std::move(fut).getAsync([outside = std::move(pf.promise)](
-                                StatusWith<Widget> sw) mutable {
-                                ASSERT_OK(sw);
-                                outside.emplaceValue(std::move(sw.getValue()));
-                            });
+                            std::move(fut).getAsync(
+                                [outside = std::move(pf.promise)](StatusWith<Widget> sw) mutable {
+                                    ASSERT_OK(sw);
+                                    outside.emplaceValue(std::move(sw.getValue()));
+                                });
                             ASSERT_EQ(std::move(pf.future).get(), 1);
                         });
 }

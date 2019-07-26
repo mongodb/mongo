@@ -40,8 +40,8 @@
 #endif
 
 using std::begin;
-using std::find;
 using std::end;
+using std::find;
 
 namespace mongo {
 
@@ -139,7 +139,7 @@ BSONObjBuilder& BSONObjBuilderValueStream::operator<<<CIDR>(CIDR value) {
     return *_builder;
 }
 
-}  // namespace
+}  // namespace mongo
 
 std::ostream& mongo::operator<<(std::ostream& s, const CIDR& cidr) {
     return append(s, cidr._family, cidr._ip, cidr._len);

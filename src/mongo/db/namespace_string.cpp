@@ -194,8 +194,8 @@ StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const 
     long long term;
     status = mongo::parseNumberFromString(opTimeStr.substr(termSeparatorIndex + 1), &term);
     if (!status.isOK()) {
-        return status.withContext(str::stream() << "Invalid term in drop-pending namespace: "
-                                                << _ns);
+        return status.withContext(str::stream()
+                                  << "Invalid term in drop-pending namespace: " << _ns);
     }
 
     return repl::OpTime(Timestamp(Seconds(seconds), increment), term);

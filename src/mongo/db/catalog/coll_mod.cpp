@@ -134,8 +134,8 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 cmr.idx = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
                 if (!cmr.idx) {
                     return Status(ErrorCodes::IndexNotFound,
-                                  str::stream() << "cannot find index " << indexName << " for ns "
-                                                << nss);
+                                  str::stream()
+                                      << "cannot find index " << indexName << " for ns " << nss);
                 }
             } else {
                 std::vector<const IndexDescriptor*> indexes;
@@ -145,17 +145,14 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 if (indexes.size() > 1) {
                     return Status(ErrorCodes::AmbiguousIndexKeyPattern,
                                   str::stream() << "index keyPattern " << keyPattern << " matches "
-                                                << indexes.size()
-                                                << " indexes,"
+                                                << indexes.size() << " indexes,"
                                                 << " must use index name. "
-                                                << "Conflicting indexes:"
-                                                << indexes[0]->infoObj()
-                                                << ", "
-                                                << indexes[1]->infoObj());
+                                                << "Conflicting indexes:" << indexes[0]->infoObj()
+                                                << ", " << indexes[1]->infoObj());
                 } else if (indexes.empty()) {
                     return Status(ErrorCodes::IndexNotFound,
-                                  str::stream() << "cannot find index " << keyPattern << " for ns "
-                                                << nss);
+                                  str::stream()
+                                      << "cannot find index " << keyPattern << " for ns " << nss);
                 }
 
                 cmr.idx = indexes[0];

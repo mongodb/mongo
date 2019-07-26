@@ -317,8 +317,10 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
             fassert(31164, status);
             indexMetadataHasChanged = DurableCatalog::get(opCtx)->setIndexIsMultikey(
                 opCtx, _ns, _descriptor->indexName(), paths);
-            opCtx->recoveryUnit()->onCommit([onMultikeyCommitFn, indexMetadataHasChanged](
-                boost::optional<Timestamp>) { onMultikeyCommitFn(indexMetadataHasChanged); });
+            opCtx->recoveryUnit()->onCommit(
+                [onMultikeyCommitFn, indexMetadataHasChanged](boost::optional<Timestamp>) {
+                    onMultikeyCommitFn(indexMetadataHasChanged);
+                });
             wuow.commit();
         });
     } else {
@@ -326,8 +328,10 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
             opCtx, _ns, _descriptor->indexName(), paths);
     }
 
-    opCtx->recoveryUnit()->onCommit([onMultikeyCommitFn, indexMetadataHasChanged](
-        boost::optional<Timestamp>) { onMultikeyCommitFn(indexMetadataHasChanged); });
+    opCtx->recoveryUnit()->onCommit(
+        [onMultikeyCommitFn, indexMetadataHasChanged](boost::optional<Timestamp>) {
+            onMultikeyCommitFn(indexMetadataHasChanged);
+        });
 
     // Within a multi-document transaction, reads should be able to see the effect of previous
     // writes done within that transaction. If a previous write in a transaction has set the index

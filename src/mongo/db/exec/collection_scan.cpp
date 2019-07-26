@@ -118,8 +118,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                     Status status(ErrorCodes::CappedPositionLost,
                                   str::stream() << "CollectionScan died due to failure to restore "
                                                 << "tailable cursor position. "
-                                                << "Last seen record id: "
-                                                << _lastSeenId);
+                                                << "Last seen record id: " << _lastSeenId);
                     *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
                     return PlanStage::FAILURE;
                 }
@@ -222,8 +221,7 @@ void CollectionScan::doRestoreStateRequiresCollection() {
         uassert(ErrorCodes::CappedPositionLost,
                 str::stream()
                     << "CollectionScan died due to position in capped collection being deleted. "
-                    << "Last seen record id: "
-                    << _lastSeenId,
+                    << "Last seen record id: " << _lastSeenId,
                 couldRestore);
     }
 }

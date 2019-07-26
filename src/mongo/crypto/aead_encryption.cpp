@@ -101,9 +101,7 @@ Status _aesEncrypt(const SymmetricKey& key,
     if (len != aesCBCCipherOutputLength(inLen)) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Encrypt error, expected cipher text of length "
-                              << aesCBCCipherOutputLength(inLen)
-                              << " but found "
-                              << len};
+                              << aesCBCCipherOutputLength(inLen) << " but found " << len};
     }
 
     return Status::OK();
@@ -117,12 +115,11 @@ Status _aesDecrypt(const SymmetricKey& key,
                    std::size_t outLen,
                    std::size_t* resultLen) try {
     // Check the plaintext buffer can fit the product of decryption
-    auto[lowerBound, upperBound] = aesCBCExpectedPlaintextLen(in.length());
+    auto [lowerBound, upperBound] = aesCBCExpectedPlaintextLen(in.length());
     if (upperBound > outLen) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Cleartext buffer of size " << outLen
-                              << " too small for output which can be as large as "
-                              << upperBound
+                              << " too small for output which can be as large as " << upperBound
                               << "]"};
     }
 
@@ -145,13 +142,8 @@ Status _aesDecrypt(const SymmetricKey& key,
     if (*resultLen < lowerBound || *resultLen > upperBound) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Decrypt error, expected clear text length in interval"
-                              << "["
-                              << lowerBound
-                              << ","
-                              << upperBound
-                              << "]"
-                              << "but found "
-                              << *resultLen};
+                              << "[" << lowerBound << "," << upperBound << "]"
+                              << "but found " << *resultLen};
     }
 
     /* Check that padding was removed.
@@ -211,8 +203,7 @@ Status aeadEncrypt(const SymmetricKey& key,
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "AssociatedData for encryption is too large. Cannot be larger than "
-                          << kMaxAssociatedDataLength
-                          << " bytes.");
+                          << kMaxAssociatedDataLength << " bytes.");
     }
 
     // According to the rfc on AES encryption, the associatedDataLength is defined as the
@@ -292,8 +283,7 @@ Status aeadEncryptWithIV(ConstDataRange key,
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "AssociatedData for encryption is too large. Cannot be larger than "
-                          << kMaxAssociatedDataLength
-                          << " bytes.");
+                          << kMaxAssociatedDataLength << " bytes.");
     }
 
     const uint8_t* macKey = reinterpret_cast<const uint8_t*>(key.data());
@@ -357,8 +347,7 @@ Status aeadDecrypt(const SymmetricKey& key,
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "AssociatedData for encryption is too large. Cannot be larger than "
-                          << kMaxAssociatedDataLength
-                          << " bytes.");
+                          << kMaxAssociatedDataLength << " bytes.");
     }
 
     const uint8_t* macKey = key.getKey();
