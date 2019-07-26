@@ -12,7 +12,6 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
-
 "use strict";
 load('jstests/libs/parallelTester.js');
 load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
@@ -84,6 +83,10 @@ TestData.clusterTimeAfterPrepare =
         .commandWorked(newPrimary.getDB(dbName)[collName].runCommand(
             "insert", {documents: [{_id: "clusterTimeAfterPrepare"}]}))
         .operationTime;
+
+// Make sure the insert gets replicated to the old primary (current secondary) so that its
+// clusterTime advances before we try to do an afterClusterTime read at the time of the insert.
+rst.awaitReplication();
 
 jsTestLog("Do a read that hits a prepare conflict on the old primary");
 assert.commandWorked(
