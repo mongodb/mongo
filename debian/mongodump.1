@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGODUMP" "1" "Jun 21, 2018" "4.0" "mongodb-manual"
+.TH "MONGODUMP" "1" "Jul 25, 2019" "4.2" "mongodb-manual"
 .SH NAME
 mongodump \- MongoDB Data Dump Utility
 .
@@ -35,6 +35,8 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .IP \(bu 2
 \fI\%Synopsis\fP
 .IP \(bu 2
+\fI\%Syntax\fP
+.IP \(bu 2
 \fI\%Behavior\fP
 .IP \(bu 2
 \fI\%Required Access\fP
@@ -45,9 +47,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .UNINDENT
 .INDENT 0.0
 .INDENT 3.5
-.IP "Mac OSX Sierra and Go 1.6 Incompatibility"
+.IP "macOS Sierra and Go 1.6 Incompatibility"
 .sp
-Users running on Mac OSX Sierra require the 3.2.10 or newer version
+Users running on macOS Sierra require the 3.2.10 or newer version
 of  mongodump\&.
 .UNINDENT
 .UNINDENT
@@ -64,90 +66,310 @@ standalone. However, the use of \fI\%mongodump\fP and
 \fBmongorestore\fP as a backup strategy can be problematic for
 sharded clusters and replica sets.
 .sp
-Run \fI\%mongodump\fP from the system command line, not the \fBmongo\fP shell.
-.sp
 For an overview of \fI\%mongodump\fP in conjunction with
-\fBmongorestore\fP part of a backup and recovery strategy, see
-/tutorial/backup\-and\-restore\-tools\&.
+\fBmongorestore\fP part of a backup and recovery strategy, see:
+.INDENT 0.0
+.IP \(bu 2
+/tutorial/backup\-and\-restore\-tools
+.IP \(bu 2
+/tutorial/backup\-sharded\-cluster\-with\-database\-dumps
+.IP \(bu 2
+/core/backups
+.UNINDENT
+.SH SYNTAX
+.sp
+Run \fI\%mongodump\fP from the system command line, not the \fBmongo\fP shell.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump [options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SS Connect to a MongoDB Instance
+.sp
+To connect to a local MongoDB instance running on port 27017 and use
+the default settings to export the content, run
+\fI\%mongodump\fP without any command\-line options:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+To specify a host and/or port of the MongoDB instance, you can either:
+.INDENT 0.0
+.IP \(bu 2
+Specify the hostname and port in the \fI\%\-\-uri connection string\fP:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-uri "mongodb://mongodb0.example.com:27017" [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.IP \(bu 2
+Specify the hostname and port in the \fI\%\-\-host\fP:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-host "mongodb0.example.com:27017"  [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.IP \(bu 2
+Specify the hostname and port in the \fI\%\-\-host\fP and \fI\%\-\-port\fP:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-host "mongodb0.example.com" \-\-port 27017 [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.sp
+For more information on the options available, see \fI\%Options\fP\&.
+.SS Connect to a Replica Set
+.sp
+To connect to a replica set to export its data, you can either:
+.INDENT 0.0
+.IP \(bu 2
+Specify the replica set name and members in the \fI\%\-\-uri connection string\fP:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-uri "mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/?replicaSet=myReplicaSetName" [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.IP \(bu 2
+Specify the replica set name and members in the \fI\%\-\-host\fP:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-host "myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com" [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.sp
+By default, \fI\%mongodump\fP reads from the primary of the
+replica set. To override the default, you can specify the read
+preference:
+.INDENT 0.0
+.IP \(bu 2
+You can specify the read preference in the
+\fI\%\-\-uri connection string\fP
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-uri "mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/?replicaSet=myReplicaSetName&readPreference=secondary" [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+If specifying the read preference tags, include the
+\fBreadPreferenceTags\fP option:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-uri "mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017/?replicaSet=myReplicaSetName&readPreference=secondary&readPreferenceTags=region:east" [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.IP \(bu 2
+You can specify the read preference in using the
+\fI\%\-\-readPreference\fP command\-line
+option. The command\-line option takes a string if specifying only the read preference mode:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-host "myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017" \-\-readPreference secondary [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Or, the command\-line option can takes a quote\-enclosed document
+\fB\(aq{ mode: <mode>, tagSets: [ <tag1>, ... ], maxStalenessSeconds:<num>}\(aq\fP
+to specify the mode, the optional read preference tag
+sets, and the optional
+maxStalenessSeconds:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-host "myReplicaSetName/mongodb0.example.com:27017,mongodb1.example.com:27017,mongodb2.example.com:27017" \-\-readPreference \(aq{mode: "secondary", tagSets: [ { "region": "east" } ]}\(aq [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.sp
+For more information on the options available, see \fI\%Options\fP\&.
+.SS Connect to a Sharded Cluster
+.sp
+To connect to a sharded cluster to export its data, you can either:
+.INDENT 0.0
+.IP \(bu 2
+Specify the hostname of the \fBmongos\fP instance in the
+\fI\%\-\-uri connection string\fP
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-uri "mongodb://mongos0.example.com:27017" [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.IP \(bu 2
+Specify the hostname and port of the \fBmongos\fP instance in the \fI\%\-\-host\fP
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-host "mongos0.example.com:27017" [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.sp
+By default, \fI\%mongodump\fP reads from the primary of the
+shard replica set. To override the default, you can specify the read
+preference:
+.INDENT 0.0
+.IP \(bu 2
+You can specify the read preference in the
+\fI\%\-\-uri connection string\fP
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-uri "mongodb://mongos0.example.com:27017/?readPreference=secondary" [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+If specifying the read preference tags, include the
+\fBreadPreferenceTags\fP option:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-uri "mongodb://mongos0.example.com:27017/?readPreference=secondary&readPreferenceTags=region:east" [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.IP \(bu 2
+You can specify the read preference in using the
+\fI\%\-\-readPreference\fP command\-line
+option.  The command\-line option takes a string if specifying only the read preference mode:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-host "mongos0.example.com:27017" \-\-readPreference secondary [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Or, the command\-line option can takes a quote\-enclosed document
+\fB\(aq{ mode: <mode>, tagSets: [ <tag1>, ... ], maxStalenessSeconds: <num>}\(aq\fP
+to specify the mode, the optional read preference tag
+sets, and the optional
+maxStalenessSeconds:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodump \-\-host "mongos0.example.com:27017" \-\-readPreference \(aq{mode: "secondary", tagSets: [ { "region": "east" } ]}\(aq [additional options]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.sp
+For more information on the options available, see \fI\%Options\fP\&.
 .sp
 \fBSEE ALSO:\fP
 .INDENT 0.0
 .INDENT 3.5
-\fBmongorestore\fP,
-/tutorial/backup\-sharded\-cluster\-with\-database\-dumps
-and /core/backups\&.
+\fI\%Examples\fP
 .UNINDENT
 .UNINDENT
 .SH BEHAVIOR
+.SS Read Preference
+.sp
+By default, \fI\%mongodump\fP uses read preference
+\fBprimary\fP\&. To override the default, you can specify the
+read preference in the
+\fI\%\-\-readPreference\fP command\-line
+option or in the \fI\%\-\-uri connection string\fP\&.
+.sp
+Starting in version 4.2, if you specify read preference in the URI
+string and the \fI\%\-\-readPreference\fP
+option, the \fI\%\-\-readPreference\fP
+value overrides the read preference specified in the URI string.
+.sp
+In earlier versions, the two options are incompatible.
 .SS Data Exclusion
 .sp
 \fI\%mongodump\fP excludes the content of the \fBlocal\fP database in its output.
 .sp
-\fI\%mongodump\fP only captures the documents in the database in its
-backup data and does not include index data. \fBmongorestore\fP or
-\fBmongod\fP must then rebuild the indexes after restoring data.
+\fI\%mongodump\fP output only captures the documents in the
+database and does not include index data. \fBmongorestore\fP
+or \fBmongod\fP must then rebuild the indexes after restoring
+data.
 .sp
 Changed in version 3.4: MongoDB 3.4 added support for
 read\-only views\&. By default,
-\fI\%mongodump\fP only captures a view’s metadata: it does not
+\fI\%mongodump\fP only captures a view\(aqs metadata: it does not
 create a binary export of the documents included in the view. To
 capture the documents in a view use \fI\%\-\-viewsAsCollections\fP\&.
 
-.SS Read Preference
-.SS Replica Sets
-.sp
-Changed in version 3.2.0: The choice of target or targets for the \fI\%\-\-host\fP
-parameter affects the read preference of \fI\%mongodump\fP
-when connecting to a replica set.
-.INDENT 0.0
-.IP \(bu 2
-If the string passed to \fB\-\-host\fP is prefixed by the replica set name,
-\fI\%mongodump\fP reads from the \fBprimary\fP replica set
-member by default. For example:
-.INDENT 2.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-\-\-host "replSet/rep1.example.net:27017,rep2.example.net:27017,rep3.example.net:27017"
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.IP \(bu 2
-If the string passed to \fB\-\-host\fP contains a list of
-\fBmongod\fP instances, but does not include the replica set
-name as a prefix to the host string, \fI\%mongodump\fP
-reads from the \fBnearest\fP node by default. For example:
-.INDENT 2.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-\-\-host "rep1.example.net:27017,rep2.example.net:27017,rep3.example.net:27017"
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.UNINDENT
-
-.SS Sharded Clusters
-.sp
-Changed in version 3.0.5: For a sharded cluster where the shards are replica sets,
-\fI\%mongodump\fP no longer prefers reads from secondary
-members when run against the \fBmongos\fP instance.
-
-.sp
-For sharded clusters, specify the hostname of a \fBmongos\fP
-for the \fB\-\-host\fP option.
-\fI\%mongodump\fP reads from the \fBprimary\fP replica set
-member on each shard replica set in the cluster.
-.sp
-Unsharded collections in a sharded cluster are stored on a
-primary shard\&.
-\fI\%mongodump\fP reads from the primary replica set member on
-the primary shard for any unsharded collections. Note: each
-database has its own primary shard.
 .SS Overwrite Files
 .sp
 \fI\%mongodump\fP overwrites output files if they exist in the
@@ -165,6 +387,14 @@ WiredTiger storage engine,
 \fI\%mongodump\fP can adversely affect performance of the
 \fBmongod\fP\&. If your data is larger than system memory, the
 \fI\%mongodump\fP will push the working set out of memory.
+.SS FIPS
+.sp
+Starting in version 4.2, MongoDB removes the \fB\-\-sslFIPSMode\fP
+option for mongodump\&. mongodump
+will use FIPS compliant connections to
+\fBmongod\fP/\fBmongos\fP if the
+\fBmongod\fP/\fBmongos\fP instances are
+configured to use FIPS mode\&.
 .SH REQUIRED ACCESS
 .sp
 To run \fI\%mongodump\fP against a MongoDB deployment that has
@@ -231,50 +461,55 @@ New in version 3.4.6.
 
 .sp
 Specify a resolvable URI
-connection string for the \fBmongod\fP to which to
-connect.
-.sp
-The following is the standard
-URI connection scheme:
+connection string (enclose in quotes) to connect to the MongoDB deployment.
 .INDENT 7.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]
+\-\-uri "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]"
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-For detailed explanations of the components of this string, refer to
-the
-Connection String URI Format
-documentation.
+For information on the components of the connection string, see
+the Connection String URI Format documentation.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+For TLS/SSL options, use the command\-line options instead of the
+URI options for TLS/SSL (Available starting in
+4.2)\&.
+.UNINDENT
+.UNINDENT
 .sp
 \fBIMPORTANT:\fP
 .INDENT 7.0
 .INDENT 3.5
-The following \fI\%mongodump\fP options are incompatible with the
-\fB\-\-uri\fP option. Instead, specify these options as part of your
-\fB\-\-uri\fP connection string when applicable:
+The following command\-line options cannot be used in conjunction
+with \fI\%\-\-uri\fP option:
 .INDENT 0.0
 .IP \(bu 2
-\fB\-\-host\fP
+\fI\%\-\-host\fP
 .IP \(bu 2
-\fB\-\-port\fP
+\fI\%\-\-port\fP
 .IP \(bu 2
-\fB\-\-db\fP
+\fI\%\-\-db\fP
 .IP \(bu 2
-\fB\-\-username\fP
+\fI\%\-\-username\fP
 .IP \(bu 2
-\fB\-\-password\fP (when specifying the password as part of the
-URI connection string)
+\fI\%\-\-password\fP  (if the
+URI connection string also includes the password)
 .IP \(bu 2
-\fB\-\-authenticationDatabase\fP
+\fI\%\-\-authenticationDatabase\fP
 .IP \(bu 2
-\fB\-\-authenticationMechanism\fP
+\fI\%\-\-authenticationMechanism\fP
 .UNINDENT
+.sp
+Instead, specify these options as part of your \fI\%\-\-uri\fP
+connection string.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -295,19 +530,39 @@ the following:
 .sp
 .nf
 .ft C
-<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
+\-\-host <replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-You can always connect directly to a single MongoDB instance by
-specifying the host and port number directly.
+When specifying the replica set list format, \fBmongodump\fP always connects to
+the primary\&.
+.sp
+You can also connect to any single member of the replica set by specifying
+the host and port of only that member:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+\-\-host <hostname1><:port>
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .sp
 Changed in version 3.0.0: If you use IPv6 and use the \fB<address>:<port>\fP format, you must
 enclose the portion of an address and port combination in
 brackets (e.g. \fB[<address>]\fP).
 
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-host\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -316,6 +571,13 @@ brackets (e.g. \fB[<address>]\fP).
 .sp
 Specifies the TCP port on which the MongoDB instance listens for
 client connections.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-port\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -350,13 +612,17 @@ Specifies the \fB\&.pem\fP file that contains the root certificate chain
 from the Certificate Authority. Specify the file name of the
 \fB\&.pem\fP file using relative or absolute paths.
 .sp
-Starting in version 3.4, if \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP is not
-specified and you are not using x.509 authentication, the
-system\-wide CA certificate store will be used when connecting to an
-TLS/SSL\-enabled server.
+Starting in version 3.4, if \fB\-\-tlsCAFile\fP/\fBnet.tls.CAFile\fP (or
+their aliases \fB\-\-sslCAFile\fP/\fBnet.ssl.CAFile\fP) is not specified
+and you are not using x.509 authentication, the system\-wide CA
+certificate store will be used when connecting to an TLS/SSL\-enabled
+server.
 .sp
-If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
-must be specified.
+To use x.509 authentication, \fB\-\-tlsCAFile\fP or \fBnet.tls.CAFile\fP
+must be specified unless using \fB\-\-tlsCertificateSelector\fP or
+\fB\-\-net.tls.certificateSelector\fP\&. Or if using the \fBssl\fP aliases,
+\fB\-\-sslCAFile\fP or \fBnet.ssl.CAFile\fP must be specified unless using
+\fB\-\-sslCertificateSelector\fP or \fBnet.ssl.certificateSelector\fP\&.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
@@ -441,19 +707,23 @@ the use of invalid certificates. When using the
 warning the use of the invalid certificate.
 .sp
 Starting in MongoDB 4.0, if you specify
-\fB\-\-sslAllowInvalidCertificates\fP or \fBssl.allowInvalidCertificates:
-true\fP when using x.509 authentication, an invalid certificate is
-only sufficient to establish a TLS/SSL connection but is
-\fIinsufficient\fP for authentication.
+\fB\-\-sslAllowInvalidCertificates\fP or
+\fBnet.ssl.allowInvalidCertificates: true\fP (or in MongoDB 4.2, the
+alias \fB\-\-tlsAllowInvalidateCertificates\fP or
+\fBnet.tls.allowInvalidCertificates: true\fP) when using x.509
+authentication, an invalid certificate is only sufficient to
+establish a TLS/SSL connection but is \fIinsufficient\fP for
+authentication.
+.sp
+# We created a separate blurb for tls in the ssl\-clients page.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
 .INDENT 3.5
-For TLS/SSL connections to \fBmongod\fP and
-\fBmongos\fP, avoid using
-\fB\-\-sslAllowInvalidCertificates\fP if possible and only use
-\fB\-\-sslAllowInvalidCertificates\fP on systems where intrusion is
-not possible.
+Although available, avoid using the
+\fB\-\-sslAllowInvalidCertificates\fP option if possible. If the use of
+\fB\-\-sslAllowInvalidCertificates\fP is necessary, only use the option
+on systems where intrusion is not possible.
 .sp
 If the \fBmongo\fP shell (and other
 mongodb\-tools\-support\-ssl) runs with the
@@ -463,7 +733,9 @@ mongodb\-tools\-support\-ssl) will not attempt to validate
 the server certificates. This creates a vulnerability to expired
 \fBmongod\fP and \fBmongos\fP certificates as
 well as to foreign processes posing as valid
-\fBmongod\fP or \fBmongos\fP instances.
+\fBmongod\fP or \fBmongos\fP instances. If you
+only need to disable the validation of the hostname in the
+TLS/SSL certificates, see \fB\-\-sslAllowInvalidHostnames\fP\&.
 .UNINDENT
 .UNINDENT
 .sp
@@ -487,58 +759,56 @@ For more information about TLS/SSL and MongoDB, see
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslFIPSMode
-New in version 2.6.
-
-.sp
-Directs the \fBmongodump\fP to use the FIPS mode of the installed OpenSSL
-library. Your system must have a FIPS compliant OpenSSL library to use
-the \fI\%\-\-sslFIPSMode\fP option.
+.B \-\-username <username>, \-u <username>
+Specifies a username with which to authenticate to a MongoDB database
+that uses authentication. Use in conjunction with the \fI\%\-\-password\fP and
+\fI\%\-\-authenticationDatabase\fP options.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-FIPS\-compatible TLS/SSL is
-available only in \fI\%MongoDB Enterprise\fP\&. See
-/tutorial/configure\-fips for more information.
+You cannot specify both \fI\%\-\-username\fP and \fI\%\-\-uri\fP\&.
 .UNINDENT
 .UNINDENT
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-username <username>, \-u <username>
-Specifies a username with which to authenticate to a MongoDB database
-that uses authentication. Use in conjunction with the \fB\-\-password\fP and
-\fB\-\-authenticationDatabase\fP options.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-password <password>, \-p <password>
 Specifies a password with which to authenticate to a MongoDB database
-that uses authentication. Use in conjunction with the \fB\-\-username\fP and
-\fB\-\-authenticationDatabase\fP options.
+that uses authentication. Use in conjunction with the \fI\%\-\-username\fP and
+\fI\%\-\-authenticationDatabase\fP options.
 .sp
-Changed in version 3.0.0: If you do not specify an argument for \fI\%\-\-password\fP, \fBmongodump\fP returns
-an error.
-
-.sp
-Changed in version 3.0.2: If you wish \fBmongodump\fP to prompt the user
+Changed in version 3.0.2: To prompt the user
 for the password, pass the \fI\%\-\-username\fP option without
 \fI\%\-\-password\fP or specify an empty string as the \fI\%\-\-password\fP value,
 as in \fB\-\-password ""\fP .
 
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-password\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationDatabase <dbname>
-Specifies the database in which the user is created.
+Specifies the authentication database where the specified \fI\%\-\-username\fP has been created.
 See user\-authentication\-database\&.
 .sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-authenticationDatabase\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
+.sp
 If you do not specify an authentication database, \fBmongodump\fP
-assumes that the database specified to export holds the user’s credentials.
+assumes that the database specified to export holds the user\(aqs credentials.
 .sp
 If you do not specify an authentication database or a database to
-export, \fBmongodump\fP assumes the \fBadmin\fP database holds the user’s
+export, \fBmongodump\fP assumes the \fBadmin\fP database holds the user\(aqs
 credentials.
 .UNINDENT
 .INDENT 0.0
@@ -608,6 +878,13 @@ passwords in plain text. This mechanism is available only in
 T}
 _
 .TE
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-authenticationMechanism\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -637,6 +914,13 @@ This option is available only in MongoDB Enterprise.
 Specifies a database to backup. If you do not specify a database,
 \fI\%mongodump\fP copies all databases in this instance into the dump
 files.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+You cannot specify both \fI\%\-\-db\fP and \fI\%\-\-uri\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -651,7 +935,7 @@ to the dump files.
 Provides a JSON document as a query that optionally limits the
 documents included in the output of \fI\%mongodump\fP\&.
 .sp
-You must enclose the query in single quotes (e.g. \fB\(aq\fP) to ensure that it does
+You must enclose the query document in single quotes (\fB\(aq{ ... }\(aq\fP) to ensure that it does
 not interact with your shell environment.
 .UNINDENT
 .INDENT 0.0
@@ -663,21 +947,55 @@ New in version 3.2.
 Specifies the path to a file containing a JSON document as a query
 filter that limits the documents included in the output of
 \fI\%mongodump\fP\&. \fI\%\-\-queryFile\fP enables you to create query filters that
-are too large to fit in your terminal’s buffer.
+are too large to fit in your terminal\(aqs buffer.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-readPreference <string>
-Specify the read preference for
-\fBmongodump\fP\&.
+.B \-\-readPreference <string|document>
+\fIDefault\fP: \fBprimary\fP
 .sp
-See replica\-set\-read\-preference\-modes\&.
+Specifies the read preference for
+\fBmongodump\fP\&. The \fI\%\-\-readPreference\fP option can take:
+.INDENT 7.0
+.IP \(bu 2
+A string if specifying only the read preference mode:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+\-\-readPreference secondary
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.IP \(bu 2
+A quote\-enclosed document to specify the mode, the optional
+read preference tag sets, and the
+optional maxStalenessSeconds:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+\-\-readPreference \(aq{mode: "secondary", tagSets: [ { "region": "east" } ], maxStalenessSeconds: 120}\(aq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+If specifying the maxStalenessSeconds, the value must be greater than or equal to 90.
+.sp
+New in version 4.2.
+
+.UNINDENT
 .sp
 \fBmongodump\fP defaults to \fBprimary\fP
-read preference when connected to a
-\fBmongos\fP or a replica set\&.
+read preference\&.
 .sp
-Otherwise, \fBmongodump\fP defaults to \fBnearest\fP\&.
+Starting in version 4.2, if the read
+preference is also included in the \fI\%\-\-uri connection string\fP, the command\-line \fI\%\-\-readPreference\fP overrides the read preference
+specified in the URI string.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
@@ -687,39 +1005,20 @@ Using a read preference other than
 inconsistencies, duplicates, or result in missed documents.
 .UNINDENT
 .UNINDENT
-.sp
-See \fI\%Read Preference\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-forceTableScan
-Forces \fI\%mongodump\fP to scan the data store directly: typically,
-\fI\%mongodump\fP saves entries as they appear in the index of
-the \fB_id\fP field. If you specify a query \fI\%\-\-query\fP,
-\fBmongodump\fP will use the most appropriate index to support that query.
-.sp
-Use \fI\%\-\-forceTableScan\fP to skip the index and scan the data directly. Typically
-there are two cases where this behavior is preferable to the
-default:
-.INDENT 7.0
-.IP 1. 3
-If you have key sizes over 800 bytes that would not be present in the
+By default, \fBmongodump\fP uses the \fB_id\fP index when scanning
+collections with that index is available (e.g.
+3.4\-reference\-views do not have any indexes). Specify \fI\%\-\-forceTableScan\fP
+to direct \fBmongodump\fP to scan collection data without the use of the
 \fB_id\fP index.
-.IP 2. 3
-Your database uses a custom \fB_id\fP field.
-.UNINDENT
 .sp
-When you run with \fI\%\-\-forceTableScan\fP, the dump produced by
-\fI\%mongodump\fP can reflect the state of the database at many
-different points in time.
+\fI\%\-\-forceTableScan\fP does not ensure a point\-in\-time snapshot. Use
+\fI\%\-\-oplog\fP to create a point\-in\-time snapshot.
 .sp
-\fBIMPORTANT:\fP
-.INDENT 7.0
-.INDENT 3.5
-Use \fI\%\-\-forceTableScan\fP with extreme caution and
-consideration.
-.UNINDENT
-.UNINDENT
+You cannot use \fI\%\-\-forceTableScan\fP with the \fI\%\-\-query\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -743,7 +1042,7 @@ BSON files for the dumped databases. By default,
 \fI\%mongodump\fP saves output files in a directory named
 \fBdump\fP in the current working directory.
 .sp
-To send the database dump to standard output, specify “\fB\-\fP” instead of
+To send the database dump to standard output, specify "\fB\-\fP" instead of
 a path. Write to standard output if you want process the output before
 saving it, such as to use \fBgzip\fP to compress the dump. When writing
 standard output, \fI\%mongodump\fP does not write the metadata that
@@ -771,34 +1070,6 @@ but \fIomit\fP the filename.
 .sp
 You cannot use the \fB\-\-archive\fP option with the
 \fI\%\-\-out\fP option.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-repair
-.
-\fBNOTE:\fP
-.INDENT 7.0
-.INDENT 3.5
-When repairing a database, you should use \fBmongod \-\-repair\fP
-rather than this option. For instructions on repairing a database,
-refer to
-/tutorial/recover\-data\-following\-unexpected\-shutdown\&.
-.UNINDENT
-.UNINDENT
-.sp
-Changes the behavior of \fBmongodump\fP to only write valid data and
-exclude data that may be in an invalid state as a result of an
-improper shutdown or \fBmongod\fP crash.
-.sp
-\fI\%\-\-repair\fP is different from \fBmongod \-\-repair\fP, and may produce
-a large amount of duplicate documents. It is only available for use
-against \fBmongod\fP instances using the \fBmmapv1\fP storage
-engine. You cannot run \fI\%\-\-repair\fP against \fBmongos\fP, or against
-\fBmongod\fP instances that use the \fBwiredTiger\fP storage
-engine.
-.sp
-For instructions on repairing a database, refer to
-/tutorial/recover\-data\-following\-unexpected\-shutdown\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -852,7 +1123,7 @@ if you use any of the following options to limit the data to be dumped:
 .INDENT 0.0
 .TP
 .B \-\-dumpDbUsersAndRoles
-Includes user and role definitions in the database’s dump directory
+Includes user and role definitions in the database\(aqs dump directory
 when performing \fI\%mongodump\fP on a specific database. This
 option applies only when you specify a database in the
 \fI\%\-\-db\fP option. MongoDB always includes user and role
@@ -898,8 +1169,8 @@ produce a BSON file containing the documents in the view. If you
 restored as a collection\&.
 .sp
 If you do \fInot\fP include \fI\%\-\-viewsAsCollections\fP,
-\fBmongodump\fP captures each view’s metadata. If you include a
-view’s metadata file in a \fBmongorestore\fP operation, the view
+\fBmongodump\fP captures each view\(aqs metadata. If you include a
+view\(aqs metadata file in a \fBmongorestore\fP operation, the view
 is recreated.
 .UNINDENT
 .SH EXAMPLES
@@ -1028,6 +1299,6 @@ mongodump \-\-archive=test.20150715.gz \-\-gzip \-\-db test
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2008-2018
+2008-2019
 .\" Generated by docutils manpage writer.
 .
