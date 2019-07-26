@@ -1,0 +1,115 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/commands/map_reduce_out_options.h"
+        - "mongo/db/commands/map_reduce_javascript_code.h"
+        - "mongo/db/commands/map_reduce_global_variable_scope.h"
+        - "mongo/db/write_concern_options.h"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+types:
+    mapReduceOutOptionsType:
+        bson_serialization_type: any
+        description: "Holds the subdocument with out options"
+        cpp_type: "mongo::MapReduceOutOptions"
+        serializer: mongo::MapReduceOutOptions::serializeToBSON
+        deserializer: mongo::MapReduceOutOptions::parseFromBSON
+
+    mapReduceJavascriptCodeType:
+        bson_serialization_type: any
+        description: "Holds Javascript code passed as command input"
+        cpp_type: "mongo::MapReduceJavascriptCode"
+        serializer: mongo::MapReduceJavascriptCode::serializeToBSON
+        deserializer: mongo::MapReduceJavascriptCode::parseFromBSON
+
+    mapReduceGlobalVariableScopeType:
+        bson_serialization_type: any
+        description: "Holds a mapping of Javascript global variables"
+        cpp_type: "mongo::MapReduceGlobalVariableScope"
+        serializer: mongo::MapReduceGlobalVariableScope::serializeToBSON
+        deserializer: mongo::MapReduceGlobalVariableScope::parseFromBSON
+
+
+commands:
+    MapReduce:
+        description: "The MapReduce command."
+        namespace: concatenate_with_db
+        strict: true
+        fields:
+            map:
+                description: "Javascript code to run as the map operation which associates a value 
+                    with a key and emits the key and value pair."
+                type: mapReduceJavascriptCodeType
+            reduce:
+                description: "Javascript code to run as the map operation which reduces all the 
+                    values associated with a particular key to a single value."
+                type: mapReduceJavascriptCodeType
+            out:
+                description: "Out Options sub-object or string representing a collection."
+                type: mapReduceOutOptionsType
+                cpp_name: outOptions
+            query:
+                description: "Query object in match language to use as a filter applied before the 
+                    map step."
+                type: object
+                optional: true
+            sort:
+                description: "Sort specification to apply before the map step."
+                type: object
+                optional: true
+            collation:
+                description: "collation specification which takes effect for 'query' and 'sort'."
+                type: object
+                optional: true
+            limit:
+                description: "Document count limit to apply before the map step."
+                type: safeInt64
+                optional: true
+            finalize:
+                description: "Javascript code to run after the reduce operation."
+                type:  mapReduceJavascriptCodeType
+                optional: true
+            scope:
+                description: "Javascript global variable mapping for map, reduce and finalize."
+                type:  mapReduceGlobalVariableScopeType
+                optional: true
+            verbose:
+                description: "Specifies whether to include the timing information in the result 
+                    information."
+                type: bool
+                optional: true
+            bypassDocumentValidation:
+                description: "Causes the out portion of the operation to ignore the output 
+                    collection's document validation."
+                type: bool
+                optional: true

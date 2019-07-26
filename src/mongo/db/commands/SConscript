@@ -502,6 +502,19 @@ if has_option('use-cpu-profiler'):
     )
 
 env.CppUnitTest(
+    target="map_reduce_parse_test",
+    source=[
+        "map_reduce_out_options.cpp",
+        "map_reduce_parse_test.cpp",
+        env.Idlc('map_reduce.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/write_concern_options',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ]
+)
+
+env.CppUnitTest(
     target="db_commands_test",
     source=[
         "index_filter_commands_test.cpp",
