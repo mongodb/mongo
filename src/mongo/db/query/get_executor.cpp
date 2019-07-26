@@ -609,18 +609,6 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
 
 namespace {
 
-/**
- * Returns true if 'me' is a GTE or GE predicate over the "ts" field.
- */
-bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
-    if (mongo::MatchExpression::GT != me->matchType() &&
-        mongo::MatchExpression::GTE != me->matchType()) {
-        return false;
-    }
-
-    return me->path() == repl::OpTime::kTimestampFieldName;
-}
-
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getExecutorFind(
     OperationContext* opCtx,
     Collection* collection,
